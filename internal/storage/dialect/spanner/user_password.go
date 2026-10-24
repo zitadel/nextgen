@@ -13,9 +13,20 @@ import (
 )
 
 const (
+	// The newest row is the current password, so a new row is stamped after
+	// the newest one even when the clock reads earlier: after the clock steps
+	// back, or within one microsecond, CURRENT_TIMESTAMP() alone would leave
+	// the replaced password current or collide with it. Reading the user's rows
+	// also makes two concurrent changes of one user conflict: Spanner aborts
+	// one, and ReadWriteTransaction replays it after the other commits, so it
+	// reads the other's row as the newest. The emulator cannot prove this: it
+	// runs one read-write transaction at a time process-wide.
 	setUserPasswordStmt = `INSERT INTO user_passwords (
-	id, project_id, user_id, encoded_hash
-) VALUES (@p1, @p2, @p3, @p4)
+	id, project_id, user_id, encoded_hash, created_at
+) SELECT @p1, @p2, @p3, @p4, GREATEST(CURRENT_TIMESTAMP(),
+	IFNULL(TIMESTAMP_ADD(MAX(created_at), INTERVAL 1 MICROSECOND), CURRENT_TIMESTAMP()))
+FROM user_passwords
+WHERE project_id = @p2 AND user_id = @p3
 THEN RETURN id`
 
 	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
@@ -90,28 +101,28 @@ func (ps userPasswordStatements) GetUserPassword(ctx context.Context, filter dat
 
 // ListUserPasswords implements [service.UserPasswordStatements].
 func (ps userPasswordStatements) ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
-		return nil, err
-	}
+	passwords, nextCursor, err := pagination.Page(filter.Pagination, userpassword.Schema, func(limit uint32) ([]*domain.UserPassword, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, userPasswordQuery, filter, userpassword.Schema, currentUserPassword); err != nil {
+			return nil, err
+		}
 
-	var passwords []*domain.UserPassword
-	err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
-		var err error
-		passwords, err = collectRows(iter, ps.scanUserPassword)
-		return err
+		var passwords []*domain.UserPassword
+		err := ps.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			passwords, err = collectRows(iter, ps.scanUserPassword)
+			return err
+		})
+		if err != nil {
+			return nil, wrapError(err)
+		}
+
+		return passwords, nil
 	})
 	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
-
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		passwords,
-		userpassword.Schema,
-		filter.Pagination.Limit,
-	)
-
 	return &database.ListResult[*domain.UserPassword]{
 		Items:      passwords,
 		NextCursor: nextCursor,

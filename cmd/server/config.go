@@ -1,15 +1,20 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
+	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -28,6 +33,18 @@ type Config struct {
 	// HTTPClient configures the hardened egress client used for every fetch
 	// of a URL a platform user can inject (see the egress-policy ADR).
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
+	// Origins configures write validation for project origin patterns.
+	Origins OriginsConfig `mapstructure:"origins"`
+	// ServicePing reports the deployment's version and dialect to Vercel
+	// Web Analytics and Mixpanel (proof of concept, off by default).
+	ServicePing serviceping.Config `mapstructure:"service_ping"`
+}
+
+// OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
+// host suffix to a full-hostname allow regexp. YAML values are strings; the
+// config decode hook compiles them into *regexp.Regexp.
+type OriginsConfig struct {
+	SharedHosts map[string]*regexp.Regexp `mapstructure:"shared_hosts"`
 }
 
 // EventsConfig configures audit event retention and deployment export sinks.
@@ -57,6 +74,13 @@ type PlatformConfig struct {
 	// resolves it as the default. Off by default: no environment gets a
 	// platform project created silently. Needs no ProjectID. (#605)
 	BootstrapProject bool `mapstructure:"bootstrap_project"`
+
+	// Operators lists, by id, the platform-project users who hold
+	// platform.operator and so administer every project of the deployment
+	// (ADR 075). The server reconciles it at startup: it grants every listed
+	// user that exists and revokes what an earlier list granted. Needs a
+	// platform project, from BootstrapProject or ProjectID.
+	Operators []string `mapstructure:"operators"`
 }
 
 func (c PlatformConfig) Validate() error {
@@ -67,6 +91,15 @@ func (c PlatformConfig) Validate() error {
 	if c.BootstrapProject && c.ProjectID != "" && c.ProjectID != domain.PlatformProjectID {
 		return fmt.Errorf("platform.bootstrap_project uses the built-in id %q; leave platform.project_id empty or set it to that value",
 			domain.PlatformProjectID)
+	}
+	for _, id := range c.Operators {
+		if !domain.PrefixUser.Matches(id) {
+			return fmt.Errorf("platform.operators: %q must be a user id of the form %q",
+				id, domain.PrefixUser.IDPrefix("<id>"))
+		}
+	}
+	if len(c.Operators) > 0 && c.ResolvedProjectID() == "" {
+		return errors.New("platform.operators needs a platform project: set platform.bootstrap_project or platform.project_id")
 	}
 	return nil
 }
@@ -100,6 +133,7 @@ func (c PlatformConfig) ProvisioningProjectID() string {
 
 func (c Config) Validate() error {
 	for _, validate := range []func() error{
+		c.Server.Validate,
 		c.Session.Validate,
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
@@ -157,6 +191,35 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+	// RequestIDHeader names a header that a proxy in front of the server sets
+	// to its own ID for each request, such as Vercel's x-vercel-id. The server
+	// then uses that ID as the request ID, so its logs, events and error pages
+	// quote the ID the proxy's logs show. Empty, the server mints its own. Set
+	// it only behind a proxy that overwrites the header: otherwise a client
+	// chooses its own request ID.
+	RequestIDHeader string `mapstructure:"request_id_header"`
+}
+
+func (c ServerConfig) Validate() error {
+	// ensure there are no path collisions between idp callbacks and console/login paths
+	for _, ui := range []struct {
+		enabled bool
+		key     string
+		path    string
+	}{
+		{c.ConsoleEnabled, "server.console_path", c.ConsolePath},
+		{c.LoginEnabled, "server.login_path", c.LoginPath},
+	} {
+		if !ui.enabled {
+			continue
+		}
+		for _, prefix := range api.IDPCallbackPathPrefixes() {
+			if ui.path == prefix || strings.HasPrefix(ui.path, prefix+"/") {
+				return fmt.Errorf("%s %q must not be %s or under it: the path is reserved for the sign-in provider callback", ui.key, ui.path, prefix)
+			}
+		}
+	}
+	return nil
 }
 
 // KeysConfig sizes the in-process key caches. Both are read-through and hold

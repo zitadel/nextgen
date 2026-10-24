@@ -41,11 +41,13 @@ Every render has access to the capability dictionaries from [`../flowengine/flow
 | `gates`         | Dictionary keyed by gate name                                | Flow payload            |
 | `sso_providers` | Array of providers                                           | Flow payload            |
 | `challenge`     | The pending challenge, or `null`                             | Flow payload            |
+| `identifier`    | The account the step signs in to (`step.identifier`, `{ value, autocomplete }`), or `null` | Flow payload            |
 | `errors`        | Array of errors, localised by the component                  | Flow payload            |
 | `identity`      | The known identity, or `null`                                | Component state         |
 | `messages`      | Always an empty array today                                  | Component               |
 | `branding`      | Branding projection (see [`schema.md`](schema.md)), with `logo_url` resolved for the active theme side | Inline on flow response |
 | `loading`       | `boolean`                                                    | Component state         |
+| `pending_action` | The action of the submit in flight, or `null`; only its control shows progress | Component state         |
 
 Templates iterate these bindings. They never mutate them.
 
@@ -72,6 +74,7 @@ The bundled default is the reference: `packages/components/src/orchestrator/temp
       {% else %}
         <zl-field name="{{ f.name }}" label="{{ f.text_key | t }}" type="{{ f.type }}"
           value="{{ f.value }}" {% if f.required %}required{% endif %}
+          {% if f.read_only %}readonly{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}></zl-field>
       {% endcase %}
     {% endfor %}
@@ -169,6 +172,7 @@ Every template should render:
 
 - One field atom per entry in the `fields` array, with `name` matching the entry's `name`: `<zl-checkbox>` for `checkbox`, `<zl-select>` for `select`, `<zl-field>` for every other type.
 - The entry's `autocomplete` on that atom's `autocomplete` attribute, verbatim, so password managers and browser autofill recognise the identifier and password inputs. Never derive the token from the field's or the step's name: the identifier is whatever property the schema designates, and whether a password is filled or generated depends on the flow's purpose, neither of which a name reveals.
+- The entry's `read_only` as a `readonly` attribute on `<zl-field>`. The submit refuses a changed value for such a field, so an editable one only leads to an error. `<zl-select>` has no read-only state.
 - One primary `<zl-button>` wired to the action with `primary: true`.
 - An affordance for each secondary action: a `<zl-button hierarchy="secondary">` or a link carrying `data-action`.
 - `<zl-passkey>` when the step carries a passkey `challenge`.

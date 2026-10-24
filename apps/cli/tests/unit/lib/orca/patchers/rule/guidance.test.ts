@@ -16,14 +16,14 @@ const ctx: PatchContext = {
     id: "proj_test",
     project_secret: "sk",
     preview_secret: "pk",
-    preview_origins: [],
+    origins: [],
     created_at: "2026-01-01T00:00:00Z",
   },
   issuer: "http://localhost:3000",
   server: "http://localhost:8080",
   cliVersion: "0.1.0-alpha.15",
   preset: "passkey-first",
-} as PatchContext;
+} as unknown as PatchContext;
 
 describe("upsertGuidanceSection", () => {
   const section = "## Authentication (Zitadel)\n\nbody";
@@ -109,6 +109,7 @@ describe("guidance content", () => {
 
   it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
     const agents = agentsGuidanceSection(ctx);
+    expect(agents).toContain('"$schema": "./.zitadel/meta/project.json"');
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
     expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
@@ -118,6 +119,7 @@ describe("guidance content", () => {
 
   it("gives the README the human journey with pinned CLI commands", () => {
     const readme = readmeGuidanceSection(ctx);
+    expect(readme).toContain("from a second terminal in this directory");
     expect(readme).toContain("register a user, sign out, and sign in again");
     expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
   });
@@ -146,8 +148,12 @@ describe("guidance content", () => {
     expect(agents).toContain("`matcher`");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
+    expect(agents).toContain("403/sess.project_mismatch");
     expect(agents).toContain("404/sess.not_found");
     expect(agents).toContain("non-empty `user_id`");
+    // The read names the app's project, so another project's session on the
+    // same host never reads as signed in.
+    expect(agents).toContain("NEXT_PUBLIC_ZITADEL_PROJECT_ID");
 
     // Nuxt: the composable the scaffolded auth plugin seeds — no Next helper.
     const nuxtCtx = {
@@ -165,9 +171,10 @@ describe("guidance content", () => {
       framework: { id: "react", devPort: 5173, url: "http://localhost:5173" },
     } as PatchContext;
     const reactAgents = agentsGuidanceSection(reactCtx);
-    expect(reactAgents).toContain("/__nextgen/sessions/me");
+    expect(reactAgents).toContain("/__nextgen/sessions/me?project_id=");
     expect(reactAgents).toContain('cache: "no-store"');
     expect(reactAgents).toContain("401/auth.unauthorized");
+    expect(reactAgents).toContain("403/sess.project_mismatch");
     expect(reactAgents).toContain("404/sess.not_found");
     expect(reactAgents).toContain("unknown/error, never signed-out");
     expect(reactAgents).not.toContain("@zitadel/sdk-next/session");
@@ -189,6 +196,26 @@ describe("guidance content", () => {
     expect(widget).toContain("@zitadel/sdk-next/jsx");
   });
 
+  it("leaves the generated files to the app, as doctor does (ADR 042)", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("The app files setup generated are yours to change");
+    expect(agents).toContain("as `edited`, or as `adopted`");
+    expect(agents).toContain("`doctor --fix` restores only a missing file, never one you changed");
+    expect(agents).not.toContain("never change auth behavior");
+  });
+
+  it("points theming at the stable tokens and the forwarded parts, not a copy of them", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("the stable `--zl-*` design tokens");
+    expect(agents).toContain("`zitadel-login::part(<atom>-<part>)`");
+    expect(agents).toContain(
+      "https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app",
+    );
+    expect(agents).not.toContain("`--zl-font-family-heading`");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');
@@ -203,5 +230,16 @@ describe("guidance content", () => {
     const nuxtAgents = agentsGuidanceSection(nuxtCtx);
     expect(nuxtAgents).toContain('variant="widget"');
     expect(nuxtAgents).not.toContain("@zitadel/sdk-next/jsx");
+  });
+});
+
+describe("moving the dev port", () => {
+  it.each([
+    ["README", readmeGuidanceSection],
+    ["AGENTS.md", agentsGuidanceSection],
+  ])("the %s section names the command for a taken port", (_name, section) => {
+    const out = section(ctx);
+    expect(out).toContain("EADDRINUSE");
+    expect(out).toContain("npx @zitadel/cli@0.1.0-alpha.15 setup --dev-port <port>");
   });
 });

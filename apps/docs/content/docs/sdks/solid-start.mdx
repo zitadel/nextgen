@@ -1,0 +1,127 @@
+---
+title: SolidStart SDK
+description: Request middleware and helpers for SolidStart applications.
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+import { File, Files } from "fumadocs-ui/components/files";
+import { Step, Steps } from "fumadocs-ui/components/steps";
+import { Tab, Tabs } from "fumadocs-ui/components/tabs";
+
+The SolidStart SDK is request middleware that proxies and verifies sessions on the server. The login and logout widgets come from the [Solid SDK](/docs/sdks/solid).
+
+<Callout title="Generated setup" type="info">
+  The CLI targets SolidStart 2. It writes `src/middleware.ts`, registers it in `vite.config.ts`, and writes the backend URL, the project secret, and the project id to `.env.local`.
+</Callout>
+
+## Install
+
+<Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
+  <Tab>
+    ```sh
+    pnpm add @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    npm install @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
+    ```
+  </Tab>
+  <Tab>
+    ```sh
+    yarn add @zitadel/sdk-solid-start@latest @zitadel/sdk-solid@latest
+    ```
+  </Tab>
+</Tabs>
+
+## Setup
+
+<Tabs items={["CLI generated", "Manual"]}>
+  <Tab>
+    The CLI adds the middleware, the routes, environment files, and both SDK packages, and points the `solidStart()` plugin in `vite.config.ts` at the middleware.
+
+    <Files>
+      <File name="src/middleware.ts" />
+      <File name="src/routes/index.tsx" />
+      <File name="src/routes/login.tsx" />
+      <File name="src/routes/register.tsx" />
+      <File name="src/routes/profile.tsx" />
+      <File name="vite.config.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
+      <File name="package.json" />
+    </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+  </Tab>
+  <Tab>
+    Create `src/middleware.ts`. SolidStart 2 registers this module's default export as h3 middleware, so wrap the config in its `createMiddleware`; a bare config object registers nothing.
+
+    ```ts
+    import { createMiddleware } from "@solidjs/start/middleware";
+    import { createNextgenMiddleware } from "@zitadel/sdk-solid-start/server";
+
+    export default createMiddleware(
+      createNextgenMiddleware({
+        protectedRoutes: ["/profile"],
+        loginPath: "/login",
+      }),
+    );
+    ```
+
+    Register it in `vite.config.ts`:
+
+    ```ts
+    import { defineConfig } from "vite";
+    import { solidStart } from "@solidjs/start/config";
+    import { nitro } from "nitro/vite";
+
+    export default defineConfig({
+      plugins: [solidStart({ middleware: "./src/middleware.ts" }), nitro()],
+    });
+    ```
+
+    Load the widget with `clientOnly`. It registers custom elements when imported, which throws during server rendering, so a top-level import in a route renders an empty page:
+
+    ```tsx
+    import { clientOnly } from "@solidjs/start";
+
+    const ZitadelLogin = clientOnly(() =>
+      import("@zitadel/sdk-solid").then((m) => ({ default: m.ZitadelLogin })),
+    );
+
+    export default function Login() {
+      return (
+        <ZitadelLogin
+          projectId={import.meta.env.VITE_ZITADEL_PROJECT_ID}
+          proxyPath="/__nextgen"
+          purpose="login"
+          postSignInUrl="/profile"
+        />
+      );
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Runtime model
+
+<Steps>
+  <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
+</Steps>
+
+Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` there. Only `VITE_`-prefixed variables reach the browser.
+
+## Verify
+
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Visit `/login` and register a user.
+- Confirm `/profile` shows signed-in state.
+- Log out and confirm `/profile` redirects to `/login`.
+
+## See also
+
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-solid-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid-start) and the [CLI SolidStart patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/solid-start).

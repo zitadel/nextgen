@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 /** A project configured against a self-hosted server, without being set up. */
 async function aConfiguredApp(): Promise<ScaffoldedApp> {
@@ -55,6 +57,17 @@ describe("status", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("calls a server running although its recorded process has died", async () => {
+        const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "orphaned" });
+
+        const result = await app.status();
+
+        expect(
+          app.envelopeOf<{ server: { lifecycle: string } }>(result).data.server.lifecycle,
+        ).toBe("running");
+      });
+
       it("offers plan while nobody has registered", async () => {
         const app = await aSetUpApp();
 
@@ -83,7 +96,7 @@ describe("status", () => {
       it("calls config pointing at a project that no longer exists orphaned", async () => {
         const app = await anApp();
         await app.writeConfig({
-          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          $schema: "./.zitadel/meta/project.json",
           project: "orphan",
           server: "https://api.zitadel.cloud",
         });

@@ -10,6 +10,11 @@
 > (#799); [`error-details-producers.md`](../design/api/error-details-producers.md)
 > documents the shipped producer contract. The status moves to Implemented
 > once every decision item below is verified against code.
+>
+> **Amended by [ADR 076](076-error-pages-and-unmatched-routes.md):** the
+> router's answers use the envelope too (`req.not_found`,
+> `req.method_not_allowed`), and a browser navigation to a path no operation
+> matches gets an HTML page instead.
 
 ## Context
 

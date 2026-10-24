@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-svelte",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Svelte components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-svelte#readme",
   "bugs": {
@@ -14,14 +14,16 @@
   "license": "MIT",
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src/lib",
+    "!src/lib/**/*.spec.ts"
   ],
-  "svelte": "./dist/index.js",
+  "svelte": "./src/lib/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "svelte": "./dist/index.js",
+      "svelte": "./src/lib/index.ts",
       "default": "./dist/index.js"
     }
   },
@@ -30,10 +32,12 @@
   },
   "scripts": {
     "build": "vite build",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.json",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.lib.json && svelte-check --tsconfig ./tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "lint": "eslint ."
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -44,28 +48,18 @@
     "svelte": "^5.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
+    "@edge-runtime/vm": "catalog:",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@testing-library/svelte": "^5.3.1",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "eslint-plugin-svelte": "^3.0.0",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "prettier": "catalog:",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "svelte2tsx": "^0.7.0",
-    "typescript": "^5.7.3",
-    "typescript-eslint": "catalog:",
+    "typescript": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }

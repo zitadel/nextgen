@@ -20,6 +20,12 @@ import (
 
 func stubDB(t *testing.T) *service.DB {
 	t.Helper()
+	return stubDBWithSchemas(t, testUserSchema)
+}
+
+// stubDBWithSchemas is stubDB serving schemas as the project's user schemas.
+func stubDBWithSchemas(t *testing.T, schemas ...*domain.JSONSchema) *service.DB {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
@@ -33,8 +39,64 @@ func stubDB(t *testing.T) *service.DB {
 		}
 		return nil
 	}).AnyTimes()
+	stubUserSchemas(stmts, schemas...)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
+}
+
+// testUserSchema is the schema newDef's definitions name.
+var testUserSchema = &domain.JSONSchema{
+	ProjectID:  "proj",
+	URL:        "https://example.com/user.json",
+	ObjectType: new("human-user"),
+}
+
+// testMachineSchema is a second user schema, for definitions that name another.
+var testMachineSchema = &domain.JSONSchema{
+	ProjectID:  "proj",
+	URL:        "sch_machine",
+	ObjectType: new("machine-user"),
+}
+
+// stubUserSchemas answers schema reads from schemas: by id, and by objectType
+// as the newest-revision list does.
+func stubUserSchemas(stmts *servicemocks.MockAllStatements, schemas ...*domain.JSONSchema) {
+	stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, _, id string) (*domain.JSONSchema, error) {
+			for _, schema := range schemas {
+				if schema.URL == id {
+					return schema, nil
+				}
+			}
+			return nil, new(database.NoRowFoundError)
+		}).AnyTimes()
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.JSONSchemaField], _ service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+			objectType := schemaObjectTypeFilter(opts.Filter)
+			out := &database.ListResult[*domain.JSONSchema]{}
+			for _, schema := range schemas {
+				if schema.ObjectType != nil && *schema.ObjectType == objectType {
+					out.Items = append(out.Items, schema)
+				}
+			}
+			return out, nil
+		}).AnyTimes()
+}
+
+func schemaObjectTypeFilter(filter database.Filter[domain.JSONSchemaField]) string {
+	switch f := filter.(type) {
+	case database.AndFilter[domain.JSONSchemaField]:
+		for _, child := range f.Filters {
+			if objectType := schemaObjectTypeFilter(child); objectType != "" {
+				return objectType
+			}
+		}
+	case *database.CompareFilter[domain.JSONSchemaField]:
+		if len(f.Terms) == 1 && f.Terms[0].Column.Field() == domain.JSONSchemaFieldObjectType {
+			return f.Terms[0].Value.(string)
+		}
+	}
+	return ""
 }
 
 // stubListFlowDefinitions wires ListFlowDefinitions to filter the given slice
@@ -133,6 +195,7 @@ func newDef(name, version string, audience domain.FlowDefinitionAudience, purpos
 		Name:          name,
 		SchemaVersion: version,
 		Status:        domain.FlowDefinitionStatusActive,
+		UserSchema:    *testUserSchema.ObjectType,
 		Purposes:      entries,
 		Audience:      audience,
 	}
@@ -143,7 +206,7 @@ func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	other := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{other, want})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          new("login"),
@@ -174,7 +237,7 @@ func TestResolve_ResolveByName_FiltersWithRequestedOptions(t *testing.T) {
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	repo := service.NewPool(pool)
 
-	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		Name:          new("login"),
@@ -189,7 +252,7 @@ func TestResolve_ResolveByName_LatestActiveWhenVersionNil(t *testing.T) {
 	v15 := newDef("login", "1.5.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2, v15})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      new("login"),
@@ -210,7 +273,7 @@ func TestResolve_ResolveByName_SameVersionPicksNewest(t *testing.T) {
 
 	for _, defs := range [][]*domain.FlowDefinition{{older, newer}, {newer, older}} {
 		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 			Name:      new("login"),
@@ -233,7 +296,7 @@ func TestResolve_ResolveByName_TimestampCollisionBreaksOnID(t *testing.T) {
 
 	for _, defs := range [][]*domain.FlowDefinition{{a, b}, {b, a}} {
 		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 			Name:      new("login"),
@@ -246,7 +309,7 @@ func TestResolve_ResolveByName_TimestampCollisionBreaksOnID(t *testing.T) {
 func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	repo := stubListFlowDefinitions(t, nil)
 
-	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      new("missing"),
@@ -258,7 +321,7 @@ func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 		Name:      new("login"),
@@ -271,7 +334,7 @@ func TestResolve_ResolveByAudience_ReturnsFirstMatchingPurpose(t *testing.T) {
 	second := newDef("alt", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{first, second})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -283,7 +346,7 @@ func TestResolve_ResolveByAudience_NoMatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
 
-	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeRegister,
 	})
@@ -295,7 +358,7 @@ func TestResolve_ResolveByAudience_ExactVersionFiltersOlder(t *testing.T) {
 	v2 := newDef("login", "2.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID:     "proj",
 		Purpose:       domain.FlowDefinitionPurposeLogin,
 		SchemaVersion: new("1.0.0"),
@@ -313,7 +376,7 @@ func TestResolve_ResolveByAudience_RepoErrorPropagates(t *testing.T) {
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	repo := service.NewPool(pool)
 
-	_, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -326,7 +389,7 @@ func TestResolve_ResolveByAudience_AppHintOutranksTeamAndDefault(t *testing.T) {
 	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam, byApp})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Hint:      service.ResolveFlowHint{AppID: new("app-1"), TeamID: new("team-1")},
@@ -340,7 +403,7 @@ func TestResolve_ResolveByAudience_TeamHintOutranksDefault(t *testing.T) {
 	fallback := newDef("default", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{fallback, byTeam})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Hint:      service.ResolveFlowHint{TeamID: new("team-1")},
@@ -358,7 +421,7 @@ func TestResolve_ResolveByAudience_ScopedFlowDoesNotCaptureDefault(t *testing.T)
 	scoped.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped, fallback})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 	})
@@ -373,7 +436,7 @@ func TestResolve_ResolveByAudience_UnmatchedHintFallsBackToScoped(t *testing.T) 
 	scoped := newDef("kiosk", "1.0.0", domain.FlowDefinitionAudience{AppIDs: []string{"app-1"}}, domain.FlowDefinitionPurposeLogin)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{scoped})
 
-	got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Hint:      service.ResolveFlowHint{AppID: new("app-2")},
@@ -384,18 +447,17 @@ func TestResolve_ResolveByAudience_UnmatchedHintFallsBackToScoped(t *testing.T) 
 
 func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
 	human := newDef("human", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	human.UserSchema = "https://tenant.com/schemas/human.json"
 	human.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 	machine := newDef("machine", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	machine.UserSchema = "https://tenant.com/schemas/machine.json"
+	machine.UserSchema = *testMachineSchema.ObjectType
 	machine.CreatedAt = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{human, machine}, 2)
 
-	svc := service.NewFlowService(repo, nil)
+	svc := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{})
 	got, err := svc.Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: new("https://tenant.com/schemas/machine.json")},
+		Hint:      service.ResolveFlowHint{UserSchemaID: testMachineSchema.ObjectType},
 	})
 	require.NoError(t, err)
 	assert.Same(t, machine, got, "want the machine-schema definition despite being older")
@@ -403,7 +465,7 @@ func TestResolve_ResolveByAudience_UserSchemaHintFilters(t *testing.T) {
 	_, err = svc.Resolve(t.Context(), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Hint:      service.ResolveFlowHint{UserSchemaID: new("https://tenant.com/schemas/unknown.json")},
+		Hint:      service.ResolveFlowHint{UserSchemaID: new("visitor")},
 	})
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound(), "unmatched schema hint")
 }
@@ -417,7 +479,7 @@ func TestResolve_ResolveByAudience_NoHintPicksNewestDeterministically(t *testing
 	// Both list orders yield the same pick — the newest definition.
 	for _, defs := range [][]*domain.FlowDefinition{{older, newer}, {newer, older}} {
 		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 		})
@@ -437,7 +499,7 @@ func TestResolve_ResolveByAudience_TimestampCollisionBreaksOnID(t *testing.T) {
 
 	for _, defs := range [][]*domain.FlowDefinition{{a, b}, {b, a}} {
 		repo := stubListFlowDefinitions(t, defs)
-		got, err := service.NewFlowService(repo, nil).Resolve(t.Context(), service.ResolveFlowRequest{
+		got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(t.Context(), service.ResolveFlowRequest{
 			ProjectID: "proj",
 			Purpose:   domain.FlowDefinitionPurposeLogin,
 		})
@@ -522,12 +584,11 @@ func stubSubmitDB(t *testing.T, def *domain.FlowDefinition, attempt *domain.Auth
 
 func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	def.UserSchema = "https://example.com/user.json"
 
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}}
 
-	svc := service.NewFlowService(stubDB(t), sm)
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{})
 
 	res, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
@@ -537,7 +598,7 @@ func TestFlowService_Start_MintsFlowAndSessionIDs(t *testing.T) {
 	require.NotNil(t, res.State)
 	assert.NotEmpty(t, res.State.ID, "flow id was not minted")
 	assert.NotEmpty(t, sm.gotStartInput.Session.ID, "session id was not minted")
-	assert.Equal(t, def.UserSchema, sm.gotStartInput.UserSchemaURL)
+	assert.Equal(t, testUserSchema.URL, sm.gotStartInput.UserSchemaURL, "the objectType resolves to the revision")
 }
 
 // Path B auth.attempt.created runs inside stateMachine.Start. The flow id
@@ -546,7 +607,7 @@ func TestFlowService_Start_StampsFlowIDBeforeStateMachine(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}}
-	svc := service.NewFlowService(stubDB(t), sm)
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{})
 
 	ctx := audit.WithActorSlot(t.Context())
 	res, err := svc.Start(ctx, service.StartFlowRequest{
@@ -570,7 +631,7 @@ func TestFlowService_Start_PassesRedirectURIThrough(t *testing.T) {
 	state := &domain.FlowState{ProjectID: def.ProjectID}
 	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{}}}
 
-	svc := service.NewFlowService(stubDB(t), sm)
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{})
 
 	redirect := "https://rp.example.com/cb"
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -594,9 +655,10 @@ func TestFlowService_Start_PreservesProvidedSessionID(t *testing.T) {
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	stubUserSchemas(stmts, testUserSchema)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 
-	svc := service.NewFlowService(service.NewPool(pool), sm)
+	svc := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{})
 
 	sessionID := "sess_explicit"
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -618,6 +680,7 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	stubUserSchemas(stmts, testUserSchema)
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
 		// With no supplied session, Start persists one for the flow's project.
 		// The anonymous/building nature of a new session is domain.NewSession's
@@ -628,7 +691,7 @@ func TestFlowService_Start_PersistsSession(t *testing.T) {
 	}).Times(1)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 
-	svc := service.NewFlowService(service.NewPool(pool), sm)
+	svc := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{})
 
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
@@ -647,6 +710,7 @@ func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().NewManagedID(gomock.Any()).Return("flow_1", nil).AnyTimes()
+	stubUserSchemas(stmts, testUserSchema)
 	stmts.EXPECT().CreateSession(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, sess *domain.Session) error {
 		// The request's user agent is recorded on the session the flow creates.
 		require.NotNil(t, sess.UserAgent)
@@ -656,7 +720,7 @@ func TestFlowService_Start_RecordsUserAgent(t *testing.T) {
 	}).Times(1)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 
-	svc := service.NewFlowService(service.NewPool(pool), sm)
+	svc := service.NewFlowService(service.NewPool(pool), sm, domain.BuiltinSchemaBases{})
 
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
@@ -670,7 +734,7 @@ func TestFlowService_Start_RejectsEmptySessionID(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	sm := &fakeStateMachine{}
 
-	svc := service.NewFlowService(stubDB(t), sm)
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{})
 
 	empty := ""
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
@@ -685,7 +749,7 @@ func TestFlowService_Start_PropagatesStateMachineError(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	sm := &fakeStateMachine{startErr: errors.New("boom")}
 
-	svc := service.NewFlowService(stubDB(t), sm)
+	svc := service.NewFlowService(stubDB(t), sm, domain.BuiltinSchemaBases{})
 
 	_, err := svc.Start(t.Context(), service.StartFlowRequest{
 		Definition: def,
@@ -700,7 +764,7 @@ func TestFlowService_Submit_RefetchesDefinitionAndCallsProcess(t *testing.T) {
 	processedState := &domain.FlowState{ID: "flow_1"}
 	sm := &fakeStateMachine{processResult: domain.FlowStepResult{State: processedState, Step: &domain.FlowStep{Name: "next"}}}
 
-	svc := service.NewFlowService(repo, sm)
+	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{})
 
 	state := &domain.FlowState{
 		ID:            "flow_1",
@@ -729,7 +793,7 @@ func TestFlowService_Submit_PropagatesHandoffToken(t *testing.T) {
 		HandoffTokenExpiresAt: expiresAt,
 	}}
 
-	svc := service.NewFlowService(repo, sm)
+	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{})
 
 	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
 		State: &domain.FlowState{
@@ -753,9 +817,9 @@ func TestFlowService_Submit_PropagatesSSOReturnAndBindingNonce(t *testing.T) {
 		Step:            &domain.FlowStep{Name: domain.FlowStepNameSSORedirect},
 		SSOBindingNonce: "nonce-1",
 	}}
-	ssoReturn := &domain.FlowSSOReturn{RedirectURI: "https://login.example.test/__nextgen/idp/callback", ReturnTarget: "https://login.example.test/login"}
+	ssoReturn := &domain.FlowSSOReturn{RedirectURI: "https://login.example.test/__nextgen/idp/google/callback", ReturnTarget: "https://login.example.test/login"}
 
-	svc := service.NewFlowService(repo, sm)
+	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{})
 
 	res, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
 		State: &domain.FlowState{
@@ -797,7 +861,7 @@ func TestFlowService_Submit_DeadAttemptRestartsFlow(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 			sm := &fakeStateMachine{}
-			svc := service.NewFlowService(stubSubmitDB(t, def, tt.attempt), sm)
+			svc := service.NewFlowService(stubSubmitDB(t, def, tt.attempt), sm, domain.BuiltinSchemaBases{})
 
 			_, err := svc.Submit(t.Context(), service.SubmitFlowRequest{
 				State: &domain.FlowState{
@@ -824,7 +888,7 @@ func TestFlowService_GetStep_CallsRender(t *testing.T) {
 	}
 	sm := &fakeStateMachine{renderResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "identify"}}}
 
-	svc := service.NewFlowService(repo, sm)
+	svc := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{})
 
 	res, err := svc.GetStep(t.Context(), service.GetFlowStepRequest{State: state})
 	require.NoError(t, err)
@@ -849,8 +913,31 @@ func TestFlowService_GetStep_PropagatesHandoffToken(t *testing.T) {
 		HandoffTokenExpiresAt: expiresAt,
 	}}
 
-	res, err := service.NewFlowService(repo, sm).GetStep(t.Context(), service.GetFlowStepRequest{State: state})
+	res, err := service.NewFlowService(repo, sm, domain.BuiltinSchemaBases{}).GetStep(t.Context(), service.GetFlowStepRequest{State: state})
 	require.NoError(t, err)
 	assert.Equal(t, "ht_abc", res.HandoffToken)
 	assert.True(t, res.HandoffTokenExpiresAt.Equal(expiresAt))
+}
+
+// A definition may name its user schema by a built-in schema's `$id` under a
+// base the project was not seeded under: start pins the row the project
+// stores under the other base, the way flow-definition create resolves it.
+func TestFlowService_Start_ResolvesBuiltinSchemaUnderAnotherBase(t *testing.T) {
+	bases := domain.NewBuiltinSchemaBases("https://schemas.test/builtin/v1", "https://schemas.test/builtin/v0")
+	stored := &domain.JSONSchema{
+		ProjectID:  "proj",
+		URL:        "https://schemas.test/builtin/v1/default-human-user.json",
+		ObjectType: new("human-user"),
+	}
+	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
+	def.UserSchema = "https://schemas.test/builtin/v0/default-human-user.json"
+	state := &domain.FlowState{ProjectID: def.ProjectID}
+	sm := &fakeStateMachine{startResult: domain.FlowStepResult{State: state, Step: &domain.FlowStep{Name: "start"}}}
+
+	_, err := service.NewFlowService(stubDBWithSchemas(t, stored), sm, bases).Start(t.Context(), service.StartFlowRequest{
+		Definition: def,
+		Purpose:    domain.FlowDefinitionPurposeLogin,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, stored.URL, sm.gotStartInput.UserSchemaURL)
 }

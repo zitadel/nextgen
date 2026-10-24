@@ -19,17 +19,17 @@ The Next.js SDK wires App Router applications through one server-side middleware
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/sdk-next
+    pnpm add @zitadel/sdk-next@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/sdk-next
+    npm install @zitadel/sdk-next@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/sdk-next
+    yarn add @zitadel/sdk-next@latest
     ```
   </Tab>
 </Tabs>
@@ -38,18 +38,23 @@ The Next.js SDK wires App Router applications through one server-side middleware
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the SDK package, creates auth routes, writes a profile page, and installs middleware that runs `nextgenMiddleware`.
+    The CLI adds the SDK package, creates auth routes, writes a profile page, and adds the request boundary that runs `nextgenMiddleware`: `proxy.ts` when the `next` version in `package.json` is 16 or later, otherwise `middleware.ts` (also for a tag such as `latest`). With a `src/app` directory, the pages, the request boundary, and `custom-elements.d.ts` go under `src/`; the `.env` files and `package.json` stay at the project root.
 
     <Files>
       <File name="app/login/page.tsx" />
       <File name="app/register/page.tsx" />
       <File name="app/profile/page.tsx" />
-      <File name="middleware.ts" />
+      <File name="proxy.ts" />
+      <File name="custom-elements.d.ts" />
+      <File name=".env.local" />
+      <File name=".env.example" />
       <File name="package.json" />
     </Files>
+
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`. When setup created the app itself, it also replaces `app/page.tsx` with a redirect to `/login`.
   </Tab>
   <Tab>
-    Create `src/proxy.ts` at the root of your Next.js app and call the middleware:
+    Create `proxy.ts` next to your `app` directory (at the project root, or in `src/` when you use `src/app`) and call the middleware. On Next 15, name the file `middleware.ts` and the function `middleware`.
 
     ```ts
     import { nextgenMiddleware } from "@zitadel/sdk-next/middleware";
@@ -64,33 +69,98 @@ The Next.js SDK wires App Router applications through one server-side middleware
     }
 
     export const config = {
-      matcher: ["/__nextgen/:path*", "/profile", "/login"],
+      matcher: ["/__nextgen/:path*", "/profile/:path*"],
     };
     ```
+
+    Set `ZITADEL_URL`, `ZITADEL_PROJECT_ID`, `ZITADEL_PROJECT_SECRET`, and `NEXT_PUBLIC_ZITADEL_PROJECT_ID` in `.env.local`. The middleware adds the project secret to the session exchange; without it, sign-in cannot finish. The middleware and `auth()` count a session only when it belongs to `ZITADEL_PROJECT_ID` (else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`); with neither, nobody is signed in. See [SDK proxy](/docs/sdks/proxy).
   </Tab>
 </Tabs>
+
+## Change the dev port
+
+The project allows one origin, `http://localhost:<port>`, so setup pins the `dev` script to that port: `next dev --port 3000`. When the port is taken, `next dev` exits with `EADDRINUSE` instead of moving to another port the project does not allow. To run the app on another port, run setup again in the app with the port you want:
+
+```sh
+npx @zitadel/cli@latest setup --dev-port 3101
+```
+
+It allows the new origin on the server, then moves the `dev` script, `ZITADEL_ISSUER` in `.env.local` and `zitadel.json` to the new port. If the server refuses, nothing changes. Restart the dev server and open `http://localhost:3101/login`. A social sign-in provider has the redirect URI registered with the old port: the command prints the new one to add at the provider.
+
+Don't change the port in only one of these places. Starting the app with `PORT=3101` or `npm run dev -- --port 3101` leaves `ZITADEL_ISSUER` and the allowed origin on the old port, and sign-in breaks.
 
 ## Runtime model
 
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
-  <Step>Verify the session JWT via JWKS using Web Crypto.</Step>
-  <Step>Redirect unauthenticated users from protected routes to `loginPath`.</Step>
+  <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
+  <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
+
+## Protect a route
+
+Next.js runs the middleware only on routes the `matcher` covers, so a route needs sign-in only when it is in both `protectedRoutes` and the `matcher`. To protect another route, add it to both in `proxy.ts`:
+
+```ts
+export function proxy(req: NextRequest) {
+  return nextgenMiddleware(req, {
+    url: process.env.ZITADEL_URL,
+    protectedRoutes: ["/profile", "/orders*"],
+    loginPath: "/login",
+  });
+}
+
+export const config = {
+  matcher: ["/__nextgen/:path*", "/profile/:path*", "/orders/:path*"],
+};
+```
+
+A `protectedRoutes` entry with a trailing `*` matches every path that starts with it.
 
 ## Usage
 
 Read auth state in a server component:
 
 ```tsx
-import { auth } from "@zitadel/sdk-next";
+import { auth } from "@zitadel/sdk-next/server";
+import { Suspense } from "react";
 
-export default async function Page() {
+export default function Page() {
+  return (
+    <Suspense fallback={<p>Loading…</p>}>
+      <Greeting />
+    </Suspense>
+  );
+}
+
+async function Greeting() {
   const session = await auth();
   if (!session.isAuthenticated) return <p>Not signed in</p>;
 
-  return <p>Hello {session.session.email}</p>;
+  const { display, identifier, userId } = session.session;
+  return <p>Hello {display ?? identifier ?? userId}</p>;
 }
+```
+
+`auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
+
+`auth()` sees a session only on routes the middleware's `matcher` covers. Add the page's route to the `matcher` in `proxy.ts`, for example `"/dashboard/:path*"`.
+
+## Widget events
+
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
+
+```tsx
+<ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
 ```
 
 ## Verify
@@ -102,6 +172,6 @@ export default async function Page() {
 
 ## See also
 
-- [SDK proxy](/docs/concepts/sdk-proxy) — why `/__nextgen/*` must be same-origin and how the project key is attached.
+- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
 - [`apps/demo-next`](https://github.com/zitadel/nextgen/tree/main/apps/demo-next) — a runnable Next.js example in this repo.
 - [`@zitadel/sdk-next` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-next) and the [CLI Next.js patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/next).

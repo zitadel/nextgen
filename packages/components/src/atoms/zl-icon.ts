@@ -6,6 +6,7 @@ import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import iconStyles from "./zl-icon.css?inline";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowRight,
   Check,
   ChevronDown,
@@ -113,6 +114,7 @@ export type IconName =
   | "plus"
   | "arrow-right"
   | "arrow-left"
+  | "arrow-left-right"
   | "spinner"
   | "check"
   | "chevron-down"
@@ -134,11 +136,12 @@ export type IconName =
  */
 export type BrandIconName = "brand-google";
 
-/** Auth-surface glyph list — keep playgrounds and parity tests in sync. */
+/** Auth-surface glyph list; every name maps to a glyph (zl-icon.spec.ts). */
 export const SHIPPED_ICON_NAMES = [
   "plus",
   "arrow-right",
   "arrow-left",
+  "arrow-left-right",
   "spinner",
   "check",
   "chevron-down",
@@ -158,7 +161,9 @@ export const SHIPPED_ICON_NAMES = [
  * connection's template has a mark of its own, so adding one here is what
  * makes a new vendor's button carry its logo.
  */
-export const SHIPPED_BRAND_ICON_NAMES = ["brand-google"] as const satisfies readonly BrandIconName[];
+export const SHIPPED_BRAND_ICON_NAMES = [
+  "brand-google",
+] as const satisfies readonly BrandIconName[];
 
 export type IconSize = "16" | "24";
 
@@ -169,6 +174,7 @@ const ICON_NODES: Record<Exclude<IconName, BrandIconName>, IconNode> = {
   plus: Plus,
   "arrow-right": ArrowRight,
   "arrow-left": ArrowLeft,
+  "arrow-left-right": ArrowLeftRight,
   spinner: LoaderCircle,
   check: Check,
   "chevron-down": ChevronDown,

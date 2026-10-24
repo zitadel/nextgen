@@ -123,9 +123,9 @@ export function sanitizeResponse<T>(value: T): T {
  * The error envelope's `message` and `details` are printed as the failure, so
  * they are as attacker-influenceable as any response body. It stays an
  * `ApiError`, with the same status and URL, so `toZitadelError` classifies it
- * as before.
+ * as before. Exported for `zitadel api`, which sends its requests itself.
  */
-function sanitizeRejection(error: unknown): never {
+export function sanitizeRejection(error: unknown): never {
   if (!(error instanceof ApiError)) {
     throw error;
   }
@@ -144,10 +144,9 @@ export type SanitizeOptions = {
   /**
    * Return response bodies exactly as the server sent them. Only for a
    * caller that stores or compares what it reads rather than printing it:
-   * `apply` and `setup` write the server's canonical body back to the
-   * project's files, and `plan` diffs it against them, so an escaped
-   * `\r` or zero-width joiner would be written to disk as literal text and
-   * published as a change. Such a caller escapes at the point it prints.
+   * `plan` and `apply` compare the server's stored bodies against the
+   * project's files, so an escaped `\r` or zero-width joiner would read as a
+   * change that is not there. Such a caller escapes at the point it prints.
    * Errors are escaped either way.
    */
   verbatim?: boolean;
@@ -175,7 +174,11 @@ export function createZitadelClient(
   sanitize: SanitizeOptions = {},
 ): ZitadelClient {
   const onResolve = sanitize.verbatim ? <T>(value: T): T => value : sanitizeResponse;
-  const client = createRawClient({ signal: interruptSignal(), timeoutMs: REQUEST_TIMEOUT_MS, ...opts });
+  const client = createRawClient({
+    signal: interruptSignal(),
+    timeoutMs: REQUEST_TIMEOUT_MS,
+    ...opts,
+  });
   return new Proxy(client, {
     get(target, prop, receiver) {
       const value = Reflect.get(target, prop, receiver);

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { RESOURCES } from "../../../src/commands/resources";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
+type Json = Record<string, unknown>;
+
 describe("zitadel resources", () => {
   it("describes every registry entry without touching a server", async () => {
     const res = await runCliForTest(["resources", "--json", "--non-interactive", "--no-telemetry"]);
@@ -38,30 +40,63 @@ describe("zitadel resources", () => {
         data: {
           resources: Array<{
             topic: string;
-            create_fields?: Array<{ flag: string; required: boolean }>;
-            update_fields?: Array<{ flag: string; required: boolean }>;
+            create_fields?: Array<{ name: string; flag: string | null; required: boolean }>;
+            update_fields?: Array<{ name: string; flag: string | null; required: boolean }>;
           }>;
         };
       }
     ).data.resources;
 
     const grants = resources.find((resource) => resource.topic === "grants");
-    expect(grants?.create_fields).toEqual([
-      {
-        name: "relation",
-        flag: "--relation",
-        kind: "enum",
-        required: true,
-        options: ["viewer", "editor", "admin"],
-      },
-      { name: "expires_at", flag: "--expires-at", kind: "string", required: false },
-    ]);
+    expect(grants?.create_fields?.[0]).toMatchObject({
+      name: "relation",
+      flag: "--relation",
+      kind: "enum",
+      required: true,
+      options: ["viewer", "editor", "admin"],
+    });
+    // The principal is a nested object, and each of its leaves is a field.
+    expect(grants?.create_fields?.map((field) => [field.name, field.flag, field.required])).toEqual(
+      [
+        ["relation", "--relation", true],
+        ["expires_at", "--expires-at", false],
+        ["user.user_id", "--user-user-id", false],
+        ["user.identifier", "--user-identifier", false],
+        ["team.team_id", "--team-team-id", false],
+        ["team.name", "--team-name", false],
+      ],
+    );
     // Grants have no update endpoint, so nothing claims otherwise.
     expect(grants?.update_fields).toBeUndefined();
 
     const teams = resources.find((resource) => resource.topic === "teams");
     expect(teams?.create_fields?.find((field) => field.flag === "--name")?.required).toBe(true);
     expect(teams?.update_fields?.find((field) => field.flag === "--name")?.required).toBe(false);
+  });
+
+  it("describes a rooted document's nested fields, and what makes each required", async () => {
+    const res = await runCliForTest(["resources", "--json", "--non-interactive", "--no-telemetry"]);
+    const idps = (
+      parseJson(res.stdout) as {
+        data: {
+          resources: Array<{ topic: string; document_root?: string; create_fields?: Json[] }>;
+        };
+      }
+    ).data.resources.find((resource) => resource.topic === "idps");
+    const field = (name: string) => idps?.create_fields?.find((entry) => entry.name === name);
+
+    // The fields are the connection's own, as `.zitadel/idps/<slug>.json` spells them.
+    expect(idps?.document_root).toBe("idp");
+    expect(idps?.create_fields).toHaveLength(20);
+    expect(field("oidc.issuer")).toMatchObject({
+      flag: "--oidc-issuer",
+      kind: "string",
+      required: false,
+      required_with: "oidc",
+      description: expect.any(String),
+    });
+    expect(field("oidc.scopes")).toMatchObject({ kind: "list", item: "string" });
+    expect(field("oidc.pkce_enabled")).toMatchObject({ kind: "boolean", default: true });
   });
 
   it("reports one filter vocabulary for every list, with each field's operations", async () => {
@@ -101,9 +136,8 @@ describe("zitadel resources", () => {
     // agent knows `schemas list` is the current schemas rather than every
     // revision.
     expect(
-      resources
-        .find((r) => r.topic === "schemas")
-        ?.filters?.find((f) => f.field === "revisions")?.default,
+      resources.find((r) => r.topic === "schemas")?.filters?.find((f) => f.field === "revisions")
+        ?.default,
     ).toBe("latest");
   });
 

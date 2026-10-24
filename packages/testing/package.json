@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/testing",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Test-kit for seeded ephemeral local Zitadel instances",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/testing#readme",
   "bugs": {
@@ -38,11 +38,13 @@
   },
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "lint": "oxlint ."
+    "test:integration": "ZITADEL_SERVER_BINARY=${ZITADEL_SERVER_BINARY-$PWD/../../dist/server/nextgen} NEXTGEN_SERVER_LOGIN_ENABLED=${NEXTGEN_SERVER_LOGIN_ENABLED-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} vitest run --config vitest.integration.config.ts",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -59,9 +61,11 @@
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
     "msw": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

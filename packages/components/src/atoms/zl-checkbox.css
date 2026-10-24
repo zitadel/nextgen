@@ -1,6 +1,5 @@
 /* Styles for `<zl-checkbox>` — shadow host rules first, then the painted surface. */
 
-/* Lit-only: <zl-checkbox> host box model. Surface rules live in checkbox.css. */
 :host {
   display: inline-flex;
 }
@@ -8,15 +7,10 @@
   cursor: not-allowed;
 }
 
-/* Shared surface for `<zl-checkbox>` / `<Checkbox>`. Lit-only rules: lit/checkbox-host.css */
 /*
- * Figma models the two checked states as a `style` variant (Outline = unchecked,
- * Filled = checked) and the three interaction states (Hovered / Focused / Pressed)
- * as a 32px circular halo behind the 16px box. Here checked is the real
- * `:checked` input and the interaction states are real pseudo-classes
- * (`:hover`, `:focus-visible`, `:active`); the `[data-state]` hooks are
- * preview-only so the playground/stories can paint the full Figma matrix
- * statically (they are not product API). Disabled is the `--disabled` modifier.
+ * Checked is the real `:checked` input and interaction states are real
+ * pseudo-classes; `[data-state]` hooks are for stories only, not product API.
+ * Disabled is the `--disabled` modifier.
  */
 /* Column wrapper: the checkbox row plus an optional inline error stacked below
    (mirrors `.zr-field`'s root -> error layout). */
@@ -174,9 +168,3 @@
   border-color: var(--zl-destructive);
 }
 
-/* Inline error message under the checkbox row (mirrors .zr-field__error). */
-.zr-checkbox__error {
-  font-size: var(--zl-text-sm-size);
-  line-height: var(--zl-text-sm-leading);
-  color: var(--zl-destructive);
-}

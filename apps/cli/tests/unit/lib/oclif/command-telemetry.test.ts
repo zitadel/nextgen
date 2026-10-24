@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   commandEventProperties,
   deviceProfileProperties,
+  VERCEL_EVENT_KEYS,
 } from "../../../../src/lib/oclif/command-telemetry";
 import type { GlobalOptions } from "../../../../src/lib/oclif/types";
+import { VERCEL_ENDPOINT, vercelEventBody } from "../../../../src/lib/telemetry/vercel";
 
 function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
   return {
@@ -25,7 +27,10 @@ function meta(overrides: Partial<GlobalOptions> = {}): GlobalOptions {
 
 describe("commandEventProperties", () => {
   it("emits allow-listed dimensions and never the raw source/cwd", () => {
-    const props = commandEventProperties(meta({ source: "https://auth.internal.acme.com/x" }), "sess-1");
+    const props = commandEventProperties(
+      meta({ source: "https://auth.internal.acme.com/x" }),
+      "sess-1",
+    );
     const serialized = JSON.stringify(props);
     expect(serialized).not.toContain("auth.internal.acme.com");
     expect(serialized).not.toContain("/work/app");
@@ -42,6 +47,34 @@ describe("commandEventProperties", () => {
     const props = commandEventProperties(meta(), "sess-1", { framework: "react", step: "x" });
     expect(props.framework).toBe("react");
     expect(props.step).toBe("x");
+  });
+});
+
+describe("VERCEL_EVENT_KEYS", () => {
+  it("gives the Vercel copy of a failed command the header, its outcome and whether it ran without prompts", () => {
+    const props = commandEventProperties(meta({ command: "doctor" }), "sess-1", {
+      status: "error",
+      reason: "E_NETWORK",
+      exit_code: 1,
+      duration_ms: 12,
+    });
+    const body = JSON.parse(
+      vercelEventBody(
+        "cli_command_failed",
+        props,
+        { endpoint: VERCEL_ENDPOINT, keys: VERCEL_EVENT_KEYS },
+        0,
+      ),
+    );
+    expect(Object.keys(body.ed)).toEqual([...VERCEL_EVENT_KEYS]);
+    expect(body.ed).toMatchObject({
+      surface: "cli",
+      command: "doctor",
+      status: "error",
+      reason: "E_NETWORK",
+      non_interactive: true,
+    });
+    expect(body.ed).not.toHaveProperty("is_ci");
   });
 });
 

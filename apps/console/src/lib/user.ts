@@ -1,4 +1,4 @@
-import { field } from "./record";
+import { field, isPresent } from "./record";
 
 /** Shared so a user without attributes keeps a stable identity across renders. */
 const NO_ATTRIBUTES: Record<string, unknown> = Object.freeze({});
@@ -36,8 +36,55 @@ export function userIdentifier(user: Record<string, unknown>): string | undefine
 /**
  * The muted secondary line shown under a heading: the identifier, but only
  * when a display name is the primary (rendering the identifier twice says
- * nothing). The users list shows the identifier as its own column instead.
+ * nothing). The detail heading and the users list's User cell both use it.
  */
 export function userIdentitySecondary(user: Record<string, unknown>): string | undefined {
   return field(user, "display") ? field(user, "identifier") : undefined;
+}
+
+/**
+ * The server-owned `metadata` block. Read defensively: it sits on an otherwise
+ * open record, so a user written before it existed simply has none.
+ *
+ * `status` is one of `active`, `suspended`, `deactivated`, `pending_purge`.
+ */
+export function userMetadata(user: Record<string, unknown>): {
+  status?: string;
+  createdAt?: string;
+} {
+  const metadata = user.metadata;
+  if (!metadata || typeof metadata !== "object") return {};
+  const record = metadata as Record<string, unknown>;
+  return { status: field(record, "status"), createdAt: field(record, "created_at") };
+}
+
+/** One embedded membership, reduced to what a cell renders and links to. */
+export interface UserTeam {
+  id: string;
+  name: string;
+}
+
+/**
+ * The teams `expand: ["teams"]` embedded.
+ *
+ * Read defensively for the same reason `metadata` is: `teams` is absent when the
+ * request did not ask for it and `[]` when the user is on none, and the rows
+ * this walks are typed as an open record.
+ *
+ * Every membership the endpoint returns is kept, `pending` ones included — it
+ * omits the ones the user was removed from, so what arrives is the roster. An
+ * entry missing either half is dropped: a name with no id cannot be linked, and
+ * an id with no name has nothing to render.
+ */
+export function userTeams(user: Record<string, unknown>): UserTeam[] {
+  if (!Array.isArray(user.teams)) return [];
+  return user.teams
+    .map((team) => {
+      if (!team || typeof team !== "object") return undefined;
+      const record = team as Record<string, unknown>;
+      const id = field(record, "id");
+      const name = field(record, "name");
+      return id && name ? { id, name } : undefined;
+    })
+    .filter(isPresent);
 }

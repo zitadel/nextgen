@@ -196,7 +196,7 @@ func TestCreateIdpRejectsInvalidDocuments(t *testing.T) {
 	tests := []struct {
 		name string
 		body string
-		// property is the part of the document the error details name.
+		// property is the part of the document the error details name, if any.
 		property string
 	}{
 		{
@@ -214,18 +214,66 @@ func TestCreateIdpRejectsInvalidDocuments(t *testing.T) {
 			body:     `{"idp":{"slug":"blockless","protocol":"oidc","display_name":"X"}}`,
 			property: "oidc",
 		},
+		{
+			name: "an oauth2 connection",
+			body: `{"idp":{"slug":"github","protocol":"oauth2","display_name":"GitHub","subject_claim":"id","oauth2":{` +
+				`"authorization_endpoint":"https://github.com/login/oauth/authorize","token_endpoint":"https://github.com/login/oauth/access_token",` +
+				`"userinfo_endpoint":"https://api.github.com/user","client_id":"id","client_secret":"${{ S }}"}}}`,
+			// The request decoder refuses the unknown oauth2 block before the
+			// schema runs, and an unknown field names no path.
+		},
+		{
+			name:     "a strategy pointer",
+			body:     `{"idp":{"slug":"pointer","protocol":"oidc","display_name":"X","verified_claims":{"email":"$supplementary_fetch"},"oidc":{` + oidcBlock + `,"client_secret":"${{ S }}"}}}`,
+			property: "verified_claims",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			status, details := f.postRaw(t, tt.body)
 			assert.Equal(t, http.StatusBadRequest, status)
 			assert.Equal(t, api.ErrorCode(domain.ErrRequestInvalid().Code), details.Code)
-			assert.Contains(t, string(details.Details.Value["details"]), tt.property)
+			if tt.property != "" {
+				assert.Contains(t, string(details.Details.Value["details"]), tt.property)
+			}
 		})
 	}
 
 	listed := f.queryOK(t, &api.QueryIdpsRequest{})
 	assert.Empty(t, listed.Idps, "no invalid document was stored")
+}
+
+// TestCreateIdpRefusesPartialEndpoints sends OIDC blocks that set an endpoint
+// without the others (#1404). The schema accepts them, the engine could
+// never start a sign-in with them, so create and revise refuse them with the
+// engine's code and the missing endpoints, and store nothing.
+func TestCreateIdpRefusesPartialEndpoints(t *testing.T) {
+	t.Parallel()
+	f := newIdpFixture(t)
+
+	existing := f.create(t, helpers.OIDCConnection("google"))
+	partial := func(slug string) api.IdpConnection {
+		idp := helpers.OIDCConnection(slug)
+		oidc := idp.Oidc.Value
+		oidc.AuthorizationEndpoint = api.NewOptString("https://accounts.google.com/o/oauth2/v2/auth")
+		oidc.TokenEndpoint = api.NewOptString("https://oauth2.googleapis.com/token")
+		idp.Oidc = api.NewOptIdpConnectionOidc(oidc)
+		return idp
+	}
+
+	for name, slug := range map[string]string{"create": "fresh", "revise": existing.Slug} {
+		t.Run(name, func(t *testing.T) {
+			resp := f.put(t, partial(slug))
+			require.IsType(t, &api.CreateIdpBadRequest{}, resp, helpers.MustMarshal(t, resp))
+			body := resp.(*api.CreateIdpBadRequest)
+			assert.Equal(t, api.ErrorCode(domain.ErrIDPEndpointsPartial(nil).Code), body.Code)
+			assert.JSONEq(t, `{"missing":["jwks_uri","userinfo_endpoint"]}`, string(body.Details.Value["details"]))
+		})
+	}
+
+	listed := f.queryOK(t, &api.QueryIdpsRequest{})
+	require.Len(t, listed.Idps, 1, "the create stored nothing")
+	assert.Equal(t, existing.RevisionID, listed.Idps[0].RevisionID, "the revise stored nothing")
 }
 
 // TestQueryIdps lists each connection once, at its newest revision.
@@ -381,6 +429,17 @@ func TestIdpAccess(t *testing.T) {
 		assertAuthzError(t, outsider.query(t, &api.QueryIdpsRequest{}), notFound)
 	})
 
+	t.Run("the owner's secret naming another project gets 404", func(t *testing.T) {
+		// The secret may read the connection, but the route is scoped to the
+		// project the caller names, and the connection is not in it.
+		named := owner
+		named.project = newIdpFixture(t).project
+
+		notFound := domain.ErrIDPConnectionNotFound().Code
+		assertAuthzError(t, named.get(t, connection.ID), notFound)
+		assertAuthzError(t, named.listRevisions(t, api.ListIdpRevisionsParams{ID: connection.ID}), notFound)
+	})
+
 	t.Run("a viewer reads but cannot write", func(t *testing.T) {
 		viewer := newIdpFixture(t)
 		conn := viewer.create(t, helpers.OIDCConnection("google"))
@@ -442,11 +501,18 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	require.IsType(t, &api.ListIdpRevisionsForbidden{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
 	assertAuthzError(t, hiddenRevisions, denied)
 
-	// A single revision has no index row, so its read checks the whole
-	// project, which a grant on one connection does not cover.
+	// A revision is read through the connection it belongs to, so the grant
+	// reaches the granted connection's revision and not the hidden one's; an
+	// unknown revision answers as the hidden one does.
 	revision := f.getRevision(t, granted.RevisionID)
-	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, revision, helpers.MustMarshal(t, revision))
-	assertAuthzError(t, revision, denied)
+	require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
+	assert.Equal(t, granted.RevisionID, revision.(*api.IdpResponse).RevisionID)
+	hiddenRevision := f.getRevision(t, hidden.RevisionID)
+	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, hiddenRevision, helpers.MustMarshal(t, hiddenRevision))
+	assertAuthzError(t, hiddenRevision, denied)
+	unknownRevision := f.getRevision(t, "idprev_01KX4SB9C8E1F0N9WD3P2E4YM5")
+	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, unknownRevision, helpers.MustMarshal(t, unknownRevision))
+	assertAuthzError(t, unknownRevision, denied)
 }
 
 // replaceSecretGrant swaps the project secret's seeded admin grant for a

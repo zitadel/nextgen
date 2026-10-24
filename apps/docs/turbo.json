@@ -1,0 +1,65 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
+    // applying the repo's Redocly config, and the CLI's command reference,
+    // which its reference test writes and lib/cli-reference.ts imports.
+    "generate": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/api/openapi/**/*.yaml",
+        "$TURBO_ROOT$/redocly.yaml",
+        "$TURBO_ROOT$/apps/cli/command-reference.json"
+      ],
+      "outputs": [
+        ".generated/openapi.mjs",
+        ".generated/openapi.d.mts",
+        ".generated/cli.mjs",
+        ".generated/cli.d.mts"
+      ]
+    },
+    // The API reference's TypeScript samples compile against the client
+    // (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints its
+    // generate task writes from the same spec, and whose runtime they call.
+    "typecheck": {
+      "dependsOn": ["generate", "@zitadel/api#generate"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
+    },
+    // The build script bundles again before `next build`, because the
+    // hosted cloud's docs service runs the script without a task runner.
+    // app/global.css imports the design tokens' CSS variables, which the
+    // repository commits, so that build needs no generation of them.
+    //
+    // The build waits for typecheck, as in moon.yml: `next build` empties
+    // .next/types, where tsc reads the route types, so side by side
+    // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
+    // cache hit restores .next without running the script.
+    "build": {
+      "dependsOn": ["typecheck", "generate", "@zitadel/design-tokens#generate"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "dependsOn": ["generate", "@zitadel/design-tokens#generate"]
+    },
+    "start": {
+      "dependsOn": ["build"]
+    },
+    // The site's contract suite (tests/, playwright.config.mts); Playwright
+    // serves the build on port 3003.
+    "e2e": {
+      "dependsOn": ["build"],
+      "passThroughEnv": ["PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    },
+    // The same suite against a deployment of the hosted cloud, which
+    // CLOUD_URL names (playwright.deployment.config.mts;
+    // VERCEL_AUTOMATION_BYPASS_SECRET opens its protection). The root's
+    // `pnpm check:cloud` runs it beside every other deployment suite, and
+    // .github/workflows/deployment-checks.yml runs it for every deployment.
+    // The config refuses to run without CLOUD_URL.
+    "e2e-deployment": {
+      "cache": false,
+      "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    }
+  }
+}

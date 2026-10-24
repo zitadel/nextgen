@@ -51,6 +51,10 @@ type SchemaValidator struct {
 	// latestURIByKind maps a schema kind stem (e.g. "flow-definition") to the
 	// canonical URI of its latest known version.
 	latestSchemaURIByKind map[KnownSchemaKind]string
+	// builtinBases names the meta-schemas under the canonical base and under
+	// every other known base, so a document declaring its metaSchema under
+	// another one still validates.
+	builtinBases BuiltinSchemaBases
 }
 
 // NewSchemaValidator compiles the meta-schemas for the tenant schema kinds into memory and returns a SchemaValidator instance.
@@ -100,6 +104,7 @@ func NewSchemaValidator(builtinPublicBase string) (*SchemaValidator, error) {
 	return &SchemaValidator{
 		compiledSchemas:       compiledSchemas,
 		latestSchemaURIByKind: latestURIByKind,
+		builtinBases:          BuiltinSchemaBasesFor(builtinPublicBase),
 	}, nil
 }
 
@@ -151,7 +156,10 @@ func (v *SchemaValidator) ValidateAgainstMetaSchema(schemaBs []byte) error {
 //
 // todo: support fetching compiled schema by version as well when multiple versions of the meta-schemas are available.
 func (v *SchemaValidator) GetBuiltinSchema(uri string) (*jsonschema.Schema, error) {
-	compiledSchema, ok := v.compiledSchemas[uri]
+	// The map is keyed by the canonical base, and Canonicalize maps every
+	// spelling the resolver treats as a built-in (another base, another host
+	// spelling) onto it, so the validator accepts the same URIs.
+	compiledSchema, ok := v.compiledSchemas[v.builtinBases.Canonicalize(uri)]
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrUnknownSchemaURI, uri)
 	}
@@ -173,26 +181,56 @@ func (v *SchemaValidator) LatestSchemaURI(kind KnownSchemaKind) (string, error) 
 // a loc → msg map. loc segments are joined with "/" (e.g. "/required/x-auth-methods").
 func FlattenValidationErrors(err error) map[string]string {
 	out := make(map[string]string)
-	var ves *types.ValidationErrors
-	var ve *types.ValidationError
-	switch {
-	case errors.As(err, &ves):
-		for _, e := range ves.Errs {
-			out[validationLocString(e)] = e.Msg
-		}
-	case errors.As(err, &ve):
-		out[validationLocString(ve)] = ve.Msg
+	for _, e := range ValidationFailures(err) {
+		out[ValidationLocation(e)] = e.Msg
 	}
 	return out
 }
 
-// validationLocString formats the error location as a string.
+// ValidationFailures returns the schema validation errors err wraps.
+func ValidationFailures(err error) []*types.ValidationError {
+	var ves *types.ValidationErrors
+	var ve *types.ValidationError
+	switch {
+	case errors.As(err, &ves):
+		return ves.Errs
+	case errors.As(err, &ve):
+		return []*types.ValidationError{ve}
+	}
+	return nil
+}
+
+// ValidationLocation formats the error location as a string.
 // If the location is empty, it returns "/". Otherwise, it joins the segments with "/" and prefixes with "/".
-func validationLocString(ve *types.ValidationError) string {
+func ValidationLocation(ve *types.ValidationError) string {
 	if ve.Loc == nil || len(*ve.Loc) == 0 {
 		return "/"
 	}
 	return "/" + strings.Join(*ve.Loc, "/")
+}
+
+func ValidationErrAttributeKey(ve *types.ValidationError, doc map[string]any) (key AttributeKey, complete bool) {
+	if ve.Loc == nil {
+		return "", true
+	}
+	var instance any = doc
+	for _, segment := range *ve.Loc {
+		keyword, name, _ := strings.Cut(segment, "/")
+		switch keyword {
+		case "properties", "patternProperties", "additionalProperties", "unevaluatedProperties", "required":
+			object, ok := instance.(map[string]any)
+			if !ok {
+				return key, false
+			}
+			key = key.AppendNode(name)
+			instance = object[name]
+		case "allOf", "dependentSchemas", "dependencies":
+			// Applied to the same instance.
+		default:
+			return key, false
+		}
+	}
+	return key, true
 }
 
 // compileMetaSchema compiles a meta-schema from a rendered JSON document.

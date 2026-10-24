@@ -22,10 +22,14 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 
+import { serverCanonicalFlow } from "./server-canonical-flow.js";
+
 import type {
+  AddOrigin201,
   CompleteClaim200,
   CreateFlowDefinition201,
   CreateProject201,
+  CreateProject201OriginsItem,
   CreateSchema201,
   GetClaimWindow200,
   GetClaimStatus200,
@@ -38,6 +42,9 @@ import type {
   ListSchemas200,
 } from "@zitadel/api/generated/model";
 import {
+  AddOriginBody,
+  AddOriginParams,
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateFlowDefinitionBody,
   CreateIdpBody,
@@ -76,15 +83,15 @@ import {
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
+  RemoveOriginBody,
+  RemoveOriginParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { validateFlowDefinition } from "@zitadel/config/validate";
-import {
-  getDefaultHumanUserSchema,
-  getDefaultLoginFlow,
-} from "@zitadel/config/defaults";
+import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
+import { missingEndpoints } from "@zitadel/config/idp";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -184,7 +191,7 @@ type ProjectRecord = {
   name: string;
   projectSecret: string;
   previewSecret: string;
-  previewOrigins: string[];
+  origins: CreateProject201OriginsItem[];
   createdAt: string;
   updatedAt: string;
 };
@@ -336,11 +343,11 @@ function flowResponse(r: FlowDefinitionRecord): GetFlowDefinition200 {
     project_id: r.projectId,
     flow_definition: {
       audience: {},
-      ...(r.body as Record<string, unknown>),
+      ...serverCanonicalFlow(r.body as Record<string, unknown>),
       // After the spread: an update that omits `status` keeps the stored one,
       // which is what the endpoint documents.
       status: r.status,
-    } as unknown as GetFlowDefinition200['flow_definition'],
+    } as unknown as GetFlowDefinition200["flow_definition"],
     created_at: r.createdAt,
     updated_at: r.updatedAt,
   } as unknown as GetFlowDefinition200;
@@ -369,7 +376,7 @@ function seedDefaultProjectResources(projectID: string, createdAt: string): void
     createdAt,
     updatedAt: createdAt,
     seq: ++store.lastSeq,
-    body: getDefaultLoginFlow({ userSchemaUrl: schemaId }) as unknown as Record<string, unknown>,
+    body: getDefaultLoginFlow() as unknown as Record<string, unknown>,
   });
 }
 
@@ -432,47 +439,50 @@ function matchesIdpFilters(
  * for the life of the connection, and a mock that accepted it would let the CLI
  * pass a test the real service fails.
  */
-function immutableFieldClash(before: Record<string, unknown>, after: Record<string, unknown>): string | undefined {
+function immutableFieldClash(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): string | undefined {
   for (const field of ["protocol", "subject_claim"] as const) {
     if (before[field] !== undefined && before[field] !== after[field]) {
       return field;
     }
   }
-  // The authority is the issuer for OIDC, and the token endpoint with the
-  // userinfo endpoint for OAuth 2.0.
-  for (const [block, fields] of [
-    ["oidc", ["issuer"]],
-    ["oauth2", ["token_endpoint", "userinfo_endpoint"]],
-  ] as const) {
-    const was = before[block];
-    const now = after[block];
-    if (!isObject(was) || !isObject(now)) {
-      continue;
-    }
-    for (const field of fields) {
-      if (was[field] !== undefined && was[field] !== now[field]) {
-        return `${block}.${field}`;
-      }
-    }
+  // The authority is the issuer.
+  const was = before.oidc;
+  const now = after.oidc;
+  if (isObject(was) && isObject(now) && was.issuer !== undefined && was.issuer !== now.issuer) {
+    return "oidc.issuer";
   }
   return undefined;
 }
 
-/**
- * The owner a variables request addresses. An absent environment is the project
- * level, which is a different owner from any environment under it.
- */
-function variableOwner(projectId: string, environmentName?: string): string {
-  return environmentName === undefined ? `project:${projectId}` : `env:${projectId}/${environmentName}`;
+type VariableKind = "primary" | "preview";
+
+/** The requested kind, or both. */
+function variableKinds(kind?: VariableKind): VariableKind[] {
+  return kind === undefined ? ["primary", "preview"] : [kind];
 }
 
-/** What a read of one owner says: a value, or that a secret is held. */
-function variablesResponse(owned: Map<string, VariableRecord>): Record<string, unknown> {
-  // A secret says that a value is held and withholds it (ADR 062 §7):
-  // returning the plaintext would defeat the encryption it stands for.
-  return Object.fromEntries(
-    [...owned.entries()].map(([name, held]) => [name, held.secret ? { secret: true } : held.value]),
-  );
+/** The store key of one kind of a project's variables. */
+function variableOwner(projectId: string, kind: VariableKind): string {
+  return `${projectId}/${kind}`;
+}
+
+/** The project's variables for the given kinds, keyed by name. */
+function variablesResponse(
+  variables: Map<string, Map<string, VariableRecord>>,
+  projectId: string,
+  kinds: VariableKind[],
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const kind of kinds) {
+    for (const [name, held] of variables.get(variableOwner(projectId, kind)) ?? []) {
+      // A secret is never returned.
+      out[name] = { ...out[name], [kind]: held.secret ? { secret: true } : held.value };
+    }
+  }
+  return out;
 }
 
 /** One connection, in the wire shape every idp endpoint answers with. */
@@ -632,7 +642,10 @@ export function completeClaimChallenge(
 ): { status: number; body: CompleteClaim200 | ErrorBody } {
   const challenge = store.claimChallenges.get(challengeId);
   if (!challenge || challenge.projectId !== projectId) {
-    return { status: 404, body: errorBody("claim_challenge.not_found", "claim challenge not found") };
+    return {
+      status: 404,
+      body: errorBody("claim_challenge.not_found", "claim challenge not found"),
+    };
   }
   // Fail closed on a challenge without its project, mirroring the server's
   // proj.not_found: a claim must never be minted from an inconsistent store,
@@ -704,19 +717,18 @@ export function completeClaimChallenge(
  * (`internal/domain/flow_definition_validator.go`, ported to
  * `@zitadel/config/validate`): same rules, same fail-fast single-detail
  * `flowdef.invalid` envelope. Divergence kept deliberately lenient: the
- * schema-dependent subset runs only when the pinned `user_schema` resolves
- * in the mock store — the real server would fail such a flow with
- * `schema_fetch_failed`, but fixtures here may pin external URLs.
+ * schema-dependent subset runs only when `user_schema` resolves in the mock
+ * store — the real server would refuse such a flow, but fixtures here may
+ * name external URLs.
  * Returns null when the definition is valid.
  */
 function invalidFlowDefinitionResponse(
   flowDefinition: Record<string, unknown>,
+  schema: SchemaRecord | undefined,
 ): Response | null {
-  const ref = flowDefinition.user_schema;
-  const schema = typeof ref === "string" ? store.schemas.get(ref)?.body : undefined;
   const firstError = validateFlowDefinition(
     flowDefinition,
-    schema as object | undefined,
+    schema?.body as object | undefined,
   ).find((issue) => issue.severity === "error");
   if (!firstError) {
     return null;
@@ -732,6 +744,20 @@ function invalidFlowDefinitionResponse(
     },
     { status: 400 },
   );
+}
+
+/**
+ * The newest revision of the schema a flow's `user_schema` names, as the
+ * server resolves it: a schema id stands for its `objectType`.
+ */
+function resolveUserSchema(projectId: string, ref: unknown): SchemaRecord | undefined {
+  if (typeof ref !== "string") {
+    return undefined;
+  }
+  const objectType = store.schemas.get(ref)?.objectType ?? ref;
+  return [...store.schemas.values()]
+    .filter((record) => record.projectId === projectId && record.objectType === objectType)
+    .sort(compareNewestFirst)[0];
 }
 
 export function setupPlatformHandlers() {
@@ -753,7 +779,7 @@ export function setupPlatformHandlers() {
         name: body.data.name,
         projectSecret: `sk_proj_${id.replaceAll("-", "")}_full`,
         previewSecret: `sk_proj_${id.replaceAll("-", "")}_preview`,
-        previewOrigins: body.data.preview_origins ?? [],
+        origins: body.data.origins ?? [],
         createdAt,
         updatedAt: createdAt,
       };
@@ -766,7 +792,7 @@ export function setupPlatformHandlers() {
         name: project.name,
         project_secret: project.projectSecret,
         preview_secret: project.previewSecret,
-        preview_origins: project.previewOrigins,
+        origins: project.origins,
         created_at: project.createdAt,
       };
       return HttpResponse.json(responseBody, { status: 201 });
@@ -785,6 +811,7 @@ export function setupPlatformHandlers() {
       const responseBody: GetProject200 = {
         id: project.id,
         name: project.name,
+        origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
       };
@@ -793,6 +820,89 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // POST /projects/:project_id/origins/remove — drop one pattern. Missing
+    // project is 404; removing an already-absent pattern is idempotent 204.
+    http.post("*/projects/:project_id/origins/remove", async ({ params, request }) => {
+      const path = parse(RemoveOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemoveOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
+          status: 404,
+        });
+      }
+
+      const next = project.origins.filter((o) => o.pattern !== body.data.pattern);
+      if (next.length !== project.origins.length) {
+        project.origins = next;
+        project.updatedAt = nowIso();
+      }
+      return new HttpResponse(null, { status: 204 });
+    }),
+
+    // POST /projects/:project_id/origins — add one {pattern, kind}. Same
+    // pattern+kind is idempotent 201; same pattern with a different kind is
+    // origin.kind_conflict. No check/warning field on the response.
+    http.post("*/projects/:project_id/origins", async ({ params, request }) => {
+      const path = parse(AddOriginParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(AddOriginBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      const project = store.projects.get(path.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("origin.not_found", "origin: not found"), {
+          status: 404,
+        });
+      }
+
+      const existing = project.origins.find((o) => o.pattern === body.data.pattern);
+      if (existing && existing.kind !== body.data.kind) {
+        return HttpResponse.json(
+          errorBody(
+            "origin.kind_conflict",
+            "origin: the pattern is already stored with a different kind",
+          ),
+          { status: 409 },
+        );
+      }
+
+      const origin: CreateProject201OriginsItem = {
+        pattern: body.data.pattern,
+        kind: body.data.kind,
+      };
+      if (!existing) {
+        project.origins = [...project.origins, origin];
+        project.updatedAt = nowIso();
+      }
+
+      const responseBody: AddOrigin201 = existing ?? origin;
+      const out = parse(AddOriginResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -879,13 +989,19 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
       if (challenge.initiatingSecret !== token) {
         return HttpResponse.json(
-          errorBody("proj.permission_denied", "the presented project secret did not initiate this challenge"),
+          errorBody(
+            "proj.permission_denied",
+            "the presented project secret did not initiate this challenge",
+          ),
           { status: 403 },
         );
       }
@@ -951,15 +1067,21 @@ export function setupPlatformHandlers() {
 
       const challenge = store.claimChallenges.get(query.data.challenge_id);
       if (!challenge || challenge.projectId !== path.data.project_id) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
       const project = store.projects.get(challenge.projectId);
       if (!project) {
-        return HttpResponse.json(errorBody("claim_challenge.not_found", "claim challenge not found"), {
-          status: 404,
-        });
+        return HttpResponse.json(
+          errorBody("claim_challenge.not_found", "claim challenge not found"),
+          {
+            status: 404,
+          },
+        );
       }
 
       // The window belongs to the project, not the challenge: a spent or
@@ -1124,9 +1246,9 @@ export function setupPlatformHandlers() {
       if (!body.ok) {
         return body.response;
       }
-      const invalid = invalidFlowDefinitionResponse(
-        body.data.flow_definition as Record<string, unknown>,
-      );
+      const flowDefinition = body.data.flow_definition as unknown as Record<string, unknown>;
+      const schema = resolveUserSchema(body.data.project_id, flowDefinition.user_schema);
+      const invalid = invalidFlowDefinitionResponse(flowDefinition, schema);
       if (invalid) {
         return invalid;
       }
@@ -1140,7 +1262,10 @@ export function setupPlatformHandlers() {
         createdAt: now,
         updatedAt: now,
         seq: ++store.lastSeq,
-        body: body.data.flow_definition as unknown as Record<string, unknown>,
+        // Stored as the `objectType` it names, like the server.
+        body: schema?.objectType
+          ? { ...flowDefinition, user_schema: schema.objectType }
+          : flowDefinition,
       };
       store.flowDefinitions.set(id, record);
       const responseBody: CreateFlowDefinition201 = flowResponse(record);
@@ -1148,11 +1273,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/flow_definitions", ({ request }) => {
-      const query = parse(
-        ListFlowDefinitionsQueryParams,
-        queryRecord(request),
-        "invalid_query",
-      );
+      const query = parse(ListFlowDefinitionsQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -1169,8 +1290,7 @@ export function setupPlatformHandlers() {
       // only, so a flow whose newest revision lacks the purpose drops out
       // rather than falling back to an older matching revision — filter
       // after selecting the latest to match.
-      const current =
-        query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
+      const current = query.data.revisions === "latest" ? latestFlowRevisions(matching) : matching;
       const records = current.filter(
         (r) => !query.data.purpose || flowServesPurpose(r.body, query.data.purpose),
       );
@@ -1206,9 +1326,10 @@ export function setupPlatformHandlers() {
     }),
 
     // --- identity provider connections -----------------------------------
-    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. The
-    // Go service does not exist yet (#1003), so without these the SSO journey
-    // cannot be exercised end to end at all.
+    // The CLI's connection syncer publishes `.zitadel/idps/*.json` here. These
+    // stand in for the Go service in the CLI specs and the SSO journey, so
+    // they mirror its refusals: a CLI check the mock skipped would pass a test
+    // the real service fails.
 
     http.post("*/idps", async ({ request }) => {
       const query = parse(CreateIdpQueryParams, queryRecord(request), "invalid_query");
@@ -1225,6 +1346,20 @@ export function setupPlatformHandlers() {
       }
 
       const definition = body.data.idp as unknown as Record<string, unknown>;
+      // An oidc block names no endpoint or every one it needs. The server
+      // refuses anything in between before it looks the slug up, and nests
+      // the missing endpoints under details like any domain error's details.
+      const missing = missingEndpoints(definition.oidc);
+      if (missing.length > 0) {
+        return HttpResponse.json(
+          errorBody(
+            "idp.endpoints_partial",
+            "identity provider connection: the endpoints are partially set",
+            { details: { missing } },
+          ),
+          { status: 400 },
+        );
+      }
       const slug = definition.slug as string;
       const now = nowIso();
       // A slug that already exists is revised under its own id, so everything
@@ -1246,7 +1381,13 @@ export function setupPlatformHandlers() {
         }
       }
       const record: IdpConnectionRecord = existing
-        ? { ...existing, revisionId: `idprev_${shortId()}`, updatedAt: now, seq: ++store.lastSeq, body: definition }
+        ? {
+            ...existing,
+            revisionId: `idprev_${shortId()}`,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: definition,
+          }
         : {
             id: `idp_${shortId()}`,
             revisionId: `idprev_${shortId()}`,
@@ -1287,8 +1428,7 @@ export function setupPlatformHandlers() {
         .filter((record) => record.projectId === query.data.project_id)
         .filter((record) => matchesIdpFilters(record, body.data.filter))
         .sort((a, b) => {
-          const order =
-            field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
+          const order = field === "slug" ? a.slug.localeCompare(b.slug) : a.seq - b.seq;
           // `seq` stands in for created_at; ids break ties either way.
           return ascending ? order : -order;
         })
@@ -1329,14 +1469,25 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
+    // Registered ahead of `*/variables`, which would otherwise match it. The
+    // server answers 501 until it stores frozen sets, and so does the mock.
+    http.get("*/deployments/:deploymentId/variables", () =>
+      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
+        status: 501,
+      }),
+    ),
+
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
-      const out = parse(GetVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      const body = variablesResponse(
+        store.variables,
+        query.data.project_id,
+        variableKinds(query.data.kind),
+      );
+      const out = parse(GetVariablesResponse, body, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }
@@ -1344,9 +1495,7 @@ export function setupPlatformHandlers() {
     }),
 
     // One variable by name, which `variables get` and `variables delete`
-    // address directly. A variable belongs to the owner that entered it, so a
-    // name another owner of the same project holds answers `var.not_found`
-    // and leaves that owner's value standing.
+    // address directly.
     http.get("*/variables/:variableName", ({ request, params }) => {
       const path = parse(
         GetVariableParams,
@@ -1360,12 +1509,14 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const held = store.variables.get(owner)?.get(path.data.variable_name);
-      if (held === undefined) {
+      const body = variablesResponse(
+        store.variables,
+        query.data.project_id,
+        variableKinds(query.data.kind),
+      )[path.data.variable_name];
+      if (body === undefined) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      const body = held.secret ? { secret: true } : held.value;
       const out = parse(GetVariableResponse, body, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
@@ -1386,14 +1537,15 @@ export function setupPlatformHandlers() {
       if (!query.ok) {
         return query.response;
       }
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner);
-      const name = path.data.variable_name;
-      if (owned?.has(name) !== true) {
+      // A removal naming a kind leaves the other kind's value.
+      let removed = false;
+      for (const kind of variableKinds(query.data.kind)) {
+        const owned = store.variables.get(variableOwner(query.data.project_id, kind));
+        removed = (owned?.delete(path.data.variable_name) ?? false) || removed;
+      }
+      if (!removed) {
         return HttpResponse.json(errorBody("var.not_found", "variable not found"), { status: 404 });
       }
-      owned.delete(name);
-      store.variables.set(owner, owned);
       return new HttpResponse(null, { status: 204 });
     }),
 
@@ -1411,24 +1563,40 @@ export function setupPlatformHandlers() {
         return body.response;
       }
 
-      const owner = variableOwner(query.data.project_id, query.data.environment_name);
-      const owned = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+      const projectId = query.data.project_id;
+      const kinds = variableKinds(query.data.kind);
+      const owned = (kind: VariableKind) => {
+        const owner = variableOwner(projectId, kind);
+        const held = store.variables.get(owner) ?? new Map<string, VariableRecord>();
+        store.variables.set(owner, held);
+        return held;
+      };
       // RFC 7386: a name present is written, `null` removes it, and a name
-      // absent is left alone.
+      // absent is left alone. Without a kind, a plain value is written for
+      // both kinds, and a secret for primary only, removing the preview value.
       for (const [name, value] of Object.entries(body.data as Record<string, unknown>)) {
         if (value === null) {
-          owned.delete(name);
+          for (const kind of kinds) {
+            owned(kind).delete(name);
+          }
         } else if (typeof value === "object") {
           const input = value as { value: string | number | boolean; secret: boolean };
-          owned.set(name, { value: input.value, secret: input.secret });
+          const kindless = input.secret && query.data.kind === undefined;
+          for (const kind of kindless ? (["primary"] as const) : kinds) {
+            owned(kind).set(name, { value: input.value, secret: input.secret });
+          }
+          if (kindless) {
+            owned("preview").delete(name);
+          }
         } else {
-          owned.set(name, { value: value as string | number | boolean, secret: false });
+          for (const kind of kinds) {
+            owned(kind).set(name, { value: value as string | number | boolean, secret: false });
+          }
         }
       }
-      store.variables.set(owner, owned);
-      // 200 with the addressed owner read back, so the response also carries
-      // what that owner held and this write did not touch.
-      const out = parse(UpdateVariablesResponse, variablesResponse(owned), "mock_response_invalid");
+      // 200 with the variables read back, including what the write did not touch.
+      const response = variablesResponse(store.variables, projectId, kinds);
+      const out = parse(UpdateVariablesResponse, response, "mock_response_invalid");
       if (!out.ok) {
         return out.response;
       }

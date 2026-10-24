@@ -8,6 +8,9 @@
  * three keys the CLI sets itself, address, data dir and public base, are not
  * read from the files at all.
  *
+ * On top of the files, the CLI adds `LOCAL_DEFAULTS`: settings a server on the
+ * developer's machine needs and a deployed one must not have.
+ *
  * Only that prefix crosses into the runtime; everything else in the env files
  * stays on disk. Values travel through the child's environment, never argv,
  * so they do not show up in `ps -ef`, and only names are recorded or printed.
@@ -31,6 +34,20 @@ const CLI_OWNED = new Set([
   "NEXTGEN_SERVER_DATA_DIR",
   "NEXTGEN_SERVER_PUBLIC_BASE",
 ]);
+
+/**
+ * Server settings a local runtime gets unless the developer sets them. A key
+ * set in an env file or the shell wins, an empty value included, which is how
+ * a default is turned off.
+ *
+ * `httpclient.allow_list` lets the server fetch from this machine's loopback
+ * (ADR 061's supported development relaxation), so an identity provider on
+ * `http://localhost:<port>` works as an SSO connection's issuer. The deny list
+ * still blocks every other internal range.
+ */
+export const LOCAL_DEFAULTS: Readonly<Record<string, string>> = {
+  NEXTGEN_HTTPCLIENT_ALLOW_LIST: "localhost,127.0.0.0/8,::1/128",
+};
 
 /** What `runtime.json` and the `start`/`status` envelopes record: names only. */
 export type EnvSummary = Readonly<{ injected: readonly string[] }>;
@@ -60,7 +77,7 @@ export const loadEnvFiles = async (
 ): Promise<Readonly<Record<string, string>>> => {
   const parsed = await Promise.all(files.map((file) => readEnvFile(join(cwd, file))));
   return parsed.reduceRight<Record<string, string>>(
-    (merged, source) => ({ ...merged, ...source }),
+    (merged, source) => Object.assign(merged, source),
     {},
   );
 };
@@ -87,15 +104,22 @@ const readEnvFile = async (path: string): Promise<Readonly<Record<string, string
 };
 
 /**
- * The `NEXTGEN_*` variables from the project's env files, ready to hand to a
+ * The `NEXTGEN_*` variables from the project's env files, plus the
+ * `LOCAL_DEFAULTS` neither the files nor `shell` set, ready to hand to a
  * runtime. `start` calls this before it stops or spawns anything, so an
  * unreadable file fails fast and leaves a running runtime alone.
  */
-export const loadProjectEnv = async (cwd: string): Promise<ResolvedEnv> => {
-  const values = Object.fromEntries(
-    Object.entries(await loadEnvFiles(cwd)).filter(
-      ([name, value]) => name.startsWith(ENV_PREFIX) && !CLI_OWNED.has(name) && value !== "",
-    ),
+export const loadProjectEnv = async (
+  cwd: string,
+  shell: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<ResolvedEnv> => {
+  const declared = Object.entries(await loadEnvFiles(cwd)).filter(
+    ([name]) => name.startsWith(ENV_PREFIX) && !CLI_OWNED.has(name),
   );
+  const defaults = Object.entries(LOCAL_DEFAULTS).filter(
+    ([name]) =>
+      shell[name] === undefined && !declared.some(([declaredName]) => declaredName === name),
+  );
+  const values = Object.fromEntries([...defaults, ...declared.filter(([, value]) => value !== "")]);
   return { values, injected: Object.keys(values).sort() };
 };

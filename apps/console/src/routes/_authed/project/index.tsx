@@ -1,21 +1,14 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { AlertCircle, Box, Loader2, SlidersHorizontal } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Boxes, Settings } from "lucide-react";
 
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { api } from "@/api/zitadel";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { ProjectAdmins } from "@/components/project-admins";
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-
-import { api } from "../../../api/zitadel";
-import { describeError } from "../../../lib/api-error";
-import { formatDate } from "../../../lib/date";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
+import { RenameCard } from "@/components/rename-card";
+import { formatDate } from "@/lib/date";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 /**
  * Project settings — the selected project's own page.
@@ -28,7 +21,7 @@ import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scop
  *
  * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
  * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
- * `project-response` is `id`, `name`, `preview_origins`, `created_at` and
+ * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
  * domain layer. The cell is left out rather than shown empty, and returns as one
  * more `MetaValue` when the field lands.
@@ -43,7 +36,7 @@ export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
   staticData: {
     scope: "project",
-    nav: { label: "Project settings", order: 5, icon: SlidersHorizontal },
+    nav: { label: "Project settings", order: 8, icon: Settings },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
@@ -61,40 +54,13 @@ export const Route = createFileRoute("/_authed/project/")({
 
 function ProjectDetail() {
   const { project, grants } = Route.useLoaderData();
+  const { session } = Route.useRouteContext();
   const router = useRouter();
 
-  const [name, setName] = useState(project.name);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-
-  // A save re-runs the loader, and an edit elsewhere invalidates it; either way
-  // the field follows the record rather than holding a stale draft.
-  useEffect(() => {
-    setName(project.name);
-    setError(undefined);
-  }, [project]);
-
-  const trimmed = name.trim();
-  const dirty = trimmed !== project.name;
-
-  async function save() {
-    if (!dirty || trimmed === "" || saving) return;
-    setSaving(true);
-    setError(undefined);
-    try {
-      await api.patchProject(project.id, { name: trimmed });
-      await router.invalidate();
-    } catch (cause) {
-      setError(describeError(cause, "Could not save the project."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <DetailPage>
+    <Page>
       <DetailHeader
-        icon={Box}
+        icon={Boxes}
         title={project.name}
         meta={
           <>
@@ -105,53 +71,24 @@ function ProjectDetail() {
         }
       />
 
-      <Card className={`${DETAIL_BODY} gap-0 rounded-xl py-0`}>
-        {/* `Card Content`: inset 24px, 20px top and bottom, with a 16px gap
-            between the header, the rule and the grid. */}
-        <CardContent className="flex flex-col gap-4 px-6 py-5">
-          <span className={EYEBROW}>Details</span>
-          <Separator />
-          <div className="flex flex-col gap-[18px]">
-            <Field>
-              <FieldLabel htmlFor="project-name">Project name</FieldLabel>
-              <Input
-                id="project-name"
-                name="project-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={200}
-              />
-            </Field>
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle aria-hidden />
-                <AlertTitle>{error}</AlertTitle>
-              </Alert>
-            )}
-            <div className="flex justify-end">
-              {/* `Variant=Secondary, State=Disabled, Size=sm` — the design's
-                  resting Save is the secondary fill, which `disabled:opacity-50`
-                  then dims. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1 px-2.5 text-xs"
-                onClick={() => void save()}
-                disabled={!dirty || trimmed === "" || saving}
-              >
-                {saving && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                Save
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <RenameCard
+        id="project-name"
+        label="Project name"
+        value={project.name}
+        onSave={async (name) => {
+          await api.patchProject(project.id, { name });
+          await router.invalidate();
+        }}
+        errorFallback="Could not save the project."
+        className={DETAIL_BODY}
+      />
 
       <ProjectAdmins
         projectId={project.id}
         grants={grants}
+        viewerUserId={session.user_id ?? undefined}
         onChanged={() => void router.invalidate()}
       />
-    </DetailPage>
+    </Page>
   );
 }

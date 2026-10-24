@@ -67,6 +67,7 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		require.NoError(t, d.stmts.CreateSession(t.Context(), session))
 		require.NotEmpty(t, session.ID)
 		require.Equal(t, domain.SessionStateBuilding, session.State())
+		assert.Equal(t, domain.SessionAnonymousTTL, session.TimeToLive)
 		sessionID := session.ID
 		t.Cleanup(func() {
 			_ = d.stmts.DeleteSessionByID(context.Background(), projectID, sessionID)
@@ -99,6 +100,15 @@ func TestSessionStatements_ExchangeUpgradesSessionInPlace(t *testing.T) {
 		assert.NotEmpty(t, got.Factors, "verified factors promoted onto the upgraded session")
 		require.NotNil(t, got.UserAgent, "user agent persisted through exchange")
 		assert.Equal(t, "203.0.113.9", got.UserAgent.IP)
+
+		// The upgrade drops the shell's short lifetime for the exchange's, and
+		// the rotated session token expires with the session, not the shell.
+		assert.Equal(t, time.Hour, got.TimeToLive)
+		assert.WithinDuration(t, got.UpdatedAt.Add(time.Hour), got.ExpiresAt, 2*time.Second)
+		token, err := d.stmts.GetTokenByID(t.Context(), projectID, got.TokenID)
+		require.NoError(t, err)
+		require.NotNil(t, token.ExpiresAt)
+		assert.WithinDuration(t, got.ExpiresAt, *token.ExpiresAt, 2*time.Second)
 	})
 }
 
@@ -117,8 +127,11 @@ func createAnonymousSession(t *testing.T, stmts service.AllStatements, projectID
 func createUserBoundSession(t *testing.T, stmts service.AllStatements, projectID, userID string) *domain.Session {
 	t.Helper()
 	plain, _ := handoffCompletedAttempt(t, stmts, projectID, func(a *domain.AuthAttempt) {
-		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser}
-		a.Checks = []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}}
+		// A completed attempt carries a verified credential-class factor
+		// alongside the identifier; the bare user factor never completes one
+		// (see domain.AuthAttempt.IsCompleted).
+		a.RequiredChecks = []domain.AuthCheckType{domain.AuthCheckTypeUser, domain.AuthCheckTypePassword}
+		a.Checks = []domain.AuthCheck{&domain.AuthFactorUser{UserID: userID}, &domain.AuthFactorPassword{}}
 	})
 	session, err := stmts.ExchangeSession(t.Context(), projectID, plain, nil, time.Hour)
 	require.NoError(t, err)

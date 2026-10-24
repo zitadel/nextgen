@@ -1,6 +1,9 @@
 package domain
 
-import "cmp"
+import (
+	"cmp"
+	"encoding/json"
+)
 
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
 // docs/design/api/events-catalog.md and OpenAPI Event discriminator schemas.
@@ -16,8 +19,8 @@ type RequestAPIPayload struct {
 // ProjectPayload is shared by project.created (full snapshot) and
 // project.updated (delta: only changed fields set).
 type ProjectPayload struct {
-	Name           string   `json:"name,omitempty"`
-	PreviewOrigins []string `json:"preview_origins,omitempty"`
+	Name    string   `json:"name,omitempty"`
+	Origins []Origin `json:"origins,omitempty"`
 	// PasswordHashAlgorithm records a change to the method the project's
 	// passwords are hashed with (ADR 029 §Hashing). It is a pointer so the
 	// delta can tell "not touched" (absent) from "handed back to the deployment
@@ -26,6 +29,12 @@ type ProjectPayload struct {
 	// stay out of the audit trail -- the algorithm is what a reader is checking,
 	// and the full method is readable from the project.
 	PasswordHashAlgorithm *string `json:"password_hash_algorithm,omitempty"`
+}
+
+// OriginPayload is the allowlisted body for origin.added and origin.removed.
+type OriginPayload struct {
+	Pattern string     `json:"pattern"`
+	Kind    OriginKind `json:"kind"`
 }
 
 // ProjectCreatedPayload is an alias kept for call-site clarity.
@@ -191,11 +200,15 @@ type BrandingPayload struct {
 // BrandingCreatedPayload is an alias for branding.created.
 type BrandingCreatedPayload = BrandingPayload
 
-type EnvironmentPayload struct {
-	Name string `json:"name,omitempty"`
+// PolicyPayload records a published policy revision for policy.created (the
+// first publish of an operation) and policy.updated (every later one). The
+// policy id is the event's entity_id. Config holds the instance's settings,
+// which are configuration values, never user data.
+type PolicyPayload struct {
+	Operation  string          `json:"operation"`
+	RevisionID string          `json:"revision_id"`
+	Config     json.RawMessage `json:"config"`
 }
-
-type EnvironmentCreatedPayload = EnvironmentPayload
 
 // ReleasePayload records what a release pinned, so the audit stream answers
 // "what changed" without a join back to the releases table. ContentHash
@@ -220,6 +233,10 @@ type ReleasePointerPayload struct {
 }
 
 type ReleaseCreatedPayload = ReleasePayload
+
+type ReleaseRevokedPayload struct {
+	ContentHash string `json:"content_hash"`
+}
 
 // ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
 func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
@@ -247,16 +264,13 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where. It carries ids, not names:
-// the ids survive environment renames and, unlike the deployments table, this
-// event has no foreign key — so the audit trail of a deleted environment
-// lives on here (ADR 061).
+// DeploymentPayload records what went live where (ADR 035, ADR 068).
 type DeploymentPayload struct {
-	EnvironmentID       string `json:"environment_id,omitempty"`
-	ReleaseID           string `json:"release_id,omitempty"`
-	Reason              string `json:"reason,omitempty"`
-	Message             string `json:"message,omitempty"`
-	SourceEnvironmentID string `json:"source_environment_id,omitempty"`
+	ReleaseID  string   `json:"release_id,omitempty"`
+	Targets    []string `json:"targets,omitempty"`
+	Reason     string   `json:"reason,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	RollbackTo string   `json:"rollback_to,omitempty"`
 }
 
 type DeploymentCreatedPayload = DeploymentPayload
@@ -268,17 +282,37 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 		return DeploymentPayload{}
 	}
 	payload := DeploymentPayload{
-		EnvironmentID: dep.EnvironmentID,
-		ReleaseID:     dep.ReleaseID,
-		Reason:        dep.Metadata.Reason.String(),
+		ReleaseID: dep.ReleaseID,
+		Targets:   dep.Origins(),
+		Reason:    dep.Metadata.Reason.String(),
 	}
 	if dep.Metadata.Message != nil {
 		payload.Message = *dep.Metadata.Message
 	}
-	if dep.Metadata.SourceEnvironmentID != nil {
-		payload.SourceEnvironmentID = *dep.Metadata.SourceEnvironmentID
+	if dep.Metadata.RollbackTo != nil {
+		payload.RollbackTo = *dep.Metadata.RollbackTo
 	}
 	return payload
+}
+
+// VariableSetPayload is the record of one variable row written: variable.set
+// covers entering and replacing alike, since the write cannot tell them apart
+// and the value would be the only difference. The name is the entity id; the
+// kind is the rest of the row's key, which the envelope has no column for.
+// The secret flag says whether the value is held encrypted. The value itself
+// never appears, plain or as ciphertext: a plain value may be a pasted secret
+// the caller forgot to flag, and the ciphertext names the key that wrote it
+// (ADR 062).
+type VariableSetPayload struct {
+	Kind   string `json:"kind"`
+	Secret bool   `json:"secret"`
+}
+
+// VariableRemovedPayload is the record of one variable row removed. It
+// carries no secret flag: a removal learns nothing about the row it deleted,
+// and reading it first would be a round-trip spent on the audit record alone.
+type VariableRemovedPayload struct {
+	Kind string `json:"kind"`
 }
 
 type AuthzGrantedPayload struct {
@@ -311,6 +345,15 @@ type IDPConnectionPayload struct {
 	Template    *string `json:"template,omitempty"`
 	DisplayName string  `json:"display_name,omitempty"`
 	RevisionID  string  `json:"revision_id"`
+}
+
+// IDPIdentityLinkCreatedPayload is the create snapshot for
+// idp.identity_link.created. The link id is the event's entity_id; the
+// connection and user ids are secondary ids. The provider's subject is never
+// included: it identifies the person at the provider.
+type IDPIdentityLinkCreatedPayload struct {
+	ConnectionID string `json:"connection_id"`
+	UserID       string `json:"user_id"`
 }
 
 // IDPConnectionPayloadSnapshot is the allowlisted create snapshot for idp.created.

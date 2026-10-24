@@ -1,4 +1,4 @@
-import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -17,6 +17,7 @@ export type ZitadelErrorCode =
   | "E_NOT_FOUND"
   | "E_PORT_IN_USE"
   | "E_VALIDATION"
+  | "E_CREDENTIAL_MISSING"
   | "E_NOT_IMPLEMENTED"
   | "E_CANCELLED";
 
@@ -36,6 +37,7 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
   E_NOT_FOUND: 4,
   E_PORT_IN_USE: 5,
   E_VALIDATION: 3,
+  E_CREDENTIAL_MISSING: 3,
   E_NOT_IMPLEMENTED: 2,
   // 128 + SIGINT, what a shell reports for a command stopped by Ctrl-C.
   E_CANCELLED: 130,
@@ -103,8 +105,20 @@ export function toZitadelError(error: unknown): ZitadelError {
     if (error.status === 404) {
       // A 404 carrying the platform's error envelope (a `code` field) is a
       // domain-level miss from a real Zitadel API — an unknown schema or
-      // project id. Without the envelope the endpoint itself is missing:
-      // the CLI is pointed at a server that isn't a Zitadel platform API.
+      // project id — except `req.not_found`, which the server answers for a
+      // path no operation of its version has (ADR 076). Without the envelope
+      // the endpoint itself is missing: the CLI is pointed at a server that
+      // isn't a Zitadel platform API.
+      if (apiErrorCode(error) === "req.not_found") {
+        return new ZitadelError(
+          "E_NOT_FOUND",
+          `${error.url} has no such endpoint on this Zitadel server`,
+          {
+            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            details,
+          },
+        );
+      }
       const wrongServer = !isPlatformErrorEnvelope(error.body);
       const message = wrongServer
         ? `${apiErrorMessage(error)} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
@@ -121,12 +135,25 @@ export function toZitadelError(error: unknown): ZitadelError {
     // repeat them: `idp.field_immutable` says only "the field is fixed for the
     // life of the connection", which leaves the reader to guess which of a
     // connection document's fields it meant. Promoting them to the hint puts
-    // the answer where the failure is read, not only in `--json`.
-    const fields = rejectedFields(error.body);
-    return new ZitadelError(code, apiErrorMessage(error), {
+    // the answer where the failure is read, not only in `--json`. The same
+    // goes for what a refusal says is missing: `idp.endpoints_partial` names
+    // the endpoints a connection left out only in `missing`.
+    const fields = listedInDetails(error.body, "fields");
+    const missing = listedInDetails(error.body, "missing");
+    const hint = [
       ...(fields.length > 0
-        ? { hint: `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.` }
-        : {}),
+        ? [
+            `The server rejected ${fields.length === 1 ? "this field" : "these fields"}: ${fields.join(", ")}.`,
+          ]
+        : []),
+      ...(missing.length > 0
+        ? [
+            `The server reports ${missing.length === 1 ? "this endpoint" : "these endpoints"} missing: ${missing.join(", ")}.`,
+          ]
+        : []),
+    ].join(" ");
+    return new ZitadelError(code, apiErrorMessage(error), {
+      ...(hint !== "" ? { hint } : {}),
       details,
     });
   }
@@ -184,22 +211,23 @@ export function toZitadelError(error: unknown): ZitadelError {
  * a real Zitadel platform API rather than an arbitrary HTTP server.
  */
 /**
- * The dotted field paths a platform error envelope blames, if any.
+ * The names a platform error envelope lists under `key`, if any: the dotted
+ * field paths it blames (`fields`), or what it reports missing (`missing`).
  *
  * The envelope nests them under `details`, and the server wraps its own
- * `details` map in the response's `details` field, so the paths arrive at
- * `body.details.details.fields`. Both depths are read: the extra wrapper is
+ * `details` map in the response's `details` field, so the names arrive at
+ * `body.details.details.<key>`. Both depths are read: the extra wrapper is
  * the serialiser's doing rather than part of the contract, and a reader that
  * insisted on it would go silent the day it goes away.
  */
-function rejectedFields(body: unknown): string[] {
+function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
   const seen = new Set<string>();
   let node: unknown = body;
   for (let depth = 0; depth < 4 && isObject(node); depth += 1) {
-    const fields = (node as { fields?: unknown }).fields;
-    if (Array.isArray(fields)) {
-      for (const field of fields) {
-        if (typeof field === "string" && field !== "") seen.add(field);
+    const listed = (node as Record<string, unknown>)[key];
+    if (Array.isArray(listed)) {
+      for (const name of listed) {
+        if (typeof name === "string" && name !== "") seen.add(name);
       }
     }
     node = (node as { details?: unknown }).details;

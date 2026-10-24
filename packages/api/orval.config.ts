@@ -1,5 +1,7 @@
 import { defineConfig } from "orval";
 
+import { writeOperations } from "./scripts/operations.ts";
+
 export default defineConfig({
   zitadel: {
     input: {
@@ -27,7 +29,6 @@ export default defineConfig({
         runtime: "getProxyPath()",
         imports: [{ name: "getProxyPath", importPath: "../../runtime/base-url" }],
       },
-      formatter: "oxfmt",
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
@@ -42,6 +43,12 @@ export default defineConfig({
         },
       },
     },
+    hooks: {
+      // The operations as data (`src/generated/operations.ts`), which the
+      // endpoints above carry only as code. Run as a hook, it reads the spec
+      // inside this task and under its `generated-sources` lock.
+      afterAllFilesWrite: writeOperations,
+    },
   },
   zitadelZod: {
     input: {
@@ -54,7 +61,6 @@ export default defineConfig({
       client: "zod",
       target: "./src/generated/endpoints",
       fileExtension: ".zod.ts",
-      formatter: "oxfmt",
       clean: ["!**/*", "./src/generated/endpoints/**/*.zod.ts"],
       override: {
         zod: {

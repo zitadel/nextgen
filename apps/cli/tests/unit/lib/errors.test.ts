@@ -17,6 +17,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
     });
@@ -81,9 +82,7 @@ describe("toZitadelError", () => {
     const result = toZitadelError(errno);
     expect(result.code).toBe("E_CONFLICT");
     expect(result.message).toBe("file exists");
-    expect(result.hint).toBe(
-      "A file already exists. Use --force to overwrite or remove it first.",
-    );
+    expect(result.hint).toBe("A file already exists. Use --force to overwrite or remove it first.");
   });
 
   it("maps ENOENT errno errors to E_VALIDATION", () => {
@@ -175,7 +174,10 @@ describe("toZitadelError", () => {
       {
         code: "flowdef.invalid",
         message: "flow definition: invalid",
-        details: { details: "required fields [company] in user schema are missing in the flow definition steps" },
+        details: {
+          details:
+            "required fields [company] in user schema are missing in the flow definition steps",
+        },
       },
       "PUT http://mock/flow_definitions/flow_1?project_id=proj_1 returned 400",
     );
@@ -213,6 +215,21 @@ describe("toZitadelError", () => {
     expect(result.message).toBe(
       "not found — https://api.zitadel.cloud/projects has no such endpoint; is this a Zitadel platform API?",
     );
+  });
+
+  it("tells a server without the operation from a wrong server", () => {
+    const err = new ApiError(
+      404,
+      "http://localhost:8080/widgets",
+      { code: "req.not_found", message: "No API operation matches this path." },
+      "GET http://localhost:8080/widgets returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe(
+      "http://localhost:8080/widgets has no such endpoint on this Zitadel server",
+    );
+    expect(result.hint).toContain("different versions");
   });
 
   it("falls back to the fetch-layer message when the body is not an envelope", () => {
@@ -273,5 +290,49 @@ describe("fields the platform blames", () => {
 
   it("adds no hint when the envelope blames nothing", () => {
     expect(immutable({ code: "req.invalid", message: "nope" }).hint).toBeUndefined();
+  });
+});
+
+/**
+ * `idp.endpoints_partial` names the endpoints a connection left out only in
+ * the envelope, so the hint carries them, as it does the blamed fields.
+ */
+describe("endpoints the platform reports missing", () => {
+  const partial = (body: unknown) =>
+    toZitadelError(
+      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+    );
+
+  it("names them, in the server's order, as the server nests them", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      message: "identity provider connection: the endpoints are partially set",
+      details: { details: { missing: ["jwks_uri", "userinfo_endpoint"] } },
+    });
+
+    expect(error.code).toBe("E_VALIDATION");
+    expect(error.hint).toBe(
+      "The server reports these endpoints missing: jwks_uri, userinfo_endpoint.",
+    );
+  });
+
+  it("says endpoint, singular, when one is missing", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      details: { missing: ["token_endpoint"] },
+    });
+
+    expect(error.hint).toBe("The server reports this endpoint missing: token_endpoint.");
+  });
+
+  it("keeps the blamed fields when an envelope lists both", () => {
+    const error = partial({
+      code: "req.invalid",
+      details: { details: { fields: ["oidc.issuer"], missing: ["jwks_uri"] } },
+    });
+
+    expect(error.hint).toBe(
+      "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
+    );
   });
 });

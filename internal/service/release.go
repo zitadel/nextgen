@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/release"
 )
 
@@ -49,16 +53,41 @@ type ListReleasesOutput struct {
 
 type ReleaseService interface {
 	Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error)
+	Build(ctx context.Context, input BuildReleaseInput) (*CreateReleaseOutput, error)
 	Get(ctx context.Context, projectID, id string) (*domain.Release, error)
 	List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error)
+	Revoke(ctx context.Context, projectID, id string) (*domain.Release, error)
 }
 
 type releaseService struct {
-	v2Pool *DB
+	v2Pool   *DB
+	schemas  *SchemaService
+	flows    *flowDefinitionService
+	branding *BrandingService
+	idps     *idpConnectionService
+	// builtinBases resolves a schema given as a built-in schema's `$id` under
+	// whichever base the project stores it; the release pins the row found.
+	builtinBases domain.BuiltinSchemaBases
 }
 
-func NewReleaseService(v2Pool *DB) ReleaseService {
-	return &releaseService{v2Pool: v2Pool}
+// NewReleaseService wires Build's kind writers. flows and idps are the
+// concretes from NewFlowDefinitionService and NewIDPConnectionService.
+func NewReleaseService(
+	v2Pool *DB,
+	schemas *SchemaService,
+	flows *flowDefinitionService,
+	branding *BrandingService,
+	idps *idpConnectionService,
+	builtinBases domain.BuiltinSchemaBases,
+) ReleaseService {
+	return &releaseService{
+		v2Pool:       v2Pool,
+		schemas:      schemas,
+		flows:        flows,
+		branding:     branding,
+		idps:         idps,
+		builtinBases: builtinBases,
+	}
 }
 
 // Create assembles a release from revisions that already exist.
@@ -68,20 +97,18 @@ func NewReleaseService(v2Pool *DB) ReleaseService {
 // revisions under a new message resolves to the release that already pins
 // them. That makes a re-run against unchanged content a no-op rather than a
 // growing pile of identical releases.
-func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (*CreateReleaseOutput, error) {
-	pointers, err := s.resolvePointers(ctx, input.ProjectID, input.Pointers)
+func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (_ *CreateReleaseOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Create")
+	defer end(&err)
+
+	content, err := s.loadContent(ctx, input.ProjectID, input.Pointers)
 	if err != nil {
 		return nil, err
 	}
 
-	actor, _ := audit.ActorFromContext(ctx)
-	entity, err := domain.NewRelease(input.ProjectID, pointers, domain.ReleaseMetadata{
-		Message:       input.Message,
-		GitSHA:        input.GitSHA,
-		GitDirty:      input.GitDirty,
-		CreatedBy:     actor.ActorID,
-		CreatedByType: actor.ActorType,
-	})
+	// NewRelease first: it rejects duplicate handles and unpinnable revisions
+	// before ValidateRelease walks documents that may be incomplete for that case.
+	entity, err := s.newReleaseEntity(ctx, input.ProjectID, content, releaseMetadataFromCreate(input))
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +116,7 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	// Read before insert so the common re-deploy answers without burning an
 	// id. The unique index on (project_id, content_hash) is what makes this
 	// correct under concurrency; the read only spares the round trip.
+	// A set already released answers with that release; validation is skipped.
 	existing, err := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
 	if err != nil {
 		return nil, err
@@ -96,38 +124,18 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	if existing != nil {
 		return &CreateReleaseOutput{Release: existing}, nil
 	}
+	if err := domain.ValidateRelease(content); err != nil {
+		return nil, err
+	}
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateRelease(ctx, entity); err != nil {
-			return err
-		}
-		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
-			Type:       domain.EventTypeReleaseCreated,
-			Category:   domain.EventCategoryAdmin,
-			ProjectID:  entity.ProjectID,
-			EntityType: "release",
-			EntityID:   entity.ID,
-			Payload:    domain.ReleasePayloadSnapshot(entity),
-		})
+		return insertRelease(ctx, tx.Statements(), entity)
 	})
 	if err != nil {
-		// Two callers pinned the same set at once and this one lost the race.
-		// The winner's release is the answer: the loser asked for a release
-		// pinning exactly that set, and one now exists.
-		if _, ok := errors.AsType[*database.UniqueError](err); ok {
-			raced, hashErr := s.getByContentHash(ctx, input.ProjectID, entity.ContentHash)
-			if hashErr != nil {
-				return nil, hashErr
-			}
-			if raced != nil {
-				return &CreateReleaseOutput{Release: raced}, nil
-			}
-		}
-		// project_id is the only foreign key on releases, and every pinned
-		// revision was read from this project a moment ago, so a violation
-		// means the project was deleted underneath the call.
-		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-			return nil, domain.ErrReleaseProjectNotFound().WithParent(err)
+		if out, mapped, mapErr := s.mapReleasePersistError(ctx, input.ProjectID, entity.ContentHash, err); mapErr != nil {
+			return nil, mapErr
+		} else if mapped {
+			return out, nil
 		}
 		if de, ok := errors.AsType[domain.Error](err); ok {
 			return nil, de
@@ -138,8 +146,92 @@ func (s *releaseService) Create(ctx context.Context, input CreateReleaseInput) (
 	return &CreateReleaseOutput{Release: entity, Created: true}, nil
 }
 
-func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain.Release, error) {
-	entity, err := s.v2Pool.Statements().GetReleaseByID(ctx, projectID, id)
+func releaseMetadataFromCreate(input CreateReleaseInput) domain.ReleaseMetadata {
+	return domain.ReleaseMetadata{
+		Message:  input.Message,
+		GitSHA:   input.GitSHA,
+		GitDirty: input.GitDirty,
+	}
+}
+
+func (s *releaseService) newReleaseEntity(
+	ctx context.Context,
+	projectID string,
+	content domain.ReleaseContent,
+	meta domain.ReleaseMetadata,
+) (*domain.Release, error) {
+	actor, _ := audit.ActorFromContext(ctx)
+	meta.CreatedBy = actor.ActorID
+	meta.CreatedByType = actor.ActorType
+	return domain.NewRelease(projectID, content, meta)
+}
+
+func insertRelease(ctx context.Context, stmts AllStatements, entity *domain.Release) error {
+	if err := stmts.CreateRelease(ctx, entity); err != nil {
+		return err
+	}
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeReleaseCreated,
+		Category:   domain.EventCategoryAdmin,
+		ProjectID:  entity.ProjectID,
+		EntityType: "release",
+		EntityID:   entity.ID,
+		Payload:    domain.ReleasePayloadSnapshot(entity),
+	})
+}
+
+// finalizeReleaseOn looks up entity by content hash on stmts and inserts when
+// absent. Used inside Build's transaction so the hash check sees the same
+// snapshot as the resource writes.
+func finalizeReleaseOn(
+	ctx context.Context,
+	stmts AllStatements,
+	entity *domain.Release,
+) (*CreateReleaseOutput, error) {
+	existing, err := stmts.GetReleaseByContentHash(ctx, entity.ProjectID, entity.ContentHash)
+	if err == nil {
+		return &CreateReleaseOutput{Release: existing}, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up release by content hash")
+	}
+	if err := insertRelease(ctx, stmts, entity); err != nil {
+		return nil, err
+	}
+	return &CreateReleaseOutput{Release: entity, Created: true}, nil
+}
+
+// mapReleasePersistError recovers a concurrent content-hash winner or a
+// missing project. mapped is true when out is the answer for that race/FK.
+func (s *releaseService) mapReleasePersistError(
+	ctx context.Context,
+	projectID, contentHash string,
+	err error,
+) (out *CreateReleaseOutput, mapped bool, mapErr error) {
+	if _, ok := errors.AsType[*database.UniqueError](err); ok && contentHash != "" {
+		raced, hashErr := s.getByContentHash(ctx, projectID, contentHash)
+		if hashErr != nil {
+			return nil, false, hashErr
+		}
+		if raced != nil {
+			return &CreateReleaseOutput{Release: raced}, true, nil
+		}
+	}
+	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+		return nil, false, domain.ErrReleaseProjectNotFound().WithParent(err)
+	}
+	return nil, false, nil
+}
+
+func (s *releaseService) Get(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Get")
+	defer end(&err)
+
+	return getRelease(ctx, s.v2Pool.Statements(), projectID, id)
+}
+
+func getRelease(ctx context.Context, stmts ReleaseStatements, projectID, id string) (*domain.Release, error) {
+	entity, err := stmts.GetReleaseByID(ctx, projectID, id)
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrReleaseNotFound()
@@ -149,7 +241,75 @@ func (s *releaseService) Get(ctx context.Context, projectID, id string) (*domain
 	return entity, nil
 }
 
-func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (*ListReleasesOutput, error) {
+// Revoke marks the release revoked, once: a release already revoked comes
+// back unchanged. A release an origin still serves is refused with the
+// origins and the deployments that pin it.
+func (s *releaseService) Revoke(ctx context.Context, projectID, id string) (_ *domain.Release, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.Revoke")
+	defer end(&err)
+
+	var revoked *domain.Release
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		stmts := tx.Statements()
+		entity, err := getRelease(ctx, stmts, projectID, id)
+		if err != nil {
+			return err
+		}
+		if entity.Revoked() {
+			revoked = entity
+			return nil
+		}
+		// TODO(#2206): a concurrent deploy of this release can land after this check.
+		served, err := servedOrigins(ctx, stmts, projectID, id, time.Now())
+		if err != nil {
+			return err
+		}
+		if len(served) > 0 {
+			return domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: served})
+		}
+		revoked, err = stmts.RevokeRelease(ctx, projectID, id)
+		if err != nil {
+			return domain.ErrInternal(err).WithMessage("failed to revoke release")
+		}
+		return audit.Emit(ctx, stmts, audit.EmitSpec{
+			Type:       domain.EventTypeReleaseRevoked,
+			Category:   domain.EventCategoryAdmin,
+			ProjectID:  projectID,
+			EntityType: "release",
+			EntityID:   id,
+			Payload:    domain.ReleaseRevokedPayload{ContentHash: revoked.ContentHash},
+		})
+	})
+	if err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			return nil, de
+		}
+		return nil, domain.ErrInternal(err).WithMessage("failed to revoke release")
+	}
+	return revoked, nil
+}
+
+// servedOrigins returns the origins still serving the release, each with the
+// deployment that serves it.
+func servedOrigins(ctx context.Context, stmts DeploymentStatements, projectID, releaseID string, now time.Time) ([]domain.ReleaseInUseOrigin, error) {
+	result, err := stmts.ListLiveDeployments(WithAuthzListUnrestricted(ctx), now, deployment.LiveListOptions(projectID, &releaseID, 0))
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list the live deployments")
+	}
+	var served []domain.ReleaseInUseOrigin
+	for _, live := range result.Items {
+		for _, origin := range live.Origins() {
+			served = append(served, domain.ReleaseInUseOrigin{Origin: origin, DeploymentID: live.ID})
+		}
+	}
+	slices.SortFunc(served, func(a, b domain.ReleaseInUseOrigin) int { return strings.Compare(a.Origin, b.Origin) })
+	return served, nil
+}
+
+func (s *releaseService) List(ctx context.Context, input ListReleasesInput) (_ *ListReleasesOutput, err error) {
+	ctx, end := startSpan(ctx, "ReleaseService.List")
+	defer end(&err)
+
 	opts := release.ListOptions(input.ProjectID, uint32(normalizeLimit(input.Limit)))
 	opts.Pagination.Cursor = []byte(input.PageToken)
 
@@ -178,78 +338,51 @@ func (s *releaseService) getByContentHash(ctx context.Context, projectID, conten
 	return entity, nil
 }
 
-// resolvePointers turns the caller's (kind, revision_id) pairs into pinned
-// pointers, reading each revision's handle from the revision itself. Every
-// revision is read anyway to prove it exists, so binding the handle here costs
-// nothing extra and removes the class of error where a caller names a resource
-// its own revision disagrees with.
-//
-// Ordering, the empty set and duplicate handles are the domain constructor's
-// to reject; this only resolves.
-//
-// TODO(#1154): the pinned set is not checked for closure. A flow pinned here
-// may reference a user schema this release does not pin, and nothing objects.
-// The check belongs in this loop, which already holds every resolved handle and
-// has read each revision — but it is not expressible while a flow references
-// its schema by revision id instead of by handle (#1144).
-func (s *releaseService) resolvePointers(ctx context.Context, projectID string, requested []CreateReleasePointer) ([]domain.ReleasePointer, error) {
-	pointers := make([]domain.ReleasePointer, 0, len(requested))
-	for _, pointer := range requested {
-		handle, err := s.resolveHandle(ctx, projectID, pointer)
-		if err != nil {
-			return nil, err
-		}
-		pointers = append(pointers, domain.ReleasePointer{
-			Kind:       pointer.Kind,
-			Handle:     handle,
-			RevisionID: pointer.RevisionID,
-		})
-	}
-	return pointers, nil
-}
-
-// resolveHandle reads the handle a revision declares. It is per kind rather
-// than a shared column read: a schema's handle is its objectType, a flow
-// definition's is its name, and branding has no identifying field at all
-// because a project has exactly one.
-func (s *releaseService) resolveHandle(ctx context.Context, projectID string, pointer CreateReleasePointer) (string, error) {
+// loadContent reads each requested revision from the project; its handle
+// comes from the revision itself.
+func (s *releaseService) loadContent(ctx context.Context, projectID string, requested []CreateReleasePointer) (domain.ReleaseContent, error) {
 	stmts := s.v2Pool.Statements()
-	switch pointer.Kind {
-	case domain.ReleasePointerKindSchema:
-		schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
-		if err != nil {
-			return "", mapRevisionLookupError(err, pointer)
-		}
-		// A schema registered by URL whose document was never parsed declares
-		// no objectType, so nothing says which resource it is a revision of.
-		if schema.ObjectType == nil || *schema.ObjectType == "" {
-			return "", domain.ErrReleaseRevisionUnpinnable(
-				fmt.Sprintf("schema %q declares no objectType", pointer.RevisionID))
-		}
-		return *schema.ObjectType, nil
+	var content domain.ReleaseContent
+	for _, pointer := range requested {
+		switch pointer.Kind {
+		case domain.ReleasePointerKindSchema:
+			schema, err := s.builtinBases.GetJSONSchema(ctx, stmts, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			content.Schemas = append(content.Schemas, schema)
 
-	case domain.ReleasePointerKindFlowDefinition:
-		definition, err := stmts.GetFlowDefinitionByID(ctx, projectID, pointer.RevisionID)
-		if err != nil {
-			return "", mapRevisionLookupError(err, pointer)
-		}
-		return definition.Name, nil
+		case domain.ReleasePointerKindFlowDefinition:
+			definition, err := stmts.GetFlowDefinitionByID(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			content.FlowDefinitions = append(content.FlowDefinitions, definition)
 
-	case domain.ReleasePointerKindBranding:
-		if _, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID); err != nil {
-			return "", mapRevisionLookupError(err, pointer)
-		}
-		// A project has one branding, so there is nothing to distinguish it
-		// from; the constant still collides correctly when a caller pins two
-		// branding revisions in one release.
-		return domain.ReleaseBrandingHandle, nil
+		case domain.ReleasePointerKindIDP:
+			connection, err := stmts.GetIDPConnectionRevision(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			content.IDPConnections = append(content.IDPConnections, connection)
 
-	default:
-		// Unreachable over HTTP: the wire enum admits only the three kinds
-		// above. It stays mapped for the in-process callers that skip the
-		// decoder.
-		return "", domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)
+		case domain.ReleasePointerKindBranding:
+			branding, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			if content.Branding != nil {
+				return content, domain.ErrReleaseInvalid(fmt.Sprintf("%s %q is referenced twice",
+					domain.ReleasePointerKindBranding, domain.ReleaseBrandingHandle), nil)
+			}
+			content.Branding = branding
+
+		default:
+			// Unreachable over HTTP: the wire enum admits only the kinds above.
+			return content, domain.ErrReleaseInvalid(fmt.Sprintf("unknown pointer kind %d", pointer.Kind), nil)
+		}
 	}
+	return content, nil
 }
 
 // mapRevisionLookupError reports a missing revision as the caller's error and

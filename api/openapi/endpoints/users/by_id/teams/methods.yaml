@@ -14,15 +14,12 @@ get:
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
-    - name: user_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../../components/schemas/user-id.yaml
+    - $ref: ../../../../components/parameters/user-id.yaml
   security:
     - oauth2:
         - user.read
         - team_membership.read
+    - nextgenSession: []
   responses:
     '200':
       description: The teams of a user are returned

@@ -1,3 +1,5 @@
+import type { BaseCommand } from "./base";
+
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
  * these to correlate output with the CLI version, the command that ran, and the
@@ -29,6 +31,8 @@ export type SkippedEnvelope = EnvelopeMeta & {
   reason: string;
   data?: unknown;
   next_commands?: string[];
+  /** Warnings reported before the command stopped; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
@@ -43,6 +47,8 @@ export type ErrorEnvelope = EnvelopeMeta & {
   hint?: string;
   next_commands?: string[];
   details?: unknown;
+  /** Warnings reported before the command failed; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
@@ -71,6 +77,20 @@ export type GlobalOptions = {
   debug: boolean;
   env: NodeJS.ProcessEnv;
   isTTY: boolean;
+};
+
+/**
+ * An environment variable that sets what a global flag sets. The code that
+ * reads it declares it and reads it by `name`, and the CLI reference lists it
+ * beside the flag (`FLAG_VARIABLES` in `./base`).
+ */
+export type FlagVariable = {
+  readonly name: string;
+  /** The global flag it stands in for, without `--`. */
+  readonly flag: keyof (typeof BaseCommand)["baseFlags"];
+  readonly description: string;
+  /** How it ranks against the flag and the other sources of the setting. */
+  readonly precedence: string;
 };
 
 /**

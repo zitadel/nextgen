@@ -1,0 +1,137 @@
+---
+title: Customize the login design
+description: Style the login from your app's stylesheet, or eject a starter design, add your branding, and publish it as a revision.
+---
+
+The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app: style it from your own stylesheet with [`--zl-*` tokens and CSS parts](#style-the-login-from-your-app), and put any page layout — a split screen, a brand pane, marketing copy — around it in your own code. When you need to change the widget's *structure*, you take ownership of its template: the CLI copies a starter design into `.zitadel/branding/`, and once you apply it, the login renders your files.
+
+## Style the login from your app
+
+Two hooks reach inside the login's shadow DOM from your app's stylesheet. Both are stable across releases, and both win over the branding your project publishes, so the login matches your app without a branding revision.
+
+### Tokens
+
+Set `--zl-*` custom properties on `zitadel-login`. These names are stable:
+
+| What it styles | Tokens |
+| --- | --- |
+| Primary button | `--zl-primary`, `--zl-primary-foreground` |
+| Page and card | `--zl-background`, `--zl-card`, `--zl-popover` |
+| Text | `--zl-foreground`, `--zl-muted-foreground`, `--zl-card-foreground`, `--zl-popover-foreground` |
+| Muted surfaces | `--zl-muted`, `--zl-secondary`, `--zl-secondary-foreground`, `--zl-accent`, `--zl-accent-foreground` |
+| Edges | `--zl-border` (the card and alerts), `--zl-input` (fields and other controls) |
+| Links | `--zl-link` |
+| Status | `--zl-success`, `--zl-warning`, `--zl-destructive` |
+| Type | `--zl-font-family-sans`, `--zl-font-family-heading`, `--zl-text-{xs,sm,base,lg,xl}-size`, `--zl-text-{xs,sm,base,lg,xl}-leading` |
+| Shape | `--zl-radius-{xs,sm,md,lg,xl}`, `--zl-spacing-4`, `--zl-spacing-8`, `--zl-logo-scale` |
+
+Other `--zl-*` variables in the component's styles are internal and can change in any release.
+
+### CSS parts
+
+For what no token covers, such as border widths, shadows or letter case, style the login's parts with `::part()`. A part's name is the inner component's tag without `zl-`, a hyphen, and the part: the `card` part of `zl-card` is `zitadel-login::part(card-card)`.
+
+| Component | Parts |
+| --- | --- |
+| `zl-card` | `card-card`, `card-header`, `card-body`, `card-footer` |
+| `zl-field` | `field-root`, `field-label`, `field-label-row`, `field-forgot-link`, `field-input-wrap`, `field-input`, `field-trailing-icon`, `field-trailing-action`, `field-password-toggle`, `field-help`, `field-success`, `field-error` |
+| `zl-button` | `button-root`, `button-spinner` |
+| `zl-alert` | `alert-alert`, `alert-icon`, `alert-body`, `alert-title`, `alert-message`, `alert-detail`, `alert-link`, `alert-close` |
+| `zl-checkbox` | `checkbox-field`, `checkbox-root`, `checkbox-input`, `checkbox-box`, `checkbox-face`, `checkbox-check`, `checkbox-label`, `checkbox-error` |
+| `zl-select` | `select-root`, `select-label`, `select-field`, `select-native`, `select-trigger`, `select-listbox`, `select-option`, `select-error` |
+| `zl-sso-providers` | `sso-providers-root`, `sso-providers-divider`, `sso-providers-list`, `sso-providers-provider`, `sso-providers-provider-button` |
+| `zl-page-shell` | `page-shell-shell`, `page-shell-header`, `page-shell-main`, `page-shell-footer` |
+| `zl-account`, `zl-avatar`, `zl-pill` | `account-chip`, `avatar-avatar`, `pill-pill` |
+
+The login also names its own parts directly: `form`, `paired-identifier`, `attribution`, and `attribution-mark`.
+
+A flat, hard-edged look, for example, needs both hooks:
+
+```css
+zitadel-login {
+  --zl-font-family-sans: "Space Mono", ui-monospace, monospace;
+  --zl-primary: #0a0a0a;
+  --zl-primary-foreground: #c6ff00;
+  --zl-radius-xs: 0;
+  --zl-radius-sm: 0;
+  --zl-radius-md: 0;
+  --zl-radius-lg: 0;
+  --zl-radius-xl: 0;
+}
+
+zitadel-login::part(card-card) {
+  border: 3px solid #0a0a0a;
+  box-shadow: 6px 6px 0 #0a0a0a;
+}
+
+zitadel-login::part(button-root) {
+  text-transform: uppercase;
+}
+```
+
+The login draws its own card, so give that card your frame through `card-card` rather than wrapping the element in a second box.
+
+`<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
+
+## Starter designs
+
+| Design | Layout | Uses logo |
+| --- | --- | --- |
+| `centered` | The default card, ejected as-is | yes |
+| `minimal` | The same form without card chrome | no |
+
+Both render every step of your login flow — sign-in, registration, passkey ceremonies, and their error states — because they template the flow engine's step responses rather than individual screens.
+
+## Eject a design
+
+`zitadel setup` never applies a design: it embeds the maintained login component and publishes no branding revision. Take ownership of the template at any time:
+
+```sh
+npx @zitadel/cli@latest branding eject
+```
+
+`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you apply:
+
+- `branding.json` — the descriptor: layout, brand asset URLs, and the template reference.
+- `login.liquid` — the LiquidJS template the login renders for every step.
+- `README.md` — the template rules and workflow, kept next to the files.
+
+## Add your branding
+
+Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs at plan time, and the server rejects anything else:
+
+```json
+{
+  "$schema": "../meta/branding.json",
+  "layout": "centered",
+  "logo_url": "https://cdn.example.com/logo.svg",
+  "typography": {
+    "font_family": "Inter, ui-sans-serif, sans-serif",
+    "font_url": "https://cdn.example.com/fonts/inter.css"
+  },
+  "liquid_template": { "$file": "./login.liquid" }
+}
+```
+
+Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
+
+`typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
+
+Without `font_url` the login loads no font of its own: it renders in Arimo where the browser already has it, and in the system font otherwise, so it sends no request to a font host. A `font_url` on a third-party host such as Google Fonts sends every visitor's IP address to that host, which under the GDPR can require their consent. Serve the stylesheet and font files from your own domain to avoid that.
+
+## Publish and iterate
+
+Branding follows the same loop as schemas and flows:
+
+```sh
+npx @zitadel/cli@latest plan
+npx @zitadel/cli@latest apply
+```
+
+`plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.
+
+The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
+
+## Ownership trade-off
+
+An ejected template is yours: it stops receiving improvements to the built-in designs. Eject when you want to change the login's structure and look; to change only the wording, the `locales` prop does that without touching templates (see [Customize the login text](/docs/guides/customize-copy)). Staying on the built-in template costs nothing — `branding eject` is always one command away.

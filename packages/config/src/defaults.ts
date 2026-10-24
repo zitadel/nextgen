@@ -9,9 +9,7 @@ import type {
 import defaultHumanUserSchemaTemplate from "../defaults/default-human-user.json" with {
   type: "json",
 };
-import defaultLoginFlowTemplate from "../defaults/default-login.json" with {
-  type: "json",
-};
+import defaultLoginFlowTemplate from "../defaults/default-login.json" with { type: "json" };
 import passkeyFirstHumanUserSchemaTemplate from "../defaults/presets/passkey-first/human-user.json" with {
   type: "json",
 };
@@ -21,8 +19,8 @@ import passkeyFirstLoginFlowTemplate from "../defaults/presets/passkey-first/log
 
 export { brandingReadmeContent, flowsReadmeContent, schemasReadmeContent } from "./readmes.js";
 
-export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://nextgen.com/api/schemas";
-export const DEFAULT_FLOW_SCHEMA_URI = "https://nextgen.com/flow-definition.json";
+export const DEFAULT_BUILTIN_SCHEMA_BASE = "https://zitadel.com/schemas/v1";
+export const DEFAULT_FLOW_SCHEMA_URI = `${DEFAULT_BUILTIN_SCHEMA_BASE}/flow-definition.json`;
 export const DEFAULT_SCHEMA_CONFIG_PATH = ".zitadel/schemas/default-human-user.json";
 export const DEFAULT_FLOW_CONFIG_PATH = ".zitadel/flows/default-login.json";
 export const DEFAULT_BRANDING_CONFIG_PATH = ".zitadel/branding/branding.json";
@@ -263,9 +261,7 @@ export type DefaultConfigRenderOptions = {
   useCase?: string;
 };
 
-export function defaultHumanUserSchemaUrl(
-  builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE,
-): string {
+export function defaultHumanUserSchemaUrl(builtinSchemaBase = DEFAULT_BUILTIN_SCHEMA_BASE): string {
   return `${trimTrailingSlash(builtinSchemaBase)}/default-human-user.json`;
 }
 
@@ -285,15 +281,17 @@ export function getDefaultHumanUserSchema(
   ) as CreateSchemaBody;
 }
 
+/** The flow names its user schema by `objectType`, so no schema URL renders into it. */
+export type DefaultFlowRenderOptions = Omit<DefaultConfigRenderOptions, "userSchemaUrl">;
+
 export function getDefaultLoginFlow(
-  options: DefaultConfigRenderOptions = {},
+  options: DefaultFlowRenderOptions = {},
 ): CreateFlowDefinitionBodyFlowDefinition {
   const builtinSchemaBase = trimTrailingSlash(
     options.builtinSchemaBase ?? DEFAULT_BUILTIN_SCHEMA_BASE,
   );
   const rendered = renderTemplate(presetTemplates(options.preset ?? DEFAULT_SETUP_PRESET).flow, {
     SERVER_URL: builtinSchemaBase,
-    USER_SCHEMA_URL: options.userSchemaUrl ?? defaultHumanUserSchemaUrl(builtinSchemaBase),
   }) as Record<string, unknown>;
   return applyUseCaseToFlow(
     rendered,

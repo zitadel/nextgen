@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, sep } from "node:path";
 
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { consola } from "consola";
 
 import { ZitadelError } from "../errors";
@@ -9,10 +10,17 @@ import { FLOWS_DIR } from "../flows";
 import { stableStringify } from "../json";
 import { annotateAssetWarnings } from "./asset-probe.js";
 import { validatePlannedFlows } from "./flow-validation.js";
-import type { PlanResourceChange } from "./plan-renderer.js";
-import { readState, removeFromState, updateState } from "./state.js";
+import { validatePlannedSso } from "./sso-validation.js";
+import {
+  isUnsupportedDeletion,
+  type PlanResourceChange,
+  unsupportedDeletionNote,
+  type UnsupportedDeletion,
+} from "./plan-renderer.js";
+import { moveInState, readState, removeFromState, updateState } from "./state.js";
 import { FatalFetchError } from "./types.js";
 import type { FlowRepin, ResourceEntry, ResourceSyncer, SyncAction } from "./types.js";
+import { reportWarning } from "../warnings";
 
 /**
  * Compute the sync plan for `cwd` against the state file and (when
@@ -93,8 +101,8 @@ export async function buildSyncPlan(
       }
     }
 
-    for (const content of onDisk.values()) {
-      syncer.validate(content);
+    for (const [absPath, content] of onDisk.entries()) {
+      syncer.validate(content, toStatePath(absPath, cwd));
     }
 
     for (const [filePath, entry] of Object.entries(state.resources)) {
@@ -102,6 +110,17 @@ export async function buildSyncPlan(
         continue;
       }
       if (onDisk.has(join(cwd, filePath)) || !entry.id) {
+        continue;
+      }
+
+      if (syncer.deletion === "unsupported") {
+        actions.push({
+          kind: "skip",
+          path: filePath,
+          reason: "unsupported-deletion",
+          syncer,
+          id: entry.id,
+        });
         continue;
       }
 
@@ -120,7 +139,7 @@ export async function buildSyncPlan(
     }
 
     for (const [absPath, content] of onDisk.entries()) {
-      const relPath = absPath.slice(cwd.length + 1);
+      const relPath = toStatePath(absPath, cwd);
       scannedContents.set(relPath, content);
       const entry = state.resources[relPath];
       const hash = hashForState(syncer, content);
@@ -167,10 +186,17 @@ export async function buildSyncPlan(
       // hash for the bodies it newly touches, which costs one no-op
       // revision on the next apply; keeping a copy of every past
       // normalizer to avoid that would outlast the state files it serves.
+      //
+      // A syncer that gained its first normalizer (connections, which read a
+      // left-out default as the server's) also accepts the hash of the
+      // un-normalized body, which is what its state entries hold. The file has
+      // to be byte-for-byte what was hashed for that to match, so it is the
+      // same file.
       const unchanged =
         entry.hash === hash ||
         entry.hash === hashResourceContent(content) ||
-        entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object);
+        entry.hash === hashResourceContent(JSON.parse(stableStringify(content)) as object) ||
+        (syncer.normalize !== undefined && entry.hash === hashForState({}, content));
       // A re-pin is an upload of an otherwise unchanged file, so it needs a
       // syncer that can upload: an update for a mutable one, a new revision
       // for a revisioned one (flows).
@@ -220,6 +246,41 @@ export async function buildSyncPlan(
   // server would otherwise enforce mid-apply, after the schema revision
   // already published. Throws E_VALIDATION before any mutation.
   validatePlannedFlows({ actions, scannedContents, stateResources: state.resources });
+  // The rules that read schemas, flows and connections together.
+  await validatePlannedSso({
+    actions,
+    scannedContents,
+    stateResources: state.resources,
+    slugOfKept: async (kept) => {
+      const stored = await readStored(kept.syncer, kept.id);
+      return stored === null ? undefined : kept.syncer.identityOf?.(stored);
+    },
+  });
+
+  // What only the platform can answer, for every file this plan writes. After
+  // the local checks, so a mistake that needs no request is never hidden behind one.
+  for (const action of [...actions]) {
+    if ((action.kind === "create" || action.kind === "update") && action.syncer.preflight) {
+      const old = action.kind === "update" ? await storedBody(action) : null;
+      const existing = await action.syncer.preflight(action.path, action.content, old);
+      if (action.kind === "create" && existing !== undefined) {
+        // The platform already holds this resource, and a removed file the plan
+        // declines to delete is where it used to live: that is a move, not a new
+        // resource, and the removal is no longer a loose end.
+        const declined = actions.find(
+          (other): other is UnsupportedDeletion =>
+            isUnsupportedDeletion(other) &&
+            other.syncer === action.syncer &&
+            other.id === existing.id,
+        );
+        if (declined !== undefined) {
+          action.movedFrom = declined.path;
+          action.oldContent = existing.definition;
+          actions.splice(actions.indexOf(declined), 1);
+        }
+      }
+    }
+  }
 
   // Reachability pre-flight for branding asset URLs. Annotates warnings only:
   // the machine planning is not necessarily the machine rendering the login
@@ -232,9 +293,10 @@ export async function buildSyncPlan(
 /** Result of {@link runSyncLoop}: what changed on the platform and locally. */
 export type SyncLoopResult = {
   /**
-   * Project-relative paths of files updated from the server's canonical
-   * responses (write-back). Surfaced in human and `--json` output so a
-   * local rewrite is never silent.
+   * Project-relative paths of the flow files whose `user_schema` was re-pinned
+   * from a superseded schema revision id to the new one. Apply rewrites no
+   * other file: the rest stay as written. Surfaced in human and `--json`
+   * output so a local rewrite is never silent.
    */
   filesUpdated: string[];
   /**
@@ -244,15 +306,23 @@ export type SyncLoopResult = {
    * deleted). Feeds the `apply` `--json` `changes` array.
    */
   applied: PlanResourceChange[];
+  /** Removed files whose resource was kept, because it cannot be deleted yet. */
+  unsupported: string[];
 };
 
 /**
  * Execute every action returned by {@link buildSyncPlan} against the
  * platform. Updates the local state file (`.zitadel/state.json`) as
- * each action completes so an interrupted run can resume. After each
- * mutation, the server's canonical body is written back to the local
- * file (when it differs in normalized form), so repo config matches
- * live state by construction and the next `plan` is empty.
+ * each action completes so an interrupted run can resume, recording the
+ * hash of what was uploaded, so the next `plan` is empty.
+ *
+ * The files stay as written. The server's answer is not written back: it
+ * spells out defaults the author left to the server (a connection's
+ * `pkce_enabled`) and leaves out others (an action's `primary: false`), and
+ * `plan` reads both as no change through the syncer's `normalize`. The one
+ * rewrite is a flow's `user_schema` that pins a schema revision id this run
+ * (or an interrupted one) superseded: the file must carry the server-minted
+ * id of the new revision, or the next upload would pin the old one.
  *
  * The platform target (base URL + bearer auth) lives in the api
  * package's runtime registries; callers set them before invoking this.
@@ -269,7 +339,7 @@ export async function runSyncLoop(
   for (const action of actions) {
     if (action.kind === "create" || action.kind === "update" || action.kind === "revise") {
       for (const warning of action.warnings ?? []) {
-        consola.warn(`${action.path}: ${warning.message}`);
+        reportWarning(`${action.path}: ${warning.message}`);
       }
     }
   }
@@ -301,42 +371,42 @@ export async function runSyncLoop(
     return { ...(content as Record<string, unknown>), user_schema: newId };
   };
 
-  const writeBack = async (
-    action: Extract<SyncAction, { kind: "create" | "revise" | "update" }>,
-    canonical: object | undefined,
-    fallbackHash: string,
-  ): Promise<string> => {
-    if (!canonical) {
-      return fallbackHash;
-    }
-    const { hash, changed } = await writeBackResource(cwd, action.path, action.syncer, canonical);
-    if (changed) {
-      filesUpdated.push(action.path);
-      consola.info(`Updated ${action.path} from the server's canonical response`);
-    }
-    return hash;
-  };
-
   for (const action of actions) {
     switch (action.kind) {
       case "create": {
-        let content = action.content;
         const newId = repinTarget(action.repin);
-        if (newId) {
-          // A flow created in the same run as (or after an interrupted)
-          // schema revise must adopt the new revision — POSTing the stale
-          // pin would fail validation, and its canonical echo would revert
-          // the re-pinned local file.
-          content = { ...(content as Record<string, unknown>), user_schema: newId };
+        // A flow created in the same run as (or after an interrupted) schema
+        // revise must adopt the new revision — POSTing the stale pin would
+        // fail validation.
+        const content =
+          newId && action.repin
+            ? await adoptRepin(action.path, action.content, action.repin, newId)
+            : action.content;
+        const { id } = await action.syncer.create(content);
+        const hash = newId ? hashForState(action.syncer, content) : action.hash;
+        const entry: ResourceEntry = { id, hash };
+        if (action.movedFrom === undefined) {
+          await updateState(cwd, action.path, entry);
+        } else {
+          await moveInState(cwd, action.movedFrom, action.path, entry);
         }
-        const { id, canonical } = await action.syncer.create(content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
-        const entry: ResourceEntry = { id, hash: await writeBack(action, canonical, fallbackHash) };
-        await updateState(cwd, action.path, entry);
-        consola.info(
-          `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
-        );
-        applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        if (action.movedFrom === undefined) {
+          consola.info(
+            `Created a new ${action.syncer.kind} on Zitadel from ${action.path} (id ${id})`,
+          );
+          applied.push({ kind: action.syncer.kind, action: "create", file: action.path, id });
+        } else {
+          consola.info(
+            `Moved the ${action.syncer.kind} from ${action.movedFrom} to ${action.path} (id ${id})`,
+          );
+          applied.push({
+            kind: action.syncer.kind,
+            action: "move",
+            file: action.path,
+            id,
+            moved_from: action.movedFrom,
+          });
+        }
         break;
       }
       case "revise": {
@@ -345,14 +415,13 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { id, canonical } = await action.syncer.create(content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        const { id } = await action.syncer.create(content);
         // `previousId` lands in state before the flow files are rewritten:
         // if the process dies in between, the next plan recovers the re-pin
         // from state instead of publishing a duplicate revision.
         const entry: ResourceEntry = {
           id,
-          hash: await writeBack(action, canonical, fallbackHash),
+          hash: newId ? hashForState(action.syncer, content) : action.hash,
           previousId: action.previousId,
         };
         await updateState(cwd, action.path, entry);
@@ -381,8 +450,7 @@ export async function runSyncLoop(
           newId && action.repin
             ? await adoptRepin(action.path, action.content, action.repin, newId)
             : action.content;
-        const { id: landedOn, canonical } = await action.syncer.update(action.id, content);
-        const fallbackHash = newId ? hashForState(action.syncer, content) : action.hash;
+        const { id: landedOn } = await action.syncer.update(action.id, content);
         // The id the write reported, not the one it was given: a write
         // addressed by document content can land on a different resource than
         // the tracked one, and state has to follow it or the next plan reads
@@ -390,10 +458,15 @@ export async function runSyncLoop(
         const trackedId = landedOn ?? action.id;
         await updateState(cwd, action.path, {
           id: trackedId,
-          hash: await writeBack(action, canonical, fallbackHash),
+          hash: newId ? hashForState(action.syncer, content) : action.hash,
         });
         consola.info(`Updated the ${action.syncer.kind} on Zitadel from ${action.path}`);
-        applied.push({ kind: action.syncer.kind, action: "update", file: action.path, id: trackedId });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "update",
+          file: action.path,
+          id: trackedId,
+        });
         break;
       }
       case "delete": {
@@ -402,10 +475,18 @@ export async function runSyncLoop(
         consola.info(
           `Deleted the ${action.syncer.kind} on Zitadel because ${action.path} was removed locally`,
         );
-        applied.push({ kind: action.syncer.kind, action: "delete", file: action.path, id: action.id });
+        applied.push({
+          kind: action.syncer.kind,
+          action: "delete",
+          file: action.path,
+          id: action.id,
+        });
         break;
       }
       case "skip": {
+        if (isUnsupportedDeletion(action)) {
+          reportWarning(unsupportedDeletionNote(action));
+        }
         consola.debug(`Skipped ${action.path} (${action.reason})`);
         break;
       }
@@ -423,7 +504,11 @@ export async function runSyncLoop(
     }
   }
 
-  return { filesUpdated: [...new Set(filesUpdated)], applied };
+  return {
+    filesUpdated: [...new Set(filesUpdated)],
+    applied,
+    unsupported: actions.filter(isUnsupportedDeletion).map((action) => action.path),
+  };
 }
 
 /**
@@ -480,42 +565,37 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Reconcile a local file with the server's canonical body. What gets
- * written is the `normalizeWrite` form (strips pure transport noise like
- * the empty `audience` echo; for schemas the canonical body verbatim —
- * spelled-out x-* defaults must survive, or the next apply would publish
- * a revision without them). Equality is judged in the `normalize`
- * comparison form, so the file is rewritten only when it materially
- * differs from live state; hand-formatted files stay untouched otherwise.
- * Returns the state hash of the written form.
+ * The stored body an update is checked against. Unlike a plan's diff, a check
+ * cannot proceed on a body it failed to read, so a failure stops the run; only
+ * a resource gone from the platform reads as nothing stored.
  */
-export async function writeBackResource(
-  cwd: string,
-  relPath: string,
-  syncer: Pick<ResourceSyncer, "normalize" | "normalizeWrite">,
-  canonical: object,
-): Promise<{ hash: string; changed: boolean }> {
-  let writeBody = syncer.normalizeWrite?.(canonical) ?? canonical;
-  const compare = (body: object) => stableStringify(syncer.normalize?.(body) ?? body);
-  const absPath = join(cwd, relPath);
-  let changed = true;
+async function storedBody(action: Extract<SyncAction, { kind: "update" }>): Promise<object | null> {
+  return action.oldContent ?? (await readStored(action.syncer, action.id));
+}
+
+/**
+ * The project-relative path a file is tracked under: always forward slashes,
+ * which is how state is written, whatever separator the platform uses.
+ */
+export function toStatePath(absolute: string, root: string, separator: string = sep): string {
+  return absolute
+    .slice(root.length + 1)
+    .split(separator)
+    .join("/");
+}
+
+async function readStored(syncer: ResourceSyncer, id: string): Promise<object | null> {
   try {
-    const onDisk = JSON.parse(await readFile(absPath, "utf8")) as Record<string, unknown>;
-    changed = compare(writeBody) !== compare(onDisk);
-    // `$schema` is a local editor affordance (points at the dialect spec in
-    // .zitadel/meta/); the server never echoes it, so a rewrite would drop
-    // it. Carry the on-disk pointer over unless the canonical body has its
-    // own (user-schema documents do).
-    if (typeof onDisk.$schema === "string" && !("$schema" in writeBody)) {
-      writeBody = { ...writeBody, $schema: onDisk.$schema };
-    }
+    return (await syncer.fetch?.(id)) ?? null;
   } catch (err) {
-    consola.debug(`read ${relPath} for write-back failed:`, err);
+    if (err instanceof FatalFetchError) {
+      throw err.reason;
+    }
+    if (err instanceof ApiError && err.status === 404) {
+      return null;
+    }
+    throw err;
   }
-  if (changed) {
-    await writeFile(absPath, `${stableStringify(writeBody)}\n`);
-  }
-  return { hash: hashForState(syncer, writeBody), changed };
 }
 
 async function fetchOldIfAsked(
@@ -568,11 +648,14 @@ async function readJsonDir(dirPath: string): Promise<Map<string, object>> {
  * with a non-string one) is skipped: it does not pin a schema revision, so it
  * cannot be affected by one.
  */
-async function readLocalFlowUserSchemas(cwd: string): Promise<Map<string, string>> {
+export async function readLocalFlowUserSchemas(
+  cwd: string,
+  separator: string = sep,
+): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const flows = await readJsonDir(join(cwd, FLOWS_DIR));
   for (const [absPath, content] of flows.entries()) {
-    const relPath = absPath.slice(cwd.length + 1);
+    const relPath = toStatePath(absPath, cwd, separator);
     if (
       typeof content === "object" &&
       content !== null &&
@@ -613,10 +696,7 @@ export function hashResourceContent(data: object): string {
  * reordering keys or spelling out a meta-schema default does not read as an
  * edit.
  */
-export function hashForState(
-  syncer: Pick<ResourceSyncer, "normalize">,
-  data: object,
-): string {
+export function hashForState(syncer: Pick<ResourceSyncer, "normalize">, data: object): string {
   const normalized = syncer.normalize?.(data) ?? data;
   return createHash("sha256").update(stableStringify(normalized)).digest("hex");
 }

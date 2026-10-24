@@ -9,35 +9,22 @@ dependsOn:
   - "sdk-core"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
+      # The edge spec imports this package's built dist.
+      - "api-mock:build"
+      - "build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "components:build"
       - "sdk-core:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
       - "components:build-release"
       - "sdk-core:build-release"
     outputs:
@@ -60,10 +47,14 @@ tasks:
   # client render and the wrapped Lit web components need a real DOM. The
   # browser project pays a Chromium cold start, which this lane covers in CI.
   test:
-    command: "corepack pnpm run test:all"
     deps:
-      # api-mock serves the Flow API to the specs (test-setup.ts); its no-op
-      # build is the edge that re-runs this when api-mock source changes.
+      # api-mock serves the Flow API to the specs (test-setup.ts).
       - "api-mock:build"
       - "install-browsers"
       - "build"
+    options:
+      # Retry a failed browser suite in CI, as a safety net. It was added for
+      # "Failed to fetch dynamically imported module": Chromium aborting module
+      # imports when a container changes the host's addresses, which ci.yml's
+      # "Keep Docker's interface churn away from Chromium" step prevents. (#1490)
+      retryCount: 3

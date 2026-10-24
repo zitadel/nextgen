@@ -40,6 +40,8 @@ import { fileURLToPath } from "node:url";
 
 import { startLocalZitadel, type LocalZitadel, type SeededUser } from "@zitadel/testing";
 
+import { runnerCommand, runnerLabel } from "../../../scripts/task-runner.mjs";
+
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const workspaceRoot = resolve(appDir, "../..");
 
@@ -55,7 +57,7 @@ const seedOnly = process.argv.includes("--seed-only");
  * to the seeded project instead. Opt-in, not the default: making
  * `proj_platform` the deployment's default project is exactly the
  * standalone-semantics change the demo and embedded suites must not see (see
- * `cli-journey-e2e/scripts/run-local.mjs`).
+ * `e2e/journey/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
 
@@ -67,7 +69,7 @@ const PLATFORM_PROJECT_ID = "proj_platform";
 // way: `zitadel start` bootstraps the platform project by default, and that
 // pins the console's default project to `proj_platform` — which would leave
 // DEV_USER, seeded in the project this script bootstraps, unable to sign in.
-process.env["NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"] = claimMode ? "true" : "false";
+process.env.NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT = claimMode ? "true" : "false";
 
 /**
  * The account you sign in as. Fixed rather than random so the credentials stay
@@ -106,8 +108,9 @@ if (configuredServerBinary) {
   // Build (or cache-hit) the embedded server binary. Spawned here instead of
   // declared as a task dep: server:build depends on console:build, so a
   // dev-real -> server:build task dep would cycle the project graph.
+  const serverBuild = runnerCommand(["server:build"]);
   await new Promise<void>((resolveBuild, rejectBuild) => {
-    const build = spawn("moon", ["run", "server:build"], {
+    const build = spawn(serverBuild.command, serverBuild.args, {
       cwd: workspaceRoot,
       stdio: "inherit",
     });
@@ -118,13 +121,12 @@ if (configuredServerBinary) {
         return;
       }
       const detail = signal ? `signal ${signal}` : `exit ${code}`;
-      rejectBuild(new Error(`moon run server:build failed with ${detail}`));
+      rejectBuild(new Error(`${runnerLabel(["server:build"])} failed with ${detail}`));
     });
   });
 }
 
 // Signal handlers close over this before the asynchronous boot assigns it.
-// oxlint-disable-next-line prefer-const
 let zitadel: LocalZitadel | undefined;
 let stopping: Promise<void> | undefined;
 
@@ -161,11 +163,16 @@ zitadel = await startLocalZitadel({
 const seeded: SeededUser[] = [];
 try {
   seeded.push(await zitadel.seedUser(DEV_USER));
+  const extraUserAt = (index: number): (typeof EXTRA_USERS)[number] => {
+    const user = EXTRA_USERS[index];
+    if (!user) throw new Error(`[console-dev-real] no seed user at index ${index}`);
+    return user;
+  };
   seeded.push(
     ...(await zitadel.seedUsers(EXTRA_USERS.length, {
-      email: (index) => EXTRA_USERS[index]!.email,
+      email: (index) => extraUserAt(index).email,
       attributes: (index) => {
-        const { email: _email, ...attributes } = EXTRA_USERS[index]!;
+        const { email: _email, ...attributes } = extraUserAt(index);
         return attributes;
       },
     })),
@@ -225,6 +232,122 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
   );
 }
 
+/**
+ * An identity provider connection and the schemas around it, so the
+ * Authentication screen renders against real data: a `google` connection, a
+ * `Customer users` schema that lists it, and an `Employees` schema that lists
+ * no provider. The Sign-in methods tab then shows Google allowed by one schema
+ * and the plain methods by several, and the connection's "Used by" names one.
+ *
+ * Both schemas are the bootstrapped one with their own type, title and methods,
+ * so they carry the properties the seeded users already validate against.
+ * `Employees` adds an optional boolean and integer, and one employee is seeded
+ * with both set, so the user page shows a switch and a number field. The
+ * client id and secret are `${{ VAR }}` references: no variable backs them, so
+ * the connection renders but cannot complete a sign-in — which nothing here
+ * asks of it. Best-effort, like the grant: a failure costs the screen its
+ * data, not the instance.
+ */
+const EMPLOYEE_EMAIL = "employee@zitadel.local";
+
+async function seedAuthentication(): Promise<boolean> {
+  const headers = {
+    authorization: `Bearer ${projectSecret}`,
+    "content-type": "application/json",
+  };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const post = (path: string, body: unknown) =>
+    fetch(scoped(path), {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5_000),
+    });
+  try {
+    const idp = await post("/idps", {
+      idp: {
+        slug: "google",
+        protocol: "oidc",
+        template: "google",
+        display_name: "Google",
+        claim_mapping: { email: "email", givenName: "given_name", familyName: "family_name" },
+        verified_claims: { email: "email_verified" },
+        oidc: {
+          issuer: "https://accounts.google.com",
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          scopes: ["openid", "profile", "email"],
+        },
+      },
+    });
+    if (!idp.ok) return false;
+
+    const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!list.ok) return false;
+    const { schemas } = (await list.json()) as {
+      schemas: Array<{ schema: Record<string, unknown> }>;
+    };
+    const base = schemas[0]?.schema;
+    if (!base) return false;
+    // A fresh `$id` and `objectType` each: `objectType` is what makes a
+    // document a schema rather than a revision of the bootstrapped one.
+    const { $id: _id, ...document } = base;
+    const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+    const properties = (document.properties ?? {}) as Record<string, unknown>;
+
+    const customers = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "customer-user",
+      title: "Customer users",
+      "x-auth-methods": { ...methods, sso: { enabled: true, providers: ["google"] } },
+    });
+    const employees = await post("/schemas", {
+      ...document,
+      kind: "user-schema",
+      objectType: "employee",
+      title: "Employees",
+      "x-auth-methods": { ...methods, sso: { enabled: false } },
+      properties: {
+        ...properties,
+        newsletter: { type: "boolean", title: "Newsletter" },
+        deskNumber: { type: "integer", title: "Desk number" },
+      },
+    });
+    if (!customers.ok || !employees.ok) return false;
+    const { id: schema } = (await employees.json()) as { id: string };
+    // Its own warning: the provider and schemas above are seeded either way.
+    const employee = await post("/users", {
+      schema,
+      attributes: {
+        email: EMPLOYEE_EMAIL,
+        givenName: "Evelyn",
+        familyName: "Berezin",
+        newsletter: true,
+        deskNumber: 42,
+      },
+    }).catch(() => undefined);
+    if (!employee?.ok) {
+      console.warn(
+        `[console-dev-real] could not seed ${EMPLOYEE_EMAIL}; the user page has no boolean or number field to show.`,
+      );
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (!claimMode && !(await seedAuthentication())) {
+  console.warn(
+    "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+  );
+}
+
 // Claim mode signs in against the platform project, because that is the only
 // session `claim/complete` accepts; bootstrapping it makes it the project
 // `runtime.json` names. The seeded users stay in the project being claimed —
@@ -267,6 +390,7 @@ console.log(
     `  │  instance   ${baseUrl}`,
     `  │  project    ${projectId}`,
     `  │  users      ${seeded.length} seeded`,
+    ...(claimMode ? [] : [`  │             + ${EMPLOYEE_EMAIL}, no password (cannot sign in)`]),
     "  │",
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,

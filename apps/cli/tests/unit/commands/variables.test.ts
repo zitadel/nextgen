@@ -4,12 +4,19 @@ import { join } from "node:path";
 import { Readable } from "node:stream";
 
 import { HttpResponse, http } from "msw";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { setupServer } from "msw/node";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
 
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+
+import VariablesDelete from "../../../src/commands/variables/delete";
+import { DEFAULT_SERVER } from "../../../src/lib/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal as asPerson } from "../../helpers/terminal";
 
 const server = setupServer(...setupPlatformHandlers());
 
@@ -20,8 +27,6 @@ afterEach(() => {
   resetPlatformStore();
 });
 
-const SERVER = "https://api.zitadel.cloud";
-
 async function makeProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-variables-"));
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
@@ -31,6 +36,7 @@ async function makeProject(): Promise<string> {
       project_id: "proj_test",
       project_secret: "sk_proj_test_full",
       preview_secret: "sk_proj_test_preview",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00Z",
     }),
@@ -38,7 +44,7 @@ async function makeProject(): Promise<string> {
   return cwd;
 }
 
-const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", SERVER];
+const base = (cwd: string) => ["--cwd", cwd, "--json", "--server", DEFAULT_SERVER];
 
 /** Writes a `zitadel.json`, for the runs that exercise server resolution. */
 async function writeConfig(cwd: string, config: unknown): Promise<void> {
@@ -46,7 +52,7 @@ async function writeConfig(cwd: string, config: unknown): Promise<void> {
 }
 
 /** The plain rendering: no `--json`. */
-const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", SERVER, "--non-interactive"];
+const plainArgs = (cwd: string) => ["--cwd", cwd, "--server", DEFAULT_SERVER, "--non-interactive"];
 
 /** Run as though stdout were a terminal; under the test runner it is a pipe. */
 async function asTerminal<T>(run: () => Promise<T>): Promise<T> {
@@ -85,8 +91,9 @@ describe("variables list", () => {
     server.use(
       http.get("*/variables", () =>
         HttpResponse.json({
-          GOOGLE_CLIENT_SECRET: { secret: true },
-          GOOGLE_CLIENT_ID: "999-prod",
+          GOOGLE_CLIENT_SECRET: { primary: { secret: true } },
+          GOOGLE_CLIENT_ID: { primary: "999-prod", preview: "999-test" },
+          PREVIEW_ONLY: { preview: "x" },
         }),
       ),
     );
@@ -111,7 +118,9 @@ describe("variables list", () => {
 
   it("never emits a value key for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ S: { secret: true } })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ S: { primary: { secret: true } } })),
+    );
 
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
@@ -119,12 +128,12 @@ describe("variables list", () => {
     expect(json.data.variables[0]).not.toHaveProperty("value");
   });
 
-  it("sends no environment_name, so the project level is the owner", async () => {
+  it("reads the primary values", async () => {
     const cwd = await makeProject();
     let seen: string | null = "unset";
     server.use(
       http.get("*/variables", ({ request }) => {
-        seen = new URL(request.url).searchParams.get("environment_name");
+        seen = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -132,7 +141,7 @@ describe("variables list", () => {
     const res = await runCliForTest(["variables", "list", "--project-level", ...base(cwd)]);
 
     expect(res.exitCode).toBe(0);
-    expect(seen).toBeNull();
+    expect(seen).toBe("primary");
     const json = parseJson(res.stdout) as { data: { count: number } };
     expect(json.data.count).toBe(0);
   });
@@ -142,7 +151,9 @@ describe("variables list", () => {
     let call = 0;
     server.use(
       http.get("*/variables", () =>
-        HttpResponse.json(call++ === 0 ? { B: "two", A: { secret: true } } : {}),
+        HttpResponse.json(
+          call++ === 0 ? { B: { primary: "two" }, A: { primary: { secret: true } } } : {},
+        ),
       ),
     );
 
@@ -157,7 +168,9 @@ describe("variables list", () => {
 
   it("renders a table and a count on a terminal, unless --plain", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ V: "one\ntwo\u001b[31m" })));
+    server.use(
+      http.get("*/variables", () => HttpResponse.json({ V: { primary: "one\ntwo\u001b[31m" } })),
+    );
 
     const table = await asTerminal(() =>
       runCliForTest(["variables", "list", "--project-level", ...plainArgs(cwd)]),
@@ -214,12 +227,12 @@ describe("variables list", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(hit).toBe(DEFAULT_SERVER);
   });
 
   it("prints the project and the server on a terminal, and neither on a pipe", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables", () => HttpResponse.json({ A: "b" })));
+    server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
     // the same condition a pipe or a redirect creates.
@@ -233,7 +246,7 @@ describe("variables list", () => {
     expect(piped.stdout).not.toContain("Server    ");
     expect(piped.stdout.trim()).toBe("A\tb");
     expect(terminal.stdout).toContain("proj_test");
-    expect(terminal.stdout).toContain(SERVER);
+    expect(terminal.stdout).toContain(DEFAULT_SERVER);
   });
 
   it("ignores a per-environment server block in zitadel.json", async () => {
@@ -244,7 +257,7 @@ describe("variables list", () => {
     // short-circuits resolution and would hide it.
     await writeConfig(cwd, {
       project: "proj_test",
-      server: SERVER,
+      server: DEFAULT_SERVER,
       environments: { prod: { server: "https://elsewhere.example" } },
     });
     let hit = "";
@@ -265,7 +278,7 @@ describe("variables list", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(hit).toBe(SERVER);
+    expect(hit).toBe(DEFAULT_SERVER);
   });
 });
 
@@ -273,12 +286,12 @@ describe("variables get", () => {
   it("returns a non-secret value, addressing the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.get("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
-        return HttpResponse.json("999-prod");
+        kind = new URL(request.url).searchParams.get("kind");
+        return HttpResponse.json({ primary: "999-prod" });
       }),
     );
 
@@ -292,7 +305,7 @@ describe("variables get", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("GOOGLE_CLIENT_ID");
-    expect(environment).toBeNull();
+    expect(kind).toBe("primary");
     const json = parseJson(res.stdout) as {
       data: { name: string; secret: boolean; value: string };
     };
@@ -305,7 +318,7 @@ describe("variables get", () => {
 
   it("prints the whole record on a pipe, as every other get does", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await runCliForTest([
       "variables",
@@ -325,7 +338,9 @@ describe("variables get", () => {
 
   it("gives a pipe no value to capture for a secret", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest([
       "variables",
@@ -341,7 +356,7 @@ describe("variables get", () => {
 
   it("lays the record out field by field on a terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("999-prod")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "999-prod" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variables", "get", "GOOGLE_CLIENT_ID", "--project-level", ...plainArgs(cwd)]),
@@ -358,7 +373,7 @@ describe("variables get", () => {
     const cwd = await makeProject();
     server.use(
       http.get("*/variables/:name", ({ params }) =>
-        HttpResponse.json(params.name === "TOKEN" ? { secret: true } : ""),
+        HttpResponse.json({ primary: params.name === "TOKEN" ? { secret: true } : "" }),
       ),
     );
 
@@ -373,9 +388,23 @@ describe("variables get", () => {
     expect(empty.stdout).toMatch(/value\s+""/);
   });
 
+  it("fails with E_NOT_FOUND when the answer has no primary value", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ preview: "x" })));
+
+    const res = await runCliForTest(["variables", "get", "TOKEN", "--project-level", ...base(cwd)]);
+
+    expect(res.exitCode).not.toBe(0);
+    const json = parseJson(res.stdout) as { code: string; message: string };
+    expect(json.code).toBe("E_NOT_FOUND");
+    expect(json.message).toContain("TOKEN has no primary value");
+  });
+
   it("reports a secret as held and carries no value", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json({ secret: true })));
+    server.use(
+      http.get("*/variables/:name", () => HttpResponse.json({ primary: { secret: true } })),
+    );
 
     const res = await runCliForTest(["variables", "get", "TOKEN", "--project-level", ...base(cwd)]);
 
@@ -387,7 +416,7 @@ describe("variables get", () => {
 
   it("escapes a value that would otherwise drive the terminal", async () => {
     const cwd = await makeProject();
-    server.use(http.get("*/variables/:name", () => HttpResponse.json("a\u001b[31mb")));
+    server.use(http.get("*/variables/:name", () => HttpResponse.json({ primary: "a\u001b[31mb" })));
 
     const res = await asTerminal(() =>
       runCliForTest(["variables", "get", "NASTY", "--project-level", ...plainArgs(cwd)]),
@@ -419,11 +448,11 @@ describe("variables set", () => {
   it("sends the piped value and marks it secret", async () => {
     const cwd = await makeProject();
     let body: Record<string, unknown> = {};
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.patch("*/variables", async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return HttpResponse.json({});
       }),
     );
@@ -441,7 +470,7 @@ describe("variables set", () => {
     );
 
     expect(res.exitCode).toBe(0);
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     expect(body).toEqual({ GOOGLE_CLIENT_SECRET: { value: "GOCSPX-abc", secret: true } });
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({ name: "GOOGLE_CLIENT_SECRET", secret: true, type: "string" });
@@ -494,7 +523,7 @@ describe("variables set", () => {
       expect(res.exitCode).not.toBe(0);
       const json = parseJson(res.stdout) as { code: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
-      expect(json.hint).toContain("Pipe the value in");
+      expect(json.hint).toContain("Pipe it in on stdin");
     } finally {
       if (original) {
         Object.defineProperty(process, "stdin", original);
@@ -812,6 +841,26 @@ describe("variables set --as", () => {
     expect(json.code).toBe("E_VALIDATION");
   });
 
+  it("says what is wrong with the value and how to write it", async () => {
+    const cwd = await makeProject();
+
+    const res = await withStdin("abc", () =>
+      runCliForTest([
+        "variables",
+        "set",
+        "RETRY_COUNT",
+        "--project-level",
+        "--as",
+        "number",
+        "--non-interactive",
+        ...base(cwd),
+      ]),
+    );
+
+    const json = parseJson(res.stdout) as { message: string };
+    expect(json.message).toMatch(/Expected a number.*JSON number/);
+  });
+
   it("refuses a typed secret before reading the value", async () => {
     const cwd = await makeProject();
     const bodies = capture();
@@ -866,7 +915,7 @@ describe("variables set --as", () => {
         ...base(cwd),
       ]);
 
-      const json = parseJson(res.stdout) as { next_commands: string[] };
+      const json = parseJson(res.stdout) as { next_commands: string[]; hint: string };
       expect(json.next_commands.join(" ")).toContain("--as number");
     } finally {
       if (original) {
@@ -876,15 +925,73 @@ describe("variables set --as", () => {
   });
 });
 
+describe("variables delete asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const deleting = (cwd: string) =>
+    asPerson(() =>
+      VariablesDelete.run([
+        "SUPPORT_EMAIL",
+        "--project-level",
+        "--cwd",
+        cwd,
+        "--server",
+        DEFAULT_SERVER,
+      ]),
+    );
+  const watchingDeletes = () => {
+    const seen = { deleted: false };
+    server.use(
+      http.delete("*/variables/:name", () => {
+        seen.deleted = true;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    return seen;
+  };
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("is skipped, deleting nothing, when the answer is no", async () => {
+    const cwd = await makeProject();
+    const seen = watchingDeletes();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await deleting(cwd);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "delete-cancelled",
+    });
+    expect(seen.deleted).toBe(false);
+  });
+
+  it("fails, deleting nothing, on Ctrl-C", async () => {
+    const cwd = await makeProject();
+    const seen = watchingDeletes();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(deleting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(seen.deleted).toBe(false);
+  });
+});
+
 describe("variables delete", () => {
   it("deletes the name at the project level", async () => {
     const cwd = await makeProject();
     let path = "";
-    let environment: string | null = "unset";
+    let kind: string | null = "unset";
     server.use(
       http.delete("*/variables/:name", ({ request, params }) => {
         path = String(params.name);
-        environment = new URL(request.url).searchParams.get("environment_name");
+        kind = new URL(request.url).searchParams.get("kind");
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -901,7 +1008,7 @@ describe("variables delete", () => {
 
     expect(res.exitCode).toBe(0);
     expect(path).toBe("SUPPORT_EMAIL");
-    expect(environment).toBeNull();
+    expect(kind).toBeNull();
     const json = parseJson(res.stdout) as { data: Record<string, unknown> };
     expect(json.data).toEqual({ name: "SUPPORT_EMAIL", deleted: true });
   });
@@ -1008,7 +1115,7 @@ describe("naming the owner", () => {
 
     const scripted = await runCliForTest(["variables", "list", ...base(cwd)]);
     const terminal = await asTerminal(() =>
-      runCliForTest(["variables", "list", "--cwd", cwd, "--json", "--server", SERVER]),
+      runCliForTest(["variables", "list", "--cwd", cwd, "--json", "--server", DEFAULT_SERVER]),
     );
 
     expect(scripted.exitCode).not.toBe(0);
@@ -1018,9 +1125,9 @@ describe("naming the owner", () => {
       const json = parseJson(res.stdout) as { code: string; message: string; hint: string };
       expect(json.code).toBe("E_VALIDATION");
       expect(json.message).toContain("--project-level");
-      // The refusal has to say why there is nothing else to name, or it reads
-      // as a flag someone forgot rather than the only owner there is.
-      expect(json.hint).toContain("--environment");
+      // The refusal has to say there is nothing else to name, or it reads as
+      // a flag someone forgot rather than the only owner there is.
+      expect(json.hint).toContain("only owner");
     }
   });
 

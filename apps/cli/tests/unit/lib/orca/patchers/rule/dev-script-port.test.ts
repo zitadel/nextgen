@@ -11,7 +11,9 @@ function devScriptOf(source: string): string | undefined {
 
 describe("devScriptPortEdit", () => {
   it("pins the port on a dev script that declares none", () => {
-    const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev", build: "next build" }));
+    const out = devScriptPortEdit("http://localhost:3456")(
+      pkg({ dev: "next dev", build: "next build" }),
+    );
     expect(devScriptOf(out)).toBe("next dev --port 3456");
     // Sibling scripts survive untouched.
     expect(devScriptOf(out)).not.toBe(undefined);
@@ -45,7 +47,9 @@ describe("devScriptPortEdit", () => {
   });
 
   it("fails with actionable guidance when package.json is missing", () => {
-    expect(() => devScriptPortEdit("http://localhost:3456")(undefined)).toThrow(/package\.json is required/);
+    expect(() => devScriptPortEdit("http://localhost:3456")(undefined)).toThrow(
+      /package\.json is required/,
+    );
   });
 });
 
@@ -70,5 +74,31 @@ describe("devScriptPortEdit issuer handling", () => {
     // what the server actually allows.
     const out = devScriptPortEdit("http://localhost:3456")(pkg({ dev: "next dev --port 4000" }));
     expect(devScriptOf(out)).toBe("next dev --port 3456");
+  });
+});
+
+// Vite silently serves the next free port when the pinned one is taken.
+describe("devScriptPortEdit with strictPort", () => {
+  const strict = devScriptPortEdit("http://localhost:5173", { strictPort: true });
+
+  it.each([
+    ["vite dev", "vite dev --port 5173 --strictPort"],
+    ["vite --mode ssr", "vite --mode ssr --port 5173 --strictPort"],
+    ["vite dev --port 3000", "vite dev --port 5173 --strictPort"],
+    ["vite dev --port 5173", "vite dev --port 5173 --strictPort"],
+  ])("pins %s as %s", (dev, pinned) => {
+    expect(devScriptOf(strict(pkg({ dev })))).toBe(pinned);
+  });
+
+  it("leaves a script already pinned strictly to the port unchanged", () => {
+    const source = pkg({ dev: "vite dev --port 5173 --strictPort" });
+
+    expect(strict(source)).toBe(source);
+  });
+
+  it("does not add a second --strictPort to a script that has one", () => {
+    expect(devScriptOf(strict(pkg({ dev: "vite dev --strictPort --port 3000" })))).toBe(
+      "vite dev --strictPort --port 5173",
+    );
   });
 });

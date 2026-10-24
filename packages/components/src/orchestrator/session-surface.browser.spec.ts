@@ -11,8 +11,7 @@ import type { ZitadelSession } from "./zitadel-session.js";
  * `variant="widget"` is content-sized and transparent through every layer
  * (host, `zl-page-shell` host, inner `.zr-page-shell`), while
  * `variant="page"` claims the viewport and paints the surface — on the
- * internal page shell, since the session host itself no longer carries the
- * page paint. Theme resolution reaches real pixels the same way as the
+ * internal page shell: the session host carries no page paint. Theme resolution reaches real pixels the same way as the
  * login surface.
  */
 
@@ -48,7 +47,11 @@ function installSessionFetchStub(): { restore: () => void } {
   );
   const original = globalThis.fetch;
   globalThis.fetch = fetchStub as unknown as typeof fetch;
-  return { restore: () => void (globalThis.fetch = original) };
+  return {
+    restore: () => {
+      globalThis.fetch = original;
+    },
+  };
 }
 
 async function waitFor<T>(probe: () => T | null | undefined, timeout = 3000): Promise<T> {
@@ -81,7 +84,6 @@ describe("<zitadel-session> surface (chromium)", () => {
   afterEach(() => {
     host.remove();
     stub?.restore();
-    document.getElementById("zl-default-font-link")?.remove();
   });
 
   async function mount(configure?: (el: ZitadelSession) => void): Promise<ZitadelSession> {
@@ -122,9 +124,6 @@ describe("<zitadel-session> surface (chromium)", () => {
     expect(surface).toBeTruthy();
     expect(getComputedStyle(surface).backgroundColor).toBe(TRANSPARENT);
     expect(getComputedStyle(surface).padding).toBe("0px");
-
-    // Widget mode injects no design-system font into the host document.
-    expect(document.getElementById("zl-default-font-link")).toBeNull();
   });
 
   it("variant=page claims the viewport and paints the shell dark by default", async () => {
@@ -136,14 +135,9 @@ describe("<zitadel-session> surface (chromium)", () => {
     const shell = element.shadowRoot?.querySelector("zl-page-shell") as HTMLElement;
     expect(shell.hasAttribute("data-widget")).toBe(false);
     // The page paint lives on the internal page shell, not the session host.
-    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(
-      window.innerHeight - 1,
-    );
+    expect(element.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     const surface = shell.shadowRoot?.querySelector(".zr-page-shell") as HTMLElement;
     expect(luminance(getComputedStyle(surface).backgroundColor)).toBeLessThan(60);
-
-    // Page mode ships the brand font, matching the login surface.
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
   });
 
   it("theme=light repaints the page surface and card text", async () => {

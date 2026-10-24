@@ -15,7 +15,7 @@
  * - `startMockServer(port)` (from `./server.js`) — Express + MSW middleware
  *   for `apps/demo-next` and `apps/demo-nuxt`, and the console's mock dev loop
  *   (`apps/console/README.md`), which alone uses `/console/runtime.json`.
- *   Applies `defaultDevBranding` (Arimo `font_url`) on boot; see
+ *   Applies `defaultDevBranding` (dark theme, no font) on boot; see
  *   `default-dev-branding.ts`.
  *
  * Helpers:
@@ -23,12 +23,14 @@
  * - `applyBranding(branding)` injects a tenant branding overlay merged into
  *   every response. Pass `null` (or call `clearBranding()`) to remove it.
  * - `applySsoProviders(providers)` offers identity providers on the steps a
- *   sign-in can start from, the way a project that ran `zitadel sso enable`
- *   does. Off by default, because the shipped flow has none.
+ *   sign-in can start from, the way a project that ran
+ *   `zitadel auth-method sso enable` does. Off by default, because the shipped
+ *   flow has none.
  */
 import type { SetupWorker } from "msw/browser";
 
 import { applyBranding, clearBranding } from "./branding.js";
+import { applyPasskey, clearPasskey } from "./passkey.js";
 import { applySsoProviders, clearSsoProviders } from "./sso-providers.js";
 import { setupMockHandlers, type CapturedRequest, type MockHandle } from "./handlers.js";
 
@@ -60,8 +62,17 @@ export function getCapturedRequests(): readonly CapturedRequest[] {
   return _browserHandle?.getCaptured() ?? [];
 }
 
-export { applyBranding, clearBranding, applySsoProviders, clearSsoProviders, setupMockHandlers };
+export {
+  applyBranding,
+  clearBranding,
+  applySsoProviders,
+  clearSsoProviders,
+  applyPasskey,
+  clearPasskey,
+  setupMockHandlers,
+};
 export type { MockSsoProvider } from "./sso-providers.js";
+export { serverCanonicalFlow } from "./server-canonical-flow.js";
 
 /**
  * The password step's field name — the schema pointer the real server emits.

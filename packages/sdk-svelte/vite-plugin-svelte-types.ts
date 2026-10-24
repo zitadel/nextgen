@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 interface SvelteTypesOptions {
   /** Library source root passed to `emitDts` (default `"src"`). */
   readonly input?: string;
+  /** tsconfig `emitDts` reads, relative to the Vite root (default: nearest `tsconfig.json`). */
+  readonly tsconfig?: string;
 }
 
 /** Recursively collect absolute file paths under `dir`. */
@@ -55,6 +57,10 @@ export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
         libRoot: path.resolve(root, inputRel),
         svelteShimsPath: require.resolve("svelte2tsx/svelte-shims-v4.d.ts"),
         declarationDir: path.relative(root, tmp),
+        // Absolute, because emitDts resolves a bare name against `libRoot`.
+        ...(options.tsconfig === undefined
+          ? {}
+          : { tsconfig: path.resolve(root, options.tsconfig) }),
       });
 
       for (const file of walk(tmp)) {

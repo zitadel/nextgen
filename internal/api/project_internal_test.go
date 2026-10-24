@@ -22,10 +22,10 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
 func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
@@ -43,7 +43,16 @@ func (stubProjectService) List(context.Context, service.ListProjectsRequest) (*s
 func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
 	return nil, domain.ErrSessionTokenInvalid()
 }
+func (stubProjectService) ListEveryProject(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	return nil, domain.ErrSessionTokenInvalid()
+}
 func (stubProjectService) Delete(context.Context, string) error { return nil }
+func (stubProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	return nil, domain.ErrNotImplemented()
+}
+func (stubProjectService) RemoveOrigin(context.Context, string, string) error {
+	return domain.ErrNotImplemented()
+}
 
 var _ service.ProjectService = stubProjectService{}
 

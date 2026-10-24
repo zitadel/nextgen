@@ -9,48 +9,22 @@ dependsOn:
   - "sdk-next"
 
 tasks:
-  lint:
-    command: "corepack pnpm exec oxlint ."
-    deps:
-      - "api:build"
-      - "config:build"
-      - "sdk-next:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
-      - "config:build"
+      - "api-mock:build"
       - "sdk-next:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
-      - "config:build"
       - "sdk-next:build"
-    inputs:
-      # Default project files plus the telemetry build-channel env var, so a
-      # production-stamped (release) build is never served from — or reused as —
-      # a dev-stamped cache. See apps/cli/tsdown.config.ts.
-      - "**/*"
-      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
-    env:
-      ZITADEL_TELEMETRY_BUILD_CHANNEL: "production"
     deps:
       - "test"
-      - "api:build-release"
       - "sdk-next:build-release"
-    inputs:
-      - "**/*"
-      - "$ZITADEL_TELEMETRY_BUILD_CHANNEL"
     outputs:
       - "dist/**/*"
     options:
@@ -65,10 +39,22 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"
       - "api-mock:build"
+    inputs:
+      - "**/*"
+      # The @zitadel/server wrapper its server-wrapper test loads. An input,
+      # not a task dep on server: server depends on console, and console's dev
+      # tasks depend on cli (#1487), so that edge would close a project cycle.
+      - "/apps/server/bin/**/*"
+      # The spec files whose `x-zitadel-cli` names the api-coverage test checks
+      # against the commands.
+      - "/api/openapi/endpoints/**/methods.yaml"
+      # The product analytics catalog the catalog test checks telemetry against.
+      - "/docs/product-analytics-events.yaml"
+      # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
+      - "/vercel.json"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite
@@ -77,6 +63,17 @@ tasks:
       # graph), so a shared mutex keeps them from cleaning a dist while
       # these tests import from it.
       mutex: "public-dist"
+
+  check-advisories:
+    command: "corepack pnpm run check-advisories"
+    options:
+      # It asks the npm advisory database about the package versions the
+      # scaffolders pin, so it needs the network, and its answer changes when
+      # an advisory is published, with no input changing: never cached, and
+      # left out of `moon ci`. scaffold-advisories.yml runs it nightly and on
+      # changes to the scaffolders, with `moon exec --ignore-ci-checks`.
+      cache: false
+      runInCI: "skip"
 
   readme:
     command: "corepack pnpm run readme"

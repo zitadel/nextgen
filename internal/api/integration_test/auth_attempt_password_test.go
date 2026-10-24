@@ -3,7 +3,6 @@
 package integration_test
 
 import (
-	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -51,6 +50,44 @@ func TestAuthAttemptPasswordLogin(t *testing.T) {
 	require.NotEmpty(t, handoffResp.(*api.HandoffResponse).HandoffToken)
 }
 
+// TestAuthAttemptIdentifierOnly_CannotHandoff is the REST-path regression for
+// the identifier-only session hole: a caller that verifies only the identifier
+// (no password/passkey/SSO) must not be able to mint a handoff token, and so
+// cannot exchange one for a session. Resolving the identifier proves who the
+// caller claims to be, never that they are that user; handoff fails closed with
+// att.not_completed. Before the fix, the attempt was "completed" the moment the
+// identifier resolved (RequiredChecks is empty on this path) and a token was
+// minted — a full account takeover from the public publishable key plus a known
+// email.
+func TestAuthAttemptIdentifierOnly_CannotHandoff(t *testing.T) {
+	project, team := attemptProject(t)
+
+	const (
+		userID    = "user_attempt_idonly"
+		userEmail = "idonly@example.com"
+	)
+	createAttemptUser(t, project, team, defaultSchemaURL(), userID, map[string]string{"email": userEmail})
+
+	client := attemptClient(t, project)
+	attemptID := newAttempt(t, client, project)
+
+	identified := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(userEmail))
+	require.Contains(t, completedMethods(identified), api.FactorMethodIdentifier)
+	require.Equal(t, userID, identifiedUser(t, identified), "identified the wrong user")
+	// The attempt is not complete on the identifier alone, even though it was
+	// created with no explicit required checks.
+	require.Equal(t, api.AuthAttemptResponseStateInProgress, identified.State, helpers.MustMarshal(t, identified))
+
+	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
+	require.NoError(t, err)
+	// createHandoff declares 409 explicitly (rel.revoked), so ogen decodes every
+	// 409 — including att.not_completed — as ErrorDetails rather than the default
+	// CreateHandoffErrorResponseStatusCode wrapper.
+	rejected, ok := handoffResp.(*api.ErrorDetails)
+	require.True(t, ok, "expected handoff refused, got %s", helpers.MustMarshal(t, handoffResp))
+	require.Equal(t, api.ErrorCode("att.not_completed"), rejected.Code, helpers.MustMarshal(t, rejected))
+}
+
 // A value held in a unique property the schema does not designate identifies
 // nobody: uniqueness is data integrity, identification is a designation. This is
 // the rule a caller-chosen property would break — a unique employee id or phone
@@ -81,6 +118,7 @@ func TestAuthAttemptIdentifier_AmbiguousAcrossSchemasIsRejected(t *testing.T) {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://attempt-admin.example.com/schemas/admin-user.json",
 		"kind": "user-schema",
+		"objectType": "attempt-admin-user",
 		"type": "object",
 		"x-identifier": "username",
 		"x-auth-methods": {"password": {"enabled": true}},
@@ -187,10 +225,11 @@ func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api
 		ChallengeID: challengeID,
 	})
 	require.NoError(t, err)
-	rejected, ok := verifyResp.(*api.VerifyChallengeProofErrorResponseStatusCode)
+	// Named 409 (rel.revoked) on this operation makes ogen decode every 409 as
+	// ErrorDetails, including att.proof_rejected which still answers 409.
+	rejected, ok := verifyResp.(*api.ErrorDetails)
 	require.True(t, ok, "expected a rejection, got %s", helpers.MustMarshal(t, verifyResp))
-	require.Equal(t, http.StatusConflict, rejected.StatusCode, helpers.MustMarshal(t, rejected))
-	require.Equal(t, api.AttProofRejectedVerifyChallengeProofErrorResponse, rejected.Response.Type, helpers.MustMarshal(t, rejected))
+	require.Equal(t, api.ErrorCode("att.proof_rejected"), rejected.Code, helpers.MustMarshal(t, rejected))
 }
 
 func issueAttemptChallenge(t *testing.T, client *helpers.ApiClient, attemptID api.AttemptID, method api.ChallengeMethod) api.ChallengeID {

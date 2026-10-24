@@ -5,8 +5,8 @@ description: >-
   @zitadel/sdk-angular — the client-side SPA components for login,
   registration, logout, and the signed-in session card. Use when adding or
   wiring Zitadel auth, a login or registration screen, or session handling into
-  an Angular app, and especially when the app already exists (the CLI cannot
-  patch an existing Angular app, so wire it in by hand with this skill).
+  an Angular app, and especially when the app already exists and the CLI's
+  setup stops on it (then wire it in by hand with this skill).
 ---
 
 # @zitadel/sdk-angular
@@ -18,21 +18,21 @@ Angular wrapper components for the Zitadel auth UI in a client-side SPA.
 You are adding Zitadel login, registration, logout, or session handling to an
 Angular app and wiring the auth UI in by hand.
 
-The `zitadel` CLI can scaffold a *fresh* Angular app
-(`zitadel setup --framework angular`) with this SDK already wired in, and it can
-patch some existing frameworks (e.g. Next.js). It **cannot** integrate into an
-**existing** Angular app — it only scaffolds Angular into an empty directory. So
-for an app that already exists, do **not** rely on the CLI; follow this skill to
-install the package and wire the components in manually.
+The `zitadel` CLI scaffolds a *fresh* Angular app
+(`npx @zitadel/cli@latest setup --framework angular`) with this SDK already wired in. In an
+**existing** Angular app it writes the root component to `src/app/app.ts`, and
+stops with `E_CONFLICT` when the app has one there, or when `src/main.ts`
+bootstraps a root from another file (Angular 17–19's
+`src/app/app.component.ts`). When setup stops, follow this skill to install the
+package and wire the components in manually.
 
 ## Install
 
 ```sh
-npm install @zitadel/sdk-angular
+npm install @zitadel/sdk-angular@latest
 ```
 
-Peer dependencies (already present in any Angular 17+ app): `@angular/core` and
-`@angular/common`, both `>=17`. The published types require TypeScript `>= 5.0`.
+Peer dependencies: `@angular/core` and `@angular/common`, both `>=17`. Requires TypeScript ≥ 5.0 (the published types use `export type *`).
 
 ## Integrate
 
@@ -81,6 +81,47 @@ The components are **standalone** — import them directly into a component's
    (cross-origin), e.g. `proxyPath: 'http://localhost:8080'` (the `zitadel start`
    local runtime default port).
 
+## Widget props and events
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+
+| Prop | Type | Default | Widgets | Description |
+| --- | --- | --- | --- | --- |
+| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
+| `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
+| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
+| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
+| `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
+| `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
+| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
+| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | Colour mode. Unset follows the tenant's branding theme on Login, then the variant default (`dark` for `page`, `auto` for `widget`); Logout defaults to `auto`. `auto` follows `prefers-color-scheme`. |
+| `suppressHeader` | `boolean` | `false` | Login, Session | Visually hides the widget's own heading block while keeping it in the accessibility tree, for pages that already carry the heading. |
+| `suppressPasswordToggle` | `boolean` | `false` | Login | Hides the show/hide button on password fields. |
+| `heading` | `string` | `"Signed in as"` | Session | Heading text override. |
+| `logoutLabel` | `string` | `"Sign out"` | Session | Logout action label override. |
+| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides merged over the builtin dictionaries, keyed by primary language subtag, for example `{ en: { "identifier.title": "Welcome back" } }`. |
+| `lang` | `string` | browser language | Login | BCP-47 language override. |
+
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `(flowStep)` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `(flowInput)` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `(flowComplete)` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `(flowRedirect)` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `(flowError)` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `(signout)` |
+
+```html
+<zitadel-auth-login [project]="project" theme="light" (flowComplete)="track($event)" />
+```
+
+The `zitadel-flow-complete`, `zitadel-flow-redirect` and `zitadel-signout` details carry a `waitUntil(promise)`; call it from your handler to make the widget wait for your async work before it navigates.
+
 ## Read these, don't guess
 
 This skill shows the *pattern*; it is not an API catalog and will drift. For
@@ -96,6 +137,7 @@ exact names, inputs, and props, treat the installed package as authoritative:
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration (the `zitadel-auth-login` wrapper sets `projectId` and `proxyPath` as element properties, so adding them to the wrapper does not put them in server markup), or use a raw `<zitadel-login>` element with `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Selector is `zitadel-auth-login`, not `zitadel-login`.** The wrapper's
   selector is `zitadel-auth-login` (and `zitadel-auth-logout`,
   `zitadel-auth-session`); `<zitadel-login>` is the underlying custom element

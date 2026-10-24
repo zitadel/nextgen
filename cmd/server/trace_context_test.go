@@ -29,7 +29,7 @@ func callerTraceparent(flags string) string {
 	return "00-" + callerTraceID + "-" + callerSpanID + "-" + flags
 }
 
-// TestIncomingTraceContext pins ADR 068 against the real tracer provider and
+// TestIncomingTraceContext pins ADR 079 against the real tracer provider and
 // sampler the server uses: an incoming traceparent is ignored unless
 // instrumentation.trace.trust_remote_spans is set, in which case the server
 // span is a child of the caller's span.

@@ -16,7 +16,9 @@ import (
 
 // Import loads bootstrap users from JSON files into the database.
 // dialect is the configured database dialect name (e.g. "postgres"); used to reject unsupported backends.
-func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, paths []string) error {
+// builtinBases maps a document's schema URL onto the row the project stores
+// it under when the two name the same built-in under different bases.
+func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator crypto.HashValidator, dialect string, builtinBases domain.BuiltinSchemaBases, paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
@@ -25,7 +27,7 @@ func Import(ctx context.Context, v2Pool service.StatementPool, hashValidator cry
 	}
 
 	for _, path := range paths {
-		if err := importFile(ctx, v2Pool, hashValidator, path); err != nil {
+		if err := importFile(ctx, v2Pool, hashValidator, builtinBases, path); err != nil {
 			return fmt.Errorf("user file %q: %w", path, err)
 		}
 	}
@@ -36,6 +38,7 @@ func importFile(
 	ctx context.Context,
 	v2Pool service.StatementPool,
 	hashValidator crypto.HashValidator,
+	builtinBases domain.BuiltinSchemaBases,
 	path string,
 ) error {
 	doc, err := ParseFile(path)
@@ -50,20 +53,25 @@ func importFile(
 		return err
 	}
 
+	// Before the placeholder below can stand in for it: a document naming the
+	// default schema under a legacy base meets a project seeded under the
+	// current one, and the user must point at the seeded row to sign in.
+	doc.Header.SchemaURL, err = storedSchemaURL(ctx, v2Pool.Statements(), builtinBases, doc.Header)
+	if err != nil {
+		return err
+	}
+
 	if err := ensureDependencies(ctx, v2Pool.Statements(), doc.Header); err != nil {
 		return err
 	}
 
-	_, err = v2Pool.Statements().GetUser(ctx, database.And(
-		database.Equal(database.Col(domain.UserFieldProjectID), doc.Header.ProjectID),
-		database.Equal(database.Col(domain.UserFieldID), doc.Header.ID),
-	), service.UserQueryOptions{})
-	if err == nil {
+	exists, err := userExists(ctx, v2Pool.Statements(), doc.Header)
+	if err != nil {
+		return fmt.Errorf("check existing user: %w", err)
+	}
+	if exists {
 		slog.Info("bootstrap user: skipped user because they already exists)", slog.String("path", path), slog.String("id", doc.Header.ID))
 		return nil
-	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
-		return fmt.Errorf("check existing user: %w", err)
 	}
 
 	schema, err := loadUserSchema(ctx, v2Pool.Statements(), doc.Header)
@@ -100,12 +108,39 @@ func importFile(
 		}
 		return nil
 	}); err != nil {
+		// Several replicas starting at once (a serverless platform brings up
+		// one process per request from cold, all reading the same document)
+		// can each pass the lookup above and race the insert. A unique
+		// violation that left the user in place is the other replica's import
+		// of this same document, not a conflict to report; one on another
+		// index, with the user still missing, is.
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			if exists, checkErr := userExists(ctx, v2Pool.Statements(), doc.Header); checkErr == nil && exists {
+				slog.Info("bootstrap user: skipped user because another replica imported them first", slog.String("path", path), slog.String("id", doc.Header.ID))
+				return nil
+			}
+		}
 		return err
 	}
 
 	slog.Info("bootstrap user: loaded user", slog.String("path", path), slog.String("id", doc.Header.ID))
 
 	return nil
+}
+
+// userExists reports whether the document's user is already in the database.
+func userExists(ctx context.Context, stmts service.AllStatements, h Header) (bool, error) {
+	_, err := stmts.GetUser(ctx, database.And(
+		database.Equal(database.Col(domain.UserFieldProjectID), h.ProjectID),
+		database.Equal(database.Col(domain.UserFieldID), h.ID),
+	), service.UserQueryOptions{})
+	if err == nil {
+		return true, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return false, nil
+	}
+	return false, err
 }
 
 // buildCreateAttributes registers each attribute's uniqueness the way user
@@ -144,6 +179,20 @@ func buildCreateAttributes(
 		out = append(out, *attr)
 	}
 	return out, nil
+}
+
+// storedSchemaURL returns the URL the project stores the document's schema
+// under: the header's own when that row exists or none does, else the URL of
+// the row that names the same built-in under another base.
+func storedSchemaURL(ctx context.Context, stmts domain.JSONSchemaGetter, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
+	stored, err := builtinBases.GetJSONSchema(ctx, stmts, h.ProjectID, h.SchemaURL)
+	if err == nil {
+		return stored.URL, nil
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		return h.SchemaURL, nil
+	}
+	return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
 }
 
 // loadUserSchema reads the user's schema document so attribute uniqueness can

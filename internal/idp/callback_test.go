@@ -704,81 +704,6 @@ func TestCallback(t *testing.T) {
 			want: wantIdentity,
 		},
 		{
-			name: "the strategy overwrites its claims and vouches for them",
-			conn: func(p *provider) Connection {
-				conn := p.connection(ClientSecretBasic, true, true)
-				conn.ClaimMapping = mapping
-				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByStrategy}}
-				return conn
-			},
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
-				SupplementaryFetch: func(ctx context.Context, in StrategyInput) (StrategyResult, error) {
-					assert.Equal(t, "idprev_1", in.Connection.RevisionID)
-					assert.Equal(t, "the-access-token", in.AccessToken)
-					assert.Equal(t, "Bearer", in.TokenType)
-					assert.NotNil(t, in.HTTPClient)
-					return StrategyResult{Claims: map[string]any{"email": "primary@example.test"}, Verified: map[string]bool{"email": true}}, nil
-				}},
-			want: ExternalIdentity{
-				Subject:    "user-1",
-				Claims:     map[string]any{"email": "primary@example.test", "givenName": "Ada"},
-				Verified:   map[string]bool{"email": true},
-				RevisionID: "idprev_1",
-			},
-		},
-		{
-			name: "the strategy cannot replace the subject, mapped or not",
-			conn: func(p *provider) Connection {
-				conn := p.connection(ClientSecretBasic, true, true)
-				conn.ClaimMapping = map[string]string{"email": "email", "givenName": "given_name", "externalId": "sub"}
-				return conn
-			},
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
-				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
-					return StrategyResult{Claims: map[string]any{"sub": "user-2"}}, nil
-				}},
-			want: ExternalIdentity{
-				Subject:    "user-1",
-				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada", "externalId": "user-1"},
-				Verified:   map[string]bool{},
-				RevisionID: "idprev_1",
-			},
-		},
-		{
-			name: "a claim entry reads a verification claim the strategy emits",
-			conn: func(p *provider) Connection {
-				conn := p.connection(ClientSecretBasic, true, true)
-				conn.ClaimMapping = mapping
-				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByClaim, Claim: "email_verified"}}
-				return conn
-			},
-			handler: func(p *provider) http.HandlerFunc {
-				claims := profile(p)
-				claims["email_verified"] = false
-				return p.ceremony(t, claims, userinfo)
-			},
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
-				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
-					return StrategyResult{Claims: map[string]any{"email_verified": true}}, nil
-				}},
-			want: ExternalIdentity{
-				Subject:    "user-1",
-				Claims:     map[string]any{"email": "ada@example.test", "givenName": "Ada"},
-				Verified:   map[string]bool{"email": true},
-				RevisionID: "idprev_1",
-			},
-		},
-		{
-			name: "a strategy failure ends the attempt",
-			conn: func(p *provider) Connection { return p.connection(ClientSecretBasic, true, true) },
-			req: CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret",
-				SupplementaryFetch: func(context.Context, StrategyInput) (StrategyResult, error) {
-					return StrategyResult{}, errors.New("emails: status 500")
-				}},
-			wantErr:      domain.ErrIDPSupplementaryFetchFailed(nil),
-			wantCauseMsg: "emails: status 500",
-		},
-		{
 			name: "a subject claim the provider does not send ends the attempt",
 			conn: func(p *provider) Connection {
 				conn := p.connection(ClientSecretBasic, true, true)
@@ -800,20 +725,6 @@ func TestCallback(t *testing.T) {
 			},
 			req:     CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
 			wantErr: domain.ErrIDPExchangeFailed(nil),
-		},
-		{
-			name: "a strategy pointer without a strategy is a wiring error",
-			conn: func(p *provider) Connection {
-				conn := p.connection(ClientSecretBasic, true, true)
-				conn.ClaimMapping = mapping
-				conn.VerifiedClaims = map[string]VerificationSource{"email": {Kind: VerifyByStrategy}}
-				return conn
-			},
-			// No handler: the provider fails the test on any request.
-			handler:      func(p *provider) http.HandlerFunc { return nil },
-			req:          CallbackRequest{Code: "the-code", Nonce: "the-nonce", RedirectURI: redirectURI, RevisionID: "idprev_1", PKCEVerifier: "the-verifier", ClientSecret: "the-secret"},
-			wantErr:      domain.ErrInternal(nil),
-			wantCauseMsg: "callback: email is verified by the strategy, but none is passed",
 		},
 		{
 			name: "a client built with another redirect uri is a wiring error",
@@ -881,13 +792,10 @@ func TestEvaluateVerified(t *testing.T) {
 	conn := Connection{
 		ClaimMapping: map[string]string{"email": "email", "name": "name", "phone": "phone_number"},
 		VerifiedClaims: map[string]VerificationSource{
-			"email":    {Kind: VerifyByClaim, Claim: "email_verified"},
-			"name":     {Kind: VerifyByTrust},
-			"phone":    {Kind: VerifyByStrategy},
-			"unmapped": {Kind: VerifyByStrategy},
+			"email": {Kind: VerifyByClaim, Claim: "email_verified"},
+			"name":  {Kind: VerifyByTrust},
 		},
 	}
-	strategy := StrategyResult{Verified: map[string]bool{"phone_number": true}}
 	tests := []struct {
 		name   string
 		claims map[string]any
@@ -896,52 +804,52 @@ func TestEvaluateVerified(t *testing.T) {
 		{
 			name:   "every source vouches for a present value",
 			claims: map[string]any{"email": "ada@example.test", "email_verified": true, "name": "Ada", "phone_number": "+41"},
-			want:   map[string]bool{"email": true, "name": true, "phone": true, "unmapped": false},
+			want:   map[string]bool{"email": true, "name": true},
 		},
 		{
 			name:   `the string "true" is verified`,
 			claims: map[string]any{"email": "ada@example.test", "email_verified": "true"},
-			want:   map[string]bool{"email": true, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": true, "name": false},
 		},
 		{
 			name:   `the string "TRUE" is unverified`,
 			claims: map[string]any{"email": "ada@example.test", "email_verified": "TRUE"},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   "the number 1 is unverified",
 			claims: map[string]any{"email": "ada@example.test", "email_verified": json.Number("1")},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   `the string "yes" is unverified`,
 			claims: map[string]any{"email": "ada@example.test", "email_verified": "yes"},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   "the boolean false is unverified",
 			claims: map[string]any{"email": "ada@example.test", "email_verified": false},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   "an absent verification claim is unverified",
 			claims: map[string]any{"email": "ada@example.test"},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   "no source vouches for an absent value",
 			claims: map[string]any{"email_verified": true},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 		{
 			name:   "no source vouches for a null value",
 			claims: map[string]any{"email": nil, "email_verified": true, "name": nil, "phone_number": nil},
-			want:   map[string]bool{"email": false, "name": false, "phone": false, "unmapped": false},
+			want:   map[string]bool{"email": false, "name": false},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, evaluateVerified(conn, tt.claims, strategy))
+			assert.Equal(t, tt.want, evaluateVerified(conn, tt.claims))
 		})
 	}
 }
@@ -1013,6 +921,8 @@ func TestCallbackLeaksNothing(t *testing.T) {
 		conn    func(p *provider) Connection
 		handler func(t *testing.T, p *provider) http.HandlerFunc
 		req     func() CallbackRequest
+		// timeout bounds the call; zero means none.
+		timeout time.Duration
 		wantErr error
 	}{
 		{
@@ -1046,6 +956,7 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			handler: func(t *testing.T, p *provider) http.HandlerFunc {
 				return func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) }
 			},
+			timeout: 50 * time.Millisecond,
 			wantErr: domain.ErrIDPExchangeFailed(nil),
 		},
 		{
@@ -1072,20 +983,6 @@ func TestCallbackLeaksNothing(t *testing.T) {
 				}
 			},
 			wantErr: domain.ErrIDPUserinfoFailed(nil),
-		},
-		{
-			name: "the strategy fails",
-			handler: func(t *testing.T, p *provider) http.HandlerFunc {
-				return func(w http.ResponseWriter, r *http.Request) { tokenResponse(t, p, w, attempt(p)) }
-			},
-			req: func() CallbackRequest {
-				r := req
-				r.SupplementaryFetch = func(context.Context, StrategyInput) (StrategyResult, error) {
-					return StrategyResult{}, errors.New("emails: status 500")
-				}
-				return r
-			},
-			wantErr: domain.ErrIDPSupplementaryFetchFailed(nil),
 		},
 		{
 			name: "the subject is a boolean",
@@ -1117,8 +1014,15 @@ func TestCallbackLeaksNothing(t *testing.T) {
 			if tt.req != nil {
 				request = tt.req()
 			}
-			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-			t.Cleanup(cancel)
+			// No deadline unless the case asks for one: the others make real
+			// token, key and userinfo round trips, which a busy machine stretches
+			// past any short bound.
+			ctx := context.Background()
+			if tt.timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.timeout)
+				t.Cleanup(cancel)
+			}
 
 			_, err := c.Callback(ctx, request)
 

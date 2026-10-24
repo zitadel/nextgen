@@ -2,9 +2,15 @@ import { access, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, confirm, isCancel } from "@clack/prompts";
+
+import Eject from "../../../src/commands/eject";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 
 function eject(cwd: string, extra: string[] = []) {
@@ -80,6 +86,41 @@ async function makeManagedViteProject(): Promise<string> {
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
   await writeFile(join(cwd, "src/App.vue"), `<!-- ${MANAGED_MARKER} -->\n<template></template>\n`);
   await writeFile(join(cwd, "vite.config.ts"), "export default {};\n");
+  return cwd;
+}
+
+/**
+ * A Nuxt 4 app as an older setup left it: the two plugins setup used to write
+ * (one still managed, one the user took over) beside a managed page.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { nuxt: "^4.1.0", "@zitadel/sdk-nuxt": "latest" },
+    }),
+  );
+  await writeFile(join(cwd, "zitadel.json"), JSON.stringify({ project: "proj-001" }));
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify({ project_id: "proj-001" }));
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  await writeFile(
+    join(cwd, "app/pages/login.vue"),
+    `<script setup>\n// ${MANAGED_MARKER}\n</script>\n`,
+  );
+  await writeFile(
+    join(cwd, "app/plugins/zitadel-components.client.ts"),
+    `// ${MANAGED_MARKER}\nimport "@zitadel/components";\n`,
+  );
+  await writeFile(
+    join(cwd, "app/plugins/auth.server.ts"),
+    "export default defineNuxtPlugin(() => {});\n",
+  );
   return cwd;
 }
 
@@ -223,6 +264,15 @@ describe("eject command", () => {
     expect(await exists(join(cwd, "vite.config.ts"))).toBe(true);
   });
 
+  it("removes the managed Nuxt plugins an older setup wrote and keeps an edited one", async () => {
+    const cwd = await makeOlderNuxtProject();
+
+    await eject(cwd, ["--force"]);
+
+    expect(await exists(join(cwd, "app/plugins/zitadel-components.client.ts"))).toBe(false);
+    expect(await exists(join(cwd, "app/plugins/auth.server.ts"))).toBe(true);
+  });
+
   it("emits a skipped envelope when there is nothing to eject", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-empty-"));
     tempDirs.push(cwd);
@@ -233,5 +283,49 @@ describe("eject command", () => {
     const json = parseJson(res.stdout) as { status: string; reason: string };
     expect(json.status).toBe("skipped");
     expect(json.reason).toBe("nothing-to-eject");
+  });
+});
+
+describe("eject asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const ejecting = (cwd: string) => asTerminal(() => Eject.run(["--cwd", cwd]));
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("is skipped, removing nothing, when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = await ejecting(cwd);
+
+    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+      status: "skipped",
+      reason: "eject-cancelled",
+    });
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
+  });
+
+  it("does not ask on a dry run, which removes nothing", async () => {
+    const cwd = await makeManagedProject();
+
+    await asTerminal(() => Eject.run(["--cwd", cwd, "--dry-run"]));
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("fails, removing nothing, on Ctrl-C", async () => {
+    const cwd = await makeManagedProject();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(ejecting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 });

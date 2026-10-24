@@ -1,6 +1,12 @@
 import { type Command, Help, toConfiguredId, ux } from "@oclif/core";
 
-import { ADDITIONAL_COMMANDS_GROUP, COMMAND_GROUPS, type CommandGroup } from "./groups";
+import { showSkillsHint } from "../skills-hint";
+import {
+  ADDITIONAL_COMMANDS_GROUP,
+  COMMAND_GROUPS,
+  type CommandGroup,
+  compareInGroup,
+} from "./groups";
 
 /** A loaded command plus the root-help statics `BaseCommand` (`./base`) declares. */
 type GroupedCommand = Command.Loadable & { group?: CommandGroup; groupOrder?: number };
@@ -57,6 +63,13 @@ export default class ZitadelHelp extends Help {
         `Use \`${bin} <command> --help\` for more information about a command.`,
       ),
     ];
+    // Only a bare `zitadel`, not `zitadel --help` or an unknown command's help.
+    if (process.argv.length <= 2) {
+      await showSkillsHint({
+        env: process.env,
+        interactive: Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      });
+    }
     this.log(sections.join("\n\n"));
   }
 
@@ -88,11 +101,5 @@ export default class ZitadelHelp extends Help {
 }
 
 function byGroup(commands: readonly GroupedCommand[], group: CommandGroup): GroupedCommand[] {
-  return commands
-    .filter((command) => command.group === group)
-    .sort(
-      (a, b) =>
-        (a.groupOrder ?? Number.MAX_SAFE_INTEGER) - (b.groupOrder ?? Number.MAX_SAFE_INTEGER) ||
-        a.id.localeCompare(b.id),
-    );
+  return commands.filter((command) => command.group === group).sort(compareInGroup);
 }

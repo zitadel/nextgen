@@ -1,27 +1,38 @@
 ---
 title: Quickstart
-description: Add the Zitadel preview to a local app with the alpha CLI and npm-binary runtime.
+description: Add the Zitadel preview to a local app with the CLI and npm-binary runtime.
 ---
 
-Use this path when you want to add Zitadel auth to a local app without a source checkout.
+Use this path when you want to add Zitadel auth to a local app without a source checkout. In a new, empty folder (for an app you already have, see [Add Zitadel to an existing app](/docs/get-started/existing-app)):
+
+```sh
+npx @zitadel/cli@latest doctor
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
+npm run dev
+```
+
+`doctor` checks your machine, `start` runs Zitadel locally, `setup` scaffolds an app with login, registration and profile pages, and `npm run dev` serves it. The sections below explain each step.
 
 ## Prerequisites
 
-- Node.js 24 or newer.
+- Node.js 24 or newer. Setup checks your Node against the framework's own range; an Angular app needs a narrower one (see [Node versions](#node-versions)).
 - A package manager supported by your app.
 - Docker only if you intentionally choose the Docker runtime backend.
 
-## Create or enter an app directory
+## Create an app directory
 
 ```sh
 mkdir myapp
 cd myapp
 ```
 
+Use a new, empty directory. To add Zitadel to an app you already have, follow [Add Zitadel to an existing app](/docs/get-started/existing-app) instead.
+
 ## Check prerequisites
 
 ```sh
-npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@latest doctor
 ```
 
 Before setup, `doctor` checks local runtime prerequisites. After setup, it also verifies generated app files and local config.
@@ -29,26 +40,34 @@ Before setup, `doctor` checks local runtime prerequisites. After setup, it also 
 ## Start local Zitadel
 
 ```sh
-npx @zitadel/cli@alpha start
+npx @zitadel/cli@latest start
 ```
 
-By default this starts the matching `@zitadel/server` npm binary for the alpha train and stores runtime metadata under `.zitadel/local/runtime.json`. Runtime data is stored under `.zitadel/local/nextgen-data` (SQLite by default, see [Databases](/docs/concepts/databases)).
-
-`start` also creates a local admin, `admin@zitadel.localhost`, and ends by printing a one-time sign-in link for the management console. Keep it: it is how you reach the console without a password. You can print a fresh one at any time with `zitadel console`.
+This runs the `@zitadel/server` npm binary that matches the CLI's version. `start` also creates a local admin, `admin@zitadel.localhost`, and ends by printing a one-time link that signs you in to the management console. [Run Zitadel locally](/docs/guides/local-runtime) covers where the runtime keeps its state, the console link, and ports.
 
 ## Scaffold auth
 
 ```sh
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest setup --server local
 ```
 
-In a fresh directory, setup asks which framework to scaffold. Scripted runs should pass `--framework next`, `--framework nuxt`, `--framework react`, `--framework vue`, or `--framework angular`.
+Setup scaffolds a new app into an empty directory. What `start` wrote there, `.zitadel/local/` and the `.gitignore` line that ignores it, doesn't count. In a directory with other files but no app that setup recognizes, setup stops and points at `--force`: pass it only when those files may go, because setup replaces the ones that collide with the new app's (`package.json`, `src/`, and so on).
 
-Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password, passkey optional during registration) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point — everything under `.zitadel/` stays editable.
+Run setup in the directory `start` ran in, or one inside it: setup looks there for the local admin, and without it the project is not attached to a team and the console does not list it.
 
-Setup writes the app files, `.env.local`, `zitadel.json`, and `.zitadel/**`, then installs dependencies with the detected package manager unless `--skip-install` is passed.
+When it scaffolds a new app, setup asks which framework to use. Scripted runs pass `--framework` with one of `next`, `nuxt`, `sveltekit`, `solid-start`, `qwik-router`, `tanstack-start`, `react`, `vue`, `angular`, `solid`, `svelte`, or `qwik`. Setup creates the app only once it has asked all its questions, so cancelling one leaves the directory as it was, and `--dry-run` previews setup without creating the app. If setup fails or you cancel it after it has created the app, it removes the app again, so you can run the same command once more.
 
-Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`. The project is owned from the start, so there is nothing to claim: `zitadel claim` reports it as already owned.
+Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point: the schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
+
+Setup writes the app files, `.env.example`, `.env.local` (with the project id and the project secret), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
+
+The pages and the request boundary (Next.js's `proxy.ts`, for example) that setup writes are yours to change. Setup records each one, and `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` brings back only a file that is missing, never one you changed.
+
+Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`: there is nothing to [claim](/docs/concepts/project-team-user#claim).
+
+## Add Zitadel to an existing app
+
+Setup patches an app you already have instead of scaffolding one, and stops before it would overwrite a file of yours: follow [Add Zitadel to an existing app](/docs/get-started/existing-app).
 
 ## Prove the browser flow
 
@@ -66,35 +85,43 @@ register a user -> log out -> log in with the same user -> profile shows signed 
 
 Do not treat a rendered login form as completion. The useful proof is a full register, logout, and login loop in a real browser.
 
-The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin:
+The user you just registered is an end user of your app. The management console is a separate sign-in, as the local admin. The dev server keeps its terminal busy, so open a second terminal in the same directory:
 
 ```sh
-npx @zitadel/cli@alpha console
+npx @zitadel/cli@latest console
 ```
 
-See [Local runtime commands](/docs/cli/local-runtime) for what that link does and how long it lasts.
+[Run Zitadel locally](/docs/guides/local-runtime#open-the-console) explains what that link does and how long it lasts.
 
 ## Customize the login
 
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
 
 ```sh
-npx @zitadel/cli@alpha plan
-npx @zitadel/cli@alpha apply
+npx @zitadel/cli@latest plan
+npx @zitadel/cli@latest apply
 ```
 
-See [Plan and apply](/docs/cli/plan-apply) for a walkthrough that adds a `company` field to registration.
+[Edit the login flow and schema](/docs/guides/plan-apply) walks through adding a `company` field to registration.
 
 ## Stop or reset
+
+Run these in the directory `start` ran in ([Run Zitadel locally](/docs/guides/local-runtime#inspect-stop-and-reset)).
 
 Stop local Zitadel while keeping runtime data:
 
 ```sh
-npx @zitadel/cli@alpha stop
+npx @zitadel/cli@latest stop
 ```
 
 Delete local runtime data:
 
 ```sh
-npx @zitadel/cli@alpha reset --force
+npx @zitadel/cli@latest reset --force
 ```
+
+## Node versions
+
+When setup creates a new app, it checks your Node against the range the framework's CLI publishes before it starts. For the frameworks other than Angular, setup warns if your Node is outside that range and carries on.
+
+To create an Angular app, use a Node version the Angular CLI accepts: 22.22.3 or newer 22.x, 24.15.0 or newer 24.x, or 26.x. The Angular CLI publishes `^22.22.3 || ^24.15.0 || >=26.0.0`, but it checks each major on its own, so Node 27 and later are refused. Node 23 and 25 run with a warning. Setup refuses any other Node and names the range.

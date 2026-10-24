@@ -2,12 +2,17 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 )
+
+// idpEndpointsPartialCode is read once: building a domain.Error captures its
+// origin.
+var idpEndpointsPartialCode = domain.ErrIDPEndpointsPartial(nil).Code
 
 func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, params api.CreateIdpParams) (api.CreateIdpRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opWrite); err != nil {
@@ -20,6 +25,12 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 		return nil, domain.ErrInternal(err).WithMessage("failed to encode identity provider connection")
 	}
 	result, err := h.idpConnectionService.CreateOrRevise(ctx, string(params.ProjectID), document)
+	if de, ok := errors.AsType[domain.Error](err); ok && de.Code == idpEndpointsPartialCode {
+		// The engine refuses this at sign-in too, where it is the server's
+		// fault. Only here is it the author's, so only here is it a 400.
+		refused := api.CreateIdpBadRequest(domainErrorDetails(de))
+		return &refused, nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +48,9 @@ func (h *Handler) CreateIdp(ctx context.Context, req *api.CreateIdpRequest, para
 
 // Connection reads resolve the path id through the resource scope index in
 // the named project, so a grant scoped to one connection reaches that
-// connection and its revision list. A single revision is read project-scoped
-// because revisions have no index row, so it needs a project-level grant.
+// connection, its revision list and each of its revisions. A revision has no
+// index row of its own: its read resolves the connection it belongs to and
+// checks the grant on that.
 
 func (h *Handler) GetIdpById(ctx context.Context, params api.GetIdpByIdParams) (api.GetIdpByIdRes, error) {
 	projectID, err := h.requireResourceAccessInProject(ctx, string(params.ProjectID), params.ID, idpAccess, opRead)
@@ -57,11 +69,17 @@ func (h *Handler) GetIdpById(ctx context.Context, params api.GetIdpByIdParams) (
 }
 
 func (h *Handler) GetIdpRevisionById(ctx context.Context, params api.GetIdpRevisionByIdParams) (api.GetIdpRevisionByIdRes, error) {
-	if err := h.requireProjectAccess(ctx, string(params.ProjectID), idpAccess, opRead); err != nil {
+	projectID := string(params.ProjectID)
+	entity, err := h.idpConnectionService.GetRevision(ctx, projectID, params.RevisionID)
+	if err != nil {
+		// A miss answers as the project check would first, so a caller the
+		// project does not admit learns nothing from the id.
+		if accessErr := h.requireProjectAccess(ctx, projectID, idpAccess, opRead); accessErr != nil {
+			return nil, accessErr
+		}
 		return nil, err
 	}
-	entity, err := h.idpConnectionService.GetRevision(ctx, string(params.ProjectID), params.RevisionID)
-	if err != nil {
+	if _, err := h.requireResourceAccessInProject(ctx, projectID, entity.ID, idpAccess, opRead); err != nil {
 		return nil, err
 	}
 	resp, err := toAPIIdpResponse(entity)
@@ -102,7 +120,7 @@ func (h *Handler) ListIdpRevisions(ctx context.Context, params api.ListIdpRevisi
 }
 
 func (h *Handler) QueryIdps(ctx context.Context, req *api.QueryIdpsRequest, params api.QueryIdpsParams) (api.QueryIdpsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), idpAccess, domain.ResourceKindIDPConnection)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), idpAccess, domain.ResourceKindIDPConnection)
 	if err != nil {
 		return nil, err
 	}

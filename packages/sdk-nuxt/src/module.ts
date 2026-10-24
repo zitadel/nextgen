@@ -2,79 +2,155 @@ import {
   defineNuxtModule,
   addPlugin,
   addServerHandler,
+  addTypeTemplate,
   addImportsDir,
   createResolver,
 } from "@nuxt/kit";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 
+import type { NuxtModule } from "@nuxt/schema";
 import type { NextgenMiddlewareOptions } from "./runtime/types";
 
+const DEFAULT_PROXY_PATH = "/__nextgen";
+
 /**
- * Resolve `ZITADEL_PROJECT_SECRET`. Nuxt's CLI auto-loads `.env` but the
- * project's CLI scaffolds write the secret to `.env.local` (gitignored), which
- * `nuxi` does not auto-load on every release path. Fall back to a one-shot
- * parse so the secret reaches `runtimeConfig` for the current app-plane
- * `POST /sessions/exchange` call regardless of which env file Nuxt picked up.
+ * Parses `.env.local` in the project root. Quoted values keep their contents
+ * verbatim; unquoted values stop at an inline ` #` comment (a bare `#`
+ * mid-token is kept, matching dotenv). A key set twice keeps its last value.
  */
-function loadProjectSecret(rootDir: string): string | undefined {
-  if (process.env.ZITADEL_PROJECT_SECRET) {
-    return process.env.ZITADEL_PROJECT_SECRET;
-  }
+function parseEnvLocal(rootDir: string): Record<string, string> {
   const path = resolvePath(rootDir, ".env.local");
   if (!existsSync(path)) {
-    return undefined;
+    return {};
   }
+  const values: Record<string, string> = {};
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^\s*(?:export\s+)?ZITADEL_PROJECT_SECRET\s*=\s*(.*)$/);
-    if (match && match[1] !== undefined) {
-      const raw = match[1].trim();
-      const quoted = raw.match(/^(['"])(.*)\1\s*(?:#.*)?$/);
-      // Quoted values keep their contents verbatim; unquoted values stop at an
-      // inline ` #` comment (a bare `#` mid-token is kept, matching dotenv).
-      const value = quoted ? quoted[2] : raw.replace(/\s+#.*$/, "").trim();
-      return value === "" ? undefined : value;
+    const [, key, rest] = line.match(/^\s*(?:export\s+)?([A-Za-z_]\w*)\s*=\s*(.*)$/) ?? [];
+    if (key === undefined || rest === undefined) {
+      continue;
     }
+    const raw = rest.trim();
+    const quoted = raw.match(/^(['"])(.*)\1\s*(?:#.*)?$/);
+    values[key] = quoted ? (quoted[2] ?? "") : raw.replace(/\s+#.*$/, "").trim();
   }
-  return undefined;
+  return values;
 }
 
-export default defineNuxtModule<NextgenMiddlewareOptions>({
-  meta: {
-    name: "@zitadel/sdk-nuxt",
-    configKey: "nextgen",
-  },
-  defaults: {
-    url: process.env.ZITADEL_URL ?? "http://localhost:8080",
-    proxyPath: "/__nextgen",
-    protectedRoutes: [],
-    loginPath: "/login",
-  },
-  setup(options, nuxt) {
-    const { resolve } = createResolver(import.meta.url);
+/**
+ * The copy overlay the client plugin provides, as `useNuxtApp().$zitadelBusinessLocales`:
+ * extra locale strings keyed by primary language subtag.
+ */
+const BUSINESS_LOCALES_TYPES = `type ZitadelBusinessLocales = Record<string, Partial<Record<string, string>>>;
 
-    nuxt.options.runtimeConfig.nextgen = {
-      url: options.url ?? "http://localhost:4000",
-      loginPath: options.loginPath ?? "/login",
-      protectedRoutes: options.protectedRoutes ?? [],
-      jwtKey: options.jwtKey,
-      // Server-only — never exposed to the client. Override at deploy time via
-      // `NUXT_NEXTGEN_PROJECT_SECRET`. Left undefined when the env var (and
-      // `.env.local`) provide no value, so the middleware surfaces a missing
-      // exchange bearer instead of silently sending an empty one.
-      projectSecret: loadProjectSecret(nuxt.options.rootDir),
-    };
+declare module "#app" {
+  interface NuxtApp {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
 
-    // Expose SDK-initializer values to the client-side plugin so it can
-    // call `configureZitadel()` without hardcoding paths.
-    nuxt.options.runtimeConfig.public.zitadelProxyPath = options.proxyPath ?? "/__nextgen";
-    nuxt.options.runtimeConfig.public.nextgenProxyPath = options.proxyPath ?? "/__nextgen";
+declare module "vue" {
+  interface ComponentCustomProperties {
+    $zitadelBusinessLocales: ZitadelBusinessLocales;
+  }
+}
 
-    addPlugin(resolve("./runtime/plugin"));
-    addServerHandler({
-      middleware: true,
-      handler: resolve("./runtime/server/handler"),
-    });
-    addImportsDir(resolve("./runtime/composables"));
-  },
-});
+export {};
+`;
+
+/**
+ * Returns a lookup for the app's Zitadel settings: the process environment
+ * first (it also holds the `.env` Nuxt loaded), then `.env.local`. Nuxt's CLI
+ * loads only `.env` unless started with `--dotenv`, but `zitadel setup` writes
+ * the settings to `.env.local` (gitignored), which Next.js and Vite load on
+ * their own; reading it here gives a Nuxt app the same behavior. Empty values
+ * count as unset.
+ */
+function settingsLookup(rootDir: string): (name: string) => string | undefined {
+  const envLocal = parseEnvLocal(rootDir);
+  return (name) => process.env[name] || envLocal[name] || undefined;
+}
+
+const nextgenModule: NuxtModule<NextgenMiddlewareOptions> =
+  defineNuxtModule<NextgenMiddlewareOptions>({
+    meta: {
+      name: "@zitadel/sdk-nuxt",
+      configKey: "nextgen",
+    },
+    defaults: {
+      proxyPath: DEFAULT_PROXY_PATH,
+      protectedRoutes: [],
+      loginPath: "/login",
+    },
+    setup(options, nuxt) {
+      const { resolve } = createResolver(import.meta.url);
+      const setting = settingsLookup(nuxt.options.rootDir);
+      const proxyPath = options.proxyPath ?? DEFAULT_PROXY_PATH;
+
+      nuxt.options.runtimeConfig.nextgen = {
+        // Only a URL the app set in nuxt.config is kept. The key exists (empty)
+        // so `NUXT_NEXTGEN_URL` can set it at runtime; `ZITADEL_URL` is read by
+        // the running server and never baked into the build.
+        url: options.url || (nuxt.options.dev ? setting("ZITADEL_URL") : undefined) || "",
+        // The project a session must belong to for its user to count as signed
+        // in, when set here or through NUXT_NEXTGEN_PROJECT_ID. Unset, the
+        // handler takes the public project id the widgets sign users in to,
+        // which NUXT_PUBLIC_ZITADEL_PROJECT_ID sets at runtime, then
+        // ZITADEL_PROJECT_ID at runtime. Nothing is read from the build's
+        // environment here, so a built server is not pinned to it.
+        projectId: options.projectId,
+        // The server middleware proxies this prefix; the plugin hands the same
+        // one to the widgets, so the browser calls the path the server serves.
+        proxyPath,
+        loginPath: options.loginPath ?? "/login",
+        protectedRoutes: options.protectedRoutes ?? [],
+        // Left unset, these take the middleware's defaults; the handler reads
+        // the "" Nitro stores for them as unset.
+        ignoredRoutes: options.ignoredRoutes,
+        allowedAlgorithms: options.allowedAlgorithms,
+        allowedTokenTypes: options.allowedTokenTypes,
+        audience: options.audience,
+        clockSkewMs: options.clockSkewMs,
+        jwksTimeoutMs: options.jwksTimeoutMs,
+        proxyTimeoutMs: options.proxyTimeoutMs,
+        opaqueTokenTimeoutMs: options.opaqueTokenTimeoutMs,
+        jwtKey: options.jwtKey,
+        // Server-only. Never filled from the build environment, which would
+        // copy it into `.output/`: the running server reads it from
+        // `NUXT_NEXTGEN_PROJECT_SECRET` or `ZITADEL_PROJECT_SECRET`. Only
+        // `nuxt dev`, which writes no build output, fills it from `.env.local`
+        // that the dev server would not otherwise see.
+        projectSecret: (nuxt.options.dev ? setting("ZITADEL_PROJECT_SECRET") : undefined) ?? "",
+      };
+
+      // Expose SDK-initializer values to the client-side plugin so it can
+      // call `configureZitadel()` without hardcoding paths.
+      const publicConfig = nuxt.options.runtimeConfig.public;
+      publicConfig.zitadelProxyPath = proxyPath;
+      publicConfig.nextgenProxyPath = proxyPath;
+      // A project id set in `runtimeConfig.public` wins. The key is set even
+      // when empty, so `NUXT_PUBLIC_ZITADEL_PROJECT_ID` can still fill it at
+      // runtime.
+      publicConfig.zitadelProjectId ||= setting("NUXT_PUBLIC_ZITADEL_PROJECT_ID") ?? "";
+
+      addPlugin(resolve("./runtime/plugin"));
+      // Loads the widget elements in the browser, so the app does not depend on
+      // `@zitadel/components` itself. Client-only: registering custom elements
+      // during SSR would break.
+      addPlugin({ src: resolve("./runtime/components.client"), mode: "client" });
+      // Types the value the plugin above provides. Written into the app's own
+      // `.nuxt/types`, with the locale map spelled out, because the app does not
+      // install `@zitadel/components`, so a type import from it would not resolve.
+      addTypeTemplate({
+        filename: "types/zitadel-business-locales.d.ts",
+        getContents: () => BUSINESS_LOCALES_TYPES,
+      });
+      addServerHandler({
+        middleware: true,
+        handler: resolve("./runtime/server/handler"),
+      });
+      addImportsDir(resolve("./runtime/composables"));
+    },
+  });
+
+export default nextgenModule;

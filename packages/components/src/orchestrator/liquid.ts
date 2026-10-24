@@ -16,6 +16,7 @@
 import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
+import type { CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
 import { hookName } from "../internal/hook-name.js";
@@ -91,7 +92,15 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   engine.registerFilter(
     "t",
     function tFilter(this: { context: unknown }, key: unknown, ...args: unknown[]) {
-      const lookupKey = stringify(key);
+      const requested = stringify(key);
+      // A step with providers asks for `<step>.description.sso`; when neither it
+      // nor the plain description exists, the plain key is the one to add.
+      const lookupKey =
+        requested.endsWith(SSO_DESCRIPTION_SUFFIX) &&
+        options.locale[requested] === undefined &&
+        options.locale[requested.slice(0, -".sso".length)] === undefined
+          ? requested.slice(0, -".sso".length)
+          : requested;
       let template =
         options.locale[lookupKey] ??
         injectedKeyFallback(options.locale, lookupKey) ??
@@ -100,9 +109,7 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
         template = lookupKey;
         if (lookupKey !== "" && !warnedMissingKeys.has(lookupKey)) {
           warnedMissingKeys.add(lookupKey);
-          console.warn(
-            `[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`,
-          );
+          console.warn(`[zitadel-login] missing text key "${lookupKey}" — rendering the raw key`);
         }
       }
       return interpolate(template, args.map(stringify));
@@ -207,9 +214,18 @@ const INJECTED_KEY_FALLBACKS: ReadonlyArray<{ suffix: string; fallback: string }
   { suffix: ".action.back", fallback: "action.back" },
 ];
 
+const SSO_DESCRIPTION_SUFFIX = ".description.sso";
+
 function injectedKeyFallback(locale: Locale, key: string): string | undefined {
   for (const { suffix, fallback } of INJECTED_KEY_FALLBACKS) {
     if (key.endsWith(suffix)) return locale[fallback];
+  }
+  // A step that offers providers asks for `<step>.description.sso` (see
+  // `buildStep`). Only the steps whose plain text would mislead need their own;
+  // every other step, and any locale written before the key existed, shows the
+  // plain description.
+  if (key.endsWith(SSO_DESCRIPTION_SUFFIX)) {
+    return locale[key.slice(0, -".sso".length)];
   }
   return undefined;
 }
@@ -246,7 +262,16 @@ export type FlowErrorKeyContext = {
    * hiding the error. Omit to skip the check (pure lookups).
    */
   fields?: readonly string[];
+  /**
+   * The validation each of the step's fields carries, by name. A length key
+   * whose field carries its bound names it ("at least 12 characters") instead
+   * of the generic "too short".
+   */
+  validations?: Readonly<Record<string, FieldValidation | undefined>>;
 };
+
+/** The validation a step field carries, as the API generates it. */
+type FieldValidation = NonNullable<CreateFlow201StepFieldsItem["validation"]>;
 
 /**
  * Rule-suffix fallbacks for the server's field-validation keys
@@ -259,10 +284,26 @@ export type FlowErrorKeyContext = {
  * that suffix takes the format wording; `_unknown_field` (a submitted
  * name that is not a step field) takes the catch-all.
  */
-const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{ suffix: string; generic: string }> = [
+const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{
+  suffix: string;
+  generic: string;
+  /**
+   * For a length rule: the catalog entry that names the field's bound as
+   * `{1}`, and where the bound sits in the field's validation.
+   */
+  withBound?: { key: string; bound: (validation: FieldValidation) => number | undefined };
+}> = [
   { suffix: "_required", generic: "error.field_required" },
-  { suffix: "_min_length", generic: "error.field_min_length" },
-  { suffix: "_max_length", generic: "error.field_max_length" },
+  {
+    suffix: "_min_length",
+    generic: "error.field_min_length",
+    withBound: { key: "error.field_min_length_value", bound: (v) => v.min_length },
+  },
+  {
+    suffix: "_max_length",
+    generic: "error.field_max_length",
+    withBound: { key: "error.field_max_length_value", bound: (v) => v.max_length },
+  },
   { suffix: "_format", generic: "error.field_format" },
   { suffix: "_invalid", generic: "error.field_format" },
   { suffix: "_unknown_field", generic: "error.field_invalid" },
@@ -275,8 +316,7 @@ const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
  * field-validation violations and general engine failures (e.g.
  * `error.invalid_credentials`, `error.passkey_invalid`) alike.
  * Returns `null` unless EVERY `"; "`-joined segment is an `error.*` key
- * — the caller keeps other payloads (outcome tokens such as
- * `user_not_found`) verbatim.
+ * — the caller keeps any other payload verbatim.
  *
  * Keys the locale knows pass through as `text_key` entries: the template
  * localises them via `| t`, and `fieldErrorKeys` routes the known ones
@@ -286,54 +326,7 @@ const FLOW_ERROR_CATCH_ALL_KEY = "error.field_invalid";
  * `| t`'s behaviour for non-validation keys such as
  * `error.sign_in_server`, which localises via `.title`/`.body`).
  */
-/**
- * Decode a provider error the SSO callback parked on `step.error`.
- *
- * The engine carries the whole OAuth2 authorization error response (RFC 6749
- * §4.1.2.1: code, description, uri) in the one `step.error` string, JSON and
- * base64 behind an `sso_error:` tag, because that field cannot otherwise hold
- * a description and a link. This recognises the tag and unpacks it into a
- * single form-level [FlowError]; a string without the tag is not ours, so it
- * returns null and the caller falls through to the catalog path.
- */
-export function parseSsoError(raw: string): FlowError[] | null {
-  const tag = "sso_error:";
-  if (!raw.startsWith(tag)) return null;
-  try {
-    // `atob` yields one character per byte, so a UTF-8 description would come
-    // back as mojibake read directly. The server marshals JSON as UTF-8 before
-    // base64, and the point of carrying the provider's own words is that they
-    // arrive intact -- which for most providers means non-ASCII.
-    const bytes = Uint8Array.from(atob(raw.slice(tag.length)), (char) => char.charCodeAt(0));
-    const decoded = JSON.parse(new TextDecoder().decode(bytes)) as {
-      code?: string;
-      description?: string;
-      uri?: string;
-    };
-    // RFC 6749 §4.1.2.1: `access_denied` is the person saying no. Everything
-    // else -- `server_error`, `temporarily_unavailable`, a misconfigured
-    // client -- is the provider failing, and telling someone they cancelled
-    // when they did not sends them looking for a mistake they never made.
-    const cancelled = decoded.code === "access_denied";
-    return [
-      {
-        text_key: cancelled ? "error.sso_cancelled" : "error.sso_failed",
-        code: decoded.code,
-        detail: decoded.description || undefined,
-        uri: decoded.uri || undefined,
-      },
-    ];
-  } catch {
-    // A tag we cannot decode is still a failed sign-in; say so generically
-    // rather than leaking the raw payload to the user.
-    return [{ text_key: "error.sso_failed" }];
-  }
-}
-
-export function localiseFlowErrorKeys(
-  raw: string,
-  ctx: FlowErrorKeyContext,
-): FlowError[] | null {
+export function localiseFlowErrorKeys(raw: string, ctx: FlowErrorKeyContext): FlowError[] | null {
   const segments = raw.split("; ");
   if (!segments.every((segment) => segment.startsWith("error."))) return null;
   return segments.map((key) => localiseFlowErrorKey(key, ctx));
@@ -353,13 +346,25 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
     // alert filters.
     return inlineField !== undefined ? { field: inlineField, text_key: key } : { text_key: key };
   }
-  for (const { suffix, generic } of FLOW_ERROR_RULE_FALLBACKS) {
+  for (const { suffix, generic, withBound } of FLOW_ERROR_RULE_FALLBACKS) {
     if (!key.endsWith(suffix)) continue;
     const field = key.slice("error.".length, key.length - suffix.length);
     if (field === "") break;
-    const template =
-      ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.";
-    const message = capitaliseFirst(interpolate(template, [fieldLabel(ctx, field)]));
+    const label = fieldLabel(ctx, field);
+    // A length rule names the field's bound when the field carries a
+    // positive one and the locale has the wording; otherwise the generic
+    // sentence.
+    const validation = ctx.validations?.[field];
+    const bound = withBound && validation ? withBound.bound(validation) : undefined;
+    const boundTemplate = withBound ? ctx.locale[withBound.key] : undefined;
+    const message = capitaliseFirst(
+      typeof bound === "number" && bound > 0 && boundTemplate !== undefined
+        ? interpolate(boundTemplate, [label, String(bound)])
+        : interpolate(
+            ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.",
+            [label],
+          ),
+    );
     // Route inline when the step renders this field (the inline outlet exists);
     // otherwise keep it a banner message so it can never silently vanish. A
     // fields-less pure lookup can't confirm the outlet, so it stays a banner.

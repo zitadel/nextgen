@@ -1,0 +1,34 @@
+{
+  "name": "@zitadel/e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "test": "vitest run --config journey/vitest.config.ts",
+    "test:all": "pnpm run test",
+    "console-smoke": "playwright test --config console/playwright.config.mts",
+    "console-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test --config console/playwright.real.config.mts",
+    "console-embedded": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config console/playwright.embedded.config.mts",
+    "console-platform": "playwright test --config console/playwright.platform.config.mts",
+    "console-deployment": "playwright test --config console/playwright.deployment.config.mts",
+    "schemas-deployment": "playwright test --config schemas/playwright.deployment.config.mts",
+    "demo-next-mock": "node ../scripts/task-guard.mjs --mutex demo-next-app -- playwright test --config demo-next/playwright.config.mts",
+    "demo-next-real": "NEXTGEN_SERVER_LOGIN_ENABLED=${NEXTGEN_SERVER_LOGIN_ENABLED-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} node ../scripts/task-guard.mjs --mutex demo-next-app -- playwright test --config demo-next/playwright.real.config.mts",
+    "demo-nuxt-mock": "playwright test --config demo-nuxt/playwright.config.mts",
+    "e2e-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
+    "journey": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} node journey/scripts/run-local.mjs",
+    "journey-local": "ZITADEL_TELEMETRY=${ZITADEL_TELEMETRY-0} JOURNEY_TARBALLS_REQUIRED=${JOURNEY_TARBALLS_REQUIRED-1} node journey/scripts/run-local.mjs --ci --runtime binary"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@zitadel/api": "workspace:*",
+    "@zitadel/api-mock": "workspace:*",
+    "@zitadel/sdk-nuxt": "workspace:*",
+    "@zitadel/testing": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

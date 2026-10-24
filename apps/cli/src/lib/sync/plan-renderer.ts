@@ -2,12 +2,7 @@ import { createHash } from "node:crypto";
 
 import { escapeControlCharacters } from "../api-client";
 import { stableStringify } from "../json";
-import type {
-  ResourceSyncer,
-  SyncAction,
-  SyncActionWarning,
-  SyncPlanSummary,
-} from "./types.js";
+import type { ResourceSyncer, SyncAction, SyncActionWarning, SyncPlanSummary } from "./types.js";
 
 /**
  * Count the non-`skip` actions in a {@link buildSyncPlan} result. Pure; the
@@ -16,13 +11,35 @@ import type {
  */
 export function summarizePlan(actions: ReadonlyArray<SyncAction>): SyncPlanSummary {
   const active = actions.filter((a) => a.kind !== "skip");
+  const moved = (a: SyncAction) => a.kind === "create" && a.movedFrom !== undefined;
   return {
-    creates: active.filter((a) => a.kind === "create").length,
+    creates: active.filter((a) => a.kind === "create" && !moved(a)).length,
     updates: active.filter((a) => a.kind === "update").length,
     revisions: active.filter((a) => a.kind === "revise").length,
     deletes: active.filter((a) => a.kind === "delete").length,
+    moves: active.filter(moved).length,
+    unsupported_deletions: actions.filter(isUnsupportedDeletion).length,
     total: active.length,
   };
+}
+
+/** A removed file whose resource the platform cannot delete yet; planned as a skip. */
+export type UnsupportedDeletion = Extract<
+  SyncAction,
+  { kind: "skip"; reason: "unsupported-deletion" }
+>;
+
+/** Whether an action is a removed file that will be kept on the platform. */
+export function isUnsupportedDeletion(action: SyncAction): action is UnsupportedDeletion {
+  return action.kind === "skip" && action.reason === "unsupported-deletion";
+}
+
+/** What to tell the developer about one removed file, in a plan and in an apply. */
+export function unsupportedDeletionNote(action: UnsupportedDeletion): string {
+  return (
+    `${action.path} was removed, but deleting ${action.syncer.kind} resources is not supported yet (#1013), ` +
+    `so nothing was deleted on the platform. Restore the file if you did not mean to remove it.`
+  );
 }
 
 /**
@@ -37,6 +54,13 @@ export function collectPlanWarnings(
   for (const action of actions) {
     for (const warning of warningsOf(action)) {
       out.push({ path: action.path, rule: warning.rule, message: warning.message });
+    }
+    if (isUnsupportedDeletion(action)) {
+      out.push({
+        path: action.path,
+        rule: "unsupported-deletion",
+        message: unsupportedDeletionNote(action),
+      });
     }
   }
   return out;
@@ -62,10 +86,12 @@ function warningsOf(action: SyncAction): ReadonlyArray<SyncActionWarning> {
  */
 export type PlanResourceChange = {
   kind: ResourceSyncer["kind"];
-  action: "create" | "update" | "revision" | "delete";
+  action: "create" | "update" | "revision" | "delete" | "move";
   file: string;
   id?: string;
   previous_id?: string;
+  /** For a move: the removed file the resource used to be in. */
+  moved_from?: string;
 };
 
 /**
@@ -73,14 +99,21 @@ export type PlanResourceChange = {
  * envelope-ready {@link PlanResourceChange} rows. Pure; the structural
  * counterpart of {@link summarizePlan} — counts and rows always agree.
  */
-export function enumeratePlanResources(
-  actions: ReadonlyArray<SyncAction>,
-): PlanResourceChange[] {
+export function enumeratePlanResources(actions: ReadonlyArray<SyncAction>): PlanResourceChange[] {
   const out: PlanResourceChange[] = [];
   for (const action of actions) {
     switch (action.kind) {
       case "create":
-        out.push({ kind: action.syncer.kind, action: "create", file: action.path });
+        out.push(
+          action.movedFrom === undefined
+            ? { kind: action.syncer.kind, action: "create", file: action.path }
+            : {
+                kind: action.syncer.kind,
+                action: "move",
+                file: action.path,
+                moved_from: action.movedFrom,
+              },
+        );
         break;
       case "update":
         out.push({ kind: action.syncer.kind, action: "update", file: action.path, id: action.id });
@@ -115,12 +148,17 @@ export function enumeratePlanResources(
 export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): string {
   const active = actions.filter((a) => a.kind !== "skip");
 
+  const unsupported = actions.filter(isUnsupportedDeletion);
+  const unsupportedNote = unsupported.map((a) =>
+    paint(`# ${unsupportedDeletionNote(a)}`, A.yellow, tty),
+  );
+
   if (active.length === 0) {
-    return paint(
-      "No changes. Your Zitadel configuration matches the current state.",
-      A.bold,
-      tty,
-    );
+    const headline =
+      unsupported.length === 0
+        ? "No changes. Your Zitadel configuration matches the current state."
+        : `Nothing to apply, but ${unsupported.length} removed file${unsupported.length === 1 ? "" : "s"} cannot be deleted from the platform yet.`;
+    return [paint(headline, A.bold, tty), ...unsupportedNote].join("\n");
   }
 
   const out: string[] = [];
@@ -133,7 +171,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
 
   out.push("");
 
-  const { creates, updates, revisions, deletes } = summarizePlan(actions);
+  const { creates, updates, revisions, deletes, moves } = summarizePlan(actions);
 
   const parts: string[] = [];
   if (creates > 0) {
@@ -144,6 +182,9 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
   }
   if (revisions > 0) {
     parts.push(`${revisions} new revision${revisions === 1 ? "" : "s"}`);
+  }
+  if (moves > 0) {
+    parts.push(`${moves} moved`);
   }
   if (deletes > 0) {
     parts.push(`${deletes} to destroy`);
@@ -162,6 +203,7 @@ export function renderPlan(actions: ReadonlyArray<SyncAction>, tty: boolean): st
     );
   }
 
+  out.push(...unsupportedNote);
   return out.join("\n");
 }
 
@@ -190,7 +232,7 @@ const KNOWN_AFTER_APPLY = "(known after apply)";
 /**
  * Quote-escape a string value, then escape whatever could still drive the
  * terminal. The plan prints what the server stores, and `plan` and `apply`
- * read it verbatim so the diff and the write-back see the real bytes; this is
+ * read it verbatim so the diff sees the real bytes; this is
  * where it is made safe to print.
  */
 function escapeString(s: string): string {
@@ -505,11 +547,166 @@ function renderBlockStringDiff(
 }
 
 /**
+ * The keys that name an element of an array of objects. A flow's `steps` and
+ * each step's `actions` are named by `name`, which the dialect requires to be
+ * unique within its list; the others cover any later list of named objects.
+ */
+const ELEMENT_IDENTITY_KEYS = ["name", "id", "slug"] as const;
+
+/**
+ * The key that identifies every element of both arrays, or undefined when
+ * there is none: every element must be an object carrying that key as a
+ * string, unique within its array. Without one, elements can only be matched
+ * by position, and a changed array renders as a whole remove + add.
+ */
+function elementIdentityKey(
+  oldArr: ReadonlyArray<unknown>,
+  newArr: ReadonlyArray<unknown>,
+): string | undefined {
+  const all = [...oldArr, ...newArr];
+  if (all.length === 0 || !all.every(isPlainObject)) {
+    return undefined;
+  }
+  return ELEMENT_IDENTITY_KEYS.find((key) =>
+    [oldArr, newArr].every((arr) => {
+      const ids = arr.map((item) => (item as Record<string, unknown>)[key]);
+      return ids.every((id) => typeof id === "string") && new Set(ids).size === ids.length;
+    }),
+  );
+}
+
+function sameValue(a: unknown, b: unknown): boolean {
+  return stableStringify(a) === stableStringify(b);
+}
+
+function hiddenNote(count: number, noun: string): string {
+  return `# (${plural(count, `unchanged ${noun}`)} hidden)`;
+}
+
+/**
+ * Render a changed array element by element, so one edit inside a long list
+ * reads as one change rather than the whole list removed and added again.
+ *
+ * - Arrays of named objects (a flow's `steps`, a step's `actions`) are matched
+ *   by {@link elementIdentityKey}. A changed element renders as `~ {` with only
+ *   what changed in it, plus its name; added and removed elements render
+ *   whole; unchanged ones collapse into a `# (N unchanged elements hidden)`
+ *   line. An element that moved renders as removed and added.
+ * - Arrays of scalars (`fields`, `required`, `scopes`) render every item, with
+ *   `+` / `-` on the ones added or removed.
+ * - Anything else (objects with no shared identity, nested arrays) falls back
+ *   to a whole remove + add.
+ */
+function renderArrayDiff(
+  paddedKey: string,
+  oldArr: ReadonlyArray<unknown>,
+  newArr: ReadonlyArray<unknown>,
+  prefixCol: number,
+  tty: boolean,
+  lines: string[],
+): void {
+  const pad = " ".repeat(prefixCol);
+  const itemCol = prefixCol + 4;
+  const itemPad = " ".repeat(itemCol);
+  const closePad = " ".repeat(prefixCol + 2);
+  const yellow = (s: string) => paint(s, A.yellow, tty);
+  const green = (s: string) => paint(s, A.green, tty);
+  const red = (s: string) => paint(s, A.red, tty);
+  const identity = elementIdentityKey(oldArr, newArr);
+
+  const withinBudget = oldArr.length * newArr.length <= MAX_LCS_CELLS;
+
+  if (identity !== undefined && withinBudget) {
+    const idOf = (item: unknown) => (item as Record<string, string>)[identity] as string;
+    const oldById = new Map(oldArr.map((item) => [idOf(item), item]));
+    const newById = new Map(newArr.map((item) => [idOf(item), item]));
+
+    lines.push(yellow(`${pad}~ ${paddedKey} = [`));
+    let hidden = 0;
+    const flushHidden = () => {
+      if (hidden > 0) {
+        lines.push(`${itemPad}  ${hiddenNote(hidden, "element")}`);
+        hidden = 0;
+      }
+    };
+    for (const op of lcsDiff(oldArr.map(idOf), newArr.map(idOf))) {
+      const before = oldById.get(op.line) as Record<string, unknown>;
+      const after = newById.get(op.line) as Record<string, unknown>;
+      if (op.kind === "same" && sameValue(before, after)) {
+        hidden += 1;
+        continue;
+      }
+      flushHidden();
+      if (op.kind === "same") {
+        lines.push(yellow(`${itemPad}~ {`));
+        renderDiff(before, after, itemCol + 4, tty, lines, { compact: true, identity });
+        lines.push(yellow(`${" ".repeat(itemCol + 2)}},`));
+      } else {
+        const removed = op.kind === "del";
+        renderArrayItems(
+          [removed ? before : after],
+          removed ? "-" : "+",
+          itemCol,
+          { tty, deleteMode: false },
+          lines,
+        );
+      }
+    }
+    flushHidden();
+    lines.push(yellow(`${closePad}]`));
+    return;
+  }
+
+  if (withinBudget && [...oldArr, ...newArr].every(isPrimitive)) {
+    const label = (item: unknown) => fmtScalar(item as string | number | boolean | null);
+    lines.push(yellow(`${pad}~ ${paddedKey} = [`));
+    for (const op of lcsDiff(oldArr.map(label), newArr.map(label))) {
+      if (op.kind === "same") {
+        lines.push(`${itemPad}  ${op.line},`);
+      } else if (op.kind === "add") {
+        lines.push(green(`${itemPad}+ ${op.line},`));
+      } else {
+        lines.push(red(`${itemPad}- ${op.line},`));
+      }
+    }
+    lines.push(yellow(`${closePad}]`));
+    return;
+  }
+
+  if (oldArr.length === 0) {
+    lines.push(red(`${pad}- ${paddedKey} = []`));
+  } else {
+    lines.push(red(`${pad}- ${paddedKey} = [`));
+    renderArrayItems(oldArr, "-", itemCol, { tty, deleteMode: false }, lines);
+    lines.push(red(`${closePad}]`));
+  }
+  if (newArr.length === 0) {
+    lines.push(green(`${pad}+ ${paddedKey} = []`));
+  } else {
+    lines.push(green(`${pad}+ ${paddedKey} = [`));
+    renderArrayItems(newArr, "+", itemCol, { tty, deleteMode: false }, lines);
+    lines.push(green(`${closePad}]`));
+  }
+}
+
+/**
+ * How {@link renderDiff} renders what did not change.
+ *
+ * `compact` hides unchanged attributes behind one `# (N unchanged attributes
+ * hidden)` line, for the inside of a changed array element: there the point is
+ * which element changed and how, and its untouched rest is noise. `identity`
+ * names the attribute that is shown anyway, so the element can be recognised.
+ */
+type DiffOptions = { compact?: boolean; identity?: string };
+
+/**
  * Walks both old and new objects, emitting Terraform-style change lines.
  * Returns true if any actual change line (+ / - / ~) was emitted.
  *
  * Edge cases:
- * - Changed arrays render as a full remove + full add (no LCS diff).
+ * - Changed arrays render element by element ({@link renderArrayDiff}).
+ * - An unchanged array that holds objects collapses to a hidden-elements
+ *   line: a flow's whole `steps` list is not context for a top-level edit.
  * - Nested objects recurse, and the outer key is only marked `~` if a child
  *   actually changed; unchanged children render with the neutral prefix.
  * - A value whose type changed (e.g. string → object) also renders as a
@@ -521,16 +718,22 @@ function renderDiff(
   prefixCol: number,
   tty: boolean,
   lines: string[],
+  options: DiffOptions = {},
 ): boolean {
   const allKeys = [...new Set([...Object.keys(oldObj), ...Object.keys(newObj)])].sort();
-  const maxLen = allKeys.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
+  const unchanged = (key: string) =>
+    Object.hasOwn(oldObj, key) && Object.hasOwn(newObj, key) && sameValue(oldObj[key], newObj[key]);
+  const shown = options.compact
+    ? allKeys.filter((key) => key === options.identity || !unchanged(key))
+    : allKeys;
+  const maxLen = shown.reduce((m, k) => Math.max(m, fieldLabel(k).length), 0);
   const pad = " ".repeat(prefixCol);
   let hasChanges = false;
 
-  for (const key of allKeys) {
+  for (const key of shown) {
     const pk = fieldLabel(key).padEnd(maxLen);
-    const hasOld = Object.prototype.hasOwnProperty.call(oldObj, key);
-    const hasNew = Object.prototype.hasOwnProperty.call(newObj, key);
+    const hasOld = Object.hasOwn(oldObj, key);
+    const hasNew = Object.hasOwn(newObj, key);
     const oldVal = oldObj[key];
     const newVal = newObj[key];
 
@@ -581,36 +784,32 @@ function renderDiff(
       // Key-order-insensitive equality: the server echoes objects in its own
       // field order while local files are stably sorted — that difference is
       // not a change.
-      if (stableStringify(oldVal) === stableStringify(newVal)) {
+      if (sameValue(oldVal, newVal)) {
         if (newVal.length === 0) {
           lines.push(`${pad}  ${pk} = []`);
-        } else {
+        } else if (newVal.every(isPrimitive)) {
           lines.push(`${pad}  ${pk} = [`);
           renderArrayItems(newVal, " ", prefixCol + 4, { tty, deleteMode: false }, lines);
+          lines.push(`${" ".repeat(prefixCol + 2)}]`);
+        } else {
+          lines.push(`${pad}  ${pk} = [`);
+          lines.push(`${" ".repeat(prefixCol + 4)}  ${hiddenNote(newVal.length, "element")}`);
           lines.push(`${" ".repeat(prefixCol + 2)}]`);
         }
       } else {
         hasChanges = true;
-        const colR = (s: string) => paint(s, A.red, tty);
-        const colA = (s: string) => paint(s, A.green, tty);
-        if (oldVal.length === 0) {
-          lines.push(colR(`${pad}- ${pk} = []`));
-        } else {
-          lines.push(colR(`${pad}- ${pk} = [`));
-          renderArrayItems(oldVal, "-", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(colR(`${" ".repeat(prefixCol + 2)}]`));
-        }
-        if (newVal.length === 0) {
-          lines.push(colA(`${pad}+ ${pk} = []`));
-        } else {
-          lines.push(colA(`${pad}+ ${pk} = [`));
-          renderArrayItems(newVal, "+", prefixCol + 4, { tty, deleteMode: false }, lines);
-          lines.push(colA(`${" ".repeat(prefixCol + 2)}]`));
-        }
+        renderArrayDiff(pk, oldVal, newVal, prefixCol, tty, lines);
       }
     } else if (isPlainObject(oldVal) && isPlainObject(newVal)) {
       const childLines: string[] = [];
-      const childHasChanges = renderDiff(oldVal, newVal, prefixCol + 4, tty, childLines);
+      const childHasChanges = renderDiff(
+        oldVal,
+        newVal,
+        prefixCol + 4,
+        tty,
+        childLines,
+        options.compact ? { compact: true } : {},
+      );
       if (childHasChanges) {
         hasChanges = true;
         const col = (s: string) => paint(s, A.yellow, tty);
@@ -637,6 +836,10 @@ function renderDiff(
     }
   }
 
+  const hidden = allKeys.length - shown.length;
+  if (hidden > 0) {
+    lines.push(`${pad}  ${hiddenNote(hidden, "attribute")}`);
+  }
   return hasChanges;
 }
 
@@ -686,7 +889,35 @@ function renderBlock(action: SyncAction, tty: boolean): string[] {
 
   switch (action.kind) {
     case "create": {
-      const header = `${blkPad}# ${action.path} will be created`;
+      if (action.movedFrom !== undefined && action.oldContent !== undefined) {
+        // The platform already holds the resource, so show what changes in it
+        // the way an update does, under a header that says where it came from.
+        const [, ...diff] = renderBlock(
+          {
+            kind: "update",
+            path: action.path,
+            syncer: action.syncer,
+            id: "",
+            content: action.content,
+            hash: action.hash,
+            oldContent: action.oldContent,
+            ...(action.warnings ? { warnings: action.warnings } : {}),
+          },
+          tty,
+        );
+        return [
+          paint(
+            `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`,
+            A.bold,
+            tty,
+          ),
+          ...diff,
+        ];
+      }
+      const header =
+        action.movedFrom === undefined
+          ? `${blkPad}# ${action.path} will be created`
+          : `${blkPad}# ${action.path} will take over the ${action.syncer.kind} that was in ${action.movedFrom}`;
       const opening = `${blkPad}+ resource "${action.syncer.kind}" "${resourceName(action.path)}" {`;
       lines.push(paint(header, A.bold, tty));
       lines.push(paint(opening, A.green, tty));

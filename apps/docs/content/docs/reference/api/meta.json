@@ -1,0 +1,32 @@
+{
+  "title": "API reference",
+  "root": true,
+  "pagesIndex": "index",
+  "pages": [
+    "errors",
+    "---Runtime auth---",
+    "flows",
+    "authentication-attempts",
+    "sessions",
+    "---Configuration---",
+    "flow-definitions",
+    "schemas",
+    "branding",
+    "identity-providers",
+    "policies",
+    "variables",
+    "releases",
+    "deployments",
+    "previews",
+    "---Management---",
+    "projects",
+    "teams",
+    "users",
+    "grants",
+    "events",
+    "event-webhooks",
+    "---System---",
+    "system",
+    "..."
+  ]
+}

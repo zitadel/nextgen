@@ -18,17 +18,17 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
     ```sh
-    pnpm add @zitadel/components
+    pnpm add @zitadel/components@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    npm install @zitadel/components
+    npm install @zitadel/components@latest
     ```
   </Tab>
   <Tab>
     ```sh
-    yarn add @zitadel/components
+    yarn add @zitadel/components@latest
     ```
   </Tab>
 </Tabs>
@@ -36,6 +36,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 ## Components
 
 - `<zitadel-login>`
+- `<zitadel-session>`, the signed-in session card with sign-out
 - `<zitadel-logout>`
 - atoms such as fields, buttons, alerts, icons, pills, and page shells
 
@@ -51,8 +52,10 @@ The components speak to the configured API base, usually the same-origin `/__nex
 
 For browser automation, remember that the native controls live inside shadow roots. Prefer Playwright-style shadow-DOM-aware locators when available.
 
+If your app renders on the server, mount the widget on the client only, after hydration, or give a raw `<zitadel-login>` element `project-id` and `proxy-path` as attributes, because a widget that starts before its configuration arrives shows an error instead of the flow.
+
 ## See also
 
 - [SDKs](/docs/sdks) — framework wrappers that bundle these components for you.
-- [SDK proxy](/docs/concepts/sdk-proxy) — the same-origin `/__nextgen/*` path the orchestrator calls.
+- [SDK proxy](/docs/sdks/proxy) — the same-origin `/__nextgen/*` path the orchestrator calls.
 - [`@zitadel/components` source](https://github.com/zitadel/nextgen/tree/main/packages/components).

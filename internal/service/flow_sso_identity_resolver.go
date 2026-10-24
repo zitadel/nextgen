@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -17,10 +18,14 @@ import (
 type FlowSSOIdentityResolver struct {
 	db          StatementPool
 	connections IDPConnectionService
+	users       UserService
+	schemaStore domain.JSONSchemaStore
+	hashers     ProjectHasherResolver
+	passwords   PasswordGate
 }
 
-func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService) *FlowSSOIdentityResolver {
-	return &FlowSSOIdentityResolver{db: db, connections: connections}
+func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver, passwords PasswordGate) *FlowSSOIdentityResolver {
+	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers, passwords: passwords}
 }
 
 var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
@@ -38,16 +43,39 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		return nil, domain.ErrFlowRestartRequired()
 	}
 	check, ok := attempt.SSOCallback()
-	if !ok || check.Result == nil {
-		return boundThroughSSO(attempt), nil
+	var attemptUserID string
+	if user, bound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser); bound {
+		attemptUserID = user.UserID
 	}
-	// An already resolved row (creation disabled leaves it parked) needs none
-	// of the reads below. It still wins over an earlier bind, as an
-	// unresolved row does.
+	if ok && check.Result != nil && check.Result.CollisionUserID != "" {
+		// A collision bind replaced the result with the user it bound, in the
+		// same transaction as the user factor. Report it whatever the cookie
+		// recorded, so a flow whose cookie lost that bind can catch up. Only
+		// the marker counts: a user factor alone can come from an unrelated
+		// identifier submission. The marker holds nothing else to read.
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, CollisionUserID: check.Result.CollisionUserID, AttemptUserID: attemptUserID}, nil
+	}
+	if !ok || check.Result == nil {
+		if bound := boundThroughSSO(attempt); bound != nil {
+			bound.AttemptUserID = attemptUserID
+			return bound, nil
+		}
+		return nil, nil
+	}
+	// An already resolved row (sso_user_not_found or creation disabled leaves
+	// it parked) needs none of the reads below. It still wins over an earlier
+	// bind, as an unresolved row does.
 	if check.ID == in.ResolvedCheckID {
 		return nil, nil
 	}
 	result := check.Result
+
+	// An error result carries no identity, so none of the reads below apply.
+	// The row stays parked, like creation disabled, until the attempt expires
+	// or the next ceremony replaces it.
+	if result.IsError() {
+		return &domain.FlowSSOParkedIdentity{CheckID: check.ID, ErrorKey: result.ErrorKey, AttemptUserID: attemptUserID}, nil
+	}
 
 	// The pinned revision, not the newest: the result was produced under it.
 	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
@@ -74,6 +102,7 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 		Claims:           result.Claims,
 		Verified:         result.Verified,
 		CreationDisabled: parsed.CreationDisabled,
+		AttemptUserID:    attemptUserID,
 	}
 
 	link, err := stmts.GetIDPIdentityLink(ctx, database.And(
@@ -95,7 +124,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read linked user: %w", err)
 	}
-	if user.SchemaURL != in.UserSchemaURL {
+	sameSchema, err := r.storedUserSchemaMatches(ctx, in.ProjectID, user.SchemaURL, in.UserSchemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("load parked sso identity: %w", err)
+	}
+	if !sameSchema {
 		// The flow validates against one schema and cannot continue with a
 		// user of another. The response stays generic; the log says why.
 		getLoggingContext(ctx, "flow").Warn("sso identity is linked to a user of another schema",
@@ -107,6 +140,54 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	}
 	parked.Link = &domain.FlowSSOLinkedUser{LinkID: link.ID, UserID: link.UserID}
 	return parked, nil
+}
+
+func (r *FlowSSOIdentityResolver) LoadCollected(ctx context.Context, in domain.FlowSSOLoadInput) (*domain.FlowSSOParkedIdentity, error) {
+	attempt, err := r.db.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read attempt: %w", err)
+	}
+	// Only the row the engine resolved: a newer row is resolved by the next
+	// render first and may turn out to be linked.
+	check, ok := attempt.SSOCallback()
+	if !ok || check.ID != in.ResolvedCheckID || check.Result == nil || check.Result.CollisionUserID != "" {
+		return nil, nil
+	}
+	result := check.Result
+	// An error result means the ceremony failed: the callback stores only the
+	// key, no identity, and that ceremony replaced the collected row. This step
+	// offers no provider to retry from.
+	if result.IsError() {
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	connection, err := r.connections.GetRevision(ctx, in.ProjectID, result.ConnectionRevisionID)
+	if errors.Is(err, domain.ErrIDPConnectionNotFound()) {
+		getLoggingContext(ctx, "flow").Warn("sso identity parked on a connection revision that no longer exists",
+			slog.String("project_id", in.ProjectID),
+			slog.String("connection_revision_id", result.ConnectionRevisionID),
+		)
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: read connection revision: %w", err)
+	}
+	parsed, err := idp.ParseConnection(connection.RevisionID, connection.Document)
+	if err != nil {
+		return nil, fmt.Errorf("load collected sso identity: parse connection revision: %w", err)
+	}
+	// The engine collects only where creation is allowed, but a render with an
+	// older cookie can resolve a newer row on this step. Its submit would
+	// create the user the connection refuses.
+	if parsed.CreationDisabled {
+		return nil, domain.ErrFlowRestartRequired()
+	}
+	return &domain.FlowSSOParkedIdentity{
+		CheckID:      check.ID,
+		ConnectionID: connection.ID,
+		Subject:      result.Subject,
+		Claims:       result.Claims,
+		Verified:     result.Verified,
+	}, nil
 }
 
 // boundThroughSSO reports the user an earlier BindLinked recorded, while the
@@ -124,51 +205,248 @@ func boundThroughSSO(attempt *domain.AuthAttempt) *domain.FlowSSOParkedIdentity 
 	return &domain.FlowSSOParkedIdentity{BoundUserID: user.UserID}
 }
 
-func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
+// BindCollision binds the user an SSO claim collided with, by id, so the
+// lookup that found it is not repeated through an unscoped identifier.
+//
+// The collision replaces the parked row by a marker of the bound user (no
+// provider data), so a retry after a lost cookie raises the outcome again.
+func (r *FlowSSOIdentityResolver) BindCollision(ctx context.Context, in domain.FlowSSOBindInput) error {
 	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		stmts := tx.Statements()
-		// The exact parked row goes first: a settled or replaced one aborts before any write.
-		if err := stmts.DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+		if err := tx.Statements().MarkSSOCallbackCollision(ctx, in.ProjectID, in.AttemptID, in.CheckID, in.UserID); err != nil {
 			return err
 		}
-		attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
-		if err != nil {
-			return fmt.Errorf("bind sso identity: read attempt: %w", err)
-		}
-		// The attempt may have died since LoadParked read it; the deleted row
-		// rolls back with the transaction.
-		if attempt.IsExpired() || attempt.IsHandedOff() {
-			return domain.ErrFlowRestartRequired()
-		}
-		bound, alreadyBound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
-		if alreadyBound && bound.UserID != in.UserID {
-			return domain.ErrFlowRestartRequired()
-		}
-		if !alreadyBound {
-			// The check above is a plain read: a concurrent identifier
-			// submission can still bind a user after it, and the add refuses to
-			// overwrite one. The flow restarts without re-reading: on Spanner the
-			// refused insert has already ended the transaction.
-			userFactor := &domain.AuthFactorUser{UserID: in.UserID}
-			checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
-			if _, taken := errors.AsType[*database.UniqueError](err); taken {
-				return domain.ErrFlowRestartRequired().WithParent(err)
-			}
-			if err != nil {
-				return fmt.Errorf("bind sso identity: %w", err)
-			}
-			if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
-				return fmt.Errorf("bind sso identity: %w", err)
-			}
-		}
-		ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID, AttemptID: in.AttemptID}
-		if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
-			return fmt.Errorf("bind sso identity: %w", err)
-		}
-		return nil
+		return bindSSOIdentity(ctx, tx.Statements(), in)
 	})
 }
 
-func (r *FlowSSOIdentityResolver) CreateLinked(context.Context, domain.FlowSSOCreateInput) (string, error) {
-	return "", fmt.Errorf("%w: sso auto creation", domain.ErrFlowUnsupported())
+func (r *FlowSSOIdentityResolver) BindLinked(ctx context.Context, in domain.FlowSSOBindInput) error {
+	return r.db.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		if err := tx.Statements().DeleteSSOCallback(ctx, in.ProjectID, in.AttemptID, in.CheckID); err != nil {
+			return err
+		}
+		return bindSSOIdentity(ctx, tx.Statements(), in)
+	})
+}
+
+// bindSSOIdentity records the user factor, plus the sso factor when a link is
+// given, on the attempt. It runs inside the caller's transaction, after the
+// caller settled the exact parked row: the delete or the marker returns
+// ErrSSOStateInvalid when the row was settled or replaced, before any write.
+func bindSSOIdentity(ctx context.Context, stmts AllStatements, in domain.FlowSSOBindInput) error {
+	attempt, err := stmts.GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+	if err != nil {
+		return fmt.Errorf("bind sso identity: read attempt: %w", err)
+	}
+	// Creation without a unique claim reaches here with no earlier
+	// attempt check, so a dead attempt is refused here and every write before
+	// it rolls back.
+	if attempt.IsExpired() || attempt.IsHandedOff() {
+		return domain.ErrFlowRestartRequired()
+	}
+	bound, alreadyBound := domain.CheckAs[*domain.AuthFactorUser](attempt, domain.AuthCheckTypeUser)
+	if alreadyBound && bound.UserID != in.UserID {
+		return domain.ErrFlowRestartRequired()
+	}
+	// The same user is bound already (a retry after a lost cookie): nothing to
+	// add. Skipping the add matters on Spanner, where a refused add poisons
+	// the transaction and no read after it can run.
+	if !alreadyBound {
+		// The check above is a plain read: a concurrent identifier submission
+		// can still bind a user after it. The add refuses to overwrite one, and
+		// a refusal means exactly that race, so the flow restarts. No read
+		// follows the refusal: on Spanner it poisons the transaction.
+		userFactor := &domain.AuthFactorUser{UserID: in.UserID}
+		checkID, err := stmts.AddAuthAttemptFactor(ctx, in.ProjectID, in.AttemptID, userFactor)
+		if _, taken := errors.AsType[*database.UniqueError](err); taken {
+			return domain.ErrFlowRestartRequired().WithParent(err)
+		} else if err != nil {
+			return fmt.Errorf("bind sso identity: %w", err)
+		} else if err := emitDirectAuthFactor(ctx, stmts, attempt, userFactor, checkID); err != nil {
+			return fmt.Errorf("bind sso identity: %w", err)
+		}
+	}
+	// A collision has no link: like a typed identifier it proves nothing about
+	// the account, so it records the user factor alone.
+	if in.LinkID == "" {
+		return nil
+	}
+	ssoFactor := &domain.AuthFactorSSO{ConnectionID: in.ConnectionID, LinkID: in.LinkID, AttemptID: in.AttemptID}
+	if _, err := recordDirectAuthFactor(ctx, stmts, attempt, ssoFactor); err != nil {
+		return fmt.Errorf("bind sso identity: %w", err)
+	}
+	return nil
+}
+
+// CreateLinked creates the user, links the subject to it and binds the
+// attempt, all in one transaction. A unique attribute or the subject already
+// taken returns ErrUserAlreadyExists.
+func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.FlowSSOCreateInput) (string, error) {
+	userID, err := r.db.Statements().NewManagedID(string(domain.PrefixUser))
+	if err != nil {
+		return "", fmt.Errorf("create sso user: mint user id: %w", err)
+	}
+	createUser := NewCreateUserAction(CreateUserInput{
+		ProjectID:  in.ProjectID,
+		SchemaURL:  in.UserSchemaURL,
+		Attributes: in.Attributes,
+		ID:         userID,
+	}, r.schemaStore)
+	bind := domain.FlowSSOBindInput{
+		ProjectID:    in.ProjectID,
+		AttemptID:    in.AttemptID,
+		CheckID:      in.CheckID,
+		UserID:       userID,
+		ConnectionID: in.ConnectionID,
+	}
+	// The parked row is claimed before the user is created, so a concurrent
+	// request on the same attempt loses on the row (ErrSSOStateInvalid), not on
+	// a unique value, and is not mistaken for a collision.
+	actions := []UserAction{&ssoClaimAction{bind: bind}, createUser}
+	if in.Password != "" {
+		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers, r.passwords))
+	}
+	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
+	if err := r.users.ApplyActions(ctx, actions...); err != nil {
+		if unique, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Audited like a create through the user API.
+			emitUserCreateFailedBestEffort(ctx, r.db.Statements(), in.ProjectID, unique)
+		}
+		if domain.IsUserInvalid(err) {
+			// The validator's messages quote the values, so only where they
+			// failed is logged.
+			var locations []string
+			for _, ve := range domain.ValidationFailures(err) {
+				locations = append(locations, domain.ValidationLocation(ve))
+			}
+			getLoggingContext(ctx, "flow").WarnContext(ctx, "sso user fails the user schema",
+				slog.String("project_id", in.ProjectID),
+				slog.String("schema_url", in.UserSchemaURL),
+				slog.Any("locations", locations),
+			)
+		}
+		return "", err
+	}
+	return userID, nil
+}
+
+// ssoClaimAction deletes the exact parked row at the start of the creation
+// transaction.
+type ssoClaimAction struct {
+	bind domain.FlowSSOBindInput
+}
+
+func (a *ssoClaimAction) Prepare(context.Context) error { return nil }
+
+func (a *ssoClaimAction) Apply(ctx context.Context, stmts AllStatements) error {
+	return stmts.DeleteSSOCallback(ctx, a.bind.ProjectID, a.bind.AttemptID, a.bind.CheckID)
+}
+
+var _ UserAction = (*ssoClaimAction)(nil)
+
+// ssoLinkAction links the subject to the user created in the same
+// transaction, then binds the attempt with the link id the insert minted.
+type ssoLinkAction struct {
+	subject string
+	bind    domain.FlowSSOBindInput
+}
+
+func (a *ssoLinkAction) Prepare(context.Context) error { return nil }
+
+func (a *ssoLinkAction) Apply(ctx context.Context, stmts AllStatements) error {
+	link := &domain.IDPIdentityLink{
+		ProjectID:    a.bind.ProjectID,
+		ConnectionID: a.bind.ConnectionID,
+		Subject:      a.subject,
+		UserID:       a.bind.UserID,
+	}
+	if err := stmts.CreateIDPIdentityLink(ctx, link); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Another sign-in linked the subject first.
+			return domain.ErrUserAlreadyExists().WithParent(err)
+		}
+		return fmt.Errorf("create sso user: link identity: %w", err)
+	}
+	if err := audit.Emit(ctx, stmts, audit.EmitSpec{
+		Type:       domain.EventTypeIDPIdentityLinkCreated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  link.ProjectID,
+		EntityType: "idp_identity_link",
+		EntityID:   link.ID,
+		Payload:    domain.IDPIdentityLinkCreatedPayload{ConnectionID: link.ConnectionID, UserID: link.UserID},
+	}); err != nil {
+		return fmt.Errorf("create sso user: emit identity link created: %w", err)
+	}
+	bind := a.bind
+	bind.LinkID = link.ID
+	return bindSSOIdentity(ctx, stmts, bind)
+}
+
+var _ UserAction = (*ssoLinkAction)(nil)
+
+// FindUniqueOwner looks the value up in the rows of the unique-attributes
+// registry with team scope "", without recording anything on the attempt.
+// Those are the rows a new user with no team collides with: project-unique
+// values, and team-unique values of users with no team. A row of a team does
+// not collide, so it does not count.
+func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID, userSchemaURL, attribute string, value any) (string, error) {
+	user, err := r.db.Statements().GetUser(ctx,
+		database.Equal(database.Col(domain.UserFieldProjectID), projectID),
+		UserQueryOptions{
+			Attributes:           []domain.Attribute{{Key: domain.AttributeKey(attribute), Value: value}},
+			UniqueAttributesOnly: true,
+			UniqueTeamID:         new(""),
+		},
+	)
+	if _, missing := errors.AsType[*database.NoRowFoundError](err); missing {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	// The registry key has no schema, so the owner can be a user of another
+	// schema that also marks the property project-unique. The flow cannot
+	// continue with that user, and creation would collide on the value.
+	sameSchema, err := r.storedUserSchemaMatches(ctx, projectID, user.SchemaURL, userSchemaURL)
+	if err != nil {
+		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	if !sameSchema {
+		getLoggingContext(ctx, "flow").Warn("sso claim is owned by a user of another schema",
+			slog.String("project_id", projectID),
+			slog.String("attribute", attribute),
+			slog.String("flow_schema_url", userSchemaURL),
+			slog.String("user_schema_url", user.SchemaURL),
+		)
+		return "", domain.ErrSSOOwnerOtherSchema
+	}
+	return user.ID, nil
+}
+
+// UserHasPasskey reads one passkey row of the user. A passkey ceremony on a
+// step with this user bound lists the same rows as allowCredentials, so the
+// answer tells the visitor nothing that choosing the action would not.
+func (r *FlowSSOIdentityResolver) UserHasPasskey(ctx context.Context, projectID, userID string) (bool, error) {
+	opts := &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	}
+	result, err := r.db.Statements().ListUserPasskeys(ctx, opts.WithLimit(1))
+	if err != nil {
+		return false, fmt.Errorf("read user passkeys: %w", err)
+	}
+	return len(result.Items) > 0, nil
+}
+
+// storedUserSchemaMatches compares a stored user's schema with the flow's.
+// Both ids come from stored records, never from the request, so a schema the
+// project does not hold is an inconsistency on the server's side and not a
+// client error.
+func (r *FlowSSOIdentityResolver) storedUserSchemaMatches(ctx context.Context, projectID, userSchemaID, flowSchemaID string) (bool, error) {
+	same, err := sameUserSchema(ctx, r.schemaStore, projectID, userSchemaID, flowSchemaID)
+	if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+		return false, domain.ErrInternal(err).WithMessage("user schema revision not found")
+	}
+	return same, err
 }

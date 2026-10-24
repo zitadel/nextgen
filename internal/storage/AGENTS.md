@@ -1,191 +1,108 @@
-# Storage Agent Instructions
+# Agent Instructions — `internal/storage/`
 
-These instructions apply to `internal/storage/` and may be refined by nearer
-scoped `AGENTS.md` files. Defer to [`internal/AGENTS.md`](../AGENTS.md) (format
-before push, and the one-database rule that `stmttest` runs under) and root
-[`AGENTS.md`](../../AGENTS.md) for broader rules.
+The rules in [`internal/AGENTS.md`](../AGENTS.md) apply here too, including
+the one-database rule `stmttest` runs under.
 
-## Storage Scope
+## Scope
 
-- Storage is SQL-first. Prefer SQL-compatible modeling and query patterns.
-- Supported databases are PostgreSQL, Spanner, and SQLite.
-- SQLite is the zero-config / local (and small homelab) default when no
-  `database:` dialect is configured. It is not a production peer to Spanner.
-- Dialect implementations (pool, migrations, statements) live under
-  `internal/storage/dialect/`. Integration bring-up for Postgres/Spanner
-  is in `internal/storage/testdb` (testcontainers or env DSNs).
+- Storage is SQL-first: prefer SQL-compatible modeling and query patterns.
+- PostgreSQL, Spanner and SQLite are supported. SQLite is the zero-config
+  local (and small homelab) default when no `database:` dialect is set; it is
+  not a production peer to Spanner.
+- Dialects (pool, migrations, statements) live under `dialect/`. `testdb`
+  brings up Postgres and Spanner for integration tests (testcontainers or env
+  DSNs).
+- List a new package whose `spanner_integration` tests open a database in
+  `server:test-spanner` (`apps/server/moon.yml` and its `package.json` twin).
 
 ## Identifier minting
 
-Resource PKs are dialect-owned `prefix_<opaque>` values
-([ADR 047](../../docs/adrs/047-dialect-id-generation.md)).
+Resource PKs are dialect-owned `prefix_<opaque>` values; the prefix registry
+and the rules for a new prefix are in
+[ADR 047](../../docs/adrs/047-dialect-id-generation.md).
 
-- **Create paths:** assign empty IDs with dialect `Ensure` /
-  `ensureManagedID` before INSERT. Do not invent IDs in domain, service, or
+- Create paths assign an empty ID with the dialect's `Ensure` /
+  `ensureManagedID` before INSERT. Never invent IDs in domain, service or
   handlers.
-- **Pre-persist ceremony** (provisional user handle, passkey registration,
-  in-memory flow/session handles): mint with `Statements().NewManagedID(prefix)`
-  (same generator as `Ensure`).
-- **Empty → assign; non-empty → keep** (ceremony / schema `$id` / fixtures).
-  HTTP create must not accept a client-chosen resource PK.
-- Do **not** call `idgen` from outside `internal/storage/dialect/`.
-- Prefix registry and selection rules for new prefixes live in ADR 047.
+- Pre-persist ceremonies (provisional user handle, passkey registration,
+  in-memory flow and session handles) mint with
+  `Statements().NewManagedID(prefix)`, the same generator.
+- Empty → assign; non-empty → keep (ceremony, schema `$id`, fixtures). HTTP
+  create never accepts a client-chosen resource PK.
+- Never call `idgen` for a resource ID outside `internal/storage/dialect/`.
 
-## Statements And Transactions
+## Statements and transactions
 
-Statement methods are tx-passive: they run on whatever `queryExecutor` they were
-built with (pool client or an open transaction).
+Statement methods are tx-passive: they run on the `queryExecutor` they were
+built with, a pool client or an open transaction.
 
-### Multi-write rule
+- A statement method with two or more write round-trips (`Exec`, a write
+  `QueryRow`, `Update`, `Write`) wraps them in its dialect's
+  `withTransaction` ([postgres](dialect/postgres/with_transaction.go),
+  [spanner](dialect/spanner/with_transaction.go),
+  [sqlite](dialect/sqlite/with_transaction.go)) and uses the inner `tx` for
+  every write, never `s.client` / `s.db`.
+- A single SQL string, even a CTE or upsert touching many tables, is already
+  atomic: do not wrap it.
+- Never call `pool.Transaction` from a statement. `withTransaction` opens a
+  transaction or joins the outer one (a Postgres savepoint, a Spanner no-op
+  nest); `pool.Transaction` would take another Postgres connection or nest
+  Spanner read-write transactions.
+- Inside a transaction callback, keep the cause in the chain:
+  `fmt.Errorf("...: %w", err)`, `fmt.Errorf("%w: %w", sentinel, err)`, or
+  `domain.Err…(err)` / `.WithParent(err)`. `%v`, or a bare `domain.Err…()`
+  while holding a cause, strips the gRPC status, and Spanner returns a
+  retryable abort un-retried.
+- Keep a callback replayable: a retry re-runs the whole closure, so make it a
+  pure function of state captured before the transaction opened.
+- `BatchWrite` and `NewReadWriteStmtBasedTransaction` do not retry `ABORTED`
+  (`ReadWriteTransaction`, `Apply` and `PartitionedUpdate` do). Never adopt
+  one without writing the retry loop.
+- Never assemble statement SQL at the call site with `+` or `fmt.Sprintf`.
+  Attach filters and arguments through `statementCompiler`: `compileRead`
+  where a field schema exists, otherwise `WriteString` for the static base and
+  `WriteArg` for each value. A package-level `const` holding one complete
+  static statement is fine.
 
-If a statement method issues **two or more** separate write round-trips
-(`Exec` / write `QueryRow` / `Update` / `Write`), it **must** wrap those writes
-in the dialect helper:
+## Authz persistence
 
-- Postgres: [`withTransaction`](dialect/postgres/with_transaction.go)
-- Spanner: [`withTransaction`](dialect/spanner/with_transaction.go)
-- SQLite: [`withTransaction`](dialect/sqlite/with_transaction.go)
+[`dialect/authz/`](dialect/authz/) holds the dialect-independent authz helpers
+(ADRs 032–034; design in
+[`permission-storage.md`](../../docs/design/api/permission-storage.md)); the
+compiler and validator are in [`internal/authz/`](../authz/).
 
-Inside the callback, use the **inner** `tx` for every write — never the outer
-`s.client` / `s.db`.
-
-A **single** SQL string (including a CTE or upsert that touches many tables) is
-already atomic at the database; do not wrap it.
-
-### Do not call `pool.Transaction` from statements
-
-Service / pool `Transaction` opens the multi-entity boundary. Statement methods
-must use `withTransaction` so they:
-
-- open a transaction when called via `pool.Statements()`, and
-- **join** an outer tx (Postgres savepoint; Spanner no-op nest) when already
-  inside `pool.Transaction`.
-
-Calling `pool.Transaction` from a statement would use a different Postgres
-connection or nest Spanner RW transactions (forbidden).
-
-### Never flatten the cause of an error returned from a transaction
-
-Spanner aborts read-write transactions under concurrency, and
-`ReadWriteTransaction` retries them for you — but only while it can still find
-the gRPC status in the error your callback returns. It looks for a
-`*spanner.Error` or a `status.FromError` match; anything else it returns
-immediately, un-retried.
-
-So inside a transaction callback, always keep the cause in the chain:
-
-- `fmt.Errorf("...: %w", err)`, or `fmt.Errorf("%w: %w", sentinel, err)` when you
-  also need a domain sentinel to stay matchable.
-- `domain.Err…(err)` / `.WithParent(err)`, never a bare `domain.Err…()` when you
-  are holding a real cause.
-
-Writing `fmt.Errorf("%w: %v", sentinel, err)` strips the status off `err` and
-silently converts a retryable abort into a user-facing error. That was the cause
-of the CI flake in #788.
-
-For the same reason, a transaction callback must be **replayable**: a retry
-re-runs the whole closure, so keep it a pure function of state captured before
-the transaction opened.
-
-### These Spanner client methods do not retry ABORTED
-
-`ReadWriteTransaction`, `Apply` and `PartitionedUpdate` retry aborts internally.
-`BatchWrite` and `NewReadWriteStmtBasedTransaction` do **not** — they are
-caller-retried by design. Nothing uses them today; do not adopt one without
-writing the retry loop yourself.
-
-### Reference
-
-Multi-write nesting uses the dialect `withTransaction` helpers above
-([`dialect/postgres/with_transaction.go`](dialect/postgres/with_transaction.go),
-[`dialect/spanner/with_transaction.go`](dialect/spanner/with_transaction.go),
-[`dialect/sqlite/with_transaction.go`](dialect/sqlite/with_transaction.go)).
-
-### No call-site SQL concatenation
-
-Do not assemble statement SQL at the call site with `+` or `fmt.Sprintf`
-(for example `baseQuery + " WHERE …"`). Attach filters and bind arguments only
-through `statementCompiler`:
-
-- Prefer `compileRead` when a field schema exists (Get-by-ID and List).
-- For JOIN selects without a matching schema (auth-attempt gets), use
-  `WriteString` for the static base and `WriteArg` for each bound value.
-
-Package-level `const` values that are one complete static statement remain
-allowed (including adjacent string literals / `+` only for line wrapping).
-Compiler-internal `WriteString(" WHERE ")` on a `statementCompiler` is the
-supported path for dynamic filters.
-
-## Authz persistence (Wave 1)
-
-[`dialect/authz/`](dialect/authz/) holds the dialect-independent Wave 1 authz
-persistence helpers (ADRs 032–034; storage design in
-[`docs/design/api/permission-storage.md`](../../docs/design/api/permission-storage.md)):
-
-- **Dual-write lifecycle projection** ([`dual_write.go`](dialect/authz/dual_write.go)):
-  user lifecycle events project into the resource-scope index (RSI) **and**
-  `authz_membership_edges` in the same transaction — `UserCreated` upserts
-  RSI + the initial team edge, `UserDeactivated` clears edges but keeps RSI,
-  `UserDeleted` clears both. Any new lifecycle path that touches users or
-  team membership must go through these helpers, not write edges directly;
-  a missed dual-write silently desynchronizes authorization from identity.
-- **Catalog rows** ([`catalog_rows.go`](dialect/authz/catalog_rows.go)) map
-  compiler mutations onto catalog tables; catalog versions persist via
-  `PersistCatalogVersion`.
-- **Identifiers**: authz assignments mint `asgn_<opaque>` ids
-  (`domain.PrefixAuthzAssignment`) through the same statements surface as
-  every other resource — the Identifier minting section above applies
-  unchanged.
-- The edge table carries FK + CHECK + cascade parity across all three
-  dialects; behavior changes need `stmttest` coverage like any other
-  statement (next section). The compiler/validator side lives in
-  [`internal/authz/`](../authz/).
+- A lifecycle path that touches users or team membership goes through the
+  dual-write helpers ([`dual_write.go`](dialect/authz/dual_write.go)), which
+  update the resource-scope index and `authz_membership_edges` in one
+  transaction. Never write edges directly: a missed dual-write silently
+  desynchronizes authorization from identity.
+- Catalog rows ([`catalog_rows.go`](dialect/authz/catalog_rows.go)) map
+  compiler mutations onto the catalog tables; `PersistCatalogVersion` stores
+  catalog versions.
+- Authz assignment IDs (`asgn_…`) mint like every other resource ID.
+- The edge table keeps FK, CHECK and cascade parity across the three
+  dialects; a behaviour change needs `stmttest` coverage.
 
 ## Statement contract tests
 
-Behavioral statement parity across dialects lives in
-[`stmttest`](stmttest/) (see ADR 041). Shared suites assert through
-`service.AllStatements`; build-tagged registration brings up postgres, spanner,
-and/or sqlite, and `forEachDialect` loops dialects. CI still runs one tag per
-job; multiple tags are supported in one process for local parity checks.
+Dialect parity lives in [`stmttest`](stmttest/) (ADR 041): shared suites
+assert through `service.AllStatements`, and `forEachDialect` loops the
+dialects the build tags bring up (`postgres_integration`,
+`spanner_integration`, `sqlite_integration`; several at once for local
+parity).
 
-Each adapter is already its own cache slot: Moon hashes the three
-`server:test-*` tasks separately, and `go test` hashes a different
-`stmttest` binary per tag (`open_postgres_test.go` vs
-`open_spanner_test.go` vs `open_sqlite_test.go`).
-
-**When you add or fix dialect statement or schema behavior** under
-`dialect/{postgres,spanner,sqlite}/`, you **must** add or extend a portable
-`forEachDialect` suite in [`stmttest/`](stmttest/) for any domain-visible
-change: new statement methods, corrected error semantics (for example
-`NoRowFoundError`), and filter / cascade / uniqueness contracts that statements
-rely on. Assert through `service.AllStatements` only — no dialect SQL.
-
-**Cursor / keyset pagination:** the battle matrix lives in
-`stmttest/cursor_*.go` (harness + drain / adversarial / destructive packs).
-A new `List*` method must seed fixtures and call `drainIncarnation` from
-`TestCursorBattle_DrainAllListIncarnations` (ASC+DESC drain and NextCursor
-emission are owned by that helper). Nullable sort columns need an additional
-drain case; invalid/mismatched cursors and mid-page mutations are covered by
-the shared special suites for representative paths.
-
-`stmttest/schema_nullability_test.go` cross-checks bound columns' `Nullable`
-flags against the live DDL (dialect `LiveColumnNullability` helpers walk
-`information_schema` / `pragma_table_xinfo`). Coverage is what the suite
-enumerates: a new schema must be added to its column list (shared schemas in
-`sharedSchemaColumns`, per-dialect schemas in the dialect's
-`SchemaColumnNullability`) or its columns go unchecked. `Computed` bindings name
-no column and are skipped; sqlite and spanner also exclude
-`sessions.expires_at`, a generated column that always introspects as nullable.
-
-Dialect packages keep **engine-specific** tests only: compiler SQL shape, error
-wrapping, `withTransaction` nesting, and migration/DDL smoke. Do not duplicate
-upward: if `stmttest` can assert the behavior, put it there — not a per-dialect
-copy of the same scenario.
-
-Bring-up tags: `postgres_integration`, `spanner_integration`,
-`sqlite_integration`.
-
-[`dbtest.Pool`](dbtest/dbtest.go) is the migrated bring-up type
-(`database.Pool` + `service.Pool`). Cursor-tie project seeding uses dialect
-`SeedProjectsTiedAt` helpers under the integration build tags.
+- A domain-visible change under `dialect/{postgres,spanner,sqlite}/` (a new
+  statement method, corrected error semantics such as `NoRowFoundError`, a
+  filter, cascade or uniqueness contract) adds or extends a portable
+  `forEachDialect` suite. Assert through `service.AllStatements` only, never
+  dialect SQL.
+- A new `List*` method seeds fixtures and calls `drainIncarnation` from
+  `TestCursorBattle_DrainAllListIncarnations` (`stmttest/cursor_*`). A
+  nullable sort column needs an extra drain case.
+- A new schema joins the column lists of
+  `stmttest/schema_nullability_test.go` (`sharedSchemaColumns`, or the
+  dialect's `SchemaColumnNullability`), or its columns go unchecked.
+- Dialect packages keep only engine-specific tests: compiler SQL shape, error
+  wrapping, `withTransaction` nesting, migration and DDL smoke. If `stmttest`
+  can assert it, it goes there.
+- [`dbtest.Pool`](dbtest/dbtest.go) is the bring-up type.

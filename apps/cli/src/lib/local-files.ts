@@ -5,19 +5,17 @@
  * generated editor meta-schema accepts `{ "$file": "<path>" }` in its place,
  * so a long value such as a login template lives in its own file instead of a
  * JSON-escaped string. The API never sees a reference: before upload every
- * one is replaced by the referenced file's content, and after a write the
- * server's canonical value goes back into that file while the JSON keeps the
- * reference.
+ * one is replaced by the referenced file's content.
  *
  * Resolution is generic. Nothing here knows which fields may carry a
  * reference; the Zod gate and the editor schema decide that.
  *
  * Paths are relative to the directory of the resource file that holds them
- * and must stay inside the project, because upload reads them and write-back
- * writes to them. The check applies to the real target: a symlink, or a
- * symlinked directory on the way, that leads outside the project is refused.
+ * and must stay inside the project, because upload reads them. The check
+ * applies to the real target: a symlink, or a symlinked directory on the way,
+ * that leads outside the project is refused.
  */
-import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { ZitadelError } from "./errors";
@@ -35,36 +33,13 @@ export type FileReferenceContext = { readonly cwd: string; readonly baseDir: str
 /** The keys and indexes that lead from a document's root to one value. */
 type Path = ReadonlyArray<string | number>;
 
-type Container = Record<string, unknown> | unknown[];
 const omittedReference = Symbol("omittedReference");
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const isContainer = (value: unknown): value is Container =>
-  Array.isArray(value) || isPlainObject(value);
-
 function isErrno(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && "code" in error && error.code === code;
-}
-
-/** The value under `key` in an object or array; undefined when there is none. */
-function childOf(node: unknown, key: string | number): unknown {
-  if (Array.isArray(node)) {
-    return typeof key === "number" ? node[key] : undefined;
-  }
-  return isPlainObject(node) && typeof key === "string" ? node[key] : undefined;
-}
-
-/** Replaces the value under `key` in an object or array. */
-function setChild(node: Container, key: string | number, value: unknown): void {
-  if (Array.isArray(node)) {
-    if (typeof key === "number") {
-      node[key] = value;
-    }
-  } else if (typeof key === "string") {
-    node[key] = value;
-  }
 }
 
 /** A file's content, or undefined when it is absent. */
@@ -120,9 +95,8 @@ function isSymlink(path: string): boolean {
 
 /**
  * `path` with every symlink resolved, symlinked parent directories included,
- * even when its last segments do not exist yet (write-back may create the
- * file). Undefined when a segment is a symlink that resolves nowhere, since a
- * write through it would land wherever the link names.
+ * even when its last segments do not exist yet. Undefined when a segment is a
+ * symlink that resolves nowhere, since what it names could be anywhere.
  */
 function realTarget(path: string): string | undefined {
   const missing: string[] = [];
@@ -190,7 +164,9 @@ export function findFileReferences(document: unknown): Array<{ path: Path; ref: 
     if (isFileReference(node)) {
       found.push({ path, ref: node[FILE_REFERENCE_KEY] });
     } else if (Array.isArray(node)) {
-      node.forEach((item, index) => walk(item, [...path, index]));
+      node.forEach((item, index) => {
+        walk(item, [...path, index]);
+      });
     } else if (isPlainObject(node)) {
       for (const [key, value] of Object.entries(node)) {
         walk(value, [...path, key]);
@@ -235,38 +211,4 @@ export function inlineFileReferences<T>(
     return node;
   };
   return inline(document) as T;
-}
-
-/**
- * Converts a canonical server document back to the local form. Wherever the
- * local document holds a reference and the canonical value at the same place
- * is a string, that string is written to the referenced file when it differs,
- * and the returned document carries the reference instead of the string.
- * `written` lists the references whose files changed.
- */
-export function restoreFileReferences<T>(
-  canonical: T,
-  local: unknown,
-  context: FileReferenceContext,
-): { document: T; written: string[] } {
-  const document = structuredClone(canonical);
-  const written: string[] = [];
-  for (const { path, ref } of findFileReferences(local)) {
-    const key = path.at(-1);
-    const parent = path.slice(0, -1).reduce<unknown>(childOf, document);
-    if (key === undefined || !isContainer(parent)) {
-      continue;
-    }
-    const value = childOf(parent, key);
-    if (typeof value !== "string") {
-      continue;
-    }
-    const file = resolveFileReference(context, ref);
-    if (readIfPresent(file) !== value) {
-      writeFileSync(file, value);
-      written.push(ref);
-    }
-    setChild(parent, key, { [FILE_REFERENCE_KEY]: ref });
-  }
-  return { document, written };
 }

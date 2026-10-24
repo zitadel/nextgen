@@ -27,11 +27,7 @@ const FIELD_ATOM_TAGS = "zl-field, zl-select, zl-checkbox";
 
 export const mandatoryGatesMarkerComment = `<!--${MANDATORY_GATES_MARKER}-->`;
 
-export function patchMandatoryGates(
-  html: string,
-  step: CreateFlow201Step,
-  locale: Locale,
-): string {
+export function patchMandatoryGates(html: string, step: CreateFlow201Step, locale: Locale): string {
   const template = document.createElement("template");
   template.innerHTML = html;
   const fragment = template.content;
@@ -64,7 +60,9 @@ function collectMissingAtoms(
     for (const field of step.fields) {
       if (!field.required) continue;
       if (hasFieldFor(fragment, field.name)) continue;
-      additions.push(buildField(field.name, field.text_key, field.type, locale, field.required));
+      additions.push(
+        buildField(field.name, field.text_key, field.type, locale, field.required, field.read_only),
+      );
     }
   }
 
@@ -122,6 +120,7 @@ function buildField(
   type: string,
   locale: Locale,
   required: boolean,
+  readOnly: boolean | undefined,
 ): Element {
   const el = document.createElement("zl-field");
   el.setAttribute("name", name);
@@ -129,6 +128,9 @@ function buildField(
   el.setAttribute("type", type);
   if (required) {
     el.setAttribute("required", "");
+  }
+  if (readOnly) {
+    el.setAttribute("readonly", "");
   }
   return el;
 }

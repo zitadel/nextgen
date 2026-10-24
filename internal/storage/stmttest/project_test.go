@@ -38,7 +38,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		})
 
 		t.Run("empty id is assigned by dialect", func(t *testing.T) {
-			project := &domain.Project{Name: "project-" + uniqueSuffix(t), PreviewOrigins: []string{}}
+			project := &domain.Project{Name: "project-" + uniqueSuffix(t), Origins: []domain.Origin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
@@ -65,7 +65,10 @@ func TestProjectStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
+			project.Origins = []domain.Origin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+			}
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			createdUpdatedAt := project.UpdatedAt
@@ -76,7 +79,10 @@ func TestProjectStatements_Update(t *testing.T) {
 			require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
 			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
-			assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
+			assert.Equal(t, []domain.Origin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+			}, project.Origins)
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 			require.NoError(t, err)
@@ -341,11 +347,9 @@ func TestProjectStatements_List(t *testing.T) {
 			second, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
 			require.NoError(t, err)
 			assert.Equal(t, []string{ids[2]}, projectIDs(second.Items))
-
-			page.Cursor = second.NextCursor
-			third, err := d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{Filter: filter, Pagination: page})
-			require.NoError(t, err)
-			assert.Empty(t, projectIDs(third.Items))
+			// The two matches are an exact multiple of the limit, but the last
+			// page carries no token: look-ahead sees no further row (#849).
+			assert.Empty(t, second.NextCursor)
 		})
 	})
 }

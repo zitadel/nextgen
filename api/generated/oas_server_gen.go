@@ -8,6 +8,15 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AddOrigin implements addOrigin operation.
+	//
+	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
+	// must be an exact URL (no wildcard). Preview patterns may include a single
+	// DNS-label wildcard. Adding a pattern that already exists with the same
+	// kind is idempotent and answers 201 with the stored origin.
+	//
+	// POST /projects/{project_id}/origins
+	AddOrigin(ctx context.Context, req *ProjectOrigin, params AddOriginParams) (AddOriginRes, error)
 	// BeginUserPasskeyRegistration implements beginUserPasskeyRegistration operation.
 	//
 	// Starts a WebAuthn registration ceremony for the user and returns the
@@ -18,6 +27,37 @@ type Handler interface {
 	//
 	// POST /users/{user_id}/passkeys/registrations
 	BeginUserPasskeyRegistration(ctx context.Context, req *BeginUserPasskeyRegistrationRequest, params BeginUserPasskeyRegistrationParams) (BeginUserPasskeyRegistrationRes, error)
+	// BuildRelease implements buildRelease operation.
+	//
+	// Builds a release from the resources of `.zitadel/` as authored on disk,
+	// grouped by kind, in one transaction: a failure anywhere leaves no
+	// revision and no release. The caller records nothing.
+	// If the project already holds a release with the same content, the same
+	// `content_hash`, the request answers `200` with that release and
+	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
+	// project's newest revision of the same handle: unchanged content reuses
+	// that revision, changed content allocates a new one, and the request
+	// answers `201` with the new release. Metadata is excluded from the
+	// comparison, so the same content under a different `message` is the same
+	// release.
+	// A structurally malformed request is refused while decoding with
+	// `req.invalid`, naming the offending fields. A well-formed bundle is then
+	// checked resource by resource, as each kind's create endpoint checks it,
+	// and every failure is reported at once: the request answers `400` with
+	// `rel.invalid`, and `details.resources` lists each resource that failed.
+	// A handle that resolves neither in the bundle nor in the project answers
+	// `rel.unresolved_reference`, naming the pointer and the handle.
+	// Building writes revisions, so besides `release.write` it needs the write
+	// scope of every kind the bundle carries a resource of: `schema.write`,
+	// `flow_definition.write`, `branding.write` and `idp.write`, as the
+	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// naming the kind. An empty kind needs no scope.
+	// Building a release does not deploy it. A release is not tied to an
+	// origin, and the same release can later be deployed to any number of
+	// origins unchanged.
+	//
+	// POST /releases/build
+	BuildRelease(ctx context.Context, req *BuildReleaseRequest, params BuildReleaseParams) (BuildReleaseRes, error)
 	// CompleteClaim implements completeClaim operation.
 	//
 	// Called by the browser after the developer authenticates on the claim page.
@@ -33,7 +73,12 @@ type Handler interface {
 	// An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
 	// It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-	// also include session_id to add factors to an existing session.
+	// also include session_id and that session's session_token to add factors to an existing session.
+	// The project comes from the project secret. A body `project_id` that disagrees
+	// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
+	// same way as other runtime operations and seals it; with no browser `Origin`
+	// and nothing deployed to the resolved target the response is `409` with
+	// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -51,25 +96,31 @@ type Handler interface {
 	CreateBranding(ctx context.Context, req *Branding, params CreateBrandingParams) (CreateBrandingRes, error)
 	// CreateDeployment implements createDeployment operation.
 	//
-	// Makes a release live on an environment by recording a deployment. The two
-	// happen atomically: when the call returns, the environment runs the named
-	// release and the record exists; on any failure the environment keeps
-	// running what it ran and no record is written.
-	// Deploying, promoting and rolling back are all this call — `reason` says
-	// which. None of them assembles a release: the release must already exist,
-	// and rolling back means deploying a release the environment ran earlier,
-	// chosen from its deployment history.
-	// Idempotent on the running release: deploying the release the environment
-	// already runs changes nothing and answers `200` with the deployment that
-	// made it live, so a re-run of `zitadel deploy` on unchanged content is a
-	// no-op end to end — matching `POST /releases`, which resolves the same
-	// content to the same release first. Anything else writes a new record,
-	// including the same release returning after something else ran in between:
-	// the log is append-only, and each row is one act of making a release live.
-	// `expected_current_deployment_id` guards against racing another deploy:
-	// when present, the swap only happens if the environment's current
-	// deployment still is the one named, and a mismatch answers `409` with the
-	// actual `current_deployment_id` and `current_release_id` in the details.
+	// Makes a release live on its targets by recording a deployment,
+	// atomically: on success every target serves the release and the record
+	// exists; on failure nothing changes and no record is written.
+	// Name the release by exactly one of `release_id` or `content_hash`; it
+	// must already exist in the project. `targets` is `primary` or preview
+	// URLs. The deployment freezes the project's variable values for its kind,
+	// with no fallback between primary and preview values.
+	// A deployment to `primary` changes nothing when the project's newest
+	// primary deployment has the same release and frozen values and covers
+	// exactly the current primary origins: the call answers `200` with that
+	// deployment. Any other request writes a new deployment and answers `201`;
+	// for preview URLs that record renews their previews.
+	// Failures:
+	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
+	// a primary origin named exactly; `primary` mixed with preview URLs;
+	// `primary` on a project with no primary origin; `ttl` with `primary`;
+	// `ttl` above the project's maximum.
+	// - `400 dep.variables_missing`: a referenced variable has no value for
+	// the kind; `details` names the kind and every missing variable.
+	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
+	// pattern, or is a loopback URL.
+	// - `404 rel.not_found`: the release id or digest names no release here.
+	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
+	// this write replaces; `details.deployment` is that deployment.
+	// - `409 rel.revoked`: the release is revoked.
 	//
 	// POST /deployments
 	CreateDeployment(ctx context.Context, req *CreateDeploymentRequest, params CreateDeploymentParams) (CreateDeploymentRes, error)
@@ -77,7 +128,22 @@ type Handler interface {
 	//
 	// Resolves a flow definition based on purpose + audience context and returns
 	// the first capability step. Creates a new session implicitly unless
-	// `session_id` is provided (for step-up / reauth on an existing session).
+	// `session_id` is provided, together with that session's `session_token`
+	// (for step-up / reauth on an existing session).
+	// The browser `Origin` header selects which deployment serves this attempt:
+	// the gate admits the origin against the project's origin patterns and live
+	// previews, the newest deployment to that exact origin is the target, and
+	// that deployment's release supplies flow definitions, user schemas and
+	// branding. The resolved deployment is sealed into the `_zflow` cookie so
+	// later steps keep the same configuration. An origin that matches no pattern
+	// answers `403` with `proj.origin_not_allowed`; one that matches a preview
+	// pattern with no live preview answers `403` with `proj.preview_not_live`;
+	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
+	// revoked release answers `409` with `rel.revoked`. A request with no
+	// `Origin` passes the gate and still needs a deployment target. A loopback
+	// origin passes it too, and so does the server's own origin, from which its
+	// console previews a project's login; a step submitted from the server's
+	// own origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -86,7 +152,7 @@ type Handler interface {
 	// cookie. The browser sends it automatically on subsequent requests.
 	//
 	// POST /flow
-	CreateFlow(ctx context.Context, req *CreateFlowRequest) (CreateFlowRes, error)
+	CreateFlow(ctx context.Context, req *CreateFlowRequest, params CreateFlowParams) (CreateFlowRes, error)
 	// CreateFlowDefinition implements createFlowDefinition operation.
 	//
 	// Publishes a new flow definition revision.
@@ -119,8 +185,8 @@ type Handler interface {
 	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Session callers are authorized as
-	// the human against the target project (home may differ). CSRF/Origin
-	// for cookie mutations is a follow-up (#1140).
+	// the human against the target project (home may differ). Cookie-authenticated
+	// requests follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -133,7 +199,9 @@ type Handler interface {
 	// The handoff token is:
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
-	// - Idempotency-safe within a 5-minute window (see conventions).
+	// - Idempotency-safe within a 5-minute window (see conventions)
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
@@ -146,40 +214,56 @@ type Handler interface {
 	// `id`, so identity links that reference the connection keep resolving while
 	// releases and auth attempts stay pinned to the revision they captured.
 	// Identity fields are fixed for the life of the connection and a revision
-	// that changes one is rejected: `protocol`, `subject_claim`, and the
-	// endpoints that name the authority (`issuer` for OIDC, `token_endpoint`
-	// and `userinfo_endpoint` for OAuth 2.0). Their values decide which provider
+	// that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
+	// the field that names the authority. Their values decide which provider
 	// account a stored subject belongs to, so changing one would silently
 	// repoint existing identities at a different provider.
-	// `subject_claim` is optional for OIDC and required for OAuth 2.0. For an
-	// OIDC connection, `sub` is used as the default value. If a revision updates
-	// `subject_claim` to a different value than the one set during creation, the
-	// request is rejected.
+	// `subject_claim` is optional, and `sub` is used as the default value. If a
+	// revision updates `subject_claim` to a different value than the one set
+	// during creation, the request is rejected.
+	// OIDC is the only protocol.
 	// The document is validated against the `idp-connection.json` schema before
-	// anything is stored.
+	// anything is stored. The rules the engine applies when it starts a sign-in
+	// then run on the document, so a connection that could never start one is
+	// refused here instead with `idp.endpoints_partial`: the OIDC block sets an
+	// endpoint without the others. It either sets no endpoint, and discovery
+	// fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
+	// and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+	// `id_token_mapping` is on, but setting it alone still counts as setting an
+	// endpoint. The details list the missing endpoints.
+	// A refused document stores nothing, and on a revise the current revision
+	// stays unchanged.
 	//
 	// POST /idps
 	CreateIdp(ctx context.Context, req *CreateIdpRequest, params CreateIdpParams) (CreateIdpRes, error)
 	// CreateProject implements createProject operation.
 	//
-	// Create project.
+	// Creates a project and returns its project secret and preview secret, which no
+	// other endpoint returns.
+	// The request needs no credential and is rate-limited. Unless `seed_defaults` is
+	// `false`, the project starts with a default user schema and flow; the CLI turns
+	// that off and uploads its own from `.zitadel/`.
 	//
 	// POST /projects
 	CreateProject(ctx context.Context, req *CreateProjectRequest) (CreateProjectRes, error)
 	// CreateRelease implements createRelease operation.
 	//
-	// Bundles a release from revisions that already exist, supplied as
-	// `(kind, revision_id)` pairs. No new revisions are allocated — use the
-	// per-kind create endpoints for that, then pin the ids here.
-	// Every referenced `revision_id` must exist in the project. Each one's handle
-	// is read from the revision itself and recorded on the release, so a resource
-	// is always pinned under the identity it declares.
-	// Creating a release does not deploy it. A release is environment-agnostic
-	// and the same release can later be deployed to any number of environments
-	// unchanged.
-	// Idempotent on the pinned set: metadata is excluded from the comparison, so
-	// re-submitting the same revisions with a different `message` returns the
-	// release that already pins them rather than creating a second one.
+	// Assembles a release from existing revisions, given as
+	// `(kind, revision_id)` pairs. To build one from files on disk, use
+	// `POST /releases/build`.
+	// Each revision must exist in the project and is recorded under the handle
+	// it declares. The release must be complete and consistent:
+	// - Every handle its revisions name must be in the release: a flow's
+	// `user_schema`, and the IDP connections named by a flow step's
+	// `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
+	// one answers `rel.unresolved_reference`, naming the resource and the
+	// handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+	// - Every flow is validated as on save, against the user schema revision
+	// in the release. A flow that fails answers `rel.invalid`, with the
+	// reason in `details`.
+	// Idempotent on the set of revisions: the same revisions with a different
+	// `message` answer `200` with the existing release. A new release answers
+	// `201`. Creating a release does not deploy it.
 	//
 	// POST /releases
 	CreateRelease(ctx context.Context, req *CreateReleaseRequest, params CreateReleaseParams) (CreateReleaseRes, error)
@@ -220,13 +304,18 @@ type Handler interface {
 	CreateSession(ctx context.Context, req *CreateSessionRequest) (CreateSessionRes, error)
 	// CreateTeam implements createTeam operation.
 	//
-	// Create team.
+	// Creates a team in the project, with a name no other team in the project has.
+	// A taken name is refused with `409 team.already_exists`. The new team has no
+	// members yet.
 	//
 	// POST /teams
 	CreateTeam(ctx context.Context, req *CreateTeamRequest, params CreateTeamParams) (CreateTeamRes, error)
 	// CreateUser implements createUser operation.
 	//
-	// Create user.
+	// Creates a user whose attributes satisfy the user schema the request names.
+	// The server assigns the user's id. With `team_id`, the user also becomes an
+	// active member of that team. A value the schema marks unique that another
+	// user already holds is refused with `409`.
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
@@ -237,8 +326,8 @@ type Handler interface {
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -259,16 +348,18 @@ type Handler interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID implements DeleteUserByID operation.
 	//
-	// Delete user by ID.
+	// Deletes a user and removes them from every team they belong to.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// With a project secret the request is idempotent: deleting a user that exists
+	// in no project succeeds without changing anything.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)
 	// DeleteVariable implements deleteVariable operation.
 	//
-	// Removes the variable this owner entered under this name.
-	// A variable is deletable only by the owner that entered it. Deleting a name
-	// another owner of the same project holds answers `var.not_found` and leaves
-	// that owner's value standing.
+	// Removes a variable for the requested kind, or for both kinds without
+	// `kind`. A name with no value for that kind answers `var.not_found`.
+	// Existing deployments keep the values they froze.
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
@@ -288,6 +379,12 @@ type Handler interface {
 	// The `session_token` supersedes any previously issued `session_token` for the same session.
 	// Clients must replace their stored token at this point.
 	// Requires a project service key (OAuth2 client credentials).
+	// The project comes from the project secret. A query `project_id` that
+	// disagrees answers `403` with `proj.mismatch`. The exchange resolves a
+	// deployment the same way as other runtime operations; with no browser
+	// `Origin` and nothing deployed to the resolved target the response is
+	// `409` with `rel.not_deployed`. A revoked release answers `409` with
+	// `rel.revoked`.
 	//
 	// POST /sessions/exchange
 	ExchangeHandoff(ctx context.Context, req *ExchangeRequest, params ExchangeHandoffParams) (ExchangeHandoffRes, error)
@@ -309,6 +406,8 @@ type Handler interface {
 	// challenges issued so far, and any errors preventing progress.
 	// Use this for polling during long-running factor verifications (e.g., waiting for
 	// a federated IdP callback or a device flow).
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
@@ -352,14 +451,14 @@ type Handler interface {
 	//
 	// GET /deployments/{deployment_id}
 	GetDeploymentById(ctx context.Context, params GetDeploymentByIdParams) (GetDeploymentByIdRes, error)
-	// GetEnvironmentByName implements getEnvironmentByName operation.
+	// GetDeploymentVariables implements getDeploymentVariables operation.
 	//
-	// Reads one environment of the project by its name.
-	// The lookup is scoped to the project in `project_id`: a name that exists in
-	// another project answers `env.not_found` exactly as an unused name does.
+	// Returns the variable values the deployment froze when it was made. Later
+	// changes to the project's variables do not affect them. A secret reads
+	// back as `{"secret": true}`.
 	//
-	// GET /environments/{name}
-	GetEnvironmentByName(ctx context.Context, params GetEnvironmentByNameParams) (GetEnvironmentByNameRes, error)
+	// GET /deployments/{deployment_id}/variables
+	GetDeploymentVariables(ctx context.Context, params GetDeploymentVariablesParams) (GetDeploymentVariablesRes, error)
 	// GetEvent implements getEvent operation.
 	//
 	// Loads a single event by `(project_id, id)`. Requires `events.read`.
@@ -379,6 +478,9 @@ type Handler interface {
 	//
 	// Returns the current capability step without advancing the state machine.
 	// Useful for page reloads or re-rendering after a network error.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// GET /flow/{id}
 	GetFlowStep(ctx context.Context, params GetFlowStepParams) (GetFlowStepRes, error)
@@ -397,8 +499,8 @@ type Handler interface {
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -430,22 +532,76 @@ type Handler interface {
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
+	// GetMyPasswordState implements getMyPasswordState operation.
+	//
+	// Reports when the signed-in user's current password was set, and leaves
+	// `set_at` out when they have none. The password and its hash are never
+	// returned.
+	// With `project_id`, the state is read only when the session belongs to that
+	// project.
+	//
+	// GET /users/me/password
+	GetMyPasswordState(ctx context.Context, params GetMyPasswordStateParams) (GetMyPasswordStateRes, error)
 	// GetMySession implements getMySession operation.
 	//
 	// Returns the current state of the current session including its factors and all currently
 	// satisfied assurance levels.
+	// With `project_id`, the session is returned only when it belongs to that project.
 	// `assurance_levels[]` may shrink over time as factor freshness windows expire,
 	// without the session itself expiring. Use step-up authentication (a new `auth_attempt`
 	// against the same `session_id`) to restore a dropped assurance level.
 	//
 	// GET /sessions/me
-	GetMySession(ctx context.Context) (GetMySessionRes, error)
+	GetMySession(ctx context.Context, params GetMySessionParams) (GetMySessionRes, error)
+	// GetMySessionCsrfToken implements getMySessionCsrfToken operation.
+	//
+	// Returns the session-bound token for cross-site request forgery protection
+	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
+	// state-changing requests the session cookie authenticates that require it
+	// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+	// HttpOnly cookie is still the credential, and a cross-site page cannot
+	// read this response. It stays the same for the life of the session, so a
+	// client fetches it once per session.
+	// With `project_id`, the token is returned only when the session belongs to
+	// that project.
+	//
+	// GET /sessions/me/csrf
+	GetMySessionCsrfToken(ctx context.Context, params GetMySessionCsrfTokenParams) (GetMySessionCsrfTokenRes, error)
 	// GetMyUser implements getMyUser operation.
 	//
-	// Get my user information.
+	// Returns the user signed in to the session that authenticates the request.
+	// The project and the user both come from the session cookie, so a caller only
+	// ever reads their own user.
+	// With `project_id`, the user is returned only when the session belongs to
+	// that project.
 	//
 	// GET /users/me
-	GetMyUser(ctx context.Context) (GetMyUserRes, error)
+	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
+	// GetMyUserSchema implements getMyUserSchema operation.
+	//
+	// The schema the signed-in user's own record is validated against.
+	// With `project_id`, the schema is returned only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/schema
+	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetPolicy implements getPolicy operation.
+	//
+	// Reads a policy as its newest revision, the one that applies the next time
+	// its operation runs.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}
+	GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error)
+	// GetPolicyRevision implements getPolicyRevision operation.
+	//
+	// Reads one revision of a policy, newest or not.
+	// The lookup is scoped to the project in `project_id`: a revision of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/revisions/{revision_id}
+	GetPolicyRevision(ctx context.Context, params GetPolicyRevisionParams) (GetPolicyRevisionRes, error)
 	// GetProject implements getProject operation.
 	//
 	// Returns the current state of a project.
@@ -460,8 +616,10 @@ type Handler interface {
 	GetReady(ctx context.Context) (GetReadyRes, error)
 	// GetReleaseById implements getReleaseById operation.
 	//
-	// Reads one release: its metadata and the `(kind, handle, revision_id)`
-	// tuples it pins.
+	// Reads one release: its digest, its metadata, whether it was revoked, and
+	// the `(kind, handle, revision_id)` tuples it pins.
+	// The path takes the `rel_` id only. To find a release from its digest,
+	// list with the `content_hash` filter and read the matched entry's `id`.
 	// Does not embed resource content. Resolve each `revision_id` through the
 	// per-kind read endpoints when the bytes are needed.
 	// The lookup is scoped to the project in `project_id`: a release id belonging
@@ -503,29 +661,32 @@ type Handler interface {
 	GetTeam(ctx context.Context, params GetTeamParams) (GetTeamRes, error)
 	// GetUserByID implements GetUserByID operation.
 	//
-	// Get user by ID.
+	// Returns a user by its id, with the attributes its schema defines.
+	// With `team_id`, the user is returned only while they are an active member of
+	// that team.
 	//
 	// GET /users/{user_id}
 	GetUserByID(ctx context.Context, params GetUserByIDParams) (GetUserByIDRes, error)
+	// GetUserPasswordState implements getUserPasswordState operation.
+	//
+	// Reports when the user's current password was set, and leaves `set_at` out
+	// when the user has none. The password and its hash are never returned;
+	// setting one is `PUT` on the same path.
+	//
+	// GET /users/{user_id}/password
+	GetUserPasswordState(ctx context.Context, params GetUserPasswordStateParams) (GetUserPasswordStateRes, error)
 	// GetVariable implements getVariable operation.
 	//
-	// Reads one variable by name from the owner this request addresses — one
-	// environment of the project with `environment_name`, the project level
-	// itself without it.
-	// A name that owner has not entered answers `var.not_found`, even when
-	// another owner of the same project holds it: nothing is inherited. A secret
-	// is found but not disclosed: the response is `{"secret": true}`.
+	// Reads one variable by name, with its value per kind. A name with no
+	// value for the requested kind answers `var.not_found`. A secret reads
+	// back as `{"secret": true}`.
 	//
 	// GET /variables/{variable_name}
 	GetVariable(ctx context.Context, params GetVariableParams) (GetVariableRes, error)
 	// GetVariables implements getVariables operation.
 	//
-	// Returns the variables entered at the owner this request addresses, keyed by
-	// name — one environment of the project with `environment_name`, the project
-	// level itself without it.
-	// Owners are separate, not a ladder: an environment does not inherit the
-	// project's variables and the project does not see its environments'. Reading
-	// everything a project holds therefore means reading each owner in turn.
+	// Returns the project's variables, keyed by name, each with its value per
+	// kind. With `kind`, only that kind's values are returned.
 	// Secret values are not returned. A secret appears as `{"secret": true}`,
 	// which says a value is held without disclosing it.
 	//
@@ -548,6 +709,8 @@ type Handler interface {
 	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 	// including method, metadata, and any UI hints. The client then verifies the proof
 	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -563,24 +726,21 @@ type Handler interface {
 	ListBranding(ctx context.Context, params ListBrandingParams) (ListBrandingRes, error)
 	// ListDeployments implements listDeployments operation.
 	//
-	// Lists deployments newest first: what ran where, and when.
-	// With `environment_name`, the list is that environment's history and its
-	// first row is the environment's current deployment. Without it, the list
-	// interleaves every environment of the project — a project-wide audit view
-	// in which the first row is only the most recent deployment anywhere.
-	// `expand: ["release"]` embeds the release each deployment made live, so a
-	// history renders with each entry's content without resolving `release_id`
-	// one by one. Expanding requires `release.read` and does not affect the
-	// ordering or the page tokens.
+	// Lists what ran where, and when.
+	// By default the list is the history, newest first: every deployment of
+	// the project with every target it made the release live on. With
+	// `origin`, the history of that origin alone.
+	// With `live=true`, the list is what is served now, newest first: the
+	// project's newest primary deployment, narrowed to origins that are still
+	// primary, and the newest deployment to each live preview URL, narrowed to
+	// the URLs it still serves. Combined with `origin`, it is the one
+	// deployment that origin serves, or empty.
+	// `expand: ["release"]` embeds the release each deployment made live; it
+	// requires `release.read` and does not change the ordering or the page
+	// tokens.
 	//
 	// GET /deployments
 	ListDeployments(ctx context.Context, params ListDeploymentsParams) (ListDeploymentsRes, error)
-	// ListEnvironments implements listEnvironments operation.
-	//
-	// Lists the project's environments ordered by name.
-	//
-	// GET /environments
-	ListEnvironments(ctx context.Context, params ListEnvironmentsParams) (ListEnvironmentsRes, error)
 	// ListEvents implements listEvents operation.
 	//
 	// Returns project-scoped audit events, newest-first by keyset on
@@ -611,22 +771,90 @@ type Handler interface {
 	//
 	// GET /idps/{id}/revisions
 	ListIdpRevisions(ctx context.Context, params ListIdpRevisionsParams) (ListIdpRevisionsRes, error)
+	// ListMyIdentityLinks implements listMyIdentityLinks operation.
+	//
+	// The identity provider accounts a sign-in linked to the signed-in user,
+	// oldest first. The provider's subject and claims are never returned.
+	// With `project_id`, the links are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/identity_links
+	ListMyIdentityLinks(ctx context.Context, params ListMyIdentityLinksParams) (ListMyIdentityLinksRes, error)
+	// ListMyPasskeys implements listMyPasskeys operation.
+	//
+	// The signed-in user's own passkeys, newest first, paginated with a cursor.
+	// Each passkey carries its id, its name and when it was registered, never the
+	// credential itself.
+	// With `project_id`, the passkeys are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/passkeys
+	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects implements listMyProjects operation.
 	//
-	// The projects the signed-in user holds an active grant on, either directly or
-	// through a team they are a member of. Ordered by project id and paged with an
-	// opaque cursor.
+	// The projects the signed-in user can act on: those they hold an active grant
+	// on, either directly or through a team they are a member of. For a platform
+	// operator (ADR 075) that is every project of the deployment. Ordered by
+	// project id and paged with an opaque cursor.
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `name_contains`, only the projects whose name contains that text are
+	// listed. The search runs on the server together with the grants, so it
+	// reaches every project the user can act on, however many there are, and
+	// pages like the full list.
+	// With `project_id`, the projects are listed only when the session belongs to
+	// that project. It names the project the session was signed in to, not one to
+	// list.
 	//
 	// GET /users/me/projects
 	ListMyProjects(ctx context.Context, params ListMyProjectsParams) (ListMyProjectsRes, error)
+	// ListMyTeams implements listMyTeams operation.
+	//
+	// The signed-in user's own team roster, ordered by team name.
+	// With `project_id`, the teams are listed only when the session belongs to
+	// that project.
+	//
+	// GET /users/me/teams
+	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
+	// ListPolicies implements listPolicies operation.
+	//
+	// Lists the project's policies, one per operation, each as its newest
+	// revision, ordered by `created_at` (first publish) and then `id`. Filter
+	// by `operation` to read the policy of one operation; a project that never
+	// published one gets an empty list.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /policies
+	ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error)
+	// ListPolicyRevisions implements listPolicyRevisions operation.
+	//
+	// Returns every revision of one policy, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}/revisions
+	ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error)
+	// ListPreviews implements listPreviews operation.
+	//
+	// Lists the project's live previews, newest first by `created_at`. An
+	// expired or removed preview is not listed; what was deployed to it stays
+	// in `GET /deployments`.
+	//
+	// GET /projects/{project_id}/previews
+	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.
-	// Entries carry metadata only — the pinned set is omitted. Read one release
-	// with `GET /releases/{release_id}` to get its pointers.
+	// Entries carry the digest, the metadata and `revoked_at` — the pinned set
+	// is omitted.
+	// Read one release with `GET /releases/{release_id}` to get its pointers.
+	// `content_hash` looks a release up by its content, as the CLI does when a
+	// person types the digest a transcript printed. The project holds at most
+	// one release per digest, so the filtered list has one entry or none, and
+	// an unknown digest is an empty list rather than an error. Paths take the
+	// `rel_` id only; the matched entry's `id` is what to use there.
 	//
 	// GET /releases
 	ListReleases(ctx context.Context, params ListReleasesParams) (ListReleasesRes, error)
@@ -637,9 +865,19 @@ type Handler interface {
 	//
 	// GET /schemas
 	ListSchemas(ctx context.Context, params ListSchemasParams) (ListSchemasRes, error)
+	// ListUserIdentityLinks implements listUserIdentityLinks operation.
+	//
+	// The identity provider accounts a sign-in linked to the user, oldest first.
+	// The provider's subject and claims are never returned.
+	//
+	// GET /users/{user_id}/identity_links
+	ListUserIdentityLinks(ctx context.Context, params ListUserIdentityLinksParams) (ListUserIdentityLinksRes, error)
 	// ListUserPasskeys implements listUserPasskeys operation.
 	//
-	// List user passkeys.
+	// Returns the passkeys registered for a user, newest first, paginated with a
+	// cursor.
+	// Each passkey carries its id, its name and when it was registered, never the
+	// credential itself.
 	//
 	// GET /users/{user_id}/passkeys
 	ListUserPasskeys(ctx context.Context, params ListUserPasskeysParams) (ListUserPasskeysRes, error)
@@ -659,9 +897,11 @@ type Handler interface {
 	// Partially updates the caller's own schema-defined attributes. The merged
 	// result is validated against the user's schema before commit. Concurrent
 	// writes are last-write-wins.
+	// With `project_id`, the user is updated only when the session belongs to
+	// that project.
 	//
 	// PATCH /users/me
-	PatchMyUser(ctx context.Context, req *PatchMyUserRequest) (PatchMyUserRes, error)
+	PatchMyUser(ctx context.Context, req *PatchMyUserRequest, params PatchMyUserParams) (PatchMyUserRes, error)
 	// PatchProject implements patchProject operation.
 	//
 	// Updates the state of a project.
@@ -677,6 +917,27 @@ type Handler interface {
 	//
 	// PATCH /users/{user_id}
 	PatchUserByID(ctx context.Context, req *PatchUserRequest, params PatchUserByIDParams) (PatchUserByIDRes, error)
+	// PublishPolicy implements publishPolicy operation.
+	//
+	// Publishes the project's policy for an operation as a new immutable
+	// revision, creating the policy on its first publish. The newest revision
+	// applies to the next time the operation runs; nothing already stored is
+	// re-evaluated, so a stricter password policy applies the next time a
+	// password is set.
+	// The request is typed by `operation`: an unknown operation or setting, or
+	// a value of the wrong type or outside its bounds, answers `req.invalid`
+	// like any malformed request. The operation's template then checks the
+	// config again, together with the rules that relate settings to each other
+	// (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+	// `details.details.violations` lists everything that failed, settings
+	// first, then rules: `{"setting": "min_length"}` for one setting, or
+	// `{"config_rule": "min_length_not_above_max_length", "settings":
+	// ["min_length", "max_length"]}` for a rule across settings, with the
+	// settings it reads. A setting left out is off, and `{}` switches every
+	// rule off; there are no defaults.
+	//
+	// POST /policies
+	PublishPolicy(ctx context.Context, req PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
@@ -692,8 +953,8 @@ type Handler interface {
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -706,7 +967,11 @@ type Handler interface {
 	QueryIdps(ctx context.Context, req *QueryIdpsRequest, params QueryIdpsParams) (QueryIdpsRes, error)
 	// QueryProjects implements queryProjects operation.
 	//
-	// Query projects.
+	// Returns the project the project secret belongs to, as a page of at most one
+	// project.
+	// A credential is scoped to one project until ADR 036 widens it, so the filters
+	// and sorting apply to that project alone. The projects a signed-in person can
+	// act on are listed by `GET /users/me/projects`.
 	//
 	// POST /projects/query
 	QueryProjects(ctx context.Context, req *QueryProjectsRequest) (QueryProjectsRes, error)
@@ -730,21 +995,66 @@ type Handler interface {
 	// `project_id` names the project to list; without it, the credential's own
 	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). CSRF/Origin for cookie mutations
-	// is a follow-up (#1140).
+	// session cookie (`nextgenSession`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`nextgenSession`).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
+	// RemoveOrigin implements removeOrigin operation.
+	//
+	// Removes one pattern from the project's origins. Requests from URLs only
+	// that pattern admitted are refused from then on; live previews and
+	// deployment history are untouched. Removing a pattern that is already
+	// absent is idempotent and answers 204.
+	//
+	// POST /projects/{project_id}/origins/remove
+	RemoveOrigin(ctx context.Context, req *RemoveOriginReq, params RemoveOriginParams) (RemoveOriginRes, error)
+	// RemovePreview implements removePreview operation.
+	//
+	// Ends a preview before it expires: the URL stops being served at once.
+	// The deployments to it stay in the history.
+	// Idempotent: a URL with no live preview, including one that has already
+	// expired or was removed before, answers `204` too, so a cleanup that
+	// races the expiry still succeeds.
+	// The URL travels in the body rather than the path because an origin
+	// contains `/`.
+	//
+	// POST /projects/{project_id}/previews/remove
+	RemovePreview(ctx context.Context, req *RemovePreviewRequest, params RemovePreviewParams) (RemovePreviewRes, error)
 	// RevokeMySession implements revokeMySession operation.
 	//
 	// Logs out by permanently deleting the session.
 	// The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-	// exchange) is required. Idempotent: if the session is already gone this still
-	// returns 204. Any tokens derived from the session are invalidated, and the
-	// cookie itself is cleared in the response.
+	// exchange) is required, with the session's token from `GET /sessions/me/csrf`
+	// in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
+	// this still returns 204. Any tokens derived from the session are invalidated,
+	// and the cookie itself is cleared in the response.
+	// With `project_id`, only a session of that project is deleted. A session of
+	// another project is left alone, and so is its cookie.
 	//
 	// DELETE /sessions/me
-	RevokeMySession(ctx context.Context) (RevokeMySessionRes, error)
+	RevokeMySession(ctx context.Context, params RevokeMySessionParams) (RevokeMySessionRes, error)
+	// RevokeRelease implements revokeRelease operation.
+	//
+	// Marks the release revoked, so that its content is never served again.
+	// From then on the release cannot be deployed and is refused on every path
+	// that would serve it, including to a build that pins its digest, with
+	// `rel.revoked`.
+	// A release that any origin still serves cannot be revoked. An origin
+	// serves the release of the newest deployment to it, so the call answers
+	// `409` with `rel.in_use`, naming each such origin and that deployment.
+	// Deploy another release there or roll back first, then revoke. Revoking
+	// therefore never takes an origin down. Deployments that named the release
+	// earlier stay in the history.
+	// Idempotent: revoking a release that is already revoked answers `200`
+	// with the release unchanged, `revoked_at` still naming the first
+	// revocation. There is no un-revoke; build a new release instead.
+	// Takes no body. The lookup is scoped to the project in `project_id`, so a
+	// release id of another project answers not found exactly as an unknown id
+	// does.
+	//
+	// POST /releases/{release_id}/revoke
+	RevokeRelease(ctx context.Context, params RevokeReleaseParams) (RevokeReleaseRes, error)
 	// RevokeSession implements revokeSession operation.
 	//
 	// Permanently deletes the session, terminating it immediately.
@@ -757,9 +1067,30 @@ type Handler interface {
 	//
 	// DELETE /sessions/{session_id}
 	RevokeSession(ctx context.Context, params RevokeSessionParams) (RevokeSessionRes, error)
+	// RollbackDeployment implements rollbackDeployment operation.
+	//
+	// Re-deploys the release of the deployment named in the path to `primary`,
+	// with the variable values it froze: a new deployment with `reason:
+	// rollback` and `rollback_to` naming it. Like any deployment to `primary`,
+	// it covers every current primary origin. Idempotent like a deployment to
+	// `primary`: when nothing would change it answers `200` with the newest
+	// primary deployment.
+	// Failures:
+	// - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
+	// preview again instead), or the project has no primary origin.
+	// - `404 dep.not_found`: no deployment of the project has that id.
+	// - `409 dep.conflict`: `expected_deployment_id` is not the project's
+	// newest primary deployment; `details.deployment` is that deployment.
+	// - `409 rel.revoked`: the release is revoked.
+	//
+	// POST /deployments/{deployment_id}/rollback
+	RollbackDeployment(ctx context.Context, req OptRollbackDeploymentRequest, params RollbackDeploymentParams) (RollbackDeploymentRes, error)
 	// SetUserPassword implements setUserPassword operation.
 	//
-	// Set user password.
+	// Sets a user's password, hashed with the project's current password hashing
+	// policy.
+	// The new password replaces the current one, and setting it emits
+	// `auth.factor.password.set`.
 	//
 	// PUT /users/{user_id}/password
 	SetUserPassword(ctx context.Context, req *SetUserPasswordRequest, params SetUserPasswordParams) (SetUserPasswordRes, error)
@@ -803,6 +1134,9 @@ type Handler interface {
 	// from the project's variables. A provider the engine cannot start a
 	// sign-in with, including a reference with no variable behind it,
 	// re-renders the step with `error.sso_unavailable`.
+	// Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+	// re-resolve from `Origin`. If that release was revoked since the attempt
+	// started, the response is `409` with `rel.revoked`.
 	//
 	// POST /flow/{id}/submit
 	SubmitFlowStep(ctx context.Context, req *FlowSubmitRequest, params SubmitFlowStepParams) (SubmitFlowStepRes, error)
@@ -814,20 +1148,21 @@ type Handler interface {
 	UpdateTeam(ctx context.Context, req *UpdateTeamRequest, params UpdateTeamParams) (UpdateTeamRes, error)
 	// UpdateVariables implements updateVariables operation.
 	//
-	// Enters, replaces and removes variables at the owner this request
-	// addresses.
-	// Every name in the body is applied at exactly that owner — the project, or
-	// the environment named by `environment_name` — and reaches no other. Names
-	// not in the body are untouched.
+	// Enters, replaces and removes the project's variables for the requested
+	// kind. Names not in the body are untouched. Existing deployments keep the
+	// values they froze.
+	// Without `kind`, a plain value is written for both kinds. A secret is
+	// written for `primary` only and removes the name's `preview` value, so a
+	// preview never keeps a plaintext copy; set a preview secret with
+	// `kind=preview`. `null` removes the name from both.
 	// A bare scalar enters a non-secret value. `{"value": …, "secret": true}`
 	// stores the value encrypted under the project's active `secret` key, after
-	// which it can be referenced but not read back. `null` removes the name from
-	// this owner (RFC 7386), which is how several variables are removed in one
-	// request; removing a name this owner does not hold is a no-op rather than an
-	// error.
+	// which it can be referenced but not read back. `null` removes the name
+	// (RFC 7386), which is how several variables are removed in one request;
+	// removing a name the project does not hold is a no-op rather than an error.
 	// The body is applied whole or not at all, so a rejected request leaves the
-	// owner exactly as it was. Writing the same name and owner twice replaces the
-	// value rather than duplicating it, which makes a retry safe.
+	// project's variables exactly as they were. Writing the same name twice
+	// replaces the value rather than duplicating it, which makes a retry safe.
 	//
 	// PATCH /variables
 	UpdateVariables(ctx context.Context, req UpdateVariablesRequest, params UpdateVariablesParams) (UpdateVariablesRes, error)
@@ -841,6 +1176,8 @@ type Handler interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On successful verification, the factor is written to the auth attempt.
 	// The attempt moves to the next pending challenge or completes if all required factors are verified.
+	// Reuses the deployment sealed when the attempt was created. If that release
+	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)

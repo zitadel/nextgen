@@ -1,0 +1,317 @@
+id: "e2e"
+language: "typescript"
+layer: "automation"
+stack: "frontend"
+# The project that holds every end-to-end test. It consolidates what used to be
+# four sibling packages — console-e2e, demo-next-e2e, demo-nuxt-e2e,
+# cli-journey-e2e — into one automation-layer node that may depend on everything
+# it drives. Each former package is now a subfolder (console/, demo-next/,
+# demo-nuxt/, journey/).
+#
+# Outside this file two tasks matter. `test` is the inherited unit run (the
+# journey harness's own tests), like every other package's, so a local `:test`
+# or `pnpm run check` boots no server. `all` depends on every lane; CI runs it
+# in its own step after the build-and-test graph (`moon exec e2e:all
+# --ignore-ci-checks`, when ci-mode's `e2e` gate finds it affected or forces a
+# full run). The individual lanes below are an internal detail.
+#
+# The lanes and `all` are `runInCI: "skip"`: otherwise the graph step's
+# `--downstream deep` pulls every lane in as a dependent of an affected build,
+# and browsers and dev servers then compete with the unit suites for the
+# runner (both sides slowed down and timed out on run 38496066612).
+#
+# Every lane unsets CI / GITHUB_ACTIONS in its command, as the old workflow's
+# `env -u CI -u GITHUB_ACTIONS` steps did, so the suites behave as local runs
+# (no Playwright CI retries). A task `env` entry cannot do it: moon only sets a
+# task's env vars when they are missing, unless `options.envOverride` says so.
+#
+# The lanes run side by side: each binds ports of its own (pinned in its
+# Playwright config) and keeps its results, report and handshake file apart.
+# Only the two demo-next lanes collide — both serve apps/demo-next with
+# `next dev` on :3002 from one .next folder — so they share the
+# `demo-next-app` mutex, the lock their package.json scripts take under turbo.
+# A new lane that boots a server takes a port no other lane uses, or joins the
+# mutex of the lane it shares one with.
+dependsOn:
+  - "api-mock"
+  - "cli"
+  - "console"
+  - "demo-next"
+  - "demo-nuxt"
+  - "testing"
+
+# Each lane's inputs are its own folder plus what every browser lane reads (the
+# manifest pinning Playwright, the shared timeouts), so an edit in one area does
+# not mark the other lanes affected: ci-mode reads the journey's affectedness to
+# pick its framework matrix. The demo lanes also list the demo app they serve,
+# which no task dependency reaches. The inherited lint/typecheck/test keep the
+# whole project. `all` still runs every lane whenever one of them is affected,
+# and ci-mode runs it on every forced full run (a workflow, a root script or a
+# moon.yml changed), which no lane lists as an input.
+fileGroups:
+  laneShared:
+    - "package.json"
+    - "playwright.shared.ts"
+
+workspace:
+  inheritedTasks:
+    # Nothing to build. `test` is inherited (it runs the journey harness unit
+    # tests via `pnpm run test:all`) and is not excluded.
+    exclude:
+      - "build"
+
+tasks:
+  typecheck:
+    deps:
+      # The real-instance configs and src-real specs import
+      # @zitadel/testing/playwright.
+      - "testing:build"
+
+  # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
+  # dependency changed, or a file the lane lists), and running it runs every
+  # lane as its dependencies. CI runs it in a step of its own; run it by hand
+  # with `moon run e2e:all` and the journey's tarballs in JOURNEY_TARBALLS_DIR
+  # (see journey-local). `test` stays the inherited unit run, so `:test` never
+  # boots a server.
+  all:
+    command: "noop"
+    # Affected only through its lanes (their folders and their dependencies),
+    # so an edit elsewhere in this project, a README say, runs no lane.
+    inputs: []
+    deps:
+      - "e2e:console-smoke"
+      - "e2e:console-real"
+      - "e2e:console-embedded"
+      - "e2e:console-platform"
+      - "e2e:demo-next-mock"
+      - "e2e:demo-next-real"
+      - "e2e:demo-nuxt-mock"
+      - "e2e:journey-local"
+      # The test kit's own real-instance suite. Ran in the old workflow via the
+      # same step as demo-next-real; kept in CI here as a dependency.
+      - "testing:test-integration"
+    options:
+      runInCI: "skip"
+
+  # ── console lanes (former @zitadel/console-e2e) ──────────────────────────────
+
+  # Embedded shell smoke: Vite preview of the built console under its production
+  # embed base. No live API.
+  console-smoke:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
+    deps:
+      - "console:build"
+    options:
+      cache: false
+      runInCI: "skip"
+
+  # Live console resource coverage through the Vite server-side API proxy.
+  console-real:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.real.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      REAL_ZITADEL_PORT: "8093"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+    options:
+      cache: false
+      runInCI: "skip"
+
+  # The embedded surfaces, served by the binary itself — no Vite, no proxy. The
+  # only lane proving the console's API base and the Go mux routing table agree.
+  console-embedded:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.embedded.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      EMBEDDED_ZITADEL_PORT: "8095"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+    options:
+      cache: false
+      runInCI: "skip"
+
+  # The embedded console against a deployment with the platform project
+  # bootstrapped (the `zitadel start` default; the server alone leaves it off).
+  console-platform:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config console/playwright.platform.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      PLATFORM_ZITADEL_PORT: "8097"
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+    options:
+      cache: false
+      runInCI: "skip"
+
+  # The hosted cloud's console on a deployment, which CLOUD_URL names
+  # (VERCEL_AUTOMATION_BYPASS_SECRET opens its protection): how vercel.json routes
+  # the console's paths, and the console signed out, down to the login widget's
+  # first step. Nothing to build or boot, no credential; the root's
+  # `pnpm check:cloud` runs it beside every other deployment suite, and the
+  # deployment-checks workflow runs it for every deployment. Not a dependency of
+  # `all`: the config refuses to run without CLOUD_URL.
+  console-deployment:
+    command: "corepack pnpm exec playwright test --config console/playwright.deployment.config.mts"
+    inputs:
+      - "console/**/*"
+      - "@group(laneShared)"
+    options:
+      cache: false
+      runInCI: false
+
+  # The built-in schemas on a deployment of the hosted cloud, which CLOUD_URL
+  # names, as the `schemas` service publishes them under /schemas/v1/: each
+  # one this commit renders (the spec imports the renderer), labelled, cached
+  # and routed as vercel.json says. HTTP only, nothing to build or boot; run
+  # beside the console's suite and, like it, not a dependency of `all`.
+  schemas-deployment:
+    command: "corepack pnpm exec playwright test --config schemas/playwright.deployment.config.mts"
+    inputs:
+      - "schemas/**/*"
+      - "@group(laneShared)"
+      - "/scripts/render-builtin-schemas.mjs"
+      - "/api/openapi/endpoints/schemas/*.json"
+    options:
+      cache: false
+      runInCI: false
+
+  # ── demo-next lanes (former @zitadel/demo-next-e2e) ──────────────────────────
+
+  # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.
+  # The demo app itself is an input: the lane serves it with `next dev`, and no
+  # task dependency reaches its source.
+  demo-next-mock:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config demo-next/playwright.config.mts"
+    inputs:
+      - "demo-next/**/*"
+      - "@group(laneShared)"
+      - "/apps/demo-next/**/*"
+    deps:
+      - "api-mock:build"
+      - "sdk-next:build"
+    options:
+      cache: false
+      runInCI: "skip"
+      mutex: "demo-next-app"
+
+  # Real lane: the same sign-in journey against a real ephemeral instance seeded
+  # via @zitadel/testing instead of api-mock.
+  demo-next-real:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config demo-next/playwright.real.config.mts"
+    inputs:
+      - "demo-next/**/*"
+      - "@group(laneShared)"
+      - "/apps/demo-next/**/*"
+    deps:
+      - "testing:build"
+      - "cli:build"
+      - "server:build"
+    env:
+      ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
+      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
+      NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
+    options:
+      cache: false
+      runInCI: "skip"
+      mutex: "demo-next-app"
+
+  # ── demo-nuxt lane (former @zitadel/demo-nuxt-e2e) ───────────────────────────
+
+  # Mock lane: the Vue / Nitro demo against @zitadel/api-mock (the demo app is
+  # an input for the same reason as demo-next's).
+  demo-nuxt-mock:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm exec playwright test --config demo-nuxt/playwright.config.mts"
+    inputs:
+      - "demo-nuxt/**/*"
+      - "@group(laneShared)"
+      - "/apps/demo-nuxt/**/*"
+    deps:
+      - "api-mock:build"
+      - "sdk-nuxt:build"
+    options:
+      cache: false
+      runInCI: "skip"
+
+  # ── journey lane (former @zitadel/cli-journey-e2e) ───────────────────────────
+
+  # Run the journey by hand with any runner flags, e.g.
+  # `moon run e2e:journey -- --framework next` (see journey/README.md). Not part
+  # of `all`: the CI task below fixes the flags to the `--ci` set.
+  journey:
+    command: "corepack pnpm run e2e-local"
+    inputs:
+      - "journey/**/*"
+      - "package.json"
+      # The console copy the claim suite asserts on.
+      - "console/support/copy.ts"
+    env:
+      ZITADEL_TELEMETRY: "0"
+    deps:
+      - "cli:build"
+      - "testing:build"
+      # The mock OIDC provider the runner starts beside each framework lane.
+      - "oidc-mock:build"
+    options:
+      cache: false
+      runInCI: false
+
+  # The CLI customer setup journey. `--ci` runs the fixed variant set in one
+  # process (fresh-app framework matrix, passkey preset, pre-existing app,
+  # testkit); `--runtime binary` drives the built server binary. It reads
+  # prebuilt tarballs from JOURNEY_TARBALLS_DIR (in CI built by a prior workflow
+  # step, outside this graph) and refuses to run without them
+  # (JOURNEY_TARBALLS_REQUIRED): packing its own takes a nested
+  # `moon run release:pack`, which wipes and rebuilds the dist folders the lanes
+  # beside it read. By hand, run `moon run e2e:journey -- --ci`, which packs.
+  #
+  # Like every lane, the command unsets CI / GITHUB_ACTIONS so the runner
+  # behaves as a local run, matching the old `env -u CI` step.
+  #
+  # It depends on every framework SDK build so that a change isolated to one SDK
+  # still selects this lane (the fresh-app matrix scaffolds an app per SDK) —
+  # the affected-selection edge the old ci-mode gating provided by hand.
+  journey-local:
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run e2e-local -- --ci --runtime binary"
+    inputs:
+      - "journey/**/*"
+      - "package.json"
+      - "console/support/copy.ts"
+    env:
+      ZITADEL_TELEMETRY: "0"
+      JOURNEY_TARBALLS_REQUIRED: "1"
+    deps:
+      - "cli:build"
+      - "testing:build"
+      - "oidc-mock:build"
+      # sdk-next is omitted: cli:build already reaches it (no duplicate edges).
+      - "sdk-nuxt:build"
+      - "sdk-vue:build"
+      - "sdk-angular:build"
+      - "sdk-solid:build"
+      - "sdk-svelte:build"
+      - "sdk-qwik:build"
+    options:
+      cache: false
+      runInCI: "skip"

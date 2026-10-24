@@ -1,6 +1,6 @@
 # ADR 015: Shared component styles for paired Lit/React components
 
-> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) — 2026-05-20
+> **Status:** Superseded by [ADR 055](./055-lit-only-login-surface.md) (2026-08-16)
 
 > With no React pair left to share with, the surface/host split had nothing to
 > reconcile: each atom's CSS now lives beside it as
@@ -40,5 +40,5 @@ Components not listed in `pairs.json` keep styles in their own package.
 
 ## Related
 
-- [`packages/shared-component-styles/README.md`](../../packages/shared-component-styles/README.md)
+- `packages/shared-component-styles/README.md`
 - [ADR 014](./014-design-tokens-and-ui-react-pairs.md)

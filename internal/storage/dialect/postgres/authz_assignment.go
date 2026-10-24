@@ -46,6 +46,17 @@ SELECT id, project_id, catalog_id,
        expires_at, revoked_at, created_at, updated_at
 FROM zitadel_nextgen.authz_assignments`
 
+	listActiveAuthzAssignmentsByRelationStmt = `
+SELECT id, project_id, catalog_id,
+       principal_type, principal_id, object_type, relation,
+       scope_kind, scope_team_id, scope_resource_id,
+       grantor_type, grantor_id, delegation_id,
+       expires_at, revoked_at, created_at, updated_at
+FROM zitadel_nextgen.authz_assignments
+WHERE project_id = $1 AND object_type = $2 AND relation = $3
+  AND revoked_at IS NULL
+ORDER BY created_at, id`
+
 	listAuthzAssignmentsStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -147,17 +158,9 @@ func (s authzAssignmentStatements) ListAuthzAssignments(ctx context.Context, pro
 	return assignments, nil
 }
 
-// ListManagedGrants implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
-	filter, err := authz.ScopeManagedGrantList(projectID, filter)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	var compiler statementCompiler
-	if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
-		return nil, err
-	}
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+// ListActiveAuthzAssignmentsByRelation implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, listActiveAuthzAssignmentsByRelationStmt, projectID, objectType, relation)
 	if err != nil {
 		return nil, wrapError(err)
 	}
@@ -165,12 +168,34 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 	if err != nil {
 		return nil, wrapError(err)
 	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		assignments,
-		authz.AuthzAssignmentSchema,
-		filter.Pagination.Limit,
-	)
+	return assignments, nil
+}
+
+// ListManagedGrants implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projectID string, filter *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error) {
+	filter, err := authz.ScopeManagedGrantList(projectID, filter)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, nextCursor, err := pagination.Page(filter.Pagination, authz.AuthzAssignmentSchema, func(limit uint32) ([]*domain.AuthzAssignment, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, listManagedGrantsQuery, filter, authz.AuthzAssignmentSchema, "", "", authz.ManagedGrantListConjunct); err != nil {
+			return nil, err
+		}
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return assignments, nil
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &database.ListResult[*domain.AuthzAssignment]{
 		Items:      assignments,
 		NextCursor: nextCursor,
@@ -225,34 +250,37 @@ func (s authzAssignmentStatements) ListClaimedProjectIDs(ctx context.Context, af
 }
 
 // ListAuthorizedProjects implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-	var compiler statementCompiler
-	compiler.WriteString(projectQuery)
-	compiler.WriteString(" WHERE id IN (")
-	authz.WriteAuthorizedProjectIDs(&compiler, postgresAuthzEnv(), homeProjectID, userID)
-	compiler.WriteString(")")
-	keyset, err := cursorFilter(page, projectSchema)
+func (s authzAssignmentStatements) ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+	projects, nextCursor, err := pagination.Page(opts.Pagination, projectSchema, func(limit uint32) ([]*domain.Project, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		compiler.WriteString(projectQuery)
+		compiler.WriteString(" WHERE id IN (")
+		authz.WriteAuthorizedProjectIDs(&compiler, postgresAuthzEnv(), homeProjectID, userID)
+		compiler.WriteString(")")
+		if err := compileWhereRest(&compiler, opts, projectSchema); err != nil {
+			return nil, err
+		}
+
+		rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		projects, err := pgx.CollectRows(rows, newProjectStatements(s.client).scanProject)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return projects, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if keyset != nil {
-		compiler.WriteString(" AND ")
-		compileFilter(&compiler, keyset, projectSchema)
-	}
-	compileOrderBy(&compiler, page.OrderBy, projectSchema)
-	compileLimit(&compiler, page.Limit)
-
-	rows, err := s.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	projects, err := pgx.CollectRows(rows, newProjectStatements(s.client).scanProject)
-	if err != nil {
-		return nil, wrapError(err)
+	if err := newProjectStatements(s.client).hydrateOrigins(ctx, projects...); err != nil {
+		return nil, err
 	}
 	return &database.ListResult[*domain.Project]{
 		Items:      projects,
-		NextCursor: pagination.MarshalNext(page.OrderBy, projects, projectSchema, page.Limit),
+		NextCursor: nextCursor,
 	}, nil
 }
 

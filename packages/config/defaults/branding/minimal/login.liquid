@@ -4,6 +4,28 @@
 
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
+    {% comment %}
+      The account the step signs in to, when the visitor named it earlier
+      (`identifier`, which the engine sends on a password step). The template
+      decides what `<zl-account>` shows on each step:
+      - action: the step's `back`, which returns to the step that collected the
+        identifier. A step with its own way out to sign-in (the SSO conflict
+        step's `sign_in`) keeps only that one, so its chip is static.
+      - avatar: generated from what was typed. Left off where the password
+        field asks for a new password (the engine marks it `new-password`
+        under the register purpose), since no account exists yet.
+    {% endcomment %}
+    {% if identifier and identifier.value != blank %}
+      {% assign change_account = actions | where: "kind", "back" | first %}
+      {% assign sign_in_action = actions | where: "name", "sign_in" | first %}
+      <zl-account
+        data-testid="zitadel-account"
+        identifier="{{ identifier.value }}"
+        {% if change_account and sign_in_action == nil %}action="{{ change_account.name }}" label="{{ 'action.use_another_account' | t }}"{% endif %}
+        {% unless password_field.autocomplete == "new-password" %}avatar{% endunless %}
+      ></zl-account>
+    {% endif %}
+
     <div class="zl-field-group">
     {% for f in fields %}
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
@@ -38,6 +60,7 @@
           type="{{ f.type }}"
           value="{{ f.value }}"
           {% if f.autocomplete %}autocomplete="{{ f.autocomplete }}"{% endif %}
+          {% if f.read_only %}readonly{% endif %}
           {% if f.required %}required{% endif %}
           {% if field_placeholder != "" %}placeholder="{{ field_placeholder }}"{% endif %}
           {% if field_err != "" %}invalid error="{{ field_err }}"{% endif %}
@@ -88,7 +111,8 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
-          {% if loading %}loading{% endif %}
+          {% comment %} Only the control that started the submit shows progress. {% endcomment %}
+          {% if loading %}{% if pending_action == blank or pending_action == a.name %}loading{% endif %}{% endif %}
         ></zl-button>
       {% endif %}
     {% endfor %}
@@ -118,6 +142,7 @@
           action="{{ a.name }}"
           data-testid="zitadel-action-{{ a.name }}"
           label="{{ a.text_key | t }}"
+          {% if loading and pending_action == a.name %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endfor %}
@@ -132,6 +157,7 @@
           action="passkey"
           data-testid="zitadel-action-passkey"
           label="{{ passkey.text_key | t }}"
+          {% if loading and pending_action == "passkey" %}loading{% endif %}
         ></zl-button>
       {% endunless %}
     {% endif %}

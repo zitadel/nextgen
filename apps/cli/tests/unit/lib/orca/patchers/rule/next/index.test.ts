@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
+import { FRAMEWORK_IDS } from "../../../../../../helpers/framework-ids";
 import type {
   FileOp,
   ScaffoldPlan,
 } from "../../../../../../../src/lib/orca/patchers/rule/file-writer/types";
 import { NextPatcher } from "../../../../../../../src/lib/orca/patchers/rule/next";
+import { PAGE_SURFACE_BACKGROUND } from "../../../../../../../src/lib/orca/patchers/rule/next/renderers/react";
 import type { PatchContext } from "../../../../../../../src/lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../../../../../../../src/lib/paths";
 
@@ -20,7 +24,7 @@ function ctxFor(
       id: "proj-1",
       project_secret: "sk_proj_full",
       preview_secret: "sk_proj_preview",
-      preview_origins: [],
+      origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
     },
     issuer: "http://localhost:3000",
@@ -55,11 +59,7 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/register"');
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain("next/link");
     expect(writeContents(plan, "app/login/page.tsx")).not.toContain('href="/profile"');
-    // Page chrome comes from the widget itself now — the wrapper only pins
-    // the color scheme, and no token hex is duplicated into generated code.
     expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="page"');
-    expect(writeContents(plan, "app/login/page.tsx")).not.toContain("#0f0f11");
-    expect(writeContents(plan, "app/login/page.tsx")).toContain('colorScheme: "dark"');
     // The embedding alternative is named where a developer will see it, and
     // a minimal scaffold keeps the widget's neutral built-in copy.
     expect(writeContents(plan, "app/login/page.tsx")).toContain('variant="widget"');
@@ -70,40 +70,62 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/login"');
     expect(writeContents(plan, "app/register/page.tsx")).not.toContain('href="/profile"');
     expect(writeContents(plan, "app/register/page.tsx")).toContain('variant="page"');
-    expect(writeContents(plan, "app/register/page.tsx")).not.toContain("#0f0f11");
-    expect(writeContents(plan, "app/register/page.tsx")).toContain('colorScheme: "dark"');
     expect(writeContents(plan, "middleware.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "middleware.ts")).toContain("export function middleware(");
     expect(plan.ops.some((op) => op.kind === "add-dep")).toBe(true);
+  });
+
+  it("renders the widgets through the SDK's React wrappers, not the raw elements", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('"@zitadel/sdk-next/components"');
+      expect(page).not.toMatch(/<zitadel-(login|session)/);
+    }
   });
 
   it("wires the business copy overlay for business-use-case projects", () => {
     const plan = new NextPatcher().plan({ ...ctxFor("app"), useCase: "business" });
     for (const path of ["app/login/page.tsx", "app/register/page.tsx"]) {
       const page = writeContents(plan, path);
-      // The overlay ships with the SDK: the page pulls it from the client
-      // entry it already imports and assigns it through the ref — a JSX
-      // locales prop would decay to an attribute on React 18 (sdk-next's
-      // floor) and silently keep the neutral copy.
-      expect(page).toContain("businessLocales, configureZitadel");
-      expect(page).toContain("element.locales = businessLocales");
-      expect(page).not.toContain("locales={businessLocales}");
+      // The overlay ships with the SDK and is passed as a locales prop to
+      // the wrapper, which sets it as a property on React 18 and 19.
+      expect(page).toContain("ZitadelLogin: Login, businessLocales, configureZitadel");
+      expect(page).toContain("locales={businessLocales}");
+      expect(page).not.toContain("element.locales");
     }
     // Consumer scaffolds keep the neutral built-ins, like minimal ones.
     const consumer = new NextPatcher().plan({ ...ctxFor("app"), useCase: "consumer" });
     expect(writeContents(consumer, "app/login/page.tsx")).not.toContain("businessLocales");
   });
 
-  it("leaves profile page chrome to the session card's page surface", () => {
+  it("paints the widget's dark page surface before the client-only widget mounts", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
-    const profile = writeContents(plan, "app/profile/page.tsx");
-    expect(profile).toContain('variant="page"');
-    // The card paints its own full-page chrome from design tokens — no
-    // duplicated token hex or forced viewport height in generated markup.
-    expect(profile).not.toContain("#0f0f11");
-    expect(profile).not.toContain("minHeight");
-    expect(profile).toContain('colorScheme: "dark"');
-    expect(profile).toContain('variant="widget"');
+    for (const path of ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"]) {
+      const page = writeContents(plan, path);
+      expect(page).toContain('variant="page"');
+      // The wrapper is server-rendered: without the surface on it, the first
+      // paint is the host page's background (white in light mode) until the
+      // widget mounts and paints dark.
+      expect(page).toContain(
+        `<main style={{ minHeight: "100vh", background: "${PAGE_SURFACE_BACKGROUND}", colorScheme: "dark" }}>`,
+      );
+      expect(page).toContain('variant="widget"');
+    }
+  });
+
+  it("pre-paints the page surface the design tokens give the dark theme", () => {
+    const tokensCss = readFileSync(
+      new URL(
+        "../../../../../../../../../packages/design-tokens/src/generated/tokens.css",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const darkTheme = tokensCss.slice(tokensCss.indexOf(':root[data-theme="dark"]'));
+    const background = /--zl-background:\s*([^;]+);/.exec(darkTheme)?.[1];
+
+    expect(background).toBe(PAGE_SURFACE_BACKGROUND);
   });
 
   it("replaces the starter home page for a freshly scaffolded Next app", () => {
@@ -112,6 +134,9 @@ describe("NextPatcher.plan", () => {
 
     expect(homePage).toContain(MANAGED_MARKER);
     expect(homePage).toContain('redirect("/login")');
+    // Cache Components' dev server logs the redirect as a failed instant
+    // validation on every GET / unless the page opts out.
+    expect(homePage).toContain("export const instant = false;");
     expect(homePage).not.toContain("Sign in, create an account");
   });
 
@@ -123,6 +148,7 @@ describe("NextPatcher.plan", () => {
       // Layout-neutral wrapper: no forced color scheme, no <main> that would
       // nest inside the host app's own landmark.
       expect(page).not.toContain('colorScheme: "dark"');
+      expect(page).not.toContain(PAGE_SURFACE_BACKGROUND);
       expect(page).not.toContain("<main");
       expect(page).toContain('justifyContent: "center"');
       // The full-page alternative stays named for discoverability.
@@ -142,7 +168,7 @@ describe("NextPatcher.plan", () => {
     });
     const page = writeContents(plan, "app/login/page.tsx");
     expect(page).toContain('variant="widget"');
-    expect(page).toContain("element.locales = businessLocales");
+    expect(page).toContain("locales={businessLocales}");
   });
 
   it("treats absent posture as the page posture (legacy restores)", () => {
@@ -168,17 +194,34 @@ describe("NextPatcher.plan", () => {
     expect(dep).toMatchObject({ name: "@zitadel/sdk-next", version: "0.1.0-alpha.0" });
   });
 
+  it.each([
+    ["1.2.0", "1.2.0"],
+    ["2.0.0-beta.3", "beta"],
+  ])("pins the SDK for CLI %s at %s", (cliVersion, expected) => {
+    const plan = new NextPatcher().plan({ ...ctxFor("app"), cliVersion });
+    const dep = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "add-dep" }> => op.kind === "add-dep",
+    );
+    expect(dep?.version).toBe(expected);
+  });
+
   it("leaves schema and flow files for setup's resource materializer", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     expect(writeContents(plan, ".zitadel/schemas/user.json")).toBeUndefined();
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern as the raw origins, not a doubled scheme", () => {
+  it("writes preview issuer_pattern from preview origins only, not a doubled scheme", () => {
     const base = ctxFor("app");
     const ctx = {
       ...base,
-      project: { ...base.project, preview_origins: ["https://nextgen.dev.mrida.ng"] },
+      project: {
+        ...base.project,
+        origins: [
+          { pattern: "https://app.example.com", kind: "primary" as const },
+          { pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const },
+        ],
+      },
     };
     const zitadelJson = JSON.parse(
       writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
@@ -229,5 +272,11 @@ describe("NextPatcher.artifacts", () => {
     });
     expect(artifacts.markedFiles).toContain("proxy.ts");
     expect(artifacts.markedFiles).not.toContain("middleware.ts");
+  });
+});
+
+describe("NextPatcher.canPatch", () => {
+  it.each(FRAMEWORK_IDS)("matches %s only when it is its own framework", (id) => {
+    expect(new NextPatcher().canPatch(id)).toBe(id === "next");
   });
 });

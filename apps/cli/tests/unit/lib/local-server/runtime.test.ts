@@ -1,20 +1,23 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ZitadelError } from "../../../../src/lib/errors";
 import {
-  DEFAULT_LOCAL_SERVER_URL,
   LOCAL_RUNTIME_FILE,
   defaultLocalServerImageForCliVersion,
-  detectHealthyLocalServer,
+  findUpward,
   ensureContainerIdentity,
   ensureLocalState,
   localContainerName,
   localRuntimePaths,
+  loopbackReach,
+  readNearestRuntimeMetadata,
   readRuntimeMetadata,
   removeLocalData,
+  retargetMalformedRuntime,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../../src/lib/local-server/runtime";
@@ -34,7 +37,8 @@ describe("local server runtime metadata", () => {
     ["0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
     ["v0.1.0-alpha.5", "ghcr.io/zitadel/nextgen:0.1.0-alpha.5"],
     ["0.0.0-test", "ghcr.io/zitadel/nextgen:latest"],
-    ["0.1.0", "ghcr.io/zitadel/nextgen:latest"],
+    ["0.1.0", "ghcr.io/zitadel/nextgen:0.1.0"],
+    ["1.0.0-beta.2", "ghcr.io/zitadel/nextgen:latest"],
   ])("derives the default image for CLI version %s", (cliVersion, image) => {
     expect(defaultLocalServerImageForCliVersion(cliVersion)).toBe(image);
   });
@@ -139,71 +143,135 @@ describe("local server runtime metadata", () => {
   });
 });
 
-describe("detectHealthyLocalServer", () => {
-  // `checkLocalServerHealth` probes real URLs (including the fixed default
-  // localhost:8080, which a dev machine may genuinely occupy), so stub the
-  // global fetch and answer per-origin instead of binding real sockets.
-  let healthyOrigins: ReadonlySet<string>;
+describe("findUpward", () => {
+  // Root reads through any mode, so the unreadable directory proves nothing there.
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+    "refuses to look past local state it cannot read",
+    async () => {
+      await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+      const app = join(cwd, "my-app");
+      await mkdir(join(app, ".zitadel/local"), { recursive: true });
+      await chmod(join(app, ".zitadel/local"), 0o000);
 
-  beforeEach(() => {
-    healthyOrigins = new Set();
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string | URL) => {
-        const url = new URL(String(input));
-        if (url.pathname === "/healthz" && healthyOrigins.has(url.origin)) {
-          return new Response("ok", { status: 200 });
-        }
-        throw new TypeError("fetch failed (stub: connection refused)");
-      }),
-    );
-  });
+      try {
+        await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).rejects.toMatchObject({
+          code: "E_VALIDATION",
+        });
+      } finally {
+        await chmod(join(app, ".zitadel/local"), 0o700);
+      }
+    },
+  );
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("returns the runtime-metadata URL when that server is healthy", async () => {
+  it("stops looking for local state at the boundary it is given", async () => {
     await writeRuntimeMetadata(cwd, runtimeFor(cwd));
-    healthyOrigins = new Set(["http://localhost:8081"]);
+    const home = join(cwd, "home");
+    const app = join(home, "my-app");
+    await mkdir(app, { recursive: true });
 
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBe("http://localhost:8081");
+    await expect(findUpward(app, LOCAL_RUNTIME_FILE, home)).resolves.toBeUndefined();
+    await expect(findUpward(app, LOCAL_RUNTIME_FILE, cwd)).resolves.toBe(cwd);
   });
+});
 
-  it("falls back to the default URL when the metadata URL is unhealthy", async () => {
-    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
-    healthyOrigins = new Set([DEFAULT_LOCAL_SERVER_URL]);
+describe("readNearestRuntimeMetadata", () => {
+  async function malformedRecordAt(dir: string): Promise<void> {
+    await mkdir(join(dir, ".zitadel/local"), { recursive: true });
+    await writeFile(join(dir, LOCAL_RUNTIME_FILE), JSON.stringify({ backend: "nope" }));
+  }
 
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBe(DEFAULT_LOCAL_SERVER_URL);
-  });
+  it("recovers a malformed record in a parent where it is", async () => {
+    await malformedRecordAt(cwd);
+    const app = join(cwd, "my-app");
+    await mkdir(app);
 
-  it("probes the default URL only once when the metadata already points there", async () => {
-    await writeRuntimeMetadata(cwd, {
-      ...runtimeFor(cwd),
-      port: 8080,
-      server_url: DEFAULT_LOCAL_SERVER_URL,
+    await expect(readNearestRuntimeMetadata(app)).rejects.toMatchObject({
+      nextCommands: [`zitadel reset --force --cwd ${cwd}`, `zitadel start --cwd ${cwd}`],
     });
-
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
-  it("returns the default URL when no metadata exists but the default server is healthy", async () => {
-    healthyOrigins = new Set([DEFAULT_LOCAL_SERVER_URL]);
+  it("recovers a malformed record in the working directory without naming it", async () => {
+    await malformedRecordAt(cwd);
 
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBe(DEFAULT_LOCAL_SERVER_URL);
+    await expect(readNearestRuntimeMetadata(cwd)).rejects.toMatchObject({
+      nextCommands: ["zitadel reset --force", "zitadel start"],
+    });
+  });
+});
+
+describe("loopbackReach", () => {
+  const ALLOW_LIST = { injected: ["NEXTGEN_HTTPCLIENT_ALLOW_LIST"] };
+
+  function binaryRuntime(env = ALLOW_LIST): RuntimeMetadata {
+    return {
+      ...runtimeFor(cwd),
+      backend: "binary",
+      pid: 4242,
+      command: "zitadel-server",
+      log_path: join(cwd, ".zitadel/local/server.log"),
+      server_package: "@zitadel/server",
+      server_version: "0.0.0-test",
+      env,
+    };
+  }
+
+  it("allows loopback on a process server that got the allow list, from a subdirectory too", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    const app = join(cwd, "my-app");
+    await mkdir(app);
+
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("allowed");
+    await expect(loopbackReach(app, "http://127.0.0.1:8081/")).resolves.toBe("allowed");
   });
 
-  it("swallows malformed runtime metadata instead of throwing", async () => {
-    const paths = localRuntimePaths(cwd);
-    await ensureLocalState(cwd);
-    await writeFile(paths.runtimeFile, "{not json", "utf8");
-
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
+  it("names a container server, whose localhost is the container", async () => {
+    await writeRuntimeMetadata(cwd, runtimeFor(cwd));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("container");
   });
 
-  it("returns undefined when nothing is running", async () => {
-    await expect(detectHealthyLocalServer(cwd)).resolves.toBeUndefined();
+  it("knows nothing of a process server started with the allow list off", async () => {
+    await writeRuntimeMetadata(cwd, binaryRuntime({ injected: [] }));
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+  });
+
+  it("knows nothing of a server the record does not name, or of no record", async () => {
+    await expect(loopbackReach(cwd, "http://localhost:8081")).resolves.toBe("unknown");
+    await writeRuntimeMetadata(cwd, binaryRuntime());
+    await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
+    await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
+  });
+});
+
+describe("retargetMalformedRuntime", () => {
+  const malformed = new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
+    details: { x: 1 },
+  });
+
+  it.each([
+    ["a Windows path with a space", "C:\\work\\my app"],
+    ["a Windows path with an apostrophe", "C:\\work\\it's"],
+    ["a POSIX path with a space", "/home/dev/my app"],
+  ])("hands over %s as arguments, not as commands", (_name, dir) => {
+    const retargeted = retargetMalformedRuntime(malformed, dir) as ZitadelError;
+
+    expect(retargeted.nextCommands).toBeUndefined();
+    expect(retargeted.details).toEqual({
+      x: 1,
+      suggested_args: [
+        ["reset", "--force", "--cwd", dir],
+        ["start", "--cwd", dir],
+      ],
+    });
+    expect(retargeted.hint).toContain("details.suggested_args");
+  });
+
+  it("writes the commands out for a path that needs no quoting", () => {
+    const retargeted = retargetMalformedRuntime(malformed, "/home/dev/app") as ZitadelError;
+
+    expect(retargeted.nextCommands).toEqual([
+      "zitadel reset --force --cwd /home/dev/app",
+      "zitadel start --cwd /home/dev/app",
+    ]);
   });
 });
 

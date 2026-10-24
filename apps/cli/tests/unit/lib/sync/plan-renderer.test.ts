@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+} from "@zitadel/config/normalize";
 
 import {
+  collectPlanWarnings,
   enumeratePlanResources,
+  isUnsupportedDeletion,
   renderPlan,
   summarizePlan,
+  unsupportedDeletionNote,
 } from "../../../../src/lib/sync/plan-renderer";
 import type { ResourceSyncer, SyncAction } from "../../../../src/lib/sync/types";
 
@@ -28,10 +35,18 @@ function makeSyncer(
     mutable,
     revisioned,
     ...(normalize ? { normalize } : {}),
-    validate() { /* no-op: renderer tests do not exercise validation */ },
-    async create(_d: object) { return { id: "id" }; },
-    async update() { return {}; },
-    async delete() { /* no-op: renderer tests do not exercise delete */ },
+    validate() {
+      /* no-op: renderer tests do not exercise validation */
+    },
+    async create(_d: object) {
+      return { id: "id" };
+    },
+    async update() {
+      return {};
+    },
+    async delete() {
+      /* no-op: renderer tests do not exercise delete */
+    },
   };
 }
 
@@ -43,7 +58,15 @@ describe("summarizePlan", () => {
     const actions: SyncAction[] = [
       { kind: "create", path: "a", syncer: schema, content: {}, hash: "h" },
       { kind: "create", path: "b", syncer: schema, content: {}, hash: "h" },
-      { kind: "update", path: "c", syncer: flow, id: "1", content: {}, hash: "h", oldContent: null },
+      {
+        kind: "update",
+        path: "c",
+        syncer: flow,
+        id: "1",
+        content: {},
+        hash: "h",
+        oldContent: null,
+      },
       { kind: "delete", path: "d", syncer: schema, id: "2", oldContent: null },
       { kind: "skip", path: "e", reason: "no-change" },
     ];
@@ -53,6 +76,8 @@ describe("summarizePlan", () => {
       updates: 1,
       revisions: 0,
       deletes: 1,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 4,
     });
   });
@@ -63,6 +88,8 @@ describe("summarizePlan", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 0,
     });
     expect(summarizePlan([{ kind: "skip", path: "a", reason: "immutable" }])).toEqual({
@@ -70,6 +97,8 @@ describe("summarizePlan", () => {
       updates: 0,
       revisions: 0,
       deletes: 0,
+      moves: 0,
+      unsupported_deletions: 0,
       total: 0,
     });
   });
@@ -78,7 +107,13 @@ describe("summarizePlan", () => {
 describe("enumeratePlanResources", () => {
   it("maps every non-skip action to an envelope row, in plan order", () => {
     const actions: SyncAction[] = [
-      { kind: "create", path: ".zitadel/schemas/user.json", syncer: schema, content: {}, hash: "h" },
+      {
+        kind: "create",
+        path: ".zitadel/schemas/user.json",
+        syncer: schema,
+        content: {},
+        hash: "h",
+      },
       {
         kind: "update",
         path: ".zitadel/flows/login.json",
@@ -98,7 +133,13 @@ describe("enumeratePlanResources", () => {
         oldContent: null,
         affectedPaths: [".zitadel/flows/login.json"],
       },
-      { kind: "delete", path: ".zitadel/flows/old.json", syncer: flow, id: "flow_0", oldContent: null },
+      {
+        kind: "delete",
+        path: ".zitadel/flows/old.json",
+        syncer: flow,
+        id: "flow_0",
+        oldContent: null,
+      },
       { kind: "skip", path: ".zitadel/schemas/other.json", reason: "no-change" },
     ];
 
@@ -146,6 +187,43 @@ describe("renderPlan — no changes", () => {
   it("prints no-changes message for empty action list", () => {
     expect(renderPlan([], false)).toContain("No changes.");
   });
+
+  it("reports a removed file whose resource cannot be deleted yet among the warnings", () => {
+    const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+
+    expect(
+      collectPlanWarnings([
+        {
+          kind: "skip",
+          path: ".zitadel/idps/a.json",
+          reason: "unsupported-deletion",
+          id: "idp_1",
+          syncer: idp,
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({ path: ".zitadel/idps/a.json", rule: "unsupported-deletion" }),
+    ]);
+  });
+
+  it("still names a removed file whose resource cannot be deleted yet", () => {
+    const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+    const out = renderPlan(
+      [
+        {
+          kind: "skip",
+          path: ".zitadel/idps/google.json",
+          reason: "unsupported-deletion",
+          id: "idp_1",
+          syncer: idp,
+        },
+      ],
+      false,
+    );
+    expect(out).toContain(".zitadel/idps/google.json was removed");
+    expect(out).toContain("nothing was deleted on the platform");
+    expect(out).not.toContain("to destroy");
+  });
 });
 
 describe("renderPlan — create block", () => {
@@ -160,15 +238,11 @@ describe("renderPlan — create block", () => {
   ];
 
   it("prints the correct header comment", () => {
-    expect(renderPlan(actions, false)).toContain(
-      "# .zitadel/schemas/user.json will be created",
-    );
+    expect(renderPlan(actions, false)).toContain("# .zitadel/schemas/user.json will be created");
   });
 
   it("prints the resource opening line with kind and filename", () => {
-    expect(renderPlan(actions, false)).toContain(
-      '+ resource "schema" "user.json" {',
-    );
+    expect(renderPlan(actions, false)).toContain('+ resource "schema" "user.json" {');
   });
 
   it("shows id = (known after apply)", () => {
@@ -257,8 +331,8 @@ describe("renderPlan — update block", () => {
     const out = renderPlan(actions, false);
     expect(out).toContain("# .zitadel/flows/default.json will be updated in-place");
     expect(out).toContain('~ resource "flow" "default.json" {');
-    expect(out).toContain("~ version = 1 -> 2");      // changed field
-    expect(out).toContain("  name    = \"Default\"");  // unchanged field, no prefix
+    expect(out).toContain("~ version = 1 -> 2"); // changed field
+    expect(out).toContain('  name    = "Default"'); // unchanged field, no prefix
     expect(out).toContain("Plan: 1 to change.");
   });
 
@@ -341,6 +415,168 @@ describe("renderPlan — nested structures", () => {
     expect(out).toContain("+ team_ids = [");
     expect(out).toContain('+ "alpha",');
     expect(out).toContain('+ "beta",');
+  });
+});
+
+describe("renderPlan — changed arrays", () => {
+  const revisedFlow = makeSyncer("flow", ".zitadel/flows", { revisioned: true });
+  const step = (name: string, fields: string[], extra: Record<string, unknown> = {}) => ({
+    name,
+    fields,
+    actions: [{ name: "submit", kind: "submit", primary: true }],
+    transitions: { submit: { target: "done" } },
+    ...extra,
+  });
+  const steps = [
+    step("identifier", ["email"]),
+    step("password", ["x-auth-methods#password"]),
+    step("register", ["email"]),
+    { name: "done", complete: "show" },
+  ];
+  /** The block a revision of a flow whose `steps` went from `before` to `after` renders. */
+  const revise = (before: unknown[], after: unknown[], extra: Record<string, unknown> = {}) =>
+    renderPlan(
+      [
+        {
+          kind: "revise",
+          path: ".zitadel/flows/default-login.json",
+          syncer: revisedFlow,
+          content: { name: "default-login", steps: after, ...extra },
+          hash: "h",
+          previousId: "flowdef_1",
+          oldContent: { name: "default-login", steps: before },
+          affectedPaths: [],
+        },
+      ],
+      false,
+    );
+
+  it("renders one field added to one step as that one line under that step", () => {
+    const after = structuredClone(steps);
+    after[2] = step("register", ["email", "company"]);
+
+    expect(revise(steps, after)).toBe(
+      [
+        "Zitadel will perform the following actions:",
+        "",
+        "  # .zitadel/flows/default-login.json will publish a new revision",
+        '  ~ resource "flow" "default-login.json" {',
+        '      ~ id    = "flowdef_1" -> (known after apply)',
+        '        name  = "default-login"',
+        "      ~ steps = [",
+        "            # (2 unchanged elements hidden)",
+        "          ~ {",
+        "              ~ fields = [",
+        '                    "email",',
+        '                  + "company",',
+        "                ]",
+        '                name   = "register"',
+        "                # (2 unchanged attributes hidden)",
+        "            },",
+        "            # (1 unchanged element hidden)",
+        "        ]",
+        "    }",
+        "",
+        "Plan: 1 new revision.",
+      ].join("\n"),
+    );
+  });
+
+  it("renders a changed action by its name inside its step", () => {
+    const after = structuredClone(steps);
+    after[0] = step("identifier", ["email"], {
+      actions: [{ name: "submit", kind: "submit", primary: true, text_key: "continue" }],
+    });
+
+    const out = revise(steps, after);
+
+    expect(out).toContain('                      + text_key = "continue"');
+    expect(out).toContain('                        name     = "submit"');
+    expect(out).not.toMatch(/^\s*[-+] \{/m);
+  });
+
+  it("renders an added step whole and leaves the others hidden", () => {
+    const after = [...steps.slice(0, 3), step("mfa", ["otp"]), steps[3]];
+
+    const out = revise(steps, after);
+
+    expect(out).toContain("          + {");
+    expect(out).toContain('              + name        = "mfa"');
+    expect(out).toContain("            # (3 unchanged elements hidden)");
+    expect(out).toContain("            # (1 unchanged element hidden)");
+    expect(out).not.toMatch(/^\s*- /m);
+  });
+
+  it("renders a removed step whole as a removal", () => {
+    const after = steps.filter((s) => s.name !== "password");
+
+    const out = revise(steps, after);
+
+    expect(out).toContain("          - {");
+    expect(out).toContain('              - name        = "password"');
+    expect(out).not.toMatch(/^\s*\+ /m);
+  });
+
+  it("falls back to a whole remove and add when elements share no unique name", () => {
+    const out = revise([{ kind: "a" }, { kind: "b" }], [{ kind: "a" }, { kind: "c" }]);
+
+    expect(out).toContain("      - steps = [");
+    expect(out).toContain("      + steps = [");
+  });
+
+  it("collapses an unchanged list of steps when only a top-level field changed", () => {
+    const out = revise(steps, steps, { status: "inactive" });
+
+    expect(out).toContain(
+      "        steps  = [\n            # (4 unchanged elements hidden)\n        ]",
+    );
+    expect(out).not.toContain("identifier");
+  });
+
+  it("keeps an unchanged list of scalars in full", () => {
+    const out = renderPlan(
+      [
+        {
+          kind: "update",
+          path: ".zitadel/flows/default.json",
+          syncer: flow,
+          id: "flow-1",
+          content: { status: "active", team_ids: ["alpha"] },
+          hash: "h",
+          oldContent: { status: "inactive", team_ids: ["alpha"] },
+        },
+      ],
+      false,
+    );
+
+    expect(out).toContain('        team_ids = [\n            "alpha",\n        ]');
+  });
+
+  it("marks the removed and added items of a changed list of scalars", () => {
+    const out = renderPlan(
+      [
+        {
+          kind: "update",
+          path: ".zitadel/flows/default.json",
+          syncer: flow,
+          id: "flow-1",
+          content: { team_ids: ["alpha", "gamma"] },
+          hash: "h",
+          oldContent: { team_ids: ["alpha", "beta"] },
+        },
+      ],
+      false,
+    );
+
+    expect(out).toContain(
+      [
+        "      ~ team_ids = [",
+        '            "alpha",',
+        '          - "beta",',
+        '          + "gamma",',
+        "        ]",
+      ].join("\n"),
+    );
   });
 });
 
@@ -475,7 +711,7 @@ describe("renderPlan — normalized diffs", () => {
 
     const out = renderPlan(actions, false);
     expect(out).not.toContain("audience");
-    expect(out).toContain('~ version = 1 -> 2');
+    expect(out).toContain("~ version = 1 -> 2");
   });
 
   it("does not render spelled-out meta-schema defaults as schema changes", () => {
@@ -506,6 +742,45 @@ describe("renderPlan — normalized diffs", () => {
     // spelled out on the server side must not read as removals.
     expect(out).not.toContain("x-audit");
     expect(out).toContain("company");
+  });
+
+  it("does not render the defaults a stored connection spells out as removals", () => {
+    const connectionSyncer = makeSyncer("idp", ".zitadel/idps", {
+      mutable: true,
+      normalize: normalizeIdpBody,
+    });
+    const oidc = {
+      issuer: "https://accounts.google.com",
+      client_id: "${{ GOOGLE_CLIENT_ID }}",
+      client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+      scopes: ["openid", "profile", "email"],
+    };
+    const actions: SyncAction[] = [
+      {
+        kind: "update",
+        path: ".zitadel/idps/google.json",
+        syncer: connectionSyncer,
+        id: "idp_1",
+        content: { slug: "google", display_name: "Google Workspace", oidc },
+        hash: "h",
+        oldContent: {
+          slug: "google",
+          display_name: "Google",
+          oidc: {
+            ...oidc,
+            id_token_mapping: false,
+            pkce_enabled: true,
+            token_endpoint_auth_method: "client_secret_basic",
+          },
+        },
+      },
+    ];
+
+    const out = renderPlan(actions, false);
+
+    expect(out).toContain('~ display_name = "Google" -> "Google Workspace"');
+    expect(out).not.toMatch(/pkce_enabled|token_endpoint_auth_method|id_token_mapping/);
+    expect(out).not.toMatch(/^\s*[-+] /m);
   });
 });
 
@@ -673,9 +948,9 @@ describe("renderPlan — block strings (liquid_template)", () => {
   const branding = makeSyncer("branding", ".zitadel/branding", { revisioned: true });
   const template = [
     "<zl-page-shell>",
-    "  <aside class=\"zl-split__brand\">",
+    '  <aside class="zl-split__brand">',
     "    {% if branding.logo_url %}",
-    "      <img class=\"zl-split__logo\" src=\"{{ branding.logo_url }}\" alt=\"\" />",
+    '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="" />',
     "    {% endif %}",
     "  </aside>",
     "</zl-page-shell>",
@@ -699,7 +974,10 @@ describe("renderPlan — block strings (liquid_template)", () => {
 
   it("summarises an unchanged template instead of dumping it on one line", () => {
     const out = renderPlan(
-      revise({ layout: "split", liquid_template: template }, { layout: "centered", liquid_template: template }),
+      revise(
+        { layout: "split", liquid_template: template },
+        { layout: "centered", liquid_template: template },
+      ),
       false,
     );
 
@@ -717,9 +995,15 @@ describe("renderPlan — block strings (liquid_template)", () => {
       false,
     );
 
-    expect(out).toMatch(/~ liquid_template = \(2 lines changed of 7, sha256:[0-9a-f]{8} -> sha256:[0-9a-f]{8}\)/);
-    expect(out).toContain('- ' + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="" />');
-    expect(out).toContain('+ ' + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="Acme" />');
+    expect(out).toMatch(
+      /~ liquid_template = \(2 lines changed of 7, sha256:[0-9a-f]{8} -> sha256:[0-9a-f]{8}\)/,
+    );
+    expect(out).toContain(
+      "- " + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="" />',
+    );
+    expect(out).toContain(
+      "+ " + '      <img class="zl-split__logo" src="{{ branding.logo_url }}" alt="Acme" />',
+    );
     // Untouched lines never reach the output.
     expect(out).not.toContain("<zl-page-shell>");
   });
@@ -740,7 +1024,10 @@ describe("renderPlan — block strings (liquid_template)", () => {
     const long = Array.from({ length: 40 }, (_, i) => `line ${i}`).join("\n");
     const rewritten = Array.from({ length: 40 }, (_, i) => `LINE ${i}`).join("\n");
 
-    const out = renderPlan(revise({ liquid_template: rewritten }, { liquid_template: long }), false);
+    const out = renderPlan(
+      revise({ liquid_template: rewritten }, { liquid_template: long }),
+      false,
+    );
 
     expect(out).toContain("(80 lines changed of 40");
     expect(out).toContain("# (60 more changed lines not shown)");
@@ -762,5 +1049,102 @@ describe("renderPlan — block strings (liquid_template)", () => {
 
     expect(out).toMatch(/\+ liquid_template = \(7 lines, sha256:[0-9a-f]{8}\)/);
     expect(out).not.toContain("zl-split__brand");
+  });
+});
+
+describe("a removed file whose resource cannot be deleted yet", () => {
+  const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+  const removed: SyncAction = {
+    kind: "skip",
+    path: ".zitadel/idps/google.json",
+    reason: "unsupported-deletion",
+    id: "idp_1",
+    syncer: idp,
+  };
+
+  it("is counted on its own and not in the total", () => {
+    expect(summarizePlan([removed])).toMatchObject({ unsupported_deletions: 1, total: 0 });
+  });
+
+  it("is not called no changes in the headline", () => {
+    expect(renderPlan([removed], false)).not.toContain("No changes.");
+  });
+
+  it("is the headline when it is all there is", () => {
+    expect(renderPlan([removed], false)).toContain("Nothing to apply, but 1 removed file");
+  });
+
+  it("uses the same words in the plan and in the warnings", () => {
+    const [warning] = collectPlanWarnings([removed]);
+
+    expect(warning?.message).toBe(unsupportedDeletionNote(removed as never));
+  });
+
+  it("is recognised as one", () => {
+    expect(isUnsupportedDeletion(removed)).toBe(true);
+  });
+
+  it("is not confused with an ordinary skip", () => {
+    expect(isUnsupportedDeletion({ kind: "skip", path: "a", reason: "no-change" })).toBe(false);
+  });
+});
+
+describe("a file that took over a resource from a removed one", () => {
+  const idp = makeSyncer("idp", ".zitadel/idps", { mutable: true });
+  const moved: SyncAction = {
+    kind: "create",
+    path: ".zitadel/idps/new.json",
+    syncer: idp,
+    content: {},
+    hash: "h",
+    movedFrom: ".zitadel/idps/old.json",
+  };
+
+  it("is counted as a move, not a create", () => {
+    expect(summarizePlan([moved])).toMatchObject({ creates: 0, moves: 1, total: 1 });
+  });
+
+  it("is a move row that says where it came from", () => {
+    expect(enumeratePlanResources([moved])).toEqual([
+      {
+        kind: "idp",
+        action: "move",
+        file: ".zitadel/idps/new.json",
+        moved_from: ".zitadel/idps/old.json",
+      },
+    ]);
+  });
+
+  it("says in the plan which file it took over from", () => {
+    expect(renderPlan([moved], false)).toContain(
+      "will take over the idp that was in .zitadel/idps/old.json",
+    );
+  });
+
+  describe("when the stored connection is known", () => {
+    const stored = { slug: "acme", display_name: "Acme", id_note: "same" };
+    const withStored: SyncAction = {
+      ...moved,
+      content: { slug: "acme", display_name: "Acme SSO", id_note: "same" },
+      oldContent: stored,
+    } as SyncAction;
+
+    it("shows what changes, as an update does", () => {
+      expect(renderPlan([withStored], false)).toContain("display_name");
+    });
+
+    it("shows the old value next to the new one", () => {
+      const out = renderPlan([withStored], false);
+
+      expect(out).toContain('"Acme" -> "Acme SSO"');
+    });
+
+    it("does not show the connection as if it were new", () => {
+      expect(renderPlan([withStored], false)).not.toContain("(known after apply)");
+    });
+  });
+
+  it("is in the summary line as moved", () => {
+    expect(renderPlan([moved], false)).toContain("1 moved");
   });
 });

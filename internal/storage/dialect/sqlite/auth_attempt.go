@@ -75,6 +75,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` AND factor_payload IS NULL`
 
 	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
+	// markSSOCallbackCollisionStmt replaces the parked result with the
+	// collision marker alone.
+	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = ?` +
+		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
@@ -563,6 +567,23 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
 	if err != nil {
 		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadString(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	n, err := execAffected(ctx, as.client, markSSOCallbackCollisionStmt,
+		*payload, projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
+	if err != nil {
+		return fmt.Errorf("failed to mark sso callback collision: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrSSOStateInvalid()

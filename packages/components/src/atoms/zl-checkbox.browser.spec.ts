@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-checkbox.js";
 import type { ZlCheckbox, ZlCheckboxChangeDetail } from "./zl-checkbox.js";
@@ -77,6 +77,31 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     expect(nativeChanges).toBe(1);
   });
 
+  it("keeps zl-change inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = host.attachShadow({ mode: "open" });
+    const element = document.createElement("zl-checkbox");
+    element.name = "terms";
+    window.addEventListener("zl-change", heardOnPage, true);
+    element.addEventListener("zl-change", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-change", heardOnPage, true);
+      host.remove();
+    });
+    root.append(element);
+    await element.updateComplete;
+
+    // Act
+    element.shadowRoot?.querySelector("input")?.click();
+
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
+  });
+
   it("restores the default checked state when the host form is reset", async () => {
     const { form, checkbox } = mount(
       `<form><zl-checkbox name="terms" checked></zl-checkbox></form>`,
@@ -87,6 +112,37 @@ describe("<zl-checkbox> form participation (chromium)", () => {
     form.reset();
     await checkbox.updateComplete;
     expect(checkbox.checked).toBe(true);
+  });
+
+  it("keeps the default from its first connect when moved in the DOM", async () => {
+    // `checked` reflects to the attribute, so re-reading the markup on every
+    // connect would turn the user's tick into the default.
+    const { form, checkbox } = mount(
+      `<form><div class="a"><zl-checkbox name="terms"></zl-checkbox></div><div class="b"></div></form>`,
+    );
+    await checkbox.updateComplete;
+    checkbox.checked = true;
+    await checkbox.updateComplete;
+    (form.querySelector(".b") as HTMLDivElement).append(checkbox);
+    await checkbox.updateComplete;
+    form.reset();
+    await checkbox.updateComplete;
+    expect(checkbox.checked).toBe(false);
+  });
+
+  it("is disabled by an enclosing fieldset", async () => {
+    const { form, checkbox } = mount(
+      `<form><fieldset disabled><zl-checkbox name="terms" checked></zl-checkbox></fieldset></form>`,
+    );
+    await checkbox.updateComplete;
+    const input = checkbox.shadowRoot?.querySelector("input") as HTMLInputElement;
+    expect(input.disabled).toBe(true);
+    expect(new FormData(form).get("terms")).toBeNull();
+
+    (form.querySelector("fieldset") as HTMLFieldSetElement).disabled = false;
+    await checkbox.updateComplete;
+    expect(input.disabled).toBe(false);
+    expect(new FormData(form).get("terms")).toBe("on");
   });
 
   it("delegates focus from the host to the inner input", async () => {

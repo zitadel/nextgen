@@ -21,11 +21,9 @@ Three properties of this pipeline routinely read as defects but are not:
   `isLeaf()` keys off `$value` alone, so a description never enters the alias
   registry or any generated artifact. A description that disagrees with its
   token is a note to pass to design, not a code change.
-- **Brand grays are not the semantic gray ramp.** `{brand.gray.N}` resolves
-  through `figma-export/brand.json`; `--zl-color-gray-N` is a separate semantic
-  ramp offset by one step (`brand.gray.400` and `--zl-color-gray-300` are both
-  `#686883`). Resolve an alias against `brand.json` before calling the export
-  and the generated output inconsistent.
+- **Brand grays resolve through `brand.json`.** `{brand.gray.N}` resolves
+  through `figma-export/brand.json`. Resolve an alias against `brand.json`
+  before calling the export and the generated output inconsistent.
 
 What is worth reviewing on a sync PR:
 

@@ -1,5 +1,121 @@
 # @zitadel/sdk-qwik
 
+## 0.1.0
+
+### Patch Changes
+
+- [#2178](https://github.com/zitadel/nextgen/pull/2178) [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa) Thanks [@mridang](https://github.com/mridang)! - The widgets now wait for their listeners before they navigate. The detail of `zitadel-flow-redirect`, `zitadel-flow-complete` and `zitadel-signout` carries a `waitUntil(promise)` function; the widget navigates once every promise a listener passed has settled, or after two seconds, and at once when none was passed. The React, Solid, Svelte and Qwik wrappers forward each callback's returned promise to `waitUntil`, so an async or lazily loaded handler runs before the page unloads; the Vue and Angular wrappers expose `waitUntil` on the event detail for a handler to call itself.
+- Updated dependencies [[`114c32c`](https://github.com/zitadel/nextgen/commit/114c32c4a86f7b05794528b889faad159d59bf3f), [`5680eb7`](https://github.com/zitadel/nextgen/commit/5680eb76a273b722456d567f94554e828bcf55e9), [`17523dc`](https://github.com/zitadel/nextgen/commit/17523dcf8e55d9d8a07f27a05c6597749f81ef9b), [`8ef9c49`](https://github.com/zitadel/nextgen/commit/8ef9c495c97188893fd8b879c524ce8e097fa52b), [`dedd93b`](https://github.com/zitadel/nextgen/commit/dedd93ba07e58108771019e70466e858b504c374), [`1653960`](https://github.com/zitadel/nextgen/commit/16539605bbdeadbcf4d8ac2bbfa7e3e16b1af557), [`e3cd8f8`](https://github.com/zitadel/nextgen/commit/e3cd8f81111f3298b5635e31ab3c63a2ce293707), [`be96308`](https://github.com/zitadel/nextgen/commit/be96308eec43f3ffe04a62fd414a18ea2b1ccb21), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`b44d6f9`](https://github.com/zitadel/nextgen/commit/b44d6f9aaf0e7b6c4fdf4579d28b1c69ea0456a1), [`831cb81`](https://github.com/zitadel/nextgen/commit/831cb81978e65f1b5d41b41330c31e9c43fd2030), [`3b206b2`](https://github.com/zitadel/nextgen/commit/3b206b2453cabf4da6840396f2be0e96b4ede8fa)]:
+  - @zitadel/api@0.1.0
+  - @zitadel/components@0.1.0
+  - @zitadel/sdk-core@0.1.0
+
+## 1.0.0-alpha.28
+
+### Minor Changes
+
+- [#2075](https://github.com/zitadel/nextgen/pull/2075) [`f64c9c4`](https://github.com/zitadel/nextgen/commit/f64c9c46b0475e143abd68c2c16e67f134773f08) Thanks [@mridang](https://github.com/mridang)! - The ZitadelLogin, ZitadelLogout and ZitadelSession wrappers of the React, Vue, Svelte, Solid and Qwik SDKs now pass the standard HTML attributes (class, style, id, title, slot, hidden, role, tabindex, data-* and aria-*) to the widget element, so an app can position, style and label a widget without an extra wrapper element, and their props types accept exactly those attributes besides the widget's own props. All five use one definition, standardAttributes in @zitadel/sdk-core/types, which also exports the widgetTags constant that names the three widget elements. This changes behaviour for React and Vue callers: those wrappers used to pass every extra prop or attribute on to the element, and now pass only the standard attributes, so a prop such as an event handler, srcdoc or part no longer reaches the element. In Svelte, removing the title prop leaves title="null" on the element. In Angular the component tag already carries the standard attributes, so that SDK is unchanged. The TanStack Start entry re-exports the new React types.
+
+### Patch Changes
+
+- [#2099](https://github.com/zitadel/nextgen/pull/2099) [`20e5433`](https://github.com/zitadel/nextgen/commit/20e5433792cb70a515ad3e22730d8b1ae6dbee74) Thanks [@mridang](https://github.com/mridang)! - The Qwik wrappers now hand a widget event to your `on…$` handler only when it is a custom event with a detail, instead of reading the detail from any event, and the entry says that it registers the elements in the browser only.
+
+- Updated dependencies [[`0f4b901`](https://github.com/zitadel/nextgen/commit/0f4b901f60f2ed20bff71e321564d3b1fc187eab), [`4efca9c`](https://github.com/zitadel/nextgen/commit/4efca9c361ecf7d7806d6147ca3e2e6a31241e23), [`20e5433`](https://github.com/zitadel/nextgen/commit/20e5433792cb70a515ad3e22730d8b1ae6dbee74), [`437c7f1`](https://github.com/zitadel/nextgen/commit/437c7f127395ac45c8b014948c627516c1f9b4af), [`fce5b01`](https://github.com/zitadel/nextgen/commit/fce5b01506a1941f743c25a51a4011955c7b9bd8), [`fa301b9`](https://github.com/zitadel/nextgen/commit/fa301b96daf57512cef6ffb4eb60fdd49cff33e4), [`628e101`](https://github.com/zitadel/nextgen/commit/628e101e5c254ab8bdaca830fc6e4acbd084b41e), [`12b3226`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f), [`5bf2573`](https://github.com/zitadel/nextgen/commit/5bf257321b290dc54befe3a32b4c39027bd25a2b), [`f65cebe`](https://github.com/zitadel/nextgen/commit/f65cebe8142daaab33882a8ae22822a75bd94e6f), [`e90dade`](https://github.com/zitadel/nextgen/commit/e90dade940d52ce4827ed63d0171d0de68cf2959), [`f64c9c4`](https://github.com/zitadel/nextgen/commit/f64c9c46b0475e143abd68c2c16e67f134773f08)]:
+  - @zitadel/api@1.0.0-alpha.28
+  - @zitadel/components@1.0.0-alpha.28
+  - @zitadel/sdk-core@1.0.0-alpha.28
+
+## 1.0.0-alpha.27
+
+### Minor Changes
+
+- [#2055](https://github.com/zitadel/nextgen/pull/2055) [`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d) Thanks [@fforootd](https://github.com/fforootd)! - Signing in after a protected route sent you to the login page now takes you back to that route. The middleware of `@zitadel/sdk-next`, `@zitadel/sdk-nuxt` and the other server SDKs sends a signed-out visit to `/login?next=<path>`, and `<zitadel-login>` now returns to that path after sign-in instead of always going to its `post-sign-in-url`, which pages generated by `zitadel setup` set to `/profile`. Only a path on the login page's own origin is followed: a `next` that is a full URL, starts with `//`, or contains a backslash or a control character is ignored, and the widget goes to `post-sign-in-url` as before. Pages that use `next` for something of their own can keep the old behavior with `force-post-sign-in-url` on the element, or `forcePostSignInUrl` on every SDK's `ZitadelLogin`.
+
+### Patch Changes
+
+- Updated dependencies [[`eec415d`](https://github.com/zitadel/nextgen/commit/eec415d551befd25e3e057b36274fed31743db20), [`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d), [`bdf4347`](https://github.com/zitadel/nextgen/commit/bdf4347950868e3c35d3e6109d48f16dbe17781d)]:
+  - @zitadel/sdk-core@1.0.0-alpha.27
+  - @zitadel/components@1.0.0-alpha.27
+  - @zitadel/api@1.0.0-alpha.27
+
+## 1.0.0-alpha.26
+
+### Minor Changes
+
+- [#1630](https://github.com/zitadel/nextgen/pull/1630) [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b) Thanks [@peintnermax](https://github.com/peintnermax)! - feat: password fields in `<zitadel-login>` now have a show/hide button, as
+  NIST SP 800-63B recommends. It is on by default; set `suppress-password-toggle`
+  on the element (a `suppressPasswordToggle` prop on every framework wrapper) to
+  hide it. The setting belongs to the embedding page and is not stored with the
+  branding.
+
+  The button replaces the clear button on password fields, so the field shows
+  one icon. It sits in the tab order right after the input, so keyboard users
+  can reach it, while a pointer click keeps focus in the field. A revealed
+  field opts out of spellcheck and autocorrect, and it is hidden again on
+  submit, form reset and step change. The widget applies the setting to its
+  fields directly, so it also holds for ejected templates; it is not a
+  `<zl-field>` attribute.
+
+  `@zitadel/testing`: the flow helpers' label fallback (`flowField` with a
+  `label`, used by `loginWithPassword` and `registerWithPassword`) now matches
+  the field by its textbox role, so the toggle's "Show password" name never
+  competes with the password field.
+
+- [#1938](https://github.com/zitadel/nextgen/pull/1938) [`9564ecf`](https://github.com/zitadel/nextgen/commit/9564ecf403a6e3383c7bf2215708e897aed1f124) Thanks [@mridang](https://github.com/mridang)! - Every SDK's `ZitadelLogin` now takes `resumeFlowId`, documented in its README, so a page can resume an existing sign-in flow (for example one kept across a reload) without reaching for the element. Clearing it, or passing `null` or an empty string, on `<zitadel-login>` now means "no handle" in every framework, which falls back to the `flow` query parameter as before.
+
+### Patch Changes
+
+- [#1977](https://github.com/zitadel/nextgen/pull/1977) [`2f2b873`](https://github.com/zitadel/nextgen/commit/2f2b87360d8604bf0f82271fb27958fbd29170f3) Thanks [@mridang](https://github.com/mridang)! - The SPA SDK READMEs now have an Installation section with the `@alpha` dist-tag and name their peer dependencies, and the Agent Skills use one install-note wording and the same `npx @zitadel/cli@alpha setup` command for scaffolding a new app.
+
+- [#1965](https://github.com/zitadel/nextgen/pull/1965) [`40470cc`](https://github.com/zitadel/nextgen/commit/40470ccc49759e091c72e103430df0e035dc1f9e) Thanks [@mridang](https://github.com/mridang)! - The READMEs and agent skills now explain what to do when an app server-renders the widgets: mount them on the client only, after hydration, or, where the SDK wrapper writes the project id and proxy path as attributes (React, Solid, Svelte), pass them as strings instead of a `project` object; the Vue, Angular and Qwik wrappers set them as element properties, so those pages point to client-only mounting or a raw `<zitadel-login>` element.
+
+- [#1995](https://github.com/zitadel/nextgen/pull/1995) [`decabad`](https://github.com/zitadel/nextgen/commit/decabad10dcd9fb78e5745a62d1e0a9434bd76c0) Thanks [@mridang](https://github.com/mridang)! - The READMEs and agent skills of every SDK now list the same widget props (including `heading`, `logoutLabel` and `suppressPasswordToggle`) and all six widget events, and the Next.js and Nuxt SDKs list the events their widgets dispatch.
+
+- [#373](https://github.com/zitadel/nextgen/pull/373) [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7) Thanks [@mridang](https://github.com/mridang)! - `@zitadel/sdk-qwik` is now built and tested against the Qwik 2 release candidate that
+  `zitadel setup` scaffolds (`@qwik.dev/core` 2.0.0-rc.2) instead of 2.0.0-beta.45.
+
+- [#1956](https://github.com/zitadel/nextgen/pull/1956) [`bdfca75`](https://github.com/zitadel/nextgen/commit/bdfca75531cd27245da2056b0d048723be012820) Thanks [@mridang](https://github.com/mridang)! - The README and Agent Skill install commands now name the `@alpha` dist-tag (`pnpm add @zitadel/sdk-react@alpha`). Without it, npm installs an old preview from `latest` instead of the current release.
+
+- [#373](https://github.com/zitadel/nextgen/pull/373) [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7) Thanks [@mridang](https://github.com/mridang)! - - `@zitadel/sdk-qwik` applied the widget config only imperatively, from a `ref` callback and a `useVisibleTask$`. Qwik resumes server-rendered markup instead of re-rendering it, so under SSR the `ref` never ran and the widget upgraded unconfigured ("requires a configured project", and a `login` flow on a register page) before the visible task re-bound it. The components now also emit their attribute-backed config declaratively — `project-id` / `proxy-path` / `url` (from the `project` handle or the discrete props), `purpose`, `post-sign-in-url`, `post-sign-out-url` and the rest — which Qwik serialises into the server-rendered HTML, so the widget is configured the instant it upgrades. Property-only config (the full `project` handle, `locales`) is still bound on the client.
+  - `@zitadel/sdk-core`'s `HOP_BY_HOP` set now includes `content-length`, so a proxy that re-sends a buffered body no longer forwards the client's value. undici computes the length itself and rejects a forwarded one with `UND_ERR_INVALID_ARG`, which surfaced as an opaque "fetch failed".
+
+- [#1916](https://github.com/zitadel/nextgen/pull/1916) [`66ad8b6`](https://github.com/zitadel/nextgen/commit/66ad8b6a3b2bc42ea8e4678940b686a15a1555ea) Thanks [@mridang](https://github.com/mridang)! - Emit the widget config as attributes (`project-id`, `proxy-path`, `url`, `purpose`, `post-sign-in-url`,
+  `post-sign-out-url`, `resume-flow-id` and the rest) so Qwik's resumed server markup is configured the moment the widget
+  upgrades, instead of only from the `ref` callback and `useVisibleTask$`.
+  The project's publishable key travels the same way.
+  Widget events that fire before the visible task attaches the `on…$` callbacks (such as `zitadel-flow-complete` from an already finished resumed flow) are held and replayed to them instead of being lost. Only the wrappers' own widgets are buffered, and only their terminal events (complete, redirect, error, signout, at most eight per widget); input and step events, which carry field values, are never stored.
+
+- [#1951](https://github.com/zitadel/nextgen/pull/1951) [`a1ac41c`](https://github.com/zitadel/nextgen/commit/a1ac41c30eabb503670db379893d35f178216a9d) Thanks [@mridang](https://github.com/mridang)! - A widget prop that is unset or cleared in the Qwik components now restores the web component's own default instead of keeping its last value. For example, clearing the `heading` of `<ZitadelSession />` brings back the default "Signed in as" title.
+
+- [#1926](https://github.com/zitadel/nextgen/pull/1926) [`8d29800`](https://github.com/zitadel/nextgen/commit/8d298007a056c99ccaa8ff23b6cb90a332a1862a) Thanks [@mridang](https://github.com/mridang)! - `@zitadel/sdk-qwik` is now built and tested against the Qwik 2 release candidate (`@qwik.dev/core` 2.0.0-rc) that
+  `zitadel setup` scaffolds, instead of 2.0.0-beta.45.
+
+- [#2024](https://github.com/zitadel/nextgen/pull/2024) [`c0c48ce`](https://github.com/zitadel/nextgen/commit/c0c48ce3102fc25d2719eb6d3fa46507757a9e5d) Thanks [@mridang](https://github.com/mridang)! - Every SDK README now has a Requirements section after Installation that lists the peer dependencies the package declares and links the TypeScript floor shared by all SDKs, instead of the Next.js, Nuxt, Qwik City, SolidStart, SvelteKit and TanStack Start READMEs having none and the others restating the reason for the floor.
+
+- Updated dependencies [[`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`17f56de`](https://github.com/zitadel/nextgen/commit/17f56de60ea40128898b6142d93a22c6fc6f2acd), [`717ae39`](https://github.com/zitadel/nextgen/commit/717ae39f47a1f27383e0f4e09d2d32125d5d8f57), [`c3e8fa4`](https://github.com/zitadel/nextgen/commit/c3e8fa47306d9f286d07303fea977e3f6d910d7d), [`66ad8b6`](https://github.com/zitadel/nextgen/commit/66ad8b6a3b2bc42ea8e4678940b686a15a1555ea), [`40470cc`](https://github.com/zitadel/nextgen/commit/40470ccc49759e091c72e103430df0e035dc1f9e), [`b4886f9`](https://github.com/zitadel/nextgen/commit/b4886f98de362ef6e80cb5e49a38e97daa2288b0), [`290dfe6`](https://github.com/zitadel/nextgen/commit/290dfe6f1c9b45d592e42703573a6acd5b16fa2a), [`4a4132f`](https://github.com/zitadel/nextgen/commit/4a4132fd2dc13f3a833a7aa0ab1dd35ef9b8fd6b), [`a76143e`](https://github.com/zitadel/nextgen/commit/a76143ef82829d098a30de40542f1c9bffb8eb99), [`cba30e6`](https://github.com/zitadel/nextgen/commit/cba30e6df9d61cf399c9d3f7288d21e97c63dd88), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`3949dab`](https://github.com/zitadel/nextgen/commit/3949daba71747aa6590ef6d454df482329f3322b), [`7fbd942`](https://github.com/zitadel/nextgen/commit/7fbd942580560ccab74d3fdd19b3e1eb6d922ee7), [`bdfca75`](https://github.com/zitadel/nextgen/commit/bdfca75531cd27245da2056b0d048723be012820), [`4a5578b`](https://github.com/zitadel/nextgen/commit/4a5578bf825132c047f37d124d616a3a4f9e9da9), [`44abdb8`](https://github.com/zitadel/nextgen/commit/44abdb8e827ce34d7aae8d620d43904b3142baf9), [`40c35c8`](https://github.com/zitadel/nextgen/commit/40c35c8f49e4e967ff701cf510b6cc6a4e776fc8), [`7f82bfc`](https://github.com/zitadel/nextgen/commit/7f82bfc46930d2b8ca4132e569dfa4db4abfd5c7), [`02c751f`](https://github.com/zitadel/nextgen/commit/02c751fc59b542e1c9ac6081875a91aa03bc0cbc), [`9564ecf`](https://github.com/zitadel/nextgen/commit/9564ecf403a6e3383c7bf2215708e897aed1f124), [`36fbcb4`](https://github.com/zitadel/nextgen/commit/36fbcb4e5383a0d6764efc44e9ac6da4e5c8d596), [`b3b0b28`](https://github.com/zitadel/nextgen/commit/b3b0b2888f0e64a4805f373a9835d8dc853add84), [`c205f49`](https://github.com/zitadel/nextgen/commit/c205f49fa0c6c0ea44407da6776cdb6e5dcfdfc9), [`13042d8`](https://github.com/zitadel/nextgen/commit/13042d8957738091ac428f28c7191f9b2e912697), [`c095aa3`](https://github.com/zitadel/nextgen/commit/c095aa334f77b5b59b6f72baae22703cd7c5369d), [`8182584`](https://github.com/zitadel/nextgen/commit/8182584001fe2115851022e8f92e696db52ee8be), [`3301e90`](https://github.com/zitadel/nextgen/commit/3301e90778a633b6d900a8ca427944f9e0b996d8)]:
+  - @zitadel/sdk-core@1.0.0-alpha.26
+  - @zitadel/api@1.0.0-alpha.26
+  - @zitadel/components@1.0.0-alpha.26
+
+## 1.0.0-alpha.25
+
+### Minor Changes
+
+- [#1287](https://github.com/zitadel/nextgen/pull/1287) [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b) Thanks [@mridang](https://github.com/mridang)! - Render the identity providers a login step offers. A new `<zl-sso-providers>` atom draws one button per entry in the step's `sso_providers`, choosing one submits the reserved `sso` action with that connection's id, and the orchestrator follows the `redirect_url` the engine answers with — a new `zitadel-flow-redirect` event, kept separate from `zitadel-flow-complete` because nobody is signed in yet and the flow resumes when the provider returns. Every SDK forwards it, as `onFlowRedirect` in React, Solid and Svelte, `flowRedirect` in Vue and Angular, and `onFlowRedirect$` in Qwik. The atom is driven entirely by the step's data: a mark is looked up by the connection's `template` (Google ships one), and a template without one still gets a working button rather than a wrong logo, which is what a tenant's own OIDC connection will always look like. Copy for the provider buttons and for the `register-sso` and `sso-conflict` steps is added to every builtin locale, and `applySsoProviders()` in the mock API package lets a test or playground offer providers the way a project that ran `zitadel sso enable` does. The shipped `centered` and `minimal` designs carry the provider block; the retired split and hero designs ([#1039](https://github.com/zitadel/nextgen/issues/1039)) do not, so a tenant still on a revision published from one of those sees no provider buttons until it moves to `centered` or `minimal`.
+
+- [#1406](https://github.com/zitadel/nextgen/pull/1406) [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b) Thanks [@mridang](https://github.com/mridang)! - Add a per-framework Agent Skill for each SDK and `@zitadel/components`, alongside a top-level `zitadel` router skill that routes to the right one. The skills are distributed through the repo (not published to npm); a single `npx skills add zitadel/nextgen --full-depth` installs the whole set, giving a coding agent framework-specific guidance for integrating Zitadel auth into a React, Next.js, Angular, Nuxt, Vue, Solid, Svelte, or Qwik app — including existing apps the CLI can't scaffold — and for embedding the `<zitadel-login>` web component directly. Each skill is discover-first: it teaches the integration pattern and points at the installed package's own README and types for exact APIs, so it does not drift with the package version.
+
+- [#1358](https://github.com/zitadel/nextgen/pull/1358) [`67461ef`](https://github.com/zitadel/nextgen/commit/67461efbc0db36d4771af85f09cdc5219e49a5a5) Thanks [@mridang](https://github.com/mridang)! - `@zitadel/sdk-qwik` now targets Qwik 2: it declares a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`) in place of `@builder.io/qwik`, so your app must be on Qwik 2 to use it. Qwik 2 runs on Vite 8. The widgets stay reactive to their props, mirroring the other framework SDKs.
+
+  The CLI's Qwik support follows suit. `zitadel setup` now scaffolds and detects Qwik 2 apps: a new app is created on `@qwik.dev/core` and Vite 8 (no Vite 7 pin), and a Qwik 1 project is no longer auto-detected, since it cannot use the Qwik 2 SDK.
+
+### Patch Changes
+
+- Updated dependencies [[`3937a77`](https://github.com/zitadel/nextgen/commit/3937a7724380c0e59ff039e946053945a8e6475d), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`d821e91`](https://github.com/zitadel/nextgen/commit/d821e91a4f778b29a524c8a67129951795a16f8d), [`4af9f8e`](https://github.com/zitadel/nextgen/commit/4af9f8ec460b3f83f11bece0d4134f0fa1d2e52e), [`79527ed`](https://github.com/zitadel/nextgen/commit/79527edba346d39fd43502eb4357d3d19a77ad2d), [`6aca9bb`](https://github.com/zitadel/nextgen/commit/6aca9bb9afcb6e2b33f9e5e5cf5af6c1319d4fe1), [`6821cc6`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d203470f35cd1a9a), [`c03400d`](https://github.com/zitadel/nextgen/commit/c03400d0a6263534a1fe862eacf198d62979230d), [`77369ca`](https://github.com/zitadel/nextgen/commit/77369ca215600478d8f56740406ce9f52cf09d00), [`7897a77`](https://github.com/zitadel/nextgen/commit/7897a77cd7963591827bf1427574f0bb0b2df827), [`46a366f`](https://github.com/zitadel/nextgen/commit/46a366fabf688964b3a62158e6922902f0f0045b), [`faccf02`](https://github.com/zitadel/nextgen/commit/faccf02136ff713718e103b18d4128e5a665d02e), [`0ca8019`](https://github.com/zitadel/nextgen/commit/0ca80197fedb2755964617d9fe5f17e08b1cb95b), [`790ce8e`](https://github.com/zitadel/nextgen/commit/790ce8eb90ba043574f5822216e88de89b5767c9), [`59c6e9a`](https://github.com/zitadel/nextgen/commit/59c6e9ab1f6a77c327be53bd7ffe89073f2192f2), [`b208b0c`](https://github.com/zitadel/nextgen/commit/b208b0c7635b7c146c0fa7294ead08c92eba6cd2), [`9b7b4b2`](https://github.com/zitadel/nextgen/commit/9b7b4b2268b968b03752393850c28d047eca13cc), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`0269f56`](https://github.com/zitadel/nextgen/commit/0269f56e8299584b20e5815cf9b8d3c84ae65010), [`9b7b4b2`](https://github.com/zitadel/nextgen/commit/9b7b4b2268b968b03752393850c28d047eca13cc)]:
+  - @zitadel/api@1.0.0-alpha.25
+  - @zitadel/components@1.0.0-alpha.25
+  - @zitadel/sdk-core@1.0.0-alpha.25
+
 ## 1.0.0-alpha.24
 
 ### Patch Changes

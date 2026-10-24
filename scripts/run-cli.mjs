@@ -9,10 +9,11 @@ import {
   localRegistryPort,
   prepareLocalRegistry,
   stopLocalRegistry,
-} from "../apps/cli-journey-e2e/scripts/local-registry.mjs";
+} from "../e2e/journey/scripts/local-registry.mjs";
 import { buildLocalRuntimeImage, LOCAL_RUNTIME_IMAGE } from "./build-local-runtime-image.mjs";
-import { forwardedArgs, isDirectRun, run, runCapture } from "./dev-process.mjs";
+import { forwardedArgs, isDirectRun, run, runCapture, withWorkspaceTools } from "./dev-process.mjs";
 import { readServerBuildMetadata } from "./server-build.mjs";
+import { runnerCommand, runnerLabel } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const cliBin = join(repoRoot, "apps/cli/bin/run.js");
@@ -22,7 +23,7 @@ const localRegistryWorkDir = join(repoRoot, "tmp", "cli-local-registry");
 
 export async function main(options = {}) {
   const args = options.args ?? forwardedArgs();
-  const env = options.env ?? process.env;
+  const env = withWorkspaceTools(options.env ?? process.env, options);
   const runFn = options.run ?? run;
   const assertFreshInstallFn = options.assertFreshInstall ?? assertFreshInstall;
   const runCaptureFn = options.runCapture ?? runCapture;
@@ -32,7 +33,7 @@ export async function main(options = {}) {
   const prepareLocalRegistryFn = options.prepareLocalRegistry ?? prepareLocalRegistry;
   const stopLocalRegistryFn = options.stopLocalRegistry ?? stopLocalRegistry;
   const stderr = options.stderr ?? process.stderr;
-  const cliEnv = { ...env };
+  const cliEnv = withDevelopmentTelemetry(env);
   const cliCwd = options.cwd ?? cliCwdFor(env);
   let registryProcess;
 
@@ -45,36 +46,43 @@ export async function main(options = {}) {
     cliEnv.ZITADEL_SERVER_BINARY_VERSION = localServer.version;
   }
 
-  if (shouldPrepareLocalPackages(args, env)) {
-    const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
-    const registryPort = localRegistryPort(repoRoot, env);
-    const registryUrl = `http://127.0.0.1:${registryPort}`;
-    const registryPaths = localRegistryPaths(registryWorkDir);
-    const packageRegistry = await prepareLocalRegistryFn({
-      env,
-      log: (message) => {
-        stderr.write(`[zitadel-cli] ${message}\n`);
-      },
-      onStarted: (registry) => {
-        registryProcess = registry;
-      },
-      paths: registryPaths,
-      registryPort,
-      registryUrl,
-      repoRoot,
-      run: wrapperRun({ jsonMode: hasJsonFlag(args), runCaptureFn, runFn, stderr }),
-      workDir: registryWorkDir,
-    });
-    registryProcess = packageRegistry.registry;
-    Object.assign(cliEnv, packageRegistry.env);
-  }
-
-  if (shouldAutoBuildLocalRuntimeImage(args, env)) {
-    await buildLocalRuntimeImageFn({ env });
-    cliEnv.ZITADEL_LOCAL_IMAGE = LOCAL_RUNTIME_IMAGE;
-  }
-
+  // Once started, the registry stops however the wrapper ends, also when
+  // packing or publishing fails.
   try {
+    if (shouldPrepareLocalPackages(args, env)) {
+      const registryWorkDir = options.localRegistryWorkDir ?? localRegistryWorkDir;
+      const registryPort = localRegistryPort(repoRoot, env);
+      const registryUrl = `http://127.0.0.1:${registryPort}`;
+      const packageRegistry = await prepareLocalRegistryFn({
+        env,
+        log: (message) => {
+          stderr.write(`[zitadel-cli] ${message}\n`);
+        },
+        onStarted: (registry) => {
+          registryProcess = registry;
+        },
+        // What a generated app installs, from cached dev builds; the release
+        // tarballs are release:pack's.
+        packageSet: "app",
+        paths: localRegistryPaths(registryWorkDir),
+        // Keep what Verdaccio proxied from npmjs for the next setup; it drops
+        // and republishes only the @zitadel packages.
+        resetStorage: false,
+        registryPort,
+        registryUrl,
+        repoRoot,
+        run: wrapperRun({ jsonMode: hasJsonFlag(args), runCaptureFn, runFn, stderr }),
+        workDir: registryWorkDir,
+      });
+      registryProcess = packageRegistry.registry;
+      Object.assign(cliEnv, packageRegistry.env);
+    }
+
+    if (shouldAutoBuildLocalRuntimeImage(args, env)) {
+      await buildLocalRuntimeImageFn({ env });
+      cliEnv.ZITADEL_LOCAL_IMAGE = LOCAL_RUNTIME_IMAGE;
+    }
+
     await runFn(process.execPath, [cliBin, ...args], { cwd: cliCwd, env: cliEnv });
   } finally {
     if (registryProcess) {
@@ -83,8 +91,14 @@ export async function main(options = {}) {
   }
 }
 
+// Local builds report the version they will be released as, so their
+// telemetry goes to the development project unless the caller picked one.
+export function withDevelopmentTelemetry(env) {
+  return env.ZITADEL_TELEMETRY_ENV ? { ...env } : { ...env, ZITADEL_TELEMETRY_ENV: "development" };
+}
+
 // A stale install (lockfile changed since the last `pnpm install`) makes the
-// task chain behind every CLI command fail deep inside cli:test with
+// builds behind every CLI command fail deep inside a task with
 // misleading module-resolution errors, so fail fast with the remedy instead.
 // mtime is a heuristic: a branch switch can rewrite an unchanged lockfile and
 // report stale, but the remedy is then a fast no-op install.
@@ -240,20 +254,23 @@ function wrapperRun({ jsonMode, runCaptureFn, runFn, stderr }) {
 }
 
 export function buildCli({ env = process.env } = {}) {
-  return runMoonToStderr(["run", "cli:build"], "moon run cli:build", env);
+  return runTargetsToStderr(["cli:build"], env);
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  // server:build deps console:build and login-ui:build, so one invocation
-  // produces the fully embedded binary in graph order.
-  await runMoonToStderr(["run", "server:build"], "moon run server:build", env);
+  // server:build depends on console:build and login-ui:build, so one
+  // invocation produces the fully embedded binary in graph order.
+  await runTargetsToStderr(["server:build"], env);
   const metadata = await readServerBuildMetadata(localServerMetadata);
   return { path: localServerBinary, version: metadata.version };
 }
 
-function runMoonToStderr(args, label, env = process.env) {
+// The task runner's own output goes to stderr: stdout is the CLI's JSON envelope.
+function runTargetsToStderr(targets, env = process.env) {
+  const { command, args } = runnerCommand(targets, env);
+  const label = runnerLabel(targets, env);
   return new Promise((resolve, reject) => {
-    const child = spawn("moon", args, {
+    const child = spawn(command, args, {
       cwd: repoRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],

@@ -1,4 +1,5 @@
 import { parseModule } from "magicast";
+import type { ProxifiedModule, ProxifiedObject } from "magicast";
 
 import { ZitadelError } from "../../../../errors";
 
@@ -9,13 +10,50 @@ import { ZitadelError } from "../../../../errors";
  */
 
 /**
+ * A magicast object literal these helpers edit by dynamic key. magicast's
+ * published `Proxified*` types don't model arbitrary-key indexing (the proxy is
+ * dynamic), so arbitrary string keys read back as `unknown` while `$type` still
+ * identifies the node as an object.
+ */
+type EditableObject = ProxifiedObject<Record<string, unknown>>;
+
+/** The `$type` tag magicast puts on a proxified object node. */
+interface ProxyObject {
+  $type?: string;
+}
+
+/** The array surface {@link ensureArrayItem} reads and mutates. */
+interface ProxyArray {
+  push: (item: string) => void;
+  length: number;
+  [index: number]: unknown;
+}
+
+/**
+ * The slice of a raw (babel) AST node {@link hasCommonJsExport} walks. Only the
+ * members it reads are described; every one is optional because the shapes it
+ * scans across (statements, expressions, member accesses) don't share them.
+ */
+interface AstNodeLike {
+  type?: string;
+  name?: string;
+  expression?: AstNodeLike;
+  left?: AstNodeLike;
+  object?: AstNodeLike;
+  property?: AstNodeLike;
+}
+
+/**
  * Parses a config file with magicast, throwing a clean `E_VALIDATION` (instead
  * of a raw parse error) when the source is missing or unparseable. `filename` is
  * only used in the error message, so each patcher can name its own config file.
+ * `options` go to the parser, e.g. `{ tabWidth: 1 }` for node offsets that index
+ * the source even where it is indented with tabs.
  */
 export function parseConfigModule(
   source: string | undefined,
   filename: string,
+  options?: Parameters<typeof parseModule>[1],
 ): ReturnType<typeof parseModule> {
   if (source === undefined) {
     throw new ZitadelError("E_VALIDATION", `Cannot edit ${filename}: file not found`, {
@@ -24,7 +62,7 @@ export function parseConfigModule(
   }
   let mod: ReturnType<typeof parseModule>;
   try {
-    mod = parseModule(source);
+    mod = parseModule(source, options);
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", `Could not parse ${filename}`, {
       hint: `Ensure ${filename} is valid, or apply the Zitadel changes manually.`,
@@ -37,9 +75,13 @@ export function parseConfigModule(
   // the parsed AST for a real `module.exports`/`exports.x` assignment — scanning
   // raw text would false-positive on the same string in a comment or literal.
   if (hasCommonJsExport(mod)) {
-    throw new ZitadelError("E_VALIDATION", `${filename} is a CommonJS module, which can't be edited`, {
-      hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
-    });
+    throw new ZitadelError(
+      "E_VALIDATION",
+      `${filename} is a CommonJS module, which can't be edited`,
+      {
+        hint: `The Zitadel edits use ESM imports. Convert the config to ESM (a .ts/.mts file, or set "type": "module"), or add the Zitadel block manually.`,
+      },
+    );
   }
   return mod;
 }
@@ -49,28 +91,30 @@ export function parseConfigModule(
  * `module.exports = …`, `module.exports.x = …`, or `exports.x = …` — read from
  * the parsed AST so comments and string literals can't trigger a false match.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function hasCommonJsExport(mod: any): boolean {
+function hasCommonJsExport(mod: ProxifiedModule): boolean {
   // magicast's `$ast` may be a babel `File` (with `.program.body`) or the
   // `Program` node itself (`.body`) — handle both.
-  const program = mod?.$ast?.program ?? mod?.$ast;
-  const body = program?.body ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return body.some((node: any) => {
+  const ast = mod.$ast as { program?: { body?: AstNodeLike[] }; body?: AstNodeLike[] };
+  const body = ast.program?.body ?? ast.body ?? [];
+  return body.some((node: AstNodeLike) => {
     if (node?.type !== "ExpressionStatement" || node.expression?.type !== "AssignmentExpression") {
       return false;
     }
-    const left = node.expression.left;
+    const left = node.expression?.left;
     if (left?.type !== "MemberExpression") {
       return false;
     }
-    const object = left.object;
+    const object = left?.object;
     // `exports.x = …`
     if (object?.type === "Identifier" && object.name === "exports") {
       return true;
     }
     // `module.exports = …`
-    if (object?.type === "Identifier" && object.name === "module" && left.property?.name === "exports") {
+    if (
+      object?.type === "Identifier" &&
+      object.name === "module" &&
+      left.property?.name === "exports"
+    ) {
       return true;
     }
     // `module.exports.x = …`
@@ -89,8 +133,7 @@ function hasCommonJsExport(mod: any): boolean {
  * safely edit (function-form, configs built elsewhere) so the caller can fall
  * back to manual steps.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function resolveDefaultExportObject(mod: any, filename: string): any {
+export function resolveDefaultExportObject(mod: ProxifiedModule, filename: string): EditableObject {
   const def = mod.exports?.default;
   const unreachable = () =>
     new ZitadelError("E_VALIDATION", `Could not locate the config object in ${filename}`, {
@@ -101,7 +144,7 @@ export function resolveDefaultExportObject(mod: any, filename: string): any {
   }
   if (def.$type === "function-call") {
     const arg = def.$args?.[0];
-    if (!arg || arg.$type !== "object") {
+    if (arg?.$type !== "object") {
       throw unreachable();
     }
     return arg;
@@ -112,8 +155,7 @@ export function resolveDefaultExportObject(mod: any, filename: string): any {
   throw unreachable();
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function importIsPresent(mod: any, local: string, from?: string): boolean {
+export function importIsPresent(mod: ProxifiedModule, local: string, from?: string): boolean {
   try {
     const items: ReadonlyArray<{ local?: string; from?: string }> = mod.imports?.$items ?? [];
     // Match the source module too when given, so a same-named local imported
@@ -131,13 +173,12 @@ export function importIsPresent(mod: any, local: string, from?: string): boolean
  * actually added the item, so callers can tell whether the edit changed
  * anything (and skip rewriting an already-complete config).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function ensureArrayItem(parent: any, key: string, item: string): boolean {
+export function ensureArrayItem(parent: EditableObject, key: string, item: string): boolean {
   if (parent[key] === undefined) {
     parent[key] = [item];
     return true;
   }
-  const arr = parent[key];
+  const arr = parent[key] as Partial<ProxyArray>;
   // The existing value is something other than an array literal (e.g. an
   // identifier or spread), which magicast cannot safely append to. Surface a
   // clean E_VALIDATION instead of letting `arr.push` throw a raw TypeError.
@@ -146,11 +187,10 @@ export function ensureArrayItem(parent: any, key: string, item: string): boolean
       hint: `Add "${item}" to "${key}" in your config manually.`,
     });
   }
-  const present = Array.from({ length: arr.length as number }, (_unused, i) => arr[i]).includes(
-    item,
-  );
+  const array = arr as ProxyArray;
+  const present = Array.from({ length: array.length }, (_unused, i) => array[i]).includes(item);
   if (!present) {
-    arr.push(item);
+    array.push(item);
     return true;
   }
   return false;
@@ -164,16 +204,15 @@ export function ensureArrayItem(parent: any, key: string, item: string): boolean
  * assigning into them otherwise throws a raw proxy `TypeError`. The object
  * sibling of {@link ensureArrayItem}.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function ensureEditableObject(parent: any, key: string): any {
+export function ensureEditableObject(parent: EditableObject, key: string): EditableObject {
   if (parent[key] === undefined) {
     parent[key] = {};
   }
-  const value = parent[key];
+  const value = parent[key] as ProxyObject;
   if (value?.$type !== "object") {
     throw new ZitadelError("E_VALIDATION", `Could not edit "${key}" in the config`, {
       hint: `Set "${key}" to an inline object literal, or add the Zitadel settings manually.`,
     });
   }
-  return value;
+  return value as unknown as EditableObject;
 }

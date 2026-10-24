@@ -18,7 +18,11 @@ type Dialect struct {
 
 // Connect implements [database.Dialect].
 func (d *Dialect) Connect(ctx context.Context) (database.Pool, error) {
-	client, err := spanner.NewClient(ctx, d.Database)
+	opts, err := clientOptions()
+	if err != nil {
+		return nil, err
+	}
+	client, err := spanner.NewClient(ctx, d.Database, opts...)
 	if err != nil {
 		return nil, err
 	}

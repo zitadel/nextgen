@@ -4,28 +4,39 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/proj-missing_id.yaml'
         - $ref: '../../../components/schemas/errors/proj-name_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../../components/schemas/errors/proj-password_hash_invalid.yaml'
         - $ref: '../../../components/schemas/errors/proj-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.csrf_invalid: '../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           proj.missing_id: '../../../components/schemas/errors/proj-missing_id.yaml'
           proj.name_invalid: '../../../components/schemas/errors/proj-name_invalid.yaml'
           proj.not_found: '../../../components/schemas/errors/proj-not_found.yaml'
           proj.password_hash_invalid: '../../../components/schemas/errors/proj-password_hash_invalid.yaml'
           proj.permission_denied: '../../../components/schemas/errors/proj-permission_denied.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
+      auth.csrf_invalid:
+        summary: auth.csrf_invalid
+        value:
+          code: auth.csrf_invalid
+          message: 'The request failed cross-site request forgery validation.'
       auth.unauthorized:
         summary: auth.unauthorized
         value:
@@ -41,6 +52,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       proj.missing_id:
         summary: proj.missing_id
         value:
@@ -71,3 +87,8 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

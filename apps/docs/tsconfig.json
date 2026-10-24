@@ -1,25 +1,20 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
-    "jsx": "react-jsx",
-    "lib": ["dom", "DOM.Iterable", "ES2023"],
-    "types": ["node", "vite/client", "react/experimental", "react-dom/experimental"],
-    "allowJs": true,
-    "checkJs": true,
-    "rootDir": ".",
-    "composite": false,
-    "declaration": false,
-    "declarationMap": false,
-    "emitDeclarationOnly": false
-  },
-  "exclude": ["dist", "node_modules"],
+  "extends": "./tsconfig.spec.json",
+  // Next reads this file and expects its generated route types listed here.
   "include": [
-    "press.config.tsx",
-    "source.config.ts",
-    "waku.config.ts",
-    "src/**/*.ts",
-    "src/**/*.tsx"
+    "next-env.d.ts",
+    "proxy.ts",
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    ".next/types/**/*.ts"
   ]
 }

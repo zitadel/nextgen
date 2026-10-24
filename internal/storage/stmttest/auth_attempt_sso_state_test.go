@@ -33,7 +33,7 @@ func (ssoTestCrypter) Decrypt(encrypted string) (string, error) {
 // issueSSOState mints a state and persists it on the attempt.
 func issueSSOState(t *testing.T, stmts service.AllStatements, projectID, attemptID string) *domain.SSOState {
 	t.Helper()
-	sso, err := domain.NewSSOState("google", "idprev_1", "https://auth.example.com/__nextgen/idp/callback", "/after-login", ssoTestCrypter{})
+	sso, err := domain.NewSSOState(projectID, "google", "idprev_1", "https://auth.example.com/__nextgen/idp/google/callback", "/after-login", ssoTestCrypter{})
 	require.NoError(t, err)
 	require.NoError(t, stmts.IssueSSOState(t.Context(), projectID, attemptID, sso.Check))
 	return sso
@@ -427,5 +427,41 @@ func TestAuthAttemptStatements_DeleteSSOCallback(t *testing.T) {
 
 		// A second settlement of the same row lost the race.
 		require.ErrorIs(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID), domain.ErrSSOStateInvalid())
+	})
+}
+
+// TestAuthAttemptStatements_MarkSSOCallbackCollision covers the marker a
+// collision bind writes without settling the row: the exact row keeps only
+// the collision user, the provider data goes, and any other id is refused.
+func TestAuthAttemptStatements_MarkSSOCallbackCollision(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		attempt := createBareAttempt(t, d.stmts, projectID)
+		sso := issueSSOState(t, d.stmts, projectID, attempt.ID)
+		_, err := d.stmts.ConsumeSSOState(t.Context(), projectID, sso.Check.StateHash, sso.BindingNonce)
+		require.NoError(t, err)
+		result := &domain.SSOCallbackResult{
+			Subject:              "sub-1",
+			ConnectionRevisionID: "idprev_1",
+			Claims:               map[string]any{"email": "alice@example.com"},
+			Verified:             map[string]bool{"email": true},
+		}
+		require.NoError(t, d.stmts.SetSSOCallbackResult(t.Context(), projectID, sso.Check.StateHash, result))
+
+		require.ErrorIs(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, "ch_other", "user_9"), domain.ErrSSOStateInvalid())
+		require.NoError(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, sso.Check.ID, "user_9"))
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		parked, ok := got.SSOCallback()
+		require.True(t, ok, "the mark keeps the parked row")
+		assert.Equal(t, sso.Check.ID, parked.ID)
+		// The provider's subject, claims and verification data are gone: the row
+		// holds only the marker a retry reconciles from.
+		assert.Equal(t, &domain.SSOCallbackResult{CollisionUserID: "user_9"}, parked.Result)
+
+		require.NoError(t, d.stmts.DeleteSSOCallback(t.Context(), projectID, attempt.ID, sso.Check.ID))
+		require.ErrorIs(t, d.stmts.MarkSSOCallbackCollision(t.Context(), projectID, attempt.ID, sso.Check.ID, "user_9"), domain.ErrSSOStateInvalid(),
+			"a settled row is refused")
 	})
 }

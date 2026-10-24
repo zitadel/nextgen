@@ -24,6 +24,9 @@ type FieldBinding[T any] struct {
 	// value-after-column shape of the other filters cannot express. Only
 	// meaningful together with Computed.
 	SQLSuffix string
+	// SQLBetween goes between the bound values of an expression that takes
+	// more than one, so it holds one entry fewer than the values.
+	SQLBetween []string
 }
 
 // NullableValue flattens a nil pointer to untyped nil so it binds as SQL NULL.
@@ -67,6 +70,12 @@ func (s Schema[F, T]) ParamCast(col Column[F]) string {
 // SQLSuffix returns the SQL that closes col's inline-bound computed expression.
 func (s Schema[F, T]) SQLSuffix(col Column[F]) string {
 	return s.binding(col.Field()).SQLSuffix
+}
+
+// SQLBetween returns the SQL between the bound values of col's inline-bound
+// computed expression.
+func (s Schema[F, T]) SQLBetween(col Column[F]) []string {
+	return s.binding(col.Field()).SQLBetween
 }
 
 // Nullable reports whether col can hold SQL NULL.

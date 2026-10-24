@@ -1,3 +1,5 @@
+import { api } from "@/api/zitadel";
+import { readAllPages } from "./paging";
 import { field } from "./record";
 
 /**
@@ -10,16 +12,78 @@ import { field } from "./record";
  */
 export type UserSchema = Record<string, unknown>;
 
+/** A user schema at its latest revision, with that revision's created date. */
+export interface SchemaEntry {
+  id: string;
+  schema: UserSchema;
+  createdAt: string;
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      revisions: "latest",
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
+  });
+  return entries.map((entry) => ({
+    id: entry.id,
+    schema: entry.schema as UserSchema,
+    createdAt: entry.metadata.created_at,
+  }));
+}
+
 /** One rendered form control, derived from a single schema property. */
 export interface SchemaField {
   /** Property key — also the attribute name sent in the `POST /users` body. */
   key: string;
   label: string;
   required: boolean;
-  /** `<input type>` chosen from the property's JSON Schema `format`. */
-  inputType: "text" | "email" | "number" | "url" | "tel" | "date";
+  /**
+   * `<input type>` chosen from the property's JSON Schema `format`, or
+   * `boolean`, which no `<input type>` names: each form picks its own control.
+   */
+  inputType: "text" | "email" | "number" | "url" | "tel" | "date" | "boolean";
   placeholder?: string;
 }
+
+/**
+ * The `<input>` attributes a field's type decides. A number is typed as text:
+ * a number input reports text it cannot parse as empty, which a form would
+ * read as emptied, and iOS's decimal keypad has no minus key. A boolean is
+ * typed as text where a form has no switch for it.
+ */
+export function inputAttributes(entry: SchemaField): { type: string } {
+  const text = entry.inputType === "number" || entry.inputType === "boolean";
+  return { type: text ? "text" : entry.inputType };
+}
+
+/**
+ * The JSON value a form control's text stands for. An input always yields a
+ * string, but JSON Schema validates a `number`/`integer` property against a
+ * JSON number, and `"42"` would be rejected. A value that will not parse is
+ * sent through untouched so the server explains why, rather than becoming
+ * `NaN`, which `JSON.stringify` would silently turn into `null`. So is text
+ * `Number` would read differently than typed: hex, binary or octal (`0x10` is
+ * 16), and a whole number past 2^53, which it rounds. A boolean is `"true"` or
+ * `"false"`, as a switch writes it; other text is sent as typed.
+ */
+export function attributeValue(entry: SchemaField, value: string): unknown {
+  if (entry.inputType === "boolean" && (value === "true" || value === "false")) {
+    return value === "true";
+  }
+  if (entry.inputType !== "number" || !DECIMAL.test(value)) return value;
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return value;
+  return Number.isInteger(numeric) && !Number.isSafeInteger(numeric) ? value : numeric;
+}
+
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 /**
  * Human-readable schema name for the picker.
@@ -163,6 +227,13 @@ export interface SchemaAuthMethod {
   key: string;
   label: string;
   enabled: boolean;
+  /**
+   * The connection slugs an enabled `sso` lists in `providers`, verbatim and in
+   * the document's order. Empty for every other method, and for `sso` while it
+   * is disabled: the meta-schema forbids `providers` then, so a stray list on a
+   * disabled method describes nothing a user can sign in with.
+   */
+  providers: string[];
 }
 
 /**
@@ -184,13 +255,45 @@ export function schemaAuthMethods(schema: UserSchema): SchemaAuthMethod[] {
   return Object.entries(methods as Record<string, unknown>)
     .map(([key, value]) => {
       const entry = (value ?? {}) as Record<string, unknown>;
+      const enabled = entry.enabled === true;
       return {
         key,
         label: AUTH_METHOD_LABELS[key] ?? key,
-        enabled: entry.enabled === true,
+        enabled,
+        providers: key === "sso" && enabled ? readProviders(entry.providers) : [],
       };
     })
     .sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * The connection slugs a schema's latest revision makes available to its users
+ * (`x-auth-methods.sso.providers`), or none when SSO is off or undeclared.
+ */
+export function schemaSsoProviders(schema: UserSchema): string[] {
+  return schemaAuthMethods(schema).find((method) => method.key === "sso")?.providers ?? [];
+}
+
+/**
+ * `"Passkey + SSO (google, github)"` — the enabled methods as one line, for the
+ * schemas list. The slugs are shown raw: resolving them to connection names
+ * needs `idp.read`, which the schema screens do not assume.
+ */
+export function schemaSignInSummary(schema: UserSchema): string {
+  return schemaAuthMethods(schema)
+    .filter((method) => method.enabled)
+    .map((method) =>
+      method.providers.length > 0
+        ? `${method.label} (${method.providers.join(", ")})`
+        : method.label,
+    )
+    .join(" + ");
+}
+
+function readProviders(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((slug): slug is string => typeof slug === "string")
+    : [];
 }
 
 /**
@@ -287,6 +390,7 @@ function propertyInputType(property: Record<string, unknown>): SchemaField["inpu
       break;
   }
   const type = field(property, "type");
+  if (type === "boolean") return "boolean";
   return type === "number" || type === "integer" ? "number" : "text";
 }
 

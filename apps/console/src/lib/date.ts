@@ -3,9 +3,7 @@
  * viewer's locale puts that date in.
  *
  * Day, short month and year are requested; the order and separators are the
- * viewer's, not ours. The Figma frames draw `12 Jul 2026` because that is how
- * the mock's locale renders it — not because the product should impose it, so
- * this deliberately does not pin the order. Tests derive the expected string
+ * viewer's and are deliberately not pinned. Tests derive the expected string
  * the same way rather than hardcoding one locale's output.
  *
  * Falls back to the raw value rather than rendering `Invalid Date` if the
@@ -13,11 +11,21 @@
  * nothing, and beats showing a lie.
  */
 export function formatDate(value: string): string {
+  return format(value, DATE);
+}
+
+/**
+ * `2026-04-28T15:32:00Z` → `28 Apr 2026, 15:32` in the viewer's locale and
+ * time zone — {@link formatDate} with the time of day, and the same fallback.
+ */
+export function formatDateTime(value: string): string {
+  return format(value, { ...DATE, hour: "2-digit", minute: "2-digit" });
+}
+
+const DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+
+function format(value: string, options: Intl.DateTimeFormatOptions): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return parsed.toLocaleString(undefined, options);
 }

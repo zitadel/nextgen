@@ -16,7 +16,15 @@ type SecurityHandler interface {
 	// HandleNextgenSession handles nextgenSession security.
 	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`.
+	// `Missing or invalid session token.`
+	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
+	// cookie authenticates must come from the same origin — a cross-site browser
+	// request is refused with `403` and code `auth.csrf_invalid`. Every such
+	// request must also send the session's token from `GET /sessions/me/csrf` in the
+	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
+	// authenticates is not affected.
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
@@ -39,33 +47,50 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
-	CompleteClaimOperation:       []string{},
-	CreateGrantOperation:         []string{},
-	CreateTeamOperation:          []string{},
-	CreateUserOperation:          []string{},
-	DeleteGrantOperation:         []string{},
-	DeleteUserByIDOperation:      []string{},
-	GetBrandingByIdOperation:     []string{},
-	GetFlowDefinitionOperation:   []string{},
-	GetGrantOperation:            []string{},
-	GetMySessionOperation:        []string{},
-	GetMyUserOperation:           []string{},
-	GetProjectOperation:          []string{},
-	GetSchemaByIdOperation:       []string{},
-	GetTeamOperation:             []string{},
-	GetUserByIDOperation:         []string{},
-	ListBrandingOperation:        []string{},
-	ListFlowDefinitionsOperation: []string{},
-	ListMyProjectsOperation:      []string{},
-	ListSchemasOperation:         []string{},
-	ListUserPasskeysOperation:    []string{},
-	PatchMyUserOperation:         []string{},
-	PatchProjectOperation:        []string{},
-	QueryGrantsOperation:         []string{},
-	QueryTeamsOperation:          []string{},
-	QueryUsersOperation:          []string{},
-	RevokeMySessionOperation:     []string{},
-	UpdateTeamOperation:          []string{},
+	CompleteClaimOperation:         []string{},
+	CreateGrantOperation:           []string{},
+	CreateTeamOperation:            []string{},
+	CreateUserOperation:            []string{},
+	DeleteGrantOperation:           []string{},
+	DeleteUserByIDOperation:        []string{},
+	GetBrandingByIdOperation:       []string{},
+	GetFlowDefinitionOperation:     []string{},
+	GetGrantOperation:              []string{},
+	GetIdpByIdOperation:            []string{},
+	GetIdpRevisionByIdOperation:    []string{},
+	GetMyPasswordStateOperation:    []string{},
+	GetMySessionOperation:          []string{},
+	GetMySessionCsrfTokenOperation: []string{},
+	GetMyUserOperation:             []string{},
+	GetMyUserSchemaOperation:       []string{},
+	GetPolicyOperation:             []string{},
+	GetPolicyRevisionOperation:     []string{},
+	GetProjectOperation:            []string{},
+	GetSchemaByIdOperation:         []string{},
+	GetTeamOperation:               []string{},
+	GetUserByIDOperation:           []string{},
+	GetUserPasswordStateOperation:  []string{},
+	ListBrandingOperation:          []string{},
+	ListFlowDefinitionsOperation:   []string{},
+	ListMyIdentityLinksOperation:   []string{},
+	ListMyPasskeysOperation:        []string{},
+	ListMyProjectsOperation:        []string{},
+	ListMyTeamsOperation:           []string{},
+	ListPoliciesOperation:          []string{},
+	ListPolicyRevisionsOperation:   []string{},
+	ListSchemasOperation:           []string{},
+	ListUserIdentityLinksOperation: []string{},
+	ListUserPasskeysOperation:      []string{},
+	ListUserTeamsOperation:         []string{},
+	PatchMyUserOperation:           []string{},
+	PatchProjectOperation:          []string{},
+	PatchUserByIDOperation:         []string{},
+	QueryGrantsOperation:           []string{},
+	QueryIdpsOperation:             []string{},
+	QueryTeamsOperation:            []string{},
+	QueryUsersOperation:            []string{},
+	RevokeMySessionOperation:       []string{},
+	UpdateTeamOperation:            []string{},
 }
 
 // GetRolesForNextgenSession returns the required roles for the given operation.
@@ -91,8 +116,14 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	AddOriginOperation: []string{
+		"origin.write",
+	},
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
+	},
+	BuildReleaseOperation: []string{
+		"release.write",
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
@@ -160,8 +191,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
-	GetEnvironmentByNameOperation: []string{
-		"environment.read",
+	GetDeploymentVariablesOperation: []string{
+		"deployment.read",
+		"variable.read",
 	},
 	GetEventOperation: []string{
 		"events.read",
@@ -177,6 +209,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
+	},
+	GetPolicyOperation: []string{
+		"policy.read",
+	},
+	GetPolicyRevisionOperation: []string{
+		"policy.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",
@@ -194,6 +232,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"team.read",
 	},
 	GetUserByIDOperation: []string{
+		"user.read",
+	},
+	GetUserPasswordStateOperation: []string{
 		"user.read",
 	},
 	GetVariableOperation: []string{
@@ -214,9 +255,6 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListDeploymentsOperation: []string{
 		"deployment.read",
 	},
-	ListEnvironmentsOperation: []string{
-		"environment.read",
-	},
 	ListEventsOperation: []string{
 		"events.read",
 	},
@@ -226,11 +264,23 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
 	},
+	ListPoliciesOperation: []string{
+		"policy.read",
+	},
+	ListPolicyRevisionsOperation: []string{
+		"policy.read",
+	},
+	ListPreviewsOperation: []string{
+		"deployment.read",
+	},
 	ListReleasesOperation: []string{
 		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
+	},
+	ListUserIdentityLinksOperation: []string{
+		"user.read",
 	},
 	ListUserPasskeysOperation: []string{
 		"user.read",
@@ -244,6 +294,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchUserByIDOperation: []string{
 		"user.write",
+	},
+	PublishPolicyOperation: []string{
+		"policy.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",
@@ -263,8 +316,20 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
+	RemoveOriginOperation: []string{
+		"origin.delete",
+	},
+	RemovePreviewOperation: []string{
+		"deployment.write",
+	},
+	RevokeReleaseOperation: []string{
+		"release.write",
+	},
 	RevokeSessionOperation: []string{
 		"session.delete",
+	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
@@ -347,7 +412,15 @@ type SecuritySource interface {
 	// NextgenSession provides nextgenSession security value.
 	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`.
+	// `Missing or invalid session token.`
+	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
+	// cookie authenticates must come from the same origin — a cross-site browser
+	// request is refused with `403` and code `auth.csrf_invalid`. Every such
+	// request must also send the session's token from `GET /sessions/me/csrf` in the
+	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
+	// authenticates is not affected.
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)

@@ -10,12 +10,14 @@ import {
   getDefaultBrandingConfig,
   getDefaultLoginFlow,
   SETUP_PRESETS,
+  SETUP_USE_CASES,
 } from "./defaults.js";
 import {
   BRANDING_FILE_SCHEMA_REF,
   FLOW_FILE_SCHEMA_REF,
   META_SCHEMA_DIR,
   metaSchemaFiles,
+  PROJECT_FILE_SCHEMA_REF,
 } from "./meta-schemas.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -45,6 +47,7 @@ describe("meta-schemas", () => {
       "sso-auth-method.json",
       "idp-connection.json",
       "branding.json",
+      "project.json",
     ]);
   });
 
@@ -63,6 +66,18 @@ describe("meta-schemas", () => {
     }
   });
 
+  it("the zitadel.json $schema ref resolves from the project root into the meta dir", () => {
+    expect(join(PROJECT_FILE_SCHEMA_REF)).toBe(join(META_SCHEMA_DIR, "project.json"));
+  });
+
+  it("the zitadel.json schema enumerates every setup preset and use case", () => {
+    const project = metaSchemaFiles().find((f) => f.name === "project.json")?.body as {
+      properties: Record<string, { enum?: unknown[] }>;
+    };
+    expect(project.properties.preset?.enum).toEqual([...SETUP_PRESETS]);
+    expect(project.properties.useCase?.enum).toEqual([...SETUP_USE_CASES]);
+  });
+
   it("the flow $schema ref resolves from .zitadel/flows/ into the meta dir", () => {
     expect(META_SCHEMA_DIR).toBe(".zitadel/meta");
     expect(join(".zitadel/flows", FLOW_FILE_SCHEMA_REF)).toBe(
@@ -78,7 +93,7 @@ describe("meta-schemas", () => {
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
     for (const preset of SETUP_PRESETS) {
-      const flow = getDefaultLoginFlow({ preset, userSchemaUrl: "sch_TEST" });
+      const flow = getDefaultLoginFlow({ preset });
       expect(check(flow), `${preset}: ${JSON.stringify(check.errors)}`).toBe(true);
     }
   });
@@ -124,7 +139,7 @@ describe("meta-schemas", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{
         transitions?: Record<string, { target: string; action?: string | null }>;
       }>;
@@ -148,7 +163,7 @@ describe("meta-schemas", () => {
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
     const withStep = (step: Record<string, unknown>): object => {
-      const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+      const flow = getDefaultLoginFlow() as unknown as {
         steps: object[];
       };
       flow.steps.push({ name: "extra", ...step });
@@ -268,6 +283,7 @@ describe("meta-schemas", () => {
     const userSchema = (properties: unknown) => ({
       metaSchema: "https://example.test/user-schema.json",
       kind: "user-schema",
+      objectType: "human-user",
       "x-auth-methods": { password: { enabled: true } },
       properties,
     });
@@ -318,11 +334,13 @@ describe("meta-schemas", () => {
     expect(check({ hero_url: "https://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ hero_url: "HTTPS://cdn.example.com/hero.png" })).toBe(true);
     expect(check({ logo_url: "https://cdn.example.com:8443/logo.svg" })).toBe(true);
-    expect(check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } })).toBe(
-      true,
-    );
     expect(
-      check({ typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" } }),
+      check({ theme: { light: { logo_url: "https://cdn.example.com:8443/on-light.svg" } } }),
+    ).toBe(true);
+    expect(
+      check({
+        typography: { font_family: "Inter", font_url: "https://fonts.example.com:8443/css" },
+      }),
     ).toBe(true);
     // Loopback HTTP is the dev-posture carve-out, mirrored across the zod
     // and Go gates: editors must not flag what plan/apply accept.
@@ -371,7 +389,7 @@ describe("meta-schemas", () => {
     const ajv = new Ajv2020({ strict: false });
     const flowSchema = metaSchemaFiles().find((f) => f.name === "flow-definition.json");
     const check = ajv.compile(flowSchema?.body as object);
-    const flow = getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }) as unknown as {
+    const flow = getDefaultLoginFlow() as unknown as {
       steps: Array<{ actions?: unknown }>;
     };
     // Old dialect: actions keyed by name instead of an ordered array.
@@ -382,7 +400,7 @@ describe("meta-schemas", () => {
     expect(check(flow)).toBe(false);
 
     const withUnknown = {
-      ...getDefaultLoginFlow({ userSchemaUrl: "sch_TEST" }),
+      ...getDefaultLoginFlow(),
       not_a_flow_key: true,
     };
     expect(check(withUnknown)).toBe(false);

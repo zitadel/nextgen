@@ -12,7 +12,7 @@ import {
 describe("parseConfigModule", () => {
   it("parses valid source", () => {
     const mod = parseConfigModule("export default {}", "vite.config.ts");
-    expect(mod.exports.default).toBeDefined();
+    expect((mod.exports as { default?: unknown }).default).toBeDefined();
   });
 
   it("throws E_VALIDATION when the source is missing", () => {

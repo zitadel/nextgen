@@ -5,7 +5,7 @@
   "workspaceFolder": "/workspaces/nextgen",
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "lts"
+      "version": "24"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
@@ -17,13 +17,11 @@
     "vscode": {
       "extensions": [
         "golang.go",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
+        "biomejs.biome",
         "GitHub.vscode-pull-request-github",
         "streetsidesoftware.code-spell-checker",
         "ms-azuretools.vscode-docker",
         "github.vscode-github-actions",
-        "inferrinizzard.prettier-sql-vscode",
         "redhat.vscode-yaml"
       ]
     }

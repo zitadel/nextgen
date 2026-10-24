@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -43,6 +43,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
       "types": "./dist/branding-url.d.mts",
@@ -64,7 +69,7 @@
       "import": "./dist/normalize.mjs"
     },
     "./validate": {
-      "@zitadel/source": "./src/validate.ts",
+      "@zitadel/source": "./src/validation/index.ts",
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
@@ -80,21 +85,24 @@
     },
     "./defaults/default-human-user.json": "./defaults/default-human-user.json",
     "./defaults/default-login.json": "./defaults/default-login.json",
+    "./defaults/branding/*": "./defaults/branding/*",
     "./package.json": "./package.json"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "sync-schemas": "node scripts/sync-meta-schemas.mjs",
-    "prebuild": "pnpm run sync-schemas",
+    "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
+    "prebuild": "node --run sync-schemas",
     "build": "tsdown",
-    "pretypecheck": "pnpm run sync-schemas",
-    "typecheck": "tsc --build tsconfig.json",
-    "pretest": "pnpm run sync-schemas",
+    "pretypecheck": "node --run sync-schemas",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "pretest": "node --run sync-schemas",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "lint": "oxlint ."
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -104,9 +112,11 @@
   },
   "devDependencies": {
     "@types/culori": "catalog:",
+    "@types/node": "catalog:",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
+    "typescript": "catalog:",
     "vitest": "catalog:"
   }
 }

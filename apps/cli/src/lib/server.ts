@@ -2,15 +2,25 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { ZitadelError } from "./errors";
-import { resolveLocalServer } from "./local-server/runtime";
+import { LocalServer } from "./local-server/server";
 import { parseJsonObject } from "./json";
+import type { FlagVariable } from "./oclif/types";
+import { DEFAULT_SERVER } from "@zitadel/config/server";
 
 /**
- * Server URL used when nothing else resolves. Also surfaced in hints and
- * the interactive setup prompt as the suggested value, so it is exported
- * rather than kept private.
+ * Server URL used when nothing else resolves (`@zitadel/config/server`, which
+ * the console shares). Also surfaced in hints and the interactive setup
+ * prompt as the suggested value, so it is re-exported here.
  */
-export const DEFAULT_SERVER = "https://api.zitadel.cloud";
+export { DEFAULT_SERVER } from "@zitadel/config/server";
+
+/** The variable {@link resolveServer} reads when `--server` is not given. */
+export const SERVER_VARIABLE: FlagVariable = {
+  name: "ZITADEL_API_BASE",
+  flag: "server",
+  description: "The server URL, or `local`, as `--server` takes it.",
+  precedence: "`--server` wins over it, and it wins over `server` in `zitadel.json`.",
+};
 
 /**
  * The resolved target server plus the source it came from. `origin` is
@@ -44,7 +54,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
   if (input.serverFlag) {
     return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
   }
-  const envValue = input.env.ZITADEL_API_BASE;
+  const envValue = input.env[SERVER_VARIABLE.name];
   if (envValue) {
     return validate(input.cwd, { value: envValue, origin: "env" });
   }
@@ -59,7 +69,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
 
 async function validate(cwd: string, resolved: ResolvedServer): Promise<ResolvedServer> {
   if (resolved.value === "local") {
-    return { value: await resolveLocalServer(cwd), origin: "local" };
+    return { value: await LocalServer.resolveUrl(cwd), origin: "local" };
   }
 
   try {

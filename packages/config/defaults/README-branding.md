@@ -33,9 +33,11 @@ by re-applying an earlier template.
   decides which fields it renders: `centered` uses `logo_url`; `minimal` uses
   none until you add it to `login.liquid`. Set the typeface with
   `typography.font_family`. `typography.font_url` is loaded when the component
-  runs as `variant="page"`, which the sign-in pages `zitadel setup` generates
-  use: the component then adds that stylesheet to your page. With
-  `variant="widget"` it is not loaded, and your page loads the font.
+  runs as `variant="page"`: the component then adds that stylesheet to your
+  page. `zitadel setup` generates page-variant sign-in pages only when it
+  creates a Next.js or Nuxt app itself, in an empty directory. Everywhere else
+  the component runs as `variant="widget"`, which doesn't load it, so your page
+  loads the font.
 
   ```json
   {
@@ -70,7 +72,10 @@ by re-applying an earlier template.
 - Back-navigation: the engine injects a `kind: "back"` action on steps
   that can return to their predecessor, and the browser's back gesture
   submits it automatically — the shipped designs deliberately render **no
-  visible back control**. Your template may render one if you want it;
+  visible back button**. The one place they offer it is beside the account a
+  step signs in to (`identifier.value`, on the password step): a "Use another
+  account" link that goes back to where the email was typed. Your template
+  may render a back control anywhere you want it;
   select the action by kind (never by name) and submit it like any other
   action:
 

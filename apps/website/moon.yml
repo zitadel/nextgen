@@ -1,0 +1,47 @@
+id: "website"
+language: "typescript"
+layer: "application"
+stack: "frontend"
+dependsOn:
+  # The showcase's login previews render the atoms of @zitadel/components.
+  - "components"
+
+tasks:
+  # lint and test are the inherited tasks unchanged, and so are the commands
+  # below.
+  typecheck:
+    deps:
+      # After the build, never beside it: `next typegen` and `next build`
+      # both write .next/types, and `next build` empties it and fills it
+      # again, while tsc reads the route types there (next-env.d.ts imports
+      # .next/types/routes.d.ts, which declares the LayoutProps of
+      # app/layout.tsx). A tsc that finds the file gone or empty fails with
+      # TS2304. An edge, not a mutex: moon holds a mutex only while a
+      # command runs, not while it restores or archives .next.
+      - "build"
+
+  build:
+    deps:
+      # Next resolves @zitadel/components to its dist/.
+      - "components:build"
+    outputs:
+      - ".next/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
+
+  dev:
+    command: "corepack pnpm run dev"
+    deps:
+      - "components:build"
+    options:
+      persistent: true
+      runInCI: false
+
+  start:
+    command: "corepack pnpm run start"
+    deps:
+      - "build"
+    options:
+      persistent: true
+      runInCI: false
