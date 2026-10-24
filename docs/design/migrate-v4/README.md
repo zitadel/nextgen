@@ -1,12 +1,14 @@
 # Migrating Zitadel v4 to nextgen: the `migrate-v4` POC plan
 
-> **Status:** Plan for a proof of concept, 2026-10-22
+> **Status:** Plan, and a working proof of concept in
+> [`internal/migratev4`](../../../internal/migratev4) ([results](#proof-of-concept)), 2026-10-22
 > **Scope:** organizations, human users with their password hashes, and
 > generic OIDC IdPs with the users' links to them, from one v4 instance into
 > one nextgen project
 > **Checked against:** nextgen `8b99ba069`, Zitadel `v4.19.5`
 > **References:** [Reading v4](v4-source.md) (tables, events, crypto) ·
-> [Writing nextgen](nextgen-target.md) (write paths, gaps)
+> [Writing nextgen](nextgen-target.md) (write paths, gaps) ·
+> [demo fixture](../../../internal/migratev4/demo/README.md)
 
 ## Goal
 
@@ -31,6 +33,49 @@ The POC is done when it shows, end to end against a real v4.19.5 database:
 Not in the POC: apps, projects, roles and grants (nextgen has no OIDC
 provider or `app_group` yet), machine users, MFA factors, policies, branding,
 texts, actions, reverse sync, and Spanner or SQLite as the target.
+
+## Proof of concept
+
+`nextgen migrate-v4` implements milestones M0 to M4 below, with one exception:
+`--identifier login_name` designates the identifier in the schema but does not
+yet rename the login flow's identifier field, so only `email` works end to
+end. It was run against a real Zitadel v4.19.5 database seeded through v4's
+own APIs ([demo fixture](../../../internal/migratev4/demo/README.md)): 22
+people in 5 orgs, every user state, 10 password-hash formats, 4 IdPs and 5
+links.
+
+| Criterion | Shown by |
+|---|---|
+| Sign-in with the v4 password | The demo check signs every seeded user in through nextgen's auth-attempt service: bcrypt (v4's own and `$2y$`), md5-crypt, sha512-crypt, phpass, md5salted and scrypt verify. The three hashes outside nextgen's default limits (argon2 at 4 MiB, pbkdf2 at 12 rounds, md5plain) are reported and refused, as `assess` said they would be |
+| Sign-in through a migrated IdP | The integration test runs the SSO state round trip, callback result, identity resolution and bind the flow engine runs; the provider's subject lands on the migrated user. Only the OIDC exchange is simulated |
+| Re-runs converge | A second run writes nothing. With v4 still serving, an email change, a deactivation and a new user made through v4's API converged after one `run`. A user edited in nextgen since the last run is reported as a conflict instead of being overwritten |
+| `assess` | Prints migrates, partial, not migrated, conflicts and operator actions for the demo instance, setup defaults left out |
+
+```sh
+nextgen -c nextgen.yaml migrate-v4 assess --v4-masterkey-file v4.key
+nextgen -c nextgen.yaml migrate-v4 run --v4-masterkey-file v4.key
+nextgen -c nextgen.yaml migrate-v4 verify
+```
+
+Tests: unit tests for the reducers, the v4 decryption (with a vector from a
+real v4.19.5 database), the planner and the login-flow rewrite (validated by
+the server's own flow validator), and a Postgres integration test that
+migrates, signs in with a password and through SSO, re-runs, and converges
+edits (`go test -tags postgres_integration ./internal/migratev4/`).
+
+It also confirmed [gap G1](nextgen-target.md#9-gaps) on real data: the four
+users v4 holds inactive or locked are deactivated in nextgen, and still sign
+in.
+
+Where the POC departs from the design below:
+
+- **Stage.** One JSON document per v4 aggregate in `zitadel_migrate_v4.aggregates`
+  instead of a table per kind: IdPs live in their instance's or org's document,
+  links in their user's.
+- **Ingest.** It reads changed aggregates' events by sequence, not position
+  (see [Pipeline](#pipeline)).
+- **Reducer version.** The stage records the version of the reducers that
+  folded it; a new version re-reads v4 from the start, keeping the id map.
 
 ## Concepts
 
@@ -88,25 +133,30 @@ most of the mapping.
 ## Command
 
 ```text
-nextgen migrate-v4 assess     [--instance ID]... [--json FILE] [--include-pii]
-nextgen migrate-v4 run        --instance ID [--project ID] [--follow[=INTERVAL]] [--dry-run]
+nextgen migrate-v4 assess     [--instance ID] [--json FILE] [--include-pii]
+nextgen migrate-v4 run        [--instance ID] [--project ID] [--follow INTERVAL]
 nextgen migrate-v4 status     [--instance ID]
-nextgen migrate-v4 verify     --instance ID [--deep]
-nextgen migrate-v4 export-ids --instance ID [--format csv|json]
-nextgen migrate-v4 cleanup    --instance ID
+nextgen migrate-v4 verify     [--instance ID]
+nextgen migrate-v4 export-ids [--instance ID] [--format csv|json]
+nextgen migrate-v4 cleanup    [--instance ID]
 ```
 
 | Flag | Meaning |
 |---|---|
-| `-c, --config` | nextgen's own config: database and master keys, as `nextgen migrate` reads it |
-| `--source` | DSN of the v4 database. Default: nextgen's own Postgres connection, i.e. the same database |
+| `-c, --config` | nextgen's own config: database and master keys, as the server reads it |
+| `--source` | DSN of the v4 database, also `NEXTGEN_MIGRATE_V4_SOURCE`. Default: nextgen's own Postgres connection, i.e. the same database |
 | `--v4-masterkey-file` | The 32-byte v4 master key, also read from `ZITADEL_MASTERKEY` as v4 reads it. Needed only for IdP secrets |
-| `--instance` | The v4 instance. Required when the database holds more than one |
+| `--instance` | The v4 instance. Needed only when the database holds more than one |
 | `--project` | An existing nextgen project to fill. Default: create one |
-| `--identifier` | `email` (default) or `login-name`: the property users sign in with ([D4](#open-decisions)) |
+| `--identifier` | `email` (default) or `login_name`: the property users sign in with ([D4](#open-decisions)) |
 | `--default-org-users` | `self` (default) or `team` ([D5](#open-decisions)) |
-| `--only` | Restrict to `orgs,users,idps,links` |
-| `--dry-run` | Ingest and plan, then print what `apply` would write |
+| `--v4-stopped` | Confirms v4 is not running; required to read a v4 older than 4.18 |
+| `--follow` | `run` keeps going, pausing this long between runs |
+| `--json` | Also writes the report as JSON to a file, or only JSON with `-` |
+| `--include-pii` | Lets issues name users and values |
+
+Not built yet: `--dry-run` (plan without writing; `assess` covers most of it)
+and `verify --deep` (compare against v4's projections).
 
 - `assess` writes only to the stage. It never writes nextgen data.
 - `status` prints the cursor, how far it lags v4, and counts per state.
@@ -149,19 +199,23 @@ flowchart LR
 ```
 
 1. **Ingest.**
-   - Reads the instance's relevant events after the stored cursor, in v4's sort
-     order and behind v4's barrier.
-   - Folds each event into its stage row, together with the aggregate
-     `sequence` it reflects. An event at or below that sequence is skipped.
-   - Cursor and stage rows commit in one transaction.
+   - Asks v4 which aggregates have relevant events after the stored cursor, in
+     v4's sort order and behind v4's barrier. Position only detects change.
+   - Reads each changed aggregate's events after its staged `sequence`, in
+     sequence order, on the events2 primary key. One aggregate's sequences
+     become visible in order, so this folds correctly however v4 stamped
+     positions, including old data with positions out of sequence order.
+   - Folds them into the aggregate's document. Documents and cursor commit in
+     one transaction.
 2. **Apply.**
-   - Visits stage rows whose sequence is newer than the one last applied.
-   - Derives the nextgen state the row should produce and converges nextgen to
-     it, in dependency order: project, user schema, teams, IdP secrets and
+   - Derives the nextgen state the stage should produce and converges nextgen
+     to it, in dependency order: project, user schema, teams, IdP secrets and
      connections, login flow, users, identity links, then deactivations and
      removals.
-3. **Verify.** Compares stage and nextgen counts and per-entity fingerprints.
-   `--deep` also checks the stage against v4's own projections.
+   - A source whose fingerprint and sequence match what was applied is skipped
+     without touching nextgen.
+3. **Verify.** Compares what the stage says should exist with what nextgen
+   holds: counts, user attributes, passwords, connections and links.
 
 The stage exists because several v4 facts only make sense folded together:
 
@@ -174,20 +228,18 @@ The stage exists because several v4 facts only make sense folded together:
 
 | Table | Holds |
 |---|---|
-| `cursor` | Per instance: the last sort key read, i.e. position, `in_tx_order`, instance, aggregate type, aggregate id, sequence |
-| `src_instance` | Name, default org, domain policy, the login policy flags we read, the IdPs the login policy offers |
-| `src_org` | Name, state, verified domains, primary domain, domain-policy override, removed |
-| `src_user` | Org, kind, state, username, profile, email and phone with their verified flags, encoded password hash, `changeRequired`, factor counts, metadata count, removed |
-| `src_idp` | Owner (instance or org), type, name, OIDC settings, the encrypted secret exactly as stored, options, legacy flag, state, removed |
-| `src_idp_link` | IdP id, external user id, user id, removed |
-| `src_inventory` | Live counts of everything out of scope, for `assess` ([Reading v4 §6](v4-source.md#6-what-assess-counts-but-does-not-migrate)) |
-| `id_map` | v4 kind and id → nextgen kind and id, `applied_seq`, fingerprint, status, reason |
-| `issue` | Conflicts and skips per run: code, severity, v4 id. Values only with `--include-pii` |
-| `run` | Options, timings, counts, the source's detected capability |
+| `cursors` | Per instance: the last sort key read (position, `in_tx_order`, aggregate type, aggregate id, sequence) and the version of the reducers that folded the stage |
+| `aggregates` | One JSON document per v4 aggregate with the sequence of the newest event folded into it ([model.go](../../../internal/migratev4/stage/model.go)): instance (name, default org, domain and login policy, the IdPs offered at sign-in, instance IdPs with their encrypted secrets as stored), org (name, state, domains, domain-policy override, org IdPs), user (org, state, username, profile, email and phone with verified flags, encoded password hash, factor and metadata counts, links), and the out-of-scope objects `assess` counts |
+| `id_map` | v4 kind and id → nextgen id, `applied` or `reserved`, the v4 sequence applied, and a fingerprint of what was written |
+| `runs` | Each command's report, conflicts and skips included. Values appear only with `--include-pii` |
 
-These are Postgres tables created by the migrator's own goose set. A
-dialect-portable version belongs to the work that makes nextgen Cloud a
+The migrator creates these idempotently ([schema.sql](../../../internal/migratev4/stage/schema.sql)).
+A dialect-portable version belongs to the work that makes nextgen Cloud a
 target ([D8](#open-decisions)).
+
+The reducers carry a version. When it changes, as when they learn an event
+type they skipped before, ingest drops the stage and re-reads v4 from the
+start. The id map stays, so apply converges without writing anything new.
 
 ### Converging nextgen: reserve, write, mark
 
@@ -424,26 +476,47 @@ The report has four parts:
 3. **Conflicts** that block a clean run.
 4. **Operator actions.**
 
+The demo fixture's instance, after one live-sync run (real output, issues left out):
+
 ```text
-instance 3124…  "Acme"   v4 4.19.5 (continuous sync supported)
+instance 396264278547497158  "Acme Corp v4"  (continuous sync supported, last setup step 80_users14_instance_resource_owner_idx)
 
 MIGRATES
-  organizations -> teams             42   (1 inactive)
-  human users -> users           18 210   (17 950 with a password)
-  OIDC IdPs -> connections            3   (okta, entra, google)
-  IdP links -> identity links     4 120
-PARTIAL
-  users with TOTP                 3 112   factor dropped, password or IdP still work
-  users with passkeys                87   factor dropped (WebAuthn user handle)
+  organizations -> teams                   3   1 inactive, deactivated
+  default organization -> no team          1   its users are self-owned
+  OIDC and Google IdPs -> IdP connections  3   corporate-sso, google, acme-okta
+  human users -> users                     22  17 with a password
+  IdP links -> identity links              4   
+
+PARTIAL (migrated, something stays behind)
+  org-owned IdPs                         1  created, not offered at sign-in: nextgen has no team-scoped login yet
+  inactive or locked users               3  deactivated (nextgen has no locked state)
+  users without a password or link       1  cannot sign in until an admin sets a password
+  users with OTP email                   1  factor dropped
+  users with metadata                    1  dropped
+  users who must change their password   1  not enforced in nextgen
+  IdP links to IdPs that do not migrate  1  dropped
+
 NOT MIGRATED
-  machine users                      12   no equivalent
-  projects / apps / user grants   5 / 9 / 31 004   not built in nextgen
-  actions v1 / executions          4 / 2  no equivalent
+  IdPs of type github               1  nextgen connections speak OIDC only
+  machine users                     2  0 keys, 2 PATs; no equivalent
+  users of removed organizations    1  removed in v4
+  projects (without Zitadel's own)  1  1 app, 1 role, 0 project grants; no OIDC provider in nextgen yet
+  user grants (authorizations)      1  not built in nextgen
+  actions v2 targets                1  no equivalent
+  changes to org login policies     6  no team-scoped login yet
+
 CONFLICTS
-  duplicate emails (case-folded)     14 groups, identifier would collide
-  hashes outside nextgen bounds      10 (md5plain)
+  users whose email collides                             1  first created wins, the rest are skipped
+  password hashes outside nextgen's verifiers or limits  3  migrated without a password
+
 ACTIONS
-  register https://<origin>/__nextgen/idp/okta/callback at the provider
+  - register the redirect URI https://<app origin>/__nextgen/idp/corporate-sso/callback at "Corporate SSO" (v4 id 396264293663834310)
+  - register the redirect URI https://<app origin>/__nextgen/idp/google/callback at "Google" (v4 id 396264293680611526)
+  - register the redirect URI https://<app origin>/__nextgen/idp/acme-okta/callback at "Acme Okta" (v4 id 396264293680545990)
+  - add the origins your apps run on (zitadel origin add); v4 served sign-in on acme-corp-v4-hwruzi.localhost, localhost
+  - widen password_hasher.limits or add verifiers (md5plain) in nextgen's config, then run again, to keep the passwords of the users listed as password_hash_rejected
+  - integrate the apps with nextgen: v4 OIDC clients do not carry over, and each user's id changes (export-ids)
 ```
 
 `--json` writes the same content with stable keys and a `report_version`. It
