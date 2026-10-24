@@ -5,19 +5,22 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-func TestSendPostsOneCustomEvent(t *testing.T) {
+func TestSendVercelPostsOneCustomEvent(t *testing.T) {
 	type received struct {
 		header http.Header
-		body   event
+		body   vercelEvent
 	}
 	got := make(chan received, 1)
 	intake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
-		var body event
+		var body vercelEvent
 		if err := json.Unmarshal(raw, &body); err != nil {
 			t.Errorf("body is not an event: %v", err)
 		}
@@ -26,10 +29,10 @@ func TestSendPostsOneCustomEvent(t *testing.T) {
 	}))
 	defer intake.Close()
 
-	p := New(Config{Enabled: true, Endpoint: intake.URL}, Facts{Version: "v1.2.3", Dialect: "sqlite"})
+	p := New(Config{Enabled: true, VercelEndpoint: intake.URL}, Facts{Version: "v1.2.3", Dialect: "sqlite"})
 	now := time.UnixMilli(1_700_000_000_000)
-	if err := p.send(t.Context(), now); err != nil {
-		t.Fatalf("send: %v", err)
+	if err := p.sendVercel(t.Context(), now); err != nil {
+		t.Fatalf("sendVercel: %v", err)
 	}
 
 	r := <-got
@@ -44,14 +47,14 @@ func TestSendPostsOneCustomEvent(t *testing.T) {
 	}
 }
 
-func TestSendFailsOnARejectedEvent(t *testing.T) {
+func TestSendVercelFailsOnARejectedEvent(t *testing.T) {
 	intake := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 	}))
 	defer intake.Close()
 
-	p := New(Config{Enabled: true, Endpoint: intake.URL}, Facts{})
-	if err := p.send(t.Context(), time.Now()); err == nil {
+	p := New(Config{Enabled: true, VercelEndpoint: intake.URL}, Facts{})
+	if err := p.sendVercel(t.Context(), time.Now()); err == nil {
 		t.Fatal("send succeeded on a 400")
 	}
 }
@@ -105,7 +108,80 @@ func TestDisabledPingerSendsNothing(t *testing.T) {
 	}))
 	defer intake.Close()
 
-	p := New(Config{Enabled: false, Endpoint: intake.URL}, Facts{})
+	p := New(Config{Enabled: false, VercelEndpoint: intake.URL, MixpanelEndpoint: intake.URL, MixpanelToken: "tok"}, Facts{})
 	p.Start()
 	p.Close()
+}
+
+func TestSendMixpanelPostsOneEventItCannotLocate(t *testing.T) {
+	type received struct {
+		path   string
+		query  url.Values
+		header http.Header
+		body   []mixpanelEvent
+	}
+	got := make(chan received, 1)
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		var body []mixpanelEvent
+		if err := json.Unmarshal(raw, &body); err != nil {
+			t.Errorf("body is not a list of events: %v", err)
+		}
+		got <- received{path: r.URL.Path, query: r.URL.Query(), header: r.Header.Clone(), body: body}
+		_, _ = io.WriteString(w, `{"status":1,"error":null}`)
+	}))
+	defer api.Close()
+
+	p := New(Config{Enabled: true, MixpanelEndpoint: api.URL + "/telemetry/mixpanel/track", MixpanelToken: "tok"}, Facts{Version: "v1.2.3", Dialect: "postgres"})
+	now := time.UnixMilli(1_700_000_000_000)
+	if err := p.sendMixpanel(t.Context(), now); err != nil {
+		t.Fatalf("sendMixpanel: %v", err)
+	}
+
+	r := <-got
+	if r.path != "/telemetry/mixpanel/track" || r.query.Get("ip") != "0" || r.query.Get("verbose") != "1" || r.header.Get("Content-Type") != "application/json" {
+		t.Errorf("path = %s, query = %v, headers = %v", r.path, r.query, r.header)
+	}
+	if len(r.body) != 1 || r.body[0].Event != EventName {
+		t.Fatalf("events = %+v", r.body)
+	}
+	properties := r.body[0].Properties
+	if properties["token"] != "tok" || properties["ip"] != float64(0) || properties["time"] != float64(now.UnixMilli()) ||
+		properties["surface"] != "server" || properties["server_version"] != "v1.2.3" || properties["dialect"] != "postgres" {
+		t.Errorf("properties = %v", properties)
+	}
+	if id, _ := properties["$insert_id"].(string); id == "" || len(id) > 36 {
+		t.Errorf("$insert_id = %v", properties["$insert_id"])
+	}
+	if id, ok := properties["distinct_id"]; ok {
+		t.Errorf("sent a distinct_id, %v", id)
+	}
+}
+
+func TestSendMixpanelFailsWhenMixpanelRefuses(t *testing.T) {
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// What Mixpanel answers an event without a token, with HTTP 200.
+		_, _ = io.WriteString(w, `{"error":"token, missing or empty","status":0}`)
+	}))
+	defer api.Close()
+
+	p := New(Config{Enabled: true, MixpanelEndpoint: api.URL, MixpanelToken: "tok"}, Facts{})
+	if err := p.sendMixpanel(t.Context(), time.Now()); err == nil || !strings.Contains(err.Error(), "token, missing or empty") {
+		t.Fatalf("err = %v, want Mixpanel's refusal", err)
+	}
+}
+
+func TestSendOnceSkipsADestinationWithoutAnEndpointOrToken(t *testing.T) {
+	var requests atomic.Int32
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		_, _ = io.WriteString(w, `{"status":1}`)
+	}))
+	defer api.Close()
+
+	New(Config{Enabled: true, VercelEndpoint: api.URL}, Facts{}).sendOnce()
+	New(Config{Enabled: true, MixpanelEndpoint: api.URL}, Facts{}).sendOnce()
+	if n := requests.Load(); n != 1 {
+		t.Fatalf("%d requests, want only Vercel's", n)
+	}
 }

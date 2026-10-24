@@ -1,5 +1,6 @@
 // Package serviceping reports, on an interval, which version and storage
-// dialect a deployment runs, as one anonymous event to Vercel Web Analytics.
+// dialect a deployment runs, as one anonymous event to Vercel Web Analytics
+// and to Mixpanel.
 //
 // Proof of concept: the event is named with a poc_ prefix so proof traffic
 // never mixes with a released ping's events, and the ping is off by default.
@@ -8,8 +9,11 @@ package serviceping
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -25,18 +29,30 @@ const EventPrefix = "poc_"
 // EventName is the event every ping sends.
 const EventName = EventPrefix + "service_ping"
 
-// DefaultEndpoint is the cloud project's Web Analytics intake, the URL
+// DefaultVercelEndpoint is the cloud project's Web Analytics intake, the URL
 // `@vercel/analytics/server` posts custom events to.
-const DefaultEndpoint = "https://preview.zitadel.com/_vercel/insights/event"
+const DefaultVercelEndpoint = "https://preview.zitadel.com/_vercel/insights/event"
+
+// DefaultMixpanelEndpoint is Mixpanel's track API behind the cloud's proxy,
+// the `/telemetry/mixpanel/*` rewrite in the repo-root vercel.json.
+const DefaultMixpanelEndpoint = "https://preview.zitadel.com/telemetry/mixpanel/track"
+
+// DefaultMixpanelToken is the CLI's production project's ingestion token. It
+// can only add events, so it is published on purpose, as the CLI's copy is
+// (apps/cli/src/lib/telemetry/config.ts).
+const DefaultMixpanelToken = "f56fd7315ccd614fba8eecb2a8966152"
 
 // MaxProperties is the custom-event property limit of Web Analytics Plus.
 const MaxProperties = 8
 
-// Config controls the service ping.
+// Config controls the service ping. A destination without an endpoint, or
+// Mixpanel without a token, is left out.
 type Config struct {
-	Enabled  bool          `mapstructure:"enabled"`
-	Endpoint string        `mapstructure:"endpoint"`
-	Interval time.Duration `mapstructure:"interval"`
+	Enabled          bool          `mapstructure:"enabled"`
+	VercelEndpoint   string        `mapstructure:"vercel_endpoint"`
+	MixpanelEndpoint string        `mapstructure:"mixpanel_endpoint"`
+	MixpanelToken    string        `mapstructure:"mixpanel_token"`
+	Interval         time.Duration `mapstructure:"interval"`
 }
 
 // Facts are what a ping reports: versions and enums only, never a host, an
@@ -54,9 +70,9 @@ type Facts struct {
 	PublicBase string
 }
 
-// Properties returns the event data: the header every Zitadel component
-// sends, as docs/product-analytics-events.yaml defines it, then the server's
-// context. It holds at most MaxProperties keys.
+// Properties returns what both destinations get: the header every Zitadel
+// component sends, as docs/product-analytics-events.yaml defines it, then the
+// server's dialect and platform. It holds at most MaxProperties keys.
 func (f Facts) Properties() map[string]any {
 	return map[string]any{
 		"surface":        "server",
@@ -108,8 +124,8 @@ func nodeArch(goarch string) string {
 	return goarch
 }
 
-// event is the body `@vercel/analytics/server` sends for a custom event.
-type event struct {
+// vercelEvent is the body `@vercel/analytics/server` sends for a custom event.
+type vercelEvent struct {
 	Origin     string         `json:"o"`
 	Timestamp  int64          `json:"ts"`
 	SDKName    string         `json:"sdkn"`
@@ -117,6 +133,12 @@ type event struct {
 	Referrer   string         `json:"r"`
 	Name       string         `json:"en"`
 	Data       map[string]any `json:"ed"`
+}
+
+// mixpanelEvent is one event as Mixpanel's track API takes it.
+type mixpanelEvent struct {
+	Event      string         `json:"event"`
+	Properties map[string]any `json:"properties"`
 }
 
 const closeTimeout = 5 * time.Second
@@ -133,9 +155,6 @@ type Pinger struct {
 
 // New returns a pinger; Start does nothing when cfg.Enabled is false.
 func New(cfg Config, facts Facts) *Pinger {
-	if cfg.Endpoint == "" {
-		cfg.Endpoint = DefaultEndpoint
-	}
 	if cfg.Interval <= 0 {
 		cfg.Interval = 24 * time.Hour
 	}
@@ -174,23 +193,45 @@ func (p *Pinger) loop() {
 	}
 }
 
-// sendOnce sends one ping. A failure is logged and never reaches the server.
+// destination is one place a ping goes.
+type destination struct {
+	name     string
+	endpoint string
+	send     func(context.Context, time.Time) error
+}
+
+func (p *Pinger) destinations() []destination {
+	var all []destination
+	if p.cfg.VercelEndpoint != "" {
+		all = append(all, destination{name: "vercel", endpoint: p.cfg.VercelEndpoint, send: p.sendVercel})
+	}
+	if p.cfg.MixpanelEndpoint != "" && p.cfg.MixpanelToken != "" {
+		all = append(all, destination{name: "mixpanel", endpoint: p.cfg.MixpanelEndpoint, send: p.sendMixpanel})
+	}
+	return all
+}
+
+// sendOnce sends one ping to each destination. A failure is logged and never
+// reaches the server.
 func (p *Pinger) sendOnce() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := p.send(ctx, time.Now()); err != nil {
-		slog.Warn("service ping failed", slog.String("error", err.Error()))
-		return
+	now := time.Now()
+	for _, d := range p.destinations() {
+		if err := d.send(ctx, now); err != nil {
+			slog.Warn("service ping failed", slog.String("destination", d.name), slog.String("error", err.Error()))
+			continue
+		}
+		slog.Info("service ping sent", slog.String("destination", d.name), slog.String("endpoint", d.endpoint))
 	}
-	slog.Info("service ping sent", slog.String("endpoint", p.cfg.Endpoint))
 }
 
-func (p *Pinger) send(ctx context.Context, now time.Time) error {
-	endpoint, err := url.Parse(p.cfg.Endpoint)
+func (p *Pinger) sendVercel(ctx context.Context, now time.Time) error {
+	endpoint, err := url.Parse(p.cfg.VercelEndpoint)
 	if err != nil {
 		return fmt.Errorf("parse endpoint: %w", err)
 	}
-	body, err := json.Marshal(event{
+	body, err := json.Marshal(vercelEvent{
 		Origin:     endpoint.Scheme + "://" + endpoint.Host,
 		Timestamp:  now.UnixMilli(),
 		SDKName:    "zitadel-server",
@@ -201,12 +242,10 @@ func (p *Pinger) send(ctx context.Context, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.cfg.Endpoint, bytes.NewReader(body))
+	req, err := p.newRequest(ctx, p.cfg.VercelEndpoint, body)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", fmt.Sprintf("zitadel-server/%s (%s; %s)", p.facts.Version, runtime.GOOS, runtime.GOARCH))
 	// What `@vercel/analytics/server` sends to mark an event as server-side.
 	req.Header.Set("X-Va-Server", "1")
 	resp, err := p.client.Do(req)
@@ -218,6 +257,82 @@ func (p *Pinger) send(ctx context.Context, now time.Time) error {
 		return fmt.Errorf("intake answered %s", resp.Status)
 	}
 	return nil
+}
+
+// mixpanelProperties adds what Mixpanel needs to the ping's properties: the
+// token, the time, an $insert_id so a resent ping is counted once, and ip: 0
+// so Mixpanel does not locate the server by its address. It sends no
+// distinct_id: the server has no install id yet.
+func (p *Pinger) mixpanelProperties(now time.Time, insertID string) map[string]any {
+	properties := p.facts.Properties()
+	properties["token"] = p.cfg.MixpanelToken
+	properties["time"] = now.UnixMilli()
+	properties["$insert_id"] = insertID
+	properties["ip"] = 0
+	return properties
+}
+
+func (p *Pinger) sendMixpanel(ctx context.Context, now time.Time) error {
+	endpoint, err := url.Parse(p.cfg.MixpanelEndpoint)
+	if err != nil {
+		return fmt.Errorf("parse endpoint: %w", err)
+	}
+	query := endpoint.Query()
+	query.Set("ip", "0")
+	query.Set("verbose", "1")
+	endpoint.RawQuery = query.Encode()
+	insertID, err := newInsertID()
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal([]mixpanelEvent{{Event: EventName, Properties: p.mixpanelProperties(now, insertID)}})
+	if err != nil {
+		return err
+	}
+	req, err := p.newRequest(ctx, endpoint.String(), body)
+	if err != nil {
+		return err
+	}
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return fmt.Errorf("mixpanel answered %s", resp.Status)
+	}
+	// verbose=1 makes Mixpanel say whether it took the event.
+	var answer struct {
+		Status int    `json:"status"`
+		Error  string `json:"error"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 4096)).Decode(&answer); err != nil {
+		return fmt.Errorf("read mixpanel's answer: %w", err)
+	}
+	if answer.Status != 1 {
+		return fmt.Errorf("mixpanel refused the event: %s", answer.Error)
+	}
+	return nil
+}
+
+func (p *Pinger) newRequest(ctx context.Context, endpoint string, body []byte) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", fmt.Sprintf("zitadel-server/%s (%s; %s)", p.facts.Version, runtime.GOOS, runtime.GOARCH))
+	return req, nil
+}
+
+// newInsertID returns a random dedupe key for one Mixpanel event, within the
+// 36 letters, digits and dashes Mixpanel allows. It is no resource id.
+func newInsertID() (string, error) {
+	raw := make([]byte, 16)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("make an insert id: %w", err)
+	}
+	return hex.EncodeToString(raw), nil
 }
 
 // Close stops the pinger and waits for an in-flight ping, up to a timeout.

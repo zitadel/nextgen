@@ -7,7 +7,7 @@ import mixpanelLib, {
   type Properties,
 } from "mixpanel";
 
-import { resolveTelemetryHost } from "./config";
+import { resolveTelemetryEndpoint, type TelemetryEndpoint } from "./config";
 import { resolveConsent } from "./consent";
 import { type Identity, loadOrCreateIdentity } from "./identity";
 import { compact } from "./util";
@@ -40,7 +40,7 @@ export type TelemetryDeps = {
    * priority order (proof of concept). Without them no copy is sent.
    */
   readonly vercelKeys?: readonly string[];
-  readonly initClient?: (token: string, host: string) => MixpanelClient;
+  readonly initClient?: (token: string, endpoint: TelemetryEndpoint) => MixpanelClient;
   readonly loadIdentity?: (env: NodeJS.ProcessEnv) => Identity;
   readonly newId?: () => string;
   /** Sends the Vercel copy; defaults to the global `fetch`. */
@@ -96,7 +96,7 @@ export class Telemetry {
   }
 
   /**
-   * Resolve consent, identity, token, and host, then build the Mixpanel client
+   * Resolve consent, identity, token, and endpoint, then build the Mixpanel client
    * lazily — only when consent is granted *and* a token is configured. Any
    * failure along the way yields an inert instance whose methods are no-ops.
    */
@@ -119,7 +119,7 @@ export class Telemetry {
 
     let client: MixpanelClient | undefined;
     try {
-      client = (deps.initClient ?? defaultInit)(consent.token, resolveTelemetryHost(deps.env));
+      client = (deps.initClient ?? defaultInit)(consent.token, resolveTelemetryEndpoint(deps.env));
     } catch {
       return inert(identity.isFirstRun);
     }
@@ -246,6 +246,6 @@ export class Telemetry {
 }
 
 /** Real Mixpanel client construction, isolated so {@link Telemetry.create} can swap it in tests. */
-function defaultInit(token: string, host: string): MixpanelClient {
-  return mixpanelLib.init(token, { host, geolocate: false });
+function defaultInit(token: string, { host, path }: TelemetryEndpoint): MixpanelClient {
+  return mixpanelLib.init(token, { host, path, geolocate: false });
 }

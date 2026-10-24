@@ -1,6 +1,6 @@
 import type { Properties } from "mixpanel";
 
-import { resolveChannel } from "./config";
+import { CLOUD_HOST, resolveChannel } from "./config";
 
 /**
  * Proof of concept: a copy of each event for Vercel Web Analytics, posted the
@@ -9,7 +9,7 @@ import { resolveChannel } from "./config";
  */
 
 /** The cloud project's Web Analytics intake. */
-export const VERCEL_ENDPOINT = "https://preview.zitadel.com/_vercel/insights/event";
+export const VERCEL_ENDPOINT = `https://${CLOUD_HOST}/_vercel/insights/event`;
 
 /** The custom-event property limit of Web Analytics Plus. */
 export const VERCEL_MAX_PROPERTIES = 8;
