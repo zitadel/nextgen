@@ -1,5 +1,21 @@
 # @zitadel/api
 
+## 0.2.0
+
+### Minor Changes
+
+- [#2248](https://github.com/zitadel/nextgen/pull/2248) [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87) Thanks [@fforootd](https://github.com/fforootd)! - Find a project by name in the console, however many you can act on: the ⌘K search, the Projects list and the project switcher search on the server rather than in the projects already loaded. `GET /users/me/projects` takes `name_contains`, a case-insensitive name search that pages like the full list, and the `@zitadel/api` client's `listMyProjects()` accepts it. A project's Admins section no longer says your access comes from the owning team when it cannot tell where it comes from.
+
+- [#1852](https://github.com/zitadel/nextgen/pull/1852) [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d) Thanks [@vitorbari](https://github.com/vitorbari)! - `POST /deployments/{deployment_id}/rollback` re-deploys an earlier primary deployment's release to `primary`: a new deployment with `reason: rollback` and `rollback_to` naming it, covering every current primary origin. When nothing would change it answers `200` with the newest primary deployment, and `expected_deployment_id` guards against racing another deploy with `409` `dep.conflict`. A deployment to preview URLs, or a project without a primary origin, answers `400` with `dep.invalid`.
+
+- [#1803](https://github.com/zitadel/nextgen/pull/1803) [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171) Thanks [@peintnermax](https://github.com/peintnermax)! - Add `GET /users/me/passkeys`, `GET /users/me/identity_links` and `GET /users/me/password`: the signed-in user's own passkeys, linked identity provider accounts and password state, readable with the session alone. Like the other `/users/me` reads they take an optional `project_id`, and refuse a session of another project with `403 sess.project_mismatch`. The `@zitadel/api` client gains `listMyPasskeys()`, `listMyIdentityLinks()` and `getMyPasswordState()`.
+
+### Patch Changes
+
+- [#2301](https://github.com/zitadel/nextgen/pull/2301) [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8) Thanks [@fforootd](https://github.com/fforootd)! - The console's error screens now show the failed request's ID, the same ID the server logs the request under, so a support request can quote it. They no longer show the error code, which only repeated the message. `ApiError` from `@zitadel/api` carries it as `requestId`, read from the response's `X-Request-Id` header.
+  
+  Their button now goes to Projects without the selected project, so it gets you out of a screen that fails for that project, such as a mistyped `?project=` in the address. It used to lead back to the same failing screen.
+
 ## 0.1.0
 
 ### Minor Changes

@@ -1,5 +1,18 @@
 # @zitadel/config
 
+## 0.2.0
+
+### Minor Changes
+
+- [#2241](https://github.com/zitadel/nextgen/pull/2241) [`b4d0e4a`](https://github.com/zitadel/nextgen/commit/b4d0e4af5a1e6dc07acb7af3c0a9d45bc114d30d) Thanks [@peintnermax](https://github.com/peintnermax)! - Console fixes from the navigation review ([#2239](https://github.com/zitadel/nextgen/issues/2239)): a number on Settings is typed as text, so a half-typed value is sent as typed instead of deleting the attribute; saving the profile refreshes only the session instead of every cached read and the CSRF token; search drops team results the typing has ruled out; ⌘K toggles once per press and not over another dialog; the Teams title sits on the shared title row; the theme control uses the menu's radio items. `@zitadel/config` adds `@zitadel/config/server` with `DEFAULT_SERVER`, the server the CLI targets by default, which the CLI and the console now share.
+
+- [#2231](https://github.com/zitadel/nextgen/pull/2231) [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5) Thanks [@peintnermax](https://github.com/peintnermax)! - The password step of `<zitadel-login>` now shows the account it signs in to as a full-width chip with a generated avatar, and the whole chip takes the visitor back to use another account. The avatar is generated from the identifier the visitor typed, so it never confirms that an account exists, and sign-up steps show the chip without it, since no account exists yet. The SSO-conflict step shows the provider's email the same way, without the switch. The console's avatar is now generated from the same identifier, so a person sees one avatar in the login and the console. Custom templates get the chip as the new `<zl-account>` atom (`identifier`, optional `action`, `label` and `avatar`), and `<zl-avatar>` and the `@zitadel/components/avatar` entry export the avatar for your own pages.
+
+### Patch Changes
+
+- Updated dependencies [[`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171)]:
+  - @zitadel/api@0.2.0
+
 ## 0.1.0
 
 ### Patch Changes
