@@ -1,14 +1,16 @@
-import { useRouter } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
-import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 import { fetchSession, invalidateSessionCache } from "@/auth/session";
 import { describeError } from "@/lib/api-error";
 import { routerRelativeHref } from "@/lib/base-path";
+
+import { EYEBROW } from "./typography";
 
 const STATE_ROW = "flex items-center justify-center gap-2 text-muted-foreground";
 
@@ -24,6 +26,53 @@ function StatePage({ children }: { children: ReactNode }) {
     <div className="flex min-h-[60vh] flex-1 items-center justify-center px-6 py-8">
       <div className="w-full max-w-xl">{children}</div>
     </div>
+  );
+}
+
+/**
+ * The anatomy every error page shares (ADR 076): the status, a title, one
+ * sentence, a way on and, for a refused request, the code to quote. The
+ * website, the docs and the server's own page show the same parts in their
+ * own chrome.
+ */
+function ErrorPage({
+  status,
+  title,
+  children,
+  action,
+  code,
+}: {
+  status?: number;
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+  code?: string;
+}) {
+  return (
+    <StatePage>
+      <div role="alert" className="flex flex-col items-center gap-3 text-center">
+        {status !== undefined && <p className={EYEBROW}>Error {status}</p>}
+        <h1 className="text-foreground font-serif text-2xl leading-8 tracking-tight text-balance">
+          {title}
+        </h1>
+        <p className="text-muted-foreground max-w-md text-sm leading-6 text-pretty">{children}</p>
+        {action && <div className="mt-3">{action}</div>}
+        {code && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Code <code className="font-mono">{code}</code>
+          </p>
+        )}
+      </div>
+    </StatePage>
+  );
+}
+
+/** The way on from an error page: the console's start page. */
+function StartPageLink() {
+  return (
+    <Button asChild variant="secondary">
+      <Link to="/">Go to the start page</Link>
+    </Button>
   );
 }
 
@@ -92,17 +141,16 @@ export function ErrorState({ error }: ErrorComponentProps) {
   if (unauthenticated) {
     if (sessionAlive) {
       return (
-        <StatePage>
-          <Alert variant="destructive">
-            <AlertCircle aria-hidden />
-            <AlertTitle>Console API not authorized</AlertTitle>
-            <AlertDescription>
-              You are signed in, but the server did not accept your session for this request.
-              Signing out and in again may help; if it persists, this screen calls an operation the
-              console session cannot use yet.
-            </AlertDescription>
-          </Alert>
-        </StatePage>
+        <ErrorPage
+          status={error.status}
+          title="Console API not authorized"
+          code={apiErrorCode(error)}
+          action={<StartPageLink />}
+        >
+          You are signed in, but the server did not accept your session for this request. Signing
+          out and in again may help; if it persists, this screen calls an operation the console
+          session cannot use yet.
+        </ErrorPage>
       );
     }
     return (
@@ -115,51 +163,77 @@ export function ErrorState({ error }: ErrorComponentProps) {
     );
   }
 
-  const { heading, message } = describeBoundaryError(error);
+  const { title, message, retry } = describeBoundaryError(error);
   return (
-    <StatePage>
-      <Alert variant="destructive">
-        <AlertCircle aria-hidden />
-        <AlertTitle>{heading}</AlertTitle>
-        <AlertDescription>{message}</AlertDescription>
-      </Alert>
-    </StatePage>
+    <ErrorPage
+      status={error instanceof ApiError ? error.status : undefined}
+      title={title}
+      code={apiErrorCode(error)}
+      action={
+        retry ? (
+          <Button variant="secondary" onClick={() => void router.invalidate()}>
+            Try again
+          </Button>
+        ) : (
+          <StartPageLink />
+        )
+      }
+    >
+      {message}
+    </ErrorPage>
   );
 }
 
-/** Shared not-found boundary. */
+/** Shared not-found boundary: a path no route matches. */
 export function NotFoundState() {
   return (
-    <StatePage>
-      <Alert>
-        <TriangleAlert aria-hidden />
-        <AlertTitle>Not found</AlertTitle>
-        <AlertDescription>
-          The page or resource you were looking for does not exist.
-        </AlertDescription>
-      </Alert>
-    </StatePage>
+    <ErrorPage status={404} title="Page not found" action={<StartPageLink />}>
+      There is nothing at this address. The link may be broken, or the page may have moved.
+    </ErrorPage>
   );
 }
 
-function describeBoundaryError(error: unknown): { heading: string; message: string } {
+/**
+ * The title and sentence for a failed load. The server owns the sentence
+ * (`describeError`); the title says what kind of failure it is, in the words
+ * every error page uses (ADR 076). A server fault or a request that got no
+ * answer may pass on a second try; a refusal will not.
+ */
+function describeBoundaryError(error: unknown): { title: string; message: string; retry: boolean } {
   if (error instanceof ApiError) {
     if (error.status === 403) {
       return {
-        heading: "Not authorized",
+        title: "No access",
+        message: describeError(error, "You are signed in, but this account cannot open this page."),
+        retry: false,
+      };
+    }
+    if (error.status === 404) {
+      return {
+        title: "Not found",
+        message: describeError(error, "What this page shows does not exist, or no longer does."),
+        retry: false,
+      };
+    }
+    if (error.status >= 500) {
+      return {
+        title: "Something went wrong",
         message: describeError(
           error,
-          "You are signed in, but this account does not have access to this resource.",
+          "The server could not complete this request. Try again in a moment.",
         ),
+        retry: true,
       };
     }
     return {
-      heading: `Request failed (${error.status})`,
+      title: "Request failed",
       message: describeError(error, "The server could not complete this request."),
+      retry: false,
     };
   }
   return {
-    heading: "Something went wrong",
+    title: "Something went wrong",
     message: describeError(error, "An unexpected error occurred."),
+    retry: true,
   };
 }

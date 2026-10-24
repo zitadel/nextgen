@@ -1,6 +1,12 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { resolveTelemetryHost, resolveTelemetryToken } from "../../../../src/lib/telemetry/config";
+import {
+  resolveTelemetryEndpoint,
+  resolveTelemetryToken,
+} from "../../../../src/lib/telemetry/config";
 
 const DEV_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
 const PROD_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
@@ -42,14 +48,34 @@ describe("resolveTelemetryToken", () => {
   });
 });
 
-describe("resolveTelemetryHost", () => {
-  it("defaults to the EU host (the Zitadel projects' region) and switches to US on request", () => {
-    expect(resolveTelemetryHost({})).toBe("api-eu.mixpanel.com");
-    expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: "us" })).toBe("api.mixpanel.com");
-    expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: "EU" })).toBe("api-eu.mixpanel.com");
+const CLOUD_PROXY = { host: "preview.zitadel.com", path: "/telemetry/mixpanel" };
+const US_DIRECT = { host: "api.mixpanel.com", path: "" };
+
+describe("resolveTelemetryEndpoint", () => {
+  it("sends EU events (the Zitadel projects' region) through the cloud, US ones to Mixpanel", () => {
+    expect(resolveTelemetryEndpoint({})).toEqual(CLOUD_PROXY);
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "us" })).toEqual(US_DIRECT);
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: "EU" })).toEqual(CLOUD_PROXY);
   });
 
   it("trims surrounding whitespace on the region env", () => {
-    expect(resolveTelemetryHost({ ZITADEL_TELEMETRY_REGION: " us " })).toBe("api.mixpanel.com");
+    expect(resolveTelemetryEndpoint({ ZITADEL_TELEMETRY_REGION: " us " })).toEqual(US_DIRECT);
+  });
+
+  // Released CLIs send to this path, so the cloud has to keep forwarding it.
+  it("matches the cloud's rewrite to Mixpanel's EU host, ahead of the server's catch-all", async () => {
+    const vercelJson = join(import.meta.dirname, "../../../../../../vercel.json");
+    const { rewrites } = JSON.parse(await readFile(vercelJson, "utf8")) as {
+      rewrites: { source: string; destination: unknown }[];
+    };
+    const proxy = rewrites.findIndex(
+      ({ source, destination }) =>
+        source === `${resolveTelemetryEndpoint({}).path}/:path(.*)` &&
+        destination === "https://api-eu.mixpanel.com/:path",
+    );
+    expect(proxy, "vercel.json has no rewrite for the CLI's Mixpanel path").toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(proxy).toBeLessThan(rewrites.findIndex(({ source }) => source === "/(.*)"));
   });
 });

@@ -24,6 +24,7 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
+  VERCEL_EVENT_KEYS,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import type {
@@ -287,7 +288,12 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry) {
       return;
     }
-    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetry = this.createTelemetry({
+      env: process.env,
+      flag,
+      debug: this.meta.debug,
+      vercelKeys: VERCEL_EVENT_KEYS,
+    });
     if (!this.telemetry.enabled) {
       return;
     }

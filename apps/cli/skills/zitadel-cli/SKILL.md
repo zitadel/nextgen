@@ -212,8 +212,9 @@ Common error codes point at their own fix in `next_commands`:
   with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
-- `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
-  Zitadel platform API. Follow `next_commands`.
+- `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
+  version does not have (`details.body.code` is `req.not_found`), or a
+  `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.
 

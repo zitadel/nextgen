@@ -139,7 +139,7 @@ that version is published on npm.
 
 The wrapper sets `ZITADEL_TELEMETRY_ENV=development` unless you set it, so local
 builds, which report their unreleased version, stay out of the production
-telemetry project.
+telemetry project and send no copy to Vercel Web Analytics.
 
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.

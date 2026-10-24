@@ -34,9 +34,11 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
@@ -45,6 +47,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -305,8 +308,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
-	// The console previews a project's login from the public base, so the
-	// flow gate admits its origin to every project, as it admits loopback.
+	// The console previews a project's login from the public base, so opening
+	// a flow admits its origin for every project; no later step does.
 	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
 	if err != nil {
 		return err
@@ -429,6 +432,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
+		Version:    build.Version(),
+		Commit:     build.Commit(),
+		Dialect:    databaseDialectName(cfg),
+		OnVercel:   os.Getenv("VERCEL") == "1",
+		PublicBase: cfg.Server.PublicBase,
+	})
+	pinger.Start()
+	defer pinger.Close()
+
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
@@ -458,7 +471,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
-		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
@@ -687,6 +700,11 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.enabled", true)
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	v.SetDefault("service_ping.enabled", false)
+	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
+	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
+	v.SetDefault("service_ping.mixpanel_token", serviceping.DefaultMixpanelToken)
+	v.SetDefault("service_ping.interval", 24*time.Hour)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -810,8 +828,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 // ----------------------------- HTTP --------------------------------------
 
 // apiServerOptions are the options of the ogen API server that buildHTTPMux
-// mounts, shared with the test of that chain.
-func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider) []oasapi.ServerOption {
+// mounts, shared with the test of that chain. home is the way on that the
+// error page of a path nothing answers offers a person (ADR 076).
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -820,7 +839,21 @@ func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.
 		oasapi.WithMeterProvider(meterProvider),
 		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
 		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithNotFound(api.OgenNotFound(home)),
+		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
+}
+
+// consoleLink is the console's start page as an error page's way on. The
+// path is where the console lives even when this server does not serve it:
+// the hosted cloud runs it as a service of its own, and the claim and
+// dashboard links the server hands out assume the same.
+func consoleLink(consolePath string) *errorpage.Link {
+	consolePath = strings.TrimSuffix(consolePath, "/")
+	if consolePath == "" {
+		return nil
+	}
+	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
@@ -863,7 +896,9 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 
 	chain := func(h http.Handler, redactQuery ...string) http.Handler {
 		return middleware.Chain(h,
-			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
 			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
@@ -922,6 +957,19 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
 	return dialect, nil
+}
+
+// databaseDialectName names the configured dialect without connecting, for
+// the service ping; an unconfigured database is the sqlite default.
+func databaseDialectName(cfg Config) string {
+	if len(cfg.Database.Raw) == 0 {
+		return "sqlite"
+	}
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return "unknown"
+	}
+	return dialect.Name()
 }
 
 func defaultSQLitePath(dataDir string) string {

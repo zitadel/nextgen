@@ -38,9 +38,14 @@
 
 ## Telemetry
 
-Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
+Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`), plus a
+copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
 
 - Add no other analytics tool or SDK, browser SDK included.
+- The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
+  the catalog's `vercel` list (`catalog.test.ts`); Vercel locates it by IP.
+- Development runs (`resolveChannel`, CI included) send no Vercel copy unless
+  `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake.
 - Send nothing that identifies a person, machine or credential: no user,
   email, name, IP, URL, project id, file path, secret or free text. Allowed
   values are enums, booleans, counts and versions.
@@ -58,6 +63,8 @@ Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`).
   and published on purpose. Without settings, events go to the production
   project; `ZITADEL_TELEMETRY_ENV=development` selects the dev project, and CI
   sets `DO_NOT_TRACK=1`.
+- Events for the EU projects go through the cloud's `/telemetry/mixpanel/*`
+  rewrite in `vercel.json`, which released CLIs depend on (`config.test.ts`).
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
   (`src/lib/user-agent.ts`) and obey the same opt-out.
 - The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
@@ -72,21 +79,10 @@ from `BaseCommand` for every command. Add a dimension rather than an event:
    after it, so not `started`. Never fetch data just to record it.
 2. Name it `snake_case`; a boolean starts with `is_`, `has_`, `dry_` or
    `non_`. Leave out empty values; `compact()` drops them.
-3. List it below and on the telemetry page, then cover it in
-   `tests/unit/lib/telemetry/`. The `setup-dimensions` and
-   `variables-dimensions` tests fail on a recorded dimension their line below
-   does not name.
+3. List it under its command in the
+   [event catalog](../../docs/product-analytics-events.yaml) and on the
+   telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
+   code and the catalog disagree.
 4. Check that it arrives in Mixpanel's Live View. The region defaults to `eu`;
    set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are silently
    dropped.
-
-Dimensions each command records:
-
-- **setup** — `framework`, `renderer`, `package_manager`, `scaffolded_skeleton`, `skip_install`, `dev_port_explicit`, `preset`, `use_case`, `sso` (an `IDP_PROVIDERS` slug, `custom` for a developer-described connection but never its slug, `none`, or `multiple`), `files_written_count`, `step` (`framework_resolved` → `project_created` → `files_patched` → `dependencies_installed`).
-- **branding eject** — `design` (a `BRANDING_DESIGNS` value).
-- **plan / apply** — `creates`, `updates`, `deletes`, `revisions`, `total` (counts only).
-- **doctor** — `runtime`, `checks_total`, `checks_failed`, `checks_warn`, `failed_checks` (check names, never messages).
-- **start** — `runtime` (`binary` / `docker`).
-- **variables** — `is_secret`, `variable_count`. Never the variable's name or value.
-- **api** — `operation` (an `operationId` of the spec, never a path, an id or a field), `is_paginated`.
-- **claim** — `claim_outcome` (`completed` / `already_claimed` / `expired` / `window_expired` / `timeout` / `dry_run`), `poll_count`, `browser_opened`. Never an id or a URL.
