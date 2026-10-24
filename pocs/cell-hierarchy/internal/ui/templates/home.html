@@ -1,0 +1,73 @@
+{{define "home"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      <h1>Cells</h1>
+      <p class="muted">Ops surface: topology + join spare. WAN pairwise delays are fixed defaults in code (broadcast to cells at UI startup).</p>
+      {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+      {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+      <div class="panel" style="margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+        <form method="get" action="/" style="margin:0">
+          <button type="submit">Refresh tree</button>
+        </form>
+        <span class="muted">Platform-only · no auto-poll (avoids pairwise delay amplification)</span>
+      </div>
+      <div id="tree">
+        {{template "tree" .}}
+      </div>
+
+      <div class="panel">
+        <h2>Join spare</h2>
+        <p class="muted">Prepare an invite on a parent cell, then accept on an unjoined child.</p>
+        <form method="post" action="/join">
+          <label for="parent_url">Parent (is_parent)</label>
+          <select id="parent_url" name="parent_url" required>
+            <option value="">Select parent…</option>
+            {{range .Parents}}
+            <option value="{{.URL}}">{{.Label}} — {{.URL}}</option>
+            {{end}}
+          </select>
+          <label for="child_url">Unjoined cell</label>
+          <select id="child_url" name="child_url" required>
+            <option value="">Select cell…</option>
+            {{range .UnjoinedO}}
+            <option value="{{.URL}}">{{.Label}} — {{.URL}}</option>
+            {{end}}
+          </select>
+          <button type="submit">Join</button>
+        </form>
+      </div>
+
+      <div class="panel">
+        <h2>Pairwise delays (fixed)</h2>
+        <p class="muted">Read-only defaults. Same-cell = 0; unlisted labeled pairs = 0; unlabeled URLs = 50ms.</p>
+        <table class="delay-matrix">
+          <thead><tr><th>Pair</th><th>Delay (ms)</th></tr></thead>
+          <tbody>
+          {{range .DelayPairs}}
+            <tr>
+              <td><code>{{.Left}}</code> ↔ <code>{{.Right}}</code></td>
+              <td>{{.Ms}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}

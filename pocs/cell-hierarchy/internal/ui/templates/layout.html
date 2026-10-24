@@ -1,0 +1,194 @@
+{{define "layout-styles"}}
+:root { --bg:#0f1419; --panel:#1a222c; --text:#e7ecf1; --muted:#8b9aab; --accent:#3d9cf0; --ok:#3ecf8e; --bad:#f07178; --stale:#6b7280; --border:#2a3542; --warn:#e6b450; --sidebar:#121820; }
+* { box-sizing: border-box; }
+body { margin:0; font-family:ui-sans-serif,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.45; }
+a { color:var(--accent); }
+.app { display:flex; min-height:100vh; }
+.sidebar { width:220px; flex-shrink:0; background:var(--sidebar); border-right:1px solid var(--border); padding:1rem 0.75rem; }
+.sidebar .brand { font-weight:700; padding:0.25rem 0.5rem 1rem; font-size:0.95rem; }
+.sidebar .nav-group { margin:0.75rem 0 0.25rem; padding:0 0.5rem; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); }
+.sidebar a { display:block; color:var(--muted); text-decoration:none; padding:0.4rem 0.6rem; border-radius:6px; margin:0.1rem 0; font-size:0.9rem; }
+.sidebar a:hover { color:var(--text); background:#1a222c; }
+.sidebar a.active { color:var(--accent); background:#1a222c; }
+.content { flex:1; min-width:0; display:flex; flex-direction:column; }
+.content-main { padding:1.25rem; max-width:1100px; width:100%; margin:0 auto; flex:1; }
+.breadcrumbs { font-size:0.85rem; color:var(--muted); margin:0 0 0.75rem; }
+.breadcrumbs a { color:var(--muted); text-decoration:none; }
+.breadcrumbs a:hover { color:var(--accent); }
+.breadcrumbs .sep { margin:0 0.35rem; }
+h1 { font-size:1.25rem; margin:0 0 1rem; }
+h2 { font-size:1rem; margin:0 0 0.5rem; }
+.panel { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+.muted { color:var(--muted); font-size:0.875rem; }
+.flash-ok { color:var(--ok); margin-bottom:0.75rem; }
+.flash-err { color:var(--bad); margin-bottom:0.75rem; }
+.badge { display:inline-block; font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); color:var(--muted); margin-left:0.35rem; }
+.badge.parent { color:var(--accent); border-color:var(--accent); }
+.badge.lookup { color:var(--ok); border-color:var(--ok); }
+.dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.35rem; background:var(--ok); }
+.dot.stale { background:var(--stale); }
+.dot.down { background:var(--bad); }
+ul.tree { list-style:none; padding-left:1.1rem; margin:0.25rem 0; }
+ul.tree.root { padding-left:0; }
+li.node { margin:0.35rem 0; }
+code { font-size:0.8rem; color:var(--muted); }
+table { width:100%; border-collapse:collapse; }
+th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid var(--border); font-size:0.9rem; vertical-align:middle; }
+table.trace { font-size:0.85rem; }
+table.trace th, table.trace td { vertical-align:top; }
+label { display:block; margin:0.5rem 0 0.25rem; color:var(--muted); font-size:0.875rem; }
+input, select, button { font:inherit; padding:0.45rem 0.6rem; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+input:not([type=checkbox]):not([type=range]), select { width:100%; }
+button { background:var(--accent); border-color:var(--accent); color:#041018; font-weight:600; cursor:pointer; margin-top:0.5rem; margin-right:0.5rem; }
+button.secondary { background:transparent; color:var(--text); }
+button.danger { color:var(--bad); background:transparent; border-color:var(--bad); }
+.grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media (max-width:900px) {
+  .app { flex-direction:column; }
+  .sidebar { width:100%; border-right:none; border-bottom:1px solid var(--border); }
+  .grid { grid-template-columns:1fr; }
+}
+.controls { background:var(--panel); border:1px solid var(--accent); border-radius:8px; padding:1rem; margin-bottom:1rem; }
+.row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:flex-end; }
+form.inline { display:inline; }
+form.row { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:end; margin-top:0.75rem; }
+form.row label { display:flex; flex-direction:column; gap:0.2rem; font-size:0.75rem; color:var(--muted); }
+.hint { font-size:0.8rem; color:var(--muted); margin:0.35rem 0 0; }
+.badge.local { color:var(--accent); border-color:var(--accent); }
+.badge.child { color:var(--ok); border-color:var(--ok); }
+.badge.tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
+tr.tombstoned td { opacity:0.55; text-decoration:line-through; }
+ul.compact { margin:0.35rem 0; padding-left:1.2rem; font-size:0.875rem; color:var(--muted); }
+.delay-matrix input { width:5rem; }
+.latest-trace { border-left:3px solid var(--accent); }
+:root { --ui:#e6b450; }
+.hop-frame { margin:0; }
+.hop-head { display:flex; flex-wrap:wrap; gap:10px 16px; justify-content:space-between; align-items:flex-start; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+.hop-title { margin:0; font-size:1rem; font-weight:600; }
+.hop-sub { margin:4px 0 0; color:var(--muted); font-size:0.85rem; }
+.hop-total { margin:0; color:var(--muted); font-size:0.85rem; text-align:right; }
+.hop-total strong { color:var(--text); font-weight:600; }
+.hop-tl { list-style:none; margin:0; padding:0; }
+.hop-step { display:grid; grid-template-columns:20px minmax(0,1fr); gap:10px; position:relative; }
+.hop-step:not(:last-child) .hop-rail::after { content:""; position:absolute; left:9px; top:22px; bottom:-4px; width:2px; background:var(--border); }
+.hop-rail { position:relative; padding-top:10px; }
+.hop-dot { display:block; width:12px; height:12px; margin-left:4px; border-radius:50%; background:var(--muted); border:2px solid var(--panel); box-sizing:border-box; }
+.hop-dot-hit { background:var(--ok); }
+.hop-card { background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+.hop-step-hit .hop-card { border-color:var(--ok); }
+.hop-step-meta { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:6px; }
+.hop-n { display:inline-flex; align-items:center; justify-content:center; width:1.35rem; height:1.35rem; border-radius:50%; background:var(--panel); border:1px solid var(--border); font-size:0.75rem; font-weight:600; }
+.hop-when { color:var(--muted); font-size:0.75rem; font-variant-numeric:tabular-nums; }
+.hop-badge { font-size:0.7rem; font-weight:600; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border); }
+.hop-miss { color:var(--muted); }
+.hop-hit { color:var(--ok); border-color:var(--ok); }
+.hop-tombstone { color:var(--muted); border-color:var(--muted); text-decoration:line-through; }
+.hop-call { margin:0 0 4px; display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-weight:600; }
+.hop-actor { font-family:ui-monospace,monospace; font-size:0.8rem; padding:0.1rem 0.35rem; border-radius:4px; border:1px solid var(--border); }
+.hop-ui { color:var(--ui); border-color:var(--ui); }
+.hop-cell { color:var(--accent); border-color:var(--accent); }
+.hop-arrow { color:var(--muted); }
+.hop-ep { margin:0 0 4px; color:var(--muted); font-size:0.85rem; }
+.hop-timing { margin:0; font-size:0.75rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.hop-more { margin-top:8px; font-size:0.75rem; color:var(--muted); }
+.hop-more summary { cursor:pointer; color:var(--muted); }
+.hop-more p { margin:6px 0 0; }
+.hop-swim { margin-top:8px; padding-top:12px; border-top:1px solid var(--border); }
+.hop-swim-title { margin:0 0 8px; font-size:0.85rem; font-weight:600; }
+.hop-lanes { display:grid; gap:8px; }
+.hop-lane { display:grid; grid-template-columns:48px minmax(0,1fr) auto; gap:8px; align-items:center; font-size:0.75rem; }
+.hop-lane-lab { font-family:ui-monospace,monospace; color:var(--accent); }
+.hop-lane-bar { height:8px; border-radius:4px; background:var(--border); width:max(4px, calc(var(--d) * 1px)); max-width:100%; }
+.hop-lane-bar-d { background:var(--accent); opacity:0.65; }
+.hop-lane-bar-hit { background:var(--ok); opacity:0.85; }
+.hop-lane-val { color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap; }
+@media (max-width:520px) {
+  .hop-total { text-align:left; }
+  .hop-lane { grid-template-columns:40px minmax(0,1fr); }
+  .hop-lane-val { grid-column:2; }
+}
+{{end}}
+
+{{define "layout-nav"}}
+<aside class="sidebar">
+  <div class="brand">cell hierarchy</div>
+  <div class="nav-group">Ops</div>
+  <a href="/" class="{{if eq .NavActive "cells"}}active{{end}}">Cells</a>
+  <div class="nav-group">Hoster</div>
+  <a href="/platform" class="{{if eq .NavActive "platform"}}active{{end}}">Platform</a>
+  <div class="nav-group">Customer</div>
+  <a href="/workspaces" class="{{if eq .NavActive "workspaces"}}active{{end}}">Workspaces</a>
+</aside>
+{{end}}
+
+{{define "layout-breadcrumbs"}}
+{{if .Breadcrumbs}}
+<nav class="breadcrumbs">
+  {{range $i, $c := .Breadcrumbs}}
+    {{if $i}}<span class="sep">/</span>{{end}}
+    {{if $c.Href}}<a href="{{$c.Href}}">{{$c.Label}}</a>{{else}}<span>{{$c.Label}}</span>{{end}}
+  {{end}}
+</nav>
+{{end}}
+{{end}}
+
+{{define "latest-trace"}}
+{{with .LatestTimeline}}
+<div class="panel latest-trace hop-frame" role="region" aria-label="Latest hop timeline">
+  <header class="hop-head">
+    <div>
+      <h2 class="hop-title">Latest hop</h2>
+      <p class="hop-sub">{{if .AtShort}}{{.AtShort}}{{else}}{{.At}}{{end}} · <strong>{{.Action}}</strong>{{if .Note}} — {{.Note}}{{end}}</p>
+    </div>
+    {{if .Steps}}
+    <p class="hop-total">Total <strong>{{.TotalMs}} ms</strong> · {{.StepCount}} site step{{if ne .StepCount 1}}s{{end}}{{if .Outcome}} · {{.Outcome}}{{end}}</p>
+    {{end}}
+  </header>
+  {{if .Steps}}
+  <ol class="hop-tl" aria-label="Call timeline">
+    {{range .Steps}}
+    <li class="hop-step{{if .IsHit}} hop-step-hit{{end}}">
+      <div class="hop-rail" aria-hidden="true"><span class="hop-dot{{if .IsHit}} hop-dot-hit{{end}}"></span></div>
+      <div class="hop-card">
+        <div class="hop-step-meta">
+          <span class="hop-n">{{.N}}</span>
+          <span class="hop-when">t+{{.CumulativeMs}} ms</span>
+          <span class="hop-badge {{.ResultClass}}">{{.Result}}</span>
+        </div>
+        <p class="hop-call">
+          <span class="hop-actor hop-ui">{{.Caller}}</span>
+          <span class="hop-arrow" aria-hidden="true">→</span>
+          <span class="hop-actor hop-cell">{{.CellLabel}}</span>
+        </p>
+        <p class="hop-ep"><code>{{.Method}}</code>{{if .ProjectID}} · project <code>{{.ProjectID}}</code>{{end}}{{if .HomeHint}} · home=<code>{{.HomeHint}}</code>{{end}}</p>
+        <p class="hop-timing">wire {{.WireMs}} ms · pair delay {{if and (gt .PairDelayMs 0) (ne .PairHint "entry")}}<strong>{{.PairDelayMs}} ms</strong> ({{.PairHint}}){{else}}{{.PairDelayMs}} ms ({{.PairHint}}){{end}} · step {{.StepMs}} ms</p>
+        {{with .Parent}}
+        <details class="hop-more">
+          <summary>Parent resolve</summary>
+          <p><span class="hop-actor hop-ui">{{.Caller}}</span> → <span class="hop-actor hop-cell">{{.CellLabel}}</span> · <code>{{.Method}}</code> · {{.Result}} · {{.Ms}} ms · {{.NextHint}}</p>
+        </details>
+        {{end}}
+      </div>
+    </li>
+    {{end}}
+  </ol>
+  {{if .Swimlanes}}
+  <div class="hop-swim" aria-label="Cell swimlane summary">
+    <p class="hop-swim-title">Who was called</p>
+    <div class="hop-lanes">
+      {{range .Swimlanes}}
+      <div class="hop-lane">
+        <span class="hop-lane-lab">{{.Label}}</span>
+        <span class="hop-lane-bar{{if gt .DelayMs 0}} hop-lane-bar-d{{end}}{{if .IsHit}} hop-lane-bar-hit{{end}}" style="--d:{{.DelayMs}}"></span>
+        <span class="hop-lane-val">{{.DelayMs}} ms · {{.Result}}</span>
+      </div>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+  {{else}}
+  <p class="muted">No peer hops recorded for this action.</p>
+  {{end}}
+</div>
+{{end}}
+{{end}}
