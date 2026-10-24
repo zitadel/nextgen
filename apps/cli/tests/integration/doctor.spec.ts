@@ -216,7 +216,12 @@ describe("doctor", () => {
 
           const result = await app.doctorAtItsServer();
 
-          expect(app.suggestedArgsOf(result)).toContainEqual(["start", "--cwd", parent.path]);
+          expect(app.suggestedArgsOf(result)).toContainEqual([
+            "start",
+            "--cwd",
+            parent.path,
+            "--json",
+          ]);
         },
       );
 
@@ -234,6 +239,7 @@ describe("doctor", () => {
             "--force",
             "--cwd",
             parent.path,
+            "--json",
           ]);
         },
       );
@@ -252,6 +258,7 @@ describe("doctor", () => {
             "--force",
             "--cwd",
             parent.path,
+            "--json",
           ]);
         },
       );

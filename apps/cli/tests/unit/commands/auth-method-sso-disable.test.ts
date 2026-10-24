@@ -174,8 +174,8 @@ describe("auth-method sso disable", () => {
     const { envelope } = await run(cwd, "--provider", "google");
 
     expect(envelope.data?.next_args).toEqual([
-      ["plan", "--cwd", expect.any(String)],
-      ["apply", "--cwd", expect.any(String)],
+      ["plan", "--cwd", expect.any(String), "--json"],
+      ["apply", "--cwd", expect.any(String), "--json"],
     ]);
   });
 
@@ -288,6 +288,7 @@ describe("auth-method sso disable", () => {
         "--cwd",
         expect.any(String),
         "--force",
+        "--json",
       ]);
       expect(await ssoOf(cwd)).toEqual({ enabled: true, providers: ["google"] });
     });
@@ -333,10 +334,10 @@ describe("auth-method sso disable", () => {
 
       expect(envelope.next_commands?.map((c) => c.replace(/^.*? auth-method /, ""))).toEqual([
         expect.stringMatching(
-          /^sso disable --provider google --schema default-human-user --cwd \S+ --force$/,
+          /^sso disable --provider google --schema default-human-user --cwd \S+ --force --json$/,
         ),
-        expect.stringMatching(/^password enable --schema default-human-user --cwd \S+$/),
-        expect.stringMatching(/^passkey enable --schema default-human-user --cwd \S+$/),
+        expect.stringMatching(/^password enable --schema default-human-user --cwd \S+ --json$/),
+        expect.stringMatching(/^passkey enable --schema default-human-user --cwd \S+ --json$/),
       ]);
     });
 
