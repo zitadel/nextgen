@@ -3,6 +3,8 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"net/url"
+	"strings"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -47,6 +49,9 @@ type Handler struct {
 	// `$id` under whichever base the project stores it (see
 	// WithBuiltinSchemaBases); the zero value resolves ids as written.
 	builtinBases domain.BuiltinSchemaBases
+	// flowDiagnostics puts the error code behind a flow step's error on the
+	// wire (see WithFlowDiagnostics).
+	flowDiagnostics bool
 }
 
 func NewHandler(
@@ -119,6 +124,27 @@ func (h *Handler) WithPersonalTeamEnsurer(e service.PersonalTeamEnsurer) *Handle
 func (h *Handler) WithBuiltinSchemaBases(bases domain.BuiltinSchemaBases) *Handler {
 	h.builtinBases = bases
 	return h
+}
+
+// WithFlowDiagnostics sends a flow step's `error_code` to the client: the
+// code of a failure the step shows only generically, such as why an identity
+// provider is unavailable. Only a local development deployment turns it on
+// (see FlowDiagnosticsFor); anywhere else the code stays in the server log.
+func (h *Handler) WithFlowDiagnostics(enabled bool) *Handler {
+	h.flowDiagnostics = enabled
+	return h
+}
+
+// FlowDiagnosticsFor reports whether a deployment reachable at publicBase
+// serves local development: an http loopback origin, which is what the CLI's
+// local runtime configures. It is the deployment's own configuration, not
+// anything a request carries, so a visitor cannot turn it on.
+func FlowDiagnosticsFor(publicBase string) bool {
+	u, err := url.Parse(publicBase)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Scheme, "http") && isLoopbackHost(u.Hostname())
 }
 
 // NewError implements the api.Handler interface and is used by ogen to convert any error

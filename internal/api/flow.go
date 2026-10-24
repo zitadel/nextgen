@@ -406,7 +406,7 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 	resp := api.FlowResponse{
 		ID:        result.State.ID,
 		SessionID: result.State.SessionID,
-		Step:      toFlowStep(result.Step),
+		Step:      toFlowStep(result.Step, h.flowDiagnostics),
 		Branding:  api.NewOptBranding(h.resolveBranding(ctx, result.State.ProjectID)),
 	}
 	if terminal && result.State.RedirectURI != nil {
@@ -421,7 +421,9 @@ func (h *Handler) buildFlowResponse(ctx context.Context, result domain.FlowStepR
 	return resp
 }
 
-func toFlowStep(step *domain.FlowStep) api.FlowStep {
+// toFlowStep maps a domain step onto the wire. diagnostics adds the error
+// code behind the step's error (see Handler.WithFlowDiagnostics).
+func toFlowStep(step *domain.FlowStep, diagnostics bool) api.FlowStep {
 	if step == nil {
 		return api.FlowStep{}
 	}
@@ -437,6 +439,9 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
+		if diagnostics && step.ErrorCode != "" {
+			out.ErrorCode = api.NewOptString(step.ErrorCode)
+		}
 	}
 	if step.Complete != nil {
 		out.Complete = api.NewOptFlowStepComplete(toFlowStepComplete(*step.Complete))

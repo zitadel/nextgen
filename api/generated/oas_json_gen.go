@@ -45963,6 +45963,12 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.ErrorCode.Set {
+			e.FieldStart("error_code")
+			s.ErrorCode.Encode(e)
+		}
+	}
+	{
 		if s.Complete.Set {
 			e.FieldStart("complete")
 			s.Complete.Encode(e)
@@ -46018,18 +46024,19 @@ func (s *FlowStep) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfFlowStep = [11]string{
+var jsonFieldsNameOfFlowStep = [12]string{
 	0:  "name",
 	1:  "texts",
 	2:  "error",
-	3:  "complete",
-	4:  "redirect_url",
-	5:  "fields",
-	6:  "identifier",
-	7:  "actions",
-	8:  "gates",
-	9:  "sso_providers",
-	10: "challenge",
+	3:  "error_code",
+	4:  "complete",
+	5:  "redirect_url",
+	6:  "fields",
+	7:  "identifier",
+	8:  "actions",
+	9:  "gates",
+	10: "sso_providers",
+	11: "challenge",
 }
 
 // Decode decodes FlowStep from json.
@@ -46073,6 +46080,16 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"error\"")
 			}
+		case "error_code":
+			if err := func() error {
+				s.ErrorCode.Reset()
+				if err := s.ErrorCode.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"error_code\"")
+			}
 		case "complete":
 			if err := func() error {
 				s.Complete.Reset()
@@ -46094,7 +46111,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"redirect_url\"")
 			}
 		case "fields":
-			requiredBitSet[0] |= 1 << 5
+			requiredBitSet[0] |= 1 << 6
 			if err := func() error {
 				s.Fields = make([]Field, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -46122,7 +46139,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"identifier\"")
 			}
 		case "actions":
-			requiredBitSet[0] |= 1 << 7
+			requiredBitSet[1] |= 1 << 0
 			if err := func() error {
 				s.Actions = make([]FlowStepAction, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -46140,7 +46157,7 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 				return errors.Wrap(err, "decode field \"actions\"")
 			}
 		case "gates":
-			requiredBitSet[1] |= 1 << 0
+			requiredBitSet[1] |= 1 << 1
 			if err := func() error {
 				if err := s.Gates.Decode(d); err != nil {
 					return err
@@ -46186,8 +46203,8 @@ func (s *FlowStep) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b10100001,
-		0b00000001,
+		0b01000001,
+		0b00000011,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.

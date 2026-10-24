@@ -147,7 +147,7 @@ func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 			{ID: "google", Name: "Google", Template: "google"},
 			{ID: "github", Name: "GitHub", Template: "github"},
 		},
-	})
+	}, false)
 
 	require.Equal(t, []apigen.SSOProvider{
 		{ID: "google", Name: "Google", Template: "google"},
@@ -158,7 +158,7 @@ func TestToFlowStep_EmitsSSOProvidersInOrder(t *testing.T) {
 func TestToFlowStep_NoSSOProvidersLeavesListEmpty(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"}, false)
 
 	require.Empty(t, got.SSOProviders)
 }
@@ -172,7 +172,7 @@ func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
 			Value:        "alice@example.com",
 			Autocomplete: domain.AutocompleteUsername,
 		},
-	})
+	}, false)
 
 	require.True(t, got.Identifier.Set)
 	require.Equal(t, "alice@example.com", got.Identifier.Value.Value)
@@ -182,9 +182,40 @@ func TestToFlowStep_CarriesThePairedIdentifier(t *testing.T) {
 func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
 	t.Parallel()
 
-	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"}, false)
 
 	require.False(t, got.Identifier.Set)
+}
+
+// The code behind a step error reaches the wire only with diagnostics on,
+// which only a local development deployment turns on.
+func TestToFlowStep_ErrorCodeOnlyWithDiagnostics(t *testing.T) {
+	t.Parallel()
+	step := &domain.FlowStep{
+		Name:      "identifier",
+		Error:     new(domain.FlowStepErrorSSOUnavailable),
+		ErrorCode: "idp.discovery_failed",
+	}
+
+	require.False(t, toFlowStep(step, false).ErrorCode.Set)
+	got := toFlowStep(step, true)
+	require.True(t, got.ErrorCode.Set)
+	require.Equal(t, "idp.discovery_failed", got.ErrorCode.Value)
+}
+
+func TestFlowDiagnosticsFor(t *testing.T) {
+	t.Parallel()
+	for base, want := range map[string]bool{
+		"http://localhost:8081":         true,
+		"http://127.0.0.1:8080":         true,
+		"http://[::1]:8080":             true,
+		"https://localhost:8443":        false,
+		"https://nextgen.zitadel.cloud": false,
+		"http://auth.example.com":       false,
+		"":                              false,
+	} {
+		require.Equal(t, want, FlowDiagnosticsFor(base), base)
+	}
 }
 
 func TestValidateOriginAgainstProject(t *testing.T) {

@@ -70,6 +70,19 @@ properties:
       the step has no transition for sends `error.user_not_found`,
       `error.user_already_exists`, `error.sso_user_not_found`, or
       `error.outcome_unhandled` for any other outcome.
+  error_code:
+    type: string
+    description: |
+      The API error code behind `error`, for a developer to look up, when
+      the engine has one it does not show the user: why an identity
+      provider is unavailable (`error.sso_unavailable`), for example
+      `idp.discovery_failed`.
+
+      Sent only by a deployment serving local development, one whose public
+      base is an http loopback origin, such as the CLI's local runtime. A
+      deployment on any other origin never sends it, so a production visitor
+      learns nothing about the project's configuration from it.
+    example: idp.discovery_failed
   complete:
     type: string
     enum: [redirect, show]

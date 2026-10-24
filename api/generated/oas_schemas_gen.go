@@ -27094,6 +27094,15 @@ type FlowStep struct {
 	// `error.user_already_exists`, `error.sso_user_not_found`, or
 	// `error.outcome_unhandled` for any other outcome.
 	Error OptNilString `json:"error"`
+	// The API error code behind `error`, for a developer to look up, when
+	// the engine has one it does not show the user: why an identity
+	// provider is unavailable (`error.sso_unavailable`), for example
+	// `idp.discovery_failed`.
+	// Sent only by a deployment serving local development, one whose public
+	// base is an http loopback origin, such as the CLI's local runtime. A
+	// deployment on any other origin never sends it, so a production visitor
+	// learns nothing about the project's configuration from it.
+	ErrorCode OptString `json:"error_code"`
 	// Present only on terminal steps. Tells the frontend what to do:
 	// - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
 	// - show: render the step as a success screen (e.g., registration confirmed).
@@ -27167,6 +27176,11 @@ func (s *FlowStep) GetError() OptNilString {
 	return s.Error
 }
 
+// GetErrorCode returns the value of ErrorCode.
+func (s *FlowStep) GetErrorCode() OptString {
+	return s.ErrorCode
+}
+
 // GetComplete returns the value of Complete.
 func (s *FlowStep) GetComplete() OptFlowStepComplete {
 	return s.Complete
@@ -27220,6 +27234,11 @@ func (s *FlowStep) SetTexts(val OptStepTexts) {
 // SetError sets the value of Error.
 func (s *FlowStep) SetError(val OptNilString) {
 	s.Error = val
+}
+
+// SetErrorCode sets the value of ErrorCode.
+func (s *FlowStep) SetErrorCode(val OptString) {
+	s.ErrorCode = val
 }
 
 // SetComplete sets the value of Complete.
