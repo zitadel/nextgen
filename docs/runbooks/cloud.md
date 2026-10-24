@@ -484,7 +484,9 @@ project and imports the root admin.
   launcher's first line names the database host and database it serves
   from. Add a log drain for retention. A line's `request_id` is Vercel's
   Request ID for the request (the launcher sets `server.request_id_header`
-  to `x-vercel-id`), the one an error page quotes: search for it.
+  to `x-vercel-id`), the one an error page and `X-Request-Id` quote: search
+  for it. On a protected preview the response's `x-vercel-id` names an outer
+  hop that Vercel does not log; search for `X-Request-Id` instead.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

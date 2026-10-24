@@ -63,26 +63,27 @@ test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
 
 // A path no service answers reaches the server: a browser gets its error page
 // and a program its envelope, and both quote Vercel's ID for the request, the
-// one Vercel's logs show (ADR 076). Its x-vercel-id names the regions the
-// request passed, then that ID.
+// one Vercel's logs file it under (ADR 076). The response's x-vercel-id is no
+// match for it on a protected preview, which answers through one more hop
+// with an ID of its own that Vercel does not log, so the check asks only that
+// the server quotes one of Vercel's IDs, not a req_ ID it minted.
 test("a path no service answers: a page for a browser, the envelope for a program", async ({
   request,
 }) => {
   const path = "/no-such-page-routes-spec";
-  const vercelRequestID = (response: { headers(): Record<string, string> }) =>
-    response.headers()["x-vercel-id"]?.split("::").at(-1);
+  // Five characters, the Unix time in milliseconds, twelve hex digits.
+  const vercelRequestID = /^[0-9a-z]{5}-\d{13}-[0-9a-f]{12}$/;
 
   const page = await request.get(path, { headers: { accept: "text/html" } });
   expect(page.status()).toBe(404);
-  const pageID = vercelRequestID(page);
-  expect(pageID).toBeTruthy();
-  expect(page.headers()["x-request-id"]).toBe(pageID);
+  const pageID = page.headers()["x-request-id"];
+  expect(pageID).toMatch(vercelRequestID);
   const html = await page.text();
   expect(html).toContain("<title>Page not found · Zitadel</title>");
   expect(html).toContain(`Request ID <code>${pageID}</code>`);
 
   const envelope = await request.get(path, { headers: { accept: "application/json" } });
   expect(envelope.status()).toBe(404);
-  expect(envelope.headers()["x-request-id"]).toBe(vercelRequestID(envelope));
+  expect(envelope.headers()["x-request-id"]).toMatch(vercelRequestID);
   expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
 });
