@@ -303,7 +303,7 @@ Design: [origins](https://github.com/zitadel/nextgen/pull/1427) in the spike beh
 The console previews a project's login with the project's own flow, opened
 by `createFlow` from the server's own origin, which a project's origins do
 not list. `createFlow` therefore admits the origin of `server.public_base`
-without a pattern, as it admits a loopback origin. Nothing past the first
-step follows from that: `submitFlowStep` still holds a browser `Origin` to
-the project's primary patterns and loopback, so a page on the server's own
-origin can show a project's first step but cannot sign anyone in to it.
+without a pattern, as it admits a loopback origin. Only opening a flow
+takes this exemption: every later step is held to the project's origins
+without it, so a page on the server's own origin can show a project's first
+step but cannot sign anyone in to it.

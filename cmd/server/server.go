@@ -305,8 +305,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
-	// The console previews a project's login from the public base, so the
-	// flow gate admits its origin to every project, as it admits loopback.
+	// The console previews a project's login from the public base, so opening
+	// a flow admits its origin for every project; no later step does.
 	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
 	if err != nil {
 		return err

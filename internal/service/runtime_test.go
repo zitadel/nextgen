@@ -216,3 +216,20 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.True(t, errors.Is(err, domain.ErrReleaseRevoked()))
 	})
 }
+
+// Gate is what the steps of an attempt answer to, not only its opening. The
+// deployment's own origin opens a flow (Resolve above) but passes no Gate of
+// a project that lists its origins.
+func TestRuntimeResolver_Gate(t *testing.T) {
+	resolver, _, _ := newMockedRuntimeResolver(t)
+	project := &domain.Project{
+		ID: "proj_1",
+		Origins: []domain.Origin{
+			{Pattern: "https://app.acme.com", Kind: domain.OriginKindPrimary},
+		},
+	}
+
+	_, err := resolver.Gate(t.Context(), project, ownOrigin)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)))
+}
