@@ -197,3 +197,13 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		}
 	})
 }
+
+func TestValidatePreviewTTL(t *testing.T) {
+	for _, ttl := range []time.Duration{time.Second, 7 * 24 * time.Hour, MaxPreviewTTL} {
+		assert.NoError(t, ValidatePreviewTTL(ttl), ttl)
+	}
+	for _, ttl := range []time.Duration{0, -time.Hour, MaxPreviewTTL + time.Second} {
+		assert.ErrorIs(t, ValidatePreviewTTL(ttl), ErrDeploymentInvalid(), ttl)
+	}
+	assert.ErrorContains(t, ValidatePreviewTTL(MaxPreviewTTL+time.Second), "at most 365 days")
+}

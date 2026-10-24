@@ -2,6 +2,7 @@ package ogenx
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"time"
@@ -43,30 +44,22 @@ func ParseISODuration(raw string) (time.Duration, error) {
 		return 0, fmt.Errorf("duration must include at least one unit")
 	}
 	total := time.Duration(0)
-	if m[1] != "" {
-		days, err := strconv.ParseInt(m[1], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("invalid day component")
+	for i, unit := range []struct {
+		name string
+		size time.Duration
+	}{{"day", 24 * time.Hour}, {"hour", time.Hour}, {"minute", time.Minute}} {
+		if m[i+1] == "" {
+			continue
 		}
-		total += time.Duration(days) * 24 * time.Hour
-	}
-	if m[2] != "" {
-		hours, err := strconv.ParseInt(m[2], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("invalid hour component")
+		count, err := strconv.ParseInt(m[i+1], 10, 64)
+		if err != nil || count > int64((math.MaxInt64-total)/unit.size) {
+			return 0, fmt.Errorf("invalid %s component", unit.name)
 		}
-		total += time.Duration(hours) * time.Hour
-	}
-	if m[3] != "" {
-		minutes, err := strconv.ParseInt(m[3], 10, 64)
-		if err != nil {
-			return 0, fmt.Errorf("invalid minute component")
-		}
-		total += time.Duration(minutes) * time.Minute
+		total += time.Duration(count) * unit.size
 	}
 	if m[4] != "" {
 		seconds, err := strconv.ParseFloat(m[4], 64)
-		if err != nil {
+		if err != nil || seconds*float64(time.Second) >= float64(math.MaxInt64-total) {
 			return 0, fmt.Errorf("invalid second component")
 		}
 		total += time.Duration(seconds * float64(time.Second))

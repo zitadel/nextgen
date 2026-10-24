@@ -299,7 +299,7 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
 
@@ -578,8 +578,12 @@ func expectPreviewServing(statements *servicemocks.MockAllStatements, origins []
 // expectPreviewWrite expects the insert and the renewal of the previews of
 // origins for the default ttl.
 func expectPreviewWrite(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment) {
+	expectPreviewWriteFor(statements, origins, read, 7*24*time.Hour)
+}
+
+func expectPreviewWriteFor(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment, ttl time.Duration) {
 	expectInsert(statements, read)
-	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(7*24*time.Hour), deployedAt).Return(nil)
+	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(ttl), deployedAt).Return(nil)
 }
 
 func previewDeployment(id, origin string, at time.Time) *domain.Deployment {
@@ -607,13 +611,13 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		assert.Equal(t, origins, result.Deployment.Origins())
 	})
 
-	t.Run("a request ttl takes the default", func(t *testing.T) {
+	t.Run("a request ttl sets the expiry", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, previewPattern)
 		expectPreviewServing(statements, []string{gitOrigin}, nil, nil)
-		expectPreviewWrite(statements, []string{gitOrigin}, nil)
+		expectPreviewWriteFor(statements, []string{gitOrigin}, nil, time.Hour)
 
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(time.Hour)})
 		require.NoError(t, err)
 	})
 
