@@ -98,11 +98,23 @@ export async function validatePlannedSso(opts: {
   if (issues.length === 0) {
     return;
   }
-  const noun = issues.length === 1 ? "issue" : "issues";
+  // A warning-grade issue names a mapping that works but is weaker than it
+  // reads (a custom connection missing a scope, a verification nothing reads).
+  // It is non-blocking, so `apply` must not fail where `plan` only warned:
+  // it goes through reportWarning, which prints it and carries it in the
+  // envelope's `warnings`, and only the errors throw.
+  for (const issue of issues.filter((issue) => issue.severity === "warning")) {
+    reportWarning(`${issue.file}: ${issue.message}`);
+  }
+  const errors = issues.filter((issue) => issue.severity === "error");
+  if (errors.length === 0) {
+    return;
+  }
+  const noun = errors.length === 1 ? "issue" : "issues";
   throw new ZitadelError(
     "E_VALIDATION",
-    `SSO configuration is not consistent (${issues.length} ${noun}):\n` +
-      issues.map((issue) => `  - ${issue.file}: ${issue.message}`).join("\n"),
+    `SSO configuration is not consistent (${errors.length} ${noun}):\n` +
+      errors.map((issue) => `  - ${issue.file}: ${issue.message}`).join("\n"),
     {
       hint:
         "These checks read the schemas, flows and connection files together. " +
@@ -110,7 +122,7 @@ export async function validatePlannedSso(opts: {
         "Only the CLI makes these checks. Setting ZITADEL_SKIP_FLOW_VALIDATION skips them, " +
         "along with flow validation.",
       details: {
-        issues: issues.map(({ rule, file, steps, message }) => ({
+        issues: errors.map(({ rule, file, steps, message }) => ({
           rule,
           path: file,
           ...(steps === undefined ? {} : { steps }),

@@ -5,7 +5,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import consola from "consola";
 
 import { createZitadelClient } from "../lib/api-client";
-import { wrapForBox } from "../lib/box";
+import { printBox } from "../lib/term/box";
 import { openInBrowser } from "../lib/browser";
 import { CLAIM_WINDOW_DAYS, isAttached } from "../lib/claim-state";
 import { ZitadelError } from "../lib/errors";
@@ -178,14 +178,13 @@ export default class Claim extends BaseCommand {
     // it must never be split (clickability, and the journey e2e scrape reads
     // it out of the narration), and consola pads every box line to the
     // longest one, so a ~110-character URL inside the box would re-break the
-    // frame on any terminal narrower than the URL itself. `wrapForBox` keeps
+    // frame on any terminal narrower than the URL itself. `printBox` keeps
     // the frame's own content inside the terminal width.
-    consola.box({
+    printBox({
       title: "Finish in your browser",
-      message: wrapForBox(
+      tone: "info",
+      message:
         "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
-      ),
-      style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
     });
     consola.log(challenge.claim_url);
 

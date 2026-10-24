@@ -1,4 +1,4 @@
-import type { BoxAction } from "./box";
+import type { BoxAction } from "./term/box";
 import { serverKind } from "./oclif/server-kind";
 import type { ZitadelSecret } from "./project";
 import { publicCliCommand } from "./public-cli";

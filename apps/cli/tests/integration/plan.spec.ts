@@ -180,7 +180,7 @@ describe("plan", () => {
           [
             "subject_claim",
             (c: ConnectionDocument) => {
-              c.subject_claim = "email";
+              c.subject_claim = "oid";
             },
           ],
         ])("refuses an edit of %s on a connection already applied", async (_field, edit) => {
@@ -188,6 +188,98 @@ describe("plan", () => {
           await app.editConnection("google", edit);
 
           expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it.each([
+          [
+            "a mapping target the schema does not define",
+            async (app: ScaffoldedApp) => {
+              await app.editConnection("google", (c) => {
+                c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
+              });
+            },
+          ],
+          [
+            "a standard claim the requested scopes do not return",
+            async (app: ScaffoldedApp) => {
+              await app.editConnection("google", (c) => {
+                c.oidc.scopes = ["openid", "email"];
+                c.claim_mapping = { ...c.claim_mapping, givenName: "given_name" };
+              });
+            },
+          ],
+          [
+            "a claim whose type the property cannot hold",
+            async (app: ScaffoldedApp) => {
+              await app.editUserSchema((schema) => {
+                schema.properties.refreshedAt = { type: "string" };
+              });
+              await app.editConnection("google", (c) => {
+                c.claim_mapping = { ...c.claim_mapping, refreshedAt: "updated_at" };
+              });
+            },
+          ],
+          [
+            "a verification that reads a claim which is not a boolean",
+            async (app: ScaffoldedApp) => {
+              await app.editConnection("google", (c) => {
+                c.verified_claims = { email: "email" };
+              });
+            },
+          ],
+          [
+            "an email verified by a claim that vouches for another",
+            async (app: ScaffoldedApp) => {
+              await app.editConnection("google", (c) => {
+                c.claim_mapping = { ...c.claim_mapping, email: "preferred_username" };
+              });
+            },
+          ],
+          [
+            "a subject that is a claim the user can change",
+            async (app: ScaffoldedApp) => {
+              await app.editConnection("google", (c) => {
+                c.subject_claim = "email";
+              });
+            },
+          ],
+        ])("stops on %s", async (_name, edit) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.planAttempt()).toFailWith("E_VALIDATION");
+        });
+
+        it("warns, but does not stop, on a verification of a property nothing reads", async () => {
+          const app = await anAppWithGoogle();
+          await app.editUserSchema((schema) => {
+            schema.properties.nickname = { type: "string" };
+          });
+          await app.editConnection("google", (c) => {
+            c.claim_mapping = { ...c.claim_mapping, nickname: "nickname" };
+            c.verified_claims = { ...c.verified_claims, nickname: "nickname_ok" };
+          });
+
+          const result = await app.planRendered();
+
+          expect(result).toSucceed();
+          expect(result).toSay("not unique");
+        });
+
+        it("warns, but does not stop, on a custom connection whose scopes omit a claim it reads", async () => {
+          const app = await aSetUpApp();
+          await app.enableCustomSso(
+            { slug: "acme-sso", displayName: "Acme SSO", issuer: "https://sso.acme.example" },
+            { clientId: "acme-client-id", secret: "acme-client-secret" },
+          );
+          await app.editConnection("acme-sso", (c) => {
+            c.oidc.scopes = ["openid"];
+          });
+
+          const result = await app.planRendered();
+
+          expect(result).toSucceed();
+          expect(result).toSay("only returns for");
         });
 
         it("plans an edit of a field that does not identify the connection", async () => {
@@ -465,6 +557,34 @@ describe("plan", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("ends with a summary of the changes", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableSso("google", GOOGLE)).toSucceed();
+
+        expect(await app.planRendered()).toPrint("Plan summary");
+      });
+
+      it("prints no summary when there is nothing to apply", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableSso("google", GOOGLE)).toSucceed();
+        expect(await app.apply()).toSucceed();
+
+        expect(await app.planRendered()).not.toPrint("Plan summary");
+      });
+
+      it("suggests the property a mistyped mapping target was meant for", async () => {
+        const app = await aSetUpApp();
+        expect(await app.enableSso("google", GOOGLE)).toSucceed();
+        await app.editUserSchema((schema) => {
+          schema.properties.contactEmail = { type: "string" };
+        });
+        await app.editConnection("google", (c) => {
+          c.claim_mapping = { ...c.claim_mapping, contactEmial: "mail" };
+        });
+
+        expect(await app.planRendered()).toSay('Did you mean "contactEmail"?');
+      });
+
       it("names the edited field", async () => {
         const app = await aSetUpApp();
         await addCompanyField(app);

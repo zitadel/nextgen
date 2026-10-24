@@ -13,9 +13,9 @@ export type FlowValidationIssue = {
   step?: string;
 };
 
-/** A finding about the project as a whole. Every project rule is an error. */
+/** A finding about the project as a whole. Most project rules are errors; a few are warnings. */
 export type ProjectIssue = {
-  severity: "error";
+  severity: "error" | "warning";
   rule: ProjectRuleId;
   /** Project-relative path of the file the issue is in. */
   file: string;

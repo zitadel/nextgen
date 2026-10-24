@@ -9,6 +9,7 @@ import {
   isUnsupportedDeletion,
   makeSyncers,
   renderPlan,
+  renderPlanSummary,
   summarizePlan,
 } from "../lib/sync";
 import { readZitadelSecret } from "../lib/project";
@@ -74,7 +75,9 @@ export default class Plan extends BaseCommand {
         changes: enumeratePlanResources(plan),
         warnings: collectPlanWarnings(plan),
       },
-      pretty: renderPlan(plan, isTTY),
+      pretty: [renderPlan(plan, isTTY), await renderPlanSummary(cwd, plan)]
+        .filter((part) => part !== undefined)
+        .join("\n"),
     });
   }
 }

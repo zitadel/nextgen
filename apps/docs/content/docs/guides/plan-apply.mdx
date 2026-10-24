@@ -5,7 +5,7 @@ description: Change your user schema and login flows in .zitadel/, preview the c
 
 `.zitadel/schemas/*.json` and `.zitadel/flows/*.json` are the source of truth for your project's user schemas and login flows; `.zitadel/branding/` and `.zitadel/idps/` sync the same way. Edit them, preview with `plan`, publish with `apply`. How the sync decides what changed, and what it checks before it uploads anything: [Configuration as code](/docs/concepts/repo-config#how-syncing-works).
 
-`plan` previews the configuration sync diff without mutating files or platform state:
+`plan` previews the configuration sync diff without mutating files or platform state. It ends with a summary box that lists the changes and, for each connection it creates or changes, what the connection maps (user attribute → claim) and what verifies it, read from the file, which holds variable references and never a secret. The box is left out when there is nothing to apply:
 
 ```sh
 npx @zitadel/cli@latest plan

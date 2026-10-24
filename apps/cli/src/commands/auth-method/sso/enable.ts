@@ -14,6 +14,7 @@ import {
   parseClientId,
   parseClientSecret,
   type ProviderName,
+  uniquePropertyNames,
   type ProviderSelection,
   providerOf,
   selectionName,
@@ -23,6 +24,7 @@ import {
 import { createZitadelClient } from "../../../lib/api-client";
 import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
+import { printBox } from "../../../lib/term/box";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
 import { stableStringify } from "../../../lib/json";
@@ -34,6 +36,7 @@ import {
   CONNECTION_SCHEMA_REF,
   enabledMethods,
   type ConnectionPlan,
+  type ConnectionStatus,
   type FlowFile,
   credentialVariablesOf,
   customExample,
@@ -41,6 +44,8 @@ import {
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
+  mappingLines,
+  readMappings,
   planConnection,
   publishClientId,
   type PublishState,
@@ -50,6 +55,8 @@ import {
   selectionFromFlags,
   type StoredVariables,
   ssoEditRefusal,
+  statusLine,
+  stillToConfigure,
   type SsoResult,
   type SsoSkipped,
   reportSecretOutcome,
@@ -257,9 +264,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // written, both arrive here.
     let secret: SecretOutcome | undefined;
     let clientIdState: PublishState | undefined;
+    // The connection as it stands in the file, for the summary below.
+    let connectionBody: object;
 
     if (reusing) {
       consola.success(`Reusing ${plan.file.path}`);
+      connectionBody = plan.file.body;
       // Shown on reuse too: the URI moved to one per connection after the
       // first release, and rerunning this command is how a developer finds
       // the one to register now.
@@ -358,6 +368,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const connection = entry.connection({
         slug: plan.slug,
         schemaProperties: schema.properties,
+        uniqueProperties: uniquePropertyNames(schema.body),
         schemaRef: CONNECTION_SCHEMA_REF,
         endpoints,
       });
@@ -377,6 +388,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // else in the output would show it.
         reportWarning(`${entry.displayName} points at ${endpoints.issuer}, not the provider`);
       }
+      connectionBody = connection;
       const target = join(cwd, plan.path);
       await mkdir(dirname(target), { recursive: true });
       // `wx` rather than a plain write: planConnection decided this file does
@@ -422,6 +434,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // has one, because the command refuses without it.
       reportSecretOutcome(secret, this.meta.cliVersion, reusing);
     }
+    this.reportConnection({
+      body: connectionBody,
+      file: reusing ? plan.file.path : plan.path,
+      provider: entry.displayName,
+      status: reusing ? "present" : "saved",
+    });
     this.reportOutcome(outcome);
     // `variables set` first, for a credential that did not reach the project:
     // the connection references it as `${{ NAME }}` and the engine resolves
@@ -450,12 +468,39 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           idVariable,
           changed: written,
           skipped: edits.skipped,
+          body: connectionBody,
+          status: reusing ? "present" : "saved",
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
         ...this.followUps(!reusing || written.length > 0, cwdArgs, recovery),
       },
       pretty: `Enabled ${entry.displayName} for ${schema.name}`,
+    });
+  }
+
+  /**
+   * The connection file, what it maps and what is still to do, so a run does
+   * not end with the mapping known only to whoever opens the file. Not shown
+   * under `--json`, which carries the mapping in its payload instead.
+   */
+  private reportConnection(input: {
+    body: object;
+    file: string;
+    provider: string;
+    status: ConnectionStatus;
+  }): void {
+    printBox({
+      title: `${input.provider} is set up`,
+      message: [
+        `Connection file   ${input.file}`,
+        "",
+        ...mappingLines(input.body, input.file),
+        "",
+        statusLine(input.status),
+        "Still to do:",
+        ...stillToConfigure(input).map((step, at) => `  ${at + 1}. ${step}`),
+      ].join("\n"),
     });
   }
 
@@ -520,7 +565,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     idVariable: ClientIdVariable | undefined;
     changed?: string[];
     skipped?: SsoSkipped[];
+    /** The connection as it stands in the file, when the run read or wrote it. */
+    body?: object;
+    /** Where the connection stands, for a result that wrote or read its file. */
+    status?: ConnectionStatus;
   }): Record<string, unknown> {
+    const mappings = input.body === undefined ? undefined : readMappings(input.body);
     return {
       project_id: input.projectId,
       provider: input.provider,
@@ -529,6 +579,18 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         action: input.plan.action,
         slug: input.plan.slug,
         file: input.plan.action === "reuse" ? input.plan.file.path : input.plan.path,
+        ...(input.status === undefined ? {} : { state: input.status }),
+        ...(mappings === undefined
+          ? {}
+          : {
+              claim_mapping: Object.fromEntries(
+                mappings.mapping.map((r) => [r.attribute, r.claim]),
+              ),
+              verified_claims: Object.fromEntries(
+                mappings.verification.map((r) => [r.attribute, r.claim]),
+              ),
+              scopes: mappings.scopes,
+            }),
       },
       callback_uri: input.callbackUri,
       changed: input.changed ?? [],

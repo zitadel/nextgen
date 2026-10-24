@@ -371,6 +371,24 @@ them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
 `sso enable`, verbatim. Each connection has its own URI, so a URI from another
 provider or an older CLI version does not work.
 
+The same results carry the connection's `claim_mapping` (user attribute to
+claim), `verified_claims` (what makes an attribute verified), `scopes` and
+`state` (`saved`, `applied` or `present`: only `applied` has reached the server,
+and none is tested until a sign-in) in `data.sso[]` from `setup` and
+`data.connection` from `sso enable`. To map another
+claim, edit `claim_mapping` in the connection file named there, then run `plan`
+and `apply`; the connection is not tested until a real sign-in.
+`plan` and `apply` refuse a mapping that cannot work and name the file, the
+problem and the fix: a target no schema defines (with a "Did you mean" when one
+is close), a standard claim of a type the property cannot hold, an email
+verified by a claim that vouches for another, and a `subject_claim` that is a
+profile claim. A catalog connection that reads a standard claim without its
+scope is refused too. Two softer mistakes warn but do not stop, so `apply`
+carries on: a verification of a property that is not unique (nothing reads it
+today), and a custom connection that reads a standard claim without the scope
+that returns it.
+Fix the file named; do not set `ZITADEL_SKIP_FLOW_VALIDATION`, which skips them.
+
 After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.

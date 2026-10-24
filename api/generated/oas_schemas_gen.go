@@ -38892,7 +38892,8 @@ type IdpConnection struct {
 	// Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 	// top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 	// `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
-	// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
+	// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored. A
+	// key is one property name, so it cannot contain a dot.
 	ClaimMapping OptIdpConnectionClaimMapping `json:"claim_mapping"`
 	// Maps a verifiable user-schema property to its verification source: a claim name (read the claim)
 	// or the literal `true` (trust this provider unconditionally). Values starting with `$` are reserved
@@ -39019,7 +39020,8 @@ func (s *IdpConnection) SetOidc(val OptIdpConnectionOidc) {
 // Maps user-schema property names (keys) to provider claim names (values). A value is an exact
 // top-level claim key: no path syntax, and a dot is part of the key, so nested claims (OIDC
 // `address`) are not addressable yet. `$`-prefixed strings and non-string values are reserved for
-// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored.
+// future mapping forms. Add properties defined in the user schemas; unmatched entries are ignored. A
+// key is one property name, so it cannot contain a dot.
 type IdpConnectionClaimMapping map[string]string
 
 func (s *IdpConnectionClaimMapping) init() IdpConnectionClaimMapping {

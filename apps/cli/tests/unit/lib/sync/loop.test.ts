@@ -1832,7 +1832,7 @@ describe("a syncer's preflight", () => {
   async function aProjectWithAnEditedFile(): Promise<string> {
     const cwd = makeCwd();
     await writeState(cwd, tracked);
-    await writeResource(cwd, IDPS, "acme.json", { slug: "acme", changed: true });
+    await writeResource(cwd, IDPS, "acme.json", { slug: "acme", display_name: "Acme, edited" });
     return cwd;
   }
 

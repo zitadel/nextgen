@@ -227,6 +227,12 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 	if err := schema.Validate(doc); err != nil {
 		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
 	}
+	// What the document alone shows about its claim mapping. The CLI makes
+	// these checks too, with the ones that need the user schemas, so a
+	// document sent without it is held to the same.
+	if problems := idp.MappingProblems(doc); len(problems) > 0 {
+		return "", domain.ErrRequestInvalid().WithDetails(map[string]any{"claim_mapping": problems})
+	}
 	if _, err := idp.ParseConnection("", document); err != nil {
 		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {
 			return "", err
