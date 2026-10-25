@@ -31,6 +31,24 @@ export interface CliResult {
   readonly stderr: string;
 }
 
+/** What a `zitadel mcp` tool answered: its text, whether it is an error result, or why the call was refused. */
+export interface McpToolResult {
+  readonly isError: boolean;
+  readonly text: string;
+  readonly refused?: string;
+}
+
+/** One JSON-RPC answer `zitadel mcp` wrote. */
+interface McpAnswer {
+  readonly id?: number;
+  readonly result?: {
+    readonly tools?: readonly { readonly name: string }[];
+    readonly content?: readonly { readonly text?: string }[];
+    readonly isError?: boolean;
+  };
+  readonly error?: { readonly message: string };
+}
+
 export interface Envelope<T = Record<string, unknown>> {
   readonly status: "ok" | "skipped" | "error";
   readonly code?: string;
@@ -635,6 +653,72 @@ export class ScaffoldedApp {
   /** `zitadel api ls` without `--json`. */
   apiOperationsRendered(...args: string[]): Promise<CliResult> {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
+  }
+
+  /** The tools `zitadel mcp`, started with `flags`, lists to a client. */
+  async mcpTools(...flags: string[]): Promise<string[]> {
+    const answer = await this.mcpAnswering({ method: "tools/list" }, flags);
+    return (answer.result?.tools ?? []).map(({ name }) => name);
+  }
+
+  /** One call of a `zitadel mcp` tool, as a client makes it. */
+  async mcpCall(
+    name: string,
+    args: Record<string, unknown>,
+    ...flags: string[]
+  ): Promise<McpToolResult> {
+    const answer = await this.mcpAnswering(
+      { method: "tools/call", params: { name, arguments: args } },
+      flags,
+    );
+    return {
+      isError: answer.result?.isError === true,
+      text: answer.result?.content?.[0]?.text ?? "",
+      refused: answer.error?.message,
+    };
+  }
+
+  /** `zitadel mcp` with these flags and nothing on stdin, for a spec asserting how it refuses. */
+  mcpRefusing(...flags: string[]): Promise<CliResult> {
+    return this.pipingStdin("", () => this.cli(["mcp", ...flags]));
+  }
+
+  /**
+   * Runs `zitadel mcp` as a stdio client drives it: the handshake, then
+   * `request`, then stdin closes, and the server's answer to the request.
+   */
+  private async mcpAnswering(
+    request: Readonly<{ method: string; params?: unknown }>,
+    flags: readonly string[],
+  ): Promise<McpAnswer> {
+    const session = [
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "spec", version: "0" },
+        },
+      },
+      { jsonrpc: "2.0", method: "notifications/initialized" },
+      { jsonrpc: "2.0", id: 2, ...request },
+    ];
+    const result = await this.pipingStdin(
+      session.map((message) => `${JSON.stringify(message)}\n`).join(""),
+      () => this.cli(["mcp", ...flags]),
+    );
+    expect(result, "zitadel mcp should have served the session").toSucceed();
+    const answers = result.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as McpAnswer);
+    const answer = answers.find((candidate) => candidate.id === 2);
+    if (!answer) {
+      throw new Error(`zitadel mcp did not answer the request:\n${result.stdout}`);
+    }
+    return answer;
   }
 
   getVariable(name: string): Promise<CliResult> {

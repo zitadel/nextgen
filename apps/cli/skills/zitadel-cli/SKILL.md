@@ -113,6 +113,18 @@ upgrade, so upgrade the app and rerun rather than retrying.
   cookie authenticates is refused with `E_VALIDATION`. Prefer a resource
   command where one exists: `api ls --json` names it in each operation's
   `command`.
+- **Serving the API to an MCP client (experimental).** `zitadel mcp` is a
+  stdio MCP server for a client to start (`claude mcp add zitadel -- npx
+  @zitadel/cli@latest mcp --cwd <app>`), not a command to run and parse: its
+  stdout carries the protocol alone, so it refuses `--json`. Each tool is one
+  operation `zitadel api` can call, named by its `operationId`, with the path
+  and query parameters as arguments and the JSON body as `body`; it calls the
+  resolved server with `.zitadel/secret`, and a `project_id` left out is the
+  project's own. Only the operations that read are tools unless it was
+  started with `--allow-writes`; with `--dry-run` a call that writes answers
+  with its request and sends nothing. `--tag` keeps the parts of the API
+  `api ls` names. Driving the CLI from a shell yourself, use `zitadel api`
+  instead.
 - **Never put secrets on the command line.** A property whose name reads as a
   credential (`password`, `client_secret`, `api_key`, …) is refused anywhere on
   argv when it holds free-form text — as a field flag, a `--set` or

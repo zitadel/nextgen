@@ -37,12 +37,12 @@ export const urlOf = (server: string, request: ApiRequest): string => {
 
 /**
  * The generated Zod schema for one part of an operation's request:
- * `QueryUsersBody`, `ListEventsQueryParams`. orval names them after the
- * `operationId` with its first letter raised.
+ * `QueryUsersBody`, `ListEventsQueryParams`, `GetUserByIDParams` (the path's).
+ * orval names them after the `operationId` with its first letter raised.
  */
 export const schemaOf = (
   operation: ApiOperation,
-  part: "Body" | "QueryParams",
+  part: "Body" | "Params" | "QueryParams",
 ): ZodLike | undefined => {
   const name = `${operation.id.charAt(0).toUpperCase()}${operation.id.slice(1)}${part}`;
   return Object.hasOwn(schemas, name)

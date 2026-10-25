@@ -1184,6 +1184,39 @@
       ]
     },
     {
+      "id": "mcp",
+      "group": "Resource commands",
+      "description": "Serve the Zitadel API to an AI agent as MCP tools on stdio, with this project's server and project secret.\n\nAdd it to an MCP client as a stdio server: `claude mcp add zitadel -- npx @zitadel/cli@latest mcp --cwd <app>`. Each tool is one operation, named by its operationId and typed by its schema. The tools only read unless --allow-writes; with --dry-run, a call that writes answers with its request instead of sending it.\n\nExperimental: its tools and flags may change.",
+      "args": [],
+      "flags": [
+        {
+          "name": "allow-writes",
+          "description": "Also offer the operations that create, change or delete.",
+          "type": "boolean"
+        },
+        {
+          "name": "tag",
+          "description": "Only the operations of this part of the API, as `api ls` lists them. Repeatable.",
+          "type": "option",
+          "multiple": true
+        }
+      ],
+      "examples": [
+        {
+          "command": "mcp"
+        },
+        {
+          "command": "mcp --tag Users --tag Teams"
+        },
+        {
+          "command": "mcp --allow-writes"
+        },
+        {
+          "command": "mcp --allow-writes --dry-run"
+        }
+      ]
+    },
+    {
       "id": "events get",
       "group": "Resource commands",
       "description": "Get one event by id.",

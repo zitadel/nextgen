@@ -15,6 +15,7 @@ import Console from "./commands/console";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
 import Logs from "./commands/logs";
+import Mcp from "./commands/mcp";
 import Plan from "./commands/plan";
 import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
@@ -45,6 +46,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   doctor: Doctor,
   eject: Eject,
   logs: Logs,
+  mcp: Mcp,
   plan: Plan,
   reset: Reset,
   resources: ResourcesList,

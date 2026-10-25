@@ -605,6 +605,9 @@ importers:
       '@clack/prompts':
         specifier: 'catalog:'
         version: 1.7.0
+      '@modelcontextprotocol/server':
+        specifier: 'catalog:'
+        version: 2.3.1
       '@oclif/core':
         specifier: 'catalog:'
         version: 4.11.4

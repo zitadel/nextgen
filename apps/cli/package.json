@@ -102,6 +102,7 @@
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
+    "@modelcontextprotocol/server": "catalog:",
     "@oclif/core": "catalog:",
     "@oclif/plugin-autocomplete": "catalog:",
     "@oclif/plugin-commands": "catalog:",
