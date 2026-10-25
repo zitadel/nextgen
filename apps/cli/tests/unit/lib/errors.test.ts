@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -28,7 +29,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: ["zitadel doctor", "zitadel init"],
+      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -103,9 +104,7 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe(
-      "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-    );
+    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 

@@ -1,3 +1,4 @@
+import type { SuggestedCommand } from "../suggestion";
 import type { BaseCommand } from "./base";
 
 /**
@@ -111,6 +112,6 @@ export type CommandResult =
       readonly status: "skipped";
       readonly reason: string;
       readonly data?: unknown;
-      readonly nextCommands?: ReadonlyArray<string>;
+      readonly nextCommands?: ReadonlyArray<SuggestedCommand>;
       readonly pretty?: string;
     };

@@ -14,6 +14,9 @@ import Claim from "./commands/claim";
 import Console from "./commands/console";
 import Doctor from "./commands/doctor/index";
 import Eject from "./commands/eject";
+import Env from "./commands/env/index";
+import EnvAdd from "./commands/env/add";
+import EnvList from "./commands/env/list";
 import Logs from "./commands/logs";
 import Plan from "./commands/plan";
 import Reset from "./commands/reset";
@@ -44,6 +47,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   console: Console,
   doctor: Doctor,
   eject: Eject,
+  env: Env,
   logs: Logs,
   plan: Plan,
   reset: Reset,
@@ -60,6 +64,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   "auth-method:sso:disable": AuthMethodSsoDisable,
   "api:ls": ApiLs,
   "branding:eject": BrandingEject,
+  "env:add": EnvAdd,
+  "env:list": EnvList,
   "variables:list": VariablesList,
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,

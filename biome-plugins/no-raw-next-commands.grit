@@ -1,0 +1,14 @@
+language js
+
+// A command's data carries suggestions through nextCommandsData() in
+// apps/cli/src/lib/oclif/envelope.ts, which takes SuggestedCommand[] — the
+// branded type only the lib/suggestion builders make. A `next_commands:` key
+// written by hand skips that check, and a suggestion that forgets the run's
+// --env/--env-file/--server quietly targets the default project (#1689).
+`next_commands: $_` as $member where {
+  $filename <: r".*/apps/cli/src/.*",
+  $filename <: not r".*/lib/oclif/envelope\.ts$",
+  $filename <: not r".*/lib/oclif/base\.ts$",
+  $filename <: not r".*/lib/oclif/types\.ts$",
+  register_diagnostic(span=$member, message="Build a command's next_commands with nextCommandsData() from lib/oclif/envelope, so each entry is a SuggestedCommand.", severity="error")
+}

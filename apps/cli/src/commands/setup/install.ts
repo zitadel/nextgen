@@ -11,7 +11,12 @@ import {
   type PackageCommand,
   type PackageManager,
 } from "../../lib/package-manager";
-import { publicCliCommand } from "../../lib/public-cli";
+import {
+  type EnvironmentSelector,
+  projectCommand,
+  shellCommand,
+  type SuggestedCommand,
+} from "../../lib/suggestion";
 
 type InstallReason = "dry-run" | "skip-install" | "no-dependency-changes";
 
@@ -35,7 +40,7 @@ export type SetupInstallOutcome = {
   boxActions: BoxAction[];
   /** Complete journey for the JSON envelope — agents consume all of it. */
   nextActions: string[];
-  nextCommands: string[];
+  nextCommands: SuggestedCommand[];
 };
 
 export type SetupInstallInput = {
@@ -46,6 +51,14 @@ export type SetupInstallInput = {
   env: NodeJS.ProcessEnv;
   issuer: string;
   json: boolean;
+  /**
+   * The selector pinning the project setup just created, for the follow-ups
+   * below. Without it a bare `status`/`deploy` resolves the environment as the
+   * next shell does, where the process environment outranks the `.env` files:
+   * in a shell holding production values the follow-up would read — or publish
+   * to — another project.
+   */
+  selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
   run?: typeof runPackageCommand;
@@ -70,6 +83,7 @@ export async function installDependenciesForSetup(
       devCommand: devCommand.display,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: false,
     });
   }
@@ -85,6 +99,7 @@ export async function installDependenciesForSetup(
       devCommand: devCommand.display,
       cliVersion: input.cliVersion,
       issuer: input.issuer,
+      selector: input.selector,
       includeInstallCommand: true,
     });
   }
@@ -110,6 +125,7 @@ export async function installDependenciesForSetup(
     devCommand: devCommand.display,
     cliVersion: input.cliVersion,
     issuer: input.issuer,
+    selector: input.selector,
     includeInstallCommand: false,
   });
 }
@@ -119,10 +135,11 @@ function outcome(input: {
   devCommand: string;
   cliVersion: string;
   issuer: string;
+  selector: EnvironmentSelector;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = publicCliCommand("plan", input.cliVersion);
-  const statusCommand = publicCliCommand("status", input.cliVersion);
+  const planCommand = projectCommand("plan", input.selector, input.cliVersion);
+  const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
@@ -148,10 +165,13 @@ function outcome(input: {
     install: input.install,
     devCommand: input.devCommand,
     boxActions,
-    nextActions: [...verifyActions, ...customizeAndPublishActions(input.cliVersion)],
+    nextActions: [
+      ...verifyActions,
+      ...customizeAndPublishActions(input.cliVersion, input.selector),
+    ],
     nextCommands: input.includeInstallCommand
-      ? [input.install.command, input.devCommand, planCommand]
-      : [input.devCommand, planCommand],
+      ? [shellCommand(input.install.command), shellCommand(input.devCommand), planCommand]
+      : [shellCommand(input.devCommand), planCommand],
   };
 }
 
@@ -163,7 +183,7 @@ function installFailed(
 ): ZitadelError {
   return new ZitadelError("E_VALIDATION", `Dependency install failed: ${installCommand.display}`, {
     hint: `Run ${installCommand.display} in ${cwd}, then start the app with ${devCommand.display}.`,
-    nextCommands: [installCommand.display],
+    nextCommands: [shellCommand(installCommand.display)],
     details: { command: installCommand.display, cwd, original: errorShape(error) },
   });
 }

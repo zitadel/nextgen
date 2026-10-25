@@ -4,6 +4,7 @@ import type { Parsed } from "@zitadel/config/idp";
 
 import { ZitadelError } from "./errors";
 import { readStdin } from "./variables";
+import type { SuggestedCommand } from "./suggestion";
 
 /** One option of a `select` or `multiselect`. */
 type Choice<V> = { value: V; label: string; hint?: string };
@@ -33,7 +34,7 @@ type Common = {
    * run. It becomes the refusal's `nextCommands`, and for a value it is also
    * quoted in the hint as an example.
    */
-  retry?: string;
+  retry?: SuggestedCommand;
 };
 
 /** A question whose answer is text that must parse. */

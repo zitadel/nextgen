@@ -1,7 +1,7 @@
 import type { Command, Interfaces } from "@oclif/core";
 
 import { ZitadelError } from "../../../errors";
-import { BaseCommand } from "../../base";
+import { EnvironmentCommand } from "../../environment-command";
 import type { CommandResult, GlobalOptions, JsonEnvelope } from "../../types";
 import type { Json, ResourceCommandOptions, ResourceDescriptor } from "../types";
 
@@ -41,7 +41,7 @@ export type OperationClass<Ctx, Spec> = typeof ResourceCommand<Ctx, Spec> & {
  * definition is bound onto a subclass by {@link bindOperation}; the operation
  * classes themselves are never registered with oclif directly.
  */
-export class ResourceCommand<Ctx, Spec> extends BaseCommand {
+export class ResourceCommand<Ctx, Spec> extends EnvironmentCommand {
   protected get definition(): OperationDefinition<Ctx, Spec> {
     const definition = definitionOf(this.constructor as typeof Command);
     if (!definition) {
@@ -62,8 +62,8 @@ export class ResourceCommand<Ctx, Spec> extends BaseCommand {
   }
 
   /** Open the platform connection; deferred so `--dry-run` never connects. */
-  protected connect(meta: GlobalOptions): Promise<Ctx> {
-    return this.definition.options.connect(meta);
+  protected context(): Promise<Ctx> {
+    return this.definition.options.connect(() => this.connect());
   }
 
   /**

@@ -335,6 +335,12 @@ properties:
   failed_checks:
     type: string
     description: The failed checks' names, comma-separated, never their messages.
+  credential:
+    type: string
+    description: Which credential a command connected with, `project` or `preview`; never a token.
+  has_env_file:
+    type: boolean
+    description: Whether `--env-file` was given; never the file's path.
   is_secret:
     type: boolean
     description: Whether a variable is secret; never its name or value.

@@ -676,7 +676,7 @@ export class ScaffoldedApp {
   async projectVariables(): Promise<ProjectVariable[]> {
     const result = await this.cli(["variables", "list", "--project-level", "--json"]);
     expect(result, "variables list should have succeeded").toSucceed();
-    return this.envelopeOf<{ variables: ProjectVariable[] }>(result).data.variables;
+    return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 
   /**
@@ -866,6 +866,17 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
+  bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
+    return this.writeProjectFile(`.env.${name}.local`, dotenv(values));
+  }
+
+  /** Writes a dotenv file the developer keeps anywhere, returning the path `--env-file` takes. */
+  async writeEnvFile(fileName: string, values: Record<string, string>): Promise<string> {
+    await this.writeProjectFile(fileName, dotenv(values));
+    return join(this.path, fileName);
+  }
+
   private async editDocument<T>(relativePath: string, edit: (document: T) => void): Promise<void> {
     const contents = await readFile(join(this.path, relativePath), "utf8");
     const document = JSON.parse(contents) as T;
@@ -994,6 +1005,12 @@ async function hashTree(root: string, prefix = ""): Promise<Map<string, string>>
   return files;
 }
 
+function dotenv(values: Record<string, string>): string {
+  return `${Object.entries(values)
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n")}\n`;
+}
+
 function only<T>(items: T[], what: string): T {
   if (items.length !== 1) {
     throw new Error(`expected exactly one ${what} on the platform, found ${items.length}`);
@@ -1010,6 +1027,13 @@ function only<T>(items: T[], what: string): T {
  */
 export function assertEnvelope(result: CliResult, args: string[] = []): void {
   const where = `\`${args.filter((arg) => !arg.startsWith("-")).join(" ")}\` --json`;
+  // A JSON envelope must never carry a raw ANSI colour byte: one would break
+  // `JSON.parse` and `jq` for every consumer. Checked on every spec's `--json`
+  // run rather than in a suite of its own, so a command that hand-writes colour
+  // onto the structured stream fails in that command's own spec. (A U+001B
+  // inside a string value is safe — `JSON.stringify` escapes it to `\u001b`, so
+  // this only trips on a raw control byte on stdout.)
+  expect(result.stdout, `${where}: JSON output contains ANSI colour codes`).not.toContain("\u001B");
   let envelope: Envelope;
   try {
     envelope = parseJson(result.stdout) as Envelope;
@@ -1025,6 +1049,80 @@ export function assertEnvelope(result: CliResult, args: string[] = []): void {
   expect(envelope.status, `${where}: status missing or unknown`).toMatch(/^(ok|skipped|error)$/);
   if (envelope.status === "error") {
     expect(envelope.code, `${where}: error envelope carries no code`).toBeTypeOf("string");
+  }
+  assertDataShape(where, envelope);
+}
+
+/**
+ * The `data`-shape half of the contract, enforced on every command so an agent
+ * reads every command's output the same way.
+ *
+ * Classed off the resolved command id (`envelope.command`), not the raw argv, so
+ * a positional argument that happens to be the word `list` (e.g. `variable get
+ * list`) is never misread as a list command. A `list` command (and `resources`,
+ * the one collection not named `… list`) must use the canonical
+ * `{ items, count, next_page_token }` envelope (`listData`); any command that
+ * emits `items` must carry `count` and `next_page_token`; a delete command must
+ * confirm with `deleted: true` (`deletedData`), and no command anywhere may use
+ * `removed`. A dry run has its own preview shape, so it is exempt. A divergent
+ * shape fails in that command's own spec, not a central list someone forgot to
+ * update.
+ */
+function assertDataShape(where: string, envelope: Envelope): void {
+  if (envelope.status !== "ok") {
+    return;
+  }
+  const data = envelope.data as Record<string, unknown> | undefined;
+  if (!data || typeof data !== "object") {
+    return;
+  }
+  // A dry run previews what a write would do; it carries `dry_run: true` and
+  // not the real result shape, so the shape contract does not apply to it.
+  if (data.dry_run === true) {
+    return;
+  }
+  const command = envelope.command ?? "";
+  const verb = command.split(/[:\s]/).filter(Boolean).pop() ?? "";
+
+  if (verb === "list" || command === "resources") {
+    expect(
+      Array.isArray(data.items),
+      `${where}: a list command must emit its rows under \`items\` (use listData())`,
+    ).toBe(true);
+  }
+  if (Array.isArray(data.items)) {
+    expect(typeof data.count, `${where}: a list envelope needs a numeric \`count\``).toBe("number");
+    const token = data.next_page_token;
+    expect(
+      token === null || typeof token === "string",
+      `${where}: a list envelope needs \`next_page_token\` (string or null), got ${JSON.stringify(token)}`,
+    ).toBe(true);
+  }
+  if (verb === "rm" || verb === "delete" || verb === "remove") {
+    expect(
+      data.deleted === true,
+      `${where}: a \`${verb}\` command must confirm with \`deleted: true\` (use deletedData())`,
+    ).toBe(true);
+  }
+  expect(
+    Object.hasOwn(data, "removed"),
+    `${where}: confirm a delete with \`deleted: true\`, never \`removed\` (use deletedData())`,
+  ).toBe(false);
+}
+
+/**
+ * Runs `fn` with stdout reporting as a terminal, so a list command renders its
+ * aligned table instead of the piped tab-separated rows it emits off a TTY.
+ * The in-process runner shares this process's `process.stdout`, so a terminal
+ * assertion must flip `isTTY` around the call.
+ */
+export async function onATerminal<T>(fn: () => Promise<T>): Promise<T> {
+  const original = process.stdout.isTTY;
+  process.stdout.isTTY = true;
+  try {
+    return await fn();
+  } finally {
+    process.stdout.isTTY = original;
   }
 }
 

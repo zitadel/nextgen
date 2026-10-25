@@ -104,15 +104,27 @@ describe("the cli", () => {
         expect(result).toSuggest(expectedPublicCliCommand("setup"));
       });
 
-      it("resolves the real server when nothing says otherwise", async () => {
+      it("has no server of its own when nothing names one", async () => {
         const app = await anApp();
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://preview.zitadel.com");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
-      it("prefers the server named in zitadel.json", async () => {
+      it("takes the server from ZITADEL_URL in the project's env file", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("development", {
+          ZITADEL_URL: "https://self.example",
+          ZITADEL_PROJECT_ID: "existing",
+        });
+
+        const result = await app.runWithoutServer(["status", "--json"]);
+
+        expect(app.envelopeOf(result).source).toBe("https://self.example");
+      });
+
+      it("ignores the server named in zitadel.json", async () => {
         const app = await anApp();
         await app.writeConfig({
           $schema: "./.zitadel/meta/project.json",
@@ -122,7 +134,7 @@ describe("the cli", () => {
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://self.example");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
       it("only ever suggests commands a user can run", async () => {

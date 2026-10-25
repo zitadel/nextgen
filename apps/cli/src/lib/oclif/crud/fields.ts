@@ -83,6 +83,8 @@ const RESERVED = new Set([
   "force",
   "cwd",
   "server",
+  "env",
+  "env-file",
   "non-interactive",
   "dry-run",
   "verbose",
