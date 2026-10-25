@@ -7,13 +7,12 @@ except the Changesets version PR's `changeset-release/*` branch and the merge
 queue's `gh-readonly-queue/**` branches.
 
 The repo-root [`vercel.json`](../../vercel.json) defines the Vercel
-deployment as six [services](https://vercel.com/docs/services):
+deployment as five [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
 | `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
-| `storybook` | `apps/storybook` | the component workbench, a static build | `/storybook/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
@@ -40,10 +39,12 @@ The services install and build from `vercel.json` itself. The install
 leaves out the other platforms' native packages, so Vercel's build cache
 stays under its 1.5 GB limit, and pnpm skips it once a service built earlier
 in the deployment has installed (`--optimistic-repeat-install`). The console
-and the storybook build with `turbo run build`, which reads and writes the
-team's remote cache as Vercel sets it up; the docs and the website run their
-own `pnpm run build`, the website after `@zitadel/components` has built
-through turbo, since its showcase renders the package's atoms. The schemas
+builds with `turbo run build`, which reads and writes the team's remote cache
+as Vercel sets it up; the docs and the website run their own
+`pnpm run build` after turbo has built the packages they render: the
+website's showcase the atoms of `@zitadel/components`, the docs' live
+examples the same package, `@zitadel/api-mock` and the `@zitadel/api` client
+the mock calls. The schemas
 need no install: their build is one Node script, and the service is rooted
 here, where no `package.json` makes Vercel detect a framework.
 

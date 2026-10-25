@@ -4,6 +4,10 @@ layer: "application"
 stack: "frontend"
 dependsOn:
   - "api"
+  # The live examples (components/examples) render the components, the login
+  # over the mock.
+  - "api-mock"
+  - "components"
 
 workspace:
   inheritedTasks:
@@ -39,10 +43,12 @@ tasks:
   typecheck:
     deps:
       - "generate"
-      # The API reference's TypeScript samples compile against the client
-      # (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints this
-      # generates from the same spec.
-      - "api:generate"
+      # The live examples import the components and the mock, each from its
+      # dist/. The mock's build reaches the client's (api:build, after
+      # api:generate), which the mock calls and the API reference's TypeScript
+      # samples compile against (scripts/sdk-samples.ts, tsconfig.samples.json).
+      - "api-mock:build"
+      - "components:build"
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
@@ -63,8 +69,11 @@ tasks:
       # Listed here and not only reached through typecheck: typecheck has no
       # outputs, so moon would not hash generate through it.
       - "generate"
-      # app/global.css imports the design tokens' CSS variables.
-      - "design-tokens:generate"
+      # The live examples' packages, as for typecheck. The components' build
+      # reaches design-tokens:generate, whose CSS variables app/global.css
+      # imports.
+      - "api-mock:build"
+      - "components:build"
     outputs:
       - ".next/**/*"
     options:
@@ -78,7 +87,9 @@ tasks:
     command: "corepack pnpm exec next dev --port 3003"
     deps:
       - "generate"
-      - "design-tokens:generate"
+      # The live examples' packages and the design tokens, as for build.
+      - "api-mock:build"
+      - "components:build"
     options:
       persistent: true
       runInCI: false
