@@ -49,7 +49,6 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
-	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -610,8 +609,6 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
-	v.SetDefault("server.login_enabled", true)
-	v.SetDefault("server.login_path", "/ui/login")
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -859,18 +856,6 @@ func consoleLink(consolePath string) *errorpage.Link {
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
-	if cfg.LoginEnabled {
-		if err := login.ValidateDist(); err != nil {
-			return nil, err
-		}
-		loginHandler, err := login.Handler(cfg.LoginPath)
-		if err != nil {
-			return nil, fmt.Errorf("build login UI handler: %w", err)
-		}
-		mux.Handle(cfg.LoginPath, loginHandler)
-		mux.Handle(cfg.LoginPath+"/", loginHandler)
-	}
-
 	if cfg.ConsoleEnabled {
 		if err := console.ValidateDist(); err != nil {
 			return nil, err
@@ -883,16 +868,13 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	// Pre-session runtime metadata for the embedded UI surfaces (Console
-	// ADR 0004 §3). Named for the console, which carries it first, but it
-	// describes the deployment — the default project and its publishable key
-	// — and the hosted login shell resolves the project it signs into from
-	// the same two fields, so it is mounted for either surface rather than
-	// only alongside the console. Registered as an exact path, so it wins
-	// over the catch-all API mount below.
-	if cfg.ConsoleEnabled || cfg.LoginEnabled {
-		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
-	}
+	// Pre-session runtime metadata for the console (Console ADR 0004 §3): the
+	// default project and its publishable key. Mounted whether or not this
+	// binary serves the console, because a console served elsewhere reads it
+	// from here: the hosted cloud's console service, and the console's dev
+	// server through its proxy. Registered as an exact path, so it wins over
+	// the catch-all API mount below.
+	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 
 	chain := func(h http.Handler, redactQuery ...string) http.Handler {
 		return middleware.Chain(h,

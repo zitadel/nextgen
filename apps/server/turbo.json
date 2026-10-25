@@ -143,10 +143,10 @@
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]
     },
-    // go vet compiles //go:embed all:dist, so the UI builds go first (a
+    // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -168,7 +168,7 @@
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
     "lint": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -189,11 +189,11 @@
         "$TURBO_ROOT$/biome.json"
       ]
     },
-    // The test binary embeds both UI dists. Listed directly and not only
+    // The test binary embeds the console's dist. Listed directly and not only
     // through vet: turbo hashes every dependency's result, but the direct edge
     // keeps the intent visible, as in moon.yml.
     "test": {
-      "dependsOn": ["openapi", "format", "vet", "lint", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["openapi", "format", "vet", "lint", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -224,7 +224,7 @@
     // type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"],
       "inputs": [
@@ -246,7 +246,7 @@
     },
     "test-spanner": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"],
       "inputs": [
@@ -268,7 +268,7 @@
     },
     "test-sqlite": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"],
       "inputs": [
@@ -288,11 +288,11 @@
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
       ]
     },
-    // The binary embeds both UI dists; the dist bytes are inputs of the build
-    // alone, so a UI-only change re-links the binary without re-running the
-    // Go checks and tests.
+    // The binary embeds the console's dist; the dist bytes are inputs of the
+    // build alone, so a console-only change re-links the binary without
+    // re-running the Go checks and tests.
     "build": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",

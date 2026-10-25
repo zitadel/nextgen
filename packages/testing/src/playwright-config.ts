@@ -57,8 +57,8 @@ export interface WithZitadelOptions {
    * The app dev server to run against the instance.
    *
    * Omit it when the **instance itself serves the app** — the Zitadel binary
-   * embeds the console and hosted login shells at `/ui/console/` and
-   * `/ui/login/`, so there is no second server to boot and no env to hand it.
+   * embeds the console at `/ui/console/`, so there is no second server to
+   * boot and no env to hand it.
    * Only the supervisor entry is generated, and `appOrigin` must then be the
    * instance's own local origin — `http://localhost:<port>` (or another
    * loopback alias); nothing else is served in this mode. This is the only
@@ -101,8 +101,8 @@ export interface WithZitadelOptions {
  * ```
  *
  * Omit `app` when the instance serves the app itself (the binary's embedded
- * `/ui/console/` and `/ui/login/` surfaces): only the boot entry is
- * generated, and `appOrigin` must be the instance's own origin.
+ * console at `/ui/console/`): only the boot entry is generated, and
+ * `appOrigin` must be the instance's own origin.
  *
  * Also points ZITADEL_TESTING_HANDSHAKE at the handshake file so the
  * `@zitadel/testing/playwright` fixtures resolve the instance — Playwright

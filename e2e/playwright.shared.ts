@@ -53,7 +53,7 @@ export const chromiumProjects: PlaywrightTestConfig["projects"] = [
  * `withZitadel`'s `zitadel` options for the lanes that boot a real instance:
  * the source-built server binary, which `moon run server:build` writes (the
  * moon tasks set ZITADEL_SERVER_BINARY to the same path). That build embeds
- * the console and login-ui dists, so a lane tests the working tree's UI.
+ * the console's dist, so a lane tests the working tree's console.
  */
 export const inRepoZitadel = {
   serverBinary:

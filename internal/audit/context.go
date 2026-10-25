@@ -70,7 +70,7 @@ func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
 }
 
 // BindPublicRequest stamps project/flow/session onto the actor slot so Path A
-// can emit request.api without a token (hosted login/flow). No-op when
+// can emit request.api without a token (the login flow). No-op when
 // projectID is empty or there is no slot. Does not set Authenticated.
 func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string) {
 	if projectID == "" {

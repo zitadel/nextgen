@@ -22,8 +22,16 @@
     // The API reference's TypeScript samples compile against the client
     // (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints its
     // generate task writes from the same spec, and whose runtime they call.
+    // The live examples (components/examples) import the components, the
+    // mock and the client the mock calls, each from its dist/.
     "typecheck": {
-      "dependsOn": ["generate", "@zitadel/api#generate"],
+      "dependsOn": [
+        "generate",
+        "@zitadel/api#generate",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
     },
     // The build script bundles again before `next build`, because the
@@ -36,11 +44,24 @@
     // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
     // cache hit restores .next without running the script.
     "build": {
-      "dependsOn": ["typecheck", "generate", "@zitadel/design-tokens#generate"],
+      "dependsOn": [
+        "typecheck",
+        "generate",
+        "@zitadel/design-tokens#generate",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build"
+      ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {
-      "dependsOn": ["generate", "@zitadel/design-tokens#generate"]
+      "dependsOn": [
+        "generate",
+        "@zitadel/design-tokens#generate",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build"
+      ]
     },
     "start": {
       "dependsOn": ["build"]
