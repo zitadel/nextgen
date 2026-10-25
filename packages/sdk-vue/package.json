@@ -45,7 +45,6 @@
   "devDependencies": {
     "@testing-library/vue": "^8.1.0",
     "@types/node": "catalog:",
-    "@vitejs/plugin-vue": "^6.0.10",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",

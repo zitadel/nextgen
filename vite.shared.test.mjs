@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { libraryBuild } from "./vite.shared.mjs";
+import { failOnDiagnostics, libraryBuild } from "./vite.shared.mjs";
 
 const roots = [];
 
@@ -94,9 +94,27 @@ describe("libraryBuild entries", () => {
     });
   });
 
-  it("names a file for a module kept apart without being an entry", () => {
+  it("names a module kept apart without being an entry a .js file when every target is one", () => {
     const root = packageOf({ exports: { ".": { import: "./dist/index.js" } } }, ["src/index.ts"]);
     expect(buildOf(root).lib.fileName("es", "lib/jwt")).toBe("lib/jwt.js");
+  });
+
+  it("names a module kept apart without being an entry a .mjs file when the targets are", () => {
+    const root = packageOf({ exports: { ".": { import: "./dist/index.mjs" } } }, ["src/index.ts"]);
+    expect(buildOf(root).lib.fileName("es", "lib/jwt")).toBe("lib/jwt.mjs");
+  });
+
+  it("names a module kept apart without being an entry a .mjs file when the targets mix", () => {
+    const root = packageOf(
+      {
+        exports: {
+          ".": { import: "./dist/index.js" },
+          "./server": { import: "./dist/server.mjs" },
+        },
+      },
+      ["src/index.ts", "src/server.ts"],
+    );
+    expect(buildOf(root).lib.fileName("es", "lib/jwt")).toBe("lib/jwt.mjs");
   });
 
   it("accepts a types-only target that has a declaration source", () => {
@@ -174,8 +192,13 @@ describe("libraryBuild externals and warnings", () => {
     }
   });
 
-  it("does not report how long plugins took, which depends on the machine's load", () => {
-    expect(buildOf(root()).rolldownOptions.checks).toEqual({ bundlerTimings: false });
+  it("keeps Rolldown's check of how long plugins take", () => {
+    expect(buildOf(root()).rolldownOptions.checks).toBeUndefined();
+  });
+
+  it("lets a report of how long plugins took through, which depends on the machine's load", () => {
+    const { onwarn } = buildOf(root()).rolldownOptions;
+    expect(() => onwarn({ code: "PLUGIN_TIMINGS", message: "slow plugin" })).not.toThrow();
   });
 
   it("fails the build on a warning", () => {
@@ -186,8 +209,79 @@ describe("libraryBuild externals and warnings", () => {
   });
 
   it("lets only the allowed warning codes through", () => {
-    const { onwarn } = buildOf(root(), { allow: ["MODULE_LEVEL_DIRECTIVE"] }).rolldownOptions;
-    expect(() => onwarn({ code: "MODULE_LEVEL_DIRECTIVE", message: "directive" })).not.toThrow();
-    expect(() => onwarn({ code: "EVAL", message: "eval" })).toThrow();
+    const { onwarn } = buildOf(root(), { allow: ["EVAL"] }).rolldownOptions;
+    expect(() => onwarn({ code: "EVAL", message: "eval" })).not.toThrow();
+    expect(() => onwarn({ code: "CIRCULAR_DEPENDENCY", message: "cycle" })).toThrow();
+  });
+});
+
+describe("libraryBuild module-level directives", () => {
+  const directive = (id) => ({ code: "MODULE_LEVEL_DIRECTIVE", id, message: '"use client"' });
+
+  /** The plugin of a package with entries `index` and `react`, resolved with `build`. */
+  const resolved = (build = {}) => {
+    const root = packageOf(
+      {
+        exports: {
+          ".": { import: "./dist/index.js" },
+          "./react": { import: "./dist/react.js" },
+        },
+      },
+      ["src/index.ts", "src/react.tsx", "src/context.tsx"],
+    );
+    const plugin = libraryBuild(root);
+    const { onwarn } = plugin.config().build.rolldownOptions;
+    plugin.configResolved({ build });
+    return { root, onwarn };
+  };
+
+  it("keeps the directive of an entry module", () => {
+    const { root, onwarn } = resolved();
+    expect(() => onwarn(directive(join(root, "src/react.tsx")))).not.toThrow();
+  });
+
+  it("fails for the directive of a module merged into a chunk", () => {
+    const { root, onwarn } = resolved();
+    expect(() => onwarn(directive(join(root, "src/context.tsx")))).toThrow(
+      "@zitadel/x: MODULE_LEVEL_DIRECTIVE",
+    );
+  });
+
+  it("fails for a directive warning that names no module", () => {
+    const { onwarn } = resolved();
+    expect(() => onwarn(directive(undefined))).toThrow("MODULE_LEVEL_DIRECTIVE");
+  });
+
+  it.each([
+    ["rolldownOptions", { rolldownOptions: { output: { preserveModules: true } } }],
+    ["rollupOptions", { rollupOptions: { output: { preserveModules: true } } }],
+    ["an output list", { rolldownOptions: { output: [{}, { preserveModules: true }] } }],
+  ])("keeps every directive of a build that preserves modules (%s)", (_, build) => {
+    const { root, onwarn } = resolved(build);
+    expect(() => onwarn(directive(join(root, "src/context.tsx")))).not.toThrow();
+  });
+});
+
+describe("failOnDiagnostics", () => {
+  const file = {
+    fileName: "/pkg/src/index.ts",
+    getLineAndCharacterOfPosition: (position) => ({ line: 2, character: position }),
+  };
+
+  it("passes when the declarations have no diagnostic", () => {
+    expect(() => failOnDiagnostics([])).not.toThrow();
+  });
+
+  it("fails with the place and message of each diagnostic", () => {
+    expect(() =>
+      failOnDiagnostics([
+        { file, start: 4, messageText: "Type 'string' is not assignable to type 'number'." },
+        { messageText: { messageText: "Cannot find module './x'." } },
+      ]),
+    ).toThrow(
+      "the declarations have 2 type error(s):\n" +
+        "/pkg/src/index.ts:3:5: Type 'string' is not assignable to type 'number'.\n" +
+        "Cannot find module './x'.",
+    );
   });
 });
