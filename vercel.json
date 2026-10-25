@@ -48,7 +48,7 @@
       "root": "apps/docs",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/api --filter=@zitadel/api-mock --filter=@zitadel/components && pnpm run build"
     },
     "website": {
       "root": "apps/website",

@@ -4,6 +4,10 @@ layer: "application"
 stack: "frontend"
 dependsOn:
   - "api"
+  # The live examples (components/examples) render the components, the login
+  # over the mock.
+  - "api-mock"
+  - "components"
 
 workspace:
   inheritedTasks:
@@ -43,6 +47,11 @@ tasks:
       # (scripts/sdk-samples.ts, tsconfig.samples.json), whose endpoints this
       # generates from the same spec.
       - "api:generate"
+      # The live examples import the components, the mock and the client the
+      # mock calls, each from its dist/.
+      - "api:build"
+      - "api-mock:build"
+      - "components:build"
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
@@ -65,6 +74,10 @@ tasks:
       - "generate"
       # app/global.css imports the design tokens' CSS variables.
       - "design-tokens:generate"
+      # The live examples' packages, as for typecheck.
+      - "api:build"
+      - "api-mock:build"
+      - "components:build"
     outputs:
       - ".next/**/*"
     options:
@@ -79,6 +92,10 @@ tasks:
     deps:
       - "generate"
       - "design-tokens:generate"
+      # The live examples' packages, as for typecheck.
+      - "api:build"
+      - "api-mock:build"
+      - "components:build"
     options:
       persistent: true
       runInCI: false

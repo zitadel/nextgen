@@ -191,13 +191,13 @@ async function ensureLocalSecrets() {
 
 /**
  * What the services' dev commands read from disk: the login UI the server
- * embeds, the packages the console and storybook builds import, and the
- * docs' generated sources. Two calls, because under turbo every named task
+ * embeds, the packages the console's, the storybook's and the docs' builds
+ * import, and the docs' generated sources. Two calls, because under turbo every named task
  * runs in every named package.
  */
 async function buildPrerequisites() {
   for (const targets of [
-    ["login-ui:build", "sdk-react:build", "api-mock:build", "components:build"],
+    ["login-ui:build", "sdk-react:build", "api:build", "api-mock:build", "components:build"],
     ["docs:generate", "design-tokens:generate"],
   ]) {
     const { command, args } = runnerCommand(targets);

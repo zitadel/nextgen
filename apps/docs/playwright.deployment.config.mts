@@ -39,7 +39,11 @@ export default defineConfig({
     trace: "off",
     // Every request the suite makes, from the request fixture and from the
     // browser, carries the bypass; a deployment without protection ignores it.
-    extraHTTPHeaders: bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {},
+    // The cookie it asks for carries the bypass on to what the live examples'
+    // service worker fetches in the page's place (tests/examples.browser.spec.ts).
+    extraHTTPHeaders: bypassSecret
+      ? { "x-vercel-protection-bypass": bypassSecret, "x-vercel-set-bypass-cookie": "true" }
+      : {},
   },
   // The deployment serves itself.
   webServer: undefined,

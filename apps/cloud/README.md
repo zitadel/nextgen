@@ -42,8 +42,10 @@ stays under its 1.5 GB limit, and pnpm skips it once a service built earlier
 in the deployment has installed (`--optimistic-repeat-install`). The console
 and the storybook build with `turbo run build`, which reads and writes the
 team's remote cache as Vercel sets it up; the docs and the website run their
-own `pnpm run build`, the website after `@zitadel/components` has built
-through turbo, since its showcase renders the package's atoms. The schemas
+own `pnpm run build` after turbo has built the packages they render: the
+website's showcase the atoms of `@zitadel/components`, the docs' live
+examples the same package, `@zitadel/api-mock` and the `@zitadel/api` client
+the mock calls. The schemas
 need no install: their build is one Node script, and the service is rooted
 here, where no `package.json` makes Vercel detect a framework.
 
