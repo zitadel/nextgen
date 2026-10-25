@@ -5,10 +5,11 @@
 > **Context:** The hosted cloud is one Vercel deployment of six services built
 > from one commit, and every merge to `main` deploys it to production
 > ([runbook](../runbooks/cloud.md#layout)). The console ships with most of
-> those merges. What each test layer proves about a change, what each service
-> of a deployment is checked for, which checks hold back a merge, a production
-> deployment and a self-hosted release, what the server's health endpoints
-> mean, and how a suite signs in on a deployment it did not boot.
+> those merges. What each test layer proves about a change, which services a
+> deployment holds and what each is checked for, which checks hold back a
+> merge, a production deployment and a self-hosted release, what the server's
+> health endpoints mean, and how a suite signs in on a deployment it did not
+> boot.
 > **Related:** [ADR 002](002-multi-package-release-strategy.md),
 > [ADR 046](046-claim-lifecycle-v2.md),
 > [ADR 048](048-wide-events-internal-audit-primitive.md),
@@ -59,26 +60,37 @@
 
 ### What is missing
 
-1. **Half of the deployment has no suite of its own.** The server is reached
-   only through the console's suite, which makes no call with a credential.
-   The website and the storybook have none: nothing loads `/`, `/changelog`,
-   the favicons the other services link, or the storybook.
-2. **Nothing signed in runs against a deployment.** The lanes boot a local
+1. **Two services have no suite of their own.** The server is reached only
+   through the console's suite, which makes no call with a credential, and
+   nothing loads the website's `/`, `/changelog` or the favicons the other
+   services link.
+2. **Customers read about the login's components and see none of them.** The
+   docs describe the components
+   ([`sdks/components`](../../apps/docs/content/docs/sdks/components.mdx)) and
+   the tokens and parts that restyle them
+   ([`customize-design`](../../apps/docs/content/docs/guides/customize-design.mdx))
+   in text and tables, with no example. The one place every component
+   renders is the storybook at `/storybook/`, which nothing links to and no
+   suite checks, and which is laid out for the team: its stories never
+   restyle an atom
+   ([its rules](../../apps/storybook/AGENTS.md)), so it cannot show what an
+   app's stylesheet does to the login.
+3. **Nothing signed in runs against a deployment.** The lanes boot a local
    server. The cloud's stack, Vercel in front of PlanetScale Postgres, is
    reached only signed out.
-3. **What holds production back is a setting the repository does not record.**
+4. **What holds production back is a setting the repository does not record.**
    `production-checks.yml` reports `docs (Production)`,
    `console (Production)` and `schemas (Production)`. Vercel waits for them
    only once they are added as blocking Deployment Checks in the project's
    settings; until then a red status shows on a commit that is already
    serving.
-4. **No endpoint says whether the server works.** All three health endpoints
+5. **No endpoint says whether the server works.** All three health endpoints
    answer `ok` with the database down, so a check that reads one proves only
    that the process started.
-5. **Accessibility and visual regressions in console screens pass every
+6. **Accessibility and visual regressions in console screens pass every
    check.** No console screen runs axe, and nothing in the repository compares
    screenshots.
-6. **The test kit has no credential for a deployment it did not boot.**
+7. **The test kit has no credential for a deployment it did not boot.**
    `connectZitadel` takes the handle the kit's own boot wrote, and the
    platform automation principal the kit keeps `handle.platform` for does not
    exist (ADR 053 §9).
@@ -123,21 +135,21 @@
 
 ### 2. A deployment suite per service
 
-Every service of the deployment has one suite, run on the deployment's own
-URL. A suite pins the paths its service serves and what they need behind
-them, and a path is pinned by the suite of the service that serves it,
-wherever it is linked from. Adding one is what the runbook already describes:
-a turbo task `check:cloud` lists, a job in `deployment-checks.yml` and a
-status in `production-checks.yml`'s `SUITES`.
+The deployment keeps five services; the storybook leaves it (§8). Each has
+one suite, run on the deployment's own URL. A suite pins the paths its
+service serves and what they need behind them, and a path is pinned by the
+suite of the service that serves it, wherever it is linked from. Adding one
+is what the runbook already describes: a turbo task `check:cloud` lists, a
+job in `deployment-checks.yml` and a status in `production-checks.yml`'s
+`SUITES`.
 
 | Service | Its suite pins |
 | --- | --- |
 | `server` | New: `/readyz`, which covers the database (§5); the not-found answer, a page for a browser and the envelope for a program, which moves here from the console's suite; on a preview, signed in through §4, a round trip with the project's secret. |
 | `console` | As today, and on a preview the admin journey, signed in (§4). |
-| `docs` | As today. |
+| `docs` | As today, and the live examples on the component pages render: the atoms, and `<zitadel-login>` over the mock (§8). |
 | `schemas` | As today. |
 | `website` | New: `/` and `/changelog` render, with the releases GitHub's API returns, and log no errors; `/llms.txt`; `/favicon.ico` and `/favicons/*`, which the other services link. |
-| `storybook` | New: it replies. `/storybook/` answers with its index; nothing more. Its mock service worker needs no check of its own: it loads from `/storybook/`, and the browser keeps a worker inside the path its script comes from. |
 
 - `/telemetry/mixpanel/*` belongs to no service; its check stays in the
   console's suite.
@@ -152,7 +164,7 @@ status in `production-checks.yml`'s `SUITES`.
 | Gate | Held by |
 | --- | --- |
 | A merge to `main` | `full-pr`, the only required check: the build-and-test graph, then `e2e:all` whenever a lane is affected |
-| The production domains | every service's `(Production)` status, for `server`, `console`, `storybook`, `docs`, `website` and `schemas`, blocking in the `cloud` project's Deployment Checks |
+| The production domains | every service's `(Production)` status, for `server`, `console`, `docs`, `website` and `schemas`, blocking in the `cloud` project's Deployment Checks |
 | A self-hosted release | the `full-pr` of every pull request it contains; the version PR packs and verifies the tarballs and runs no browser |
 
 - The production setting becomes a requirement: the runbook lists the
@@ -254,7 +266,7 @@ third name for the first, goes at 1.0.0.
 - **A probe stays cheap:** one round trip on the pool, bounded by its
   timeout. Probes are skipped by the request events (ADR 048).
 - **On the cloud nothing probes the function.** `/readyz` there serves the
-  server's suite (§2), and whatever watches production later (§8).
+  server's suite (§2), and whatever watches production later (§9).
 
 ### 6. Accessibility
 
@@ -320,7 +332,32 @@ Argos, Percy and Chromatic are the common ones.
 A once §6 exists, on a few screens; B if reviewing references in the
 repository turns out to be the bottleneck.
 
-### 8. Out of scope, and deferred
+### 8. The login's components in the docs, the storybook in the repository
+
+Customers see the login's components where they read about them: the docs
+pages that document the components render them live. The storybook stays the
+team's workbench (`moon run storybook:dev`) and, in CI, the atoms' gate on
+render and accessibility. It leaves the deployment.
+
+- **What the docs show:** the atoms with the attributes they take, and
+  `<zitadel-login>` itself: a flow a reader can walk, its first step in each
+  preview state (`preview-state`), and the `--zl-*` tokens and parts
+  `customize-design` lists, set the way an app's stylesheet sets them.
+- **How they render:** the atoms as the website's showcase renders them, from
+  `@zitadel/components/atoms` in a client component; `<zitadel-login>` over
+  `@zitadel/api-mock`'s handlers in the browser, as in the storybook's
+  orchestrator stories, so no page creates a flow on a real server. Fumadocs
+  ships examples with controls as `@fumadocs/story`, and the docs take a
+  Fumadocs recipe before writing one ([their rules](../../apps/docs/AGENTS.md)).
+- **The mock's worker** loads from `/docs/`, and the browser keeps a worker
+  inside the path its script comes from: it never answers for the console or
+  the login UI on the same origin, as the storybook's never does from
+  `/storybook/` today.
+- **Leaving the deployment** takes the `storybook` service, its rewrite and
+  its redirect out of `vercel.json`, and the service out of the runbook's
+  layout, `apps/cloud/README.md` and the storybook's `AGENTS.md` and README.
+
+### 9. Out of scope, and deferred
 
 - **Deferred: watching production between deployments.** Nothing runs
   against production between deployments, and nothing pages anyone; the
@@ -348,12 +385,14 @@ repository turns out to be the bottleneck.
    Deployment Checks (§3): a setting, no code.
 2. The probes (§5): `/readyz` checks the database, the repository's readers
    move to it, and `/healthz` gets its `Deprecation` header.
-3. The server, website and storybook suites (§2), each joining the production
-   checks as it lands.
-4. The console's browser project, with axe and the exceptions file (§6).
-5. Verify §4's first items, then build the kit's remote mode, the preview
+3. The server and website suites (§2), each joining the production checks as
+   it lands.
+4. The docs' live examples, with the docs' suite checking they render; then
+   the storybook leaves the deployment (§8).
+5. The console's browser project, with axe and the exceptions file (§6).
+6. Verify §4's first items, then build the kit's remote mode, the preview
    journey and the server suite's signed-in round trip.
-6. The screenshot trial (§7).
+7. The screenshot trial (§7).
 
 ## Consequences
 
@@ -369,12 +408,19 @@ repository turns out to be the bottleneck.
 - The cloud's stack is checked signed in on every preview, with no new
   standing credential.
 - A console screen's accessibility regressions fail the way an atom's do.
+- Customers see the login's components live where they read about them,
+  styled the way their own stylesheet would style them, and every preview's
+  docs show an atom change to its reviewers.
 
 ### Negative and risks
 
-- Production waits on six suites, so a flaky one delays a deployment; it is
-  run again from its run's page (runbook). The storybook's only asks that it
-  replies, which a built static site rarely fails.
+- Production waits on five suites, so a flaky one delays a deployment; it is
+  run again from its run's page (runbook).
+- The docs' build gains `@zitadel/components` and `@zitadel/api-mock`, built
+  first as the website's build builds the components, and a page with a live
+  login ships the mock to the browser.
+- No deployment carries the storybook: seeing every state of every atom takes
+  `moon run storybook:dev`.
 - A self-hosted readiness probe on `/readyz` takes every instance out of its
   load balancer while the database is down, the requests that need no
   database with them. Nearly every request needs it anyway.
@@ -394,9 +440,9 @@ repository turns out to be the bottleneck.
 
 1. Does `createProject` answer through Deployment Protection with the bypass
    header, and are sign-up and claim open on previews (§4 A)?
-2. Is the storybook part of the cloud for customers, curated to the login's
-   customization surface and linked from the docs, or a team tool that leaves
-   the production deployment? Its suite and its status follow the answer.
+2. Do the examples live on the pages that document the components today
+   (`sdks/components` and the customize guides), or on a page per component,
+   as Vercel's Geist documents its components (§8)?
 3. Does `/readyz` also check that the schema is migrated as far as the binary
    needs (§5)?
 4. Should the version PR run `console-embedded` against the binary the release
@@ -425,6 +471,14 @@ repository turns out to be the bottleneck.
   for now.
 - **Blocking on visual differences.** Intended changes fail them as often as
   regressions do.
+- **The storybook as the customers' component site, curated and linked from
+  the docs.** A second site beside the docs, laid out for the team, which
+  could show what an app's stylesheet does to the login only by breaking its
+  rule that stories never restyle an atom. Rejected: the docs show the
+  components (§8).
+- **The storybook as a Vercel project of its own.** It would leave the
+  production gate, but stay a second site nothing links to, with a project of
+  its own to set up and keep. Rejected (§8).
 
 ## On acceptance
 
