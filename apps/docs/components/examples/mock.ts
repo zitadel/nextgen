@@ -9,8 +9,8 @@
 export const MOCK_API = "/docs/mock-api";
 
 // Served by app/docs/mock-service-worker.js. Under /docs/ the worker's scope
-// stays inside the docs, so it never answers for the console or the login UI
-// on the cloud's host.
+// stays inside the docs, so it never answers for the console on the cloud's
+// host.
 const WORKER = "/docs/mock-service-worker.js";
 const RELOADED_FOR_CONTROL = "zitadel-docs:mock-control-reload";
 

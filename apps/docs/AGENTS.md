@@ -93,7 +93,7 @@ Fumadocs stories (`components/examples/`).
 - Run `<zitadel-login>` over the mock (`mock.ts`), never a server, and at most
   once per page: every login on a page walks the same mock flow.
 - Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
-  it would answer for the console and the login UI.
+  it would answer for the console.
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
