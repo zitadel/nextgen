@@ -85,8 +85,8 @@ const config: StorybookConfig = {
     viteConfig.resolve.conditions = ["@zitadel/source", ...(viteConfig.resolve.conditions ?? [])];
     // `@zitadel/components` intentionally does NOT publish a `@zitadel/source`
     // condition: its source imports raw `*.css?inline` and `*.liquid` assets, and
-    // exposing it repo-wide would force every TS consumer (the SDKs, `login-ui`)
-    // to typecheck those un-declared modules and conflict with their composite
+    // exposing it repo-wide would force every TS consumer (the SDKs) to
+    // typecheck those un-declared modules and conflict with their composite
     // `dist` project references. Alias it to source here instead — a Storybook-
     // bundler-only override that keeps the Lit shadow CSS (`?inline`) and atom
     // logic hot, without changing how the rest of the workspace resolves it.

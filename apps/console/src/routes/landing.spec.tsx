@@ -138,7 +138,7 @@ describe("landing routes", () => {
         });
       }),
     );
-    server.use(http.get("*/api/healthz", () => HttpResponse.json({ status: "ok" })));
+    server.use(http.get("*/api/readyz", () => HttpResponse.text("ok")));
     await renderAt("/system");
 
     const pill = await screen.findByRole("button", { name: "Switch project" });

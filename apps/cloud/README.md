@@ -11,7 +11,7 @@ deployment as five [services](https://vercel.com/docs/services):
 
 | Service | Root | What it is | Paths |
 |---|---|---|---|
-| `server` | `.` | the Go server on Vercel's Go preset, login UI embedded, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
+| `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
 | `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
@@ -26,8 +26,8 @@ console's, and old `/ui/console/*` links redirect to `/console/*` (307, query
 kept). Everything the docs serve, their scripts and their search, lives
 under `/docs` ([`apps/docs/AGENTS.md`](../docs/AGENTS.md)). The website's
 scripts, styles and fonts load from `/_next/`; a page of its own beyond `/`
-needs a rewrite of its own. Its favicons are the host's: the console, the
-login UI and the docs link the same set at `/favicons/`
+needs a rewrite of its own. Its favicons are the host's: the console and the
+docs link the same set at `/favicons/`
 ([`apps/website/AGENTS.md`](../website/AGENTS.md)). The `schemas` service
 publishes the built-in schemas the server names under
 `https://zitadel.com/schemas/v1`: `/schemas/v1/user-schema.json` answers with
@@ -51,7 +51,7 @@ here, where no `package.json` makes Vercel detect a framework.
 | File | Role |
 |---|---|
 | [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
-| [`build.sh`](build.sh) | the `server` service's build: login UI, launcher, migrations |
+| [`build.sh`](build.sh) | the `server` service's build: launcher, migrations |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
 `pnpm run cloud` runs the same services on http://localhost:3000 with

@@ -18,10 +18,9 @@
  *   `moon run console:dev-real`.
  *
  * What only a local run needs comes from here: the builds the dev servers
- * read from disk (build.sh builds the login UI in a deployment), a throwaway
- * master key and root admin minted on the first run under
- * .zitadel/local/cloud/, where the SQLite database lives too, and the
- * function compiled without the console (-tags noconsole) as build.sh
+ * read from disk, a throwaway master key and root admin minted on the first
+ * run under .zitadel/local/cloud/, where the SQLite database lives too, and
+ * the function compiled without the console (-tags noconsole) as build.sh
  * compiles it. No Vercel account, link or secret is involved (-L), and Go
  * need not be installed: Vercel's Go builder downloads the version go.mod
  * names.
@@ -65,7 +64,7 @@ try {
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
     GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };
-  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /ui/login/`);
+  console.log(`[cloud] ${origin}/ (website), /docs, /console/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
   const vercel = await vercelCli();
   console.log(`[cloud] Vercel CLI ${vercel.version} (${vercel.source})`);
@@ -189,14 +188,13 @@ async function ensureLocalSecrets() {
 }
 
 /**
- * What the services' dev commands read from disk: the login UI the server
- * embeds, the packages the console's and the docs' builds import, and the
- * docs' generated sources. Two calls, because under turbo every named task
- * runs in every named package.
+ * What the services' dev commands read from disk: the packages the console's
+ * and the docs' builds import, and the docs' generated sources. Two calls,
+ * because under turbo every named task runs in every named package.
  */
 async function buildPrerequisites() {
   for (const targets of [
-    ["login-ui:build", "sdk-react:build", "api:build", "api-mock:build", "components:build"],
+    ["sdk-react:build", "api:build", "api-mock:build", "components:build"],
     ["docs:generate", "design-tokens:generate"],
   ]) {
     const { command, args } = runnerCommand(targets);
