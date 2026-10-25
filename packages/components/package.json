@@ -57,6 +57,11 @@
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
+    "./avatar": {
+      "types": "./dist/avatar.d.mts",
+      "import": "./dist/avatar.mjs"
+    },
+    "./avatar.css": "./dist/avatar.css",
     "./events": {
       "types": "./dist/events.d.mts",
       "import": "./dist/events.mjs"

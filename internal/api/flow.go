@@ -164,22 +164,23 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	} else if h, ok := requestOriginFromContext(ctx); ok {
 		originStr = h
 	}
+	// Any origin the request carries is held to the project's, an opaque one
+	// (`null`) included; only the passkey params need it to have a host.
 	requestOrigin := ""
 	if originStr != "" {
-		originURL, err := url.Parse(originStr)
-		if err == nil {
+		project, err := h.projectService.Get(ctx, state.ProjectID)
+		if err != nil {
+			// A project lookup failing mid-submit is a server-side
+			// fault, not client input: keep it a 500 rather than
+			// letting proj.not_found surface as a 404 here.
+			return nil, domain.ErrInternal(err)
+		}
+		if err := validateOriginAgainstProject(originStr, project); err != nil {
+			return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
+		}
+		if originURL, err := url.Parse(originStr); err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
 				requestOrigin = originURL.Scheme + "://" + originURL.Host
-				project, err := h.projectService.Get(ctx, state.ProjectID)
-				if err != nil {
-					// A project lookup failing mid-submit is a server-side
-					// fault, not client input: keep it a 500 rather than
-					// letting proj.not_found surface as a 404 here.
-					return nil, domain.ErrInternal(err)
-				}
-				if err := validateOriginAgainstProject(originStr, project); err != nil {
-					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
-				}
 				submitReq.PasskeyRP = rp
 			}
 		}
@@ -343,7 +344,7 @@ func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState,
 	decrypter, err := h.keyService.GetCrypter(ctx, header.KeyID, header.EncryptionAlgorithm)
 	if err != nil {
 		var domainError domain.Error
-		if errors.As(err, &domainError) && domainError.Code != domain.ErrInternal(nil).Code {
+		if errors.As(err, &domainError) && !domain.IsServerFault(domainError) {
 			return nil, domain.ErrFlowCookieInvalid()
 		}
 		return nil, err

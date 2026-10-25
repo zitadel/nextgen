@@ -179,12 +179,19 @@ func writeListAuthzRSIBase(w ArgWriter, env Env, params domain.AuthzListObjectsP
 }
 
 // writeConstantVisibilityArms writes the arms that cannot reference r: their
-// truth value is fixed once the bind arguments are bound.
+// truth value is fixed once the bind arguments are bound. The platform operator
+// arm joins them for a user homed in the platform project, so a materialized
+// list agrees with the resolver's Check, which asks it second (ADR 075 §3).
 func writeConstantVisibilityArms(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	writeProjectScopedClosureExists(w, env, params)
 	w.WriteString(`
     OR `)
 	writeFullTTUExists(w, env, params)
+	if params.PlatformOperatorEligible() {
+		w.WriteString(`
+    OR `)
+		writePlatformOperatorExists(w, env, params.PlatformCheckParams())
+	}
 }
 
 // writeCorrelatedVisibilityArms writes the arms that do reference r, and so must

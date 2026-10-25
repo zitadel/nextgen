@@ -76,8 +76,9 @@ Theming levers (strongest-first resolution, documented in the README):
 
 - **Host CSS tokens** — set `--zl-*` custom properties in your own stylesheet on
   `zitadel-login { ... }`. These inherit across shadow boundaries and **outrank**
-  both the design-system defaults and server-side tenant branding. Catalogue
-  lives in `@zitadel/design-tokens`.
+  both the design-system defaults and server-side tenant branding. The stable
+  names are listed in
+  [Customize the login design](https://preview.zitadel.com/docs/guides/customize-design.md).
 - **`::part(...)`** — e.g. `zitadel-login::part(form)`, `::part(field-input)`,
   `::part(button-root)`. Atom parts forward through the orchestrator as
   `<atom>-<part>`; bare names (`zl-field::part(input)`) apply when composing
@@ -117,7 +118,8 @@ authoritative and discover the current shape first:
 - The published TypeScript types (`./dist/index.d.mts` and the `./atoms`,
   `./orchestrator`, `./tokens`, `./jsx` subpaths) — exact prop/event/manifest
   shapes.
-- `@zitadel/design-tokens` README — the `--zl-*` token catalogue.
+- [Customize the login design](https://preview.zitadel.com/docs/guides/customize-design.md)
+  — the stable `--zl-*` tokens and the `::part()` names the login forwards.
 - Per-atom manifests (`@zitadel/components/manifests`) — the allowed
   attributes/parts/events for each atom.
 

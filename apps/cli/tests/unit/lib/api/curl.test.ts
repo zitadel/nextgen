@@ -20,8 +20,8 @@ describe("curlOf", () => {
   });
 
   it("sends no credential for an operation that needs none", () => {
-    expect(curlOf("http://localhost:8080", requestFor("getHealth"))).toBe(
-      "curl -X GET 'http://localhost:8080/healthz'",
+    expect(curlOf("http://localhost:8080", requestFor("getLive"))).toBe(
+      "curl -X GET 'http://localhost:8080/livez'",
     );
   });
 });

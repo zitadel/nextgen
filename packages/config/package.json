@@ -43,6 +43,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
       "types": "./dist/branding-url.d.mts",

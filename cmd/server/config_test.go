@@ -83,6 +83,26 @@ func TestPlatformConfigValidate(t *testing.T) {
 		t.Parallel()
 		require.Error(t, PlatformConfig{ProjectID: "user_01H0000000000000000000000"}.Validate())
 	})
+
+	t.Run("operators with a platform project are valid", func(t *testing.T) {
+		t.Parallel()
+		require.NoError(t, PlatformConfig{BootstrapProject: true, Operators: []string{"user_platformadmin"}}.Validate())
+		require.NoError(t, PlatformConfig{ProjectID: "proj_setup", Operators: []string{"user_01H0000000000000000000000"}}.Validate())
+	})
+
+	t.Run("operators without a platform project error", func(t *testing.T) {
+		t.Parallel()
+		err := PlatformConfig{Operators: []string{"user_platformadmin"}}.Validate()
+		require.ErrorContains(t, err, "platform.operators needs a platform project")
+	})
+
+	t.Run("an operator that is not a user id errors", func(t *testing.T) {
+		t.Parallel()
+		for _, id := range []string{"team_ops", "ffo@zitadel.com", " user_platformadmin", ""} {
+			err := PlatformConfig{BootstrapProject: true, Operators: []string{id}}.Validate()
+			require.ErrorContains(t, err, "platform.operators", "%q", id)
+		}
+	})
 }
 
 func TestPlatformConfigResolvedProjectID(t *testing.T) {
@@ -129,8 +149,8 @@ func TestPlatformConfigProvisioningProjectID(t *testing.T) {
 	})
 }
 
-// A UI path at or under the IdP callback's routes would overlap the callback
-// pattern, which ServeMux answers with a panic at boot.
+// A console path at or under the IdP callback's routes would overlap the
+// callback pattern, which ServeMux answers with a panic at boot.
 func TestServerConfigValidate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -138,12 +158,12 @@ func TestServerConfigValidate(t *testing.T) {
 		cfg     ServerConfig
 		wantKey string
 	}{
-		{name: "the default paths validate", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/ui/console", LoginEnabled: true, LoginPath: "/ui/login"}},
-		{name: "a login path under /idp errors", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idp/login"}, wantKey: "server.login_path"},
-		{name: "a login path of /idp itself errors", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idp"}, wantKey: "server.login_path"},
+		{name: "the default path validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/ui/console"}},
+		{name: "a console path under /idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp/console"}, wantKey: "server.console_path"},
+		{name: "a console path of /idp itself errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp"}, wantKey: "server.console_path"},
 		{name: "a console path under /__nextgen/idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/__nextgen/idp/admin"}, wantKey: "server.console_path"},
-		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idps"}},
-		{name: "a disabled surface is not checked", cfg: ServerConfig{LoginEnabled: false, LoginPath: "/idp/login"}},
+		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idps"}},
+		{name: "a disabled console is not checked", cfg: ServerConfig{ConsoleEnabled: false, ConsolePath: "/idp/console"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

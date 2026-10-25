@@ -34,7 +34,7 @@ When operating outside the current directory, also pass:
 --cwd <path>
 ```
 
-The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress belongs on stderr. Capture stdout and stderr separately when scripting. The contract covers the Zitadel commands; oclif's built-in `help`, `version`, and `commands` print no envelope.
+The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress belongs on stderr. Capture stdout and stderr separately when scripting, into files outside the app directory: setup scaffolds a new app only into an empty directory. The contract covers the Zitadel commands; oclif's built-in `help`, `version`, and `commands` print no envelope.
 
 ## Envelope shape
 

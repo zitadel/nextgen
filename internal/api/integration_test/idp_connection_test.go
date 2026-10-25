@@ -429,6 +429,17 @@ func TestIdpAccess(t *testing.T) {
 		assertAuthzError(t, outsider.query(t, &api.QueryIdpsRequest{}), notFound)
 	})
 
+	t.Run("the owner's secret naming another project gets 404", func(t *testing.T) {
+		// The secret may read the connection, but the route is scoped to the
+		// project the caller names, and the connection is not in it.
+		named := owner
+		named.project = newIdpFixture(t).project
+
+		notFound := domain.ErrIDPConnectionNotFound().Code
+		assertAuthzError(t, named.get(t, connection.ID), notFound)
+		assertAuthzError(t, named.listRevisions(t, api.ListIdpRevisionsParams{ID: connection.ID}), notFound)
+	})
+
 	t.Run("a viewer reads but cannot write", func(t *testing.T) {
 		viewer := newIdpFixture(t)
 		conn := viewer.create(t, helpers.OIDCConnection("google"))

@@ -8,6 +8,10 @@
    those standard names so shadcn/ui components drop in unchanged. */
 @import "@zitadel/design-tokens/css/shadcn.css";
 
+/* The generated avatar's gradient and motion (`.zl-avatar`), shared with the
+   login's `<zl-avatar>` so the two never drift (`components/user-avatar.tsx`). */
+@import "@zitadel/components/avatar.css";
+
 /* Self-hosted Arimo — the design's body typeface (`font-sans`). */
 @import "@fontsource/arimo/400.css";
 @import "@fontsource/arimo/500.css";
@@ -122,72 +126,6 @@ select:-webkit-autofill {
   caret-color: var(--color-foreground);
 }
 
-/* The generated avatar (`components/user-avatar.tsx`): the person's two
-   design-system gradient starts as one linear gradient across the circle, so
-   both colours always show in the same proportion.
-
-   Only its direction moves, and not evenly: a slow turn plus two sways on
-   different periods, all registered angles so they interpolate. The gradient
-   drifts round, speeds up, slows and sometimes swings back, rather than
-   turning steadily about its centre. Each person starts from their own angle
-   (`--avatar-base`) and point in the motion (`--avatar-phase`), so a list of
-   avatars never moves in step. The component speeds it up while its host is
-   hovered. */
-@property --avatar-turn {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@property --avatar-sway-a {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@property --avatar-sway-b {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
-@keyframes avatar-turn {
-  to {
-    --avatar-turn: 360deg;
-  }
-}
-
-@keyframes avatar-sway-a {
-  from {
-    --avatar-sway-a: -90deg;
-  }
-  to {
-    --avatar-sway-a: 90deg;
-  }
-}
-
-@keyframes avatar-sway-b {
-  from {
-    --avatar-sway-b: -45deg;
-  }
-  to {
-    --avatar-sway-b: 45deg;
-  }
-}
-
-.user-avatar {
-  background-image: linear-gradient(
-    calc(var(--avatar-base) + var(--avatar-turn) + var(--avatar-sway-a) + var(--avatar-sway-b)),
-    var(--avatar-from) 15%,
-    var(--avatar-to) 85%
-  );
-  animation:
-    avatar-turn 60s linear infinite,
-    avatar-sway-a 18s ease-in-out infinite alternate,
-    avatar-sway-b 26s ease-in-out infinite alternate;
-  animation-delay: var(--avatar-phase);
-}
-
 /* A hover host (the sidebar footer) carries the same colours: on hover or
    while its menu is open, a wash of them sweeps in behind its content. */
 .avatar-host {
@@ -203,8 +141,8 @@ select:-webkit-autofill {
   border-radius: inherit;
   background-image: linear-gradient(
     100deg,
-    color-mix(in oklab, var(--avatar-from) 22%, transparent),
-    color-mix(in oklab, var(--avatar-to) 10%, transparent) 50%,
+    color-mix(in oklab, var(--zl-avatar-from) 22%, transparent),
+    color-mix(in oklab, var(--zl-avatar-to) 10%, transparent) 50%,
     transparent 80%
   );
   background-size: 200% 100%;
@@ -222,10 +160,6 @@ select:-webkit-autofill {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .user-avatar {
-    animation: none;
-  }
-
   .avatar-host::before {
     transition: none;
   }

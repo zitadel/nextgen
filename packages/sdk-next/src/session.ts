@@ -70,7 +70,8 @@ function warnMissingProject(): void {
  * With none of them, it reads as signed out without asking the server.
  *
  * - `200` with an authenticated user → `{ isAuthenticated: true, session }`
- *   with the client-safe identity (`userId`, `email`, `name` — no token).
+ *   with the client-safe identity (`userId`, `identifier`,
+ *   `identifierProperty`, `display` — no token).
  * - `200` for an anonymous session, `401` with `auth.unauthorized`, `403`
  *   with `sess.project_mismatch`, or `404` with `sess.not_found` → signed out.
  *   The `403` answers a session of another project on the same server, and a

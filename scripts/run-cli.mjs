@@ -258,8 +258,8 @@ export function buildCli({ env = process.env } = {}) {
 }
 
 export async function buildLocalServerBinary({ env = process.env } = {}) {
-  // server:build depends on console:build and login-ui:build, so one
-  // invocation produces the fully embedded binary in graph order.
+  // server:build depends on console:build, so one invocation produces the
+  // fully embedded binary in graph order.
   await runTargetsToStderr(["server:build"], env);
   const metadata = await readServerBuildMetadata(localServerMetadata);
   return { path: localServerBinary, version: metadata.version };

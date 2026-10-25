@@ -38,6 +38,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -48,6 +49,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
 )
 
 const (
@@ -183,6 +185,9 @@ type serving struct {
 	database string
 	// admin is the bootstrap admin document, nil when none is configured.
 	admin []byte
+	// adminID is the user id admin names, the deployment's platform operator
+	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
+	adminID string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -246,7 +251,17 @@ func parseServing(env string) (*serving, error) {
 		if !strings.Contains(string(doc), `"header"`) || !strings.Contains(string(doc), `"authenticators"`) {
 			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document")
 		}
+		var admin users.Document
+		if err := json.Unmarshal(doc, &admin); err != nil {
+			return nil, fmt.Errorf("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document: %w", err)
+		}
+		// The server's import refuses a document without one too; refusing it
+		// here keeps the cloud from starting without its platform operator.
+		if admin.Header.ID == "" {
+			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 names no user id (header.id)")
+		}
 		s.admin = doc
+		s.adminID = admin.Header.ID
 	}
 	return s, nil
 }
@@ -313,14 +328,14 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 	// Set, not defaulted: these follow from how Vercel runs the function and
 	// how vercel.json routes, so a leftover variable must not move them. The
-	// login UI stays on because the console service reads
-	// /console/runtime.json, which the server only mounts while one of its
-	// UIs is enabled.
+	// request ID is Vercel's, the one its dashboard shows for the request:
+	// Vercel sets x-vercel-id on every request and replaces the ID a client
+	// sends.
 	for key, value := range map[string]string{
-		"NEXTGEN_SERVER_ADDRESS":         ":" + port,
-		"NEXTGEN_SERVER_CONSOLE_ENABLED": "false",
-		"NEXTGEN_SERVER_CONSOLE_PATH":    consolePath,
-		"NEXTGEN_SERVER_LOGIN_ENABLED":   "true",
+		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
+		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
+		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err
@@ -333,6 +348,9 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT": "true",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT": "json",
 		"NEXTGEN_SERVER_PUBLIC_BASE":         publicBase(env),
+		// The bootstrap admin administers every project (ADR 075), unless
+		// the deployment names its platform operators itself.
+		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err

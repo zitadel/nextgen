@@ -122,9 +122,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `${{ NAME }}` reference to a project variable is not a secret and may stay on
   argv (a connection's `client_secret` takes nothing else); write it in single
   quotes, since inside double quotes the shell reads `${` as its own expansion.
-- **Streams.** Capture stdout and stderr separately when scripting. The machine
-  contract is one parseable JSON object on stdout; installer, audit, and
-  package-manager progress belongs on stderr.
+- **Streams.** Capture stdout and stderr separately when scripting, into files
+  outside the app directory: `setup` scaffolds a new app only into an empty
+  directory. The machine contract is one parseable JSON object on stdout;
+  installer, audit, and package-manager progress belongs on stderr.
 
 ## Discovering commands
 
@@ -211,8 +212,9 @@ Common error codes point at their own fix in `next_commands`:
   with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
-- `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
-  Zitadel platform API. Follow `next_commands`.
+- `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
+  version does not have (`details.body.code` is `req.not_found`), or a
+  `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.
 
@@ -354,7 +356,10 @@ server and its port, but runs its project checks in the working directory, so ru
 it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). A
+local server is healthy once its `/readyz` answers, which takes its database
+answering too: `start` waits for that, and the commands that read a server
+treat one whose database does not answer as unhealthy. `stop`,
 `reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
