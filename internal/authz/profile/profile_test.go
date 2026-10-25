@@ -159,7 +159,7 @@ type document
 				Code:     profile.CodeUnboundedTupleToUserset,
 				Type:     "document",
 				Relation: "viewer",
-				Message:  `type "folder" is not a known hierarchy edge: "app", "app_group", "project", "team", "user"`,
+				Message:  `type "folder" is not a known hierarchy edge: "app", "app_group", "platform", "project", "team", "user"`,
 			},
 		},
 		{

@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
@@ -17,6 +17,11 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // with the session cookie (#1237). Not `POST /projects/query`, which the server
 // pins to the calling credential's one home project.
 const PROJECTS_URL = "http://localhost/api/users/me/projects";
+
+/** A project as `GET /users/me/projects` lists it. */
+function listed(id: string, name: string) {
+  return { id, name, created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" };
+}
 
 /** The same locale-derived string the screen renders, rather than one locale's output. */
 function expectedDate(value: string): string {
@@ -63,7 +68,7 @@ describe("projects screen", () => {
     expect(table.getByText(expectedDate("2026-07-08T09:00:00Z"))).toBeInTheDocument();
   });
 
-  it("suggests setup against this console's own server", async () => {
+  it("opens New project on setup against this console's own server", async () => {
     server.use(
       http.get(PROJECTS_URL, () =>
         HttpResponse.json({
@@ -79,13 +84,107 @@ describe("projects screen", () => {
       ),
     );
     await renderProjects();
-    await screen.findByRole("heading", { name: "Projects" });
 
+    await userEvent.click(await screen.findByRole("button", { name: "New project" }));
+    const drawer = within(await screen.findByRole("dialog", { name: "New project" }));
     // The specs' API base is http://localhost/api, so that is the server the
     // command names, not the CLI's hosted default.
     expect(
-      await screen.findByText("npx @zitadel/cli@latest setup --server http://localhost"),
+      drawer.getByText("npx @zitadel/cli@latest setup --server http://localhost"),
     ).toBeInTheDocument();
+    expect(drawer.getByRole("button", { name: "Copy the setup command" })).toBeInTheDocument();
+  });
+
+  it("tells projects of one name apart by their host and id", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            // The local machine tells no project apart, so it shows no host.
+            {
+              ...listed("proj_1", "maxtest1"),
+              origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+            },
+            // A preview pattern names no host; the primary origin does.
+            {
+              ...listed("proj_2", "maxtest1"),
+              origins: [
+                { pattern: "https://*.preview.example.com", kind: "preview" },
+                { pattern: "https://shop.example.com", kind: "primary" },
+              ],
+            },
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    const table = within(await screen.findByRole("table"));
+    // Below the header row; two of one name keep their places by id.
+    const [first, second] = table.getAllByRole("row").slice(1) as [HTMLElement, HTMLElement];
+    expect(within(first).getByText("proj_1")).toBeInTheDocument();
+    expect(within(first).queryByText(/localhost/)).not.toBeInTheDocument();
+    expect(within(second).getByText("proj_2")).toBeInTheDocument();
+    expect(within(second).getByText("shop.example.com")).toBeInTheDocument();
+    expect(table.getAllByRole("button", { name: "Copy the ID of maxtest1" })).toHaveLength(2);
+  });
+
+  it("marks the selected project, which the bar does not name here", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({ projects: [listed("proj_1", "River"), listed("proj_2", "Delta")] }),
+      ),
+    );
+    await renderProjects("/projects?project=proj_2");
+
+    const table = within(await screen.findByRole("table"));
+    const current = (await table.findByText("Current")).closest("tr") as HTMLElement;
+    expect(within(current).getByRole("link", { name: "Delta" })).toBeInTheDocument();
+    expect(table.getAllByText("Current")).toHaveLength(1);
+    // The list is the switcher here (D21).
+    expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+  });
+
+  it("lists the projects by name while they fit on one page", async () => {
+    // By id, the server's order, `proj_platform` sorts after every generated id.
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [
+            listed("proj_1", "zeta"),
+            listed("proj_2", "app-10"),
+            listed("proj_3", "app-2"),
+            listed("proj_platform", "Platform"),
+          ],
+        }),
+      ),
+    );
+    await renderProjects();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getAllByRole("link").map((link) => link.textContent)).toEqual([
+      "app-2",
+      "app-10",
+      "Platform",
+      "zeta",
+    ]);
+  });
+
+  it("keeps the server's order past one page", async () => {
+    // A page sorted among itself would put rows Load more appends out of place.
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [listed("proj_1", "zeta"), listed("proj_2", "alpha")],
+          next_page_token: "page-2",
+        }),
+      ),
+    );
+    await renderProjects();
+
+    const table = within(await screen.findByRole("table"));
+    await table.findByRole("link", { name: "zeta" });
+    expect(table.getAllByRole("link").map((link) => link.textContent)).toEqual(["zeta", "alpha"]);
   });
 
   it("lists a project somebody else granted access to", async () => {
@@ -154,8 +253,8 @@ describe("projects screen", () => {
   });
 
   it("asks for a selection while none is made", async () => {
-    // Until a project is selected the sidebar lists only Projects, so this
-    // page is the one that explains what to do. Two projects: with one, the
+    // Until a project is selected the project's screens ask for one first, so
+    // this page says what choosing one is for. Two projects: with one, the
     // `_authed` guard would select it.
     server.use(
       http.get(PROJECTS_URL, () =>
@@ -207,6 +306,9 @@ describe("projects screen", () => {
     );
     await renderProjects(`/projects?next=${encodeURIComponent("/teams?status=deactivated")}`);
 
+    // On the way to Teams, the page is named for it (D22).
+    expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
+    expect(await screen.findByText("Choose a project to continue.")).toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "Delta" })).toHaveAttribute(
       "href",
       "/teams?status=deactivated&project=proj_2",
@@ -247,6 +349,9 @@ describe("projects screen", () => {
     await renderProjects();
 
     expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    // Nothing to search, while New project stays.
+    expect(screen.queryByRole("searchbox", { name: "Search projects" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "New project" })).toBeInTheDocument();
   });
 
   it("appends the next page and drops the button when the list is complete", async () => {
@@ -294,6 +399,128 @@ describe("projects screen", () => {
     // Absent rather than disabled: its absence is how the screen says the list
     // is complete (design decisions log D5 — no total count to show instead).
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+  });
+
+  it("offers the search however few projects there are", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    await renderProjects();
+
+    expect(await screen.findByRole("link", { name: "River" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toBeInTheDocument();
+  });
+
+  it("searches every project on the server once the list runs past one page", async () => {
+    const searched: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        if (!params.has("name_contains")) {
+          return HttpResponse.json({
+            projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+            next_page_token: "page-2",
+          });
+        }
+        searched.push(params);
+        // Past the loaded rows: only the server can find it.
+        return HttpResponse.json({ projects: [listed("proj_9", "Zephyr")] });
+      }),
+    );
+    const router = await renderProjects();
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Search projects" }), "zep");
+
+    expect(await screen.findByRole("link", { name: "Zephyr" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "River" })).not.toBeInTheDocument();
+    // One read per pause in typing, at the screen's page size.
+    expect(searched.map((params) => [params.get("name_contains"), params.get("limit")])).toEqual([
+      ["zep", "25"],
+    ]);
+    // The search is in the URL, and the screen's own navigation leaves the
+    // field as it was typed.
+    await waitFor(() => expect(router.state.resolvedLocation?.search).toMatchObject({ q: "zep" }));
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+  });
+
+  it("keeps the field while a cleared search reloads the list", async () => {
+    // A short list opened on a search: clearing it drops `?q=`, and the field
+    // stays rather than leaving with it.
+    server.use(
+      http.get(PROJECTS_URL, () => HttpResponse.json({ projects: [listed("proj_1", "River")] })),
+    );
+    const router = await renderProjects("/projects?q=riv");
+
+    const field = await screen.findByRole("searchbox", { name: "Search projects" });
+    await userEvent.clear(field);
+
+    await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
+    expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue("");
+    expect(screen.getByRole("link", { name: "River" })).toBeInTheDocument();
+  });
+
+  it("keeps the search when loading more", async () => {
+    const reads: URLSearchParams[] = [];
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        reads.push(params);
+        if (params.get("page_token") === "zep-2") {
+          return HttpResponse.json({ projects: [listed("proj_10", "Zephyr Two")] });
+        }
+        return HttpResponse.json({
+          projects: [listed("proj_9", "Zephyr")],
+          next_page_token: "zep-2",
+        });
+      }),
+    );
+    await renderProjects("/projects?q=zep");
+
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+    await userEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("link", { name: "Zephyr Two" })).toBeInTheDocument();
+
+    // The loader's read and Load more both carry the search: a page token
+    // continues the list it came from.
+    const searched = reads.filter((params) => params.get("limit") === "25");
+    expect(searched.map((params) => params.get("name_contains"))).toEqual(["zep", "zep"]);
+    expect(searched.map((params) => params.get("page_token"))).toEqual([null, "zep-2"]);
+  });
+
+  it("says when a search matches nothing", async () => {
+    server.use(
+      http.get(PROJECTS_URL, ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has("name_contains")
+            ? { projects: [] }
+            : { projects: [listed("proj_1", "River")], next_page_token: "page-2" },
+        ),
+      ),
+    );
+    await renderProjects("/projects?q=zzz");
+
+    expect(await screen.findByText("No projects match “zzz”.")).toBeInTheDocument();
+  });
+
+  it("clears the search when Projects is opened from the sidebar", async () => {
+    server.use(
+      http.get(PROJECTS_URL, () =>
+        HttpResponse.json({
+          projects: [listed("proj_1", "River"), listed("proj_2", "Delta")],
+          next_page_token: "page-2",
+        }),
+      ),
+    );
+    const router = await renderProjects("/projects?q=zep");
+    expect(await screen.findByRole("searchbox", { name: "Search projects" })).toHaveValue("zep");
+
+    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    await userEvent.click(nav.getByRole("link", { name: "Projects" }));
+
+    await waitFor(() => expect(router.state.resolvedLocation?.search.q).toBeUndefined());
+    await waitFor(() =>
+      expect(screen.getByRole("searchbox", { name: "Search projects" })).toHaveValue(""),
+    );
   });
 
   // On localhost the cookie may hold an app's session. Every read of the list

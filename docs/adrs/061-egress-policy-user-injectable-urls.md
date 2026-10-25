@@ -1,7 +1,12 @@
 # ADR 061: Egress Policy for User-Injectable URLs
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-09-10)
 > **Date:** 2026-09-10
+>
+> **Amendment (2026-10-24):** shipped with schema ingest in #1208
+> (`internal/httputil/`), enforced by the `egresslint` analyzer (#1220), and
+> adopted by SSO (#1253, #1386). The dev-mode loopback question stays open on
+> #928.
 > **Context:** #1114 (schema ingest fetched caller-supplied URLs without limits), epic #928 (egress policy), advisory [GHSA-29jh-8cfq-rr8x](https://github.com/zitadel/zitadel/security/advisories/GHSA-29jh-8cfq-rr8x)
 > **Builds on:** [ADR 030](030-error-model-mapping-and-reporting.md) (error mapping), the [Server-Side Fetch Policy](../design/idp/3-social-login-flow.md#server-side-fetch-policy)
 
@@ -116,7 +121,7 @@ epic-wide, not in this document alone.
 ## Consequences
 
 - Schema ingest by URL (#1114) is the first consumer; social login (#851)
-  and tenant webhooks adopt the same client when they land.
+  uses the same client, and tenant webhooks adopt it when they land.
 - An allow entry added for one feature applies to every consumer of the
   shared policy. A future consumer needing a different trust level gets
   its own configured instance of the same mechanism, not a second

@@ -1,6 +1,10 @@
 package policy
 
-import "errors"
+import (
+	"errors"
+	"slices"
+	"strings"
+)
 
 var (
 	// ErrUnknownOperation is returned for an operation the catalog does not
@@ -20,3 +24,52 @@ var (
 	// the template's context schema. Evaluation fails closed.
 	ErrContextMismatch = errors.New("policy: request context does not match the schema")
 )
+
+// Violation is one way an instance does not fit its template: a setting that
+// is unknown, of the wrong type or out of bounds, or a config rule that does
+// not hold. [Engine.Bind] reports every violation at once; [Violations] reads
+// them back.
+type Violation struct {
+	// Setting names the setting that failed; empty for a config rule.
+	Setting string
+	// ConfigRule names the config rule that does not hold; empty for a
+	// setting.
+	ConfigRule string
+	// Settings are the settings a failed config rule reads, sorted.
+	Settings []string
+	// Reason says what is wrong, for the error message.
+	Reason string
+}
+
+// invalidInstanceError carries every violation Bind found. It is
+// [ErrInvalidInstance] to errors.Is.
+type invalidInstanceError struct {
+	violations []Violation
+}
+
+func (e *invalidInstanceError) Error() string {
+	reasons := make([]string, 0, len(e.violations))
+	for _, v := range e.violations {
+		reasons = append(reasons, v.Reason)
+	}
+	return ErrInvalidInstance.Error() + ": " + strings.Join(reasons, "\n")
+}
+
+func (e *invalidInstanceError) Unwrap() error { return ErrInvalidInstance }
+
+// Violations returns the violations err carries, in the order Bind found
+// them: the settings by name, then the config rules in template order. It
+// returns nil for an error that names none, such as a missing config or a
+// wrong kind.
+func Violations(err error) []Violation {
+	var invalid *invalidInstanceError
+	if !errors.As(err, &invalid) {
+		return nil
+	}
+	out := make([]Violation, 0, len(invalid.violations))
+	for _, v := range invalid.violations {
+		v.Settings = slices.Clone(v.Settings)
+		out = append(out, v)
+	}
+	return out
+}

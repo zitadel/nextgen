@@ -30,9 +30,9 @@ func TestNew_servesIndex(t *testing.T) {
 	root := fstest.MapFS{
 		"index.html": &fstest.MapFile{Data: []byte("index-body")},
 	}
-	h := staticui.New("/ui/login", root)
+	h := staticui.New("/ui/console", root)
 
-	req := httptest.NewRequest(http.MethodGet, "/ui/login/", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ui/console/", nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 

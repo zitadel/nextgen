@@ -1,0 +1,601 @@
+# Product analytics events, per component: what each one sends today
+# (status: emitted) and what its tracking ticket plans (status: planned).
+#
+# An event is a header and a body. Every component sends the header the same
+# way, so events compare across components. The body is the component's own:
+# its context, which all its events carry, and the event's properties.
+#
+# Conventions: product-analytics.md. Every property is defined once under
+# `properties`. The CLI's unit tests
+# (apps/cli/tests/unit/lib/telemetry/catalog.test.ts) check what it sends
+# against this file.
+
+# What every event carries, whichever component sends it. `<surface>` stands
+# for the component, as in `cli_version`: the release version of a build that
+# came from a release, or the git commit of one we deployed ourselves, as the
+# cloud's server and Console, the website and the docs are. Vercel's automatic
+# page views carry no properties, so the header applies to the events a
+# component sends.
+header:
+  properties: [surface, <surface>_version, server_kind]
+  # Website and docs belong to no Zitadel deployment.
+  except:
+    website: [server_kind]
+    docs: [server_kind]
+
+properties:
+  # Header
+  surface:
+    type: string
+    values: [cli, server, console, website, docs]
+    description: The component that sent the event.
+  cli_version:
+    type: string
+    description: The CLI's release version, such as `1.0.0-alpha.26`.
+  server_version:
+    type: string
+    description: >-
+      The server's release version; in the cloud, the git commit it was
+      deployed from.
+  console_version:
+    type: string
+    description: >-
+      The release version of the server that embeds the Console; in the cloud,
+      the git commit it was deployed from.
+  website_version:
+    type: string
+    description: The git commit the website was deployed from.
+  docs_version:
+    type: string
+    description: The git commit the docs site was deployed from.
+  server_kind:
+    type: string
+    values: [cloud, local, self_hosted, unknown]
+    description: >-
+      The kind of Zitadel deployment the event concerns, never its URL: the
+      server a CLI command talked to, the one serving the Console, or the
+      server itself.
+
+  # Interface and location
+  page:
+    type: string
+    description: A stable page category, never a URL.
+  view:
+    type: string
+    values: [list, details]
+    description: The kind of page; on a modal, the page it was opened from.
+  tab:
+    type: string
+    values: [sign_in_methods, identity_providers, overview, authentication, active, deactivated]
+    description: The selected tab, on pages with tracked tabs.
+
+  # Journeys and actions
+  flow:
+    type: string
+    values: [onboarding, oidc_provider_setup]
+    description: The journey an event belongs to.
+  step:
+    type: string
+    values:
+      - framework_resolved
+      - project_created
+      - files_patched
+      - dependencies_installed
+      - initial_checks
+      - framework_selection
+      - server_selection
+      - dev_port_selection
+      - use_case_selection
+      - preset_selection
+      - provider_selection
+      - application_setup
+    description: >-
+      A journey's step. Today `setup` records the furthest stage it reached
+      (framework_resolved to dependencies_installed); #2200 plans the
+      onboarding flow's steps (initial_checks to application_setup). Settle one
+      meaning before #2200 ships.
+  action:
+    type: string
+    values: [create, update, delete, deactivate, enable, disable, test, deploy, redeploy, rollback]
+    description: What happened.
+  resource_type:
+    type: string
+    values:
+      - project
+      - user
+      - team
+      - grant
+      - user_schema
+      - authentication_method
+      - identity_provider
+      - login_flow
+      - branding
+      - release
+      - deployment
+    description: What the action acted on.
+  entry_point:
+    type: string
+    values: [onboarding, standalone]
+    description: Whether an authentication change ran inside onboarding or on its own.
+  method:
+    type: string
+    values: [password, passkey, sso]
+    description: The sign-in method enabled or disabled.
+  access_level:
+    type: string
+    description: The predefined permission a grant gives, never who receives it.
+  provider_type:
+    type: string
+    description: The kind of identity provider, never its name, issuer URL or client id.
+  provider_types:
+    type: list
+    description: The kinds of identity providers chosen during onboarding; empty when none.
+  server_type:
+    type: string
+    values: [local, remote]
+    description: The server chosen during onboarding.
+  test_mode:
+    type: string
+    values: [static, live]
+    description: A configuration check (static) or a real sign-in (live).
+  test_result:
+    type: string
+    values: [passed, failed, inconclusive]
+    description: How an identity provider test ended.
+  stage:
+    type: string
+    values: [validation, release_creation, deployment]
+    description: Where a deployment failed.
+  changed_configuration_types:
+    type: list
+    values: [user_schema, login_flow, branding, policy, identity_provider]
+    description: Configuration a deployment actually changed, never one it merely included.
+  preview_option:
+    type: string
+    values: [journey, viewport, theme, state, flow]
+    description: The branding preview control a developer changed.
+  selected_value:
+    type: string
+    values:
+      - register
+      - login
+      - desktop
+      - mobile
+      - light
+      - dark
+      - revision
+      - default
+      - validation_error
+      - submission_error
+      - loading
+      - success
+    description: The preview control's new value; absent for `flow`.
+
+  # Outcomes and measurements
+  status:
+    type: string
+    values: [ok, skipped, error]
+    description: How a CLI command ended.
+  reason:
+    type: string
+    description: A predefined error code such as `E_NETWORK`, never a raw message.
+  exit_code:
+    type: number
+    description: The CLI process's exit code.
+  duration_ms:
+    type: number
+    description: How long the command, flow or operation took.
+
+  # Platform
+  os:
+    type: string
+    description: >-
+      The operating system, as Node.js names it (`darwin`, `linux`, `win32`);
+      the server maps Go's names to these.
+  arch:
+    type: string
+    description: >-
+      The CPU architecture, as Node.js names it (`arm64`, `x64`); the server
+      maps Go's names to these.
+
+  # Server
+  dialect:
+    type: string
+    values: [sqlite, postgres, spanner, unknown]
+    description: The server's storage dialect; `unknown` when its database configuration is invalid.
+
+  # Mixpanel
+  ip:
+    type: number
+    values: [0]
+    description: Always 0, so Mixpanel does not locate the sender by IP address.
+  $insert_id:
+    type: string
+    description: A random id per event, so a resent event is counted once.
+
+  # CLI invocation
+  command:
+    type: string
+    description: The CLI command id, such as `variables:set`.
+  node_version:
+    type: string
+    description: The Node.js version running the CLI.
+  $os:
+    type: string
+    description: The platform, as Mixpanel labels it (`Mac OS X`).
+  mp_country_code:
+    type: string
+    description: The country of the system timezone, on events; none for timezones the CLI does not know.
+  $country_code:
+    type: string
+    description: The same country, on the install profile.
+  is_tty:
+    type: boolean
+    description: Whether the CLI ran in a terminal.
+  non_interactive:
+    type: boolean
+    description: Whether the CLI ran without prompts.
+  dry_run:
+    type: boolean
+    description: Whether the command ran as a dry run.
+  force:
+    type: boolean
+    description: Whether the command ran with `--force`.
+  is_ci:
+    type: boolean
+    description: Whether the CLI ran in CI.
+  ci_provider:
+    type: string
+    values: [github_actions, gitlab_ci, circleci, buildkite, jenkins, unknown]
+    description: Which CI it ran in; absent outside CI.
+  host_agent:
+    type: string
+    values: [claude_code, cursor, vscode, unknown]
+    description: >-
+      The application that started the CLI. Context only: it does not say
+      whether a person or an agent acted.
+  invocation_channel:
+    type: string
+    values: [npm, pnpm, yarn, bun, unknown]
+    description: The package manager that started the CLI.
+  invocation_id:
+    type: string
+    description: A random id that ties one run's events together.
+  distinct_id:
+    type: string
+    description: The CLI's install id, a random UUID tied to no account or machine.
+  $name:
+    type: string
+    description: A readable label for the install profile, built from the host agent or platform and the install id.
+
+  # CLI command dimensions
+  framework:
+    type: string
+    description: The framework `setup` set up.
+  renderer:
+    type: string
+    description: The UI renderer `setup` used.
+  scaffolded_skeleton:
+    type: boolean
+    description: Whether `setup` created the app's skeleton.
+  skip_install:
+    type: boolean
+    description: Whether `setup` skipped installing dependencies.
+  dev_port_explicit:
+    type: boolean
+    description: Whether `setup` was given a dev port.
+  preset:
+    type: string
+    description: The authentication preset chosen.
+  use_case:
+    type: string
+    description: The use case chosen.
+  sso:
+    type: string
+    description: >-
+      An `IDP_PROVIDERS` slug, `custom` for a developer-described connection
+      (never its slug), `none` or `multiple`.
+  files_written_count:
+    type: number
+    description: How many files `setup` wrote.
+  package_manager:
+    type: string
+    description: The package manager `setup` installed dependencies with.
+  design:
+    type: string
+    description: The `BRANDING_DESIGNS` value `branding eject` ejected.
+  creates:
+    type: number
+    description: How many resources a plan creates.
+  updates:
+    type: number
+    description: How many resources a plan updates.
+  deletes:
+    type: number
+    description: How many resources a plan deletes.
+  revisions:
+    type: number
+    description: How many revisions a plan makes.
+  total:
+    type: number
+    description: How many changes a plan holds.
+  runtime:
+    type: string
+    values: [binary, docker]
+    description: The local server runtime.
+  checks_total:
+    type: number
+    description: How many checks `doctor` ran.
+  checks_failed:
+    type: number
+    description: How many checks failed.
+  checks_warn:
+    type: number
+    description: How many checks warned.
+  failed_checks:
+    type: string
+    description: The failed checks' names, comma-separated, never their messages.
+  credential:
+    type: string
+    description: Which credential a command connected with, `project` or `preview`; never a token.
+  has_env_file:
+    type: boolean
+    description: Whether `--env-file` was given; never the file's path.
+  resources:
+    type: number
+    description: How many resources the release pinned; never a handle or a digest.
+  origin_count:
+    type: number
+    description: How many origins a deployment went live on; never an origin.
+  is_secret:
+    type: boolean
+    description: Whether a variable is secret; never its name or value.
+  variable_count:
+    type: number
+    description: How many variables `variables list` found.
+  operation:
+    type: string
+    description: The `operationId` `zitadel api` called, never a path, an id or a field.
+  is_paginated:
+    type: boolean
+    description: Whether `zitadel api` followed pagination.
+  claim_outcome:
+    type: string
+    values: [completed, already_claimed, expired, window_expired, timeout, dry_run]
+    description: How `claim` ended; never an id or a URL.
+  poll_count:
+    type: number
+    description: How often `claim` polled.
+  browser_opened:
+    type: boolean
+    description: Whether `claim` opened a browser.
+
+components:
+  cli:
+    source: apps/cli
+    # Every CLI event carries this after the header. #2125 may still change
+    # its identity and execution-context properties, for every event.
+    context:
+      - command
+      - node_version
+      - os
+      - $os
+      - arch
+      - mp_country_code
+      - ip
+      - is_tty
+      - non_interactive
+      - dry_run
+      - force
+      - is_ci
+      - ci_provider
+      - host_agent
+      - invocation_channel
+      - invocation_id
+      - distinct_id
+      - $insert_id
+    # Proof of concept: the copy of an event sent to Vercel Web Analytics, from
+    # runs on the production channel. Its name takes the prefix, and it keeps
+    # the first 8 of these properties that hold a value, in this order.
+    vercel:
+      prefix: poc_
+      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, non_interactive]
+    events:
+      cli_command_started:
+        status: emitted
+        trigger: A command has read its flags.
+        destinations: [mixpanel, vercel]
+      cli_command_completed:
+        status: emitted
+        trigger: A command finished.
+        destinations: [mixpanel, vercel]
+        properties: [status, duration_ms]
+      cli_command_failed:
+        status: emitted
+        trigger: A command failed.
+        destinations: [mixpanel, vercel]
+        properties: [status, reason, exit_code, duration_ms]
+      flow_started:
+        status: planned
+        plan: "#2200"
+        trigger: Onboarding begins, before its initial checks; or identity provider setup begins.
+        destinations: [mixpanel]
+        properties: [flow, entry_point, provider_type]
+      viewed_step:
+        status: planned
+        plan: "#2200"
+        trigger: A setup prompt is shown.
+        destinations: [mixpanel]
+        properties: [flow, step]
+      step_completed:
+        status: planned
+        plan: "#2200"
+        trigger: A setup choice is confirmed, or resolved from the options given.
+        destinations: [mixpanel]
+        properties: [flow, step, framework, server_type, use_case, preset, provider_types]
+      flow_completed:
+        status: planned
+        plan: "#2200"
+        trigger: A new application's setup succeeds; or an identity provider and its credentials are saved.
+        destinations: [mixpanel]
+        properties: [flow, duration_ms, framework, use_case, preset, entry_point, provider_type]
+      flow_failed:
+        status: planned
+        plan: "#2200"
+        trigger: Setup fails; or identity provider setup fails.
+        destinations: [mixpanel]
+        properties: [flow, step, duration_ms, reason, framework, use_case, preset, entry_point, provider_type]
+      action_completed:
+        status: planned
+        plan: "#2200"
+        trigger: >-
+          A user, team or grant change, a sign-in method change, an identity
+          provider test, a deployment or a rollback succeeds.
+        destinations: [mixpanel]
+        properties:
+          - action
+          - resource_type
+          - access_level
+          - method
+          - entry_point
+          - test_mode
+          - test_result
+          - duration_ms
+          - changed_configuration_types
+      action_failed:
+        status: planned
+        plan: "#2200"
+        trigger: One of the operations `action_completed` covers fails.
+        destinations: [mixpanel]
+        properties: [action, resource_type, access_level, method, entry_point, test_mode, duration_ms, stage, reason]
+    # Added to the completed and failed events fired after the command records
+    # them. Keyed by command id; a command may also re-record a header or
+    # context property.
+    dimensions:
+      setup:
+        - framework
+        - renderer
+        - scaffolded_skeleton
+        - skip_install
+        - dev_port_explicit
+        - preset
+        - use_case
+        - sso
+        - step
+        - files_written_count
+        - package_manager
+      branding:eject: [design]
+      deploy: [resources, origin_count]
+      doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
+      start: [runtime]
+      variables:get: [is_secret]
+      variables:list: [variable_count]
+      variables:set: [is_secret]
+      api: [operation, is_paginated]
+      claim: [claim_outcome, poll_count, browser_opened]
+    profile:
+      trigger: The CLI's first run on an install.
+      destinations: [mixpanel]
+      properties: [$os, $country_code, os, arch, node_version, cli_version, $name, host_agent]
+
+  console:
+    source: apps/console
+    automatic:
+      - Vercel Web Analytics page views and Speed Insights, in the cloud build only (`CONSOLE_VERCEL_INSIGHTS=1`).
+    events:
+      viewed_page:
+        status: planned
+        plan: "#2233"
+        trigger: A page is shown, including on a tab switch.
+        destinations: [mixpanel]
+        properties: [page, resource_type, view, tab]
+      clicked_project_selector:
+        status: planned
+        plan: "#2233"
+        trigger: The top project selector opens.
+        destinations: [mixpanel]
+        properties: [page]
+      selected_project:
+        status: planned
+        plan: "#2233"
+        trigger: A project is picked in the selector.
+        destinations: [mixpanel]
+        properties: [page]
+      clicked_create_button:
+        status: planned
+        plan: "#2233"
+        trigger: Add user, Add team or the create-deployment modal opens.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+      clicked_confirm_button:
+        status: planned
+        plan: "#2233"
+        trigger: Adding a user or team, deleting a user, or a redeploy or rollback is confirmed.
+        destinations: [mixpanel]
+        properties: [resource_type, view, action]
+      clicked_save_button:
+        status: planned
+        plan: "#2233"
+        trigger: User attributes or a team's name are saved from its details.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+      clicked_delete_button:
+        status: planned
+        plan: "#2233"
+        trigger: The user deletion confirmation opens.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+      changed_preview_option:
+        status: planned
+        plan: "#2233"
+        trigger: A branding preview control changes.
+        destinations: [mixpanel]
+        properties: [resource_type, preview_option, selected_value]
+      clicked_deploy_button:
+        status: planned
+        plan: "#2233"
+        trigger: Deploy is clicked after picking a release.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+      clicked_redeploy_button:
+        status: planned
+        plan: "#2233"
+        trigger: The redeploy modal opens.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+      clicked_rollback_button:
+        status: planned
+        plan: "#2233"
+        trigger: The rollback modal opens.
+        destinations: [mixpanel]
+        properties: [resource_type, view]
+
+  website:
+    source: apps/website
+    automatic:
+      - Vercel Web Analytics page views and Speed Insights.
+    events: {}
+
+  docs:
+    source: apps/docs
+    automatic:
+      - Vercel Web Analytics page views and Speed Insights.
+    events: {}
+
+  server:
+    source: internal
+    # Every server event carries this after the header. It sends no
+    # distinct_id: the server has no install id yet.
+    context: [dialect, os, arch, ip, $insert_id]
+    # Proof of concept: an event's name takes the prefix in both destinations,
+    # and the Vercel copy keeps these properties.
+    vercel:
+      prefix: poc_
+      properties: [surface, server_version, server_kind, dialect, os, arch]
+    mixpanel:
+      prefix: poc_
+    events:
+      service_ping:
+        status: emitted
+        trigger: At start and then daily, when `service_ping.enabled` is set; it is off by default.
+        destinations: [vercel, mixpanel]

@@ -13,9 +13,11 @@ content:
         - $ref: '../../components/schemas/errors/var-invalid_name.yaml'
         - $ref: '../../components/schemas/errors/var-invalid_value.yaml'
         - $ref: '../../components/schemas/errors/var-no_project_id.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../components/schemas/errors/var-limit_exceeded.yaml'
         - $ref: '../../components/schemas/errors/var-not_found.yaml'
         - $ref: '../../components/schemas/errors/var-permission_denied.yaml'
@@ -31,9 +33,11 @@ content:
           var.invalid_name: '../../components/schemas/errors/var-invalid_name.yaml'
           var.invalid_value: '../../components/schemas/errors/var-invalid_value.yaml'
           var.no_project_id: '../../components/schemas/errors/var-no_project_id.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
           var.limit_exceeded: '../../components/schemas/errors/var-limit_exceeded.yaml'
           var.not_found: '../../components/schemas/errors/var-not_found.yaml'
           var.permission_denied: '../../components/schemas/errors/var-permission_denied.yaml'
@@ -83,6 +87,11 @@ content:
         value:
           code: var.no_project_id
           message: 'a variable must be owned by a project'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       proj.not_found:
         summary: proj.not_found
         value:
@@ -98,6 +107,11 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
       var.limit_exceeded:
         summary: var.limit_exceeded
         value:
