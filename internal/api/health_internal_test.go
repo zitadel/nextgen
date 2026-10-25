@@ -38,8 +38,8 @@ func probe(srv http.Handler, path string) *httptest.ResponseRecorder {
 	return rec
 }
 
-// /readyz answers whether the database does; /livez and /healthz answer
-// whether the process serves, so a database outage restarts no instance.
+// /readyz answers whether the database does; /livez answers whether the
+// process serves, so a database outage restarts no instance.
 func TestProbes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -62,23 +62,11 @@ func TestProbes(t *testing.T) {
 			require.Equal(t, tc.readyBody, ready.Body.String())
 			require.Equal(t, "text/plain; charset=utf-8", ready.Header().Get("Content-Type"))
 
-			for _, path := range []string{"/livez", "/healthz"} {
-				rec := probe(srv, path)
-				require.Equal(t, http.StatusOK, rec.Code, path)
-				require.Equal(t, "ok", rec.Body.String(), path)
-			}
+			live := probe(srv, "/livez")
+			require.Equal(t, http.StatusOK, live.Code)
+			require.Equal(t, "ok", live.Body.String())
 		})
 	}
-}
-
-// Only /healthz is deprecated, and says so as RFC 9745 spells it.
-func TestHealthzIsDeprecated(t *testing.T) {
-	t.Parallel()
-	srv := newHealthTestServer(t, &fakeDatabase{})
-
-	require.Equal(t, "@1792800000", probe(srv, "/healthz").Header().Get("Deprecation"))
-	require.Empty(t, probe(srv, "/livez").Header().Values("Deprecation"))
-	require.Empty(t, probe(srv, "/readyz").Header().Values("Deprecation"))
 }
 
 // The ping runs under the probe's own deadline, so a database that hangs

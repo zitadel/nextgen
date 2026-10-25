@@ -260,7 +260,7 @@ describe("checkLocalServerHealth", () => {
         res.writeHead(database === "up" ? 200 : 503).end(database === "up" ? "ok" : "fail");
         return;
       }
-      res.writeHead(req.url === "/livez" || req.url === "/healthz" ? 200 : 404).end("ok");
+      res.writeHead(req.url === "/livez" ? 200 : 404).end("ok");
     });
     servers.push(server);
     await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));

@@ -136,7 +136,7 @@ describe("uncallable", () => {
   });
 
   it("lets the CLI call what needs no credential", () => {
-    expect(uncallable(byId("getHealth"))).toBeUndefined();
+    expect(uncallable(byId("getLive"))).toBeUndefined();
   });
 
   it("refuses what only an end user's session authenticates", () => {
@@ -169,7 +169,6 @@ describe("findOperations", () => {
 
   it("keeps to one tag", () => {
     expect(findOperations({ tag: "system" }).map((operation) => operation.id)).toEqual([
-      "getHealth",
       "getLive",
       "getReady",
     ]);

@@ -1,8 +1,0 @@
-description: |
-  When this endpoint was deprecated, as a structured date (RFC 9745): `@`
-  and the Unix time in seconds. A deprecated endpoint keeps answering until
-  1.0.0; its description names what replaces it.
-schema:
-  type: string
-  pattern: '^@-?[0-9]+$'
-example: '@1792800000'

@@ -504,18 +504,6 @@ type Handler interface {
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
-	// GetHealth implements getHealth operation.
-	//
-	// Answers `ok` while the server process serves HTTP, as `GET /livez` does, without checking the
-	// database.
-	// > **Deprecated:** point a liveness probe at `GET /livez` and a readiness
-	// > probe at `GET /readyz`. This endpoint keeps answering until 1.0.0, with
-	// > a `Deprecation` header.
-	//
-	// Deprecated: schema marks this operation as deprecated.
-	//
-	// GET /healthz
-	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById implements getIdpById operation.
 	//
 	// Reads a connection by its id, at its newest revision.

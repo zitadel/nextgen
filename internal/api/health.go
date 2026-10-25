@@ -11,12 +11,7 @@ import (
 )
 
 // The probes answer two questions apart (ADR 079 §5): /livez whether to
-// restart the process, /readyz whether to send it requests. /healthz is a
-// third name for the first and answers until 1.0.0.
-
-// healthzDeprecated is when /healthz was deprecated (2026-10-24), as RFC
-// 9745's Deprecation header spells a date: "@" and the Unix time in seconds.
-const healthzDeprecated = "@1792800000"
+// restart the process, /readyz whether to send it requests.
 
 // readyTimeout bounds /readyz's round trip to the database: one that has not
 // answered by then counts as down.
@@ -34,16 +29,6 @@ type Pinger interface {
 func (h *Handler) WithReadinessCheck(database Pinger) *Handler {
 	h.readiness = database
 	return h
-}
-
-// GetHealth answers as GetLive does, with a Deprecation header, so a released
-// CLI that probes it still finds a server that is up and a liveness probe
-// pointed at it never restarts an instance over the database.
-func (h *Handler) GetHealth(ctx context.Context) (api.GetHealthRes, error) {
-	return &api.GetHealthOKHeaders{
-		Deprecation: api.NewOptString(healthzDeprecated),
-		Response:    api.GetHealthOK{Data: strings.NewReader("ok")},
-	}, nil
 }
 
 // GetLive checks nothing behind the process: a liveness probe that checked the
