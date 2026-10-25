@@ -18,6 +18,9 @@ if (!deployment) {
   throw new Error("CLOUD_URL names the deployment to test");
 }
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const bypass: Record<string, string> = bypassSecret
+  ? { "x-vercel-protection-bypass": bypassSecret }
+  : {};
 // GitHub Actions (deployment-checks.yml): annotations on the check that name
 // the failing test and its assertion.
 const onGitHub = !!process.env.GITHUB_RUN_ID;
@@ -39,12 +42,24 @@ export default defineConfig({
     trace: "off",
     // Every request the suite makes, from the request fixture and from the
     // browser, carries the bypass; a deployment without protection ignores it.
-    // The cookie it asks for carries the bypass on to what the live examples'
-    // service worker fetches in the page's place (tests/examples.browser.spec.ts).
-    extraHTTPHeaders: bypassSecret
-      ? { "x-vercel-protection-bypass": bypassSecret, "x-vercel-set-bypass-cookie": "true" }
-      : {},
+    extraHTTPHeaders: bypass,
   },
+  // The browser also asks for the bypass cookie, which carries the bypass on
+  // to what the live examples' service worker fetches in the page's place
+  // (tests/examples.browser.spec.ts). Vercel sets it with a 307 to the same
+  // URL, which over the request fixture would stand in for the redirects the
+  // specs check, so only the browser asks.
+  projects: local.projects?.map((project) =>
+    project.name === "chromium" && bypassSecret
+      ? {
+          ...project,
+          use: {
+            ...project.use,
+            extraHTTPHeaders: { ...bypass, "x-vercel-set-bypass-cookie": "true" },
+          },
+        }
+      : project,
+  ),
   // The deployment serves itself.
   webServer: undefined,
 });
