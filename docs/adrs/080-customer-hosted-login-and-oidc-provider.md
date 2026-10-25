@@ -251,7 +251,7 @@ reorder them, so a flow edit cannot remove a third-party client's consent
 screen. Account choice comes first, on `prompt=select_account`; signing in
 as someone else replaces the session at the exchange. Consent comes last,
 when the client requires it for scopes not yet granted or the request says
-`prompt=consent`. Grants are kept per user, client and scope. A client the
+`prompt=consent`. Consents are kept per user, client and scope. A client the
 customer registers for its own apps, a relying-party-mode app for example,
 is first-party and needs no consent unless the request asks for it. The
 widget renders both from the step payload, with the client's name, logo and
