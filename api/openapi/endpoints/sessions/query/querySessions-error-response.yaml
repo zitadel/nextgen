@@ -11,6 +11,7 @@ content:
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/sess-not_found.yaml'
         - $ref: '../../../components/schemas/errors/sess-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -21,6 +22,7 @@ content:
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           sess.not_found: '../../../components/schemas/errors/sess-not_found.yaml'
           sess.permission_denied: '../../../components/schemas/errors/sess-permission_denied.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -57,3 +59,8 @@ content:
         value:
           code: sess.permission_denied
           message: 'session: requires a session scope bound to the project'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

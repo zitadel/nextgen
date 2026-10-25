@@ -411,7 +411,7 @@ the account that minted it.
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
-support governance. It must not be represented as
+support governance, in [ADR 075](075-platform-operators.md). It must not be represented as
 `project:platform#admin -> every project`, and it must not be approximated by a
 platform-homed automation key granted broad roles — the operator credential is
 explicit precisely so issuance governance, customer visibility, and audit

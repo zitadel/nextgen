@@ -1772,9 +1772,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // wired to it is the contextual correction beside the account the step
       // names.
       expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
-      const wired = element.shadowRoot?.querySelectorAll('[data-action="back"]') ?? [];
+      const wired =
+        element.shadowRoot?.querySelectorAll('[data-action="back"], [action="back"]') ?? [];
       expect(Array.from(wired, (el) => el.getAttribute("data-testid"))).toEqual([
-        "zitadel-action-change-account",
+        "zitadel-account",
       ]);
     });
 

@@ -12,7 +12,9 @@ content:
         - $ref: '../../components/schemas/errors/idp-revision_conflict.yaml'
         - $ref: '../../components/schemas/errors/idp-endpoints_partial.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -24,7 +26,9 @@ content:
           idp.revision_conflict: '../../components/schemas/errors/idp-revision_conflict.yaml'
           idp.endpoints_partial: '../../components/schemas/errors/idp-endpoints_partial.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -66,8 +70,18 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

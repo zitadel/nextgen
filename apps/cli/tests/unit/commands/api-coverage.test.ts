@@ -42,7 +42,6 @@ const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
 
 /** Collections with no resource commands at all, and why. */
 const NOT_RESOURCES: Readonly<Record<string, string>> = {
-  healthz: "liveness probe, not a resource",
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",

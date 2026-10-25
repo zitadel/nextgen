@@ -1,7 +1,14 @@
 # ADR 052: User Envelope and Attributes
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-08-17)
 > **Date:** 2026-08-17
+>
+> **Amendment (2026-10-24):** shipped in #900: users carry `id`, `schema`,
+> `attributes` and `metadata`, and a create request rejects unknown top-level
+> properties. [ADR 058](058-user-identity-designation-and-references.md) §3a
+> adds `identifier`, `identifier_property` and `display` to the envelope. The
+> open question below is still open; the server currently returns the schema's
+> URL in `schema`.
 > **Context:** `GET /users`, `POST /users`, user schema validation
 >
 > **Amends** [ADR 009](009-user-json-schema-validation.md) — the API property is

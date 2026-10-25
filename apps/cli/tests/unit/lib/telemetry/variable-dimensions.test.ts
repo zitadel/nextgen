@@ -4,18 +4,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The `variable` commands record per-command dimensions, and `AGENTS.md`'s
- * tracking plan is the contract for what may be sent: every dimension is
- * listed there, boolean names carry an `is_`/`has_`/`dry_`/`non_` prefix, and
- * nothing that identifies a person, a machine, or a credential is recorded.
+ * The `variable` commands record per-command dimensions. `catalog.test.ts`
+ * checks that the event catalog lists each one; these check that boolean names
+ * carry an `is_`/`has_`/`dry_`/`non_` prefix and that nothing that identifies a
+ * person, a machine, or a credential is recorded.
  *
  * Reading the sources rather than running the commands is deliberate: consent
  * gates the transport, so a command test proves nothing about what a dimension
- * is *called*, which is the part that reaches Mixpanel and cannot be renamed
- * later without breaking saved reports.
+ * is *called*, which is the part that reaches the analytics tools and cannot be
+ * renamed later without breaking saved reports.
  */
 const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
-const agentsDoc = join(import.meta.dirname, "../../../../AGENTS.md");
 
 /** The dimension names each command passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
@@ -34,21 +33,6 @@ async function recordedDimensions(): Promise<Map<string, string[]>> {
 }
 
 describe("variable telemetry dimensions", () => {
-  it("records only dimensions the tracking plan documents", async () => {
-    const documented = (await readFile(agentsDoc, "utf8"))
-      .split("\n")
-      .find((line) => line.startsWith("- **variable**"));
-    expect(documented, "AGENTS.md has no variable entry in the tracking plan").toBeDefined();
-
-    for (const [file, keys] of await recordedDimensions()) {
-      for (const key of keys) {
-        expect(documented, `${file} records an undocumented dimension: ${key}`).toContain(
-          `\`${key}\``,
-        );
-      }
-    }
-  });
-
   it("names booleans with the documented prefixes", async () => {
     for (const [file, keys] of await recordedDimensions()) {
       for (const key of keys) {

@@ -62,6 +62,15 @@ let pageUserId: string | undefined;
 let reloading = false;
 
 /**
+ * Drops only the cached session, so the next `fetchSession()` reads it again:
+ * for a change to the session's own fields (the user ref's `display` after a
+ * profile save). The CSRF token and the person's other cached reads stay.
+ */
+export function refreshSession(): void {
+  cachedSession = null;
+}
+
+/**
  * Drops the cached session, the CSRF token, and every read cached for the
  * person (`lib/session-cache.ts`), so the next read goes to the server. This
  * page's person stays: see `pageUserId`.

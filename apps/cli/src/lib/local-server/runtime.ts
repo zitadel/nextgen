@@ -324,13 +324,18 @@ export async function removeLocalData(cwd: string): Promise<void> {
   await rm(localRuntimePaths(cwd).dataDir, { recursive: true, force: true });
 }
 
+/**
+ * Whether the server at `serverUrl` is ready: `/readyz` answers once the
+ * server's database does, so a server that started but cannot reach its
+ * database is not healthy.
+ */
 export async function checkLocalServerHealth(
   serverUrl: string,
   timeoutMs = 1500,
 ): Promise<boolean> {
   try {
-    const healthUrl = new URL("/healthz", serverUrl);
-    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    const readyUrl = new URL("/readyz", serverUrl);
+    const response = await fetch(readyUrl, { signal: AbortSignal.timeout(timeoutMs) });
     return response.ok;
   } catch {
     return false;

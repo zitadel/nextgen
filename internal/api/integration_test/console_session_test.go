@@ -462,6 +462,42 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.IsType(t, &api.ListUserIdentityLinksResponse{}, links, helpers.MustMarshal(t, links))
 	})
 
+	t.Run("policies", func(t *testing.T) {
+		t.Parallel()
+		// The console shows a project's policies read-only (#898); the
+		// project's own credentials publish them.
+		published := passwordSetPolicy(t, publishPolicy(t, customerSecret, customer.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		list, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, list, helpers.MustMarshal(t, list))
+		require.Len(t, list.(*api.ListPoliciesResponse).Policies, 1)
+
+		got, err := session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID)
+
+		revisions, err := session.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+		assert.Len(t, revisions.(*api.ListPolicyRevisionsResponse).Revisions, 1)
+
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: customerProjectID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, revision).RevisionID)
+
+		// Publishing stays with the project's credentials: a policy is
+		// authored as a file and applied, so publish does not take the
+		// session, even with the CSRF token the console would send.
+		status, body := consoleCall(t, platformSessionCookie(t, operatorID), http.MethodPost,
+			"/policies?project_id="+customer.ID,
+			`{"operation": "auth.factor.password.set", "config": {"min_length": 1}}`)
+		assert.Equal(t, http.StatusUnauthorized, status, body)
+		got, err = session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID, "the session published nothing")
+	})
+
 	t.Run("team read and update", func(t *testing.T) {
 		t.Parallel()
 		resp, err := session.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(customerTeamID)})

@@ -65,7 +65,6 @@ tasks:
     deps:
       - "release:build-public-packages"
       - "console:build-release"
-      - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
@@ -80,7 +79,6 @@ tasks:
       - "server:test"
       - "release:build-public-packages"
       - "console:build-release"
-      - "login-ui:build-release"
     outputs:
       - "/dist/release/**/*"
     options:
@@ -94,7 +92,6 @@ tasks:
     deps:
       - "release:build-public-packages"
       - "console:build-release"
-      - "login-ui:build-release"
     options:
       cache: false
       runDepsInParallel: false

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Build step of the `server` service (repo-root vercel.json, Go preset):
-# build the login UI the server embeds, compile the launcher into the
-# function binary, then migrate the deployment's database (a preview's is
-# created first; see apps/cloud/launcher/database.go).
+# compile the launcher into the function binary, then migrate the
+# deployment's database (a preview's is created first; see
+# apps/cloud/launcher/database.go).
 #
 # The console is not embedded: it is a service of its own, and the launcher
 # turns the server's console off. The services build one after another in
@@ -19,14 +19,6 @@
 # Output: $VERCEL_OUTPUT_FILE on Vercel, dist/nextgen-launcher locally.
 set -eu
 cd "$(dirname "$0")/../.."
-
-# The Go preset runs no installCommand, so the install the other services
-# declare in vercel.json runs here; pnpm skips it once a service built
-# earlier in the deployment has installed.
-pnpm install --os=current --cpu=current --optimistic-repeat-install
-# turbo's own binary: through `pnpm exec`, every task's `pnpm run` would
-# re-check the workspace and warn about each other platform's package.
-node_modules/.bin/turbo run build --filter=@zitadel/login-ui
 
 version="$(node -p 'require("./apps/server/package.json").version')"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"

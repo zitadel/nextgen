@@ -234,14 +234,6 @@ func TestCreateDeployment(t *testing.T) {
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
-		// Deploying to preview URLs lands on top of this.
-		"a preview URL": {
-			req: &api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{previewOrigin},
-			},
-			wantType: &api.CreateDeploymentErrorResponseStatusCode{}, wantCode: domain.ErrNotImplemented().Code,
-		},
 		"an unknown release": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
@@ -580,7 +572,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	fixture := newReleaseFixture(t)
 	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-	releaseID := created.(*api.CreateReleaseCreated).ID
 	project := api.ProjectID(fixture.project)
 
 	expectNotImplemented := func(t *testing.T, resp any) {
@@ -607,18 +598,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("create to preview URLs", func(t *testing.T) {
-		resp, err := fixture.client.CreateDeployment(t.Context(),
-			&api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"https://acme-git-sso-acmeinc.vercel.app"},
-				TTL:       api.NewOptPreviewTTL("168h"),
-			},
-			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -698,5 +677,104 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 		})
 		require.NoError(t, err)
 		expectError(t, resp, http.StatusForbidden, domain.ErrDeploymentPermissionDenied().Code)
+	})
+}
+
+// TestCreatePreviewDeployment deploys to preview URLs and reads the
+// deployments back. The subtests share one project and run in order.
+func TestCreatePreviewDeployment(t *testing.T) {
+	t.Parallel()
+
+	const shaOrigin = "https://acme-k3x9v2-acmeinc.vercel.app"
+	fixture := newDeploymentFixture(t)
+	releaseID := fixture.release.ID
+	project := api.ProjectID(fixture.project)
+
+	preview := func(t *testing.T, req *api.CreateDeploymentRequest) *api.CreateDeploymentCreated {
+		t.Helper()
+		req.ReleaseID = api.NewOptReleaseID(releaseID)
+		resp := fixture.createDeployment(t, req)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.CreateDeploymentCreated)
+	}
+	get := func(t *testing.T, id api.DeploymentID) *api.Deployment {
+		t.Helper()
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: id})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.Deployment)
+	}
+
+	first := preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{shaOrigin, previewOrigin}})
+
+	t.Run("each URL serves the deployment", func(t *testing.T) {
+		assert.Equal(t, api.DeploymentKindPreview, first.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, first.Status)
+		assert.Equal(t, []string{previewOrigin, shaOrigin}, origins(first.Targets))
+		assert.Equal(t, api.DeploymentStatusLive, get(t, first.ID).Status)
+	})
+
+	var renewed *api.CreateDeploymentCreated
+	t.Run("the same release again writes a new deployment", func(t *testing.T) {
+		renewed = preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{previewOrigin}})
+		assert.NotEqual(t, first.ID, renewed.ID)
+		assert.Equal(t, api.DeploymentStatusLive, get(t, first.ID).Status, "it still serves the other URL")
+	})
+
+	t.Run("the live view narrows each to the URLs it serves", func(t *testing.T) {
+		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{ProjectID: project, Live: api.NewOptBool(true)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		byID := map[api.DeploymentID]api.Deployment{}
+		for _, item := range resp.(*api.ListDeploymentsResponse).Deployments {
+			byID[item.ID] = item
+		}
+		require.Contains(t, byID, renewed.ID)
+		require.Contains(t, byID, first.ID)
+		assert.Equal(t, []string{previewOrigin}, origins(byID[renewed.ID].Targets))
+		assert.Equal(t, []string{shaOrigin}, origins(byID[first.ID].Targets))
+	})
+
+	t.Run("the guard is the newest deployment to any of the URLs", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID:            api.NewOptReleaseID(releaseID),
+			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			ExpectedDeploymentID: api.NewOptDeploymentID(first.ID),
+		})
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		replaced := resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment
+		require.False(t, replaced.Null)
+		assert.Equal(t, renewed.ID, replaced.Value.ID)
+
+		guarded := preview(t, &api.CreateDeploymentRequest{
+			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			ExpectedDeploymentID: api.NewOptDeploymentID(renewed.ID),
+		})
+		assert.Equal(t, api.DeploymentStatusInactive, get(t, first.ID).Status, "both of its URLs moved on")
+		assert.Equal(t, api.DeploymentStatusLive, get(t, guarded.ID).Status)
+	})
+
+	t.Run("a URL no preview pattern matches", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin, "https://acme.example"},
+		})
+		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
+	})
+
+	t.Run("a ttl is accepted", func(t *testing.T) {
+		preview(t, &api.CreateDeploymentRequest{
+			Targets: api.DeploymentTargetsRequest{previewOrigin},
+			TTL:     api.NewOptPreviewTTL("1h"),
+		})
+	})
+
+	t.Run("a loopback URL is never a preview", func(t *testing.T) {
+		fixture.addOrigin(t, domain.Origin{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview})
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{"http://localhost:3000"},
+		})
+		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 }
