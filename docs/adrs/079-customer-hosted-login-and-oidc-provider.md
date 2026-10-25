@@ -152,10 +152,20 @@ models ADR 057 keeps after its amendment are the whole list:
   page for other apps, it takes §8's and §9's steps itself.
 
 The Console is Zitadel's app for operating Zitadel. It signs in with the same
-embedded widget; in a standalone deployment it signs in to the deployment's
-default project, which `zitadel setup` creates for the customer
+embedded widget, on a page of its own under `/ui/console/` on the server's
+origin ([`login.tsx`](../../apps/console/src/routes/login.tsx)), configured by
+the server's runtime document
 ([`console_runtime.go`](../../cmd/server/console_runtime.go)). That sign-in
 belongs to the Console. No app of the customer's sends its users there.
+
+The project the Console signs in to is partly transitional. A server with
+`platform.bootstrap_project`, which `zitadel start` and the cloud turn on,
+signs it in to the reserved platform project of
+[Console ADR 0004](../../apps/console/docs/adrs/0004-console-deployment-modes.md)
+§1, which no customer's application signs its users in to. A server without
+it signs the Console in to the pinned `platform.project_id` or to the
+first-created project, normally the one `zitadel setup` creates for the
+customer. The pin and that fallback retire with Console ADR 0004.
 
 ### 2. What a Zitadel-rendered login was for
 
@@ -576,8 +586,15 @@ from outside a browser request.
   related origins help with the latter.
 - The login app becomes availability-critical for every relying party.
   Zitadel has no login of its own to fall back on. That is the end users'
-  sign-in: administration keeps working, because the Console signs in by
-  itself (§1), so an outage of the login app never locks operators out.
+  sign-in: operators sign in through the Console's own page (§1), whether or
+  not the login app is deployed. Where the Console still signs in to the
+  customer's project, operators are users of that project and sign in
+  through its flow, and every step must come from an origin that project
+  admits. Once the customer restricts it to their app's origins, the Console
+  on the server's origin can open a flow
+  ([#2297](https://github.com/zitadel/nextgen/pull/2297)) but not finish one.
+  Full independence from the customer's project waits for Console ADR 0004's
+  platform project in every deployment.
 - The authorization response passes through the login page's scripts, as
   the user's credentials already do. PKCE, and a confidential client's own
   authentication, keep a code read there useless to anyone but the client. A
