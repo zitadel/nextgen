@@ -18,6 +18,9 @@ import Env from "./commands/env/index";
 import EnvAdd from "./commands/env/add";
 import EnvList from "./commands/env/list";
 import Logs from "./commands/logs";
+import OriginAdd from "./commands/origin/add";
+import OriginList from "./commands/origin/list";
+import OriginRm from "./commands/origin/rm";
 import Plan from "./commands/plan";
 import Reset from "./commands/reset";
 import { RESOURCE_COMMANDS } from "./commands/resources";
@@ -66,6 +69,9 @@ export const COMMANDS: Record<string, typeof Command> = {
   "branding:eject": BrandingEject,
   "env:add": EnvAdd,
   "env:list": EnvList,
+  "origin:add": OriginAdd,
+  "origin:list": OriginList,
+  "origin:rm": OriginRm,
   "variables:list": VariablesList,
   "variables:get": VariablesGet,
   "variables:set": VariablesSet,
