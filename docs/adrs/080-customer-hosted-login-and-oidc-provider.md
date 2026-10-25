@@ -35,9 +35,9 @@
 - Later, that login becomes the sign-in page of an authorization server whose
   issuer is the app's origin. Two `/.well-known/` paths reserved now let the
   server turn OIDC on without the app changing.
-- Every response that leaves the app passes through the login page, and
-  generated code gets no credential, protocol or CSRF logic, so fixes ship as
-  version bumps.
+- Every response that leaves the app passes through the login page, and new
+  work adds no credential, protocol or CSRF logic to generated code, so fixes
+  ship as version bumps.
 
 ## Context
 
@@ -80,9 +80,11 @@ fallback Console ADR 0004 retires.
 ADR 057 had Zitadel-served login for SSO, third-party or legacy apps and a
 centrally operated login
 ([as it stood](https://github.com/zitadel/nextgen/blob/ea054e637/docs/design/branding/customization-strategy.md#zitadel-served)),
-and Level 3 for a branded `auth.acme.com`. A scaffolded login app on that
-host does all of it, as the OIDC provider other apps sign in with (§12), and
-`zitadel setup` makes one in a command.
+and Level 3 adds a branded `auth.acme.com` and a redirect-style login. Part 2
+does all of these: the scaffolded login app is the OIDC provider on the
+customer's domain, other apps sign in with it as relying parties (§12) or as
+any OIDC client, and `auth.acme.com` is such an app on that host. `zitadel
+setup` makes one in a command.
 
 ### 3. What changes in the platform overview
 
@@ -91,10 +93,10 @@ host does all of it, as the OIDC provider other apps sign in with (§12), and
 - Level 2's authorization endpoints and issuer on a Zitadel subdomain are
   withdrawn. An SPA's issuer is its own origin (§5) once its production host
   forwards `/__nextgen` and the reserved paths (§7) and it can sign users in
-  there, which waits for ADR 036's publishable key
-  ([#560](https://github.com/zitadel/nextgen/issues/560)); until then, a
-  login app that has to be an issuer uses a server runtime. An SPA whose host
-  cannot forward has no issuer.
+  there, which waits for ADR 036's publishable key and the public-plane
+  exchange ([#560](https://github.com/zitadel/nextgen/issues/560)); until
+  then, a login app that has to be an issuer uses a server runtime. An SPA
+  whose host cannot forward has no issuer.
 
 ### 4. Where a link into the login points
 
@@ -104,9 +106,9 @@ request, a link opens the login path the SDK sent (§7) on the request's
 origin: the recorded issuer (§5), or else the flow's. Outside one, it opens
 the project's link target, one literal primary origin and a login path, set
 on the project, not in a release, since these senders resolve no deployment.
-The target defaults to the only literal primary pattern and
-`/login`; a project with several or none sets it, and until then such a
-message fails with an error naming the setting.
+The target defaults to the only literal primary pattern and `/login`; a
+project with several or none sets it, and until then such a message fails
+with an error naming the setting.
 
 ### Part 2: the scaffolded login becomes the OIDC provider
 
@@ -149,19 +151,21 @@ From the reservation release on
 ([Recommended sequence](#recommended-sequence)), every request boundary
 forwards `/.well-known/openid-configuration` and
 `/.well-known/oauth-authorization-server` to its project's §6 documents,
-which answer `404 req.not_found` (ADR 076) until the server ships OIDC.
-Without a project id, the SDK answers the 404 itself.
+while the server still answers `404 req.not_found` (ADR 076): a client learns
+there is no authorization server at that origin. Without a project id, the
+SDK answers the 404 itself.
 
 | Boundary | Change |
 |---|---|
 | Next.js | Generated `matcher` entries; the SDK maps the paths. |
 | Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router | The SDK alone. |
-| SPA dev proxies (Vite, Angular) | Two generated entries, with the project from `ZITADEL_PROJECT_ID`. |
+| SPA dev proxies (Vite, Angular) | Two generated entries, with the project from `ZITADEL_PROJECT_ID`, read as the cookie hooks read it (ADR 073). |
 | SPA production hop | The hop `setup` will write ([#560](https://github.com/zitadel/nextgen/issues/560)), with the project id in its destination. |
 
-The SDK proxy sends its `loginPath` as `X-Zitadel-Login-Path`, replacing any
-incoming value; the server falls back to `/login`. Being a path, it can only
-name a page on the issuer.
+The SDK proxy sends its `loginPath` (default `/login`) as
+`X-Zitadel-Login-Path` on every request it forwards, replacing any incoming
+value; without the header, the server uses `/login`. The value must be a
+path, so it can only name a page on the issuer.
 
 An app that serves the documents itself takes them out of its boundary. An
 older app gets the SDK's part in a version bump and the generated entries
@@ -177,15 +181,17 @@ from `doctor --fix`, which `doctor` warns about. Nothing else is reserved.
    `/login?auth_request=<handle>`.
 3. The handle is not a capability: a cookie set with the redirect binds it to
    the browser, as `_zsso` binds a provider callback, and `POST /flow`
-   accepts it only with that binding. Bindings are per request and pass the
-   proxies unchanged, and before the authorization server ships the flow
-   cookie (one `_zflow` per host today) gets one name per flow, so a second
-   request does not end the first.
+   accepts it only with that binding. A second request in the same browser
+   must not end the first: bindings are per request, the flow cookie (one
+   `_zflow` per host today) gets one name per flow before the authorization
+   server ships, and the proxies pass both through unchanged.
 4. `<zitadel-login>` reads `auth_request` from the page URL and sends it as
    `auth_request_id` on `POST /flow`, also when it restarts a flow; a
-   provider round trip returns to the same URL. Page code never sees it.
-5. `login_hint` pre-fills the identifier but never submits it (ADR 078), and
-   `hint.login_name` loses its "auto-submits" description. `prompt=create`
+   provider round trip returns to the same URL. Generated page code never
+   sees it.
+5. `login_hint` pre-fills the identifier and maps onto `hint.login_name`,
+   whose "auto-submits" description goes: a URL anyone can craft never starts
+   an identifier lookup or a message by itself (ADR 078). `prompt=create`
    starts at registration, whatever the page's `purpose`; `prompt=login`, or
    a last authentication older than `max_age`, forces a fresh one;
    `acr_values` stay for step-up.
@@ -235,20 +241,22 @@ client's origin or none, so:
   loopback or a primary origin kept for staging.
 - In relying-party mode (§12) the login app's flow decides, even when the two
   apps pin different releases
-  ([#1635](https://github.com/zitadel/nextgen/issues/1635)):
-  `X-Zitadel-Release` does not apply to the protocol endpoints.
+  ([#1635](https://github.com/zitadel/nextgen/issues/1635)): a relying
+  party's `X-Zitadel-Release` does not apply to the protocol endpoints.
 
 ### 11. Consent and account choice are flow steps
 
 The engine inserts both; page code and flow definitions cannot add, drop or
 reorder them, so a flow edit cannot remove a third-party client's consent
 screen. Account choice comes first, on `prompt=select_account`; signing in
-as someone else replaces the session at the exchange. Consent comes last, when the client requires it for
-scopes not yet granted or the request says `prompt=consent`. Grants are kept
-per user, client and scope, and the customer's own first-party clients need
-none unless asked. The widget renders both from the step payload, with the
-client's name, logo and scopes in a widget release; a request that needs a
-step the calling widget predates (§13) fails with an error to the client.
+as someone else replaces the session at the exchange. Consent comes last,
+when the client requires it for scopes not yet granted or the request says
+`prompt=consent`. Grants are kept per user, client and scope. A client the
+customer registers for its own apps, a relying-party-mode app for example,
+is first-party and needs no consent unless the request asks for it. The
+widget renders both from the step payload, with the client's name, logo and
+scopes in a widget release; a request that needs a step the calling widget
+predates (§13) fails with an error to the client.
 
 ### 12. Relying-party mode
 
@@ -264,10 +272,13 @@ instead of a login page.
   with redirect URIs on its origins, so its users are that project's.
   Signing in with another project is an IdP connection, out of scope.
 - The app is a confidential client with its own credential, never the
-  project secret (open question 3).
-- The SDK validates the ID token per OpenID Connect Core §3.1.3.7 and keeps
-  the session in an HttpOnly cookie, so no token is script-readable. Access
-  tokens it accepts as bearers follow ADR 036.
+  project secret; the client resource decides its kind (open question 3).
+- The SDK signs the user in from the ID token, validated as OpenID Connect
+  Core §3.1.3.7 requires (its signature against the issuer's JWKS, `iss`, an
+  `aud` that names the client, `nonce`), and keeps the session in an HttpOnly
+  cookie on the app's origin, so no token becomes script-readable. An access
+  token is for the resources it names; where the app accepts one as a
+  bearer, ADR 036's rule applies.
 
 SPAs, with no server for the callback or the cookie, are not covered yet
 (open question 9).
@@ -276,28 +287,43 @@ SPAs, with no server for the callback or the cookie, are not covered yet
 
 Generated code owns route files, the page around the widget (ADR 042),
 configuration values and the path list a framework reads statically. New
-work never gives it credentials, protocol handling, CSRF and cookie policy,
-or flow logic such as §8's handle and §9's completion rule. Two places
-predate this: the SPA dev
-proxies attach the project secret and carry ADR 073's cookie hooks until
-ADR 036's publishable key, and the SvelteKit hook passes the secret to its
-SDK. This ADR adds only path entries to generated files.
+work never gives it:
+
+- **credentials:** the project secret, client credentials, and session,
+  handoff and OAuth tokens. The SDK reads secrets from the environment and
+  attaches them only where ADR 036 allows;
+- **protocol handling:** endpoints, metadata, redirect-URI validation, PKCE,
+  `state` and `nonce`, the code exchange, token validation and logout;
+- **CSRF and cookie policy:** `X-Zitadel-CSRF`, origin checks, cookie
+  attributes and ADR 073's cookie names;
+- **flow logic:** steps, consent and account choice, §8's handle and §9's
+  completion rule.
+
+Two places predate the rule. The generated SPA dev proxies attach the project
+secret, which ADR 036's publishable key retires, and carry ADR 073's cookie
+hooks, which ADR 073 expects to move into a helper with it; the generated
+SvelteKit hook hands the secret to its SDK. This ADR adds only path entries
+to generated files.
 
 So fixes ship as package releases and reach apps as version bumps, with
 `doctor --fix` migrating a generated file it recognizes. Pins stay exact
 (ADR 074 §4); a fix reaches pinned apps through `doctor`'s
 [`dependency-version`](../../apps/cli/src/commands/doctor/checks/dependency-version.ts)
 check, security advisories, and the server. The SDK proxy and the widget
-send their version (`X-Zitadel-Client`); the server records it and answers
-one below a published security floor with a warning header, which the SDK
-logs as an error and `doctor` reports, without refusing the client.
+name their package and version on every request (`X-Zitadel-Client`); the
+server records them on the request's event and answers a version below a
+published security floor with a warning header, which the SDK logs as an
+error and `doctor` reports, without refusing the client.
 
 ### 14. What the server can turn on alone
 
 For an app on the reservation release or later, the server can authorize
 clients at the app's origin without the app changing; an SPA needs #560
-first (§3). Everything else ships in packages, including bearer acceptance
-in the SDK, whose verifier expects `iss` to be `ZITADEL_URL`
+first (§3). What builds on that arrives in package releases, never in a
+re-scaffold: consent, account choice and end session (§8, §11),
+relying-party mode (§12), and the SDK accepting the authorization server's
+access tokens as bearers, which its verifier cannot yet: it expects `iss` to
+be `ZITADEL_URL` and fetches keys from `{ZITADEL_URL}/auth/keys`
 ([`jwt.ts`](../../packages/sdk-core/src/jwt.ts)).
 
 ### 15. ADR 077 loses one reason
@@ -312,12 +338,14 @@ prefix routes `/oauth/` beside `/api/`.
 ## Recommended sequence
 
 1. This ADR and the documents below.
-2. The reservation release, before the server's OIDC: §7's entries and their
-   `doctor` migration, `X-Zitadel-Login-Path`, the widget's handle and
-   completion rule, and `X-Zitadel-Client`.
-3. The authorization server: per-project keys, stored requests, a flow cookie
-   per flow, the code flow with PKCE and `iss`, and codes and grants that
-   carry their deployment.
+2. The reservation release, before the server's OIDC: the SDK's mapping and
+   `X-Zitadel-Login-Path`, the `matcher` and dev proxy entries and their
+   `doctor` migration, the widget's handle and completion rule, and
+   `X-Zitadel-Client`.
+3. The authorization server: stored requests, a flow cookie per flow,
+   per-project signing keys, the authorization code flow with PKCE and `iss`,
+   codes and grants that carry their deployment, metadata, JWKS, token and
+   userinfo.
 4. The self-host path: a login-only setup mode, Nuxt first, and a compose
    example that runs that app on its own hostname beside the server
    ([compose quick start](../quick-start/docker-compose.md)).
@@ -335,15 +363,18 @@ from outside a browser request.
 - No app is scaffolded again for OIDC (§14), and an app gives up only two
   root paths, under the `/.well-known/` prefix
   [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615) reserves.
-- Relying parties and MCP clients find the authorization server at the app's
-  origin, and the apps behind one login app share a passkey relying-party ID.
+- Relying parties, and MCP clients once a resource names the issuer, find the
+  authorization server at the app's origin, and the apps behind one login app
+  share a passkey relying-party ID.
 
 ### Negative / Risks
 
 - `/__nextgen` becomes part of public endpoint URLs, so renaming it breaks
   clients that copied them.
 - Moving the login app to another domain changes the issuer, which relying
-  parties pin, and the passkeys' relying-party ID (open question 11).
+  parties pin, and the passkeys' relying-party ID;
+  [ADR 038](038-user-credential-migration-and-recovery.md)'s related origins
+  help with the latter.
 - The login app becomes availability-critical for every relying party, with
   no Zitadel login to fall back on. The Console does not depend on it (§1),
   but under §1's fallback, restricting the customer project's origins to the
@@ -353,8 +384,9 @@ from outside a browser request.
   credentials do; PKCE and client authentication make a code read there
   useless, and a login-only app with a strict content security policy limits
   those scripts.
-- Silent SSO costs a load of the login page, since a cross-site iframe gets
-  neither the session nor the flow cookie; clients on other sites use refresh
+- Silent SSO costs one load of the login page (§8). `prompt=none` in an
+  iframe works only for clients on the issuer's site, since a cross-site
+  frame gets neither the session nor the flow cookie; others use refresh
   tokens.
 - An app under a base path, or on a host it shares, cannot be an issuer: the
   metadata has to sit at the host's root.
@@ -374,19 +406,22 @@ from outside a browser request.
    and where its SDK keeps the session: an encrypted cookie needs a key in
    the layer ADR 036 empties of secrets.
 4. Whether `POST /flow`'s free-form `redirect_uri` goes once authorization
-   requests carry the allowlist its TODO asks for.
+   requests exist; they already carry the allowlist its TODO asks for.
 5. Whether the server refuses clients below the security floor after GA.
-6. Whether the SDK or a resource-server feature serves
-   [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) protected-resource
-   metadata for an app that hosts an MCP server.
+6. Whether the SDK serves [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)
+   protected-resource metadata for an app that hosts an MCP server. It names
+   the app's own resource, so it belongs to a resource-server feature, not to
+   this reservation.
 7. Whether an SPA needs ADR 036's minimal worker on platforms that do not
    forward the original host.
 8. Whether account choice also shows, by a project setting, whenever a live
    session exists.
-9. An SPA as a relying party: a public client holding its tokens, or a
-   backend holding them for it.
-10. Whether a refresh keeps the deployment sealed at sign-in (§10) or moves
-    to the newest one, carrying configuration fixes to long-lived grants.
+9. An SPA as a relying party: a public client that holds its tokens in the
+   browser, under the OAuth guidance for browser-based apps, or a backend
+   that holds them for it.
+10. Whether a refresh keeps the deployment sealed at sign-in until the grant
+    ends, as §10 has it, or moves to the newest deployment to the issuer's
+    origin, which would carry a configuration fix to long-lived grants.
 11. Can the passkey relying-party ID be the registrable domain rather than
     the full hostname (`passkeyRPFromOrigin`), so moving the login between
     subdomains keeps passkeys? ADR 038's related origins are the other lever.
@@ -396,10 +431,10 @@ from outside a browser request.
 - **Zitadel renders the login on a custom domain** (Level 3's model): a
   second owner of the sign-in page, when a login app on that host does the
   same jobs (§2).
-- **A prebuilt login for self-hosters and homelabs:** it needs OIDC, the
-  publishable key (#560) and a hostname of its own, since on the server's
-  origin it cannot sign anyone in
-  ([#2297](https://github.com/zitadel/nextgen/pull/2297)), and it would run
+- **A prebuilt SPA login for self-hosters and homelabs:** it needs OIDC, as a
+  static bundle the publishable key (#560), and a hostname of its own, since
+  on the server's origin it cannot sign anyone in
+  ([#2297](https://github.com/zitadel/nextgen/pull/2297)); and it would run
   the last deployment to its origin (#536). Then it is this ADR's login app,
   prebuilt, and a second owner of the sign-in page that customers fork, as
   with Zitadel v4's Login V2. Homelabs have Zitadel v4; self-hosters get
@@ -411,8 +446,8 @@ from outside a browser request.
 - **Create the flow at `/authorize` and redirect with `?flow=`:** the flow
   loses the page's `purpose` and definition, flow creation becomes a
   cross-site `GET`, and a restart drops the request.
-- **Page code reads the handle:** the same lines in every template, and a
-  page that forgets them drops the request.
+- **Generated page code reads the handle:** the same lines in every
+  template, and a page that forgets them drops the request.
 - **Let the proxy pass redirects that leave the app:** every app on that SDK
   would accept answers that send its browser anywhere.
 - **A server-rendered page that redirects:** a page Zitadel renders on the
