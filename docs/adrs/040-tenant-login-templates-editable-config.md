@@ -243,11 +243,11 @@ authoritative validator and a component-level render test.
 
 [ADR 057](057-login-customization-categories.md) keeps this ADR's storage,
 validation, and eject→apply path for the **widget template** (advanced
-structure inside the widget, shared by embedded and Zitadel-served login,
-strict scope, later). It amends §5's catalog: `split` / `split-right` /
-`hero` are page chrome. Setup must not publish those files as
-`login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
-proposal, not a requirement.
+structure inside the widget, strict scope, later). It amends §5's catalog:
+`split` / `split-right` / `hero` are page chrome. Setup must not publish
+those files as `login.liquid`. Page chrome is the customer's application:
+ADR 057's amendment of 2026-10-24 drops Zitadel-served login, so there is
+no page template.
 
 Implemented in [#1039](https://github.com/zitadel/nextgen/issues/1039):
 setup no longer has a `--design` flag or design question and publishes no

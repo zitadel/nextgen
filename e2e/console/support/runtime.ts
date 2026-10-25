@@ -1,8 +1,8 @@
 import type { Page, Route } from "@playwright/test";
 
 /**
- * Stubs for the runtime document the console and the hosted sign-in shell boot
- * from (`/console/runtime.json`). Console ADR 0004 §3 keeps three deployment
+ * Stubs for the runtime document the console boots from
+ * (`/console/runtime.json`). Console ADR 0004 §3 keeps three deployment
  * states apart — a server that cannot answer, one with no project yet, and a
  * provisioned one — and a lane can produce at most one of them for real: the
  * smoke lane serves no backend, the embedded lane's instance is provisioned.
@@ -25,7 +25,7 @@ export async function serveRuntime(page: Page, document: object): Promise<void> 
 }
 
 /** Answers the runtime document with `answer`, whatever it is. */
-export async function answerRuntime(page: Page, answer: RuntimeAnswer): Promise<void> {
+async function answerRuntime(page: Page, answer: RuntimeAnswer): Promise<void> {
   await page.route(RUNTIME_URL, (route) => route.fulfill(answer));
 }
 

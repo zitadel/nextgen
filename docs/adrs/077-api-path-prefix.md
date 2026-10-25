@@ -3,8 +3,8 @@
 > **Status:** Proposed
 > **Date:** 2026-10-23
 > **Context:** Where the resource API's routes live on a host it shares with
-> the login UI, the console, the website, the docs and the protocol
-> endpoints, and whether its path carries a version.
+> the console, the website, the docs and the protocol endpoints, and whether
+> its path carries a version.
 > **Amends if accepted:** the "no version segment in paths" lock in the
 > [glossary §7](../design/glossary.md#7-url-shape), and the
 > [API design guide](../design/api/README.md)'s premise of an API host of its
@@ -14,8 +14,8 @@
 
 The server mounts the resource API as a catch-all at `/`
 ([`buildHTTPMux`](../../cmd/server/server.go)). The few other paths it serves
-are registered ahead of it: the login UI (`/ui/login`), the console
-(`/ui/console`), `/console/runtime.json` and the IdP callbacks
+are registered ahead of it: the console (`/ui/console`),
+`/console/runtime.json` and the IdP callbacks
 (`/idp/{slug}/callback`, `/__nextgen/idp/{slug}/callback`). The health probes
 are operations of the API itself.
 
@@ -71,7 +71,7 @@ with no deployment-mode branch.
 
 Paths that aren't the resource API keep their place, outside the prefix:
 
-- the login UI, the console and `/console/runtime.json`;
+- the console and `/console/runtime.json`;
 - the IdP callbacks, which external providers hold as registered redirect
   URIs;
 - the health probes (`/healthz`, `/livez`, `/readyz`), where orchestrators
@@ -168,8 +168,8 @@ nor a self-hosted server has.
 
 ### Give the API its own host
 
-The console and the hosted login rely on sharing an origin with the API for
-the session cookie and CSRF. A self-hosted operator would need a second
+The console relies on sharing an origin with the API for the session cookie
+and CSRF. A self-hosted operator would need a second
 hostname and certificate, and local development on `localhost` a second port.
 The prefix doesn't rule out a dedicated host later.
 

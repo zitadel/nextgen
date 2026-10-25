@@ -80,7 +80,6 @@ The table shows port 8080; use the port `zitadel start` printed if your director
 | ------- | --- |
 | API | http://localhost:8080 |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
 | Liveness probe | http://localhost:8080/livez |
 | Readiness probe (checks the database) | http://localhost:8080/readyz |
 

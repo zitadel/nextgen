@@ -113,9 +113,8 @@ Every error page a person sees shows, in this order:
 
 Each surface draws it with its own stack: the docs in Next.js inside their
 layout, with search (`app/docs/not-found.tsx`), the console in shadcn
-(`src/components/boundaries.tsx`), the server in `internal/errorpage`. The
-login shell's notices already have the anatomy. This table is the one home of
-the copy; an implementation names this ADR instead of restating it.
+(`src/components/boundaries.tsx`), the server in `internal/errorpage`. This
+table is the one home of the copy; an implementation names this ADR instead of restating it.
 
 ### 5. No new error package
 
