@@ -3,18 +3,23 @@
   "extends": ["//"],
   "tasks": {
     // Bundles api/openapi into .generated/, which lib/openapi.ts imports,
-    // applying the repo's Redocly config, and the CLI's command reference,
-    // which its reference test writes and lib/cli-reference.ts imports.
+    // applying the repo's Redocly config, with its error codes, which
+    // lib/error-reference.ts imports, and the CLI's command reference, which
+    // its reference test writes and lib/cli-reference.ts imports, with the
+    // CLI's release notes, which Changesets writes on every release.
     "generate": {
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/api/openapi/**/*.yaml",
         "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/apps/cli/command-reference.json"
+        "$TURBO_ROOT$/apps/cli/command-reference.json",
+        "$TURBO_ROOT$/apps/cli/CHANGELOG.md"
       ],
       "outputs": [
         ".generated/openapi.mjs",
         ".generated/openapi.d.mts",
+        ".generated/errors.mjs",
+        ".generated/errors.d.mts",
         ".generated/cli.mjs",
         ".generated/cli.d.mts"
       ]
