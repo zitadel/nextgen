@@ -1,5 +1,6 @@
 post:
   operationId: buildRelease
+  x-zitadel-cli: deploy
   summary: Build a release from files
   description: |
     Builds a release from the resources of `.zitadel/` as authored on disk,

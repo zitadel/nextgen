@@ -5,7 +5,7 @@ description: >-
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
   for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
-  Vue, Angular, Solid, Svelte, or Qwik app, or plan and apply Zitadel config
+  Vue, Angular, Solid, Svelte, or Qwik app, or build and deploy Zitadel config
   changes from repo state.
 ---
 
@@ -169,7 +169,7 @@ npx @zitadel/cli@latest api ls --json        # every API operation, its paramete
 
 `--help` groups the surface into project commands (create a project and scaffold
 auth), local-server commands (run a local Zitadel), configuration commands
-(`plan`/`apply` plus the config resources), and resource commands (the uniform
+(`deploy` plus the config resources), and resource commands (the uniform
 `<resource> <verb>` surface). Read the groups from `--help` rather than from
 memory, since they change as the CLI gains commands.
 
@@ -203,19 +203,10 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
-- `plan` and `apply` emit `data.changes`: one row per touched resource
-  (`{kind, action, file, id?, previous_id?, moved_from?}`, action ∈ create/
-  update/revision/delete/move). A `move` is a file that took over a resource
-  from a removed one (`moved_from`). Plan rows preview; apply rows report, with
-  the resulting platform ids. Use it to verify an edit did what you intended.
-  `data.unsupported_deletions` counts removed files whose resource cannot be
-  deleted yet (they are kept, and are not part of `total`); on `apply` the files
-  are listed in `data.unsupported_deletion_files`.
-- `apply` leaves the files under `.zitadel/` as written: what the server stores
-  is never written back, and a field a file leaves out reads as the server's
-  default, so `plan` reports no change after an `apply`. `data.files_updated`
-  lists the one rewrite: a flow whose `user_schema` pinned a schema revision id
-  the apply superseded, re-pinned to the new revision's id.
+- `deploy` emits `data.content_hash` (the release digest), `data.origins`
+  (the origins it went live on) and `data.resources` (how many it pinned). A
+  re-run on unchanged config returns the same digest. Use it to confirm what
+  went live.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -299,7 +290,7 @@ like. Read the current sets from `setup --help`, but know the traps:
   enabled**; `passkey-first` leads with a passkey. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
-  `.zitadel/schemas/*.json`, then `apply`.
+  `.zitadel/schemas/*.json`, then `deploy`.
 
 Translate the developer's answers into the right axis values, then **verify
 against what actually deployed**: read the live schema back
@@ -314,13 +305,12 @@ invocation) or were explicitly told to just set it up.
 ## Answering the user
 
 Report what changed, in the user's terms — not how you drove the CLI. The
-flags, `--json`, the `plan`/`apply` split, exit codes, and the number of
+flags, `--json`, the deploy flow, exit codes, and the number of
 commands you ran are your internal business; the user asked for an outcome, not
 a transcript. Say what they got.
 
 - Good: "Added an optional phone number to your user schema and deployed it."
-- Avoid: "I ran `plan` and `apply`, both with `--non-interactive --json`, and
-  both returned ok."
+- Avoid: "I ran `deploy` with `--non-interactive --json` and it returned ok."
 
 Quote a command or flag only when the user asks *how* something works, or when
 they need to run something themselves. Otherwise keep the mechanics out of the
@@ -337,8 +327,7 @@ npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest start --non-interactive --json
 npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@latest doctor --non-interactive --json
-npx @zitadel/cli@latest plan --non-interactive --json
-npx @zitadel/cli@latest apply --non-interactive --json
+npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
@@ -457,14 +446,14 @@ and warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey). Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
-when nothing changed. Follow `data.next_commands` (`plan`, `apply`, and
+when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
 `variables set` when a credential did not reach the project) to publish the
 change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. See the reference below for driving the login UI
+then re-run `deploy`. See the reference below for driving the login UI
 and the config-sync details.
 
 ## Reference files

@@ -41,7 +41,7 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
 }
 
 const selector = " --env-file .env.development.local";
-const planCommand = `npx @zitadel/cli@1.2.3 plan${selector}`;
+const planCommand = `npx @zitadel/cli@1.2.3 deploy --dry-run${selector}`;
 
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
@@ -72,7 +72,7 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 apply${selector} to publish.`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${selector} to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });

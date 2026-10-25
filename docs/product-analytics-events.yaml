@@ -341,6 +341,12 @@ properties:
   has_env_file:
     type: boolean
     description: Whether `--env-file` was given; never the file's path.
+  resources:
+    type: number
+    description: How many resources the release pinned; never a handle or a digest.
+  origin_count:
+    type: number
+    description: How many origins a deployment went live on; never an origin.
   is_secret:
     type: boolean
     description: Whether a variable is secret; never its name or value.
@@ -479,8 +485,7 @@ components:
         - files_written_count
         - package_manager
       branding:eject: [design]
-      plan: [creates, updates, deletes, revisions, total]
-      apply: [creates, updates, deletes, revisions, total]
+      deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
       start: [runtime]
       variables:get: [is_secret]

@@ -138,7 +138,7 @@ function outcome(input: {
   selector: EnvironmentSelector;
   includeInstallCommand: boolean;
 }): SetupInstallOutcome {
-  const planCommand = projectCommand("plan", input.selector, input.cliVersion);
+  const planCommand = projectCommand("deploy --dry-run", input.selector, input.cliVersion);
   const statusCommand = projectCommand("status", input.selector, input.cliVersion);
   const verifyActions = [
     ...(input.includeInstallCommand ? [`Install dependencies: ${input.install.command}`] : []),

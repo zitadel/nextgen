@@ -1,4 +1,4 @@
-import { portableCommands, publicCliCommand } from "./public-cli";
+import { isPortableShellWord, publicCliCommand } from "./public-cli";
 
 declare const suggestedCommand: unique symbol;
 
@@ -65,8 +65,20 @@ export function unscopedCommand(args: string, cliVersion?: string): SuggestedCom
 export function portableSuggestions(
   argLists: readonly string[][],
   cliVersion: string,
+  /** Arguments the caller fills in (`<what changed>`): quoted in the command, not portable words. */
+  placeholders: readonly string[] = [],
 ): SuggestedCommand[] {
-  return portableCommands(argLists, cliVersion) as SuggestedCommand[];
+  const allowed = (word: string) => placeholders.includes(word) || isPortableShellWord(word);
+  if (!argLists.every((args) => args.every(allowed))) {
+    return [];
+  }
+  return argLists.map(
+    (args) =>
+      publicCliCommand(
+        args.map((word) => (placeholders.includes(word) ? `'${word}'` : word)).join(" "),
+        cliVersion,
+      ) as SuggestedCommand,
+  );
 }
 
 /** A command that is not the CLI (`npm install …`, `rm …`), suggested as written. */

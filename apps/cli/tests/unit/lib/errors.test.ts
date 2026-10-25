@@ -166,6 +166,17 @@ describe("toZitadelError", () => {
     expect(result.details).toBe("just a string");
   });
 
+  it("reports a 409 as a conflict with the state the platform holds", () => {
+    const err = new ApiError(
+      409,
+      "http://mock/releases/rel_1/revoke?project_id=proj_1",
+      { code: "rel.in_use", message: "release: still served by an origin" },
+      "POST http://mock/releases/rel_1/revoke returned 409",
+    );
+
+    expect(toZitadelError(err).code).toBe("E_CONFLICT");
+  });
+
   it("surfaces the server's message + nested details.details on ApiError 400", () => {
     const err = new ApiError(
       400,
@@ -246,6 +257,16 @@ describe("toZitadelError", () => {
     const server = new ApiError(500, "http://mock/x", { message: "boom" }, "GET returned 500");
     expect(toZitadelError(auth).code).toBe("E_AUTH");
     expect(toZitadelError(server).code).toBe("E_NETWORK");
+  });
+
+  it("classifies a 403 refusing a target origin as E_VALIDATION, not E_AUTH", () => {
+    const refused = new ApiError(
+      403,
+      "http://mock/deployments",
+      { code: "proj.origin_not_allowed", message: "project: https://x is not a primary origin" },
+      "POST returned 403",
+    );
+    expect(toZitadelError(refused).code).toBe("E_VALIDATION");
   });
 });
 

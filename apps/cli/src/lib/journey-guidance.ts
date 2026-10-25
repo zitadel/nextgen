@@ -1,5 +1,6 @@
 import { publicCliCommand } from "./public-cli";
 import { type EnvironmentSelector, projectCommand } from "./suggestion";
+import { DEPLOY_ARGS } from "./release";
 
 /**
  * Guidance copy that commands share, so the story doesn't fork; most of it is
@@ -52,8 +53,8 @@ export function customizeAndPublishActions(
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${projectCommand("plan", selector, cliVersion)} to preview, ` +
-      `then ${projectCommand("apply", selector, cliVersion)} to publish.`,
+    `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
   ];
 }
 
