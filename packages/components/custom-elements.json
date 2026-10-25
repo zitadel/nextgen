@@ -6373,6 +6373,14 @@
       "declarations": [
         {
           "kind": "variable",
+          "name": "defaultTemplate",
+          "type": {
+            "text": "string"
+          },
+          "default": "defaultTemplateSource"
+        },
+        {
+          "kind": "variable",
           "name": "layoutChromeCss",
           "type": {
             "text": "string"
@@ -6577,8 +6585,8 @@
           "kind": "js",
           "name": "defaultTemplate",
           "declaration": {
-            "name": "default",
-            "module": "./templates/default.liquid"
+            "name": "defaultTemplate",
+            "module": "src/orchestrator/index.ts"
           }
         },
         {

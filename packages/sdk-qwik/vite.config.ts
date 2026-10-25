@@ -27,7 +27,7 @@ export default defineConfig({
     dts({
       tsconfigPath: "./tsconfig.lib.json",
       include: ["src"],
-      exclude: ["src/**/*.spec.*"],
+      exclude: ["src/**/*.spec.*", "src/**/__tests__/**", "src/browser-commands.d.ts"],
       bundleTypes: true,
     }),
   ],
