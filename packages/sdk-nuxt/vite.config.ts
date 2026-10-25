@@ -1,4 +1,4 @@
-import nuxtModule from "vite-plugin-nuxt-module";
+import nuxtModule from "@mridang/vite-plugin-nuxt-module";
 import { defineConfig } from "vite";
 
 export default defineConfig({

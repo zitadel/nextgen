@@ -30,7 +30,6 @@ catalog:
   "@mswjs/http-middleware": ^0.10.3
   "@nuxt/kit": ^4.5.1
   "@nuxt/schema": ^4.5.1
-  "@nuxt/test-utils": ^4.3.4
   '@oclif/core': ^4.11.4
   '@oclif/plugin-autocomplete': ^3.2.50
   '@oclif/plugin-commands': ^4.1.55
@@ -221,3 +220,6 @@ skills:
 # platform, pnpm 12's check reinstalls them all over an install made with
 # --os=current --cpu=current, which breaks the Vercel services' shared node_modules.
 verifyDepsBeforeRun: false
+# 0.1.0 was published less than the minimumReleaseAge ago; drop this entry once it is older.
+minimumReleaseAgeExclude:
+  - "@mridang/vite-plugin-nuxt-module@0.1.0"

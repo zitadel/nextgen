@@ -23,10 +23,6 @@ const BUILD_MUTEX_REQUIREMENTS = new Map([
   ["sdk-next:build-release", "public-dist"],
   ["sdk-nuxt:build-release", "sdk-nuxt-dist"],
 ]);
-// Builds of private packages that a release build only reads: no release
-// build cleans or rewrites their dist, so they may run beside the release
-// builds. sdk-nuxt:build-release loads vite-plugin-nuxt-module from its dist.
-const PRIVATE_READ_ONLY_BUILDS = new Set(["vite-plugin-nuxt-module:build"]);
 const RELEASE_ENTRYPOINT_TARGETS = ["release:pack", "release:snapshot", "release:publish"];
 
 // The public package release builds run in parallel wherever their
@@ -360,7 +356,6 @@ function assertReleaseBuildsStartAfterOtherWork(waitsFor, entryPoint) {
     for (const other of waitsFor.keys()) {
       if (
         PUBLIC_PACKAGE_BUILD_TARGETS.includes(other) ||
-        PRIVATE_READ_ONLY_BUILDS.has(other) ||
         afterRelease.has(other) ||
         other.startsWith("release:") ||
         before.has(other)

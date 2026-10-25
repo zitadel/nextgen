@@ -14,16 +14,13 @@
     "build": {
       "dependsOn": [
         "@zitadel/components#build",
-        "@zitadel/sdk-core#build",
-        "vite-plugin-nuxt-module#build"
+        "@zitadel/sdk-core#build"
       ]
     },
-    // The private build plugin has no release build; its normal build is what vite.config.ts loads.
     "build-release": {
       "dependsOn": [
         "@zitadel/components#build-release",
-        "@zitadel/sdk-core#build-release",
-        "vite-plugin-nuxt-module#build"
+        "@zitadel/sdk-core#build-release"
       ]
     },
     "test": {
@@ -34,8 +31,7 @@
     "dev": {
       "dependsOn": [
         "@zitadel/components#build",
-        "@zitadel/sdk-core#build",
-        "vite-plugin-nuxt-module#build"
+        "@zitadel/sdk-core#build"
       ]
     }
   }

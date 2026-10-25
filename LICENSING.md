@@ -73,7 +73,6 @@ packages/testing/
 packages/sdk-core/
 packages/sdk-next/
 packages/sdk-*/
-packages/vite-plugin-nuxt-module/
 ```
 
 These exceptions cover code and contracts that are intended to be imported,

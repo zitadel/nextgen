@@ -1,8 +1,7 @@
 # Agent Instructions — `packages/`
 
 Rules for the packages without an `AGENTS.md` of their own: the SDKs
-(`packages/sdk-*`), `packages/vite-plugin-nuxt-module`, `packages/api` and
-`packages/config`.
+(`packages/sdk-*`), `packages/api` and `packages/config`.
 
 ## The SDKs (`packages/sdk-*`)
 
@@ -33,9 +32,9 @@ change needs a changeset, and the whole train versions together.
 - **Allow a warning code only with a comment saying why.**
 - **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
   into shared chunks and strip the directive. Re-test the App Router split.
-- **`sdk-nuxt` builds with `vite-plugin-nuxt-module`** (below): its `vite.config.ts`
-  lists `nuxtModule({ extension: ".js", entry })`, and the plugin writes what
-  `nuxt-module-build` writes. The entries beside `src/module.ts` go in `entry`,
+- **`sdk-nuxt` builds with the published `@mridang/vite-plugin-nuxt-module`**: its
+  `vite.config.ts` lists `nuxtModule({ extension: ".js", entry })`, and the plugin
+  writes what `nuxt-module-build` writes. The entries beside `src/module.ts` go in `entry`,
   not in `exports`; `src/runtime` is built file by file.
 - **Check `sdk-angular` templates in `typecheck`, not the build**: Analog's plugin
   does not type-check templates, so `ngc --noEmit` enforces `strictTemplates`.
@@ -74,23 +73,6 @@ change needs a changeset, and the whole train versions together.
   the reader to the package's README and types for props, exports and APIs,
   never listing them. A changed property updates the README or types; edit a
   skill only when the pattern changes.
-
-## `packages/vite-plugin-nuxt-module`
-
-The Vite plugin `sdk-nuxt` builds with. It is private and moves to its own
-repository, so keep it free of anything of this one: no `@zitadel/*` import, no
-`vite.shared.mjs` (it only builds itself with `libraryBuild()`), no Zitadel name
-in its source, docs or fixtures. Its README and `docs/` describe it for
-someone who has never seen this repo.
-
-- **Unit tests mirror their source** (`src/foo.ts`, `src/foo.test.ts`). The slow
-  contract spec (`tests/contract`) builds a fixture module, installs it into a
-  Nuxt app and starts it; run it with `moon run vite-plugin-nuxt-module:test-contract`
-  after changing what the plugin writes. It stays out of `test` and CI.
-- **A new `@nuxt/kit` export fails `tests/kit-coverage.test.ts`** until
-  `tests/contract/kit-api.ts` covers it in the fixture or excludes it with a reason.
-- **The build tools come from the module being built** (TypeScript, Sass,
-  `vue-tsc`, `vue-sfc-transformer`, `nuxi`), as optional peer dependencies.
 
 ## `packages/api`
 
