@@ -1094,17 +1094,38 @@ function pointerHandle(kind: string, revisionId: string): string {
  * for every project, matching the spec's "omitted, the project's default
  * applies" (create-deployment-request.yaml).
  */
-const DEFAULT_PREVIEW_TTL = "7d";
+const DEFAULT_PREVIEW_TTL = "P7D";
 
-/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
-function ttlToExpiry(ttl: string): string {
-  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+/** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
+function isoDurationMs(ttl: string): number | undefined {
+  // The shapes preview-ttl.yaml admits: whole days, or a time part in hours,
+  // minutes or seconds. Weeks (`P4W`) are their own ISO form and are accepted
+  // too; months and years are not, having no fixed length.
+  const match = /^P(?:(\d+)W|(\d+)D|(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)$/.exec(ttl);
   if (!match) {
+    return undefined;
+  }
+  const [, weeks, days, tDays, hours, minutes, seconds] = match;
+  // `PT` on its own carries no components and is not a duration.
+  if ([weeks, days, tDays, hours, minutes, seconds].every((part) => part === undefined)) {
+    return undefined;
+  }
+  return (
+    Number(weeks ?? 0) * 604_800_000 +
+    Number(days ?? tDays ?? 0) * 86_400_000 +
+    Number(hours ?? 0) * 3_600_000 +
+    Number(minutes ?? 0) * 60_000 +
+    Number(seconds ?? 0) * 1_000
+  );
+}
+
+/** Turn a `ttl` (`PT30M`, `PT168H`, `P7D`) into an ISO expiry counted from now. */
+function ttlToExpiry(ttl: string): string {
+  const ms = isoDurationMs(ttl);
+  if (ms === undefined) {
     return new Date().toISOString();
   }
-  const amount = Number(match[1]);
-  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
-  return new Date(Date.now() + amount * unitMs).toISOString();
+  return new Date(Date.now() + ms).toISOString();
 }
 
 /** The project's primary origins, as exact URLs, sorted. */

@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../src/lib/errors";
-import { formatTtl, parseTtl } from "../../../src/lib/ttl";
+import { formatTtl, isoDuration, parseTtl } from "../../../src/lib/ttl";
 
 describe("parseTtl", () => {
   it("keeps a whole unit as it is written", () => {
-    expect(parseTtl("7d")).toEqual({ canonical: "7d", ms: 7 * 24 * 60 * 60 * 1000 });
-    expect(parseTtl("12h")).toEqual({ canonical: "12h", ms: 12 * 60 * 60 * 1000 });
-    expect(parseTtl("90m")).toEqual({ canonical: "90m", ms: 90 * 60 * 1000 });
+    expect(parseTtl("7d")).toEqual({ canonical: "7d", iso: "P7D", ms: 7 * 24 * 60 * 60 * 1000 });
+    expect(parseTtl("12h")).toEqual({ canonical: "12h", iso: "PT12H", ms: 12 * 60 * 60 * 1000 });
+    expect(parseTtl("90m")).toEqual({ canonical: "90m", iso: "PT90M", ms: 90 * 60 * 1000 });
   });
 
   it("re-expresses seconds in the coarsest exact unit", () => {
@@ -25,6 +25,28 @@ describe("parseTtl", () => {
     expect(() => parseTtl("1w")).toThrow(ZitadelError);
     expect(() => parseTtl("0d")).toThrow(ZitadelError);
     expect(() => parseTtl("1.5h")).toThrow(ZitadelError);
+  });
+});
+
+describe("isoDuration", () => {
+  it("writes whole days as a date-part duration", () => {
+    expect(isoDuration(7 * 24 * 60 * 60)).toBe("P7D");
+    expect(isoDuration(24 * 60 * 60)).toBe("P1D");
+  });
+
+  it("writes anything shorter in the coarsest exact time part", () => {
+    expect(isoDuration(12 * 60 * 60)).toBe("PT12H");
+    expect(isoDuration(90 * 60)).toBe("PT90M");
+  });
+
+  it("rounds a sub-minute remainder up, matching the canonical string", () => {
+    expect(isoDuration(90)).toBe("PT2M");
+    expect(parseTtl("90s")).toEqual({ canonical: "2m", iso: "PT2M", ms: 90_000 });
+  });
+
+  it("is the form the wire carries for a parsed ttl", () => {
+    expect(parseTtl("168h").iso).toBe("P7D");
+    expect(parseTtl("3600s").iso).toBe("PT1H");
   });
 });
 
