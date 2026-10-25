@@ -887,9 +887,12 @@ var transportErrors = []string{
 
 // securityErrors join transportErrors for operations that declare a security
 // requirement: the generated middleware rejects a failed one before dispatch,
-// as auth.unauthorized. An operation with `security: []` — the health probes,
+// as auth.unauthorized. A security handler that cannot introspect the
+// credential (the token or key store failed) answers with the status of the
+// fault instead (OgenErrorHandler): unavailable, not_implemented, or internal
+// for the rest. An operation with `security: []` — the health probes,
 // the pre-authentication flow steps — has no requirement to fail, so listing
-// the code there would advertise an answer it cannot give. Over-advertising is
+// these codes there would advertise answers it cannot give. Over-advertising is
 // harmless to decode, but it costs the typed models the precision that makes
 // them worth generating.
 //
@@ -897,6 +900,9 @@ var transportErrors = []string{
 // call-graph walk, so gating here only drops the transport's contribution.
 var securityErrors = []string{
 	"domain.ErrAuthUnauthorized",
+	"domain.ErrInternal",
+	"domain.ErrNotImplemented",
+	"domain.ErrUnavailable",
 }
 
 // csrfErrors join for operations the session cookie may authenticate that

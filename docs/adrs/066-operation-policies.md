@@ -265,10 +265,10 @@ Instances are published with `POST /policies` and resolved through
 `service.PolicyResolver`, which `service.PolicyService.ResolvePolicy`
 implements: the newest stored revision of the project's policy for the
 operation, and no policy when the project published none, in which case the
-gate applies only the server's own length cap. Registration and SSO sign-up
-also keep the flow field's own minimum of 8 until the field reads the policy
-([#1449](https://github.com/zitadel/nextgen/issues/1449)). The newest stored
-revision is a stand-in: ADR 035 says an environment sees only what its active
+gate applies only the server's own length cap. A flow step where the user
+chooses a password shows and checks the same length bounds before the gate
+runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)). The newest stored
+revision is a stand-in: ADR 035 says a deployment serves only what its
 release pins, so resolution moves to the release's pinned policy revision once
 release-pinned reads exist (scope table in
 [`docs/design/policies/`](../design/policies/README.md)). The
@@ -390,8 +390,7 @@ needs a misbehaving policy out of the way publishes a revision with an empty
 ### End to end: a user enters their password during sign-up (via flow-engine)
 
 The flow for an instance that sets `min_length: 12`; the step's constraints
-come from the policy once the flow field reads them
-([#1449](https://github.com/zitadel/nextgen/issues/1449)). A new user has no
+come from the policy. A new user has no
 password history and sign-up is not a self-service change, so the gate sends
 `self_service: false` and the `history_depth` rule passes without a hash
 being verified, even when the instance sets it. The constraints projection
@@ -425,13 +424,30 @@ sequenceDiagram
     end
 ```
 
-1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection ([#1449](https://github.com/zitadel/nextgen/issues/1449)). The client can perform frontend validation.
+1. Render. Flow-engine fills `FlowFieldValidation` from the `constraints` projection, through `domain.FlowPasswordPolicy`, on steps where the user chooses a password. The client can perform frontend validation and name the bound in its message ("at least 12 characters").
 2. Submit. The client posts the new password as the reserved field `x-auth-methods#password`.
 3. Validation. Flow-engine backend payload validation re-checks constraints.
 4. Domain operation. The flow engine calls `SetPasswordUserAction`. This is the guarded operation.
 5. Prepare context. Per-operation Go code derives the context (see [Evaluation](../design/policies/2-evaluation.md)).
 6. Evaluate. Every active rule runs over config plus context.
-7. Return the error, or proceed with the operation. In a flow the violated rules come back as field errors on the step that creates the user (`error.x-auth-methods#password_min_length`), here the step with the password field.
+7. Return the error, or proceed with the operation. In a flow the violated rules come back as field errors on the step that creates the user (`error.x-auth-methods#password_min_length`), here the step with the password field. A length violation never gets this far in a flow that collects the password on its own step: step 3 refuses it there.
+
+#### What a step discloses
+
+A step where the user chooses a password carries the policy's `min_length`
+and `max_length` in the field's `validation`, and a sign-up step is served
+before anyone is authenticated. That disclosure is deliberate: a user cannot
+choose a valid password without the length bounds, and they say nothing about
+any account. `history_depth` is never sent with a step; a history violation
+names only the rule. Which settings of future operations a step or the
+constraints endpoint may disclose is not decided here.
+
+A step where the user enters a password they have (signing in) carries no
+length rules: a stored password that predates a stricter policy must still
+sign in. The purpose the flow runs under decides between the two: its
+`chooses` field in `passwordPurposes`. The `new-password` or
+`current-password` autocomplete token beside it is what the form tells a
+password manager, and does not decide the bounds.
 
 ### The rule language: CEL
 
@@ -487,10 +503,10 @@ ADR 063 like identity provider connections: a `policies` row per operation per
 project carries the fixed `id` (`pol_`), a `policy_revisions` row per publish
 carries the `revision_id` (`polrev_`) and the config, and the newest revision
 is the one with the greatest `created_at`. It has no URL identity or `$ref`
-handling, which a policy does not need. Today the API publishes
-(`POST /policies`) and reads one revision
-(`GET /policies/revisions/{revision_id}`); the other ADR 063 reads (the
-list, the read by `id`, the revisions of one policy) follow. Templates are not
+handling, which a policy does not need. The API publishes
+(`POST /policies`) and has the ADR 063 reads: the list (`GET /policies`),
+the read by `id`, the revisions of one policy and one revision
+(`GET /policies/revisions/{revision_id}`). Templates are not
 release content: they ship with the server, and a release records the catalog
 version it was validated against. Release validation runs the same check as
 publishing (`policy.Engine.ValidateInstance`: known operation and settings,

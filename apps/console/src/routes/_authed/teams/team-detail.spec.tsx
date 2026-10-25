@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -15,6 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 const TEAM_ID = "team_1";
 const TEAM_URL = `http://localhost/api/teams/${TEAM_ID}`;
+const USERS_QUERY_URL = "*/api/users/query";
 
 function team(overrides: Record<string, unknown> = {}) {
   return {
@@ -40,6 +41,15 @@ async function renderDetail() {
 }
 
 describe("team detail", () => {
+  // The top bar's team switcher lists the project's teams beside the open one,
+  // and the Members tab's first page loads with the team.
+  beforeEach(() =>
+    server.use(
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team()] })),
+      http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+    ),
+  );
+
   it("renders the name, the id and the created date", async () => {
     server.use(http.get(TEAM_URL, () => HttpResponse.json(team())));
     await renderDetail();
@@ -101,5 +111,77 @@ describe("team detail", () => {
 
     // `name` is the only property `PATCH /teams/{team_id}` accepts.
     expect(patched).toEqual([{ name: "Acme Group" }]);
+  });
+
+  it("renames the team in the top bar's switcher too", async () => {
+    let name = "Acme Web";
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team({ name }))),
+      http.post("*/api/teams/query", () => HttpResponse.json({ teams: [team({ name })] })),
+      http.patch(TEAM_URL, async ({ request }) => {
+        name = ((await request.json()) as { name: string }).name;
+        return HttpResponse.json(team({ name }));
+      }),
+    );
+    await renderDetail();
+
+    const switcher = await screen.findByRole("button", { name: "Switch team" });
+    await waitFor(() => expect(switcher).toHaveTextContent("Acme Web"));
+
+    const field = await screen.findByLabelText("Tenant name");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Acme Group");
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(switcher).toHaveTextContent("Acme Group"));
+  });
+
+  it("lists the team's members on the Members tab", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team())),
+      http.post(USERS_QUERY_URL, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              display: "Ada Lovelace",
+              identifier: "ada@example.com",
+              metadata: { status: "active" },
+            },
+          ],
+        });
+      }),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    expect(await screen.findByRole("link", { name: "Ada Lovelace" })).toHaveAttribute(
+      "href",
+      scopedPath("/users/user_1"),
+    );
+    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    // Membership is the `team_id` filter, not a per-user roster read.
+    expect(bodies).toEqual([
+      expect.objectContaining({
+        filter: [{ field: "team_id", operation: "equals", value: TEAM_ID }],
+      }),
+    ]);
+  });
+
+  it("keeps the team's page when its members may not be read", async () => {
+    server.use(
+      http.get(TEAM_URL, () => HttpResponse.json(team())),
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({ code: "user.permission_denied" }, { status: 403 }),
+      ),
+    );
+    await renderDetail();
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Members" }));
+    expect(
+      await screen.findByText("Your access does not include this team's members."),
+    ).toBeInTheDocument();
   });
 });

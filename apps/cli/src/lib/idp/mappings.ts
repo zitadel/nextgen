@@ -23,7 +23,7 @@ export type ConnectionMappings = {
 /**
  * Read the claim mapping, the verification and the scopes out of a connection
  * document. Anything that is not the expected shape reads as absent: the
- * summary describes the file, and judging it is `plan`'s job.
+ * summary describes the file, and judging it is `deploy`'s job.
  */
 export function readMappings(connection: object): ConnectionMappings {
   const body = connection as Record<string, unknown>;
@@ -106,7 +106,7 @@ export function stillToConfigure(options: {
   return [
     `Register the redirect URI at ${provider}.`,
     `Check the claim names in ${file}.`,
-    ...(status === "saved" ? ["Run `zitadel plan`, then `zitadel apply`."] : []),
+    ...(status === "saved" ? ["Run `zitadel deploy`."] : []),
     "Sign in once: until then the mapping is untested.",
   ];
 }
@@ -119,6 +119,6 @@ export function statusLine(status: ConnectionStatus): string {
     case "applied":
       return "Saved and applied. Not tested with a sign-in.";
     case "present":
-      return "In your project. `zitadel plan` shows whether it is applied. Not tested.";
+      return "In your project. `zitadel deploy --dry-run` shows whether it is deployed. Not tested.";
   }
 }

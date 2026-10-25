@@ -5,7 +5,7 @@ import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +29,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "login flow" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
@@ -73,7 +73,7 @@ function FlowDefinitionDetail() {
   const steps = definition.steps ?? [];
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
@@ -128,7 +128,7 @@ function FlowDefinitionDetail() {
 
         <DocumentViewer document={definition} noun="definition" />
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

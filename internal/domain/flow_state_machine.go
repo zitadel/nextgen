@@ -323,6 +323,7 @@ type FlowStateMachineRuntime struct {
 	ssoProviders  FlowSSOProviderResolver
 	ssoIdentities FlowSSOIdentityService
 	ssoRedirects  FlowSSORedirectIssuer
+	passwords     FlowPasswordPolicy
 	now           func() time.Time
 }
 
@@ -337,6 +338,7 @@ func NewFlowStateMachine(
 	ssoProviders FlowSSOProviderResolver,
 	ssoIdentities FlowSSOIdentityService,
 	ssoRedirects FlowSSORedirectIssuer,
+	passwords FlowPasswordPolicy,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
@@ -351,6 +353,7 @@ func NewFlowStateMachine(
 		ssoProviders:  ssoProviders,
 		ssoIdentities: ssoIdentities,
 		ssoRedirects:  ssoRedirects,
+		passwords:     passwords,
 		now:           now,
 	}
 }
@@ -2370,7 +2373,46 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
+	if err := r.applyPasswordPolicy(ctx, state, step, resolved.Fields); err != nil {
+		return FlowResolvedFields{}, err
+	}
 	return resolved, nil
+}
+
+// applyPasswordPolicy sets the length rules of a step's password fields for
+// the purpose the flow runs under, so the rendered step and the submit check
+// carry the same ones. Where the user chooses a password (register,
+// recovery), the field carries the project's policy bounds: the form can show
+// them, and a candidate the gate would refuse is refused on this step. Where
+// the user enters one they have, the field carries none: a stored password
+// may predate a stricter policy, and verifying it is the only check. The
+// bounds are public on purpose: a user cannot choose a valid password without
+// them (ADR 066, What a step discloses).
+func (r *FlowStateMachineRuntime) applyPasswordPolicy(ctx context.Context, state *FlowState, step *FlowDefinitionStep, fields []FlowField) error {
+	if !choosesPassword(state.CurrentPurpose) {
+		return nil
+	}
+	read := false
+	var minLength, maxLength int
+	for i := range fields {
+		f := &fields[i]
+		if f.Challenge != FlowFieldChallengePassword {
+			continue
+		}
+		if !read {
+			if r.passwords == nil {
+				return fmt.Errorf("%w: password policy not wired", ErrFlowIntegrity())
+			}
+			var err error
+			minLength, maxLength, err = r.passwords.PasswordLengthBounds(ctx, state.ProjectID)
+			if err != nil {
+				return fmt.Errorf("flow state machine: read the password policy on step %q: %w", step.Name, err)
+			}
+			read = true
+		}
+		f.Validation = withPasswordBounds(f.Validation, minLength, maxLength)
+	}
+	return nil
 }
 
 // resolveVisitedFields resolves the union of fields collected by every

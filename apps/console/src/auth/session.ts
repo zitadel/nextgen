@@ -62,6 +62,15 @@ let pageUserId: string | undefined;
 let reloading = false;
 
 /**
+ * Drops only the cached session, so the next `fetchSession()` reads it again:
+ * for a change to the session's own fields (the user ref's `display` after a
+ * profile save). The CSRF token and the person's other cached reads stay.
+ */
+export function refreshSession(): void {
+  cachedSession = null;
+}
+
+/**
  * Drops the cached session, the CSRF token, and every read cached for the
  * person (`lib/session-cache.ts`), so the next read goes to the server. This
  * page's person stays: see `pageUserId`.
@@ -117,8 +126,7 @@ async function readSession(): Promise<ConsoleSession | null> {
 
 /**
  * The `project_id` the calls on the cookie's session and its user hold that
- * session to: the token read, sign-out, `GET /users/me` and
- * `GET /users/me/projects`. It is the console's, once the runtime document
+ * session to: the token read, sign-out, and every `/users/me` call. It is the console's, once the runtime document
  * names it, and the server refuses an app's session there too
  * (`403 sess.project_mismatch`). It is not a management scope: those name the
  * selected project (`lib/project-scope.ts`).

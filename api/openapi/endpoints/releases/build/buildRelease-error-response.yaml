@@ -16,6 +16,7 @@ content:
         - $ref: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
         - $ref: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
         - $ref: '../../../components/schemas/errors/sch-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/rel-invalid.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-permission_denied.yaml'
@@ -24,6 +25,7 @@ content:
         - $ref: '../../../components/schemas/errors/rel-unresolved_reference.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -39,6 +41,7 @@ content:
           sch.fetch_too_large: '../../../components/schemas/errors/sch-fetch_too_large.yaml'
           sch.fetch_too_many_redirects: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
           sch.not_found: '../../../components/schemas/errors/sch-not_found.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           rel.invalid: '../../../components/schemas/errors/rel-invalid.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.permission_denied: '../../../components/schemas/errors/rel-permission_denied.yaml'
@@ -47,6 +50,7 @@ content:
           rel.unresolved_reference: '../../../components/schemas/errors/rel-unresolved_reference.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           flowdef.schema_fetch_failed: '../../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -108,6 +112,11 @@ content:
         value:
           code: sch.not_found
           message: 'schema not found'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       rel.invalid:
         summary: rel.invalid
         value:
@@ -148,3 +157,8 @@ content:
         value:
           code: flowdef.schema_fetch_failed
           message: 'flow definition: failed to fetch schema'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

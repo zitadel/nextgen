@@ -1,31 +1,57 @@
-// `Building2` returns with the parked organisation switcher below.
-import { Link, type LinkProps, useMatches } from "@tanstack/react-router";
-import { Boxes, ChevronsUpDown, type LucideIcon, Search } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import {
+  Link,
+  type LinkProps,
+  useMatch,
+  useMatches,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
+import { Box, Boxes, Check, ChevronsUpDown, type LucideIcon, Plus, Slash } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
+import { AddTeamSheet } from "@/components/add-team-sheet";
+import { ProjectMark } from "@/components/project-mark";
+import {
+  Combobox,
+  ComboboxAnchor,
+  ComboboxContent,
+  type ComboboxGroup,
+  type ComboboxOption,
+} from "@/components/ui/combobox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { api } from "@/api/zitadel";
+import { queryActiveTeams } from "@/lib/teams";
+import { useAsync } from "@/hooks/use-async";
 import {
-  listMyProjectsCached,
+  byName,
+  type ProjectRef,
+  type SelectedProject,
+  useMyProjects,
   useProjectScope,
+  useProjectSearch,
+  useSelectedProject,
   useSelectProjectTarget,
   withoutTrailingSlash,
 } from "@/lib/project-scope";
+import {
+  RECENT_PROJECT_LIMIT,
+  readRecentProjects,
+  useRememberRecentProject,
+} from "@/lib/recent-projects";
 
 /**
- * Project switcher pill. Desktop: 196px `bg-card` pills side by side. Mobile:
- * full-width stacked rows. Built on shadcn `Popover`.
+ * The top bar's context: the project switcher, then — on a team's page — a
+ * slash and the team switcher, as the design's navbar draws them.
  *
- * The project popover's footer links to the Projects overview (`All projects`),
- * the same screen as the sidebar's first entry, for someone already in the
- * switcher looking for a project it does not list.
- *
- * No create action in the footer: this component backs both switchers, so one
- * shared button would be mislabelled in one of them.
+ * The project switcher is the design system's searchable picker (`Combobox`):
+ * it opens on a search field, matched on the server across every project the
+ * person can act on, above the selected project and the ones they opened
+ * recently, and, while all their projects fit on one page, every other one by
+ * name. Its footer opens Projects. The team switcher is a `Popover` over the
+ * project's active teams; its footer adds a team, opening the Add team drawer
+ * and then the new team.
  */
 
 /**
@@ -37,112 +63,254 @@ const NO_PROJECTS = "No projects";
 /** What the project pill says while projects exist but none is selected. */
 const NO_SELECTION = "Select a project";
 
+/** The project list's search field, label and placeholder alike. */
+const FIND_PROJECT = "Find a project";
+
+/** What the project list says when a search finds nothing. */
+const NO_MATCHES = "No matching projects";
+
+/** What it says while the search for what was typed is on its way. */
+const SEARCHING = "Searching…";
+
+/** What it says with nothing to open on: too many projects to list, none recent. */
+const TYPE_TO_FIND = "Type to find a project";
+
+/** What it says while the first page loads. */
+const LOADING = "Loading projects…";
+
+/** How many projects a search lists: as many as the first page. */
+const PROJECT_RESULTS = 20;
+
 interface SwitcherOption {
   id: string;
   label: string;
-  plan?: string;
-  /**
-   * Where following the row goes — for a project, the same screen re-scoped
-   * to it (`?project=`). Without one the row is a plain label.
-   */
-  link?: Pick<LinkProps, "to" | "params" | "search">;
+  /** Where following the row goes — for a team, its page. */
+  link: Pick<LinkProps, "to" | "params" | "search">;
 }
 
-export function ContextSwitcher() {
-  const projects = useProjects();
+export function ContextSwitcher({ userId }: { userId?: string }) {
   // The pill shows the selected project (`?project=`, `src/lib/project-scope.ts`),
   // never `getConsoleProjectId()`: that is the project the console signs into —
   // the platform project on a platform deployment — which is not what anybody
-  // means here unless it was selected.
+  // means here unless it was selected. Never named from a search's matches,
+  // which come and go as the person types; by its id until its name is read.
+  // Read here, once, for the pill and for the person's recent projects: a
+  // project selected anywhere — the switcher, Projects, search, a link — is the
+  // one they opened last.
+  const current = useSelectedProject();
+  useRememberRecentProject(userId, current);
   const selected = useProjectScope();
-  const current = useSelectedOption(selected, projects);
+  const teamId = useParams({ strict: false, select: (params) => params.teamId });
+  // Projects is the switcher's list with room to read it, and has its own
+  // search, so a pill there would only offer a second way to find a project,
+  // naming one above the list of all of them (D21). That list marks the
+  // selected project instead.
+  const onProjects = useMatch({ from: "/_authed/projects/", shouldThrow: false });
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-2 md:w-auto md:flex-row md:items-center">
-      {/* The organisation switcher is parked. It was four invented orgs —
-          "Acme Inc / Free", "Clearwater Labs / Pro", "Benimac LTD / Enterprise",
-          "Horizons Studio / Pro" — with a hardcoded current selection and a plan
-          badge naming a tier nothing sells yet. It sat at the top of every
-          screen, which made the whole console look like it was scoped to a real
-          organisation on a real plan.
-
-          Organisations are teams in this model. `POST /teams/query` now lists
-          them, so the dropdown could be populated — but two things it needs are
-          still missing, and without them the control would look live while doing
-          nothing:
-
-            - **no current team.** Neither `GET /sessions/me` nor the runtime
-              document carries one, so there is nothing to show as selected.
-            - **nothing is team-scoped yet.** `POST /users/query` now accepts a
-              `team_id` filter, but the console does not send one, and the
-              schemas list is still project-scoped — so choosing a team would
-              change nothing on screen until the users list passes it through.
-
-          Restore this when a current team is resolvable and the list reads accept
-          it. If a plan badge returns, take it from billing (#667) rather than a
-          literal.
-
-          <Switcher
-            icon={Box}
-            label={currentTeam?.label}
-            shortLabel={currentTeam?.shortLabel}
-            plan={currentTeam?.plan}
-            options={teams}
-            ariaLabel="Switch organization"
-          /> */}
-      <Switcher
-        icon={Boxes}
-        label={current?.label}
-        currentId={current?.id}
-        options={projects}
-        emptyLabel={projects?.length === 0 ? NO_PROJECTS : NO_SELECTION}
-        ariaLabel="Switch project"
-        footer={{ label: "All projects", link: { to: "/projects" } }}
-      />
-    </div>
+    <nav aria-label="Context" className="flex min-w-0 items-center gap-2">
+      {!onProjects && <ProjectSwitcher userId={userId} current={current} />}
+      {/* The team switcher joins the bar once a team is open — the team is the
+          context then, and following another team from the list switches it.
+          Teams are not a standing selection the way projects are: no screen
+          other than the team's own reads one. */}
+      {teamId && selected && (
+        <>
+          <Slash aria-hidden className="size-3.5 shrink-0 -rotate-[20deg] text-border" />
+          {/* Keyed: another project's teams must not show while this one's load. */}
+          <TeamSwitcher key={selected} projectId={selected} teamId={teamId} />
+        </>
+      )}
+    </nav>
   );
 }
 
 /**
- * The projects the signed-in person can act on, from `GET /users/me/projects`
- * (root ADR 053 §6) — their own, and the ones somebody else granted them.
- *
- * Read with the session cookie, so it answers the same on the embedded console
- * as behind the dev proxy. `POST /projects/query` cannot serve this: the server
- * pins it to the calling credential's home project and accepts only a project
- * secret, which left the embedded pill a permanent skeleton.
- *
- * One page is enough: the pill shows the first project and the dropdown is a
- * reference list, not the directory — the Projects screen pages the full set.
- *
- * The read is the one the `_authed` guard makes when it picks a default
- * selection (`listMyProjectsCached`), so a landing asks once for both.
- *
- * Loaded here rather than in the `_authed` loader so the shell paints
- * immediately and a failure degrades to an empty switcher instead of blocking
- * every screen behind it — the chrome is not worth a boundary.
+ * The project pill and its list. Choosing a project is a navigation, as a link
+ * would be: the selection lives in the URL. Past the first page the list opens
+ * on no more than the selected and recent projects, since that page is only the
+ * oldest ones; the search reaches the rest.
  */
-function useProjects(): SwitcherOption[] | undefined {
-  const [projects, setProjects] = useState<{ id: string; label: string }[] | undefined>(undefined);
+function ProjectSwitcher({
+  userId,
+  current,
+}: {
+  userId: string | undefined;
+  /** The selected project, named once it is read. */
+  current: SelectedProject | undefined;
+}) {
+  // The first page says whether there are more projects than it shows, and so
+  // whether the list can open on all of them.
+  const mine = useMyProjects();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const found = useProjectSearch(query, PROJECT_RESULTS);
+  const navigate = useNavigate();
   const scopeTo = useScopeTarget();
+  const selected = useProjectScope();
+  // Read as the list opens, so it holds what was opened since it last did.
+  const recents = useMemo(() => (open ? readRecentProjects(userId) : []), [open, userId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void listMyProjectsCached()
-      .then((result) => {
-        if (cancelled) return;
-        setProjects(result.projects.map((project) => ({ id: project.id, label: project.name })));
-      })
-      .catch(() => {
-        if (!cancelled) setProjects([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    // A search starts over each time the list opens.
+    if (!next) setQuery("");
+  };
 
-  return projects?.map((project) => ({ ...project, link: scopeTo(project.id) }));
+  const term = query.trim().toLowerCase();
+  let groups: ComboboxGroup[] = [];
+  let emptyLabel = LOADING;
+  if (term) {
+    // Re-filtered against the live query: until the next debounced read lands,
+    // the last one's answer can name projects the typing has already ruled out.
+    const matches = (found?.projects ?? []).filter((project) =>
+      project.name.toLowerCase().includes(term),
+    );
+    groups = [{ options: byName(matches).map(toOption) }];
+    emptyLabel = found?.term.toLowerCase() === term ? NO_MATCHES : SEARCHING;
+  } else if (mine) {
+    const named = current?.name === undefined ? undefined : { ...current, name: current.name };
+    const { recent, rest } = openingList(mine, named, recents);
+    groups = [
+      { heading: "Recent", options: recent.map(toOption) },
+      { heading: "Projects", options: rest.map(toOption) },
+    ];
+    emptyLabel = mine.projects.length === 0 && !mine.more ? NO_PROJECTS : TYPE_TO_FIND;
+  }
+
+  const label = current && (current.name ?? current.id);
+
+  return (
+    <Combobox open={open} onOpenChange={changeOpen}>
+      <ComboboxAnchor asChild>
+        <button type="button" aria-label="Switch project" className={TRIGGER}>
+          {selected ? (
+            <ProjectMark projectId={selected} className="size-4" />
+          ) : (
+            <Boxes size={16} className="shrink-0 text-foreground" aria-hidden />
+          )}
+          {mine === undefined ? (
+            <Skeleton className="h-4 w-24" />
+          ) : label === undefined ? (
+            <span className="min-w-0 truncate text-muted-foreground">
+              {mine.projects.length === 0 ? NO_PROJECTS : NO_SELECTION}
+            </span>
+          ) : (
+            <span className="min-w-0 truncate leading-5 text-foreground">{label}</span>
+          )}
+          <ChevronsUpDown size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+        </button>
+      </ComboboxAnchor>
+      <ComboboxContent
+        groups={groups}
+        selected={selected ? [selected] : []}
+        searchPlaceholder={FIND_PROJECT}
+        emptyLabel={emptyLabel}
+        search={{ query, onQueryChange: setQuery }}
+        footer={{
+          label: "All projects",
+          icon: <Boxes aria-hidden />,
+          onSelect: () => void navigate({ to: "/projects" }),
+        }}
+        label="Projects"
+        // Wider than the pill: a row carries a name and its host or id.
+        className="w-72"
+        onSelect={(projectId) => void navigate(scopeTo(projectId))}
+        onClose={() => changeOpen(false)}
+      />
+    </Combobox>
+  );
 }
+
+/**
+ * A project as the list shows it: its mark, its name, and beneath it what
+ * tells it from another of the same name — its site's host, or else its id.
+ */
+function toOption(project: ProjectRef): ComboboxOption {
+  return {
+    value: project.id,
+    label: project.name,
+    description: project.host ?? project.id,
+    icon: <ProjectMark projectId={project.id} />,
+  };
+}
+
+/**
+ * What the list opens on before anything is typed: the selected project, then
+ * the recent ones, then, while the first page holds all of the person's
+ * projects, the rest by name. A recent project that full list lacks is gone,
+ * or no longer theirs; past one page that cannot be told, so recent ones stand
+ * as they were kept.
+ */
+function openingList(
+  mine: { projects: ProjectRef[]; more: boolean },
+  current: ProjectRef | undefined,
+  recents: ProjectRef[],
+): { recent: ProjectRef[]; rest: ProjectRef[] } {
+  const listed = new Map(mine.projects.map((project) => [project.id, project]));
+  const recent: ProjectRef[] = [];
+  for (const project of current ? [current, ...recents] : recents) {
+    if (recent.length === RECENT_PROJECT_LIMIT) break;
+    if (recent.some((shown) => shown.id === project.id)) continue;
+    // The list's copy carries the name as it is now.
+    const fresh = listed.get(project.id);
+    if (fresh) recent.push(fresh);
+    else if (mine.more || project === current) recent.push(project);
+  }
+  const rest = mine.more
+    ? []
+    : byName(mine.projects.filter((project) => !recent.some((shown) => shown.id === project.id)));
+  return { recent, rest };
+}
+
+/**
+ * The open team and the project's active teams, each a link to its own page —
+ * so choosing one is a navigation, like choosing a project. One page of teams:
+ * the list is a way across; the sidebar's Teams is the directory. Its footer
+ * adds a team. The drawer lives outside the popover, which unmounts on close,
+ * and opens the new team once it is created.
+ */
+function TeamSwitcher({ projectId, teamId }: { projectId: string; teamId: string }) {
+  // The open team as its page loaded it. The page's loader re-runs after a
+  // rename (`router.invalidate()`), so the label follows, and the list is
+  // re-read with it.
+  const openTeam = useMatch({ from: "/_authed/teams/$teamId", shouldThrow: false });
+  const teams = useAsync(
+    () => queryActiveTeams(projectId, { limit: TEAM_PAGE }),
+    [],
+    [projectId, openTeam?.updatedAt],
+  );
+  const [adding, setAdding] = useState(false);
+  const navigate = useNavigate();
+
+  return (
+    <>
+      <Switcher
+        icon={Box}
+        heading="Teams"
+        label={openTeam?.loaderData?.team.name}
+        currentId={teamId}
+        options={teams?.map((team) => ({
+          id: team.id,
+          label: team.name,
+          link: { to: "/teams/$teamId", params: { teamId: team.id } },
+        }))}
+        emptyLabel="No teams"
+        ariaLabel="Switch team"
+        footer={{ label: "Add team", icon: Plus, onSelect: () => setAdding(true) }}
+        current
+      />
+      <AddTeamSheet
+        open={adding}
+        onOpenChange={setAdding}
+        onCreated={(team) => navigate({ to: "/teams/$teamId", params: { teamId: team.id } })}
+      />
+    </>
+  );
+}
+
+/** One page of the team switcher's list. */
+const TEAM_PAGE = 25;
 
 /**
  * Where selecting a project goes. A project-scoped list stays where it is and
@@ -152,7 +320,7 @@ function useProjects(): SwitcherOption[] | undefined {
  * Projects row would (`useSelectProjectTarget`): the screen `?next=` names, or
  * the console's landing for that project.
  */
-function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["link"]> {
+function useScopeTarget(): (projectId: string) => SwitcherOption["link"] {
   const leaf = useMatches({ select: (matches) => matches[matches.length - 1] });
   const selectTarget = useSelectProjectTarget();
   const stays = leaf?.staticData.scope === "project" && leaf.staticData.nav !== undefined;
@@ -165,59 +333,22 @@ function useScopeTarget(): (projectId: string) => NonNullable<SwitcherOption["li
       : selectTarget(projectId);
 }
 
-/**
- * The option the pill shows. A selected project missing from the list — one
- * named by a shared link's `?project=` rather than chosen here — is named by
- * `GET /projects/{id}`, and by its id until that read answers or if it is
- * refused.
- */
-function useSelectedOption(
-  selected: string | undefined,
-  projects: SwitcherOption[] | undefined,
-): SwitcherOption | undefined {
-  const listed = selected ? projects?.find((project) => project.id === selected) : undefined;
-  const missing = selected !== undefined && projects !== undefined && listed === undefined;
-  // Names read so far, by project id.
-  const [names, setNames] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!missing || !selected) return;
-    let cancelled = false;
-    void api
-      .getProject(selected)
-      .then((project) => {
-        if (!cancelled) setNames((known) => ({ ...known, [selected]: project.name }));
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setNames(({ [selected]: _refused, ...known }) => known);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [missing, selected]);
-
-  if (listed) return listed;
-  if (!missing) return undefined;
-  return { id: selected, label: names[selected] ?? selected };
-}
-
 function Switcher({
   icon: Icon,
+  heading,
   label,
-  shortLabel,
-  plan,
   currentId,
   options,
   emptyLabel,
   ariaLabel,
   footer,
+  current = false,
 }: {
   icon: LucideIcon;
+  /** The list's caption, as the design's menu label draws it (`TEAMS`). */
+  heading: string;
   /** `undefined` while loading, and when there are no options to name. */
   label: string | undefined;
-  shortLabel?: string;
-  plan?: string;
   /** The option the pill is showing, marked `aria-current` in the list. */
   currentId?: string;
   /** `undefined` while options are loading. */
@@ -225,55 +356,37 @@ function Switcher({
   /** Shown in place of a label once the options have loaded and there are none. */
   emptyLabel: string;
   ariaLabel: string;
-  /** A link beneath the options — for projects, the overview of all of them. */
-  footer?: { label: string; link: Pick<LinkProps, "to" | "search"> };
+  /** An action beneath the options, which closes the popover first. */
+  footer?: { label: string; icon: LucideIcon; onSelect: () => void };
+  /** The innermost context in the bar, whose label the design sets semibold. */
+  current?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const listId = useId();
 
   // Loading is the options not having answered yet — not the label being
   // absent, which is also what an empty answer looks like.
   const loading = options === undefined;
-  const empty = options?.length === 0;
 
-  const rows = (options ?? []).filter((option) =>
-    option.label.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  const rows = options ?? [];
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setQuery("");
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          className={cn(
-            "flex h-12 w-full items-center gap-2 rounded-xs bg-card px-2 text-sm transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 md:h-10 md:w-[196px]",
-          )}
-        >
+        <button type="button" aria-label={ariaLabel} className={TRIGGER}>
           <Icon size={16} className="shrink-0 text-foreground" aria-hidden />
           {loading ? (
-            <Skeleton className="h-4 min-w-0 flex-1" />
+            <Skeleton className="h-4 w-24" />
           ) : label === undefined ? (
-            <span className="min-w-0 flex-1 truncate text-left text-muted-foreground">
-              {emptyLabel}
-            </span>
+            <span className="min-w-0 truncate text-muted-foreground">{emptyLabel}</span>
           ) : (
-            <span className="min-w-0 flex-1 truncate text-left font-serif text-foreground">
-              <span className="md:hidden">{shortLabel ?? label}</span>
-              <span className="hidden md:inline">{label}</span>
+            <span
+              className={cn(
+                "min-w-0 truncate text-foreground",
+                current ? "leading-none font-semibold" : "leading-5",
+              )}
+            >
+              {label}
             </span>
-          )}
-          {plan && (
-            <Badge variant="secondary" className="shrink-0">
-              {plan}
-            </Badge>
           )}
           <ChevronsUpDown size={16} className="shrink-0 text-muted-foreground" aria-hidden />
         </button>
@@ -281,67 +394,32 @@ function Switcher({
 
       <PopoverContent
         align="start"
-        className="w-72 border-border bg-popover p-2 text-popover-foreground"
+        className="w-60 border-border bg-popover p-1 text-popover-foreground"
       >
-        <div className="mb-1 flex items-center gap-2 rounded-sm border border-input px-3 py-2">
-          <Search size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-          <input
-            type="search"
-            name={`${listId}-search`}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            aria-label={`${ariaLabel} search`}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-          />
-        </div>
-
-        <ul id={listId} aria-label={ariaLabel} className="flex flex-col">
+        <p className="px-2 py-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          {heading}
+        </p>
+        <ul aria-label={ariaLabel} className="flex flex-col">
           {rows.length === 0 ? (
-            <li className="px-3 py-2.5 text-sm text-muted-foreground">
-              {empty ? emptyLabel : "No results"}
-            </li>
+            <li className="px-2 py-1.5 text-sm text-muted-foreground">{emptyLabel}</li>
           ) : (
-            // Links, not buttons: selecting a project is a navigation, since
-            // the selection lives in the URL (`?project=`). The sidenav and its
-            // screens re-scope to it; screens whose endpoints cannot yet
-            // authorize the session on another project say so on their own.
+            // Links, not buttons: selecting a team is a navigation — the team
+            // is the page.
             rows.map((option) => {
-              const content = (
-                <>
-                  <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
-                  {option.plan && (
-                    <Badge variant="secondary" className="shrink-0">
-                      {option.plan}
-                    </Badge>
-                  )}
-                </>
-              );
-              const rowClass = "flex w-full items-center gap-3 rounded-sm px-3 py-2.5 text-left";
+              const selected = option.id === currentId;
               return (
                 <li
                   key={option.id}
-                  // By id, not by label: two projects may share a name.
-                  aria-current={option.id === currentId ? "true" : undefined}
+                  // By id, not by label: two teams may share a name.
+                  aria-current={selected ? "true" : undefined}
                 >
-                  {option.link ? (
-                    <Link
-                      {...option.link}
-                      onClick={() => setOpen(false)}
-                      // The ring is the buttons' (`ui/button.tsx`): the background
-                      // alone is also the hover state, so it cannot be what tells
-                      // a keyboard user where focus is.
-                      className={cn(
-                        rowClass,
-                        "outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                      )}
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className={rowClass}>{content}</div>
-                  )}
+                  <Link {...option.link} onClick={() => setOpen(false)} className={ROW}>
+                    <Icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                    <span className="flex-1 truncate text-sm text-foreground">{option.label}</span>
+                    {selected && (
+                      <Check size={16} className="shrink-0 text-foreground" aria-hidden />
+                    )}
+                  </Link>
                 </li>
               );
             })
@@ -349,19 +427,43 @@ function Switcher({
         </ul>
 
         {footer && (
-          <div className="border-border mt-1 border-t pt-1">
-            <Link
-              {...footer.link}
-              onClick={() => setOpen(false)}
-              // No icon, but indented like one: `pl-10` is a row's `px-3` plus its
-              // 16px icon and `gap-3`, so the label lines up with the names above.
-              className="flex w-full items-center rounded-sm py-2.5 pr-3 pl-10 text-left text-sm text-foreground outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          // `foreground/10`, as the account menu's hairlines: `border` is the
+          // popover's own colour on the dark theme and would not show.
+          <div className="-mx-1 mt-1 border-t border-foreground/10 px-1 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                footer.onSelect();
+              }}
+              // Laid out like a row: icon, then the label in line with the
+              // names above.
+              className={ROW}
             >
-              {footer.label}
-            </Link>
+              <footer.icon size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+              <span className="flex-1 truncate text-sm text-foreground">{footer.label}</span>
+            </button>
           </div>
         )}
       </PopoverContent>
     </Popover>
   );
 }
+
+/**
+ * The bar's switcher: a borderless 32px button — glyph, name, chevrons — that
+ * fills only on hover or while open. Height, padding, radius and the hover fill
+ * are the sidebar rows' (`SidebarMenuButton`), so the bar and the sidebar read
+ * as one set of controls rather than two contrasts. Capped so a long name
+ * truncates rather than pushing search off the bar.
+ */
+const TRIGGER =
+  "flex h-8 max-w-64 min-w-0 items-center gap-2 rounded-md px-2 text-sm transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent";
+
+/**
+ * A list row: 32px, glyph, name, and a check on the current one. The focus
+ * ring is the buttons' (`ui/button.tsx`): the background alone is also the
+ * hover state, so it cannot be what tells a keyboard user where focus is.
+ */
+const ROW =
+  "flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";

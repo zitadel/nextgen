@@ -22,7 +22,7 @@ const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secr
 async function anAppServingAcme(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
   expect(await app.enableCustomSso(ACME, ACME_CREDENTIALS)).toSucceed();
-  expect(await app.apply()).toSucceed();
+  expect(await app.publish()).toSucceed();
   return app;
 }
 
@@ -30,7 +30,7 @@ async function anAppServingAcme(): Promise<ScaffoldedApp> {
 async function anAppServingGoogle(): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
   expect(await app.enableSso(GOOGLE, CREDENTIALS)).toSucceed();
-  expect(await app.apply()).toSucceed();
+  expect(await app.publish()).toSucceed();
   return app;
 }
 
@@ -57,12 +57,13 @@ describe("auth-method sso disable", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("leaves the change for apply to publish", async () => {
+      it("leaves the change for deploy to publish", async () => {
         const app = await anAppServingGoogle();
 
         expect(await app.disableSso(GOOGLE)).toSucceed();
 
-        expect(await app.plan()).not.toReportNothingToDo();
+        const { schema } = await app.publishedSchema();
+        expect(schema["x-auth-methods"]?.sso).toMatchObject({ enabled: true });
       });
 
       it("changes nothing for a provider the project does not offer", async () => {
@@ -74,11 +75,11 @@ describe("auth-method sso disable", () => {
         expect(await files.changes()).toMatchObject({ added: [], modified: [], removed: [] });
       });
 
-      describe("once applied", () => {
+      describe("once deployed", () => {
         it("publishes SSO as off", async () => {
           const app = await anAppServingGoogle();
           expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           const { schema } = await app.publishedSchema();
 
@@ -88,7 +89,7 @@ describe("auth-method sso disable", () => {
         it("stops offering the provider on any step", async () => {
           const app = await anAppServingGoogle();
           expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           expect(await app.stepsOfferingSso()).toEqual([]);
         });
@@ -96,7 +97,7 @@ describe("auth-method sso disable", () => {
         it("keeps the connection, so enabling it again needs no credentials", async () => {
           const app = await anAppServingGoogle();
           expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           const registered = await app.registeredIdps();
 
@@ -106,17 +107,19 @@ describe("auth-method sso disable", () => {
         it("removes a custom connection named by its slug", async () => {
           const app = await anAppServingAcme();
           expect(await app.disableSso(ACME.slug)).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           expect(await app.stepsOfferingSso()).toEqual([]);
         });
 
-        it("leaves nothing to reconcile", async () => {
+        it("leaves nothing left to deploy", async () => {
           const app = await anAppServingGoogle();
           expect(await app.disableSso(GOOGLE)).toSucceed();
-          expect(await app.apply()).toSucceed();
+          const first = await app.publishData();
 
-          expect(await app.plan()).toReportNothingToDo();
+          const again = await app.deployData();
+
+          expect(again.release_id).toBe(first.release_id);
         });
       });
     });

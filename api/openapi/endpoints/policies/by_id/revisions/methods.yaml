@@ -1,0 +1,29 @@
+get:
+  operationId: listPolicyRevisions
+  summary: List the revisions of a policy
+  description: |
+    Returns every revision of one policy, newest first, paginated with a
+    cursor. The order is fixed, so there is no `sorting`.
+
+    The lookup is scoped to the project in `project_id`: a policy of another
+    project answers not found exactly as an unknown id does.
+  tags:
+    - Policies
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/policy-id.yaml
+    - $ref: ../../../../components/parameters/limit.yaml
+    - $ref: ../../../../components/parameters/page-token.yaml
+  security:
+    - oauth2:
+        - policy.read
+    - nextgenSession: []
+  responses:
+    '200':
+      description: The revisions were returned.
+      content:
+        application/json:
+          schema:
+            $ref: list-policy-revisions-response.yaml
+    default:
+      $ref: listPolicyRevisions-error-response.yaml

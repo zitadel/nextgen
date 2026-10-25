@@ -10,7 +10,7 @@ async function reviseUserSchema(app: ScaffoldedApp): Promise<void> {
   await app.editUserSchema((schema) => {
     schema.properties.company = { type: "string" };
   });
-  expect(await app.apply()).toSucceed();
+  expect(await app.publish()).toSucceed();
 }
 
 describe("api", () => {

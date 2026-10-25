@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 
 import * as rosie from "rosie-skills";
 
-import { command, printBox } from "./term/box";
+import { command, printBox } from "./box";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {

@@ -15,6 +15,8 @@
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
+export { renderConnectionSummaries } from "./connection-summary";
+
 export {
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,

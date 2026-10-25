@@ -13,7 +13,7 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * ogen API at the origin root, with no proxy in between. That makes the
  * console's API base a real claim about a real routing table instead of a
  * string nobody checks — the claim that shipped wrong, as `/api/*` against a
- * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
+ * mux that serves `/ui/console`, `/console/runtime.json`, `/`.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
  * in `src-real/`, which runs the same screens through the Vite dev proxy.
@@ -53,8 +53,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // `/` has no screen of its own and lands on Users, which acts on a selected
   // project. The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
-  // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
-  // never to the project the console signed into, which they could not manage.
+  // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
+  // project the console signed into, which they could not manage.
   // That read is authenticated by the session cookie alone (#1237), so it
   // answering 200 is what proves the base and the cookie are right.
   expect((await myProjects).status()).toBe(200);
@@ -65,8 +65,6 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByText("No projects yet.")).toBeVisible();
-  // `toContainText`: the pill carries its label twice, once per breakpoint.
-  await expect(page.getByRole("button", { name: "Switch project" })).toContainText("No projects");
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {

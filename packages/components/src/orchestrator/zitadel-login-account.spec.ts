@@ -100,25 +100,40 @@ describe("<zitadel-login> around the step", () => {
   });
 
   describe("the account a step signs in to", () => {
-    it("names it on the password step", async () => {
+    it("names it on the password step, with its avatar", async () => {
       const element = await mount(host);
-      type(element, "email", "alice@acme.com");
+      type(element, "email", "Alice@Acme.com");
       submit(element);
 
       const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
-      expect(account.querySelector(".zl-card-account__value")?.textContent).toBe("alice@acme.com");
+      expect(account.getAttribute("identifier")).toBe("Alice@Acme.com");
+      expect(account.hasAttribute("avatar")).toBe(true);
+    });
+
+    it("names it without an avatar while signing up, before the account exists", async () => {
+      const element = attach(host, (login) => {
+        login.purpose = "register";
+      });
+      await waitFor(() => query(element, 'zl-field[name="email"]'));
+      type(element, "email", "alice@acme.com");
+      type(element, "given_name", "Alice");
+      type(element, "family_name", "Acme");
+      submit(element);
+
+      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
+      expect(account.getAttribute("identifier")).toBe("alice@acme.com");
+      expect(account.getAttribute("action")).toBe("back");
+      expect(account.hasAttribute("avatar")).toBe(false);
     });
 
     it("changes it by going back to the step that collects it", async () => {
       const element = await mount(host);
       type(element, "email", "alice@acme.com");
       submit(element);
-      const change = await waitFor(() =>
-        query(element, '[data-testid="zitadel-action-change-account"]'),
-      );
-      expect(change.textContent).toBe("Use another account");
+      const account = await waitFor(() => query(element, '[data-testid="zitadel-account"]'));
+      await (account as HTMLElement & { updateComplete: Promise<unknown> }).updateComplete;
 
-      change.click();
+      account.shadowRoot?.querySelector("a")?.click();
 
       await waitFor(() => query(element, 'zl-field[name="email"]'));
       expect(submittedActions()).toEqual(["submit", "back"]);

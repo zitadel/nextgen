@@ -54,6 +54,7 @@ import { hashForState } from "./sync";
 import { updateState } from "./sync/state";
 import { SCHEMAS_DIR } from "./user-schema";
 import { ZitadelError } from "./errors";
+import { type SuggestedCommand, unscopedCommand } from "./suggestion";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
@@ -373,18 +374,25 @@ async function writeReadmeFile(cwd: string, relPath: string, content: string): P
  * tenant-owned. So the one rule is that setup does not write there, and the
  * developer decides what happens to the file.
  */
-function connectionExists(selection: ProviderSelection): { hint: string; nextCommands: string[] } {
+function connectionExists(selection: ProviderSelection): {
+  hint: string;
+  nextCommands: SuggestedCommand[];
+} {
   return {
     hint:
       "A connection file is yours to keep, so setup never replaces or removes one. " +
       "Remove it and run setup again to scaffold a fresh one, or keep it and enable the " +
       "provider afterwards to reuse it.",
+    // Setup stopped before it created a project, so there is no environment
+    // to carry: the retry is for after the developer reruns setup.
     nextCommands: [
-      `zitadel auth-method sso enable --provider ${selectionName(selection)}${
-        selection.kind === "custom"
-          ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-          : ""
-      }`,
+      unscopedCommand(
+        `auth-method sso enable --provider ${selectionName(selection)}${
+          selection.kind === "custom"
+            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
+            : ""
+        }`,
+      ),
     ],
   };
 }
@@ -404,7 +412,7 @@ async function writeResourceFile(
   relPath: string,
   body: object,
   force: boolean,
-  onExists?: { hint: string; nextCommands?: string[] },
+  onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): Promise<boolean> {
   const contents = `${stableStringify(body)}\n`;
   try {
@@ -420,7 +428,7 @@ async function writeResourceFile(
 
 function resourceExists(
   relPath: string,
-  onExists?: { hint: string; nextCommands?: string[] },
+  onExists?: { hint: string; nextCommands?: SuggestedCommand[] },
 ): ZitadelError {
   return new ZitadelError("E_CONFLICT", `${relPath} already exists`, {
     hint:

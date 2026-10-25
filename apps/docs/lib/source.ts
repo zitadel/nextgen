@@ -12,7 +12,7 @@ import { pathnameFromRequest } from "fumadocs-openapi/requests/generators";
 import { curl } from "fumadocs-openapi/requests/generators/curl";
 
 import { cliCommandUrl, cliSidebarNames, cliSource, commandOperations } from "./cli-reference";
-import { codeThemes } from "./code-theme";
+import { codeOptions } from "./code-theme";
 import { cliCommand, cliSample } from "./cli-sample";
 import { defaultRequest, withRefValues } from "./default-request";
 import { firstSentence, shortDescription } from "./description";
@@ -26,12 +26,16 @@ const docs = defineDocs({
   docs: {
     schema: pageSchema,
     // Fumadocs' defaults, the code blocks in the console's colours.
-    mdxOptions: (environment) =>
-      applyMdxPreset({ rehypeCodeOptions: { themes: codeThemes } })(environment),
+    mdxOptions: (environment) => applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
     postprocess: {
       // An API tag's page lists the tag's operations with <Operations />,
-      // which its Markdown renders as the page does (pageText).
-      includeProcessedMarkdown: { mdxAsPlaceholder: ["Operations"] },
+      // which its Markdown renders as the page does (pageText). A live
+      // example, a story's <….WithControl /> (components/examples), works
+      // only on the page: its Markdown leaves it out.
+      includeProcessedMarkdown: {
+        mdxAsPlaceholder: ["Operations"],
+        filterElement: (node) => !("name" in node && node.name?.endsWith(".WithControl")),
+      },
     },
   },
   meta: {

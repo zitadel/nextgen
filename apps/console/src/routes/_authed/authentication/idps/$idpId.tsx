@@ -6,7 +6,7 @@ import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { EYEBROW } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "identity provider" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
@@ -49,7 +49,7 @@ function IdpDetail() {
   const clientId = idpClientId(idp.definition);
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelTitle icon={Shield} title={idp.definition.display_name} />
@@ -100,7 +100,7 @@ function IdpDetail() {
           <DocumentViewer document={idp.definition} noun="connection" />
         </div>
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

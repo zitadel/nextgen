@@ -1,14 +1,17 @@
 import { execFile, spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
-import { mkdir, open, readFile, stat } from "node:fs/promises";
+import { type FileHandle, mkdir, open, readFile, stat } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { basename, dirname } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
 import { ZitadelError, isErrno } from "../../errors";
+import { shellCommand } from "../../suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
 import type { BinaryRuntimeMetadata } from "../runtime";
+import type { LogSink } from "../server-log";
+import { type Clock, realClock, stopSignal } from "./clock";
 import { type Launched, type Launcher, launched } from "./lifecycle";
 
 export const SERVER_NPM_PACKAGE = "@zitadel/server";
@@ -16,6 +19,8 @@ const COMMAND_ENV = "ZITADEL_SERVER_BINARY";
 const COMMAND_VERSION_ENV = "ZITADEL_SERVER_BINARY_VERSION";
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_KILL_TIMEOUT_MS = 2_000;
+/** How often a followed log file is checked for new lines. */
+const LOG_POLL_MS = 1_000;
 const MIGRATE_FLAG = "--migrate";
 /** What the server binary is called, whatever launched it. */
 const SERVER_PROGRAM = "nextgen";
@@ -231,7 +236,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: ["npm install @zitadel/cli@latest"],
+        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -307,20 +312,23 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   }
 
   /**
-   * The last `tail` lines of a server's log file, or an empty string if it has
-   * none yet. Read from the file, not the process, so a stopped server's log is
-   * still there.
+   * A server's whole log file, or an empty string if it has none yet. Read from
+   * the file, not the process, so a stopped server's log is still there.
    */
-  static async readLogs(logPath: string, tail: number): Promise<string> {
-    let content = "";
+  static async readLog(logPath: string): Promise<string> {
     try {
-      content = await readFile(logPath, "utf8");
+      return await readFile(logPath, "utf8");
     } catch (error) {
       if (isErrno(error, "ENOENT")) {
         return "";
       }
       throw error;
     }
+  }
+
+  /** The last `tail` lines of a server's log file, or an empty string if it has none yet. */
+  static async readLogs(logPath: string, tail: number): Promise<string> {
+    const content = await BinaryLauncher.readLog(logPath);
     const lines = content.split(/\r?\n/);
     const hasTrailingNewline = lines.at(-1) === "";
     const body = hasTrailingNewline ? lines.slice(0, -1) : lines;
@@ -329,35 +337,63 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
   }
 
   /**
-   * Writes the last `tail` lines to the terminal and then each line as it is
-   * appended, until interrupted. The file is polled by size: it is appended to by
-   * another process, and there is no event to wait on that works on every platform.
+   * Hands `sink` the log file as it is, then each part appended to it, until
+   * `signal` aborts, by default when the CLI is interrupted. The file is
+   * polled by size: it is appended to by another process, and there is no
+   * event to wait on that works on every platform.
    */
-  static async followLogs(logPath: string, tail: number): Promise<void> {
-    process.stdout.write(await BinaryLauncher.readLogs(logPath, tail));
-    let offset = await fileSize(logPath);
-    await new Promise<void>((resolveFollow, reject) => {
-      const interval = setInterval(() => {
-        void (async () => {
-          try {
-            const size = await fileSize(logPath);
-            if (size > offset) {
-              const stream = createReadStream(logPath, { start: offset, end: size - 1 });
-              stream.pipe(process.stdout, { end: false });
-              offset = size;
-            }
-          } catch (error) {
-            reject(error);
-          }
-        })();
-      }, 1000);
-      const stop = () => {
-        clearInterval(interval);
-        resolveFollow();
-      };
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
-    });
+  static async followLogs(
+    logPath: string,
+    sink: LogSink,
+    options: { clock?: Clock; signal?: AbortSignal } = {},
+  ): Promise<void> {
+    const clock = options.clock ?? realClock;
+    const stop = options.signal ? { signal: options.signal, dispose: () => {} } : stopSignal();
+    try {
+      const log = new AppendedLog(logPath);
+      sink.existing(await log.next());
+      while (!stop.signal.aborted) {
+        await clock.wait(LOG_POLL_MS, stop.signal);
+        if (!stop.signal.aborted) {
+          sink.appended(await log.next());
+        }
+      }
+    } finally {
+      stop.dispose();
+    }
+  }
+}
+
+/**
+ * A log file another process appends to, read a part at a time: each
+ * {@link AppendedLog.next} returns what was written since the one before, the
+ * first the whole file. Reading by byte offset, rather than by size after a
+ * read, loses nothing written in between. A part ends where the file did when
+ * it was read, which can be inside a character, so the decoder keeps a
+ * character's first bytes until the rest are read.
+ */
+export class AppendedLog {
+  private readonly path: string;
+  private readonly decoder = new StringDecoder("utf8");
+  private offset = 0;
+
+  constructor(path: string) {
+    this.path = path;
+  }
+
+  async next(): Promise<string> {
+    const size = await fileSize(this.path);
+    // A file shorter than what was read of it is another one, as after it was
+    // deleted: it is read from the top.
+    if (size < this.offset) {
+      this.offset = 0;
+    }
+    if (size === this.offset) {
+      return "";
+    }
+    const bytes = await readBytes(this.path, this.offset, size - this.offset);
+    this.offset += bytes.length;
+    return this.decoder.write(bytes);
   }
 }
 
@@ -458,7 +494,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: ["npm install @zitadel/cli@latest"],
+      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
       details: { command, message: errorMessage(error) },
     });
   }
@@ -480,6 +516,26 @@ async function fileSize(path: string): Promise<number> {
       return 0;
     }
     throw error;
+  }
+}
+
+/** Up to `length` bytes of a file from `position` on; none for a file that is gone. */
+async function readBytes(path: string, position: number, length: number): Promise<Buffer> {
+  let file: FileHandle;
+  try {
+    file = await open(path, "r");
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) {
+      return Buffer.alloc(0);
+    }
+    throw error;
+  }
+  try {
+    const buffer = Buffer.alloc(length);
+    const { bytesRead } = await file.read(buffer, 0, length, position);
+    return buffer.subarray(0, bytesRead);
+  } finally {
+    await file.close();
   }
 }
 

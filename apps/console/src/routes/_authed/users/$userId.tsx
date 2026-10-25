@@ -5,21 +5,16 @@ import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "r
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import {
-  DETAIL_BODY,
-  DETAIL_CARD,
-  DetailHeader,
-  DetailPage,
-  DetailSection,
-} from "@/components/detail-page";
+import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
 import { FormError } from "@/components/form-error";
+import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +26,7 @@ import {
   fetchAllIdps,
   fetchUserIdentityLinks,
 } from "@/lib/idp";
+import { passwordState } from "@/lib/sign-in-methods";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { displayValue, field } from "@/lib/record";
 import {
@@ -59,7 +55,7 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  * team and access relate).
  */
 export const Route = createFileRoute("/_authed/users/$userId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "user" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const user = await api.getUserByID(params.userId);
@@ -138,7 +134,7 @@ function UserDetail() {
   const [tab, setTab] = useState("overview");
 
   return (
-    <DetailPage>
+    <Page>
       {/* `User`, the sidebar's glyph for Users, as each detail title carries its
           section's. */}
       <DetailHeader
@@ -219,7 +215,7 @@ function UserDetail() {
           </DetailSection>
         </TabsContent>
       </Tabs>
-    </DetailPage>
+    </Page>
   );
 }
 
@@ -248,13 +244,6 @@ function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
       ))}
     </ul>
   );
-}
-
-function passwordState(setAt: string | null | undefined): string {
-  if (setAt === undefined) return "Could not be loaded";
-  // When it was set, not "verified": an operator may have set it, and no
-  // check of it is recorded.
-  return setAt === null ? "Not set" : `Set ${formatDateTime(setAt)}`;
 }
 
 /**
@@ -533,7 +522,7 @@ function ProfileField({
         <FieldLabel htmlFor={id} className={FIELD_LABEL}>
           {entry.label}
         </FieldLabel>
-        {!entry.required && <MetaItem>Optional</MetaItem>}
+        {!entry.required && <FieldOptionalIndicator />}
       </div>
       <FieldContent>
         {entry.inputType === "boolean" ? (

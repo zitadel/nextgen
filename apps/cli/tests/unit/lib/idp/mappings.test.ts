@@ -69,12 +69,12 @@ describe("what is still to configure", () => {
   const steps = (status: "saved" | "applied" | "present"): string[] =>
     stillToConfigure({ status, file: ".zitadel/idps/acme.json", provider: "Acme" });
 
-  it("sends a connection that is only saved to plan and apply", () => {
-    expect(steps("saved").join("\n")).toContain("zitadel apply");
+  it("sends a connection that is only saved to deploy", () => {
+    expect(steps("saved").join("\n")).toContain("zitadel deploy");
   });
 
-  it("does not ask for an apply of one that already reached the server", () => {
-    expect(steps("applied").join("\n")).not.toContain("zitadel apply");
+  it("does not ask for a deploy of one that already reached the server", () => {
+    expect(steps("applied").join("\n")).not.toContain("zitadel deploy");
   });
 
   it("always ends on a sign-in, the only test of the mapping", () => {
@@ -97,20 +97,20 @@ describe("the status line", () => {
     expect(statusLine("applied")).toBe("Saved and applied. Not tested with a sign-in.");
   });
 
-  it("sends a present connection to plan, since it cannot know whether it was applied", () => {
-    expect(statusLine("present")).toContain("zitadel plan");
+  it("sends a present connection to deploy, since it cannot know whether it was deployed", () => {
+    expect(statusLine("present")).toContain("zitadel deploy");
   });
 });
 
 describe("the steps for a present connection", () => {
-  it("leave out the apply a saved one needs, and still end on a sign-in", () => {
+  it("leave out the deploy a saved one needs, and still end on a sign-in", () => {
     const steps = stillToConfigure({
       status: "present",
       file: ".zitadel/idps/acme.json",
       provider: "Acme",
     });
 
-    expect(steps.join("\n")).not.toContain("zitadel apply");
+    expect(steps.join("\n")).not.toContain("zitadel deploy");
     expect(steps.at(-1)).toContain("Sign in once");
   });
 });

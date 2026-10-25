@@ -234,6 +234,10 @@ type ReleasePointerPayload struct {
 
 type ReleaseCreatedPayload = ReleasePayload
 
+type ReleaseRevokedPayload struct {
+	ContentHash string `json:"content_hash"`
+}
+
 // ReleasePayloadSnapshot is the allowlisted create snapshot for release events.
 func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	if rel == nil {
@@ -260,7 +264,7 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where (ADR 061).
+// DeploymentPayload records what went live where (ADR 035, ADR 068).
 type DeploymentPayload struct {
 	ReleaseID  string   `json:"release_id,omitempty"`
 	Targets    []string `json:"targets,omitempty"`

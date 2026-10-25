@@ -18,6 +18,7 @@ type AddOriginErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
+	NotImplemented         NotImplemented
 	OriginInvalid          OriginInvalid
 	OriginKindConflict     OriginKindConflict
 	OriginNotFound         OriginNotFound
@@ -26,6 +27,7 @@ type AddOriginErrorResponse struct {
 	ProjMissingID          ProjMissingID
 	ProjNotFound           ProjNotFound
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // AddOriginErrorResponseType is oneOf type of AddOriginErrorResponse.
@@ -36,6 +38,7 @@ const (
 	AuthUnauthorizedAddOriginErrorResponse       AddOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "evt.invalid"
 	InternalAddOriginErrorResponse               AddOriginErrorResponseType = "internal"
+	NotImplementedAddOriginErrorResponse         AddOriginErrorResponseType = "not_implemented"
 	OriginInvalidAddOriginErrorResponse          AddOriginErrorResponseType = "origin.invalid"
 	OriginKindConflictAddOriginErrorResponse     AddOriginErrorResponseType = "origin.kind_conflict"
 	OriginNotFoundAddOriginErrorResponse         AddOriginErrorResponseType = "origin.not_found"
@@ -44,6 +47,7 @@ const (
 	ProjMissingIDAddOriginErrorResponse          AddOriginErrorResponseType = "proj.missing_id"
 	ProjNotFoundAddOriginErrorResponse           AddOriginErrorResponseType = "proj.not_found"
 	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
+	UnavailableAddOriginErrorResponse            AddOriginErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
@@ -58,6 +62,11 @@ func (s AddOriginErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether AddOriginErrorResponse is Internal.
 func (s AddOriginErrorResponse) IsInternal() bool { return s.Type == InternalAddOriginErrorResponse }
+
+// IsNotImplemented reports whether AddOriginErrorResponse is NotImplemented.
+func (s AddOriginErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedAddOriginErrorResponse
+}
 
 // IsOriginInvalid reports whether AddOriginErrorResponse is OriginInvalid.
 func (s AddOriginErrorResponse) IsOriginInvalid() bool {
@@ -97,6 +106,11 @@ func (s AddOriginErrorResponse) IsProjNotFound() bool {
 // IsReqInvalid reports whether AddOriginErrorResponse is ReqInvalid.
 func (s AddOriginErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidAddOriginErrorResponse
+}
+
+// IsUnavailable reports whether AddOriginErrorResponse is Unavailable.
+func (s AddOriginErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableAddOriginErrorResponse
 }
 
 // SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
@@ -159,6 +173,27 @@ func (s AddOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalAddOriginErrorResponse(v Internal) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets AddOriginErrorResponse to NotImplemented.
+func (s *AddOriginErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedAddOriginErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if AddOriginErrorResponse is NotImplemented.
+func (s AddOriginErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedAddOriginErrorResponse returns new AddOriginErrorResponse from NotImplemented.
+func NewNotImplementedAddOriginErrorResponse(v NotImplemented) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -327,6 +362,27 @@ func (s AddOriginErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidAddOriginErrorResponse(v ReqInvalid) AddOriginErrorResponse {
 	var s AddOriginErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets AddOriginErrorResponse to Unavailable.
+func (s *AddOriginErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableAddOriginErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if AddOriginErrorResponse is Unavailable.
+func (s AddOriginErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableAddOriginErrorResponse returns new AddOriginErrorResponse from Unavailable.
+func NewUnavailableAddOriginErrorResponse(v Unavailable) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -7736,7 +7792,9 @@ type BeginUserPasskeyRegistrationErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
@@ -7754,7 +7812,9 @@ const (
 	AuthUnauthorizedBeginUserPasskeyRegistrationErrorResponse     BeginUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
 	EvtInvalidBeginUserPasskeyRegistrationErrorResponse           BeginUserPasskeyRegistrationErrorResponseType = "evt.invalid"
 	InternalBeginUserPasskeyRegistrationErrorResponse             BeginUserPasskeyRegistrationErrorResponseType = "internal"
+	NotImplementedBeginUserPasskeyRegistrationErrorResponse       BeginUserPasskeyRegistrationErrorResponseType = "not_implemented"
 	ReqInvalidBeginUserPasskeyRegistrationErrorResponse           BeginUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UnavailableBeginUserPasskeyRegistrationErrorResponse          BeginUserPasskeyRegistrationErrorResponseType = "unavailable"
 	UserInvalidBeginUserPasskeyRegistrationErrorResponse          BeginUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundBeginUserPasskeyRegistrationErrorResponse         BeginUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPermissionDeniedBeginUserPasskeyRegistrationErrorResponse BeginUserPasskeyRegistrationErrorResponseType = "user.permission_denied"
@@ -7795,9 +7855,19 @@ func (s BeginUserPasskeyRegistrationErrorResponse) IsInternal() bool {
 	return s.Type == InternalBeginUserPasskeyRegistrationErrorResponse
 }
 
+// IsNotImplemented reports whether BeginUserPasskeyRegistrationErrorResponse is NotImplemented.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedBeginUserPasskeyRegistrationErrorResponse
+}
+
 // IsReqInvalid reports whether BeginUserPasskeyRegistrationErrorResponse is ReqInvalid.
 func (s BeginUserPasskeyRegistrationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidBeginUserPasskeyRegistrationErrorResponse
+}
+
+// IsUnavailable reports whether BeginUserPasskeyRegistrationErrorResponse is Unavailable.
+func (s BeginUserPasskeyRegistrationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableBeginUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserInvalid reports whether BeginUserPasskeyRegistrationErrorResponse is UserInvalid.
@@ -7962,6 +8032,27 @@ func NewInternalBeginUserPasskeyRegistrationErrorResponse(v Internal) BeginUserP
 	return s
 }
 
+// SetNotImplemented sets BeginUserPasskeyRegistrationErrorResponse to NotImplemented.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedBeginUserPasskeyRegistrationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if BeginUserPasskeyRegistrationErrorResponse is NotImplemented.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from NotImplemented.
+func NewNotImplementedBeginUserPasskeyRegistrationErrorResponse(v NotImplemented) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets BeginUserPasskeyRegistrationErrorResponse to ReqInvalid.
 func (s *BeginUserPasskeyRegistrationErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidBeginUserPasskeyRegistrationErrorResponse
@@ -7980,6 +8071,27 @@ func (s BeginUserPasskeyRegistrationErrorResponse) GetReqInvalid() (v ReqInvalid
 func NewReqInvalidBeginUserPasskeyRegistrationErrorResponse(v ReqInvalid) BeginUserPasskeyRegistrationErrorResponse {
 	var s BeginUserPasskeyRegistrationErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets BeginUserPasskeyRegistrationErrorResponse to Unavailable.
+func (s *BeginUserPasskeyRegistrationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableBeginUserPasskeyRegistrationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if BeginUserPasskeyRegistrationErrorResponse is Unavailable.
+func (s BeginUserPasskeyRegistrationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableBeginUserPasskeyRegistrationErrorResponse returns new BeginUserPasskeyRegistrationErrorResponse from Unavailable.
+func NewUnavailableBeginUserPasskeyRegistrationErrorResponse(v Unavailable) BeginUserPasskeyRegistrationErrorResponse {
+	var s BeginUserPasskeyRegistrationErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -9814,6 +9926,7 @@ type BuildReleaseErrorResponse struct {
 	SchFetchTooLarge         SchFetchTooLarge
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
 	SchNotFound              SchNotFound
+	NotImplemented           NotImplemented
 	RelInvalid               RelInvalid
 	RelNotFound              RelNotFound
 	RelPermissionDenied      RelPermissionDenied
@@ -9822,6 +9935,7 @@ type BuildReleaseErrorResponse struct {
 	RelUnresolvedReference   RelUnresolvedReference
 	ReqInvalid               ReqInvalid
 	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
+	Unavailable              Unavailable
 }
 
 // BuildReleaseErrorResponseType is oneOf type of BuildReleaseErrorResponse.
@@ -9841,6 +9955,7 @@ const (
 	SchFetchTooLargeBuildReleaseErrorResponse         BuildReleaseErrorResponseType = "sch.fetch_too_large"
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
 	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
+	NotImplementedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "not_implemented"
 	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
@@ -9849,6 +9964,7 @@ const (
 	RelUnresolvedReferenceBuildReleaseErrorResponse   BuildReleaseErrorResponseType = "rel.unresolved_reference"
 	ReqInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "req.invalid"
 	FlowdefSchemaFetchFailedBuildReleaseErrorResponse BuildReleaseErrorResponseType = "flowdef.schema_fetch_failed"
+	UnavailableBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether BuildReleaseErrorResponse is AuthUnauthorized.
@@ -9911,6 +10027,11 @@ func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
 	return s.Type == SchNotFoundBuildReleaseErrorResponse
 }
 
+// IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
+func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedBuildReleaseErrorResponse
+}
+
 // IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
 func (s BuildReleaseErrorResponse) IsRelInvalid() bool {
 	return s.Type == RelInvalidBuildReleaseErrorResponse
@@ -9949,6 +10070,11 @@ func (s BuildReleaseErrorResponse) IsReqInvalid() bool {
 // IsFlowdefSchemaFetchFailed reports whether BuildReleaseErrorResponse is FlowdefSchemaFetchFailed.
 func (s BuildReleaseErrorResponse) IsFlowdefSchemaFetchFailed() bool {
 	return s.Type == FlowdefSchemaFetchFailedBuildReleaseErrorResponse
+}
+
+// IsUnavailable reports whether BuildReleaseErrorResponse is Unavailable.
+func (s BuildReleaseErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableBuildReleaseErrorResponse
 }
 
 // SetAuthUnauthorized sets BuildReleaseErrorResponse to AuthUnauthorized.
@@ -10203,6 +10329,27 @@ func NewSchNotFoundBuildReleaseErrorResponse(v SchNotFound) BuildReleaseErrorRes
 	return s
 }
 
+// SetNotImplemented sets BuildReleaseErrorResponse to NotImplemented.
+func (s *BuildReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedBuildReleaseErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if BuildReleaseErrorResponse is NotImplemented.
+func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from NotImplemented.
+func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetRelInvalid sets BuildReleaseErrorResponse to RelInvalid.
 func (s *BuildReleaseErrorResponse) SetRelInvalid(v RelInvalid) {
 	s.Type = RelInvalidBuildReleaseErrorResponse
@@ -10368,6 +10515,27 @@ func (s BuildReleaseErrorResponse) GetFlowdefSchemaFetchFailed() (v FlowdefSchem
 func NewFlowdefSchemaFetchFailedBuildReleaseErrorResponse(v FlowdefSchemaFetchFailed) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
+// SetUnavailable sets BuildReleaseErrorResponse to Unavailable.
+func (s *BuildReleaseErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableBuildReleaseErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if BuildReleaseErrorResponse is Unavailable.
+func (s BuildReleaseErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from Unavailable.
+func NewUnavailableBuildReleaseErrorResponse(v Unavailable) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -12318,8 +12486,10 @@ type CreateAuthAttemptErrorResponse struct {
 	EncKeyDecryptFailed EncKeyDecryptFailed
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 }
 
 // CreateAuthAttemptErrorResponseType is oneOf type of CreateAuthAttemptErrorResponse.
@@ -12332,8 +12502,10 @@ const (
 	EncKeyDecryptFailedCreateAuthAttemptErrorResponse CreateAuthAttemptErrorResponseType = "enc_key.decrypt_failed"
 	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
 	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
+	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
 	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
 )
 
 // IsAttInvalidRequest reports whether CreateAuthAttemptErrorResponse is AttInvalidRequest.
@@ -12361,6 +12533,11 @@ func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateAuthAttemptErrorResponse
 }
 
+// IsNotImplemented reports whether CreateAuthAttemptErrorResponse is NotImplemented.
+func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateAuthAttemptErrorResponse
+}
+
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
 func (s CreateAuthAttemptErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateAuthAttemptErrorResponse
@@ -12369,6 +12546,11 @@ func (s CreateAuthAttemptErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateAuthAttemptErrorResponse is EncKeyUnknownAlg.
 func (s CreateAuthAttemptErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateAuthAttemptErrorResponse
+}
+
+// IsUnavailable reports whether CreateAuthAttemptErrorResponse is Unavailable.
+func (s CreateAuthAttemptErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateAuthAttemptErrorResponse
 }
 
 // SetAttInvalidRequest sets CreateAuthAttemptErrorResponse to AttInvalidRequest.
@@ -12476,6 +12658,27 @@ func NewInternalCreateAuthAttemptErrorResponse(v Internal) CreateAuthAttemptErro
 	return s
 }
 
+// SetNotImplemented sets CreateAuthAttemptErrorResponse to NotImplemented.
+func (s *CreateAuthAttemptErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateAuthAttemptErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateAuthAttemptErrorResponse is NotImplemented.
+func (s CreateAuthAttemptErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from NotImplemented.
+func NewNotImplementedCreateAuthAttemptErrorResponse(v NotImplemented) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateAuthAttemptErrorResponse to ReqInvalid.
 func (s *CreateAuthAttemptErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateAuthAttemptErrorResponse
@@ -12515,6 +12718,27 @@ func (s CreateAuthAttemptErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAl
 func NewEncKeyUnknownAlgCreateAuthAttemptErrorResponse(v EncKeyUnknownAlg) CreateAuthAttemptErrorResponse {
 	var s CreateAuthAttemptErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets CreateAuthAttemptErrorResponse to Unavailable.
+func (s *CreateAuthAttemptErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateAuthAttemptErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateAuthAttemptErrorResponse is Unavailable.
+func (s CreateAuthAttemptErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from Unavailable.
+func NewUnavailableCreateAuthAttemptErrorResponse(v Unavailable) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -12612,7 +12836,9 @@ type CreateBrandingErrorResponse struct {
 	BrndPermissionDenied BrndPermissionDenied
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // CreateBrandingErrorResponseType is oneOf type of CreateBrandingErrorResponse.
@@ -12627,7 +12853,9 @@ const (
 	BrndPermissionDeniedCreateBrandingErrorResponse CreateBrandingErrorResponseType = "brnd.permission_denied"
 	EvtInvalidCreateBrandingErrorResponse           CreateBrandingErrorResponseType = "evt.invalid"
 	InternalCreateBrandingErrorResponse             CreateBrandingErrorResponseType = "internal"
+	NotImplementedCreateBrandingErrorResponse       CreateBrandingErrorResponseType = "not_implemented"
 	ReqInvalidCreateBrandingErrorResponse           CreateBrandingErrorResponseType = "req.invalid"
+	UnavailableCreateBrandingErrorResponse          CreateBrandingErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateBrandingErrorResponse is AuthUnauthorized.
@@ -12665,9 +12893,19 @@ func (s CreateBrandingErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateBrandingErrorResponse
 }
 
+// IsNotImplemented reports whether CreateBrandingErrorResponse is NotImplemented.
+func (s CreateBrandingErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateBrandingErrorResponse
+}
+
 // IsReqInvalid reports whether CreateBrandingErrorResponse is ReqInvalid.
 func (s CreateBrandingErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateBrandingErrorResponse
+}
+
+// IsUnavailable reports whether CreateBrandingErrorResponse is Unavailable.
+func (s CreateBrandingErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateBrandingErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateBrandingErrorResponse to AuthUnauthorized.
@@ -12817,6 +13055,27 @@ func NewInternalCreateBrandingErrorResponse(v Internal) CreateBrandingErrorRespo
 	return s
 }
 
+// SetNotImplemented sets CreateBrandingErrorResponse to NotImplemented.
+func (s *CreateBrandingErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateBrandingErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateBrandingErrorResponse is NotImplemented.
+func (s CreateBrandingErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from NotImplemented.
+func NewNotImplementedCreateBrandingErrorResponse(v NotImplemented) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateBrandingErrorResponse to ReqInvalid.
 func (s *CreateBrandingErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateBrandingErrorResponse
@@ -12835,6 +13094,27 @@ func (s CreateBrandingErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateBrandingErrorResponse(v ReqInvalid) CreateBrandingErrorResponse {
 	var s CreateBrandingErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateBrandingErrorResponse to Unavailable.
+func (s *CreateBrandingErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateBrandingErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateBrandingErrorResponse is Unavailable.
+func (s CreateBrandingErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateBrandingErrorResponse returns new CreateBrandingErrorResponse from Unavailable.
+func NewUnavailableCreateBrandingErrorResponse(v Unavailable) CreateBrandingErrorResponse {
+	var s CreateBrandingErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -12973,19 +13253,22 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
-	Type                CreateDeploymentErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	ReqInvalid          ReqInvalid
+	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	DepConflict          DepConflict
+	DepInvalid           DepInvalid
+	DepNotFound          DepNotFound
+	DepPermissionDenied  DepPermissionDenied
+	EnvProjectNotFound   EnvProjectNotFound
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -12993,18 +13276,21 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
-	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
-	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
-	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
-	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
+	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
+	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
+	NotImplementedCreateDeploymentErrorResponse       CreateDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
+	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
@@ -13057,14 +13343,29 @@ func (s CreateDeploymentErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundCreateDeploymentErrorResponse
 }
 
+// IsProjOriginNotAllowed reports whether CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedCreateDeploymentErrorResponse
+}
+
 // IsRelNotFound reports whether CreateDeploymentErrorResponse is RelNotFound.
 func (s CreateDeploymentErrorResponse) IsRelNotFound() bool {
 	return s.Type == RelNotFoundCreateDeploymentErrorResponse
 }
 
+// IsRelRevoked reports whether CreateDeploymentErrorResponse is RelRevoked.
+func (s CreateDeploymentErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedCreateDeploymentErrorResponse
+}
+
 // IsReqInvalid reports whether CreateDeploymentErrorResponse is ReqInvalid.
 func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateDeploymentErrorResponse
+}
+
+// IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
+func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateDeploymentErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateDeploymentErrorResponse to AuthUnauthorized.
@@ -13277,6 +13578,27 @@ func NewProjNotFoundCreateDeploymentErrorResponse(v ProjNotFound) CreateDeployme
 	return s
 }
 
+// SetProjOriginNotAllowed sets CreateDeploymentErrorResponse to ProjOriginNotAllowed.
+func (s *CreateDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedCreateDeploymentErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if CreateDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s CreateDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedCreateDeploymentErrorResponse(v ProjOriginNotAllowed) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
 // SetRelNotFound sets CreateDeploymentErrorResponse to RelNotFound.
 func (s *CreateDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
 	s.Type = RelNotFoundCreateDeploymentErrorResponse
@@ -13298,6 +13620,27 @@ func NewRelNotFoundCreateDeploymentErrorResponse(v RelNotFound) CreateDeployment
 	return s
 }
 
+// SetRelRevoked sets CreateDeploymentErrorResponse to RelRevoked.
+func (s *CreateDeploymentErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedCreateDeploymentErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if CreateDeploymentErrorResponse is RelRevoked.
+func (s CreateDeploymentErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from RelRevoked.
+func NewRelRevokedCreateDeploymentErrorResponse(v RelRevoked) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetRelRevoked(v)
+	return s
+}
+
 // SetReqInvalid sets CreateDeploymentErrorResponse to ReqInvalid.
 func (s *CreateDeploymentErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateDeploymentErrorResponse
@@ -13316,6 +13659,27 @@ func (s CreateDeploymentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateDeploymentErrorResponse(v ReqInvalid) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateDeploymentErrorResponse to Unavailable.
+func (s *CreateDeploymentErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateDeploymentErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateDeploymentErrorResponse is Unavailable.
+func (s CreateDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from Unavailable.
+func NewUnavailableCreateDeploymentErrorResponse(v Unavailable) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -13369,8 +13733,8 @@ type CreateDeploymentRequest struct {
 	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// Preview URLs only: how long each preview stays live, counted from this
-	// deployment. Omitted, the project's default applies.
+	// Preview URLs only. Each preview stays live for 7 days (`7d`) from this
+	// deployment; a sent value is accepted but not applied.
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
@@ -13473,8 +13837,10 @@ type CreateFlowDefinitionErrorResponse struct {
 	FlowdefRevisionConflict  FlowdefRevisionConflict
 	Internal                 Internal
 	SchNotFound              SchNotFound
+	NotImplemented           NotImplemented
 	ReqInvalid               ReqInvalid
 	FlowdefSchemaFetchFailed FlowdefSchemaFetchFailed
+	Unavailable              Unavailable
 }
 
 // CreateFlowDefinitionErrorResponseType is oneOf type of CreateFlowDefinitionErrorResponse.
@@ -13490,8 +13856,10 @@ const (
 	FlowdefRevisionConflictCreateFlowDefinitionErrorResponse  CreateFlowDefinitionErrorResponseType = "flowdef.revision_conflict"
 	InternalCreateFlowDefinitionErrorResponse                 CreateFlowDefinitionErrorResponseType = "internal"
 	SchNotFoundCreateFlowDefinitionErrorResponse              CreateFlowDefinitionErrorResponseType = "sch.not_found"
+	NotImplementedCreateFlowDefinitionErrorResponse           CreateFlowDefinitionErrorResponseType = "not_implemented"
 	ReqInvalidCreateFlowDefinitionErrorResponse               CreateFlowDefinitionErrorResponseType = "req.invalid"
 	FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse CreateFlowDefinitionErrorResponseType = "flowdef.schema_fetch_failed"
+	UnavailableCreateFlowDefinitionErrorResponse              CreateFlowDefinitionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateFlowDefinitionErrorResponse is AuthUnauthorized.
@@ -13534,6 +13902,11 @@ func (s CreateFlowDefinitionErrorResponse) IsSchNotFound() bool {
 	return s.Type == SchNotFoundCreateFlowDefinitionErrorResponse
 }
 
+// IsNotImplemented reports whether CreateFlowDefinitionErrorResponse is NotImplemented.
+func (s CreateFlowDefinitionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateFlowDefinitionErrorResponse
+}
+
 // IsReqInvalid reports whether CreateFlowDefinitionErrorResponse is ReqInvalid.
 func (s CreateFlowDefinitionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateFlowDefinitionErrorResponse
@@ -13542,6 +13915,11 @@ func (s CreateFlowDefinitionErrorResponse) IsReqInvalid() bool {
 // IsFlowdefSchemaFetchFailed reports whether CreateFlowDefinitionErrorResponse is FlowdefSchemaFetchFailed.
 func (s CreateFlowDefinitionErrorResponse) IsFlowdefSchemaFetchFailed() bool {
 	return s.Type == FlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse
+}
+
+// IsUnavailable reports whether CreateFlowDefinitionErrorResponse is Unavailable.
+func (s CreateFlowDefinitionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateFlowDefinitionErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateFlowDefinitionErrorResponse to AuthUnauthorized.
@@ -13712,6 +14090,27 @@ func NewSchNotFoundCreateFlowDefinitionErrorResponse(v SchNotFound) CreateFlowDe
 	return s
 }
 
+// SetNotImplemented sets CreateFlowDefinitionErrorResponse to NotImplemented.
+func (s *CreateFlowDefinitionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateFlowDefinitionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateFlowDefinitionErrorResponse is NotImplemented.
+func (s CreateFlowDefinitionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from NotImplemented.
+func NewNotImplementedCreateFlowDefinitionErrorResponse(v NotImplemented) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateFlowDefinitionErrorResponse to ReqInvalid.
 func (s *CreateFlowDefinitionErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateFlowDefinitionErrorResponse
@@ -13751,6 +14150,27 @@ func (s CreateFlowDefinitionErrorResponse) GetFlowdefSchemaFetchFailed() (v Flow
 func NewFlowdefSchemaFetchFailedCreateFlowDefinitionErrorResponse(v FlowdefSchemaFetchFailed) CreateFlowDefinitionErrorResponse {
 	var s CreateFlowDefinitionErrorResponse
 	s.SetFlowdefSchemaFetchFailed(v)
+	return s
+}
+
+// SetUnavailable sets CreateFlowDefinitionErrorResponse to Unavailable.
+func (s *CreateFlowDefinitionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateFlowDefinitionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateFlowDefinitionErrorResponse is Unavailable.
+func (s CreateFlowDefinitionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateFlowDefinitionErrorResponse returns new CreateFlowDefinitionErrorResponse from Unavailable.
+func NewUnavailableCreateFlowDefinitionErrorResponse(v Unavailable) CreateFlowDefinitionErrorResponse {
+	var s CreateFlowDefinitionErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -13837,6 +14257,7 @@ type CreateFlowErrorResponse struct {
 	Internal               Internal
 	TknInvalid             TknInvalid
 	TknInvalidTknid        TknInvalidTknid
+	NotImplemented         NotImplemented
 	ProjNotFound           ProjNotFound
 	ProjOriginNotAllowed   ProjOriginNotAllowed
 	ProjPreviewNotLive     ProjPreviewNotLive
@@ -13845,6 +14266,7 @@ type CreateFlowErrorResponse struct {
 	RelRevoked             RelRevoked
 	ReqInvalid             ReqInvalid
 	EncKeyUnknownAlg       EncKeyUnknownAlg
+	Unavailable            Unavailable
 }
 
 // CreateFlowErrorResponseType is oneOf type of CreateFlowErrorResponse.
@@ -13864,6 +14286,7 @@ const (
 	InternalCreateFlowErrorResponse               CreateFlowErrorResponseType = "internal"
 	TknInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateFlowErrorResponse        CreateFlowErrorResponseType = "tkn.invalid_tknid"
+	NotImplementedCreateFlowErrorResponse         CreateFlowErrorResponseType = "not_implemented"
 	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
 	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
@@ -13872,6 +14295,7 @@ const (
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
 	ReqInvalidCreateFlowErrorResponse             CreateFlowErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateFlowErrorResponse       CreateFlowErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateFlowErrorResponse            CreateFlowErrorResponseType = "unavailable"
 )
 
 // IsAttInvalidRequest reports whether CreateFlowErrorResponse is AttInvalidRequest.
@@ -13932,6 +14356,11 @@ func (s CreateFlowErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateFlowErrorResponse
 }
 
+// IsNotImplemented reports whether CreateFlowErrorResponse is NotImplemented.
+func (s CreateFlowErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateFlowErrorResponse
+}
+
 // IsProjNotFound reports whether CreateFlowErrorResponse is ProjNotFound.
 func (s CreateFlowErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundCreateFlowErrorResponse
@@ -13970,6 +14399,11 @@ func (s CreateFlowErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether CreateFlowErrorResponse is EncKeyUnknownAlg.
 func (s CreateFlowErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateFlowErrorResponse
+}
+
+// IsUnavailable reports whether CreateFlowErrorResponse is Unavailable.
+func (s CreateFlowErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateFlowErrorResponse
 }
 
 // SetAttInvalidRequest sets CreateFlowErrorResponse to AttInvalidRequest.
@@ -14224,6 +14658,27 @@ func NewTknInvalidTknidCreateFlowErrorResponse(v TknInvalidTknid) CreateFlowErro
 	return s
 }
 
+// SetNotImplemented sets CreateFlowErrorResponse to NotImplemented.
+func (s *CreateFlowErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateFlowErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateFlowErrorResponse is NotImplemented.
+func (s CreateFlowErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateFlowErrorResponse returns new CreateFlowErrorResponse from NotImplemented.
+func NewNotImplementedCreateFlowErrorResponse(v NotImplemented) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetProjNotFound sets CreateFlowErrorResponse to ProjNotFound.
 func (s *CreateFlowErrorResponse) SetProjNotFound(v ProjNotFound) {
 	s.Type = ProjNotFoundCreateFlowErrorResponse
@@ -14389,6 +14844,27 @@ func (s CreateFlowErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok b
 func NewEncKeyUnknownAlgCreateFlowErrorResponse(v EncKeyUnknownAlg) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets CreateFlowErrorResponse to Unavailable.
+func (s *CreateFlowErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateFlowErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateFlowErrorResponse is Unavailable.
+func (s CreateFlowErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateFlowErrorResponse returns new CreateFlowErrorResponse from Unavailable.
+func NewUnavailableCreateFlowErrorResponse(v Unavailable) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -14655,7 +15131,9 @@ type CreateGrantErrorResponse struct {
 	GrantPermissionDenied  GrantPermissionDenied
 	GrantPrincipalNotFound GrantPrincipalNotFound
 	Internal               Internal
+	NotImplemented         NotImplemented
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // CreateGrantErrorResponseType is oneOf type of CreateGrantErrorResponse.
@@ -14672,7 +15150,9 @@ const (
 	GrantPermissionDeniedCreateGrantErrorResponse  CreateGrantErrorResponseType = "grant.permission_denied"
 	GrantPrincipalNotFoundCreateGrantErrorResponse CreateGrantErrorResponseType = "grant.principal_not_found"
 	InternalCreateGrantErrorResponse               CreateGrantErrorResponseType = "internal"
+	NotImplementedCreateGrantErrorResponse         CreateGrantErrorResponseType = "not_implemented"
 	ReqInvalidCreateGrantErrorResponse             CreateGrantErrorResponseType = "req.invalid"
+	UnavailableCreateGrantErrorResponse            CreateGrantErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether CreateGrantErrorResponse is AuthCsrfInvalid.
@@ -14720,9 +15200,19 @@ func (s CreateGrantErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateGrantErrorResponse
 }
 
+// IsNotImplemented reports whether CreateGrantErrorResponse is NotImplemented.
+func (s CreateGrantErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateGrantErrorResponse
+}
+
 // IsReqInvalid reports whether CreateGrantErrorResponse is ReqInvalid.
 func (s CreateGrantErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateGrantErrorResponse
+}
+
+// IsUnavailable reports whether CreateGrantErrorResponse is Unavailable.
+func (s CreateGrantErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateGrantErrorResponse
 }
 
 // SetAuthCsrfInvalid sets CreateGrantErrorResponse to AuthCsrfInvalid.
@@ -14914,6 +15404,27 @@ func NewInternalCreateGrantErrorResponse(v Internal) CreateGrantErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets CreateGrantErrorResponse to NotImplemented.
+func (s *CreateGrantErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateGrantErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateGrantErrorResponse is NotImplemented.
+func (s CreateGrantErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateGrantErrorResponse returns new CreateGrantErrorResponse from NotImplemented.
+func NewNotImplementedCreateGrantErrorResponse(v NotImplemented) CreateGrantErrorResponse {
+	var s CreateGrantErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateGrantErrorResponse to ReqInvalid.
 func (s *CreateGrantErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateGrantErrorResponse
@@ -14932,6 +15443,27 @@ func (s CreateGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateGrantErrorResponse(v ReqInvalid) CreateGrantErrorResponse {
 	var s CreateGrantErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateGrantErrorResponse to Unavailable.
+func (s *CreateGrantErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateGrantErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateGrantErrorResponse is Unavailable.
+func (s CreateGrantErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateGrantErrorResponse returns new CreateGrantErrorResponse from Unavailable.
+func NewUnavailableCreateGrantErrorResponse(v Unavailable) CreateGrantErrorResponse {
+	var s CreateGrantErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -15099,7 +15631,9 @@ type CreateHandoffErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // CreateHandoffErrorResponseType is oneOf type of CreateHandoffErrorResponse.
@@ -15114,7 +15648,9 @@ const (
 	AuthUnauthorizedCreateHandoffErrorResponse    CreateHandoffErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateHandoffErrorResponse          CreateHandoffErrorResponseType = "evt.invalid"
 	InternalCreateHandoffErrorResponse            CreateHandoffErrorResponseType = "internal"
+	NotImplementedCreateHandoffErrorResponse      CreateHandoffErrorResponseType = "not_implemented"
 	ReqInvalidCreateHandoffErrorResponse          CreateHandoffErrorResponseType = "req.invalid"
+	UnavailableCreateHandoffErrorResponse         CreateHandoffErrorResponseType = "unavailable"
 )
 
 // IsAttAlreadyHandedOff reports whether CreateHandoffErrorResponse is AttAlreadyHandedOff.
@@ -15152,9 +15688,19 @@ func (s CreateHandoffErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateHandoffErrorResponse
 }
 
+// IsNotImplemented reports whether CreateHandoffErrorResponse is NotImplemented.
+func (s CreateHandoffErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateHandoffErrorResponse
+}
+
 // IsReqInvalid reports whether CreateHandoffErrorResponse is ReqInvalid.
 func (s CreateHandoffErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateHandoffErrorResponse
+}
+
+// IsUnavailable reports whether CreateHandoffErrorResponse is Unavailable.
+func (s CreateHandoffErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateHandoffErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets CreateHandoffErrorResponse to AttAlreadyHandedOff.
@@ -15304,6 +15850,27 @@ func NewInternalCreateHandoffErrorResponse(v Internal) CreateHandoffErrorRespons
 	return s
 }
 
+// SetNotImplemented sets CreateHandoffErrorResponse to NotImplemented.
+func (s *CreateHandoffErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateHandoffErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateHandoffErrorResponse is NotImplemented.
+func (s CreateHandoffErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from NotImplemented.
+func NewNotImplementedCreateHandoffErrorResponse(v NotImplemented) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateHandoffErrorResponse to ReqInvalid.
 func (s *CreateHandoffErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateHandoffErrorResponse
@@ -15322,6 +15889,27 @@ func (s CreateHandoffErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateHandoffErrorResponse(v ReqInvalid) CreateHandoffErrorResponse {
 	var s CreateHandoffErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateHandoffErrorResponse to Unavailable.
+func (s *CreateHandoffErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateHandoffErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateHandoffErrorResponse is Unavailable.
+func (s CreateHandoffErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateHandoffErrorResponse returns new CreateHandoffErrorResponse from Unavailable.
+func NewUnavailableCreateHandoffErrorResponse(v Unavailable) CreateHandoffErrorResponse {
+	var s CreateHandoffErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -15372,7 +15960,9 @@ type CreateIdpErrorResponse struct {
 	IdpRevisionConflict IdpRevisionConflict
 	IdpEndpointsPartial IdpEndpointsPartial
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // CreateIdpErrorResponseType is oneOf type of CreateIdpErrorResponse.
@@ -15388,7 +15978,9 @@ const (
 	IdpRevisionConflictCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.revision_conflict"
 	IdpEndpointsPartialCreateIdpErrorResponse CreateIdpErrorResponseType = "idp.endpoints_partial"
 	InternalCreateIdpErrorResponse            CreateIdpErrorResponseType = "internal"
+	NotImplementedCreateIdpErrorResponse      CreateIdpErrorResponseType = "not_implemented"
 	ReqInvalidCreateIdpErrorResponse          CreateIdpErrorResponseType = "req.invalid"
+	UnavailableCreateIdpErrorResponse         CreateIdpErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateIdpErrorResponse is AuthUnauthorized.
@@ -15429,9 +16021,19 @@ func (s CreateIdpErrorResponse) IsIdpEndpointsPartial() bool {
 // IsInternal reports whether CreateIdpErrorResponse is Internal.
 func (s CreateIdpErrorResponse) IsInternal() bool { return s.Type == InternalCreateIdpErrorResponse }
 
+// IsNotImplemented reports whether CreateIdpErrorResponse is NotImplemented.
+func (s CreateIdpErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateIdpErrorResponse
+}
+
 // IsReqInvalid reports whether CreateIdpErrorResponse is ReqInvalid.
 func (s CreateIdpErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateIdpErrorResponse
+}
+
+// IsUnavailable reports whether CreateIdpErrorResponse is Unavailable.
+func (s CreateIdpErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateIdpErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateIdpErrorResponse to AuthUnauthorized.
@@ -15602,6 +16204,27 @@ func NewInternalCreateIdpErrorResponse(v Internal) CreateIdpErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets CreateIdpErrorResponse to NotImplemented.
+func (s *CreateIdpErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateIdpErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateIdpErrorResponse is NotImplemented.
+func (s CreateIdpErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateIdpErrorResponse returns new CreateIdpErrorResponse from NotImplemented.
+func NewNotImplementedCreateIdpErrorResponse(v NotImplemented) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateIdpErrorResponse to ReqInvalid.
 func (s *CreateIdpErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateIdpErrorResponse
@@ -15620,6 +16243,27 @@ func (s CreateIdpErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateIdpErrorResponse(v ReqInvalid) CreateIdpErrorResponse {
 	var s CreateIdpErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateIdpErrorResponse to Unavailable.
+func (s *CreateIdpErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateIdpErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateIdpErrorResponse is Unavailable.
+func (s CreateIdpErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateIdpErrorResponse returns new CreateIdpErrorResponse from Unavailable.
+func NewUnavailableCreateIdpErrorResponse(v Unavailable) CreateIdpErrorResponse {
+	var s CreateIdpErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -16283,6 +16927,7 @@ type CreateReleaseErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
+	NotImplemented         NotImplemented
 	RelInvalid             RelInvalid
 	RelNotFound            RelNotFound
 	RelPermissionDenied    RelPermissionDenied
@@ -16291,6 +16936,7 @@ type CreateReleaseErrorResponse struct {
 	RelRevisionUnpinnable  RelRevisionUnpinnable
 	RelUnresolvedReference RelUnresolvedReference
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // CreateReleaseErrorResponseType is oneOf type of CreateReleaseErrorResponse.
@@ -16301,6 +16947,7 @@ const (
 	AuthUnauthorizedCreateReleaseErrorResponse       CreateReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "evt.invalid"
 	InternalCreateReleaseErrorResponse               CreateReleaseErrorResponseType = "internal"
+	NotImplementedCreateReleaseErrorResponse         CreateReleaseErrorResponseType = "not_implemented"
 	RelInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedCreateReleaseErrorResponse    CreateReleaseErrorResponseType = "rel.permission_denied"
@@ -16309,6 +16956,7 @@ const (
 	RelRevisionUnpinnableCreateReleaseErrorResponse  CreateReleaseErrorResponseType = "rel.revision_unpinnable"
 	RelUnresolvedReferenceCreateReleaseErrorResponse CreateReleaseErrorResponseType = "rel.unresolved_reference"
 	ReqInvalidCreateReleaseErrorResponse             CreateReleaseErrorResponseType = "req.invalid"
+	UnavailableCreateReleaseErrorResponse            CreateReleaseErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateReleaseErrorResponse is AuthUnauthorized.
@@ -16324,6 +16972,11 @@ func (s CreateReleaseErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether CreateReleaseErrorResponse is Internal.
 func (s CreateReleaseErrorResponse) IsInternal() bool {
 	return s.Type == InternalCreateReleaseErrorResponse
+}
+
+// IsNotImplemented reports whether CreateReleaseErrorResponse is NotImplemented.
+func (s CreateReleaseErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateReleaseErrorResponse
 }
 
 // IsRelInvalid reports whether CreateReleaseErrorResponse is RelInvalid.
@@ -16364,6 +17017,11 @@ func (s CreateReleaseErrorResponse) IsRelUnresolvedReference() bool {
 // IsReqInvalid reports whether CreateReleaseErrorResponse is ReqInvalid.
 func (s CreateReleaseErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateReleaseErrorResponse
+}
+
+// IsUnavailable reports whether CreateReleaseErrorResponse is Unavailable.
+func (s CreateReleaseErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateReleaseErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateReleaseErrorResponse to AuthUnauthorized.
@@ -16426,6 +17084,27 @@ func (s CreateReleaseErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateReleaseErrorResponse(v Internal) CreateReleaseErrorResponse {
 	var s CreateReleaseErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateReleaseErrorResponse to NotImplemented.
+func (s *CreateReleaseErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateReleaseErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateReleaseErrorResponse is NotImplemented.
+func (s CreateReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from NotImplemented.
+func NewNotImplementedCreateReleaseErrorResponse(v NotImplemented) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -16597,6 +17276,27 @@ func NewReqInvalidCreateReleaseErrorResponse(v ReqInvalid) CreateReleaseErrorRes
 	return s
 }
 
+// SetUnavailable sets CreateReleaseErrorResponse to Unavailable.
+func (s *CreateReleaseErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateReleaseErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateReleaseErrorResponse is Unavailable.
+func (s CreateReleaseErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateReleaseErrorResponse returns new CreateReleaseErrorResponse from Unavailable.
+func NewUnavailableCreateReleaseErrorResponse(v Unavailable) CreateReleaseErrorResponse {
+	var s CreateReleaseErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // CreateReleaseErrorResponseStatusCode wraps CreateReleaseErrorResponse with StatusCode.
 type CreateReleaseErrorResponseStatusCode struct {
 	StatusCode int
@@ -16749,7 +17449,9 @@ type CreateSchemaErrorResponse struct {
 	SchNotFound              SchNotFound
 	SchPermissionDenied      SchPermissionDenied
 	SchRevisionConflict      SchRevisionConflict
+	NotImplemented           NotImplemented
 	ReqInvalid               ReqInvalid
+	Unavailable              Unavailable
 }
 
 // CreateSchemaErrorResponseType is oneOf type of CreateSchemaErrorResponse.
@@ -16770,7 +17472,9 @@ const (
 	SchNotFoundCreateSchemaErrorResponse              CreateSchemaErrorResponseType = "sch.not_found"
 	SchPermissionDeniedCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.permission_denied"
 	SchRevisionConflictCreateSchemaErrorResponse      CreateSchemaErrorResponseType = "sch.revision_conflict"
+	NotImplementedCreateSchemaErrorResponse           CreateSchemaErrorResponseType = "not_implemented"
 	ReqInvalidCreateSchemaErrorResponse               CreateSchemaErrorResponseType = "req.invalid"
+	UnavailableCreateSchemaErrorResponse              CreateSchemaErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateSchemaErrorResponse is AuthUnauthorized.
@@ -16838,9 +17542,19 @@ func (s CreateSchemaErrorResponse) IsSchRevisionConflict() bool {
 	return s.Type == SchRevisionConflictCreateSchemaErrorResponse
 }
 
+// IsNotImplemented reports whether CreateSchemaErrorResponse is NotImplemented.
+func (s CreateSchemaErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateSchemaErrorResponse
+}
+
 // IsReqInvalid reports whether CreateSchemaErrorResponse is ReqInvalid.
 func (s CreateSchemaErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateSchemaErrorResponse
+}
+
+// IsUnavailable reports whether CreateSchemaErrorResponse is Unavailable.
+func (s CreateSchemaErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateSchemaErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateSchemaErrorResponse to AuthUnauthorized.
@@ -17116,6 +17830,27 @@ func NewSchRevisionConflictCreateSchemaErrorResponse(v SchRevisionConflict) Crea
 	return s
 }
 
+// SetNotImplemented sets CreateSchemaErrorResponse to NotImplemented.
+func (s *CreateSchemaErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateSchemaErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateSchemaErrorResponse is NotImplemented.
+func (s CreateSchemaErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from NotImplemented.
+func NewNotImplementedCreateSchemaErrorResponse(v NotImplemented) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateSchemaErrorResponse to ReqInvalid.
 func (s *CreateSchemaErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateSchemaErrorResponse
@@ -17134,6 +17869,27 @@ func (s CreateSchemaErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateSchemaErrorResponse(v ReqInvalid) CreateSchemaErrorResponse {
 	var s CreateSchemaErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateSchemaErrorResponse to Unavailable.
+func (s *CreateSchemaErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateSchemaErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateSchemaErrorResponse is Unavailable.
+func (s CreateSchemaErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateSchemaErrorResponse returns new CreateSchemaErrorResponse from Unavailable.
+func NewUnavailableCreateSchemaErrorResponse(v Unavailable) CreateSchemaErrorResponse {
+	var s CreateSchemaErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -17257,9 +18013,11 @@ type CreateSessionErrorResponse struct {
 	Internal                Internal
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
+	NotImplemented          NotImplemented
 	ReqInvalid              ReqInvalid
 	SessTokenCreationFailed SessTokenCreationFailed
 	EncKeyUnknownAlg        EncKeyUnknownAlg
+	Unavailable             Unavailable
 }
 
 // CreateSessionErrorResponseType is oneOf type of CreateSessionErrorResponse.
@@ -17274,9 +18032,11 @@ const (
 	InternalCreateSessionErrorResponse                CreateSessionErrorResponseType = "internal"
 	TknInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "tkn.invalid"
 	TknInvalidTknidCreateSessionErrorResponse         CreateSessionErrorResponseType = "tkn.invalid_tknid"
+	NotImplementedCreateSessionErrorResponse          CreateSessionErrorResponseType = "not_implemented"
 	ReqInvalidCreateSessionErrorResponse              CreateSessionErrorResponseType = "req.invalid"
 	SessTokenCreationFailedCreateSessionErrorResponse CreateSessionErrorResponseType = "sess.token_creation_failed"
 	EncKeyUnknownAlgCreateSessionErrorResponse        CreateSessionErrorResponseType = "enc_key.unknown_alg"
+	UnavailableCreateSessionErrorResponse             CreateSessionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether CreateSessionErrorResponse is AuthUnauthorized.
@@ -17314,6 +18074,11 @@ func (s CreateSessionErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidCreateSessionErrorResponse
 }
 
+// IsNotImplemented reports whether CreateSessionErrorResponse is NotImplemented.
+func (s CreateSessionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateSessionErrorResponse
+}
+
 // IsReqInvalid reports whether CreateSessionErrorResponse is ReqInvalid.
 func (s CreateSessionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateSessionErrorResponse
@@ -17327,6 +18092,11 @@ func (s CreateSessionErrorResponse) IsSessTokenCreationFailed() bool {
 // IsEncKeyUnknownAlg reports whether CreateSessionErrorResponse is EncKeyUnknownAlg.
 func (s CreateSessionErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgCreateSessionErrorResponse
+}
+
+// IsUnavailable reports whether CreateSessionErrorResponse is Unavailable.
+func (s CreateSessionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateSessionErrorResponse
 }
 
 // SetAuthUnauthorized sets CreateSessionErrorResponse to AuthUnauthorized.
@@ -17476,6 +18246,27 @@ func NewTknInvalidTknidCreateSessionErrorResponse(v TknInvalidTknid) CreateSessi
 	return s
 }
 
+// SetNotImplemented sets CreateSessionErrorResponse to NotImplemented.
+func (s *CreateSessionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateSessionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateSessionErrorResponse is NotImplemented.
+func (s CreateSessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateSessionErrorResponse returns new CreateSessionErrorResponse from NotImplemented.
+func NewNotImplementedCreateSessionErrorResponse(v NotImplemented) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateSessionErrorResponse to ReqInvalid.
 func (s *CreateSessionErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateSessionErrorResponse
@@ -17536,6 +18327,27 @@ func (s CreateSessionErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, o
 func NewEncKeyUnknownAlgCreateSessionErrorResponse(v EncKeyUnknownAlg) CreateSessionErrorResponse {
 	var s CreateSessionErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets CreateSessionErrorResponse to Unavailable.
+func (s *CreateSessionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateSessionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateSessionErrorResponse is Unavailable.
+func (s CreateSessionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateSessionErrorResponse returns new CreateSessionErrorResponse from Unavailable.
+func NewUnavailableCreateSessionErrorResponse(v Unavailable) CreateSessionErrorResponse {
+	var s CreateSessionErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -17664,12 +18476,14 @@ type CreateTeamErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	TeamAlreadyExists    TeamAlreadyExists
 	TeamNameInvalid      TeamNameInvalid
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamPermissionDenied TeamPermissionDenied
 	TeamProjectNotFound  TeamProjectNotFound
+	Unavailable          Unavailable
 }
 
 // CreateTeamErrorResponseType is oneOf type of CreateTeamErrorResponse.
@@ -17681,12 +18495,14 @@ const (
 	AuthUnauthorizedCreateTeamErrorResponse     CreateTeamErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateTeamErrorResponse           CreateTeamErrorResponseType = "evt.invalid"
 	InternalCreateTeamErrorResponse             CreateTeamErrorResponseType = "internal"
+	NotImplementedCreateTeamErrorResponse       CreateTeamErrorResponseType = "not_implemented"
 	ReqInvalidCreateTeamErrorResponse           CreateTeamErrorResponseType = "req.invalid"
 	TeamAlreadyExistsCreateTeamErrorResponse    CreateTeamErrorResponseType = "team.already_exists"
 	TeamNameInvalidCreateTeamErrorResponse      CreateTeamErrorResponseType = "team.name_invalid"
 	TeamTeamNotFoundCreateTeamErrorResponse     CreateTeamErrorResponseType = "team.team_not_found"
 	TeamPermissionDeniedCreateTeamErrorResponse CreateTeamErrorResponseType = "team.permission_denied"
 	TeamProjectNotFoundCreateTeamErrorResponse  CreateTeamErrorResponseType = "team.project_not_found"
+	UnavailableCreateTeamErrorResponse          CreateTeamErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether CreateTeamErrorResponse is AuthCsrfInvalid.
@@ -17706,6 +18522,11 @@ func (s CreateTeamErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether CreateTeamErrorResponse is Internal.
 func (s CreateTeamErrorResponse) IsInternal() bool { return s.Type == InternalCreateTeamErrorResponse }
+
+// IsNotImplemented reports whether CreateTeamErrorResponse is NotImplemented.
+func (s CreateTeamErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateTeamErrorResponse
+}
 
 // IsReqInvalid reports whether CreateTeamErrorResponse is ReqInvalid.
 func (s CreateTeamErrorResponse) IsReqInvalid() bool {
@@ -17735,6 +18556,11 @@ func (s CreateTeamErrorResponse) IsTeamPermissionDenied() bool {
 // IsTeamProjectNotFound reports whether CreateTeamErrorResponse is TeamProjectNotFound.
 func (s CreateTeamErrorResponse) IsTeamProjectNotFound() bool {
 	return s.Type == TeamProjectNotFoundCreateTeamErrorResponse
+}
+
+// IsUnavailable reports whether CreateTeamErrorResponse is Unavailable.
+func (s CreateTeamErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateTeamErrorResponse
 }
 
 // SetAuthCsrfInvalid sets CreateTeamErrorResponse to AuthCsrfInvalid.
@@ -17818,6 +18644,27 @@ func (s CreateTeamErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalCreateTeamErrorResponse(v Internal) CreateTeamErrorResponse {
 	var s CreateTeamErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets CreateTeamErrorResponse to NotImplemented.
+func (s *CreateTeamErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateTeamErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateTeamErrorResponse is NotImplemented.
+func (s CreateTeamErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateTeamErrorResponse returns new CreateTeamErrorResponse from NotImplemented.
+func NewNotImplementedCreateTeamErrorResponse(v NotImplemented) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -17947,6 +18794,27 @@ func NewTeamProjectNotFoundCreateTeamErrorResponse(v TeamProjectNotFound) Create
 	return s
 }
 
+// SetUnavailable sets CreateTeamErrorResponse to Unavailable.
+func (s *CreateTeamErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateTeamErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateTeamErrorResponse is Unavailable.
+func (s CreateTeamErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateTeamErrorResponse returns new CreateTeamErrorResponse from Unavailable.
+func NewUnavailableCreateTeamErrorResponse(v Unavailable) CreateTeamErrorResponse {
+	var s CreateTeamErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // CreateTeamErrorResponseStatusCode wraps CreateTeamErrorResponse with StatusCode.
 type CreateTeamErrorResponseStatusCode struct {
 	StatusCode int
@@ -18022,7 +18890,9 @@ type CreateUserErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserAlreadyExists    UserAlreadyExists
 	UserInvalid          UserInvalid
 	UserNotFound         UserNotFound
@@ -18038,7 +18908,9 @@ const (
 	AuthUnauthorizedCreateUserErrorResponse     CreateUserErrorResponseType = "auth.unauthorized"
 	EvtInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "evt.invalid"
 	InternalCreateUserErrorResponse             CreateUserErrorResponseType = "internal"
+	NotImplementedCreateUserErrorResponse       CreateUserErrorResponseType = "not_implemented"
 	ReqInvalidCreateUserErrorResponse           CreateUserErrorResponseType = "req.invalid"
+	UnavailableCreateUserErrorResponse          CreateUserErrorResponseType = "unavailable"
 	UserAlreadyExistsCreateUserErrorResponse    CreateUserErrorResponseType = "user.already_exists"
 	UserInvalidCreateUserErrorResponse          CreateUserErrorResponseType = "user.invalid"
 	UserNotFoundCreateUserErrorResponse         CreateUserErrorResponseType = "user.not_found"
@@ -18063,9 +18935,19 @@ func (s CreateUserErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether CreateUserErrorResponse is Internal.
 func (s CreateUserErrorResponse) IsInternal() bool { return s.Type == InternalCreateUserErrorResponse }
 
+// IsNotImplemented reports whether CreateUserErrorResponse is NotImplemented.
+func (s CreateUserErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedCreateUserErrorResponse
+}
+
 // IsReqInvalid reports whether CreateUserErrorResponse is ReqInvalid.
 func (s CreateUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidCreateUserErrorResponse
+}
+
+// IsUnavailable reports whether CreateUserErrorResponse is Unavailable.
+func (s CreateUserErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableCreateUserErrorResponse
 }
 
 // IsUserAlreadyExists reports whether CreateUserErrorResponse is UserAlreadyExists.
@@ -18172,6 +19054,27 @@ func NewInternalCreateUserErrorResponse(v Internal) CreateUserErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets CreateUserErrorResponse to NotImplemented.
+func (s *CreateUserErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedCreateUserErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if CreateUserErrorResponse is NotImplemented.
+func (s CreateUserErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedCreateUserErrorResponse returns new CreateUserErrorResponse from NotImplemented.
+func NewNotImplementedCreateUserErrorResponse(v NotImplemented) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets CreateUserErrorResponse to ReqInvalid.
 func (s *CreateUserErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateUserErrorResponse
@@ -18190,6 +19093,27 @@ func (s CreateUserErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidCreateUserErrorResponse(v ReqInvalid) CreateUserErrorResponse {
 	var s CreateUserErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets CreateUserErrorResponse to Unavailable.
+func (s *CreateUserErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableCreateUserErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if CreateUserErrorResponse is Unavailable.
+func (s CreateUserErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableCreateUserErrorResponse returns new CreateUserErrorResponse from Unavailable.
+func NewUnavailableCreateUserErrorResponse(v Unavailable) CreateUserErrorResponse {
+	var s CreateUserErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -18424,7 +19348,9 @@ type DeleteGrantErrorResponse struct {
 	GrantNotFound         GrantNotFound
 	GrantPermissionDenied GrantPermissionDenied
 	Internal              Internal
+	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
+	Unavailable           Unavailable
 }
 
 // DeleteGrantErrorResponseType is oneOf type of DeleteGrantErrorResponse.
@@ -18438,7 +19364,9 @@ const (
 	GrantNotFoundDeleteGrantErrorResponse         DeleteGrantErrorResponseType = "grant.not_found"
 	GrantPermissionDeniedDeleteGrantErrorResponse DeleteGrantErrorResponseType = "grant.permission_denied"
 	InternalDeleteGrantErrorResponse              DeleteGrantErrorResponseType = "internal"
+	NotImplementedDeleteGrantErrorResponse        DeleteGrantErrorResponseType = "not_implemented"
 	ReqInvalidDeleteGrantErrorResponse            DeleteGrantErrorResponseType = "req.invalid"
+	UnavailableDeleteGrantErrorResponse           DeleteGrantErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether DeleteGrantErrorResponse is AuthCsrfInvalid.
@@ -18471,9 +19399,19 @@ func (s DeleteGrantErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteGrantErrorResponse
 }
 
+// IsNotImplemented reports whether DeleteGrantErrorResponse is NotImplemented.
+func (s DeleteGrantErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteGrantErrorResponse
+}
+
 // IsReqInvalid reports whether DeleteGrantErrorResponse is ReqInvalid.
 func (s DeleteGrantErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidDeleteGrantErrorResponse
+}
+
+// IsUnavailable reports whether DeleteGrantErrorResponse is Unavailable.
+func (s DeleteGrantErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteGrantErrorResponse
 }
 
 // SetAuthCsrfInvalid sets DeleteGrantErrorResponse to AuthCsrfInvalid.
@@ -18602,6 +19540,27 @@ func NewInternalDeleteGrantErrorResponse(v Internal) DeleteGrantErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets DeleteGrantErrorResponse to NotImplemented.
+func (s *DeleteGrantErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteGrantErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteGrantErrorResponse is NotImplemented.
+func (s DeleteGrantErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteGrantErrorResponse returns new DeleteGrantErrorResponse from NotImplemented.
+func NewNotImplementedDeleteGrantErrorResponse(v NotImplemented) DeleteGrantErrorResponse {
+	var s DeleteGrantErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets DeleteGrantErrorResponse to ReqInvalid.
 func (s *DeleteGrantErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidDeleteGrantErrorResponse
@@ -18620,6 +19579,27 @@ func (s DeleteGrantErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidDeleteGrantErrorResponse(v ReqInvalid) DeleteGrantErrorResponse {
 	var s DeleteGrantErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets DeleteGrantErrorResponse to Unavailable.
+func (s *DeleteGrantErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteGrantErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteGrantErrorResponse is Unavailable.
+func (s DeleteGrantErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteGrantErrorResponse returns new DeleteGrantErrorResponse from Unavailable.
+func NewUnavailableDeleteGrantErrorResponse(v Unavailable) DeleteGrantErrorResponse {
+	var s DeleteGrantErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -18682,10 +19662,12 @@ type DeleteTeamErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamOwnsProject      TeamOwnsProject
 	TeamPermissionDenied TeamPermissionDenied
+	Unavailable          Unavailable
 }
 
 // DeleteTeamErrorResponseType is oneOf type of DeleteTeamErrorResponse.
@@ -18696,10 +19678,12 @@ const (
 	AuthUnauthorizedDeleteTeamErrorResponse     DeleteTeamErrorResponseType = "auth.unauthorized"
 	EvtInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "evt.invalid"
 	InternalDeleteTeamErrorResponse             DeleteTeamErrorResponseType = "internal"
+	NotImplementedDeleteTeamErrorResponse       DeleteTeamErrorResponseType = "not_implemented"
 	ReqInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "req.invalid"
 	TeamTeamNotFoundDeleteTeamErrorResponse     DeleteTeamErrorResponseType = "team.team_not_found"
 	TeamOwnsProjectDeleteTeamErrorResponse      DeleteTeamErrorResponseType = "team.owns_project"
 	TeamPermissionDeniedDeleteTeamErrorResponse DeleteTeamErrorResponseType = "team.permission_denied"
+	UnavailableDeleteTeamErrorResponse          DeleteTeamErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether DeleteTeamErrorResponse is AuthUnauthorized.
@@ -18714,6 +19698,11 @@ func (s DeleteTeamErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether DeleteTeamErrorResponse is Internal.
 func (s DeleteTeamErrorResponse) IsInternal() bool { return s.Type == InternalDeleteTeamErrorResponse }
+
+// IsNotImplemented reports whether DeleteTeamErrorResponse is NotImplemented.
+func (s DeleteTeamErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteTeamErrorResponse
+}
 
 // IsReqInvalid reports whether DeleteTeamErrorResponse is ReqInvalid.
 func (s DeleteTeamErrorResponse) IsReqInvalid() bool {
@@ -18733,6 +19722,11 @@ func (s DeleteTeamErrorResponse) IsTeamOwnsProject() bool {
 // IsTeamPermissionDenied reports whether DeleteTeamErrorResponse is TeamPermissionDenied.
 func (s DeleteTeamErrorResponse) IsTeamPermissionDenied() bool {
 	return s.Type == TeamPermissionDeniedDeleteTeamErrorResponse
+}
+
+// IsUnavailable reports whether DeleteTeamErrorResponse is Unavailable.
+func (s DeleteTeamErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteTeamErrorResponse
 }
 
 // SetAuthUnauthorized sets DeleteTeamErrorResponse to AuthUnauthorized.
@@ -18795,6 +19789,27 @@ func (s DeleteTeamErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalDeleteTeamErrorResponse(v Internal) DeleteTeamErrorResponse {
 	var s DeleteTeamErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets DeleteTeamErrorResponse to NotImplemented.
+func (s *DeleteTeamErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteTeamErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteTeamErrorResponse is NotImplemented.
+func (s DeleteTeamErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from NotImplemented.
+func NewNotImplementedDeleteTeamErrorResponse(v NotImplemented) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -18882,6 +19897,27 @@ func NewTeamPermissionDeniedDeleteTeamErrorResponse(v TeamPermissionDenied) Dele
 	return s
 }
 
+// SetUnavailable sets DeleteTeamErrorResponse to Unavailable.
+func (s *DeleteTeamErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteTeamErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteTeamErrorResponse is Unavailable.
+func (s DeleteTeamErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from Unavailable.
+func NewUnavailableDeleteTeamErrorResponse(v Unavailable) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // DeleteTeamErrorResponseStatusCode wraps DeleteTeamErrorResponse with StatusCode.
 type DeleteTeamErrorResponseStatusCode struct {
 	StatusCode int
@@ -18930,7 +19966,9 @@ type DeleteUserByIDErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -18944,7 +19982,9 @@ const (
 	AuthUnauthorizedDeleteUserByIDErrorResponse     DeleteUserByIDErrorResponseType = "auth.unauthorized"
 	EvtInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "evt.invalid"
 	InternalDeleteUserByIDErrorResponse             DeleteUserByIDErrorResponseType = "internal"
+	NotImplementedDeleteUserByIDErrorResponse       DeleteUserByIDErrorResponseType = "not_implemented"
 	ReqInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "req.invalid"
+	UnavailableDeleteUserByIDErrorResponse          DeleteUserByIDErrorResponseType = "unavailable"
 	UserNotFoundDeleteUserByIDErrorResponse         DeleteUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedDeleteUserByIDErrorResponse DeleteUserByIDErrorResponseType = "user.permission_denied"
 )
@@ -18969,9 +20009,19 @@ func (s DeleteUserByIDErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteUserByIDErrorResponse
 }
 
+// IsNotImplemented reports whether DeleteUserByIDErrorResponse is NotImplemented.
+func (s DeleteUserByIDErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteUserByIDErrorResponse
+}
+
 // IsReqInvalid reports whether DeleteUserByIDErrorResponse is ReqInvalid.
 func (s DeleteUserByIDErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidDeleteUserByIDErrorResponse
+}
+
+// IsUnavailable reports whether DeleteUserByIDErrorResponse is Unavailable.
+func (s DeleteUserByIDErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteUserByIDErrorResponse
 }
 
 // IsUserNotFound reports whether DeleteUserByIDErrorResponse is UserNotFound.
@@ -19068,6 +20118,27 @@ func NewInternalDeleteUserByIDErrorResponse(v Internal) DeleteUserByIDErrorRespo
 	return s
 }
 
+// SetNotImplemented sets DeleteUserByIDErrorResponse to NotImplemented.
+func (s *DeleteUserByIDErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteUserByIDErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteUserByIDErrorResponse is NotImplemented.
+func (s DeleteUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from NotImplemented.
+func NewNotImplementedDeleteUserByIDErrorResponse(v NotImplemented) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets DeleteUserByIDErrorResponse to ReqInvalid.
 func (s *DeleteUserByIDErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidDeleteUserByIDErrorResponse
@@ -19086,6 +20157,27 @@ func (s DeleteUserByIDErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidDeleteUserByIDErrorResponse(v ReqInvalid) DeleteUserByIDErrorResponse {
 	var s DeleteUserByIDErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets DeleteUserByIDErrorResponse to Unavailable.
+func (s *DeleteUserByIDErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteUserByIDErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteUserByIDErrorResponse is Unavailable.
+func (s DeleteUserByIDErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from Unavailable.
+func NewUnavailableDeleteUserByIDErrorResponse(v Unavailable) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -19178,7 +20270,9 @@ type DeleteVariableErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
 }
@@ -19191,7 +20285,9 @@ const (
 	AuthUnauthorizedDeleteVariableErrorResponse    DeleteVariableErrorResponseType = "auth.unauthorized"
 	EvtInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "evt.invalid"
 	InternalDeleteVariableErrorResponse            DeleteVariableErrorResponseType = "internal"
+	NotImplementedDeleteVariableErrorResponse      DeleteVariableErrorResponseType = "not_implemented"
 	ReqInvalidDeleteVariableErrorResponse          DeleteVariableErrorResponseType = "req.invalid"
+	UnavailableDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "unavailable"
 	VarNotFoundDeleteVariableErrorResponse         DeleteVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedDeleteVariableErrorResponse DeleteVariableErrorResponseType = "var.permission_denied"
 )
@@ -19211,9 +20307,19 @@ func (s DeleteVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalDeleteVariableErrorResponse
 }
 
+// IsNotImplemented reports whether DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteVariableErrorResponse
+}
+
 // IsReqInvalid reports whether DeleteVariableErrorResponse is ReqInvalid.
 func (s DeleteVariableErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidDeleteVariableErrorResponse
+}
+
+// IsUnavailable reports whether DeleteVariableErrorResponse is Unavailable.
+func (s DeleteVariableErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteVariableErrorResponse
 }
 
 // IsVarNotFound reports whether DeleteVariableErrorResponse is VarNotFound.
@@ -19289,6 +20395,27 @@ func NewInternalDeleteVariableErrorResponse(v Internal) DeleteVariableErrorRespo
 	return s
 }
 
+// SetNotImplemented sets DeleteVariableErrorResponse to NotImplemented.
+func (s *DeleteVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteVariableErrorResponse is NotImplemented.
+func (s DeleteVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from NotImplemented.
+func NewNotImplementedDeleteVariableErrorResponse(v NotImplemented) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets DeleteVariableErrorResponse to ReqInvalid.
 func (s *DeleteVariableErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidDeleteVariableErrorResponse
@@ -19307,6 +20434,27 @@ func (s DeleteVariableErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidDeleteVariableErrorResponse(v ReqInvalid) DeleteVariableErrorResponse {
 	var s DeleteVariableErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets DeleteVariableErrorResponse to Unavailable.
+func (s *DeleteVariableErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteVariableErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteVariableErrorResponse is Unavailable.
+func (s DeleteVariableErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteVariableErrorResponse returns new DeleteVariableErrorResponse from Unavailable.
+func NewUnavailableDeleteVariableErrorResponse(v Unavailable) DeleteVariableErrorResponse {
+	var s DeleteVariableErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -21154,9 +22302,8 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) getHealthRes() {}
-func (*ErrorDetailsStatusCode) getLiveRes()   {}
-func (*ErrorDetailsStatusCode) getReadyRes()  {}
+func (*ErrorDetailsStatusCode) getLiveRes()  {}
+func (*ErrorDetailsStatusCode) getReadyRes() {}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -22306,9 +23453,17 @@ func (*Event) getEventRes() {}
 // live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
+	// What authorized the request, when it was not a grant on the event's
+	// project (ADR 053 §8). Every event of such a request carries it.
+	Authorization OptEventMetadataAuthorization `json:"authorization"`
 	// Observed HTTP requestor context on Path A request.api only.
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
+}
+
+// GetAuthorization returns the value of Authorization.
+func (s *EventMetadata) GetAuthorization() OptEventMetadataAuthorization {
+	return s.Authorization
 }
 
 // GetClient returns the value of Client.
@@ -22319,6 +23474,11 @@ func (s *EventMetadata) GetClient() OptEventMetadataClient {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
 	return s.AdditionalProps
+}
+
+// SetAuthorization sets the value of Authorization.
+func (s *EventMetadata) SetAuthorization(val OptEventMetadataAuthorization) {
+	s.Authorization = val
 }
 
 // SetClient sets the value of Client.
@@ -22340,6 +23500,72 @@ func (s *EventMetadataAdditional) init() EventMetadataAdditional {
 		*s = m
 	}
 	return m
+}
+
+// What authorized the request, when it was not a grant on the event's
+// project (ADR 053 §8). Every event of such a request carries it.
+type EventMetadataAuthorization struct {
+	// `platform_operator`: the deployment's platform operator relation
+	// (ADR 075), which administers every project.
+	Path EventMetadataAuthorizationPath `json:"path"`
+	// The project the actor's user belongs to.
+	ActorHomeProjectID OptString `json:"actor_home_project_id"`
+}
+
+// GetPath returns the value of Path.
+func (s *EventMetadataAuthorization) GetPath() EventMetadataAuthorizationPath {
+	return s.Path
+}
+
+// GetActorHomeProjectID returns the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) GetActorHomeProjectID() OptString {
+	return s.ActorHomeProjectID
+}
+
+// SetPath sets the value of Path.
+func (s *EventMetadataAuthorization) SetPath(val EventMetadataAuthorizationPath) {
+	s.Path = val
+}
+
+// SetActorHomeProjectID sets the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) SetActorHomeProjectID(val OptString) {
+	s.ActorHomeProjectID = val
+}
+
+// `platform_operator`: the deployment's platform operator relation
+// (ADR 075), which administers every project.
+type EventMetadataAuthorizationPath string
+
+const (
+	EventMetadataAuthorizationPathPlatformOperator EventMetadataAuthorizationPath = "platform_operator"
+)
+
+// AllValues returns all EventMetadataAuthorizationPath values.
+func (EventMetadataAuthorizationPath) AllValues() []EventMetadataAuthorizationPath {
+	return []EventMetadataAuthorizationPath{
+		EventMetadataAuthorizationPathPlatformOperator,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventMetadataAuthorizationPath) MarshalText() ([]byte, error) {
+	switch s {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
+	switch EventMetadataAuthorizationPath(data) {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		*s = EventMetadataAuthorizationPathPlatformOperator
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Observed HTTP requestor context on Path A request.api only.
@@ -22560,6 +23786,7 @@ type ExchangeHandoffErrorResponse struct {
 	Internal                Internal
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
+	NotImplemented          NotImplemented
 	ReqInvalid              ReqInvalid
 	SessExchangeConflict    SessExchangeConflict
 	SessInvalidHandoffToken SessInvalidHandoffToken
@@ -22567,6 +23794,7 @@ type ExchangeHandoffErrorResponse struct {
 	SessNotFound            SessNotFound
 	SessTokenCreationFailed SessTokenCreationFailed
 	EncKeyUnknownAlg        EncKeyUnknownAlg
+	Unavailable             Unavailable
 }
 
 // ExchangeHandoffErrorResponseType is oneOf type of ExchangeHandoffErrorResponse.
@@ -22582,6 +23810,7 @@ const (
 	InternalExchangeHandoffErrorResponse                ExchangeHandoffErrorResponseType = "internal"
 	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
 	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
+	NotImplementedExchangeHandoffErrorResponse          ExchangeHandoffErrorResponseType = "not_implemented"
 	ReqInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "req.invalid"
 	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
 	SessInvalidHandoffTokenExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.invalid_handoff_token"
@@ -22589,6 +23818,7 @@ const (
 	SessNotFoundExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "sess.not_found"
 	SessTokenCreationFailedExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.token_creation_failed"
 	EncKeyUnknownAlgExchangeHandoffErrorResponse        ExchangeHandoffErrorResponseType = "enc_key.unknown_alg"
+	UnavailableExchangeHandoffErrorResponse             ExchangeHandoffErrorResponseType = "unavailable"
 )
 
 // IsAttNotFound reports whether ExchangeHandoffErrorResponse is AttNotFound.
@@ -22631,6 +23861,11 @@ func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
 	return s.Type == TknInvalidTknidExchangeHandoffErrorResponse
 }
 
+// IsNotImplemented reports whether ExchangeHandoffErrorResponse is NotImplemented.
+func (s ExchangeHandoffErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedExchangeHandoffErrorResponse
+}
+
 // IsReqInvalid reports whether ExchangeHandoffErrorResponse is ReqInvalid.
 func (s ExchangeHandoffErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidExchangeHandoffErrorResponse
@@ -22664,6 +23899,11 @@ func (s ExchangeHandoffErrorResponse) IsSessTokenCreationFailed() bool {
 // IsEncKeyUnknownAlg reports whether ExchangeHandoffErrorResponse is EncKeyUnknownAlg.
 func (s ExchangeHandoffErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgExchangeHandoffErrorResponse
+}
+
+// IsUnavailable reports whether ExchangeHandoffErrorResponse is Unavailable.
+func (s ExchangeHandoffErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableExchangeHandoffErrorResponse
 }
 
 // SetAttNotFound sets ExchangeHandoffErrorResponse to AttNotFound.
@@ -22834,6 +24074,27 @@ func NewTknInvalidTknidExchangeHandoffErrorResponse(v TknInvalidTknid) ExchangeH
 	return s
 }
 
+// SetNotImplemented sets ExchangeHandoffErrorResponse to NotImplemented.
+func (s *ExchangeHandoffErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedExchangeHandoffErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ExchangeHandoffErrorResponse is NotImplemented.
+func (s ExchangeHandoffErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from NotImplemented.
+func NewNotImplementedExchangeHandoffErrorResponse(v NotImplemented) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ExchangeHandoffErrorResponse to ReqInvalid.
 func (s *ExchangeHandoffErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidExchangeHandoffErrorResponse
@@ -22978,6 +24239,27 @@ func (s ExchangeHandoffErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg,
 func NewEncKeyUnknownAlgExchangeHandoffErrorResponse(v EncKeyUnknownAlg) ExchangeHandoffErrorResponse {
 	var s ExchangeHandoffErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets ExchangeHandoffErrorResponse to Unavailable.
+func (s *ExchangeHandoffErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableExchangeHandoffErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ExchangeHandoffErrorResponse is Unavailable.
+func (s ExchangeHandoffErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from Unavailable.
+func NewUnavailableExchangeHandoffErrorResponse(v Unavailable) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -23730,7 +25012,9 @@ type FinishUserPasskeyRegistrationErrorResponse struct {
 	AuthUnauthorized            AuthUnauthorized
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
+	NotImplemented              NotImplemented
 	ReqInvalid                  ReqInvalid
+	Unavailable                 Unavailable
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
 	UserPasswordEmpty           UserPasswordEmpty
@@ -23754,7 +25038,9 @@ const (
 	AuthUnauthorizedFinishUserPasskeyRegistrationErrorResponse            FinishUserPasskeyRegistrationErrorResponseType = "auth.unauthorized"
 	EvtInvalidFinishUserPasskeyRegistrationErrorResponse                  FinishUserPasskeyRegistrationErrorResponseType = "evt.invalid"
 	InternalFinishUserPasskeyRegistrationErrorResponse                    FinishUserPasskeyRegistrationErrorResponseType = "internal"
+	NotImplementedFinishUserPasskeyRegistrationErrorResponse              FinishUserPasskeyRegistrationErrorResponseType = "not_implemented"
 	ReqInvalidFinishUserPasskeyRegistrationErrorResponse                  FinishUserPasskeyRegistrationErrorResponseType = "req.invalid"
+	UnavailableFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "unavailable"
 	UserInvalidFinishUserPasskeyRegistrationErrorResponse                 FinishUserPasskeyRegistrationErrorResponseType = "user.invalid"
 	UserNotFoundFinishUserPasskeyRegistrationErrorResponse                FinishUserPasskeyRegistrationErrorResponseType = "user.not_found"
 	UserPasswordEmptyFinishUserPasskeyRegistrationErrorResponse           FinishUserPasskeyRegistrationErrorResponseType = "user.password_empty"
@@ -23813,9 +25099,19 @@ func (s FinishUserPasskeyRegistrationErrorResponse) IsInternal() bool {
 	return s.Type == InternalFinishUserPasskeyRegistrationErrorResponse
 }
 
+// IsNotImplemented reports whether FinishUserPasskeyRegistrationErrorResponse is NotImplemented.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedFinishUserPasskeyRegistrationErrorResponse
+}
+
 // IsReqInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is ReqInvalid.
 func (s FinishUserPasskeyRegistrationErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidFinishUserPasskeyRegistrationErrorResponse
+}
+
+// IsUnavailable reports whether FinishUserPasskeyRegistrationErrorResponse is Unavailable.
+func (s FinishUserPasskeyRegistrationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableFinishUserPasskeyRegistrationErrorResponse
 }
 
 // IsUserInvalid reports whether FinishUserPasskeyRegistrationErrorResponse is UserInvalid.
@@ -24058,6 +25354,27 @@ func NewInternalFinishUserPasskeyRegistrationErrorResponse(v Internal) FinishUse
 	return s
 }
 
+// SetNotImplemented sets FinishUserPasskeyRegistrationErrorResponse to NotImplemented.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedFinishUserPasskeyRegistrationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if FinishUserPasskeyRegistrationErrorResponse is NotImplemented.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from NotImplemented.
+func NewNotImplementedFinishUserPasskeyRegistrationErrorResponse(v NotImplemented) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets FinishUserPasskeyRegistrationErrorResponse to ReqInvalid.
 func (s *FinishUserPasskeyRegistrationErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidFinishUserPasskeyRegistrationErrorResponse
@@ -24076,6 +25393,27 @@ func (s FinishUserPasskeyRegistrationErrorResponse) GetReqInvalid() (v ReqInvali
 func NewReqInvalidFinishUserPasskeyRegistrationErrorResponse(v ReqInvalid) FinishUserPasskeyRegistrationErrorResponse {
 	var s FinishUserPasskeyRegistrationErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets FinishUserPasskeyRegistrationErrorResponse to Unavailable.
+func (s *FinishUserPasskeyRegistrationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableFinishUserPasskeyRegistrationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if FinishUserPasskeyRegistrationErrorResponse is Unavailable.
+func (s FinishUserPasskeyRegistrationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableFinishUserPasskeyRegistrationErrorResponse returns new FinishUserPasskeyRegistrationErrorResponse from Unavailable.
+func NewUnavailableFinishUserPasskeyRegistrationErrorResponse(v Unavailable) FinishUserPasskeyRegistrationErrorResponse {
+	var s FinishUserPasskeyRegistrationErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -28582,7 +29920,9 @@ type GetAuthAttemptErrorResponse struct {
 	AttNotFound      AttNotFound
 	AuthUnauthorized AuthUnauthorized
 	Internal         Internal
+	NotImplemented   NotImplemented
 	ReqInvalid       ReqInvalid
+	Unavailable      Unavailable
 }
 
 // GetAuthAttemptErrorResponseType is oneOf type of GetAuthAttemptErrorResponse.
@@ -28593,7 +29933,9 @@ const (
 	AttNotFoundGetAuthAttemptErrorResponse      GetAuthAttemptErrorResponseType = "att.not_found"
 	AuthUnauthorizedGetAuthAttemptErrorResponse GetAuthAttemptErrorResponseType = "auth.unauthorized"
 	InternalGetAuthAttemptErrorResponse         GetAuthAttemptErrorResponseType = "internal"
+	NotImplementedGetAuthAttemptErrorResponse   GetAuthAttemptErrorResponseType = "not_implemented"
 	ReqInvalidGetAuthAttemptErrorResponse       GetAuthAttemptErrorResponseType = "req.invalid"
+	UnavailableGetAuthAttemptErrorResponse      GetAuthAttemptErrorResponseType = "unavailable"
 )
 
 // IsAttNotFound reports whether GetAuthAttemptErrorResponse is AttNotFound.
@@ -28611,9 +29953,19 @@ func (s GetAuthAttemptErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetAuthAttemptErrorResponse
 }
 
+// IsNotImplemented reports whether GetAuthAttemptErrorResponse is NotImplemented.
+func (s GetAuthAttemptErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetAuthAttemptErrorResponse
+}
+
 // IsReqInvalid reports whether GetAuthAttemptErrorResponse is ReqInvalid.
 func (s GetAuthAttemptErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetAuthAttemptErrorResponse
+}
+
+// IsUnavailable reports whether GetAuthAttemptErrorResponse is Unavailable.
+func (s GetAuthAttemptErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetAuthAttemptErrorResponse
 }
 
 // SetAttNotFound sets GetAuthAttemptErrorResponse to AttNotFound.
@@ -28679,6 +30031,27 @@ func NewInternalGetAuthAttemptErrorResponse(v Internal) GetAuthAttemptErrorRespo
 	return s
 }
 
+// SetNotImplemented sets GetAuthAttemptErrorResponse to NotImplemented.
+func (s *GetAuthAttemptErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetAuthAttemptErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetAuthAttemptErrorResponse is NotImplemented.
+func (s GetAuthAttemptErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from NotImplemented.
+func NewNotImplementedGetAuthAttemptErrorResponse(v NotImplemented) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetAuthAttemptErrorResponse to ReqInvalid.
 func (s *GetAuthAttemptErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetAuthAttemptErrorResponse
@@ -28697,6 +30070,27 @@ func (s GetAuthAttemptErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetAuthAttemptErrorResponse(v ReqInvalid) GetAuthAttemptErrorResponse {
 	var s GetAuthAttemptErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetAuthAttemptErrorResponse to Unavailable.
+func (s *GetAuthAttemptErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetAuthAttemptErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetAuthAttemptErrorResponse is Unavailable.
+func (s GetAuthAttemptErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetAuthAttemptErrorResponse returns new GetAuthAttemptErrorResponse from Unavailable.
+func NewUnavailableGetAuthAttemptErrorResponse(v Unavailable) GetAuthAttemptErrorResponse {
+	var s GetAuthAttemptErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -28735,7 +30129,9 @@ type GetBrandingByIdErrorResponse struct {
 	BrndNotFound         BrndNotFound
 	BrndPermissionDenied BrndPermissionDenied
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // GetBrandingByIdErrorResponseType is oneOf type of GetBrandingByIdErrorResponse.
@@ -28747,7 +30143,9 @@ const (
 	BrndNotFoundGetBrandingByIdErrorResponse         GetBrandingByIdErrorResponseType = "brnd.not_found"
 	BrndPermissionDeniedGetBrandingByIdErrorResponse GetBrandingByIdErrorResponseType = "brnd.permission_denied"
 	InternalGetBrandingByIdErrorResponse             GetBrandingByIdErrorResponseType = "internal"
+	NotImplementedGetBrandingByIdErrorResponse       GetBrandingByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetBrandingByIdErrorResponse           GetBrandingByIdErrorResponseType = "req.invalid"
+	UnavailableGetBrandingByIdErrorResponse          GetBrandingByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetBrandingByIdErrorResponse is AuthUnauthorized.
@@ -28770,9 +30168,19 @@ func (s GetBrandingByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetBrandingByIdErrorResponse
 }
 
+// IsNotImplemented reports whether GetBrandingByIdErrorResponse is NotImplemented.
+func (s GetBrandingByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetBrandingByIdErrorResponse
+}
+
 // IsReqInvalid reports whether GetBrandingByIdErrorResponse is ReqInvalid.
 func (s GetBrandingByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetBrandingByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetBrandingByIdErrorResponse is Unavailable.
+func (s GetBrandingByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetBrandingByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetBrandingByIdErrorResponse to AuthUnauthorized.
@@ -28859,6 +30267,27 @@ func NewInternalGetBrandingByIdErrorResponse(v Internal) GetBrandingByIdErrorRes
 	return s
 }
 
+// SetNotImplemented sets GetBrandingByIdErrorResponse to NotImplemented.
+func (s *GetBrandingByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetBrandingByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetBrandingByIdErrorResponse is NotImplemented.
+func (s GetBrandingByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetBrandingByIdErrorResponse(v NotImplemented) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetBrandingByIdErrorResponse to ReqInvalid.
 func (s *GetBrandingByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetBrandingByIdErrorResponse
@@ -28877,6 +30306,27 @@ func (s GetBrandingByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetBrandingByIdErrorResponse(v ReqInvalid) GetBrandingByIdErrorResponse {
 	var s GetBrandingByIdErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetBrandingByIdErrorResponse to Unavailable.
+func (s *GetBrandingByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetBrandingByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetBrandingByIdErrorResponse is Unavailable.
+func (s GetBrandingByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetBrandingByIdErrorResponse returns new GetBrandingByIdErrorResponse from Unavailable.
+func NewUnavailableGetBrandingByIdErrorResponse(v Unavailable) GetBrandingByIdErrorResponse {
+	var s GetBrandingByIdErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -28914,11 +30364,13 @@ type GetClaimStatusErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	ClaimChallengeNotFound ClaimChallengeNotFound
 	Internal               Internal
+	NotImplemented         NotImplemented
 	ProjClaimExpired       ProjClaimExpired
 	ProjClaimWindowExpired ProjClaimWindowExpired
 	ProjNotFound           ProjNotFound
 	ProjPermissionDenied   ProjPermissionDenied
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // GetClaimStatusErrorResponseType is oneOf type of GetClaimStatusErrorResponse.
@@ -28929,11 +30381,13 @@ const (
 	AuthUnauthorizedGetClaimStatusErrorResponse       GetClaimStatusErrorResponseType = "auth.unauthorized"
 	ClaimChallengeNotFoundGetClaimStatusErrorResponse GetClaimStatusErrorResponseType = "claim_challenge.not_found"
 	InternalGetClaimStatusErrorResponse               GetClaimStatusErrorResponseType = "internal"
+	NotImplementedGetClaimStatusErrorResponse         GetClaimStatusErrorResponseType = "not_implemented"
 	ProjClaimExpiredGetClaimStatusErrorResponse       GetClaimStatusErrorResponseType = "proj.claim_expired"
 	ProjClaimWindowExpiredGetClaimStatusErrorResponse GetClaimStatusErrorResponseType = "proj.claim_window_expired"
 	ProjNotFoundGetClaimStatusErrorResponse           GetClaimStatusErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedGetClaimStatusErrorResponse   GetClaimStatusErrorResponseType = "proj.permission_denied"
 	ReqInvalidGetClaimStatusErrorResponse             GetClaimStatusErrorResponseType = "req.invalid"
+	UnavailableGetClaimStatusErrorResponse            GetClaimStatusErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetClaimStatusErrorResponse is AuthUnauthorized.
@@ -28949,6 +30403,11 @@ func (s GetClaimStatusErrorResponse) IsClaimChallengeNotFound() bool {
 // IsInternal reports whether GetClaimStatusErrorResponse is Internal.
 func (s GetClaimStatusErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetClaimStatusErrorResponse
+}
+
+// IsNotImplemented reports whether GetClaimStatusErrorResponse is NotImplemented.
+func (s GetClaimStatusErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetClaimStatusErrorResponse
 }
 
 // IsProjClaimExpired reports whether GetClaimStatusErrorResponse is ProjClaimExpired.
@@ -28974,6 +30433,11 @@ func (s GetClaimStatusErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether GetClaimStatusErrorResponse is ReqInvalid.
 func (s GetClaimStatusErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetClaimStatusErrorResponse
+}
+
+// IsUnavailable reports whether GetClaimStatusErrorResponse is Unavailable.
+func (s GetClaimStatusErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetClaimStatusErrorResponse
 }
 
 // SetAuthUnauthorized sets GetClaimStatusErrorResponse to AuthUnauthorized.
@@ -29036,6 +30500,27 @@ func (s GetClaimStatusErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetClaimStatusErrorResponse(v Internal) GetClaimStatusErrorResponse {
 	var s GetClaimStatusErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetClaimStatusErrorResponse to NotImplemented.
+func (s *GetClaimStatusErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetClaimStatusErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetClaimStatusErrorResponse is NotImplemented.
+func (s GetClaimStatusErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from NotImplemented.
+func NewNotImplementedGetClaimStatusErrorResponse(v NotImplemented) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -29141,6 +30626,27 @@ func (s GetClaimStatusErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetClaimStatusErrorResponse(v ReqInvalid) GetClaimStatusErrorResponse {
 	var s GetClaimStatusErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetClaimStatusErrorResponse to Unavailable.
+func (s *GetClaimStatusErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetClaimStatusErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetClaimStatusErrorResponse is Unavailable.
+func (s GetClaimStatusErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetClaimStatusErrorResponse returns new GetClaimStatusErrorResponse from Unavailable.
+func NewUnavailableGetClaimStatusErrorResponse(v Unavailable) GetClaimStatusErrorResponse {
+	var s GetClaimStatusErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -29393,7 +30899,9 @@ type GetDeploymentByIdErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetDeploymentByIdErrorResponseType is oneOf type of GetDeploymentByIdErrorResponse.
@@ -29405,7 +30913,9 @@ const (
 	DepNotFoundGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "dep.not_found"
 	DepPermissionDeniedGetDeploymentByIdErrorResponse GetDeploymentByIdErrorResponseType = "dep.permission_denied"
 	InternalGetDeploymentByIdErrorResponse            GetDeploymentByIdErrorResponseType = "internal"
+	NotImplementedGetDeploymentByIdErrorResponse      GetDeploymentByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentByIdErrorResponse          GetDeploymentByIdErrorResponseType = "req.invalid"
+	UnavailableGetDeploymentByIdErrorResponse         GetDeploymentByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetDeploymentByIdErrorResponse is AuthUnauthorized.
@@ -29428,9 +30938,19 @@ func (s GetDeploymentByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetDeploymentByIdErrorResponse
 }
 
+// IsNotImplemented reports whether GetDeploymentByIdErrorResponse is NotImplemented.
+func (s GetDeploymentByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetDeploymentByIdErrorResponse
+}
+
 // IsReqInvalid reports whether GetDeploymentByIdErrorResponse is ReqInvalid.
 func (s GetDeploymentByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetDeploymentByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetDeploymentByIdErrorResponse is Unavailable.
+func (s GetDeploymentByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetDeploymentByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetDeploymentByIdErrorResponse to AuthUnauthorized.
@@ -29517,6 +31037,27 @@ func NewInternalGetDeploymentByIdErrorResponse(v Internal) GetDeploymentByIdErro
 	return s
 }
 
+// SetNotImplemented sets GetDeploymentByIdErrorResponse to NotImplemented.
+func (s *GetDeploymentByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetDeploymentByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetDeploymentByIdErrorResponse is NotImplemented.
+func (s GetDeploymentByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetDeploymentByIdErrorResponse(v NotImplemented) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetDeploymentByIdErrorResponse to ReqInvalid.
 func (s *GetDeploymentByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetDeploymentByIdErrorResponse
@@ -29535,6 +31076,27 @@ func (s GetDeploymentByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) 
 func NewReqInvalidGetDeploymentByIdErrorResponse(v ReqInvalid) GetDeploymentByIdErrorResponse {
 	var s GetDeploymentByIdErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetDeploymentByIdErrorResponse to Unavailable.
+func (s *GetDeploymentByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetDeploymentByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetDeploymentByIdErrorResponse is Unavailable.
+func (s GetDeploymentByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetDeploymentByIdErrorResponse returns new GetDeploymentByIdErrorResponse from Unavailable.
+func NewUnavailableGetDeploymentByIdErrorResponse(v Unavailable) GetDeploymentByIdErrorResponse {
+	var s GetDeploymentByIdErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -29575,6 +31137,7 @@ type GetDeploymentVariablesErrorResponse struct {
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
 }
@@ -29590,6 +31153,7 @@ const (
 	InternalGetDeploymentVariablesErrorResponse            GetDeploymentVariablesErrorResponseType = "internal"
 	NotImplementedGetDeploymentVariablesErrorResponse      GetDeploymentVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetDeploymentVariablesErrorResponse          GetDeploymentVariablesErrorResponseType = "req.invalid"
+	UnavailableGetDeploymentVariablesErrorResponse         GetDeploymentVariablesErrorResponseType = "unavailable"
 	VarNotFoundGetDeploymentVariablesErrorResponse         GetDeploymentVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetDeploymentVariablesErrorResponse GetDeploymentVariablesErrorResponseType = "var.permission_denied"
 )
@@ -29622,6 +31186,11 @@ func (s GetDeploymentVariablesErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether GetDeploymentVariablesErrorResponse is ReqInvalid.
 func (s GetDeploymentVariablesErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetDeploymentVariablesErrorResponse
+}
+
+// IsUnavailable reports whether GetDeploymentVariablesErrorResponse is Unavailable.
+func (s GetDeploymentVariablesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetDeploymentVariablesErrorResponse
 }
 
 // IsVarNotFound reports whether GetDeploymentVariablesErrorResponse is VarNotFound.
@@ -29760,6 +31329,27 @@ func NewReqInvalidGetDeploymentVariablesErrorResponse(v ReqInvalid) GetDeploymen
 	return s
 }
 
+// SetUnavailable sets GetDeploymentVariablesErrorResponse to Unavailable.
+func (s *GetDeploymentVariablesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetDeploymentVariablesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetDeploymentVariablesErrorResponse is Unavailable.
+func (s GetDeploymentVariablesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetDeploymentVariablesErrorResponse returns new GetDeploymentVariablesErrorResponse from Unavailable.
+func NewUnavailableGetDeploymentVariablesErrorResponse(v Unavailable) GetDeploymentVariablesErrorResponse {
+	var s GetDeploymentVariablesErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // SetVarNotFound sets GetDeploymentVariablesErrorResponse to VarNotFound.
 func (s *GetDeploymentVariablesErrorResponse) SetVarNotFound(v VarNotFound) {
 	s.Type = VarNotFoundGetDeploymentVariablesErrorResponse
@@ -29838,7 +31428,9 @@ type GetEventErrorResponse struct {
 	EvtNotFound         EvtNotFound
 	EvtPermissionDenied EvtPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetEventErrorResponseType is oneOf type of GetEventErrorResponse.
@@ -29851,7 +31443,9 @@ const (
 	EvtNotFoundGetEventErrorResponse         GetEventErrorResponseType = "evt.not_found"
 	EvtPermissionDeniedGetEventErrorResponse GetEventErrorResponseType = "evt.permission_denied"
 	InternalGetEventErrorResponse            GetEventErrorResponseType = "internal"
+	NotImplementedGetEventErrorResponse      GetEventErrorResponseType = "not_implemented"
 	ReqInvalidGetEventErrorResponse          GetEventErrorResponseType = "req.invalid"
+	UnavailableGetEventErrorResponse         GetEventErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetEventErrorResponse is AuthUnauthorized.
@@ -29875,8 +31469,18 @@ func (s GetEventErrorResponse) IsEvtPermissionDenied() bool {
 // IsInternal reports whether GetEventErrorResponse is Internal.
 func (s GetEventErrorResponse) IsInternal() bool { return s.Type == InternalGetEventErrorResponse }
 
+// IsNotImplemented reports whether GetEventErrorResponse is NotImplemented.
+func (s GetEventErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetEventErrorResponse
+}
+
 // IsReqInvalid reports whether GetEventErrorResponse is ReqInvalid.
 func (s GetEventErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetEventErrorResponse }
+
+// IsUnavailable reports whether GetEventErrorResponse is Unavailable.
+func (s GetEventErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetEventErrorResponse
+}
 
 // SetAuthUnauthorized sets GetEventErrorResponse to AuthUnauthorized.
 func (s *GetEventErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
@@ -29983,6 +31587,27 @@ func NewInternalGetEventErrorResponse(v Internal) GetEventErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetEventErrorResponse to NotImplemented.
+func (s *GetEventErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetEventErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetEventErrorResponse is NotImplemented.
+func (s GetEventErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetEventErrorResponse returns new GetEventErrorResponse from NotImplemented.
+func NewNotImplementedGetEventErrorResponse(v NotImplemented) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetEventErrorResponse to ReqInvalid.
 func (s *GetEventErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetEventErrorResponse
@@ -30001,6 +31626,27 @@ func (s GetEventErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetEventErrorResponse(v ReqInvalid) GetEventErrorResponse {
 	var s GetEventErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetEventErrorResponse to Unavailable.
+func (s *GetEventErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetEventErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetEventErrorResponse is Unavailable.
+func (s GetEventErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetEventErrorResponse returns new GetEventErrorResponse from Unavailable.
+func NewUnavailableGetEventErrorResponse(v Unavailable) GetEventErrorResponse {
+	var s GetEventErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -30053,7 +31699,9 @@ type GetFlowDefinitionErrorResponse struct {
 	Internal                Internal
 	FlowdefMissingID        FlowdefMissingID
 	FlowdefMissingProjectID FlowdefMissingProjectID
+	NotImplemented          NotImplemented
 	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
 }
 
 // GetFlowDefinitionErrorResponseType is oneOf type of GetFlowDefinitionErrorResponse.
@@ -30067,7 +31715,9 @@ const (
 	InternalGetFlowDefinitionErrorResponse                GetFlowDefinitionErrorResponseType = "internal"
 	FlowdefMissingIDGetFlowDefinitionErrorResponse        GetFlowDefinitionErrorResponseType = "flowdef.missing_id"
 	FlowdefMissingProjectIDGetFlowDefinitionErrorResponse GetFlowDefinitionErrorResponseType = "flowdef.missing_project_id"
+	NotImplementedGetFlowDefinitionErrorResponse          GetFlowDefinitionErrorResponseType = "not_implemented"
 	ReqInvalidGetFlowDefinitionErrorResponse              GetFlowDefinitionErrorResponseType = "req.invalid"
+	UnavailableGetFlowDefinitionErrorResponse             GetFlowDefinitionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetFlowDefinitionErrorResponse is AuthUnauthorized.
@@ -30100,9 +31750,19 @@ func (s GetFlowDefinitionErrorResponse) IsFlowdefMissingProjectID() bool {
 	return s.Type == FlowdefMissingProjectIDGetFlowDefinitionErrorResponse
 }
 
+// IsNotImplemented reports whether GetFlowDefinitionErrorResponse is NotImplemented.
+func (s GetFlowDefinitionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetFlowDefinitionErrorResponse
+}
+
 // IsReqInvalid reports whether GetFlowDefinitionErrorResponse is ReqInvalid.
 func (s GetFlowDefinitionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetFlowDefinitionErrorResponse
+}
+
+// IsUnavailable reports whether GetFlowDefinitionErrorResponse is Unavailable.
+func (s GetFlowDefinitionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetFlowDefinitionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetFlowDefinitionErrorResponse to AuthUnauthorized.
@@ -30231,6 +31891,27 @@ func NewFlowdefMissingProjectIDGetFlowDefinitionErrorResponse(v FlowdefMissingPr
 	return s
 }
 
+// SetNotImplemented sets GetFlowDefinitionErrorResponse to NotImplemented.
+func (s *GetFlowDefinitionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetFlowDefinitionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetFlowDefinitionErrorResponse is NotImplemented.
+func (s GetFlowDefinitionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from NotImplemented.
+func NewNotImplementedGetFlowDefinitionErrorResponse(v NotImplemented) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetFlowDefinitionErrorResponse to ReqInvalid.
 func (s *GetFlowDefinitionErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetFlowDefinitionErrorResponse
@@ -30249,6 +31930,27 @@ func (s GetFlowDefinitionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) 
 func NewReqInvalidGetFlowDefinitionErrorResponse(v ReqInvalid) GetFlowDefinitionErrorResponse {
 	var s GetFlowDefinitionErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetFlowDefinitionErrorResponse to Unavailable.
+func (s *GetFlowDefinitionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetFlowDefinitionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetFlowDefinitionErrorResponse is Unavailable.
+func (s GetFlowDefinitionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetFlowDefinitionErrorResponse returns new GetFlowDefinitionErrorResponse from Unavailable.
+func NewUnavailableGetFlowDefinitionErrorResponse(v Unavailable) GetFlowDefinitionErrorResponse {
+	var s GetFlowDefinitionErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -30311,8 +32013,10 @@ type GetFlowStepErrorResponse struct {
 	IdpScopesMissingOpenid      IdpScopesMissingOpenid
 	Internal                    Internal
 	TknInvalid                  TknInvalid
+	NotImplemented              NotImplemented
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
+	Unavailable                 Unavailable
 	UserAlreadyExists           UserAlreadyExists
 	UserConflict                UserConflict
 	UserInvalid                 UserInvalid
@@ -30351,8 +32055,10 @@ const (
 	IdpScopesMissingOpenidGetFlowStepErrorResponse      GetFlowStepErrorResponseType = "idp.scopes_missing_openid"
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
+	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "enc_key.unknown_alg"
+	UnavailableGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "unavailable"
 	UserAlreadyExistsGetFlowStepErrorResponse           GetFlowStepErrorResponseType = "user.already_exists"
 	UserConflictGetFlowStepErrorResponse                GetFlowStepErrorResponseType = "user.conflict"
 	UserInvalidGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "user.invalid"
@@ -30482,6 +32188,11 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 	return s.Type == TknInvalidGetFlowStepErrorResponse
 }
 
+// IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
+func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
 // IsReqInvalid reports whether GetFlowStepErrorResponse is ReqInvalid.
 func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetFlowStepErrorResponse
@@ -30490,6 +32201,11 @@ func (s GetFlowStepErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether GetFlowStepErrorResponse is EncKeyUnknownAlg.
 func (s GetFlowStepErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgGetFlowStepErrorResponse
+}
+
+// IsUnavailable reports whether GetFlowStepErrorResponse is Unavailable.
+func (s GetFlowStepErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetFlowStepErrorResponse
 }
 
 // IsUserAlreadyExists reports whether GetFlowStepErrorResponse is UserAlreadyExists.
@@ -31031,6 +32747,27 @@ func NewTknInvalidGetFlowStepErrorResponse(v TknInvalid) GetFlowStepErrorRespons
 	return s
 }
 
+// SetNotImplemented sets GetFlowStepErrorResponse to NotImplemented.
+func (s *GetFlowStepErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetFlowStepErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetFlowStepErrorResponse is NotImplemented.
+func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from NotImplemented.
+func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetFlowStepErrorResponse to ReqInvalid.
 func (s *GetFlowStepErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetFlowStepErrorResponse
@@ -31070,6 +32807,27 @@ func (s GetFlowStepErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg, ok 
 func NewEncKeyUnknownAlgGetFlowStepErrorResponse(v EncKeyUnknownAlg) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets GetFlowStepErrorResponse to Unavailable.
+func (s *GetFlowStepErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetFlowStepErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetFlowStepErrorResponse is Unavailable.
+func (s GetFlowStepErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from Unavailable.
+func NewUnavailableGetFlowStepErrorResponse(v Unavailable) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -31263,8 +33021,10 @@ type GetGrantErrorResponse struct {
 	GrantNotFound         GrantNotFound
 	GrantPermissionDenied GrantPermissionDenied
 	Internal              Internal
+	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
 	TeamPermissionDenied  TeamPermissionDenied
+	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
 
@@ -31277,8 +33037,10 @@ const (
 	GrantNotFoundGetGrantErrorResponse         GetGrantErrorResponseType = "grant.not_found"
 	GrantPermissionDeniedGetGrantErrorResponse GetGrantErrorResponseType = "grant.permission_denied"
 	InternalGetGrantErrorResponse              GetGrantErrorResponseType = "internal"
+	NotImplementedGetGrantErrorResponse        GetGrantErrorResponseType = "not_implemented"
 	ReqInvalidGetGrantErrorResponse            GetGrantErrorResponseType = "req.invalid"
 	TeamPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "team.permission_denied"
+	UnavailableGetGrantErrorResponse           GetGrantErrorResponseType = "unavailable"
 	UserPermissionDeniedGetGrantErrorResponse  GetGrantErrorResponseType = "user.permission_denied"
 )
 
@@ -31300,12 +33062,22 @@ func (s GetGrantErrorResponse) IsGrantPermissionDenied() bool {
 // IsInternal reports whether GetGrantErrorResponse is Internal.
 func (s GetGrantErrorResponse) IsInternal() bool { return s.Type == InternalGetGrantErrorResponse }
 
+// IsNotImplemented reports whether GetGrantErrorResponse is NotImplemented.
+func (s GetGrantErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetGrantErrorResponse
+}
+
 // IsReqInvalid reports whether GetGrantErrorResponse is ReqInvalid.
 func (s GetGrantErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetGrantErrorResponse }
 
 // IsTeamPermissionDenied reports whether GetGrantErrorResponse is TeamPermissionDenied.
 func (s GetGrantErrorResponse) IsTeamPermissionDenied() bool {
 	return s.Type == TeamPermissionDeniedGetGrantErrorResponse
+}
+
+// IsUnavailable reports whether GetGrantErrorResponse is Unavailable.
+func (s GetGrantErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetGrantErrorResponse
 }
 
 // IsUserPermissionDenied reports whether GetGrantErrorResponse is UserPermissionDenied.
@@ -31397,6 +33169,27 @@ func NewInternalGetGrantErrorResponse(v Internal) GetGrantErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetGrantErrorResponse to NotImplemented.
+func (s *GetGrantErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetGrantErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetGrantErrorResponse is NotImplemented.
+func (s GetGrantErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetGrantErrorResponse returns new GetGrantErrorResponse from NotImplemented.
+func NewNotImplementedGetGrantErrorResponse(v NotImplemented) GetGrantErrorResponse {
+	var s GetGrantErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetGrantErrorResponse to ReqInvalid.
 func (s *GetGrantErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetGrantErrorResponse
@@ -31436,6 +33229,27 @@ func (s GetGrantErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDenied
 func NewTeamPermissionDeniedGetGrantErrorResponse(v TeamPermissionDenied) GetGrantErrorResponse {
 	var s GetGrantErrorResponse
 	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetUnavailable sets GetGrantErrorResponse to Unavailable.
+func (s *GetGrantErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetGrantErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetGrantErrorResponse is Unavailable.
+func (s GetGrantErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetGrantErrorResponse returns new GetGrantErrorResponse from Unavailable.
+func NewUnavailableGetGrantErrorResponse(v Unavailable) GetGrantErrorResponse {
+	var s GetGrantErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -31500,116 +33314,6 @@ type GetGrantUnauthorized ErrorDetails
 
 func (*GetGrantUnauthorized) getGrantRes() {}
 
-// GetHealthErrorResponse represents sum type.
-type GetHealthErrorResponse struct {
-	Type       GetHealthErrorResponseType // switch on this field
-	Internal   Internal
-	ReqInvalid ReqInvalid
-}
-
-// GetHealthErrorResponseType is oneOf type of GetHealthErrorResponse.
-type GetHealthErrorResponseType string
-
-// Possible values for GetHealthErrorResponseType.
-const (
-	InternalGetHealthErrorResponse   GetHealthErrorResponseType = "internal"
-	ReqInvalidGetHealthErrorResponse GetHealthErrorResponseType = "req.invalid"
-)
-
-// IsInternal reports whether GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) IsInternal() bool { return s.Type == InternalGetHealthErrorResponse }
-
-// IsReqInvalid reports whether GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetHealthErrorResponse
-}
-
-// SetInternal sets GetHealthErrorResponse to Internal.
-func (s *GetHealthErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetHealthErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalGetHealthErrorResponse returns new GetHealthErrorResponse from Internal.
-func NewInternalGetHealthErrorResponse(v Internal) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets GetHealthErrorResponse to ReqInvalid.
-func (s *GetHealthErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetHealthErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidGetHealthErrorResponse returns new GetHealthErrorResponse from ReqInvalid.
-func NewReqInvalidGetHealthErrorResponse(v ReqInvalid) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// GetHealthErrorResponseStatusCode wraps GetHealthErrorResponse with StatusCode.
-type GetHealthErrorResponseStatusCode struct {
-	StatusCode int
-	Response   GetHealthErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *GetHealthErrorResponseStatusCode) GetResponse() GetHealthErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *GetHealthErrorResponseStatusCode) SetResponse(val GetHealthErrorResponse) {
-	s.Response = val
-}
-
-func (*GetHealthErrorResponseStatusCode) getHealthRes() {}
-
-type GetHealthOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s GetHealthOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-func (*GetHealthOK) getHealthRes() {}
-
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
 	Type                GetIdpByIdErrorResponseType // switch on this field
@@ -31617,7 +33321,9 @@ type GetIdpByIdErrorResponse struct {
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetIdpByIdErrorResponseType is oneOf type of GetIdpByIdErrorResponse.
@@ -31629,7 +33335,9 @@ const (
 	IdpNotFoundGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedGetIdpByIdErrorResponse GetIdpByIdErrorResponseType = "idp.permission_denied"
 	InternalGetIdpByIdErrorResponse            GetIdpByIdErrorResponseType = "internal"
+	NotImplementedGetIdpByIdErrorResponse      GetIdpByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetIdpByIdErrorResponse          GetIdpByIdErrorResponseType = "req.invalid"
+	UnavailableGetIdpByIdErrorResponse         GetIdpByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetIdpByIdErrorResponse is AuthUnauthorized.
@@ -31650,9 +33358,19 @@ func (s GetIdpByIdErrorResponse) IsIdpPermissionDenied() bool {
 // IsInternal reports whether GetIdpByIdErrorResponse is Internal.
 func (s GetIdpByIdErrorResponse) IsInternal() bool { return s.Type == InternalGetIdpByIdErrorResponse }
 
+// IsNotImplemented reports whether GetIdpByIdErrorResponse is NotImplemented.
+func (s GetIdpByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetIdpByIdErrorResponse
+}
+
 // IsReqInvalid reports whether GetIdpByIdErrorResponse is ReqInvalid.
 func (s GetIdpByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetIdpByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetIdpByIdErrorResponse is Unavailable.
+func (s GetIdpByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetIdpByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetIdpByIdErrorResponse to AuthUnauthorized.
@@ -31739,6 +33457,27 @@ func NewInternalGetIdpByIdErrorResponse(v Internal) GetIdpByIdErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetIdpByIdErrorResponse to NotImplemented.
+func (s *GetIdpByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetIdpByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetIdpByIdErrorResponse is NotImplemented.
+func (s GetIdpByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetIdpByIdErrorResponse(v NotImplemented) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetIdpByIdErrorResponse to ReqInvalid.
 func (s *GetIdpByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetIdpByIdErrorResponse
@@ -31757,6 +33496,27 @@ func (s GetIdpByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetIdpByIdErrorResponse(v ReqInvalid) GetIdpByIdErrorResponse {
 	var s GetIdpByIdErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetIdpByIdErrorResponse to Unavailable.
+func (s *GetIdpByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetIdpByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetIdpByIdErrorResponse is Unavailable.
+func (s GetIdpByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetIdpByIdErrorResponse returns new GetIdpByIdErrorResponse from Unavailable.
+func NewUnavailableGetIdpByIdErrorResponse(v Unavailable) GetIdpByIdErrorResponse {
+	var s GetIdpByIdErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -31807,7 +33567,9 @@ type GetIdpRevisionByIdErrorResponse struct {
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetIdpRevisionByIdErrorResponseType is oneOf type of GetIdpRevisionByIdErrorResponse.
@@ -31819,7 +33581,9 @@ const (
 	IdpNotFoundGetIdpRevisionByIdErrorResponse         GetIdpRevisionByIdErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedGetIdpRevisionByIdErrorResponse GetIdpRevisionByIdErrorResponseType = "idp.permission_denied"
 	InternalGetIdpRevisionByIdErrorResponse            GetIdpRevisionByIdErrorResponseType = "internal"
+	NotImplementedGetIdpRevisionByIdErrorResponse      GetIdpRevisionByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetIdpRevisionByIdErrorResponse          GetIdpRevisionByIdErrorResponseType = "req.invalid"
+	UnavailableGetIdpRevisionByIdErrorResponse         GetIdpRevisionByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetIdpRevisionByIdErrorResponse is AuthUnauthorized.
@@ -31842,9 +33606,19 @@ func (s GetIdpRevisionByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetIdpRevisionByIdErrorResponse
 }
 
+// IsNotImplemented reports whether GetIdpRevisionByIdErrorResponse is NotImplemented.
+func (s GetIdpRevisionByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetIdpRevisionByIdErrorResponse
+}
+
 // IsReqInvalid reports whether GetIdpRevisionByIdErrorResponse is ReqInvalid.
 func (s GetIdpRevisionByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetIdpRevisionByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetIdpRevisionByIdErrorResponse is Unavailable.
+func (s GetIdpRevisionByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetIdpRevisionByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetIdpRevisionByIdErrorResponse to AuthUnauthorized.
@@ -31931,6 +33705,27 @@ func NewInternalGetIdpRevisionByIdErrorResponse(v Internal) GetIdpRevisionByIdEr
 	return s
 }
 
+// SetNotImplemented sets GetIdpRevisionByIdErrorResponse to NotImplemented.
+func (s *GetIdpRevisionByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetIdpRevisionByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetIdpRevisionByIdErrorResponse is NotImplemented.
+func (s GetIdpRevisionByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetIdpRevisionByIdErrorResponse(v NotImplemented) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetIdpRevisionByIdErrorResponse to ReqInvalid.
 func (s *GetIdpRevisionByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetIdpRevisionByIdErrorResponse
@@ -31949,6 +33744,27 @@ func (s GetIdpRevisionByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool)
 func NewReqInvalidGetIdpRevisionByIdErrorResponse(v ReqInvalid) GetIdpRevisionByIdErrorResponse {
 	var s GetIdpRevisionByIdErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetIdpRevisionByIdErrorResponse to Unavailable.
+func (s *GetIdpRevisionByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetIdpRevisionByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetIdpRevisionByIdErrorResponse is Unavailable.
+func (s GetIdpRevisionByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetIdpRevisionByIdErrorResponse returns new GetIdpRevisionByIdErrorResponse from Unavailable.
+func NewUnavailableGetIdpRevisionByIdErrorResponse(v Unavailable) GetIdpRevisionByIdErrorResponse {
+	var s GetIdpRevisionByIdErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -32105,8 +33921,10 @@ type GetMyPasswordStateErrorResponse struct {
 	Type                GetMyPasswordStateErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -32117,8 +33935,10 @@ type GetMyPasswordStateErrorResponseType string
 const (
 	AuthUnauthorizedGetMyPasswordStateErrorResponse    GetMyPasswordStateErrorResponseType = "auth.unauthorized"
 	InternalGetMyPasswordStateErrorResponse            GetMyPasswordStateErrorResponseType = "internal"
+	NotImplementedGetMyPasswordStateErrorResponse      GetMyPasswordStateErrorResponseType = "not_implemented"
 	ReqInvalidGetMyPasswordStateErrorResponse          GetMyPasswordStateErrorResponseType = "req.invalid"
 	SessProjectMismatchGetMyPasswordStateErrorResponse GetMyPasswordStateErrorResponseType = "sess.project_mismatch"
+	UnavailableGetMyPasswordStateErrorResponse         GetMyPasswordStateErrorResponseType = "unavailable"
 	UserNotFoundGetMyPasswordStateErrorResponse        GetMyPasswordStateErrorResponseType = "user.not_found"
 )
 
@@ -32132,6 +33952,11 @@ func (s GetMyPasswordStateErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetMyPasswordStateErrorResponse
 }
 
+// IsNotImplemented reports whether GetMyPasswordStateErrorResponse is NotImplemented.
+func (s GetMyPasswordStateErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetMyPasswordStateErrorResponse
+}
+
 // IsReqInvalid reports whether GetMyPasswordStateErrorResponse is ReqInvalid.
 func (s GetMyPasswordStateErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyPasswordStateErrorResponse
@@ -32140,6 +33965,11 @@ func (s GetMyPasswordStateErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether GetMyPasswordStateErrorResponse is SessProjectMismatch.
 func (s GetMyPasswordStateErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchGetMyPasswordStateErrorResponse
+}
+
+// IsUnavailable reports whether GetMyPasswordStateErrorResponse is Unavailable.
+func (s GetMyPasswordStateErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetMyPasswordStateErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyPasswordStateErrorResponse is UserNotFound.
@@ -32189,6 +34019,27 @@ func NewInternalGetMyPasswordStateErrorResponse(v Internal) GetMyPasswordStateEr
 	return s
 }
 
+// SetNotImplemented sets GetMyPasswordStateErrorResponse to NotImplemented.
+func (s *GetMyPasswordStateErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetMyPasswordStateErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetMyPasswordStateErrorResponse is NotImplemented.
+func (s GetMyPasswordStateErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from NotImplemented.
+func NewNotImplementedGetMyPasswordStateErrorResponse(v NotImplemented) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetMyPasswordStateErrorResponse to ReqInvalid.
 func (s *GetMyPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetMyPasswordStateErrorResponse
@@ -32228,6 +34079,27 @@ func (s GetMyPasswordStateErrorResponse) GetSessProjectMismatch() (v SessProject
 func NewSessProjectMismatchGetMyPasswordStateErrorResponse(v SessProjectMismatch) GetMyPasswordStateErrorResponse {
 	var s GetMyPasswordStateErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets GetMyPasswordStateErrorResponse to Unavailable.
+func (s *GetMyPasswordStateErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetMyPasswordStateErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetMyPasswordStateErrorResponse is Unavailable.
+func (s GetMyPasswordStateErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetMyPasswordStateErrorResponse returns new GetMyPasswordStateErrorResponse from Unavailable.
+func NewUnavailableGetMyPasswordStateErrorResponse(v Unavailable) GetMyPasswordStateErrorResponse {
+	var s GetMyPasswordStateErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -32285,9 +34157,11 @@ type GetMySessionCsrfTokenErrorResponse struct {
 	Type                GetMySessionCsrfTokenErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessNotFound        SessNotFound
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 }
 
 // GetMySessionCsrfTokenErrorResponseType is oneOf type of GetMySessionCsrfTokenErrorResponse.
@@ -32297,9 +34171,11 @@ type GetMySessionCsrfTokenErrorResponseType string
 const (
 	AuthUnauthorizedGetMySessionCsrfTokenErrorResponse    GetMySessionCsrfTokenErrorResponseType = "auth.unauthorized"
 	InternalGetMySessionCsrfTokenErrorResponse            GetMySessionCsrfTokenErrorResponseType = "internal"
+	NotImplementedGetMySessionCsrfTokenErrorResponse      GetMySessionCsrfTokenErrorResponseType = "not_implemented"
 	ReqInvalidGetMySessionCsrfTokenErrorResponse          GetMySessionCsrfTokenErrorResponseType = "req.invalid"
 	SessNotFoundGetMySessionCsrfTokenErrorResponse        GetMySessionCsrfTokenErrorResponseType = "sess.not_found"
 	SessProjectMismatchGetMySessionCsrfTokenErrorResponse GetMySessionCsrfTokenErrorResponseType = "sess.project_mismatch"
+	UnavailableGetMySessionCsrfTokenErrorResponse         GetMySessionCsrfTokenErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetMySessionCsrfTokenErrorResponse is AuthUnauthorized.
@@ -32310,6 +34186,11 @@ func (s GetMySessionCsrfTokenErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetMySessionCsrfTokenErrorResponse is Internal.
 func (s GetMySessionCsrfTokenErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetMySessionCsrfTokenErrorResponse
+}
+
+// IsNotImplemented reports whether GetMySessionCsrfTokenErrorResponse is NotImplemented.
+func (s GetMySessionCsrfTokenErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetMySessionCsrfTokenErrorResponse
 }
 
 // IsReqInvalid reports whether GetMySessionCsrfTokenErrorResponse is ReqInvalid.
@@ -32325,6 +34206,11 @@ func (s GetMySessionCsrfTokenErrorResponse) IsSessNotFound() bool {
 // IsSessProjectMismatch reports whether GetMySessionCsrfTokenErrorResponse is SessProjectMismatch.
 func (s GetMySessionCsrfTokenErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchGetMySessionCsrfTokenErrorResponse
+}
+
+// IsUnavailable reports whether GetMySessionCsrfTokenErrorResponse is Unavailable.
+func (s GetMySessionCsrfTokenErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetMySessionCsrfTokenErrorResponse
 }
 
 // SetAuthUnauthorized sets GetMySessionCsrfTokenErrorResponse to AuthUnauthorized.
@@ -32366,6 +34252,27 @@ func (s GetMySessionCsrfTokenErrorResponse) GetInternal() (v Internal, ok bool) 
 func NewInternalGetMySessionCsrfTokenErrorResponse(v Internal) GetMySessionCsrfTokenErrorResponse {
 	var s GetMySessionCsrfTokenErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetMySessionCsrfTokenErrorResponse to NotImplemented.
+func (s *GetMySessionCsrfTokenErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetMySessionCsrfTokenErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetMySessionCsrfTokenErrorResponse is NotImplemented.
+func (s GetMySessionCsrfTokenErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from NotImplemented.
+func NewNotImplementedGetMySessionCsrfTokenErrorResponse(v NotImplemented) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -32432,6 +34339,27 @@ func NewSessProjectMismatchGetMySessionCsrfTokenErrorResponse(v SessProjectMisma
 	return s
 }
 
+// SetUnavailable sets GetMySessionCsrfTokenErrorResponse to Unavailable.
+func (s *GetMySessionCsrfTokenErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetMySessionCsrfTokenErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetMySessionCsrfTokenErrorResponse is Unavailable.
+func (s GetMySessionCsrfTokenErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetMySessionCsrfTokenErrorResponse returns new GetMySessionCsrfTokenErrorResponse from Unavailable.
+func NewUnavailableGetMySessionCsrfTokenErrorResponse(v Unavailable) GetMySessionCsrfTokenErrorResponse {
+	var s GetMySessionCsrfTokenErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // GetMySessionCsrfTokenErrorResponseStatusCode wraps GetMySessionCsrfTokenErrorResponse with StatusCode.
 type GetMySessionCsrfTokenErrorResponseStatusCode struct {
 	StatusCode int
@@ -32465,9 +34393,11 @@ type GetMySessionErrorResponse struct {
 	Type                GetMySessionErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessNotFound        SessNotFound
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 }
 
 // GetMySessionErrorResponseType is oneOf type of GetMySessionErrorResponse.
@@ -32477,9 +34407,11 @@ type GetMySessionErrorResponseType string
 const (
 	AuthUnauthorizedGetMySessionErrorResponse    GetMySessionErrorResponseType = "auth.unauthorized"
 	InternalGetMySessionErrorResponse            GetMySessionErrorResponseType = "internal"
+	NotImplementedGetMySessionErrorResponse      GetMySessionErrorResponseType = "not_implemented"
 	ReqInvalidGetMySessionErrorResponse          GetMySessionErrorResponseType = "req.invalid"
 	SessNotFoundGetMySessionErrorResponse        GetMySessionErrorResponseType = "sess.not_found"
 	SessProjectMismatchGetMySessionErrorResponse GetMySessionErrorResponseType = "sess.project_mismatch"
+	UnavailableGetMySessionErrorResponse         GetMySessionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetMySessionErrorResponse is AuthUnauthorized.
@@ -32490,6 +34422,11 @@ func (s GetMySessionErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetMySessionErrorResponse is Internal.
 func (s GetMySessionErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetMySessionErrorResponse
+}
+
+// IsNotImplemented reports whether GetMySessionErrorResponse is NotImplemented.
+func (s GetMySessionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetMySessionErrorResponse
 }
 
 // IsReqInvalid reports whether GetMySessionErrorResponse is ReqInvalid.
@@ -32505,6 +34442,11 @@ func (s GetMySessionErrorResponse) IsSessNotFound() bool {
 // IsSessProjectMismatch reports whether GetMySessionErrorResponse is SessProjectMismatch.
 func (s GetMySessionErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchGetMySessionErrorResponse
+}
+
+// IsUnavailable reports whether GetMySessionErrorResponse is Unavailable.
+func (s GetMySessionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetMySessionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetMySessionErrorResponse to AuthUnauthorized.
@@ -32546,6 +34488,27 @@ func (s GetMySessionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetMySessionErrorResponse(v Internal) GetMySessionErrorResponse {
 	var s GetMySessionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetMySessionErrorResponse to NotImplemented.
+func (s *GetMySessionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetMySessionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetMySessionErrorResponse is NotImplemented.
+func (s GetMySessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetMySessionErrorResponse returns new GetMySessionErrorResponse from NotImplemented.
+func NewNotImplementedGetMySessionErrorResponse(v NotImplemented) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -32612,6 +34575,27 @@ func NewSessProjectMismatchGetMySessionErrorResponse(v SessProjectMismatch) GetM
 	return s
 }
 
+// SetUnavailable sets GetMySessionErrorResponse to Unavailable.
+func (s *GetMySessionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetMySessionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetMySessionErrorResponse is Unavailable.
+func (s GetMySessionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetMySessionErrorResponse returns new GetMySessionErrorResponse from Unavailable.
+func NewUnavailableGetMySessionErrorResponse(v Unavailable) GetMySessionErrorResponse {
+	var s GetMySessionErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // GetMySessionErrorResponseStatusCode wraps GetMySessionErrorResponse with StatusCode.
 type GetMySessionErrorResponseStatusCode struct {
 	StatusCode int
@@ -32645,8 +34629,10 @@ type GetMyUserErrorResponse struct {
 	Type                GetMyUserErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -32657,8 +34643,10 @@ type GetMyUserErrorResponseType string
 const (
 	AuthUnauthorizedGetMyUserErrorResponse    GetMyUserErrorResponseType = "auth.unauthorized"
 	InternalGetMyUserErrorResponse            GetMyUserErrorResponseType = "internal"
+	NotImplementedGetMyUserErrorResponse      GetMyUserErrorResponseType = "not_implemented"
 	ReqInvalidGetMyUserErrorResponse          GetMyUserErrorResponseType = "req.invalid"
 	SessProjectMismatchGetMyUserErrorResponse GetMyUserErrorResponseType = "sess.project_mismatch"
+	UnavailableGetMyUserErrorResponse         GetMyUserErrorResponseType = "unavailable"
 	UserNotFoundGetMyUserErrorResponse        GetMyUserErrorResponseType = "user.not_found"
 )
 
@@ -32670,6 +34658,11 @@ func (s GetMyUserErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetMyUserErrorResponse is Internal.
 func (s GetMyUserErrorResponse) IsInternal() bool { return s.Type == InternalGetMyUserErrorResponse }
 
+// IsNotImplemented reports whether GetMyUserErrorResponse is NotImplemented.
+func (s GetMyUserErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetMyUserErrorResponse
+}
+
 // IsReqInvalid reports whether GetMyUserErrorResponse is ReqInvalid.
 func (s GetMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserErrorResponse
@@ -32678,6 +34671,11 @@ func (s GetMyUserErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether GetMyUserErrorResponse is SessProjectMismatch.
 func (s GetMyUserErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchGetMyUserErrorResponse
+}
+
+// IsUnavailable reports whether GetMyUserErrorResponse is Unavailable.
+func (s GetMyUserErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetMyUserErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserErrorResponse is UserNotFound.
@@ -32727,6 +34725,27 @@ func NewInternalGetMyUserErrorResponse(v Internal) GetMyUserErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetMyUserErrorResponse to NotImplemented.
+func (s *GetMyUserErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetMyUserErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetMyUserErrorResponse is NotImplemented.
+func (s GetMyUserErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetMyUserErrorResponse returns new GetMyUserErrorResponse from NotImplemented.
+func NewNotImplementedGetMyUserErrorResponse(v NotImplemented) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetMyUserErrorResponse to ReqInvalid.
 func (s *GetMyUserErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetMyUserErrorResponse
@@ -32766,6 +34785,27 @@ func (s GetMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatch,
 func NewSessProjectMismatchGetMyUserErrorResponse(v SessProjectMismatch) GetMyUserErrorResponse {
 	var s GetMyUserErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets GetMyUserErrorResponse to Unavailable.
+func (s *GetMyUserErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetMyUserErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetMyUserErrorResponse is Unavailable.
+func (s GetMyUserErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetMyUserErrorResponse returns new GetMyUserErrorResponse from Unavailable.
+func NewUnavailableGetMyUserErrorResponse(v Unavailable) GetMyUserErrorResponse {
+	var s GetMyUserErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -32823,8 +34863,10 @@ type GetMyUserSchemaErrorResponse struct {
 	Type                GetMyUserSchemaErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -32835,8 +34877,10 @@ type GetMyUserSchemaErrorResponseType string
 const (
 	AuthUnauthorizedGetMyUserSchemaErrorResponse    GetMyUserSchemaErrorResponseType = "auth.unauthorized"
 	InternalGetMyUserSchemaErrorResponse            GetMyUserSchemaErrorResponseType = "internal"
+	NotImplementedGetMyUserSchemaErrorResponse      GetMyUserSchemaErrorResponseType = "not_implemented"
 	ReqInvalidGetMyUserSchemaErrorResponse          GetMyUserSchemaErrorResponseType = "req.invalid"
 	SessProjectMismatchGetMyUserSchemaErrorResponse GetMyUserSchemaErrorResponseType = "sess.project_mismatch"
+	UnavailableGetMyUserSchemaErrorResponse         GetMyUserSchemaErrorResponseType = "unavailable"
 	UserNotFoundGetMyUserSchemaErrorResponse        GetMyUserSchemaErrorResponseType = "user.not_found"
 )
 
@@ -32850,6 +34894,11 @@ func (s GetMyUserSchemaErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetMyUserSchemaErrorResponse
 }
 
+// IsNotImplemented reports whether GetMyUserSchemaErrorResponse is NotImplemented.
+func (s GetMyUserSchemaErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetMyUserSchemaErrorResponse
+}
+
 // IsReqInvalid reports whether GetMyUserSchemaErrorResponse is ReqInvalid.
 func (s GetMyUserSchemaErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetMyUserSchemaErrorResponse
@@ -32858,6 +34907,11 @@ func (s GetMyUserSchemaErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether GetMyUserSchemaErrorResponse is SessProjectMismatch.
 func (s GetMyUserSchemaErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchGetMyUserSchemaErrorResponse
+}
+
+// IsUnavailable reports whether GetMyUserSchemaErrorResponse is Unavailable.
+func (s GetMyUserSchemaErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetMyUserSchemaErrorResponse
 }
 
 // IsUserNotFound reports whether GetMyUserSchemaErrorResponse is UserNotFound.
@@ -32907,6 +34961,27 @@ func NewInternalGetMyUserSchemaErrorResponse(v Internal) GetMyUserSchemaErrorRes
 	return s
 }
 
+// SetNotImplemented sets GetMyUserSchemaErrorResponse to NotImplemented.
+func (s *GetMyUserSchemaErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetMyUserSchemaErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetMyUserSchemaErrorResponse is NotImplemented.
+func (s GetMyUserSchemaErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetMyUserSchemaErrorResponse returns new GetMyUserSchemaErrorResponse from NotImplemented.
+func NewNotImplementedGetMyUserSchemaErrorResponse(v NotImplemented) GetMyUserSchemaErrorResponse {
+	var s GetMyUserSchemaErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetMyUserSchemaErrorResponse to ReqInvalid.
 func (s *GetMyUserSchemaErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetMyUserSchemaErrorResponse
@@ -32946,6 +35021,27 @@ func (s GetMyUserSchemaErrorResponse) GetSessProjectMismatch() (v SessProjectMis
 func NewSessProjectMismatchGetMyUserSchemaErrorResponse(v SessProjectMismatch) GetMyUserSchemaErrorResponse {
 	var s GetMyUserSchemaErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets GetMyUserSchemaErrorResponse to Unavailable.
+func (s *GetMyUserSchemaErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetMyUserSchemaErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetMyUserSchemaErrorResponse is Unavailable.
+func (s GetMyUserSchemaErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetMyUserSchemaErrorResponse returns new GetMyUserSchemaErrorResponse from Unavailable.
+func NewUnavailableGetMyUserSchemaErrorResponse(v Unavailable) GetMyUserSchemaErrorResponse {
+	var s GetMyUserSchemaErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -32998,14 +35094,250 @@ func (s *GetMyUserSchemaErrorResponseStatusCode) SetResponse(val GetMyUserSchema
 
 func (*GetMyUserSchemaErrorResponseStatusCode) getMyUserSchemaRes() {}
 
+// GetPolicyErrorResponse represents sum type.
+type GetPolicyErrorResponse struct {
+	Type                GetPolicyErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// GetPolicyErrorResponseType is oneOf type of GetPolicyErrorResponse.
+type GetPolicyErrorResponseType string
+
+// Possible values for GetPolicyErrorResponseType.
+const (
+	AuthUnauthorizedGetPolicyErrorResponse    GetPolicyErrorResponseType = "auth.unauthorized"
+	InternalGetPolicyErrorResponse            GetPolicyErrorResponseType = "internal"
+	NotImplementedGetPolicyErrorResponse      GetPolicyErrorResponseType = "not_implemented"
+	PolNotFoundGetPolicyErrorResponse         GetPolicyErrorResponseType = "pol.not_found"
+	PolPermissionDeniedGetPolicyErrorResponse GetPolicyErrorResponseType = "pol.permission_denied"
+	ReqInvalidGetPolicyErrorResponse          GetPolicyErrorResponseType = "req.invalid"
+	UnavailableGetPolicyErrorResponse         GetPolicyErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether GetPolicyErrorResponse is AuthUnauthorized.
+func (s GetPolicyErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetPolicyErrorResponse
+}
+
+// IsInternal reports whether GetPolicyErrorResponse is Internal.
+func (s GetPolicyErrorResponse) IsInternal() bool { return s.Type == InternalGetPolicyErrorResponse }
+
+// IsNotImplemented reports whether GetPolicyErrorResponse is NotImplemented.
+func (s GetPolicyErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetPolicyErrorResponse
+}
+
+// IsPolNotFound reports whether GetPolicyErrorResponse is PolNotFound.
+func (s GetPolicyErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundGetPolicyErrorResponse
+}
+
+// IsPolPermissionDenied reports whether GetPolicyErrorResponse is PolPermissionDenied.
+func (s GetPolicyErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedGetPolicyErrorResponse
+}
+
+// IsReqInvalid reports whether GetPolicyErrorResponse is ReqInvalid.
+func (s GetPolicyErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetPolicyErrorResponse
+}
+
+// IsUnavailable reports whether GetPolicyErrorResponse is Unavailable.
+func (s GetPolicyErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetPolicyErrorResponse
+}
+
+// SetAuthUnauthorized sets GetPolicyErrorResponse to AuthUnauthorized.
+func (s *GetPolicyErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetPolicyErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetPolicyErrorResponse is AuthUnauthorized.
+func (s GetPolicyErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetPolicyErrorResponse returns new GetPolicyErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetPolicyErrorResponse(v AuthUnauthorized) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets GetPolicyErrorResponse to Internal.
+func (s *GetPolicyErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetPolicyErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetPolicyErrorResponse is Internal.
+func (s GetPolicyErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetPolicyErrorResponse returns new GetPolicyErrorResponse from Internal.
+func NewInternalGetPolicyErrorResponse(v Internal) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetPolicyErrorResponse to NotImplemented.
+func (s *GetPolicyErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetPolicyErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetPolicyErrorResponse is NotImplemented.
+func (s GetPolicyErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetPolicyErrorResponse returns new GetPolicyErrorResponse from NotImplemented.
+func NewNotImplementedGetPolicyErrorResponse(v NotImplemented) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets GetPolicyErrorResponse to PolNotFound.
+func (s *GetPolicyErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundGetPolicyErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if GetPolicyErrorResponse is PolNotFound.
+func (s GetPolicyErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundGetPolicyErrorResponse returns new GetPolicyErrorResponse from PolNotFound.
+func NewPolNotFoundGetPolicyErrorResponse(v PolNotFound) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets GetPolicyErrorResponse to PolPermissionDenied.
+func (s *GetPolicyErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedGetPolicyErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if GetPolicyErrorResponse is PolPermissionDenied.
+func (s GetPolicyErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedGetPolicyErrorResponse returns new GetPolicyErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedGetPolicyErrorResponse(v PolPermissionDenied) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets GetPolicyErrorResponse to ReqInvalid.
+func (s *GetPolicyErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetPolicyErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetPolicyErrorResponse is ReqInvalid.
+func (s GetPolicyErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetPolicyErrorResponse returns new GetPolicyErrorResponse from ReqInvalid.
+func NewReqInvalidGetPolicyErrorResponse(v ReqInvalid) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetPolicyErrorResponse to Unavailable.
+func (s *GetPolicyErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetPolicyErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetPolicyErrorResponse is Unavailable.
+func (s GetPolicyErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetPolicyErrorResponse returns new GetPolicyErrorResponse from Unavailable.
+func NewUnavailableGetPolicyErrorResponse(v Unavailable) GetPolicyErrorResponse {
+	var s GetPolicyErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetPolicyErrorResponseStatusCode wraps GetPolicyErrorResponse with StatusCode.
+type GetPolicyErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetPolicyErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetPolicyErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetPolicyErrorResponseStatusCode) GetResponse() GetPolicyErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetPolicyErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetPolicyErrorResponseStatusCode) SetResponse(val GetPolicyErrorResponse) {
+	s.Response = val
+}
+
+func (*GetPolicyErrorResponseStatusCode) getPolicyRes() {}
+
 // GetPolicyRevisionErrorResponse represents sum type.
 type GetPolicyRevisionErrorResponse struct {
 	Type                GetPolicyRevisionErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	PolNotFound         PolNotFound
 	PolPermissionDenied PolPermissionDenied
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetPolicyRevisionErrorResponseType is oneOf type of GetPolicyRevisionErrorResponse.
@@ -33015,9 +35347,11 @@ type GetPolicyRevisionErrorResponseType string
 const (
 	AuthUnauthorizedGetPolicyRevisionErrorResponse    GetPolicyRevisionErrorResponseType = "auth.unauthorized"
 	InternalGetPolicyRevisionErrorResponse            GetPolicyRevisionErrorResponseType = "internal"
+	NotImplementedGetPolicyRevisionErrorResponse      GetPolicyRevisionErrorResponseType = "not_implemented"
 	PolNotFoundGetPolicyRevisionErrorResponse         GetPolicyRevisionErrorResponseType = "pol.not_found"
 	PolPermissionDeniedGetPolicyRevisionErrorResponse GetPolicyRevisionErrorResponseType = "pol.permission_denied"
 	ReqInvalidGetPolicyRevisionErrorResponse          GetPolicyRevisionErrorResponseType = "req.invalid"
+	UnavailableGetPolicyRevisionErrorResponse         GetPolicyRevisionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetPolicyRevisionErrorResponse is AuthUnauthorized.
@@ -33028,6 +35362,11 @@ func (s GetPolicyRevisionErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetPolicyRevisionErrorResponse is Internal.
 func (s GetPolicyRevisionErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetPolicyRevisionErrorResponse
+}
+
+// IsNotImplemented reports whether GetPolicyRevisionErrorResponse is NotImplemented.
+func (s GetPolicyRevisionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetPolicyRevisionErrorResponse
 }
 
 // IsPolNotFound reports whether GetPolicyRevisionErrorResponse is PolNotFound.
@@ -33043,6 +35382,11 @@ func (s GetPolicyRevisionErrorResponse) IsPolPermissionDenied() bool {
 // IsReqInvalid reports whether GetPolicyRevisionErrorResponse is ReqInvalid.
 func (s GetPolicyRevisionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetPolicyRevisionErrorResponse
+}
+
+// IsUnavailable reports whether GetPolicyRevisionErrorResponse is Unavailable.
+func (s GetPolicyRevisionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetPolicyRevisionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetPolicyRevisionErrorResponse to AuthUnauthorized.
@@ -33084,6 +35428,27 @@ func (s GetPolicyRevisionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetPolicyRevisionErrorResponse(v Internal) GetPolicyRevisionErrorResponse {
 	var s GetPolicyRevisionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetPolicyRevisionErrorResponse to NotImplemented.
+func (s *GetPolicyRevisionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetPolicyRevisionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetPolicyRevisionErrorResponse is NotImplemented.
+func (s GetPolicyRevisionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from NotImplemented.
+func NewNotImplementedGetPolicyRevisionErrorResponse(v NotImplemented) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -33147,6 +35512,27 @@ func (s GetPolicyRevisionErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) 
 func NewReqInvalidGetPolicyRevisionErrorResponse(v ReqInvalid) GetPolicyRevisionErrorResponse {
 	var s GetPolicyRevisionErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetPolicyRevisionErrorResponse to Unavailable.
+func (s *GetPolicyRevisionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetPolicyRevisionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetPolicyRevisionErrorResponse is Unavailable.
+func (s GetPolicyRevisionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetPolicyRevisionErrorResponse returns new GetPolicyRevisionErrorResponse from Unavailable.
+func NewUnavailableGetPolicyRevisionErrorResponse(v Unavailable) GetPolicyRevisionErrorResponse {
+	var s GetPolicyRevisionErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -33528,14 +35914,32 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 
 func (*GetReadyOK) getReadyRes() {}
 
+type GetReadyServiceUnavailable struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s GetReadyServiceUnavailable) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*GetReadyServiceUnavailable) getReadyRes() {}
+
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {
 	Type                GetReleaseByIdErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	RelNotFound         RelNotFound
 	RelPermissionDenied RelPermissionDenied
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetReleaseByIdErrorResponseType is oneOf type of GetReleaseByIdErrorResponse.
@@ -33545,9 +35949,11 @@ type GetReleaseByIdErrorResponseType string
 const (
 	AuthUnauthorizedGetReleaseByIdErrorResponse    GetReleaseByIdErrorResponseType = "auth.unauthorized"
 	InternalGetReleaseByIdErrorResponse            GetReleaseByIdErrorResponseType = "internal"
+	NotImplementedGetReleaseByIdErrorResponse      GetReleaseByIdErrorResponseType = "not_implemented"
 	RelNotFoundGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "rel.not_found"
 	RelPermissionDeniedGetReleaseByIdErrorResponse GetReleaseByIdErrorResponseType = "rel.permission_denied"
 	ReqInvalidGetReleaseByIdErrorResponse          GetReleaseByIdErrorResponseType = "req.invalid"
+	UnavailableGetReleaseByIdErrorResponse         GetReleaseByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetReleaseByIdErrorResponse is AuthUnauthorized.
@@ -33558,6 +35964,11 @@ func (s GetReleaseByIdErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether GetReleaseByIdErrorResponse is Internal.
 func (s GetReleaseByIdErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetReleaseByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetReleaseByIdErrorResponse is NotImplemented.
+func (s GetReleaseByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetReleaseByIdErrorResponse
 }
 
 // IsRelNotFound reports whether GetReleaseByIdErrorResponse is RelNotFound.
@@ -33573,6 +35984,11 @@ func (s GetReleaseByIdErrorResponse) IsRelPermissionDenied() bool {
 // IsReqInvalid reports whether GetReleaseByIdErrorResponse is ReqInvalid.
 func (s GetReleaseByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetReleaseByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetReleaseByIdErrorResponse is Unavailable.
+func (s GetReleaseByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetReleaseByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetReleaseByIdErrorResponse to AuthUnauthorized.
@@ -33614,6 +36030,27 @@ func (s GetReleaseByIdErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetReleaseByIdErrorResponse(v Internal) GetReleaseByIdErrorResponse {
 	var s GetReleaseByIdErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetReleaseByIdErrorResponse to NotImplemented.
+func (s *GetReleaseByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetReleaseByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetReleaseByIdErrorResponse is NotImplemented.
+func (s GetReleaseByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetReleaseByIdErrorResponse(v NotImplemented) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -33680,6 +36117,27 @@ func NewReqInvalidGetReleaseByIdErrorResponse(v ReqInvalid) GetReleaseByIdErrorR
 	return s
 }
 
+// SetUnavailable sets GetReleaseByIdErrorResponse to Unavailable.
+func (s *GetReleaseByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetReleaseByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetReleaseByIdErrorResponse is Unavailable.
+func (s GetReleaseByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetReleaseByIdErrorResponse returns new GetReleaseByIdErrorResponse from Unavailable.
+func NewUnavailableGetReleaseByIdErrorResponse(v Unavailable) GetReleaseByIdErrorResponse {
+	var s GetReleaseByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // GetReleaseByIdErrorResponseStatusCode wraps GetReleaseByIdErrorResponse with StatusCode.
 type GetReleaseByIdErrorResponseStatusCode struct {
 	StatusCode int
@@ -33715,7 +36173,9 @@ type GetSchemaByIdErrorResponse struct {
 	Internal            Internal
 	SchNotFound         SchNotFound
 	SchPermissionDenied SchPermissionDenied
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // GetSchemaByIdErrorResponseType is oneOf type of GetSchemaByIdErrorResponse.
@@ -33727,7 +36187,9 @@ const (
 	InternalGetSchemaByIdErrorResponse            GetSchemaByIdErrorResponseType = "internal"
 	SchNotFoundGetSchemaByIdErrorResponse         GetSchemaByIdErrorResponseType = "sch.not_found"
 	SchPermissionDeniedGetSchemaByIdErrorResponse GetSchemaByIdErrorResponseType = "sch.permission_denied"
+	NotImplementedGetSchemaByIdErrorResponse      GetSchemaByIdErrorResponseType = "not_implemented"
 	ReqInvalidGetSchemaByIdErrorResponse          GetSchemaByIdErrorResponseType = "req.invalid"
+	UnavailableGetSchemaByIdErrorResponse         GetSchemaByIdErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetSchemaByIdErrorResponse is AuthUnauthorized.
@@ -33750,9 +36212,19 @@ func (s GetSchemaByIdErrorResponse) IsSchPermissionDenied() bool {
 	return s.Type == SchPermissionDeniedGetSchemaByIdErrorResponse
 }
 
+// IsNotImplemented reports whether GetSchemaByIdErrorResponse is NotImplemented.
+func (s GetSchemaByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetSchemaByIdErrorResponse
+}
+
 // IsReqInvalid reports whether GetSchemaByIdErrorResponse is ReqInvalid.
 func (s GetSchemaByIdErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetSchemaByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetSchemaByIdErrorResponse is Unavailable.
+func (s GetSchemaByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetSchemaByIdErrorResponse
 }
 
 // SetAuthUnauthorized sets GetSchemaByIdErrorResponse to AuthUnauthorized.
@@ -33839,6 +36311,27 @@ func NewSchPermissionDeniedGetSchemaByIdErrorResponse(v SchPermissionDenied) Get
 	return s
 }
 
+// SetNotImplemented sets GetSchemaByIdErrorResponse to NotImplemented.
+func (s *GetSchemaByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetSchemaByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetSchemaByIdErrorResponse is NotImplemented.
+func (s GetSchemaByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetSchemaByIdErrorResponse(v NotImplemented) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetSchemaByIdErrorResponse to ReqInvalid.
 func (s *GetSchemaByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetSchemaByIdErrorResponse
@@ -33857,6 +36350,27 @@ func (s GetSchemaByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetSchemaByIdErrorResponse(v ReqInvalid) GetSchemaByIdErrorResponse {
 	var s GetSchemaByIdErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetSchemaByIdErrorResponse to Unavailable.
+func (s *GetSchemaByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetSchemaByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetSchemaByIdErrorResponse is Unavailable.
+func (s GetSchemaByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetSchemaByIdErrorResponse returns new GetSchemaByIdErrorResponse from Unavailable.
+func NewUnavailableGetSchemaByIdErrorResponse(v Unavailable) GetSchemaByIdErrorResponse {
+	var s GetSchemaByIdErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -33893,9 +36407,11 @@ type GetSessionErrorResponse struct {
 	Type                 GetSessionErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	SessNotFound         SessNotFound
 	SessPermissionDenied SessPermissionDenied
+	Unavailable          Unavailable
 }
 
 // GetSessionErrorResponseType is oneOf type of GetSessionErrorResponse.
@@ -33905,9 +36421,11 @@ type GetSessionErrorResponseType string
 const (
 	AuthUnauthorizedGetSessionErrorResponse     GetSessionErrorResponseType = "auth.unauthorized"
 	InternalGetSessionErrorResponse             GetSessionErrorResponseType = "internal"
+	NotImplementedGetSessionErrorResponse       GetSessionErrorResponseType = "not_implemented"
 	ReqInvalidGetSessionErrorResponse           GetSessionErrorResponseType = "req.invalid"
 	SessNotFoundGetSessionErrorResponse         GetSessionErrorResponseType = "sess.not_found"
 	SessPermissionDeniedGetSessionErrorResponse GetSessionErrorResponseType = "sess.permission_denied"
+	UnavailableGetSessionErrorResponse          GetSessionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetSessionErrorResponse is AuthUnauthorized.
@@ -33917,6 +36435,11 @@ func (s GetSessionErrorResponse) IsAuthUnauthorized() bool {
 
 // IsInternal reports whether GetSessionErrorResponse is Internal.
 func (s GetSessionErrorResponse) IsInternal() bool { return s.Type == InternalGetSessionErrorResponse }
+
+// IsNotImplemented reports whether GetSessionErrorResponse is NotImplemented.
+func (s GetSessionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetSessionErrorResponse
+}
 
 // IsReqInvalid reports whether GetSessionErrorResponse is ReqInvalid.
 func (s GetSessionErrorResponse) IsReqInvalid() bool {
@@ -33931,6 +36454,11 @@ func (s GetSessionErrorResponse) IsSessNotFound() bool {
 // IsSessPermissionDenied reports whether GetSessionErrorResponse is SessPermissionDenied.
 func (s GetSessionErrorResponse) IsSessPermissionDenied() bool {
 	return s.Type == SessPermissionDeniedGetSessionErrorResponse
+}
+
+// IsUnavailable reports whether GetSessionErrorResponse is Unavailable.
+func (s GetSessionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetSessionErrorResponse
 }
 
 // SetAuthUnauthorized sets GetSessionErrorResponse to AuthUnauthorized.
@@ -33972,6 +36500,27 @@ func (s GetSessionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetSessionErrorResponse(v Internal) GetSessionErrorResponse {
 	var s GetSessionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetSessionErrorResponse to NotImplemented.
+func (s *GetSessionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetSessionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetSessionErrorResponse is NotImplemented.
+func (s GetSessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetSessionErrorResponse returns new GetSessionErrorResponse from NotImplemented.
+func NewNotImplementedGetSessionErrorResponse(v NotImplemented) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -34038,6 +36587,27 @@ func NewSessPermissionDeniedGetSessionErrorResponse(v SessPermissionDenied) GetS
 	return s
 }
 
+// SetUnavailable sets GetSessionErrorResponse to Unavailable.
+func (s *GetSessionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetSessionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetSessionErrorResponse is Unavailable.
+func (s GetSessionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetSessionErrorResponse returns new GetSessionErrorResponse from Unavailable.
+func NewUnavailableGetSessionErrorResponse(v Unavailable) GetSessionErrorResponse {
+	var s GetSessionErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // GetSessionErrorResponseStatusCode wraps GetSessionErrorResponse with StatusCode.
 type GetSessionErrorResponseStatusCode struct {
 	StatusCode int
@@ -34083,9 +36653,11 @@ type GetTeamErrorResponse struct {
 	Type                 GetTeamErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamPermissionDenied TeamPermissionDenied
+	Unavailable          Unavailable
 }
 
 // GetTeamErrorResponseType is oneOf type of GetTeamErrorResponse.
@@ -34095,9 +36667,11 @@ type GetTeamErrorResponseType string
 const (
 	AuthUnauthorizedGetTeamErrorResponse     GetTeamErrorResponseType = "auth.unauthorized"
 	InternalGetTeamErrorResponse             GetTeamErrorResponseType = "internal"
+	NotImplementedGetTeamErrorResponse       GetTeamErrorResponseType = "not_implemented"
 	ReqInvalidGetTeamErrorResponse           GetTeamErrorResponseType = "req.invalid"
 	TeamTeamNotFoundGetTeamErrorResponse     GetTeamErrorResponseType = "team.team_not_found"
 	TeamPermissionDeniedGetTeamErrorResponse GetTeamErrorResponseType = "team.permission_denied"
+	UnavailableGetTeamErrorResponse          GetTeamErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether GetTeamErrorResponse is AuthUnauthorized.
@@ -34107,6 +36681,11 @@ func (s GetTeamErrorResponse) IsAuthUnauthorized() bool {
 
 // IsInternal reports whether GetTeamErrorResponse is Internal.
 func (s GetTeamErrorResponse) IsInternal() bool { return s.Type == InternalGetTeamErrorResponse }
+
+// IsNotImplemented reports whether GetTeamErrorResponse is NotImplemented.
+func (s GetTeamErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetTeamErrorResponse
+}
 
 // IsReqInvalid reports whether GetTeamErrorResponse is ReqInvalid.
 func (s GetTeamErrorResponse) IsReqInvalid() bool { return s.Type == ReqInvalidGetTeamErrorResponse }
@@ -34120,6 +36699,9 @@ func (s GetTeamErrorResponse) IsTeamTeamNotFound() bool {
 func (s GetTeamErrorResponse) IsTeamPermissionDenied() bool {
 	return s.Type == TeamPermissionDeniedGetTeamErrorResponse
 }
+
+// IsUnavailable reports whether GetTeamErrorResponse is Unavailable.
+func (s GetTeamErrorResponse) IsUnavailable() bool { return s.Type == UnavailableGetTeamErrorResponse }
 
 // SetAuthUnauthorized sets GetTeamErrorResponse to AuthUnauthorized.
 func (s *GetTeamErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
@@ -34160,6 +36742,27 @@ func (s GetTeamErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalGetTeamErrorResponse(v Internal) GetTeamErrorResponse {
 	var s GetTeamErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetTeamErrorResponse to NotImplemented.
+func (s *GetTeamErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetTeamErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetTeamErrorResponse is NotImplemented.
+func (s GetTeamErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetTeamErrorResponse returns new GetTeamErrorResponse from NotImplemented.
+func NewNotImplementedGetTeamErrorResponse(v NotImplemented) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -34226,6 +36829,27 @@ func NewTeamPermissionDeniedGetTeamErrorResponse(v TeamPermissionDenied) GetTeam
 	return s
 }
 
+// SetUnavailable sets GetTeamErrorResponse to Unavailable.
+func (s *GetTeamErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetTeamErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetTeamErrorResponse is Unavailable.
+func (s GetTeamErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetTeamErrorResponse returns new GetTeamErrorResponse from Unavailable.
+func NewUnavailableGetTeamErrorResponse(v Unavailable) GetTeamErrorResponse {
+	var s GetTeamErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // GetTeamErrorResponseStatusCode wraps GetTeamErrorResponse with StatusCode.
 type GetTeamErrorResponseStatusCode struct {
 	StatusCode int
@@ -34267,7 +36891,9 @@ type GetUserByIDErrorResponse struct {
 	Type                 GetUserByIDErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -34279,7 +36905,9 @@ type GetUserByIDErrorResponseType string
 const (
 	AuthUnauthorizedGetUserByIDErrorResponse     GetUserByIDErrorResponseType = "auth.unauthorized"
 	InternalGetUserByIDErrorResponse             GetUserByIDErrorResponseType = "internal"
+	NotImplementedGetUserByIDErrorResponse       GetUserByIDErrorResponseType = "not_implemented"
 	ReqInvalidGetUserByIDErrorResponse           GetUserByIDErrorResponseType = "req.invalid"
+	UnavailableGetUserByIDErrorResponse          GetUserByIDErrorResponseType = "unavailable"
 	UserNotFoundGetUserByIDErrorResponse         GetUserByIDErrorResponseType = "user.not_found"
 	UserPermissionDeniedGetUserByIDErrorResponse GetUserByIDErrorResponseType = "user.permission_denied"
 )
@@ -34294,9 +36922,19 @@ func (s GetUserByIDErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetUserByIDErrorResponse
 }
 
+// IsNotImplemented reports whether GetUserByIDErrorResponse is NotImplemented.
+func (s GetUserByIDErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetUserByIDErrorResponse
+}
+
 // IsReqInvalid reports whether GetUserByIDErrorResponse is ReqInvalid.
 func (s GetUserByIDErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetUserByIDErrorResponse
+}
+
+// IsUnavailable reports whether GetUserByIDErrorResponse is Unavailable.
+func (s GetUserByIDErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetUserByIDErrorResponse
 }
 
 // IsUserNotFound reports whether GetUserByIDErrorResponse is UserNotFound.
@@ -34351,6 +36989,27 @@ func NewInternalGetUserByIDErrorResponse(v Internal) GetUserByIDErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetUserByIDErrorResponse to NotImplemented.
+func (s *GetUserByIDErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetUserByIDErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetUserByIDErrorResponse is NotImplemented.
+func (s GetUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetUserByIDErrorResponse returns new GetUserByIDErrorResponse from NotImplemented.
+func NewNotImplementedGetUserByIDErrorResponse(v NotImplemented) GetUserByIDErrorResponse {
+	var s GetUserByIDErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetUserByIDErrorResponse to ReqInvalid.
 func (s *GetUserByIDErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetUserByIDErrorResponse
@@ -34369,6 +37028,27 @@ func (s GetUserByIDErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetUserByIDErrorResponse(v ReqInvalid) GetUserByIDErrorResponse {
 	var s GetUserByIDErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetUserByIDErrorResponse to Unavailable.
+func (s *GetUserByIDErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetUserByIDErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetUserByIDErrorResponse is Unavailable.
+func (s GetUserByIDErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetUserByIDErrorResponse returns new GetUserByIDErrorResponse from Unavailable.
+func NewUnavailableGetUserByIDErrorResponse(v Unavailable) GetUserByIDErrorResponse {
+	var s GetUserByIDErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -34455,7 +37135,9 @@ type GetUserPasswordStateErrorResponse struct {
 	Type                 GetUserPasswordStateErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -34467,7 +37149,9 @@ type GetUserPasswordStateErrorResponseType string
 const (
 	AuthUnauthorizedGetUserPasswordStateErrorResponse     GetUserPasswordStateErrorResponseType = "auth.unauthorized"
 	InternalGetUserPasswordStateErrorResponse             GetUserPasswordStateErrorResponseType = "internal"
+	NotImplementedGetUserPasswordStateErrorResponse       GetUserPasswordStateErrorResponseType = "not_implemented"
 	ReqInvalidGetUserPasswordStateErrorResponse           GetUserPasswordStateErrorResponseType = "req.invalid"
+	UnavailableGetUserPasswordStateErrorResponse          GetUserPasswordStateErrorResponseType = "unavailable"
 	UserNotFoundGetUserPasswordStateErrorResponse         GetUserPasswordStateErrorResponseType = "user.not_found"
 	UserPermissionDeniedGetUserPasswordStateErrorResponse GetUserPasswordStateErrorResponseType = "user.permission_denied"
 )
@@ -34482,9 +37166,19 @@ func (s GetUserPasswordStateErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetUserPasswordStateErrorResponse
 }
 
+// IsNotImplemented reports whether GetUserPasswordStateErrorResponse is NotImplemented.
+func (s GetUserPasswordStateErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetUserPasswordStateErrorResponse
+}
+
 // IsReqInvalid reports whether GetUserPasswordStateErrorResponse is ReqInvalid.
 func (s GetUserPasswordStateErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetUserPasswordStateErrorResponse
+}
+
+// IsUnavailable reports whether GetUserPasswordStateErrorResponse is Unavailable.
+func (s GetUserPasswordStateErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetUserPasswordStateErrorResponse
 }
 
 // IsUserNotFound reports whether GetUserPasswordStateErrorResponse is UserNotFound.
@@ -34539,6 +37233,27 @@ func NewInternalGetUserPasswordStateErrorResponse(v Internal) GetUserPasswordSta
 	return s
 }
 
+// SetNotImplemented sets GetUserPasswordStateErrorResponse to NotImplemented.
+func (s *GetUserPasswordStateErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetUserPasswordStateErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetUserPasswordStateErrorResponse is NotImplemented.
+func (s GetUserPasswordStateErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from NotImplemented.
+func NewNotImplementedGetUserPasswordStateErrorResponse(v NotImplemented) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetUserPasswordStateErrorResponse to ReqInvalid.
 func (s *GetUserPasswordStateErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetUserPasswordStateErrorResponse
@@ -34557,6 +37272,27 @@ func (s GetUserPasswordStateErrorResponse) GetReqInvalid() (v ReqInvalid, ok boo
 func NewReqInvalidGetUserPasswordStateErrorResponse(v ReqInvalid) GetUserPasswordStateErrorResponse {
 	var s GetUserPasswordStateErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetUserPasswordStateErrorResponse to Unavailable.
+func (s *GetUserPasswordStateErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetUserPasswordStateErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetUserPasswordStateErrorResponse is Unavailable.
+func (s GetUserPasswordStateErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetUserPasswordStateErrorResponse returns new GetUserPasswordStateErrorResponse from Unavailable.
+func NewUnavailableGetUserPasswordStateErrorResponse(v Unavailable) GetUserPasswordStateErrorResponse {
+	var s GetUserPasswordStateErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -34651,7 +37387,9 @@ type GetVariableErrorResponse struct {
 	Type                GetVariableErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
 }
@@ -34663,7 +37401,9 @@ type GetVariableErrorResponseType string
 const (
 	AuthUnauthorizedGetVariableErrorResponse    GetVariableErrorResponseType = "auth.unauthorized"
 	InternalGetVariableErrorResponse            GetVariableErrorResponseType = "internal"
+	NotImplementedGetVariableErrorResponse      GetVariableErrorResponseType = "not_implemented"
 	ReqInvalidGetVariableErrorResponse          GetVariableErrorResponseType = "req.invalid"
+	UnavailableGetVariableErrorResponse         GetVariableErrorResponseType = "unavailable"
 	VarNotFoundGetVariableErrorResponse         GetVariableErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariableErrorResponse GetVariableErrorResponseType = "var.permission_denied"
 )
@@ -34678,9 +37418,19 @@ func (s GetVariableErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariableErrorResponse
 }
 
+// IsNotImplemented reports whether GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariableErrorResponse
+}
+
 // IsReqInvalid reports whether GetVariableErrorResponse is ReqInvalid.
 func (s GetVariableErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetVariableErrorResponse
+}
+
+// IsUnavailable reports whether GetVariableErrorResponse is Unavailable.
+func (s GetVariableErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetVariableErrorResponse
 }
 
 // IsVarNotFound reports whether GetVariableErrorResponse is VarNotFound.
@@ -34735,6 +37485,27 @@ func NewInternalGetVariableErrorResponse(v Internal) GetVariableErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets GetVariableErrorResponse to NotImplemented.
+func (s *GetVariableErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariableErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariableErrorResponse is NotImplemented.
+func (s GetVariableErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariableErrorResponse returns new GetVariableErrorResponse from NotImplemented.
+func NewNotImplementedGetVariableErrorResponse(v NotImplemented) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetVariableErrorResponse to ReqInvalid.
 func (s *GetVariableErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetVariableErrorResponse
@@ -34753,6 +37524,27 @@ func (s GetVariableErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetVariableErrorResponse(v ReqInvalid) GetVariableErrorResponse {
 	var s GetVariableErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetVariableErrorResponse to Unavailable.
+func (s *GetVariableErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetVariableErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetVariableErrorResponse is Unavailable.
+func (s GetVariableErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetVariableErrorResponse returns new GetVariableErrorResponse from Unavailable.
+func NewUnavailableGetVariableErrorResponse(v Unavailable) GetVariableErrorResponse {
+	var s GetVariableErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -34831,7 +37623,9 @@ type GetVariablesErrorResponse struct {
 	Type                GetVariablesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
 }
@@ -34843,7 +37637,9 @@ type GetVariablesErrorResponseType string
 const (
 	AuthUnauthorizedGetVariablesErrorResponse    GetVariablesErrorResponseType = "auth.unauthorized"
 	InternalGetVariablesErrorResponse            GetVariablesErrorResponseType = "internal"
+	NotImplementedGetVariablesErrorResponse      GetVariablesErrorResponseType = "not_implemented"
 	ReqInvalidGetVariablesErrorResponse          GetVariablesErrorResponseType = "req.invalid"
+	UnavailableGetVariablesErrorResponse         GetVariablesErrorResponseType = "unavailable"
 	VarNotFoundGetVariablesErrorResponse         GetVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedGetVariablesErrorResponse GetVariablesErrorResponseType = "var.permission_denied"
 )
@@ -34858,9 +37654,19 @@ func (s GetVariablesErrorResponse) IsInternal() bool {
 	return s.Type == InternalGetVariablesErrorResponse
 }
 
+// IsNotImplemented reports whether GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetVariablesErrorResponse
+}
+
 // IsReqInvalid reports whether GetVariablesErrorResponse is ReqInvalid.
 func (s GetVariablesErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidGetVariablesErrorResponse
+}
+
+// IsUnavailable reports whether GetVariablesErrorResponse is Unavailable.
+func (s GetVariablesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetVariablesErrorResponse
 }
 
 // IsVarNotFound reports whether GetVariablesErrorResponse is VarNotFound.
@@ -34915,6 +37721,27 @@ func NewInternalGetVariablesErrorResponse(v Internal) GetVariablesErrorResponse 
 	return s
 }
 
+// SetNotImplemented sets GetVariablesErrorResponse to NotImplemented.
+func (s *GetVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetVariablesErrorResponse is NotImplemented.
+func (s GetVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetVariablesErrorResponse returns new GetVariablesErrorResponse from NotImplemented.
+func NewNotImplementedGetVariablesErrorResponse(v NotImplemented) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets GetVariablesErrorResponse to ReqInvalid.
 func (s *GetVariablesErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetVariablesErrorResponse
@@ -34933,6 +37760,27 @@ func (s GetVariablesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidGetVariablesErrorResponse(v ReqInvalid) GetVariablesErrorResponse {
 	var s GetVariablesErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetVariablesErrorResponse to Unavailable.
+func (s *GetVariablesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetVariablesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetVariablesErrorResponse is Unavailable.
+func (s GetVariablesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetVariablesErrorResponse returns new GetVariablesErrorResponse from Unavailable.
+func NewUnavailableGetVariablesErrorResponse(v Unavailable) GetVariablesErrorResponse {
+	var s GetVariablesErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -38590,11 +41438,13 @@ type InitClaimErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	ClaimChallengeInvalid  ClaimChallengeInvalid
 	Internal               Internal
+	NotImplemented         NotImplemented
 	ProjAlreadyClaimed     ProjAlreadyClaimed
 	ProjClaimWindowExpired ProjClaimWindowExpired
 	ProjNotFound           ProjNotFound
 	ProjPermissionDenied   ProjPermissionDenied
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // InitClaimErrorResponseType is oneOf type of InitClaimErrorResponse.
@@ -38605,11 +41455,13 @@ const (
 	AuthUnauthorizedInitClaimErrorResponse       InitClaimErrorResponseType = "auth.unauthorized"
 	ClaimChallengeInvalidInitClaimErrorResponse  InitClaimErrorResponseType = "claim_challenge.invalid"
 	InternalInitClaimErrorResponse               InitClaimErrorResponseType = "internal"
+	NotImplementedInitClaimErrorResponse         InitClaimErrorResponseType = "not_implemented"
 	ProjAlreadyClaimedInitClaimErrorResponse     InitClaimErrorResponseType = "proj.already_claimed"
 	ProjClaimWindowExpiredInitClaimErrorResponse InitClaimErrorResponseType = "proj.claim_window_expired"
 	ProjNotFoundInitClaimErrorResponse           InitClaimErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedInitClaimErrorResponse   InitClaimErrorResponseType = "proj.permission_denied"
 	ReqInvalidInitClaimErrorResponse             InitClaimErrorResponseType = "req.invalid"
+	UnavailableInitClaimErrorResponse            InitClaimErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether InitClaimErrorResponse is AuthUnauthorized.
@@ -38624,6 +41476,11 @@ func (s InitClaimErrorResponse) IsClaimChallengeInvalid() bool {
 
 // IsInternal reports whether InitClaimErrorResponse is Internal.
 func (s InitClaimErrorResponse) IsInternal() bool { return s.Type == InternalInitClaimErrorResponse }
+
+// IsNotImplemented reports whether InitClaimErrorResponse is NotImplemented.
+func (s InitClaimErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedInitClaimErrorResponse
+}
 
 // IsProjAlreadyClaimed reports whether InitClaimErrorResponse is ProjAlreadyClaimed.
 func (s InitClaimErrorResponse) IsProjAlreadyClaimed() bool {
@@ -38648,6 +41505,11 @@ func (s InitClaimErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether InitClaimErrorResponse is ReqInvalid.
 func (s InitClaimErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidInitClaimErrorResponse
+}
+
+// IsUnavailable reports whether InitClaimErrorResponse is Unavailable.
+func (s InitClaimErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableInitClaimErrorResponse
 }
 
 // SetAuthUnauthorized sets InitClaimErrorResponse to AuthUnauthorized.
@@ -38710,6 +41572,27 @@ func (s InitClaimErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalInitClaimErrorResponse(v Internal) InitClaimErrorResponse {
 	var s InitClaimErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets InitClaimErrorResponse to NotImplemented.
+func (s *InitClaimErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedInitClaimErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if InitClaimErrorResponse is NotImplemented.
+func (s InitClaimErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedInitClaimErrorResponse returns new InitClaimErrorResponse from NotImplemented.
+func NewNotImplementedInitClaimErrorResponse(v NotImplemented) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -38815,6 +41698,27 @@ func (s InitClaimErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidInitClaimErrorResponse(v ReqInvalid) InitClaimErrorResponse {
 	var s InitClaimErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets InitClaimErrorResponse to Unavailable.
+func (s *InitClaimErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableInitClaimErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if InitClaimErrorResponse is Unavailable.
+func (s InitClaimErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableInitClaimErrorResponse returns new InitClaimErrorResponse from Unavailable.
+func NewUnavailableInitClaimErrorResponse(v Unavailable) InitClaimErrorResponse {
+	var s InitClaimErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -38951,7 +41855,9 @@ type IssueChallengeErrorResponse struct {
 	AttNotFound         AttNotFound
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // IssueChallengeErrorResponseType is oneOf type of IssueChallengeErrorResponse.
@@ -38965,7 +41871,9 @@ const (
 	AttNotFoundIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "att.not_found"
 	AuthUnauthorizedIssueChallengeErrorResponse    IssueChallengeErrorResponseType = "auth.unauthorized"
 	InternalIssueChallengeErrorResponse            IssueChallengeErrorResponseType = "internal"
+	NotImplementedIssueChallengeErrorResponse      IssueChallengeErrorResponseType = "not_implemented"
 	ReqInvalidIssueChallengeErrorResponse          IssueChallengeErrorResponseType = "req.invalid"
+	UnavailableIssueChallengeErrorResponse         IssueChallengeErrorResponseType = "unavailable"
 )
 
 // IsAttAlreadyHandedOff reports whether IssueChallengeErrorResponse is AttAlreadyHandedOff.
@@ -38998,9 +41906,19 @@ func (s IssueChallengeErrorResponse) IsInternal() bool {
 	return s.Type == InternalIssueChallengeErrorResponse
 }
 
+// IsNotImplemented reports whether IssueChallengeErrorResponse is NotImplemented.
+func (s IssueChallengeErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedIssueChallengeErrorResponse
+}
+
 // IsReqInvalid reports whether IssueChallengeErrorResponse is ReqInvalid.
 func (s IssueChallengeErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidIssueChallengeErrorResponse
+}
+
+// IsUnavailable reports whether IssueChallengeErrorResponse is Unavailable.
+func (s IssueChallengeErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableIssueChallengeErrorResponse
 }
 
 // SetAttAlreadyHandedOff sets IssueChallengeErrorResponse to AttAlreadyHandedOff.
@@ -39129,6 +42047,27 @@ func NewInternalIssueChallengeErrorResponse(v Internal) IssueChallengeErrorRespo
 	return s
 }
 
+// SetNotImplemented sets IssueChallengeErrorResponse to NotImplemented.
+func (s *IssueChallengeErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedIssueChallengeErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if IssueChallengeErrorResponse is NotImplemented.
+func (s IssueChallengeErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from NotImplemented.
+func NewNotImplementedIssueChallengeErrorResponse(v NotImplemented) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets IssueChallengeErrorResponse to ReqInvalid.
 func (s *IssueChallengeErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidIssueChallengeErrorResponse
@@ -39147,6 +42086,27 @@ func (s IssueChallengeErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidIssueChallengeErrorResponse(v ReqInvalid) IssueChallengeErrorResponse {
 	var s IssueChallengeErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets IssueChallengeErrorResponse to Unavailable.
+func (s *IssueChallengeErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableIssueChallengeErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if IssueChallengeErrorResponse is Unavailable.
+func (s IssueChallengeErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableIssueChallengeErrorResponse returns new IssueChallengeErrorResponse from Unavailable.
+func NewUnavailableIssueChallengeErrorResponse(v Unavailable) IssueChallengeErrorResponse {
+	var s IssueChallengeErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -39309,7 +42269,9 @@ type ListBrandingErrorResponse struct {
 	BrndNotFound         BrndNotFound
 	BrndPermissionDenied BrndPermissionDenied
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // ListBrandingErrorResponseType is oneOf type of ListBrandingErrorResponse.
@@ -39321,7 +42283,9 @@ const (
 	BrndNotFoundListBrandingErrorResponse         ListBrandingErrorResponseType = "brnd.not_found"
 	BrndPermissionDeniedListBrandingErrorResponse ListBrandingErrorResponseType = "brnd.permission_denied"
 	InternalListBrandingErrorResponse             ListBrandingErrorResponseType = "internal"
+	NotImplementedListBrandingErrorResponse       ListBrandingErrorResponseType = "not_implemented"
 	ReqInvalidListBrandingErrorResponse           ListBrandingErrorResponseType = "req.invalid"
+	UnavailableListBrandingErrorResponse          ListBrandingErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListBrandingErrorResponse is AuthUnauthorized.
@@ -39344,9 +42308,19 @@ func (s ListBrandingErrorResponse) IsInternal() bool {
 	return s.Type == InternalListBrandingErrorResponse
 }
 
+// IsNotImplemented reports whether ListBrandingErrorResponse is NotImplemented.
+func (s ListBrandingErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListBrandingErrorResponse
+}
+
 // IsReqInvalid reports whether ListBrandingErrorResponse is ReqInvalid.
 func (s ListBrandingErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListBrandingErrorResponse
+}
+
+// IsUnavailable reports whether ListBrandingErrorResponse is Unavailable.
+func (s ListBrandingErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListBrandingErrorResponse
 }
 
 // SetAuthUnauthorized sets ListBrandingErrorResponse to AuthUnauthorized.
@@ -39433,6 +42407,27 @@ func NewInternalListBrandingErrorResponse(v Internal) ListBrandingErrorResponse 
 	return s
 }
 
+// SetNotImplemented sets ListBrandingErrorResponse to NotImplemented.
+func (s *ListBrandingErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListBrandingErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListBrandingErrorResponse is NotImplemented.
+func (s ListBrandingErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListBrandingErrorResponse returns new ListBrandingErrorResponse from NotImplemented.
+func NewNotImplementedListBrandingErrorResponse(v NotImplemented) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListBrandingErrorResponse to ReqInvalid.
 func (s *ListBrandingErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListBrandingErrorResponse
@@ -39451,6 +42446,27 @@ func (s ListBrandingErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListBrandingErrorResponse(v ReqInvalid) ListBrandingErrorResponse {
 	var s ListBrandingErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListBrandingErrorResponse to Unavailable.
+func (s *ListBrandingErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListBrandingErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListBrandingErrorResponse is Unavailable.
+func (s ListBrandingErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListBrandingErrorResponse returns new ListBrandingErrorResponse from Unavailable.
+func NewUnavailableListBrandingErrorResponse(v Unavailable) ListBrandingErrorResponse {
+	var s ListBrandingErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -39520,7 +42536,9 @@ type ListDeploymentsErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListDeploymentsErrorResponseType is oneOf type of ListDeploymentsErrorResponse.
@@ -39532,7 +42550,9 @@ const (
 	DepNotFoundListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "dep.not_found"
 	DepPermissionDeniedListDeploymentsErrorResponse ListDeploymentsErrorResponseType = "dep.permission_denied"
 	InternalListDeploymentsErrorResponse            ListDeploymentsErrorResponseType = "internal"
+	NotImplementedListDeploymentsErrorResponse      ListDeploymentsErrorResponseType = "not_implemented"
 	ReqInvalidListDeploymentsErrorResponse          ListDeploymentsErrorResponseType = "req.invalid"
+	UnavailableListDeploymentsErrorResponse         ListDeploymentsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListDeploymentsErrorResponse is AuthUnauthorized.
@@ -39555,9 +42575,19 @@ func (s ListDeploymentsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListDeploymentsErrorResponse
 }
 
+// IsNotImplemented reports whether ListDeploymentsErrorResponse is NotImplemented.
+func (s ListDeploymentsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListDeploymentsErrorResponse
+}
+
 // IsReqInvalid reports whether ListDeploymentsErrorResponse is ReqInvalid.
 func (s ListDeploymentsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListDeploymentsErrorResponse
+}
+
+// IsUnavailable reports whether ListDeploymentsErrorResponse is Unavailable.
+func (s ListDeploymentsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListDeploymentsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListDeploymentsErrorResponse to AuthUnauthorized.
@@ -39644,6 +42674,27 @@ func NewInternalListDeploymentsErrorResponse(v Internal) ListDeploymentsErrorRes
 	return s
 }
 
+// SetNotImplemented sets ListDeploymentsErrorResponse to NotImplemented.
+func (s *ListDeploymentsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListDeploymentsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListDeploymentsErrorResponse is NotImplemented.
+func (s ListDeploymentsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from NotImplemented.
+func NewNotImplementedListDeploymentsErrorResponse(v NotImplemented) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListDeploymentsErrorResponse to ReqInvalid.
 func (s *ListDeploymentsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListDeploymentsErrorResponse
@@ -39662,6 +42713,27 @@ func (s ListDeploymentsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListDeploymentsErrorResponse(v ReqInvalid) ListDeploymentsErrorResponse {
 	var s ListDeploymentsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListDeploymentsErrorResponse to Unavailable.
+func (s *ListDeploymentsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListDeploymentsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListDeploymentsErrorResponse is Unavailable.
+func (s ListDeploymentsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListDeploymentsErrorResponse returns new ListDeploymentsErrorResponse from Unavailable.
+func NewUnavailableListDeploymentsErrorResponse(v Unavailable) ListDeploymentsErrorResponse {
+	var s ListDeploymentsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -39805,7 +42877,9 @@ type ListEventsErrorResponse struct {
 	EvtNotFound         EvtNotFound
 	EvtPermissionDenied EvtPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListEventsErrorResponseType is oneOf type of ListEventsErrorResponse.
@@ -39818,7 +42892,9 @@ const (
 	EvtNotFoundListEventsErrorResponse         ListEventsErrorResponseType = "evt.not_found"
 	EvtPermissionDeniedListEventsErrorResponse ListEventsErrorResponseType = "evt.permission_denied"
 	InternalListEventsErrorResponse            ListEventsErrorResponseType = "internal"
+	NotImplementedListEventsErrorResponse      ListEventsErrorResponseType = "not_implemented"
 	ReqInvalidListEventsErrorResponse          ListEventsErrorResponseType = "req.invalid"
+	UnavailableListEventsErrorResponse         ListEventsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListEventsErrorResponse is AuthUnauthorized.
@@ -39844,9 +42920,19 @@ func (s ListEventsErrorResponse) IsEvtPermissionDenied() bool {
 // IsInternal reports whether ListEventsErrorResponse is Internal.
 func (s ListEventsErrorResponse) IsInternal() bool { return s.Type == InternalListEventsErrorResponse }
 
+// IsNotImplemented reports whether ListEventsErrorResponse is NotImplemented.
+func (s ListEventsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListEventsErrorResponse
+}
+
 // IsReqInvalid reports whether ListEventsErrorResponse is ReqInvalid.
 func (s ListEventsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListEventsErrorResponse
+}
+
+// IsUnavailable reports whether ListEventsErrorResponse is Unavailable.
+func (s ListEventsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListEventsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListEventsErrorResponse to AuthUnauthorized.
@@ -39954,6 +43040,27 @@ func NewInternalListEventsErrorResponse(v Internal) ListEventsErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets ListEventsErrorResponse to NotImplemented.
+func (s *ListEventsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListEventsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListEventsErrorResponse is NotImplemented.
+func (s ListEventsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListEventsErrorResponse returns new ListEventsErrorResponse from NotImplemented.
+func NewNotImplementedListEventsErrorResponse(v NotImplemented) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListEventsErrorResponse to ReqInvalid.
 func (s *ListEventsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListEventsErrorResponse
@@ -39972,6 +43079,27 @@ func (s ListEventsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListEventsErrorResponse(v ReqInvalid) ListEventsErrorResponse {
 	var s ListEventsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListEventsErrorResponse to Unavailable.
+func (s *ListEventsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListEventsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListEventsErrorResponse is Unavailable.
+func (s ListEventsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListEventsErrorResponse returns new ListEventsErrorResponse from Unavailable.
+func NewUnavailableListEventsErrorResponse(v Unavailable) ListEventsErrorResponse {
+	var s ListEventsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -40094,7 +43222,9 @@ type ListFlowDefinitionsErrorResponse struct {
 	SchNotFound             SchNotFound
 	SchPermissionDenied     SchPermissionDenied
 	FlowdefMissingProjectID FlowdefMissingProjectID
+	NotImplemented          NotImplemented
 	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
 }
 
 // ListFlowDefinitionsErrorResponseType is oneOf type of ListFlowDefinitionsErrorResponse.
@@ -40110,7 +43240,9 @@ const (
 	SchNotFoundListFlowDefinitionsErrorResponse             ListFlowDefinitionsErrorResponseType = "sch.not_found"
 	SchPermissionDeniedListFlowDefinitionsErrorResponse     ListFlowDefinitionsErrorResponseType = "sch.permission_denied"
 	FlowdefMissingProjectIDListFlowDefinitionsErrorResponse ListFlowDefinitionsErrorResponseType = "flowdef.missing_project_id"
+	NotImplementedListFlowDefinitionsErrorResponse          ListFlowDefinitionsErrorResponseType = "not_implemented"
 	ReqInvalidListFlowDefinitionsErrorResponse              ListFlowDefinitionsErrorResponseType = "req.invalid"
+	UnavailableListFlowDefinitionsErrorResponse             ListFlowDefinitionsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListFlowDefinitionsErrorResponse is AuthUnauthorized.
@@ -40153,9 +43285,19 @@ func (s ListFlowDefinitionsErrorResponse) IsFlowdefMissingProjectID() bool {
 	return s.Type == FlowdefMissingProjectIDListFlowDefinitionsErrorResponse
 }
 
+// IsNotImplemented reports whether ListFlowDefinitionsErrorResponse is NotImplemented.
+func (s ListFlowDefinitionsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListFlowDefinitionsErrorResponse
+}
+
 // IsReqInvalid reports whether ListFlowDefinitionsErrorResponse is ReqInvalid.
 func (s ListFlowDefinitionsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListFlowDefinitionsErrorResponse
+}
+
+// IsUnavailable reports whether ListFlowDefinitionsErrorResponse is Unavailable.
+func (s ListFlowDefinitionsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListFlowDefinitionsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListFlowDefinitionsErrorResponse to AuthUnauthorized.
@@ -40326,6 +43468,27 @@ func NewFlowdefMissingProjectIDListFlowDefinitionsErrorResponse(v FlowdefMissing
 	return s
 }
 
+// SetNotImplemented sets ListFlowDefinitionsErrorResponse to NotImplemented.
+func (s *ListFlowDefinitionsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListFlowDefinitionsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListFlowDefinitionsErrorResponse is NotImplemented.
+func (s ListFlowDefinitionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from NotImplemented.
+func NewNotImplementedListFlowDefinitionsErrorResponse(v NotImplemented) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListFlowDefinitionsErrorResponse to ReqInvalid.
 func (s *ListFlowDefinitionsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListFlowDefinitionsErrorResponse
@@ -40344,6 +43507,27 @@ func (s ListFlowDefinitionsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool
 func NewReqInvalidListFlowDefinitionsErrorResponse(v ReqInvalid) ListFlowDefinitionsErrorResponse {
 	var s ListFlowDefinitionsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListFlowDefinitionsErrorResponse to Unavailable.
+func (s *ListFlowDefinitionsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListFlowDefinitionsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListFlowDefinitionsErrorResponse is Unavailable.
+func (s ListFlowDefinitionsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListFlowDefinitionsErrorResponse returns new ListFlowDefinitionsErrorResponse from Unavailable.
+func NewUnavailableListFlowDefinitionsErrorResponse(v Unavailable) ListFlowDefinitionsErrorResponse {
+	var s ListFlowDefinitionsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -40492,7 +43676,9 @@ type ListIdpRevisionsErrorResponse struct {
 	IdpNotFound         IdpNotFound
 	IdpPermissionDenied IdpPermissionDenied
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListIdpRevisionsErrorResponseType is oneOf type of ListIdpRevisionsErrorResponse.
@@ -40504,7 +43690,9 @@ const (
 	IdpNotFoundListIdpRevisionsErrorResponse         ListIdpRevisionsErrorResponseType = "idp.not_found"
 	IdpPermissionDeniedListIdpRevisionsErrorResponse ListIdpRevisionsErrorResponseType = "idp.permission_denied"
 	InternalListIdpRevisionsErrorResponse            ListIdpRevisionsErrorResponseType = "internal"
+	NotImplementedListIdpRevisionsErrorResponse      ListIdpRevisionsErrorResponseType = "not_implemented"
 	ReqInvalidListIdpRevisionsErrorResponse          ListIdpRevisionsErrorResponseType = "req.invalid"
+	UnavailableListIdpRevisionsErrorResponse         ListIdpRevisionsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListIdpRevisionsErrorResponse is AuthUnauthorized.
@@ -40527,9 +43715,19 @@ func (s ListIdpRevisionsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListIdpRevisionsErrorResponse
 }
 
+// IsNotImplemented reports whether ListIdpRevisionsErrorResponse is NotImplemented.
+func (s ListIdpRevisionsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListIdpRevisionsErrorResponse
+}
+
 // IsReqInvalid reports whether ListIdpRevisionsErrorResponse is ReqInvalid.
 func (s ListIdpRevisionsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListIdpRevisionsErrorResponse
+}
+
+// IsUnavailable reports whether ListIdpRevisionsErrorResponse is Unavailable.
+func (s ListIdpRevisionsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListIdpRevisionsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListIdpRevisionsErrorResponse to AuthUnauthorized.
@@ -40616,6 +43814,27 @@ func NewInternalListIdpRevisionsErrorResponse(v Internal) ListIdpRevisionsErrorR
 	return s
 }
 
+// SetNotImplemented sets ListIdpRevisionsErrorResponse to NotImplemented.
+func (s *ListIdpRevisionsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListIdpRevisionsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListIdpRevisionsErrorResponse is NotImplemented.
+func (s ListIdpRevisionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from NotImplemented.
+func NewNotImplementedListIdpRevisionsErrorResponse(v NotImplemented) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListIdpRevisionsErrorResponse to ReqInvalid.
 func (s *ListIdpRevisionsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListIdpRevisionsErrorResponse
@@ -40634,6 +43853,27 @@ func (s ListIdpRevisionsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListIdpRevisionsErrorResponse(v ReqInvalid) ListIdpRevisionsErrorResponse {
 	var s ListIdpRevisionsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListIdpRevisionsErrorResponse to Unavailable.
+func (s *ListIdpRevisionsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListIdpRevisionsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListIdpRevisionsErrorResponse is Unavailable.
+func (s ListIdpRevisionsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListIdpRevisionsErrorResponse returns new ListIdpRevisionsErrorResponse from Unavailable.
+func NewUnavailableListIdpRevisionsErrorResponse(v Unavailable) ListIdpRevisionsErrorResponse {
+	var s ListIdpRevisionsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -40714,8 +43954,10 @@ type ListMyIdentityLinksErrorResponse struct {
 	Type                ListMyIdentityLinksErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -40726,8 +43968,10 @@ type ListMyIdentityLinksErrorResponseType string
 const (
 	AuthUnauthorizedListMyIdentityLinksErrorResponse    ListMyIdentityLinksErrorResponseType = "auth.unauthorized"
 	InternalListMyIdentityLinksErrorResponse            ListMyIdentityLinksErrorResponseType = "internal"
+	NotImplementedListMyIdentityLinksErrorResponse      ListMyIdentityLinksErrorResponseType = "not_implemented"
 	ReqInvalidListMyIdentityLinksErrorResponse          ListMyIdentityLinksErrorResponseType = "req.invalid"
 	SessProjectMismatchListMyIdentityLinksErrorResponse ListMyIdentityLinksErrorResponseType = "sess.project_mismatch"
+	UnavailableListMyIdentityLinksErrorResponse         ListMyIdentityLinksErrorResponseType = "unavailable"
 	UserNotFoundListMyIdentityLinksErrorResponse        ListMyIdentityLinksErrorResponseType = "user.not_found"
 )
 
@@ -40741,6 +43985,11 @@ func (s ListMyIdentityLinksErrorResponse) IsInternal() bool {
 	return s.Type == InternalListMyIdentityLinksErrorResponse
 }
 
+// IsNotImplemented reports whether ListMyIdentityLinksErrorResponse is NotImplemented.
+func (s ListMyIdentityLinksErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListMyIdentityLinksErrorResponse
+}
+
 // IsReqInvalid reports whether ListMyIdentityLinksErrorResponse is ReqInvalid.
 func (s ListMyIdentityLinksErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyIdentityLinksErrorResponse
@@ -40749,6 +43998,11 @@ func (s ListMyIdentityLinksErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether ListMyIdentityLinksErrorResponse is SessProjectMismatch.
 func (s ListMyIdentityLinksErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchListMyIdentityLinksErrorResponse
+}
+
+// IsUnavailable reports whether ListMyIdentityLinksErrorResponse is Unavailable.
+func (s ListMyIdentityLinksErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListMyIdentityLinksErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyIdentityLinksErrorResponse is UserNotFound.
@@ -40798,6 +44052,27 @@ func NewInternalListMyIdentityLinksErrorResponse(v Internal) ListMyIdentityLinks
 	return s
 }
 
+// SetNotImplemented sets ListMyIdentityLinksErrorResponse to NotImplemented.
+func (s *ListMyIdentityLinksErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListMyIdentityLinksErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListMyIdentityLinksErrorResponse is NotImplemented.
+func (s ListMyIdentityLinksErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from NotImplemented.
+func NewNotImplementedListMyIdentityLinksErrorResponse(v NotImplemented) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListMyIdentityLinksErrorResponse to ReqInvalid.
 func (s *ListMyIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListMyIdentityLinksErrorResponse
@@ -40837,6 +44112,27 @@ func (s ListMyIdentityLinksErrorResponse) GetSessProjectMismatch() (v SessProjec
 func NewSessProjectMismatchListMyIdentityLinksErrorResponse(v SessProjectMismatch) ListMyIdentityLinksErrorResponse {
 	var s ListMyIdentityLinksErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets ListMyIdentityLinksErrorResponse to Unavailable.
+func (s *ListMyIdentityLinksErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListMyIdentityLinksErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListMyIdentityLinksErrorResponse is Unavailable.
+func (s ListMyIdentityLinksErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListMyIdentityLinksErrorResponse returns new ListMyIdentityLinksErrorResponse from Unavailable.
+func NewUnavailableListMyIdentityLinksErrorResponse(v Unavailable) ListMyIdentityLinksErrorResponse {
+	var s ListMyIdentityLinksErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -40894,8 +44190,10 @@ type ListMyPasskeysErrorResponse struct {
 	Type                ListMyPasskeysErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -40906,8 +44204,10 @@ type ListMyPasskeysErrorResponseType string
 const (
 	AuthUnauthorizedListMyPasskeysErrorResponse    ListMyPasskeysErrorResponseType = "auth.unauthorized"
 	InternalListMyPasskeysErrorResponse            ListMyPasskeysErrorResponseType = "internal"
+	NotImplementedListMyPasskeysErrorResponse      ListMyPasskeysErrorResponseType = "not_implemented"
 	ReqInvalidListMyPasskeysErrorResponse          ListMyPasskeysErrorResponseType = "req.invalid"
 	SessProjectMismatchListMyPasskeysErrorResponse ListMyPasskeysErrorResponseType = "sess.project_mismatch"
+	UnavailableListMyPasskeysErrorResponse         ListMyPasskeysErrorResponseType = "unavailable"
 	UserNotFoundListMyPasskeysErrorResponse        ListMyPasskeysErrorResponseType = "user.not_found"
 )
 
@@ -40921,6 +44221,11 @@ func (s ListMyPasskeysErrorResponse) IsInternal() bool {
 	return s.Type == InternalListMyPasskeysErrorResponse
 }
 
+// IsNotImplemented reports whether ListMyPasskeysErrorResponse is NotImplemented.
+func (s ListMyPasskeysErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListMyPasskeysErrorResponse
+}
+
 // IsReqInvalid reports whether ListMyPasskeysErrorResponse is ReqInvalid.
 func (s ListMyPasskeysErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyPasskeysErrorResponse
@@ -40929,6 +44234,11 @@ func (s ListMyPasskeysErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether ListMyPasskeysErrorResponse is SessProjectMismatch.
 func (s ListMyPasskeysErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchListMyPasskeysErrorResponse
+}
+
+// IsUnavailable reports whether ListMyPasskeysErrorResponse is Unavailable.
+func (s ListMyPasskeysErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListMyPasskeysErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyPasskeysErrorResponse is UserNotFound.
@@ -40978,6 +44288,27 @@ func NewInternalListMyPasskeysErrorResponse(v Internal) ListMyPasskeysErrorRespo
 	return s
 }
 
+// SetNotImplemented sets ListMyPasskeysErrorResponse to NotImplemented.
+func (s *ListMyPasskeysErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListMyPasskeysErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListMyPasskeysErrorResponse is NotImplemented.
+func (s ListMyPasskeysErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from NotImplemented.
+func NewNotImplementedListMyPasskeysErrorResponse(v NotImplemented) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListMyPasskeysErrorResponse to ReqInvalid.
 func (s *ListMyPasskeysErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListMyPasskeysErrorResponse
@@ -41017,6 +44348,27 @@ func (s ListMyPasskeysErrorResponse) GetSessProjectMismatch() (v SessProjectMism
 func NewSessProjectMismatchListMyPasskeysErrorResponse(v SessProjectMismatch) ListMyPasskeysErrorResponse {
 	var s ListMyPasskeysErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets ListMyPasskeysErrorResponse to Unavailable.
+func (s *ListMyPasskeysErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListMyPasskeysErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListMyPasskeysErrorResponse is Unavailable.
+func (s ListMyPasskeysErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListMyPasskeysErrorResponse returns new ListMyPasskeysErrorResponse from Unavailable.
+func NewUnavailableListMyPasskeysErrorResponse(v Unavailable) ListMyPasskeysErrorResponse {
+	var s ListMyPasskeysErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -41078,8 +44430,10 @@ type ListMyProjectsErrorResponse struct {
 	Type                ListMyProjectsErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 }
 
 // ListMyProjectsErrorResponseType is oneOf type of ListMyProjectsErrorResponse.
@@ -41089,8 +44443,10 @@ type ListMyProjectsErrorResponseType string
 const (
 	AuthUnauthorizedListMyProjectsErrorResponse    ListMyProjectsErrorResponseType = "auth.unauthorized"
 	InternalListMyProjectsErrorResponse            ListMyProjectsErrorResponseType = "internal"
+	NotImplementedListMyProjectsErrorResponse      ListMyProjectsErrorResponseType = "not_implemented"
 	ReqInvalidListMyProjectsErrorResponse          ListMyProjectsErrorResponseType = "req.invalid"
 	SessProjectMismatchListMyProjectsErrorResponse ListMyProjectsErrorResponseType = "sess.project_mismatch"
+	UnavailableListMyProjectsErrorResponse         ListMyProjectsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListMyProjectsErrorResponse is AuthUnauthorized.
@@ -41103,6 +44459,11 @@ func (s ListMyProjectsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListMyProjectsErrorResponse
 }
 
+// IsNotImplemented reports whether ListMyProjectsErrorResponse is NotImplemented.
+func (s ListMyProjectsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListMyProjectsErrorResponse
+}
+
 // IsReqInvalid reports whether ListMyProjectsErrorResponse is ReqInvalid.
 func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyProjectsErrorResponse
@@ -41111,6 +44472,11 @@ func (s ListMyProjectsErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether ListMyProjectsErrorResponse is SessProjectMismatch.
 func (s ListMyProjectsErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchListMyProjectsErrorResponse
+}
+
+// IsUnavailable reports whether ListMyProjectsErrorResponse is Unavailable.
+func (s ListMyProjectsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListMyProjectsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListMyProjectsErrorResponse to AuthUnauthorized.
@@ -41155,6 +44521,27 @@ func NewInternalListMyProjectsErrorResponse(v Internal) ListMyProjectsErrorRespo
 	return s
 }
 
+// SetNotImplemented sets ListMyProjectsErrorResponse to NotImplemented.
+func (s *ListMyProjectsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListMyProjectsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListMyProjectsErrorResponse is NotImplemented.
+func (s ListMyProjectsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from NotImplemented.
+func NewNotImplementedListMyProjectsErrorResponse(v NotImplemented) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListMyProjectsErrorResponse to ReqInvalid.
 func (s *ListMyProjectsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListMyProjectsErrorResponse
@@ -41194,6 +44581,27 @@ func (s ListMyProjectsErrorResponse) GetSessProjectMismatch() (v SessProjectMism
 func NewSessProjectMismatchListMyProjectsErrorResponse(v SessProjectMismatch) ListMyProjectsErrorResponse {
 	var s ListMyProjectsErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets ListMyProjectsErrorResponse to Unavailable.
+func (s *ListMyProjectsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListMyProjectsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListMyProjectsErrorResponse is Unavailable.
+func (s ListMyProjectsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListMyProjectsErrorResponse returns new ListMyProjectsErrorResponse from Unavailable.
+func NewUnavailableListMyProjectsErrorResponse(v Unavailable) ListMyProjectsErrorResponse {
+	var s ListMyProjectsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -41292,8 +44700,10 @@ type ListMyTeamsErrorResponse struct {
 	Type                ListMyTeamsErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserNotFound        UserNotFound
 }
 
@@ -41304,8 +44714,10 @@ type ListMyTeamsErrorResponseType string
 const (
 	AuthUnauthorizedListMyTeamsErrorResponse    ListMyTeamsErrorResponseType = "auth.unauthorized"
 	InternalListMyTeamsErrorResponse            ListMyTeamsErrorResponseType = "internal"
+	NotImplementedListMyTeamsErrorResponse      ListMyTeamsErrorResponseType = "not_implemented"
 	ReqInvalidListMyTeamsErrorResponse          ListMyTeamsErrorResponseType = "req.invalid"
 	SessProjectMismatchListMyTeamsErrorResponse ListMyTeamsErrorResponseType = "sess.project_mismatch"
+	UnavailableListMyTeamsErrorResponse         ListMyTeamsErrorResponseType = "unavailable"
 	UserNotFoundListMyTeamsErrorResponse        ListMyTeamsErrorResponseType = "user.not_found"
 )
 
@@ -41319,6 +44731,11 @@ func (s ListMyTeamsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListMyTeamsErrorResponse
 }
 
+// IsNotImplemented reports whether ListMyTeamsErrorResponse is NotImplemented.
+func (s ListMyTeamsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListMyTeamsErrorResponse
+}
+
 // IsReqInvalid reports whether ListMyTeamsErrorResponse is ReqInvalid.
 func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListMyTeamsErrorResponse
@@ -41327,6 +44744,11 @@ func (s ListMyTeamsErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether ListMyTeamsErrorResponse is SessProjectMismatch.
 func (s ListMyTeamsErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchListMyTeamsErrorResponse
+}
+
+// IsUnavailable reports whether ListMyTeamsErrorResponse is Unavailable.
+func (s ListMyTeamsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListMyTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListMyTeamsErrorResponse is UserNotFound.
@@ -41376,6 +44798,27 @@ func NewInternalListMyTeamsErrorResponse(v Internal) ListMyTeamsErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets ListMyTeamsErrorResponse to NotImplemented.
+func (s *ListMyTeamsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListMyTeamsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListMyTeamsErrorResponse is NotImplemented.
+func (s ListMyTeamsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from NotImplemented.
+func NewNotImplementedListMyTeamsErrorResponse(v NotImplemented) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListMyTeamsErrorResponse to ReqInvalid.
 func (s *ListMyTeamsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListMyTeamsErrorResponse
@@ -41415,6 +44858,27 @@ func (s ListMyTeamsErrorResponse) GetSessProjectMismatch() (v SessProjectMismatc
 func NewSessProjectMismatchListMyTeamsErrorResponse(v SessProjectMismatch) ListMyTeamsErrorResponse {
 	var s ListMyTeamsErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets ListMyTeamsErrorResponse to Unavailable.
+func (s *ListMyTeamsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListMyTeamsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListMyTeamsErrorResponse is Unavailable.
+func (s ListMyTeamsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListMyTeamsErrorResponse returns new ListMyTeamsErrorResponse from Unavailable.
+func NewUnavailableListMyTeamsErrorResponse(v Unavailable) ListMyTeamsErrorResponse {
+	var s ListMyTeamsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -41467,6 +44931,541 @@ func (s *ListMyTeamsErrorResponseStatusCode) SetResponse(val ListMyTeamsErrorRes
 
 func (*ListMyTeamsErrorResponseStatusCode) listMyTeamsRes() {}
 
+// ListPoliciesErrorResponse represents sum type.
+type ListPoliciesErrorResponse struct {
+	Type                ListPoliciesErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// ListPoliciesErrorResponseType is oneOf type of ListPoliciesErrorResponse.
+type ListPoliciesErrorResponseType string
+
+// Possible values for ListPoliciesErrorResponseType.
+const (
+	AuthUnauthorizedListPoliciesErrorResponse    ListPoliciesErrorResponseType = "auth.unauthorized"
+	InternalListPoliciesErrorResponse            ListPoliciesErrorResponseType = "internal"
+	NotImplementedListPoliciesErrorResponse      ListPoliciesErrorResponseType = "not_implemented"
+	PolNotFoundListPoliciesErrorResponse         ListPoliciesErrorResponseType = "pol.not_found"
+	PolPermissionDeniedListPoliciesErrorResponse ListPoliciesErrorResponseType = "pol.permission_denied"
+	ReqInvalidListPoliciesErrorResponse          ListPoliciesErrorResponseType = "req.invalid"
+	UnavailableListPoliciesErrorResponse         ListPoliciesErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListPoliciesErrorResponse is AuthUnauthorized.
+func (s ListPoliciesErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPoliciesErrorResponse
+}
+
+// IsInternal reports whether ListPoliciesErrorResponse is Internal.
+func (s ListPoliciesErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPoliciesErrorResponse
+}
+
+// IsNotImplemented reports whether ListPoliciesErrorResponse is NotImplemented.
+func (s ListPoliciesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListPoliciesErrorResponse
+}
+
+// IsPolNotFound reports whether ListPoliciesErrorResponse is PolNotFound.
+func (s ListPoliciesErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundListPoliciesErrorResponse
+}
+
+// IsPolPermissionDenied reports whether ListPoliciesErrorResponse is PolPermissionDenied.
+func (s ListPoliciesErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedListPoliciesErrorResponse
+}
+
+// IsReqInvalid reports whether ListPoliciesErrorResponse is ReqInvalid.
+func (s ListPoliciesErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPoliciesErrorResponse
+}
+
+// IsUnavailable reports whether ListPoliciesErrorResponse is Unavailable.
+func (s ListPoliciesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListPoliciesErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPoliciesErrorResponse to AuthUnauthorized.
+func (s *ListPoliciesErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPoliciesErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPoliciesErrorResponse is AuthUnauthorized.
+func (s ListPoliciesErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPoliciesErrorResponse(v AuthUnauthorized) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListPoliciesErrorResponse to Internal.
+func (s *ListPoliciesErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPoliciesErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPoliciesErrorResponse is Internal.
+func (s ListPoliciesErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPoliciesErrorResponse returns new ListPoliciesErrorResponse from Internal.
+func NewInternalListPoliciesErrorResponse(v Internal) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListPoliciesErrorResponse to NotImplemented.
+func (s *ListPoliciesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListPoliciesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListPoliciesErrorResponse is NotImplemented.
+func (s ListPoliciesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from NotImplemented.
+func NewNotImplementedListPoliciesErrorResponse(v NotImplemented) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets ListPoliciesErrorResponse to PolNotFound.
+func (s *ListPoliciesErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundListPoliciesErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if ListPoliciesErrorResponse is PolNotFound.
+func (s ListPoliciesErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundListPoliciesErrorResponse returns new ListPoliciesErrorResponse from PolNotFound.
+func NewPolNotFoundListPoliciesErrorResponse(v PolNotFound) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets ListPoliciesErrorResponse to PolPermissionDenied.
+func (s *ListPoliciesErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedListPoliciesErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if ListPoliciesErrorResponse is PolPermissionDenied.
+func (s ListPoliciesErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedListPoliciesErrorResponse returns new ListPoliciesErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedListPoliciesErrorResponse(v PolPermissionDenied) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets ListPoliciesErrorResponse to ReqInvalid.
+func (s *ListPoliciesErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPoliciesErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPoliciesErrorResponse is ReqInvalid.
+func (s ListPoliciesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPoliciesErrorResponse returns new ListPoliciesErrorResponse from ReqInvalid.
+func NewReqInvalidListPoliciesErrorResponse(v ReqInvalid) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListPoliciesErrorResponse to Unavailable.
+func (s *ListPoliciesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListPoliciesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListPoliciesErrorResponse is Unavailable.
+func (s ListPoliciesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListPoliciesErrorResponse returns new ListPoliciesErrorResponse from Unavailable.
+func NewUnavailableListPoliciesErrorResponse(v Unavailable) ListPoliciesErrorResponse {
+	var s ListPoliciesErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListPoliciesErrorResponseStatusCode wraps ListPoliciesErrorResponse with StatusCode.
+type ListPoliciesErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPoliciesErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPoliciesErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPoliciesErrorResponseStatusCode) GetResponse() ListPoliciesErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPoliciesErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPoliciesErrorResponseStatusCode) SetResponse(val ListPoliciesErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPoliciesErrorResponseStatusCode) listPoliciesRes() {}
+
+// Paginated list of the project's policies, one per operation, each as its
+// newest revision.
+// Ref: #
+type ListPoliciesResponse struct {
+	Policies []Policy `json:"policies"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetPolicies returns the value of Policies.
+func (s *ListPoliciesResponse) GetPolicies() []Policy {
+	return s.Policies
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPoliciesResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetPolicies sets the value of Policies.
+func (s *ListPoliciesResponse) SetPolicies(val []Policy) {
+	s.Policies = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPoliciesResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPoliciesResponse) listPoliciesRes() {}
+
+// ListPolicyRevisionsErrorResponse represents sum type.
+type ListPolicyRevisionsErrorResponse struct {
+	Type                ListPolicyRevisionsErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	Internal            Internal
+	NotImplemented      NotImplemented
+	PolNotFound         PolNotFound
+	PolPermissionDenied PolPermissionDenied
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
+}
+
+// ListPolicyRevisionsErrorResponseType is oneOf type of ListPolicyRevisionsErrorResponse.
+type ListPolicyRevisionsErrorResponseType string
+
+// Possible values for ListPolicyRevisionsErrorResponseType.
+const (
+	AuthUnauthorizedListPolicyRevisionsErrorResponse    ListPolicyRevisionsErrorResponseType = "auth.unauthorized"
+	InternalListPolicyRevisionsErrorResponse            ListPolicyRevisionsErrorResponseType = "internal"
+	NotImplementedListPolicyRevisionsErrorResponse      ListPolicyRevisionsErrorResponseType = "not_implemented"
+	PolNotFoundListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "pol.not_found"
+	PolPermissionDeniedListPolicyRevisionsErrorResponse ListPolicyRevisionsErrorResponseType = "pol.permission_denied"
+	ReqInvalidListPolicyRevisionsErrorResponse          ListPolicyRevisionsErrorResponseType = "req.invalid"
+	UnavailableListPolicyRevisionsErrorResponse         ListPolicyRevisionsErrorResponseType = "unavailable"
+)
+
+// IsAuthUnauthorized reports whether ListPolicyRevisionsErrorResponse is AuthUnauthorized.
+func (s ListPolicyRevisionsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedListPolicyRevisionsErrorResponse
+}
+
+// IsInternal reports whether ListPolicyRevisionsErrorResponse is Internal.
+func (s ListPolicyRevisionsErrorResponse) IsInternal() bool {
+	return s.Type == InternalListPolicyRevisionsErrorResponse
+}
+
+// IsNotImplemented reports whether ListPolicyRevisionsErrorResponse is NotImplemented.
+func (s ListPolicyRevisionsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListPolicyRevisionsErrorResponse
+}
+
+// IsPolNotFound reports whether ListPolicyRevisionsErrorResponse is PolNotFound.
+func (s ListPolicyRevisionsErrorResponse) IsPolNotFound() bool {
+	return s.Type == PolNotFoundListPolicyRevisionsErrorResponse
+}
+
+// IsPolPermissionDenied reports whether ListPolicyRevisionsErrorResponse is PolPermissionDenied.
+func (s ListPolicyRevisionsErrorResponse) IsPolPermissionDenied() bool {
+	return s.Type == PolPermissionDeniedListPolicyRevisionsErrorResponse
+}
+
+// IsReqInvalid reports whether ListPolicyRevisionsErrorResponse is ReqInvalid.
+func (s ListPolicyRevisionsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidListPolicyRevisionsErrorResponse
+}
+
+// IsUnavailable reports whether ListPolicyRevisionsErrorResponse is Unavailable.
+func (s ListPolicyRevisionsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListPolicyRevisionsErrorResponse
+}
+
+// SetAuthUnauthorized sets ListPolicyRevisionsErrorResponse to AuthUnauthorized.
+func (s *ListPolicyRevisionsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedListPolicyRevisionsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if ListPolicyRevisionsErrorResponse is AuthUnauthorized.
+func (s ListPolicyRevisionsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedListPolicyRevisionsErrorResponse(v AuthUnauthorized) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetInternal sets ListPolicyRevisionsErrorResponse to Internal.
+func (s *ListPolicyRevisionsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalListPolicyRevisionsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if ListPolicyRevisionsErrorResponse is Internal.
+func (s ListPolicyRevisionsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from Internal.
+func NewInternalListPolicyRevisionsErrorResponse(v Internal) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListPolicyRevisionsErrorResponse to NotImplemented.
+func (s *ListPolicyRevisionsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListPolicyRevisionsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListPolicyRevisionsErrorResponse is NotImplemented.
+func (s ListPolicyRevisionsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from NotImplemented.
+func NewNotImplementedListPolicyRevisionsErrorResponse(v NotImplemented) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolNotFound sets ListPolicyRevisionsErrorResponse to PolNotFound.
+func (s *ListPolicyRevisionsErrorResponse) SetPolNotFound(v PolNotFound) {
+	s.Type = PolNotFoundListPolicyRevisionsErrorResponse
+	s.PolNotFound = v
+}
+
+// GetPolNotFound returns PolNotFound and true boolean if ListPolicyRevisionsErrorResponse is PolNotFound.
+func (s ListPolicyRevisionsErrorResponse) GetPolNotFound() (v PolNotFound, ok bool) {
+	if !s.IsPolNotFound() {
+		return v, false
+	}
+	return s.PolNotFound, true
+}
+
+// NewPolNotFoundListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from PolNotFound.
+func NewPolNotFoundListPolicyRevisionsErrorResponse(v PolNotFound) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetPolNotFound(v)
+	return s
+}
+
+// SetPolPermissionDenied sets ListPolicyRevisionsErrorResponse to PolPermissionDenied.
+func (s *ListPolicyRevisionsErrorResponse) SetPolPermissionDenied(v PolPermissionDenied) {
+	s.Type = PolPermissionDeniedListPolicyRevisionsErrorResponse
+	s.PolPermissionDenied = v
+}
+
+// GetPolPermissionDenied returns PolPermissionDenied and true boolean if ListPolicyRevisionsErrorResponse is PolPermissionDenied.
+func (s ListPolicyRevisionsErrorResponse) GetPolPermissionDenied() (v PolPermissionDenied, ok bool) {
+	if !s.IsPolPermissionDenied() {
+		return v, false
+	}
+	return s.PolPermissionDenied, true
+}
+
+// NewPolPermissionDeniedListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from PolPermissionDenied.
+func NewPolPermissionDeniedListPolicyRevisionsErrorResponse(v PolPermissionDenied) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetPolPermissionDenied(v)
+	return s
+}
+
+// SetReqInvalid sets ListPolicyRevisionsErrorResponse to ReqInvalid.
+func (s *ListPolicyRevisionsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidListPolicyRevisionsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if ListPolicyRevisionsErrorResponse is ReqInvalid.
+func (s ListPolicyRevisionsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from ReqInvalid.
+func NewReqInvalidListPolicyRevisionsErrorResponse(v ReqInvalid) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListPolicyRevisionsErrorResponse to Unavailable.
+func (s *ListPolicyRevisionsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListPolicyRevisionsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListPolicyRevisionsErrorResponse is Unavailable.
+func (s ListPolicyRevisionsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListPolicyRevisionsErrorResponse returns new ListPolicyRevisionsErrorResponse from Unavailable.
+func NewUnavailableListPolicyRevisionsErrorResponse(v Unavailable) ListPolicyRevisionsErrorResponse {
+	var s ListPolicyRevisionsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// ListPolicyRevisionsErrorResponseStatusCode wraps ListPolicyRevisionsErrorResponse with StatusCode.
+type ListPolicyRevisionsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   ListPolicyRevisionsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) GetResponse() ListPolicyRevisionsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *ListPolicyRevisionsErrorResponseStatusCode) SetResponse(val ListPolicyRevisionsErrorResponse) {
+	s.Response = val
+}
+
+func (*ListPolicyRevisionsErrorResponseStatusCode) listPolicyRevisionsRes() {}
+
+// Paginated list of the revisions of one policy, newest first.
+// Ref: #
+type ListPolicyRevisionsResponse struct {
+	Revisions []Policy `json:"revisions"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetRevisions returns the value of Revisions.
+func (s *ListPolicyRevisionsResponse) GetRevisions() []Policy {
+	return s.Revisions
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *ListPolicyRevisionsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetRevisions sets the value of Revisions.
+func (s *ListPolicyRevisionsResponse) SetRevisions(val []Policy) {
+	s.Revisions = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *ListPolicyRevisionsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*ListPolicyRevisionsResponse) listPolicyRevisionsRes() {}
+
 // ListPreviewsErrorResponse represents sum type.
 type ListPreviewsErrorResponse struct {
 	Type                ListPreviewsErrorResponseType // switch on this field
@@ -41476,6 +45475,7 @@ type ListPreviewsErrorResponse struct {
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListPreviewsErrorResponseType is oneOf type of ListPreviewsErrorResponse.
@@ -41489,6 +45489,7 @@ const (
 	InternalListPreviewsErrorResponse            ListPreviewsErrorResponseType = "internal"
 	NotImplementedListPreviewsErrorResponse      ListPreviewsErrorResponseType = "not_implemented"
 	ReqInvalidListPreviewsErrorResponse          ListPreviewsErrorResponseType = "req.invalid"
+	UnavailableListPreviewsErrorResponse         ListPreviewsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListPreviewsErrorResponse is AuthUnauthorized.
@@ -41519,6 +45520,11 @@ func (s ListPreviewsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether ListPreviewsErrorResponse is ReqInvalid.
 func (s ListPreviewsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListPreviewsErrorResponse
+}
+
+// IsUnavailable reports whether ListPreviewsErrorResponse is Unavailable.
+func (s ListPreviewsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListPreviewsErrorResponse
 }
 
 // SetAuthUnauthorized sets ListPreviewsErrorResponse to AuthUnauthorized.
@@ -41647,6 +45653,27 @@ func NewReqInvalidListPreviewsErrorResponse(v ReqInvalid) ListPreviewsErrorRespo
 	return s
 }
 
+// SetUnavailable sets ListPreviewsErrorResponse to Unavailable.
+func (s *ListPreviewsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListPreviewsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListPreviewsErrorResponse is Unavailable.
+func (s ListPreviewsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListPreviewsErrorResponse returns new ListPreviewsErrorResponse from Unavailable.
+func NewUnavailableListPreviewsErrorResponse(v Unavailable) ListPreviewsErrorResponse {
+	var s ListPreviewsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // ListPreviewsErrorResponseStatusCode wraps ListPreviewsErrorResponse with StatusCode.
 type ListPreviewsErrorResponseStatusCode struct {
 	StatusCode int
@@ -41711,9 +45738,11 @@ type ListReleasesErrorResponse struct {
 	Type                ListReleasesErrorResponseType // switch on this field
 	AuthUnauthorized    AuthUnauthorized
 	Internal            Internal
+	NotImplemented      NotImplemented
 	RelNotFound         RelNotFound
 	RelPermissionDenied RelPermissionDenied
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListReleasesErrorResponseType is oneOf type of ListReleasesErrorResponse.
@@ -41723,9 +45752,11 @@ type ListReleasesErrorResponseType string
 const (
 	AuthUnauthorizedListReleasesErrorResponse    ListReleasesErrorResponseType = "auth.unauthorized"
 	InternalListReleasesErrorResponse            ListReleasesErrorResponseType = "internal"
+	NotImplementedListReleasesErrorResponse      ListReleasesErrorResponseType = "not_implemented"
 	RelNotFoundListReleasesErrorResponse         ListReleasesErrorResponseType = "rel.not_found"
 	RelPermissionDeniedListReleasesErrorResponse ListReleasesErrorResponseType = "rel.permission_denied"
 	ReqInvalidListReleasesErrorResponse          ListReleasesErrorResponseType = "req.invalid"
+	UnavailableListReleasesErrorResponse         ListReleasesErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListReleasesErrorResponse is AuthUnauthorized.
@@ -41736,6 +45767,11 @@ func (s ListReleasesErrorResponse) IsAuthUnauthorized() bool {
 // IsInternal reports whether ListReleasesErrorResponse is Internal.
 func (s ListReleasesErrorResponse) IsInternal() bool {
 	return s.Type == InternalListReleasesErrorResponse
+}
+
+// IsNotImplemented reports whether ListReleasesErrorResponse is NotImplemented.
+func (s ListReleasesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListReleasesErrorResponse
 }
 
 // IsRelNotFound reports whether ListReleasesErrorResponse is RelNotFound.
@@ -41751,6 +45787,11 @@ func (s ListReleasesErrorResponse) IsRelPermissionDenied() bool {
 // IsReqInvalid reports whether ListReleasesErrorResponse is ReqInvalid.
 func (s ListReleasesErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListReleasesErrorResponse
+}
+
+// IsUnavailable reports whether ListReleasesErrorResponse is Unavailable.
+func (s ListReleasesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListReleasesErrorResponse
 }
 
 // SetAuthUnauthorized sets ListReleasesErrorResponse to AuthUnauthorized.
@@ -41792,6 +45833,27 @@ func (s ListReleasesErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalListReleasesErrorResponse(v Internal) ListReleasesErrorResponse {
 	var s ListReleasesErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets ListReleasesErrorResponse to NotImplemented.
+func (s *ListReleasesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListReleasesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListReleasesErrorResponse is NotImplemented.
+func (s ListReleasesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListReleasesErrorResponse returns new ListReleasesErrorResponse from NotImplemented.
+func NewNotImplementedListReleasesErrorResponse(v NotImplemented) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -41855,6 +45917,27 @@ func (s ListReleasesErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListReleasesErrorResponse(v ReqInvalid) ListReleasesErrorResponse {
 	var s ListReleasesErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListReleasesErrorResponse to Unavailable.
+func (s *ListReleasesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListReleasesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListReleasesErrorResponse is Unavailable.
+func (s ListReleasesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListReleasesErrorResponse returns new ListReleasesErrorResponse from Unavailable.
+func NewUnavailableListReleasesErrorResponse(v Unavailable) ListReleasesErrorResponse {
+	var s ListReleasesErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -41924,7 +46007,9 @@ type ListSchemasErrorResponse struct {
 	Internal            Internal
 	SchNotFound         SchNotFound
 	SchPermissionDenied SchPermissionDenied
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // ListSchemasErrorResponseType is oneOf type of ListSchemasErrorResponse.
@@ -41936,7 +46021,9 @@ const (
 	InternalListSchemasErrorResponse            ListSchemasErrorResponseType = "internal"
 	SchNotFoundListSchemasErrorResponse         ListSchemasErrorResponseType = "sch.not_found"
 	SchPermissionDeniedListSchemasErrorResponse ListSchemasErrorResponseType = "sch.permission_denied"
+	NotImplementedListSchemasErrorResponse      ListSchemasErrorResponseType = "not_implemented"
 	ReqInvalidListSchemasErrorResponse          ListSchemasErrorResponseType = "req.invalid"
+	UnavailableListSchemasErrorResponse         ListSchemasErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether ListSchemasErrorResponse is AuthUnauthorized.
@@ -41959,9 +46046,19 @@ func (s ListSchemasErrorResponse) IsSchPermissionDenied() bool {
 	return s.Type == SchPermissionDeniedListSchemasErrorResponse
 }
 
+// IsNotImplemented reports whether ListSchemasErrorResponse is NotImplemented.
+func (s ListSchemasErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListSchemasErrorResponse
+}
+
 // IsReqInvalid reports whether ListSchemasErrorResponse is ReqInvalid.
 func (s ListSchemasErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListSchemasErrorResponse
+}
+
+// IsUnavailable reports whether ListSchemasErrorResponse is Unavailable.
+func (s ListSchemasErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListSchemasErrorResponse
 }
 
 // SetAuthUnauthorized sets ListSchemasErrorResponse to AuthUnauthorized.
@@ -42048,6 +46145,27 @@ func NewSchPermissionDeniedListSchemasErrorResponse(v SchPermissionDenied) ListS
 	return s
 }
 
+// SetNotImplemented sets ListSchemasErrorResponse to NotImplemented.
+func (s *ListSchemasErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListSchemasErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListSchemasErrorResponse is NotImplemented.
+func (s ListSchemasErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListSchemasErrorResponse returns new ListSchemasErrorResponse from NotImplemented.
+func NewNotImplementedListSchemasErrorResponse(v NotImplemented) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListSchemasErrorResponse to ReqInvalid.
 func (s *ListSchemasErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListSchemasErrorResponse
@@ -42066,6 +46184,27 @@ func (s ListSchemasErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListSchemasErrorResponse(v ReqInvalid) ListSchemasErrorResponse {
 	var s ListSchemasErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListSchemasErrorResponse to Unavailable.
+func (s *ListSchemasErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListSchemasErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListSchemasErrorResponse is Unavailable.
+func (s ListSchemasErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListSchemasErrorResponse returns new ListSchemasErrorResponse from Unavailable.
+func NewUnavailableListSchemasErrorResponse(v Unavailable) ListSchemasErrorResponse {
+	var s ListSchemasErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -42212,7 +46351,9 @@ type ListUserIdentityLinksErrorResponse struct {
 	Type                 ListUserIdentityLinksErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -42224,7 +46365,9 @@ type ListUserIdentityLinksErrorResponseType string
 const (
 	AuthUnauthorizedListUserIdentityLinksErrorResponse     ListUserIdentityLinksErrorResponseType = "auth.unauthorized"
 	InternalListUserIdentityLinksErrorResponse             ListUserIdentityLinksErrorResponseType = "internal"
+	NotImplementedListUserIdentityLinksErrorResponse       ListUserIdentityLinksErrorResponseType = "not_implemented"
 	ReqInvalidListUserIdentityLinksErrorResponse           ListUserIdentityLinksErrorResponseType = "req.invalid"
+	UnavailableListUserIdentityLinksErrorResponse          ListUserIdentityLinksErrorResponseType = "unavailable"
 	UserNotFoundListUserIdentityLinksErrorResponse         ListUserIdentityLinksErrorResponseType = "user.not_found"
 	UserPermissionDeniedListUserIdentityLinksErrorResponse ListUserIdentityLinksErrorResponseType = "user.permission_denied"
 )
@@ -42239,9 +46382,19 @@ func (s ListUserIdentityLinksErrorResponse) IsInternal() bool {
 	return s.Type == InternalListUserIdentityLinksErrorResponse
 }
 
+// IsNotImplemented reports whether ListUserIdentityLinksErrorResponse is NotImplemented.
+func (s ListUserIdentityLinksErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListUserIdentityLinksErrorResponse
+}
+
 // IsReqInvalid reports whether ListUserIdentityLinksErrorResponse is ReqInvalid.
 func (s ListUserIdentityLinksErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListUserIdentityLinksErrorResponse
+}
+
+// IsUnavailable reports whether ListUserIdentityLinksErrorResponse is Unavailable.
+func (s ListUserIdentityLinksErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListUserIdentityLinksErrorResponse
 }
 
 // IsUserNotFound reports whether ListUserIdentityLinksErrorResponse is UserNotFound.
@@ -42296,6 +46449,27 @@ func NewInternalListUserIdentityLinksErrorResponse(v Internal) ListUserIdentityL
 	return s
 }
 
+// SetNotImplemented sets ListUserIdentityLinksErrorResponse to NotImplemented.
+func (s *ListUserIdentityLinksErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListUserIdentityLinksErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListUserIdentityLinksErrorResponse is NotImplemented.
+func (s ListUserIdentityLinksErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from NotImplemented.
+func NewNotImplementedListUserIdentityLinksErrorResponse(v NotImplemented) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListUserIdentityLinksErrorResponse to ReqInvalid.
 func (s *ListUserIdentityLinksErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListUserIdentityLinksErrorResponse
@@ -42314,6 +46488,27 @@ func (s ListUserIdentityLinksErrorResponse) GetReqInvalid() (v ReqInvalid, ok bo
 func NewReqInvalidListUserIdentityLinksErrorResponse(v ReqInvalid) ListUserIdentityLinksErrorResponse {
 	var s ListUserIdentityLinksErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListUserIdentityLinksErrorResponse to Unavailable.
+func (s *ListUserIdentityLinksErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListUserIdentityLinksErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListUserIdentityLinksErrorResponse is Unavailable.
+func (s ListUserIdentityLinksErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListUserIdentityLinksErrorResponse returns new ListUserIdentityLinksErrorResponse from Unavailable.
+func NewUnavailableListUserIdentityLinksErrorResponse(v Unavailable) ListUserIdentityLinksErrorResponse {
+	var s ListUserIdentityLinksErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -42471,7 +46666,9 @@ type ListUserPasskeysErrorResponse struct {
 	Type                 ListUserPasskeysErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -42483,7 +46680,9 @@ type ListUserPasskeysErrorResponseType string
 const (
 	AuthUnauthorizedListUserPasskeysErrorResponse     ListUserPasskeysErrorResponseType = "auth.unauthorized"
 	InternalListUserPasskeysErrorResponse             ListUserPasskeysErrorResponseType = "internal"
+	NotImplementedListUserPasskeysErrorResponse       ListUserPasskeysErrorResponseType = "not_implemented"
 	ReqInvalidListUserPasskeysErrorResponse           ListUserPasskeysErrorResponseType = "req.invalid"
+	UnavailableListUserPasskeysErrorResponse          ListUserPasskeysErrorResponseType = "unavailable"
 	UserNotFoundListUserPasskeysErrorResponse         ListUserPasskeysErrorResponseType = "user.not_found"
 	UserPermissionDeniedListUserPasskeysErrorResponse ListUserPasskeysErrorResponseType = "user.permission_denied"
 )
@@ -42498,9 +46697,19 @@ func (s ListUserPasskeysErrorResponse) IsInternal() bool {
 	return s.Type == InternalListUserPasskeysErrorResponse
 }
 
+// IsNotImplemented reports whether ListUserPasskeysErrorResponse is NotImplemented.
+func (s ListUserPasskeysErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListUserPasskeysErrorResponse
+}
+
 // IsReqInvalid reports whether ListUserPasskeysErrorResponse is ReqInvalid.
 func (s ListUserPasskeysErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListUserPasskeysErrorResponse
+}
+
+// IsUnavailable reports whether ListUserPasskeysErrorResponse is Unavailable.
+func (s ListUserPasskeysErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListUserPasskeysErrorResponse
 }
 
 // IsUserNotFound reports whether ListUserPasskeysErrorResponse is UserNotFound.
@@ -42555,6 +46764,27 @@ func NewInternalListUserPasskeysErrorResponse(v Internal) ListUserPasskeysErrorR
 	return s
 }
 
+// SetNotImplemented sets ListUserPasskeysErrorResponse to NotImplemented.
+func (s *ListUserPasskeysErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListUserPasskeysErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListUserPasskeysErrorResponse is NotImplemented.
+func (s ListUserPasskeysErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListUserPasskeysErrorResponse returns new ListUserPasskeysErrorResponse from NotImplemented.
+func NewNotImplementedListUserPasskeysErrorResponse(v NotImplemented) ListUserPasskeysErrorResponse {
+	var s ListUserPasskeysErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListUserPasskeysErrorResponse to ReqInvalid.
 func (s *ListUserPasskeysErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListUserPasskeysErrorResponse
@@ -42573,6 +46803,27 @@ func (s ListUserPasskeysErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListUserPasskeysErrorResponse(v ReqInvalid) ListUserPasskeysErrorResponse {
 	var s ListUserPasskeysErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListUserPasskeysErrorResponse to Unavailable.
+func (s *ListUserPasskeysErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListUserPasskeysErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListUserPasskeysErrorResponse is Unavailable.
+func (s ListUserPasskeysErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListUserPasskeysErrorResponse returns new ListUserPasskeysErrorResponse from Unavailable.
+func NewUnavailableListUserPasskeysErrorResponse(v Unavailable) ListUserPasskeysErrorResponse {
+	var s ListUserPasskeysErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -42769,7 +47020,9 @@ type ListUserTeamsErrorResponse struct {
 	Type                 ListUserTeamsErrorResponseType // switch on this field
 	AuthUnauthorized     AuthUnauthorized
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -42781,7 +47034,9 @@ type ListUserTeamsErrorResponseType string
 const (
 	AuthUnauthorizedListUserTeamsErrorResponse     ListUserTeamsErrorResponseType = "auth.unauthorized"
 	InternalListUserTeamsErrorResponse             ListUserTeamsErrorResponseType = "internal"
+	NotImplementedListUserTeamsErrorResponse       ListUserTeamsErrorResponseType = "not_implemented"
 	ReqInvalidListUserTeamsErrorResponse           ListUserTeamsErrorResponseType = "req.invalid"
+	UnavailableListUserTeamsErrorResponse          ListUserTeamsErrorResponseType = "unavailable"
 	UserNotFoundListUserTeamsErrorResponse         ListUserTeamsErrorResponseType = "user.not_found"
 	UserPermissionDeniedListUserTeamsErrorResponse ListUserTeamsErrorResponseType = "user.permission_denied"
 )
@@ -42796,9 +47051,19 @@ func (s ListUserTeamsErrorResponse) IsInternal() bool {
 	return s.Type == InternalListUserTeamsErrorResponse
 }
 
+// IsNotImplemented reports whether ListUserTeamsErrorResponse is NotImplemented.
+func (s ListUserTeamsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedListUserTeamsErrorResponse
+}
+
 // IsReqInvalid reports whether ListUserTeamsErrorResponse is ReqInvalid.
 func (s ListUserTeamsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidListUserTeamsErrorResponse
+}
+
+// IsUnavailable reports whether ListUserTeamsErrorResponse is Unavailable.
+func (s ListUserTeamsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableListUserTeamsErrorResponse
 }
 
 // IsUserNotFound reports whether ListUserTeamsErrorResponse is UserNotFound.
@@ -42853,6 +47118,27 @@ func NewInternalListUserTeamsErrorResponse(v Internal) ListUserTeamsErrorRespons
 	return s
 }
 
+// SetNotImplemented sets ListUserTeamsErrorResponse to NotImplemented.
+func (s *ListUserTeamsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedListUserTeamsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if ListUserTeamsErrorResponse is NotImplemented.
+func (s ListUserTeamsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from NotImplemented.
+func NewNotImplementedListUserTeamsErrorResponse(v NotImplemented) ListUserTeamsErrorResponse {
+	var s ListUserTeamsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets ListUserTeamsErrorResponse to ReqInvalid.
 func (s *ListUserTeamsErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidListUserTeamsErrorResponse
@@ -42871,6 +47157,27 @@ func (s ListUserTeamsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidListUserTeamsErrorResponse(v ReqInvalid) ListUserTeamsErrorResponse {
 	var s ListUserTeamsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets ListUserTeamsErrorResponse to Unavailable.
+func (s *ListUserTeamsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableListUserTeamsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if ListUserTeamsErrorResponse is Unavailable.
+func (s ListUserTeamsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableListUserTeamsErrorResponse returns new ListUserTeamsErrorResponse from Unavailable.
+func NewUnavailableListUserTeamsErrorResponse(v Unavailable) ListUserTeamsErrorResponse {
+	var s ListUserTeamsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -46288,6 +50595,52 @@ func (o OptEventMetadata) Get() (v EventMetadata, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEventMetadataAuthorization returns new OptEventMetadataAuthorization with value set to v.
+func NewOptEventMetadataAuthorization(v EventMetadataAuthorization) OptEventMetadataAuthorization {
+	return OptEventMetadataAuthorization{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadataAuthorization is optional EventMetadataAuthorization.
+type OptEventMetadataAuthorization struct {
+	Value EventMetadataAuthorization
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadataAuthorization was set.
+func (o OptEventMetadataAuthorization) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadataAuthorization) Reset() {
+	var v EventMetadataAuthorization
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadataAuthorization) SetTo(v EventMetadataAuthorization) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadataAuthorization) Get() (v EventMetadataAuthorization, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadataAuthorization) Or(d EventMetadataAuthorization) EventMetadataAuthorization {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -54611,6 +58964,52 @@ func (o OptPolicyCreatedEventDelegationType) Or(d PolicyCreatedEventDelegationTy
 	return d
 }
 
+// NewOptPolicyOperation returns new OptPolicyOperation with value set to v.
+func NewOptPolicyOperation(v PolicyOperation) OptPolicyOperation {
+	return OptPolicyOperation{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPolicyOperation is optional PolicyOperation.
+type OptPolicyOperation struct {
+	Value PolicyOperation
+	Set   bool
+}
+
+// IsSet returns true if OptPolicyOperation was set.
+func (o OptPolicyOperation) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPolicyOperation) Reset() {
+	var v PolicyOperation
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPolicyOperation) SetTo(v PolicyOperation) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPolicyOperation) Get() (v PolicyOperation, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPolicyOperation) Or(d PolicyOperation) PolicyOperation {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPolicyUpdatedEventDelegationType returns new OptPolicyUpdatedEventDelegationType with value set to v.
 func NewOptPolicyUpdatedEventDelegationType(v PolicyUpdatedEventDelegationType) OptPolicyUpdatedEventDelegationType {
 	return OptPolicyUpdatedEventDelegationType{
@@ -55617,6 +60016,52 @@ func (o OptQueryUsersRequestSorting) Get() (v QueryUsersRequestSorting, ok bool)
 
 // Or returns value if set, or given parameter if does not.
 func (o OptQueryUsersRequestSorting) Or(d QueryUsersRequestSorting) QueryUsersRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptRelInUseDetails returns new OptRelInUseDetails with value set to v.
+func NewOptRelInUseDetails(v RelInUseDetails) OptRelInUseDetails {
+	return OptRelInUseDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelInUseDetails is optional RelInUseDetails.
+type OptRelInUseDetails struct {
+	Value RelInUseDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelInUseDetails was set.
+func (o OptRelInUseDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelInUseDetails) Reset() {
+	var v RelInUseDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelInUseDetails) SetTo(v RelInUseDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelInUseDetails) Get() (v RelInUseDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelInUseDetails) Or(d RelInUseDetails) RelInUseDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -61838,6 +66283,239 @@ func (s *PasswordProof) SetPassword(val string) {
 	s.Password = val
 }
 
+// The settings of an `auth.factor.password.set` policy. Every setting is
+// optional; a setting left out switches its rule off, and `{}` switches every
+// rule off. There are no defaults. The bounds are technical limits, not
+// recommendations; the server's template checks the same bounds.
+// Ref: #
+type PasswordSetConfig struct {
+	// The fewest Unicode code points a new password may have, counted after
+	// NFC normalization. At most `max_length` when both are set.
+	MinLength OptInt `json:"min_length"`
+	// The most Unicode code points a new password may have. A password above
+	// 64 code points is refused whether or not this is set.
+	MaxLength OptInt `json:"max_length"`
+	// How many of the user's passwords a new one may not repeat, the current
+	// one included. Checked only when users set their own password.
+	HistoryDepth OptInt `json:"history_depth"`
+}
+
+// GetMinLength returns the value of MinLength.
+func (s *PasswordSetConfig) GetMinLength() OptInt {
+	return s.MinLength
+}
+
+// GetMaxLength returns the value of MaxLength.
+func (s *PasswordSetConfig) GetMaxLength() OptInt {
+	return s.MaxLength
+}
+
+// GetHistoryDepth returns the value of HistoryDepth.
+func (s *PasswordSetConfig) GetHistoryDepth() OptInt {
+	return s.HistoryDepth
+}
+
+// SetMinLength sets the value of MinLength.
+func (s *PasswordSetConfig) SetMinLength(val OptInt) {
+	s.MinLength = val
+}
+
+// SetMaxLength sets the value of MaxLength.
+func (s *PasswordSetConfig) SetMaxLength(val OptInt) {
+	s.MaxLength = val
+}
+
+// SetHistoryDepth sets the value of HistoryDepth.
+func (s *PasswordSetConfig) SetHistoryDepth(val OptInt) {
+	s.HistoryDepth = val
+}
+
+// One revision of a project's `auth.factor.password.set` policy (ADR 066).
+// `id` is shared by every revision of the operation's policy; `revision_id`
+// names this revision.
+// Ref: #
+type PasswordSetPolicy struct {
+	ID         PolicyID         `json:"id"`
+	RevisionID PolicyRevisionID `json:"revision_id"`
+	// The project the policy belongs to.
+	ProjectID ProjectID `json:"project_id"`
+	// The operation the policy guards.
+	Operation PasswordSetPolicyOperation `json:"operation"`
+	Config    PasswordSetConfig          `json:"config"`
+	// When the operation's policy was first published.
+	CreatedAt time.Time `json:"created_at"`
+	// When this revision was published.
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// GetID returns the value of ID.
+func (s *PasswordSetPolicy) GetID() PolicyID {
+	return s.ID
+}
+
+// GetRevisionID returns the value of RevisionID.
+func (s *PasswordSetPolicy) GetRevisionID() PolicyRevisionID {
+	return s.RevisionID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PasswordSetPolicy) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetOperation returns the value of Operation.
+func (s *PasswordSetPolicy) GetOperation() PasswordSetPolicyOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PasswordSetPolicy) GetConfig() PasswordSetConfig {
+	return s.Config
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PasswordSetPolicy) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetUpdatedAt returns the value of UpdatedAt.
+func (s *PasswordSetPolicy) GetUpdatedAt() time.Time {
+	return s.UpdatedAt
+}
+
+// SetID sets the value of ID.
+func (s *PasswordSetPolicy) SetID(val PolicyID) {
+	s.ID = val
+}
+
+// SetRevisionID sets the value of RevisionID.
+func (s *PasswordSetPolicy) SetRevisionID(val PolicyRevisionID) {
+	s.RevisionID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PasswordSetPolicy) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *PasswordSetPolicy) SetOperation(val PasswordSetPolicyOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PasswordSetPolicy) SetConfig(val PasswordSetConfig) {
+	s.Config = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PasswordSetPolicy) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetUpdatedAt sets the value of UpdatedAt.
+func (s *PasswordSetPolicy) SetUpdatedAt(val time.Time) {
+	s.UpdatedAt = val
+}
+
+// A publish of the password policy, checked before a password is set.
+// Ref: #
+type PasswordSetPolicyInput struct {
+	// The operation the policy guards.
+	Operation PasswordSetPolicyInputOperation `json:"operation"`
+	Config    PasswordSetConfig               `json:"config"`
+}
+
+// GetOperation returns the value of Operation.
+func (s *PasswordSetPolicyInput) GetOperation() PasswordSetPolicyInputOperation {
+	return s.Operation
+}
+
+// GetConfig returns the value of Config.
+func (s *PasswordSetPolicyInput) GetConfig() PasswordSetConfig {
+	return s.Config
+}
+
+// SetOperation sets the value of Operation.
+func (s *PasswordSetPolicyInput) SetOperation(val PasswordSetPolicyInputOperation) {
+	s.Operation = val
+}
+
+// SetConfig sets the value of Config.
+func (s *PasswordSetPolicyInput) SetConfig(val PasswordSetConfig) {
+	s.Config = val
+}
+
+// The operation the policy guards.
+type PasswordSetPolicyInputOperation string
+
+const (
+	PasswordSetPolicyInputOperationAuthFactorPasswordSet PasswordSetPolicyInputOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PasswordSetPolicyInputOperation values.
+func (PasswordSetPolicyInputOperation) AllValues() []PasswordSetPolicyInputOperation {
+	return []PasswordSetPolicyInputOperation{
+		PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordSetPolicyInputOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordSetPolicyInputOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordSetPolicyInputOperation) UnmarshalText(data []byte) error {
+	switch PasswordSetPolicyInputOperation(data) {
+	case PasswordSetPolicyInputOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyInputOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The operation the policy guards.
+type PasswordSetPolicyOperation string
+
+const (
+	PasswordSetPolicyOperationAuthFactorPasswordSet PasswordSetPolicyOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PasswordSetPolicyOperation values.
+func (PasswordSetPolicyOperation) AllValues() []PasswordSetPolicyOperation {
+	return []PasswordSetPolicyOperation{
+		PasswordSetPolicyOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PasswordSetPolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PasswordSetPolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PasswordSetPolicyOperation) UnmarshalText(data []byte) error {
+	switch PasswordSetPolicyOperation(data) {
+	case PasswordSetPolicyOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type PatchMyUserBadRequest ErrorDetails
 
 func (*PatchMyUserBadRequest) patchMyUserRes() {}
@@ -61853,8 +66531,10 @@ type PatchMyUserErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 	UserAlreadyExists   UserAlreadyExists
 	UserConflict        UserConflict
 	UserInvalid         UserInvalid
@@ -61870,8 +66550,10 @@ const (
 	AuthUnauthorizedPatchMyUserErrorResponse    PatchMyUserErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "evt.invalid"
 	InternalPatchMyUserErrorResponse            PatchMyUserErrorResponseType = "internal"
+	NotImplementedPatchMyUserErrorResponse      PatchMyUserErrorResponseType = "not_implemented"
 	ReqInvalidPatchMyUserErrorResponse          PatchMyUserErrorResponseType = "req.invalid"
 	SessProjectMismatchPatchMyUserErrorResponse PatchMyUserErrorResponseType = "sess.project_mismatch"
+	UnavailablePatchMyUserErrorResponse         PatchMyUserErrorResponseType = "unavailable"
 	UserAlreadyExistsPatchMyUserErrorResponse   PatchMyUserErrorResponseType = "user.already_exists"
 	UserConflictPatchMyUserErrorResponse        PatchMyUserErrorResponseType = "user.conflict"
 	UserInvalidPatchMyUserErrorResponse         PatchMyUserErrorResponseType = "user.invalid"
@@ -61898,6 +66580,11 @@ func (s PatchMyUserErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchMyUserErrorResponse
 }
 
+// IsNotImplemented reports whether PatchMyUserErrorResponse is NotImplemented.
+func (s PatchMyUserErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedPatchMyUserErrorResponse
+}
+
 // IsReqInvalid reports whether PatchMyUserErrorResponse is ReqInvalid.
 func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchMyUserErrorResponse
@@ -61906,6 +66593,11 @@ func (s PatchMyUserErrorResponse) IsReqInvalid() bool {
 // IsSessProjectMismatch reports whether PatchMyUserErrorResponse is SessProjectMismatch.
 func (s PatchMyUserErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchPatchMyUserErrorResponse
+}
+
+// IsUnavailable reports whether PatchMyUserErrorResponse is Unavailable.
+func (s PatchMyUserErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailablePatchMyUserErrorResponse
 }
 
 // IsUserAlreadyExists reports whether PatchMyUserErrorResponse is UserAlreadyExists.
@@ -62012,6 +66704,27 @@ func NewInternalPatchMyUserErrorResponse(v Internal) PatchMyUserErrorResponse {
 	return s
 }
 
+// SetNotImplemented sets PatchMyUserErrorResponse to NotImplemented.
+func (s *PatchMyUserErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedPatchMyUserErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if PatchMyUserErrorResponse is NotImplemented.
+func (s PatchMyUserErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedPatchMyUserErrorResponse returns new PatchMyUserErrorResponse from NotImplemented.
+func NewNotImplementedPatchMyUserErrorResponse(v NotImplemented) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets PatchMyUserErrorResponse to ReqInvalid.
 func (s *PatchMyUserErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidPatchMyUserErrorResponse
@@ -62051,6 +66764,27 @@ func (s PatchMyUserErrorResponse) GetSessProjectMismatch() (v SessProjectMismatc
 func NewSessProjectMismatchPatchMyUserErrorResponse(v SessProjectMismatch) PatchMyUserErrorResponse {
 	var s PatchMyUserErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets PatchMyUserErrorResponse to Unavailable.
+func (s *PatchMyUserErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailablePatchMyUserErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if PatchMyUserErrorResponse is Unavailable.
+func (s PatchMyUserErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailablePatchMyUserErrorResponse returns new PatchMyUserErrorResponse from Unavailable.
+func NewUnavailablePatchMyUserErrorResponse(v Unavailable) PatchMyUserErrorResponse {
+	var s PatchMyUserErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -62221,12 +66955,14 @@ type PatchProjectErrorResponse struct {
 	AuthUnauthorized        AuthUnauthorized
 	EvtInvalid              EvtInvalid
 	Internal                Internal
+	NotImplemented          NotImplemented
 	ProjMissingID           ProjMissingID
 	ProjNameInvalid         ProjNameInvalid
 	ProjNotFound            ProjNotFound
 	ProjPasswordHashInvalid ProjPasswordHashInvalid
 	ProjPermissionDenied    ProjPermissionDenied
 	ReqInvalid              ReqInvalid
+	Unavailable             Unavailable
 }
 
 // PatchProjectErrorResponseType is oneOf type of PatchProjectErrorResponse.
@@ -62238,12 +66974,14 @@ const (
 	AuthUnauthorizedPatchProjectErrorResponse        PatchProjectErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "evt.invalid"
 	InternalPatchProjectErrorResponse                PatchProjectErrorResponseType = "internal"
+	NotImplementedPatchProjectErrorResponse          PatchProjectErrorResponseType = "not_implemented"
 	ProjMissingIDPatchProjectErrorResponse           PatchProjectErrorResponseType = "proj.missing_id"
 	ProjNameInvalidPatchProjectErrorResponse         PatchProjectErrorResponseType = "proj.name_invalid"
 	ProjNotFoundPatchProjectErrorResponse            PatchProjectErrorResponseType = "proj.not_found"
 	ProjPasswordHashInvalidPatchProjectErrorResponse PatchProjectErrorResponseType = "proj.password_hash_invalid"
 	ProjPermissionDeniedPatchProjectErrorResponse    PatchProjectErrorResponseType = "proj.permission_denied"
 	ReqInvalidPatchProjectErrorResponse              PatchProjectErrorResponseType = "req.invalid"
+	UnavailablePatchProjectErrorResponse             PatchProjectErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether PatchProjectErrorResponse is AuthCsrfInvalid.
@@ -62264,6 +67002,11 @@ func (s PatchProjectErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether PatchProjectErrorResponse is Internal.
 func (s PatchProjectErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchProjectErrorResponse
+}
+
+// IsNotImplemented reports whether PatchProjectErrorResponse is NotImplemented.
+func (s PatchProjectErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedPatchProjectErrorResponse
 }
 
 // IsProjMissingID reports whether PatchProjectErrorResponse is ProjMissingID.
@@ -62294,6 +67037,11 @@ func (s PatchProjectErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether PatchProjectErrorResponse is ReqInvalid.
 func (s PatchProjectErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchProjectErrorResponse
+}
+
+// IsUnavailable reports whether PatchProjectErrorResponse is Unavailable.
+func (s PatchProjectErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailablePatchProjectErrorResponse
 }
 
 // SetAuthCsrfInvalid sets PatchProjectErrorResponse to AuthCsrfInvalid.
@@ -62377,6 +67125,27 @@ func (s PatchProjectErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalPatchProjectErrorResponse(v Internal) PatchProjectErrorResponse {
 	var s PatchProjectErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets PatchProjectErrorResponse to NotImplemented.
+func (s *PatchProjectErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedPatchProjectErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if PatchProjectErrorResponse is NotImplemented.
+func (s PatchProjectErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedPatchProjectErrorResponse returns new PatchProjectErrorResponse from NotImplemented.
+func NewNotImplementedPatchProjectErrorResponse(v NotImplemented) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -62506,6 +67275,27 @@ func NewReqInvalidPatchProjectErrorResponse(v ReqInvalid) PatchProjectErrorRespo
 	return s
 }
 
+// SetUnavailable sets PatchProjectErrorResponse to Unavailable.
+func (s *PatchProjectErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailablePatchProjectErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if PatchProjectErrorResponse is Unavailable.
+func (s PatchProjectErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailablePatchProjectErrorResponse returns new PatchProjectErrorResponse from Unavailable.
+func NewUnavailablePatchProjectErrorResponse(v Unavailable) PatchProjectErrorResponse {
+	var s PatchProjectErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // PatchProjectErrorResponseStatusCode wraps PatchProjectErrorResponse with StatusCode.
 type PatchProjectErrorResponseStatusCode struct {
 	StatusCode int
@@ -62587,7 +67377,9 @@ type PatchUserByIDErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserAlreadyExists    UserAlreadyExists
 	UserConflict         UserConflict
 	UserInvalid          UserInvalid
@@ -62604,7 +67396,9 @@ const (
 	AuthUnauthorizedPatchUserByIDErrorResponse     PatchUserByIDErrorResponseType = "auth.unauthorized"
 	EvtInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "evt.invalid"
 	InternalPatchUserByIDErrorResponse             PatchUserByIDErrorResponseType = "internal"
+	NotImplementedPatchUserByIDErrorResponse       PatchUserByIDErrorResponseType = "not_implemented"
 	ReqInvalidPatchUserByIDErrorResponse           PatchUserByIDErrorResponseType = "req.invalid"
+	UnavailablePatchUserByIDErrorResponse          PatchUserByIDErrorResponseType = "unavailable"
 	UserAlreadyExistsPatchUserByIDErrorResponse    PatchUserByIDErrorResponseType = "user.already_exists"
 	UserConflictPatchUserByIDErrorResponse         PatchUserByIDErrorResponseType = "user.conflict"
 	UserInvalidPatchUserByIDErrorResponse          PatchUserByIDErrorResponseType = "user.invalid"
@@ -62632,9 +67426,19 @@ func (s PatchUserByIDErrorResponse) IsInternal() bool {
 	return s.Type == InternalPatchUserByIDErrorResponse
 }
 
+// IsNotImplemented reports whether PatchUserByIDErrorResponse is NotImplemented.
+func (s PatchUserByIDErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedPatchUserByIDErrorResponse
+}
+
 // IsReqInvalid reports whether PatchUserByIDErrorResponse is ReqInvalid.
 func (s PatchUserByIDErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPatchUserByIDErrorResponse
+}
+
+// IsUnavailable reports whether PatchUserByIDErrorResponse is Unavailable.
+func (s PatchUserByIDErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailablePatchUserByIDErrorResponse
 }
 
 // IsUserAlreadyExists reports whether PatchUserByIDErrorResponse is UserAlreadyExists.
@@ -62746,6 +67550,27 @@ func NewInternalPatchUserByIDErrorResponse(v Internal) PatchUserByIDErrorRespons
 	return s
 }
 
+// SetNotImplemented sets PatchUserByIDErrorResponse to NotImplemented.
+func (s *PatchUserByIDErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedPatchUserByIDErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if PatchUserByIDErrorResponse is NotImplemented.
+func (s PatchUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedPatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from NotImplemented.
+func NewNotImplementedPatchUserByIDErrorResponse(v NotImplemented) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets PatchUserByIDErrorResponse to ReqInvalid.
 func (s *PatchUserByIDErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidPatchUserByIDErrorResponse
@@ -62764,6 +67589,27 @@ func (s PatchUserByIDErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidPatchUserByIDErrorResponse(v ReqInvalid) PatchUserByIDErrorResponse {
 	var s PatchUserByIDErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets PatchUserByIDErrorResponse to Unavailable.
+func (s *PatchUserByIDErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailablePatchUserByIDErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if PatchUserByIDErrorResponse is Unavailable.
+func (s PatchUserByIDErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailablePatchUserByIDErrorResponse returns new PatchUserByIDErrorResponse from Unavailable.
+func NewUnavailablePatchUserByIDErrorResponse(v Unavailable) PatchUserByIDErrorResponse {
+	var s PatchUserByIDErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -63186,109 +68032,51 @@ func (s *PolRevisionConflictDetails) init() PolRevisionConflictDetails {
 	return m
 }
 
-// One revision of a project's policy for an operation (ADR 066). `id` is
-// shared by every revision of the operation's policy; `revision_id` names this
-// revision.
+// One revision of a project's policy for an operation (ADR 066), typed by
+// `operation`. `id` is shared by every revision of the operation's policy;
+// `revision_id` names this revision.
 // Ref: #
+// Policy represents sum type.
 type Policy struct {
-	ID         PolicyID         `json:"id"`
-	RevisionID PolicyRevisionID `json:"revision_id"`
-	// The project the policy belongs to.
-	ProjectID ProjectID `json:"project_id"`
-	// The operation the policy guards.
-	Operation string `json:"operation"`
-	// The settings this revision publishes.
-	Config PolicyConfig `json:"config"`
-	// When the operation's policy was first published.
-	CreatedAt time.Time `json:"created_at"`
-	// When this revision was published.
-	UpdatedAt time.Time `json:"updated_at"`
+	Type              PolicyType // switch on this field
+	PasswordSetPolicy PasswordSetPolicy
 }
 
-// GetID returns the value of ID.
-func (s *Policy) GetID() PolicyID {
-	return s.ID
+// PolicyType is oneOf type of Policy.
+type PolicyType string
+
+// Possible values for PolicyType.
+const (
+	PasswordSetPolicyPolicy PolicyType = "auth.factor.password.set"
+)
+
+// IsPasswordSetPolicy reports whether Policy is PasswordSetPolicy.
+func (s Policy) IsPasswordSetPolicy() bool { return s.Type == PasswordSetPolicyPolicy }
+
+// SetPasswordSetPolicy sets Policy to PasswordSetPolicy.
+func (s *Policy) SetPasswordSetPolicy(v PasswordSetPolicy) {
+	s.Type = PasswordSetPolicyPolicy
+	s.PasswordSetPolicy = v
 }
 
-// GetRevisionID returns the value of RevisionID.
-func (s *Policy) GetRevisionID() PolicyRevisionID {
-	return s.RevisionID
+// GetPasswordSetPolicy returns PasswordSetPolicy and true boolean if Policy is PasswordSetPolicy.
+func (s Policy) GetPasswordSetPolicy() (v PasswordSetPolicy, ok bool) {
+	if !s.IsPasswordSetPolicy() {
+		return v, false
+	}
+	return s.PasswordSetPolicy, true
 }
 
-// GetProjectID returns the value of ProjectID.
-func (s *Policy) GetProjectID() ProjectID {
-	return s.ProjectID
+// NewPasswordSetPolicyPolicy returns new Policy from PasswordSetPolicy.
+func NewPasswordSetPolicyPolicy(v PasswordSetPolicy) Policy {
+	var s Policy
+	s.SetPasswordSetPolicy(v)
+	return s
 }
 
-// GetOperation returns the value of Operation.
-func (s *Policy) GetOperation() string {
-	return s.Operation
-}
-
-// GetConfig returns the value of Config.
-func (s *Policy) GetConfig() PolicyConfig {
-	return s.Config
-}
-
-// GetCreatedAt returns the value of CreatedAt.
-func (s *Policy) GetCreatedAt() time.Time {
-	return s.CreatedAt
-}
-
-// GetUpdatedAt returns the value of UpdatedAt.
-func (s *Policy) GetUpdatedAt() time.Time {
-	return s.UpdatedAt
-}
-
-// SetID sets the value of ID.
-func (s *Policy) SetID(val PolicyID) {
-	s.ID = val
-}
-
-// SetRevisionID sets the value of RevisionID.
-func (s *Policy) SetRevisionID(val PolicyRevisionID) {
-	s.RevisionID = val
-}
-
-// SetProjectID sets the value of ProjectID.
-func (s *Policy) SetProjectID(val ProjectID) {
-	s.ProjectID = val
-}
-
-// SetOperation sets the value of Operation.
-func (s *Policy) SetOperation(val string) {
-	s.Operation = val
-}
-
-// SetConfig sets the value of Config.
-func (s *Policy) SetConfig(val PolicyConfig) {
-	s.Config = val
-}
-
-// SetCreatedAt sets the value of CreatedAt.
-func (s *Policy) SetCreatedAt(val time.Time) {
-	s.CreatedAt = val
-}
-
-// SetUpdatedAt sets the value of UpdatedAt.
-func (s *Policy) SetUpdatedAt(val time.Time) {
-	s.UpdatedAt = val
-}
-
+func (*Policy) getPolicyRes()         {}
 func (*Policy) getPolicyRevisionRes() {}
 func (*Policy) publishPolicyRes()     {}
-
-// The settings this revision publishes.
-type PolicyConfig map[string]jx.Raw
-
-func (s *PolicyConfig) init() PolicyConfig {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
-	}
-	return m
-}
 
 // PolicyCreated2XX is 2XX pattern response for PolicyCreated operation.
 type PolicyCreated2XX struct {
@@ -63770,6 +68558,42 @@ func (s *PolicyCreatedEventDelegationType) UnmarshalText(data []byte) error {
 }
 
 type PolicyID string
+
+// An operation a policy can guard; the policy catalog lists them.
+// Ref: #
+type PolicyOperation string
+
+const (
+	PolicyOperationAuthFactorPasswordSet PolicyOperation = "auth.factor.password.set"
+)
+
+// AllValues returns all PolicyOperation values.
+func (PolicyOperation) AllValues() []PolicyOperation {
+	return []PolicyOperation{
+		PolicyOperationAuthFactorPasswordSet,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PolicyOperation) MarshalText() ([]byte, error) {
+	switch s {
+	case PolicyOperationAuthFactorPasswordSet:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PolicyOperation) UnmarshalText(data []byte) error {
+	switch PolicyOperation(data) {
+	case PolicyOperationAuthFactorPasswordSet:
+		*s = PolicyOperationAuthFactorPasswordSet
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
 
 // Allowlisted fields for `policy.created` (the first publish of an
 // operation's policy) and `policy.updated` (every later publish). The policy id
@@ -66540,11 +71364,13 @@ type PublishPolicyErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	PolInvalid          PolInvalid
 	PolNotFound         PolNotFound
 	PolPermissionDenied PolPermissionDenied
 	PolRevisionConflict PolRevisionConflict
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // PublishPolicyErrorResponseType is oneOf type of PublishPolicyErrorResponse.
@@ -66555,11 +71381,13 @@ const (
 	AuthUnauthorizedPublishPolicyErrorResponse    PublishPolicyErrorResponseType = "auth.unauthorized"
 	EvtInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "evt.invalid"
 	InternalPublishPolicyErrorResponse            PublishPolicyErrorResponseType = "internal"
+	NotImplementedPublishPolicyErrorResponse      PublishPolicyErrorResponseType = "not_implemented"
 	PolInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "pol.invalid"
 	PolNotFoundPublishPolicyErrorResponse         PublishPolicyErrorResponseType = "pol.not_found"
 	PolPermissionDeniedPublishPolicyErrorResponse PublishPolicyErrorResponseType = "pol.permission_denied"
 	PolRevisionConflictPublishPolicyErrorResponse PublishPolicyErrorResponseType = "pol.revision_conflict"
 	ReqInvalidPublishPolicyErrorResponse          PublishPolicyErrorResponseType = "req.invalid"
+	UnavailablePublishPolicyErrorResponse         PublishPolicyErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether PublishPolicyErrorResponse is AuthUnauthorized.
@@ -66575,6 +71403,11 @@ func (s PublishPolicyErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether PublishPolicyErrorResponse is Internal.
 func (s PublishPolicyErrorResponse) IsInternal() bool {
 	return s.Type == InternalPublishPolicyErrorResponse
+}
+
+// IsNotImplemented reports whether PublishPolicyErrorResponse is NotImplemented.
+func (s PublishPolicyErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedPublishPolicyErrorResponse
 }
 
 // IsPolInvalid reports whether PublishPolicyErrorResponse is PolInvalid.
@@ -66600,6 +71433,11 @@ func (s PublishPolicyErrorResponse) IsPolRevisionConflict() bool {
 // IsReqInvalid reports whether PublishPolicyErrorResponse is ReqInvalid.
 func (s PublishPolicyErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidPublishPolicyErrorResponse
+}
+
+// IsUnavailable reports whether PublishPolicyErrorResponse is Unavailable.
+func (s PublishPolicyErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailablePublishPolicyErrorResponse
 }
 
 // SetAuthUnauthorized sets PublishPolicyErrorResponse to AuthUnauthorized.
@@ -66662,6 +71500,27 @@ func (s PublishPolicyErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalPublishPolicyErrorResponse(v Internal) PublishPolicyErrorResponse {
 	var s PublishPolicyErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets PublishPolicyErrorResponse to NotImplemented.
+func (s *PublishPolicyErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedPublishPolicyErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if PublishPolicyErrorResponse is NotImplemented.
+func (s PublishPolicyErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedPublishPolicyErrorResponse returns new PublishPolicyErrorResponse from NotImplemented.
+func NewNotImplementedPublishPolicyErrorResponse(v NotImplemented) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -66770,6 +71629,27 @@ func NewReqInvalidPublishPolicyErrorResponse(v ReqInvalid) PublishPolicyErrorRes
 	return s
 }
 
+// SetUnavailable sets PublishPolicyErrorResponse to Unavailable.
+func (s *PublishPolicyErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailablePublishPolicyErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if PublishPolicyErrorResponse is Unavailable.
+func (s PublishPolicyErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailablePublishPolicyErrorResponse returns new PublishPolicyErrorResponse from Unavailable.
+func NewUnavailablePublishPolicyErrorResponse(v Unavailable) PublishPolicyErrorResponse {
+	var s PublishPolicyErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // PublishPolicyErrorResponseStatusCode wraps PublishPolicyErrorResponse with StatusCode.
 type PublishPolicyErrorResponseStatusCode struct {
 	StatusCode int
@@ -66798,48 +71678,49 @@ func (s *PublishPolicyErrorResponseStatusCode) SetResponse(val PublishPolicyErro
 
 func (*PublishPolicyErrorResponseStatusCode) publishPolicyRes() {}
 
-// One publish of the project's policy for an operation. `config` sets the
-// operation template's settings; a setting left out is off, and `{}` switches
-// every rule off. The settings each operation accepts are listed in the policy
-// catalog.
+// One publish of the project's policy for an operation. `operation` selects
+// the operation's template, and `config` sets that template's settings; a
+// setting left out is off, and `{}` switches every rule off. The settings each
+// operation accepts are listed in the policy catalog.
 // Ref: #
+// PublishPolicyRequest represents sum type.
 type PublishPolicyRequest struct {
-	// The operation the policy guards.
-	Operation string `json:"operation"`
-	// The settings, checked against the operation's template.
-	Config PublishPolicyRequestConfig `json:"config"`
+	Type                   PublishPolicyRequestType // switch on this field
+	PasswordSetPolicyInput PasswordSetPolicyInput
 }
 
-// GetOperation returns the value of Operation.
-func (s *PublishPolicyRequest) GetOperation() string {
-	return s.Operation
+// PublishPolicyRequestType is oneOf type of PublishPolicyRequest.
+type PublishPolicyRequestType string
+
+// Possible values for PublishPolicyRequestType.
+const (
+	PasswordSetPolicyInputPublishPolicyRequest PublishPolicyRequestType = "auth.factor.password.set"
+)
+
+// IsPasswordSetPolicyInput reports whether PublishPolicyRequest is PasswordSetPolicyInput.
+func (s PublishPolicyRequest) IsPasswordSetPolicyInput() bool {
+	return s.Type == PasswordSetPolicyInputPublishPolicyRequest
 }
 
-// GetConfig returns the value of Config.
-func (s *PublishPolicyRequest) GetConfig() PublishPolicyRequestConfig {
-	return s.Config
+// SetPasswordSetPolicyInput sets PublishPolicyRequest to PasswordSetPolicyInput.
+func (s *PublishPolicyRequest) SetPasswordSetPolicyInput(v PasswordSetPolicyInput) {
+	s.Type = PasswordSetPolicyInputPublishPolicyRequest
+	s.PasswordSetPolicyInput = v
 }
 
-// SetOperation sets the value of Operation.
-func (s *PublishPolicyRequest) SetOperation(val string) {
-	s.Operation = val
-}
-
-// SetConfig sets the value of Config.
-func (s *PublishPolicyRequest) SetConfig(val PublishPolicyRequestConfig) {
-	s.Config = val
-}
-
-// The settings, checked against the operation's template.
-type PublishPolicyRequestConfig map[string]jx.Raw
-
-func (s *PublishPolicyRequestConfig) init() PublishPolicyRequestConfig {
-	m := *s
-	if m == nil {
-		m = map[string]jx.Raw{}
-		*s = m
+// GetPasswordSetPolicyInput returns PasswordSetPolicyInput and true boolean if PublishPolicyRequest is PasswordSetPolicyInput.
+func (s PublishPolicyRequest) GetPasswordSetPolicyInput() (v PasswordSetPolicyInput, ok bool) {
+	if !s.IsPasswordSetPolicyInput() {
+		return v, false
 	}
-	return m
+	return s.PasswordSetPolicyInput, true
+}
+
+// NewPasswordSetPolicyInputPublishPolicyRequest returns new PublishPolicyRequest from PasswordSetPolicyInput.
+func NewPasswordSetPolicyInputPublishPolicyRequest(v PasswordSetPolicyInput) PublishPolicyRequest {
+	var s PublishPolicyRequest
+	s.SetPasswordSetPolicyInput(v)
+	return s
 }
 
 type QueryGrantsBadRequest ErrorDetails
@@ -66858,6 +71739,7 @@ type QueryGrantsErrorResponse struct {
 	NotImplemented        NotImplemented
 	ReqInvalid            ReqInvalid
 	TeamPermissionDenied  TeamPermissionDenied
+	Unavailable           Unavailable
 	UserPermissionDenied  UserPermissionDenied
 }
 
@@ -66875,6 +71757,7 @@ const (
 	NotImplementedQueryGrantsErrorResponse        QueryGrantsErrorResponseType = "not_implemented"
 	ReqInvalidQueryGrantsErrorResponse            QueryGrantsErrorResponseType = "req.invalid"
 	TeamPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "team.permission_denied"
+	UnavailableQueryGrantsErrorResponse           QueryGrantsErrorResponseType = "unavailable"
 	UserPermissionDeniedQueryGrantsErrorResponse  QueryGrantsErrorResponseType = "user.permission_denied"
 )
 
@@ -66921,6 +71804,11 @@ func (s QueryGrantsErrorResponse) IsReqInvalid() bool {
 // IsTeamPermissionDenied reports whether QueryGrantsErrorResponse is TeamPermissionDenied.
 func (s QueryGrantsErrorResponse) IsTeamPermissionDenied() bool {
 	return s.Type == TeamPermissionDeniedQueryGrantsErrorResponse
+}
+
+// IsUnavailable reports whether QueryGrantsErrorResponse is Unavailable.
+func (s QueryGrantsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryGrantsErrorResponse
 }
 
 // IsUserPermissionDenied reports whether QueryGrantsErrorResponse is UserPermissionDenied.
@@ -67114,6 +72002,27 @@ func (s QueryGrantsErrorResponse) GetTeamPermissionDenied() (v TeamPermissionDen
 func NewTeamPermissionDeniedQueryGrantsErrorResponse(v TeamPermissionDenied) QueryGrantsErrorResponse {
 	var s QueryGrantsErrorResponse
 	s.SetTeamPermissionDenied(v)
+	return s
+}
+
+// SetUnavailable sets QueryGrantsErrorResponse to Unavailable.
+func (s *QueryGrantsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryGrantsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryGrantsErrorResponse is Unavailable.
+func (s QueryGrantsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryGrantsErrorResponse returns new QueryGrantsErrorResponse from Unavailable.
+func NewUnavailableQueryGrantsErrorResponse(v Unavailable) QueryGrantsErrorResponse {
+	var s QueryGrantsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -67351,6 +72260,7 @@ type QueryIdpsErrorResponse struct {
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // QueryIdpsErrorResponseType is oneOf type of QueryIdpsErrorResponse.
@@ -67365,6 +72275,7 @@ const (
 	InternalQueryIdpsErrorResponse            QueryIdpsErrorResponseType = "internal"
 	NotImplementedQueryIdpsErrorResponse      QueryIdpsErrorResponseType = "not_implemented"
 	ReqInvalidQueryIdpsErrorResponse          QueryIdpsErrorResponseType = "req.invalid"
+	UnavailableQueryIdpsErrorResponse         QueryIdpsErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether QueryIdpsErrorResponse is AuthCsrfInvalid.
@@ -67398,6 +72309,11 @@ func (s QueryIdpsErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryIdpsErrorResponse is ReqInvalid.
 func (s QueryIdpsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryIdpsErrorResponse
+}
+
+// IsUnavailable reports whether QueryIdpsErrorResponse is Unavailable.
+func (s QueryIdpsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryIdpsErrorResponse
 }
 
 // SetAuthCsrfInvalid sets QueryIdpsErrorResponse to AuthCsrfInvalid.
@@ -67544,6 +72460,27 @@ func (s QueryIdpsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryIdpsErrorResponse(v ReqInvalid) QueryIdpsErrorResponse {
 	var s QueryIdpsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets QueryIdpsErrorResponse to Unavailable.
+func (s *QueryIdpsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryIdpsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryIdpsErrorResponse is Unavailable.
+func (s QueryIdpsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryIdpsErrorResponse returns new QueryIdpsErrorResponse from Unavailable.
+func NewUnavailableQueryIdpsErrorResponse(v Unavailable) QueryIdpsErrorResponse {
+	var s QueryIdpsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -67752,6 +72689,7 @@ type QueryProjectsErrorResponse struct {
 	ProjNotFound         ProjNotFound
 	ProjPermissionDenied ProjPermissionDenied
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // QueryProjectsErrorResponseType is oneOf type of QueryProjectsErrorResponse.
@@ -67766,6 +72704,7 @@ const (
 	ProjNotFoundQueryProjectsErrorResponse         QueryProjectsErrorResponseType = "proj.not_found"
 	ProjPermissionDeniedQueryProjectsErrorResponse QueryProjectsErrorResponseType = "proj.permission_denied"
 	ReqInvalidQueryProjectsErrorResponse           QueryProjectsErrorResponseType = "req.invalid"
+	UnavailableQueryProjectsErrorResponse          QueryProjectsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether QueryProjectsErrorResponse is AuthUnauthorized.
@@ -67801,6 +72740,11 @@ func (s QueryProjectsErrorResponse) IsProjPermissionDenied() bool {
 // IsReqInvalid reports whether QueryProjectsErrorResponse is ReqInvalid.
 func (s QueryProjectsErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryProjectsErrorResponse
+}
+
+// IsUnavailable reports whether QueryProjectsErrorResponse is Unavailable.
+func (s QueryProjectsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryProjectsErrorResponse
 }
 
 // SetAuthUnauthorized sets QueryProjectsErrorResponse to AuthUnauthorized.
@@ -67947,6 +72891,27 @@ func (s QueryProjectsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryProjectsErrorResponse(v ReqInvalid) QueryProjectsErrorResponse {
 	var s QueryProjectsErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets QueryProjectsErrorResponse to Unavailable.
+func (s *QueryProjectsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryProjectsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryProjectsErrorResponse is Unavailable.
+func (s QueryProjectsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryProjectsErrorResponse returns new QueryProjectsErrorResponse from Unavailable.
+func NewUnavailableQueryProjectsErrorResponse(v Unavailable) QueryProjectsErrorResponse {
+	var s QueryProjectsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -68153,6 +73118,7 @@ type QuerySessionsErrorResponse struct {
 	ReqInvalid           ReqInvalid
 	SessNotFound         SessNotFound
 	SessPermissionDenied SessPermissionDenied
+	Unavailable          Unavailable
 }
 
 // QuerySessionsErrorResponseType is oneOf type of QuerySessionsErrorResponse.
@@ -68167,6 +73133,7 @@ const (
 	ReqInvalidQuerySessionsErrorResponse           QuerySessionsErrorResponseType = "req.invalid"
 	SessNotFoundQuerySessionsErrorResponse         QuerySessionsErrorResponseType = "sess.not_found"
 	SessPermissionDeniedQuerySessionsErrorResponse QuerySessionsErrorResponseType = "sess.permission_denied"
+	UnavailableQuerySessionsErrorResponse          QuerySessionsErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether QuerySessionsErrorResponse is AuthUnauthorized.
@@ -68202,6 +73169,11 @@ func (s QuerySessionsErrorResponse) IsSessNotFound() bool {
 // IsSessPermissionDenied reports whether QuerySessionsErrorResponse is SessPermissionDenied.
 func (s QuerySessionsErrorResponse) IsSessPermissionDenied() bool {
 	return s.Type == SessPermissionDeniedQuerySessionsErrorResponse
+}
+
+// IsUnavailable reports whether QuerySessionsErrorResponse is Unavailable.
+func (s QuerySessionsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQuerySessionsErrorResponse
 }
 
 // SetAuthUnauthorized sets QuerySessionsErrorResponse to AuthUnauthorized.
@@ -68348,6 +73320,27 @@ func (s QuerySessionsErrorResponse) GetSessPermissionDenied() (v SessPermissionD
 func NewSessPermissionDeniedQuerySessionsErrorResponse(v SessPermissionDenied) QuerySessionsErrorResponse {
 	var s QuerySessionsErrorResponse
 	s.SetSessPermissionDenied(v)
+	return s
+}
+
+// SetUnavailable sets QuerySessionsErrorResponse to Unavailable.
+func (s *QuerySessionsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQuerySessionsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QuerySessionsErrorResponse is Unavailable.
+func (s QuerySessionsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQuerySessionsErrorResponse returns new QuerySessionsErrorResponse from Unavailable.
+func NewUnavailableQuerySessionsErrorResponse(v Unavailable) QuerySessionsErrorResponse {
+	var s QuerySessionsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -68548,6 +73541,7 @@ type QueryTeamsErrorResponse struct {
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamPermissionDenied TeamPermissionDenied
 	TeamProjectNotFound  TeamProjectNotFound
+	Unavailable          Unavailable
 }
 
 // QueryTeamsErrorResponseType is oneOf type of QueryTeamsErrorResponse.
@@ -68563,6 +73557,7 @@ const (
 	TeamTeamNotFoundQueryTeamsErrorResponse     QueryTeamsErrorResponseType = "team.team_not_found"
 	TeamPermissionDeniedQueryTeamsErrorResponse QueryTeamsErrorResponseType = "team.permission_denied"
 	TeamProjectNotFoundQueryTeamsErrorResponse  QueryTeamsErrorResponseType = "team.project_not_found"
+	UnavailableQueryTeamsErrorResponse          QueryTeamsErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether QueryTeamsErrorResponse is AuthCsrfInvalid.
@@ -68601,6 +73596,11 @@ func (s QueryTeamsErrorResponse) IsTeamPermissionDenied() bool {
 // IsTeamProjectNotFound reports whether QueryTeamsErrorResponse is TeamProjectNotFound.
 func (s QueryTeamsErrorResponse) IsTeamProjectNotFound() bool {
 	return s.Type == TeamProjectNotFoundQueryTeamsErrorResponse
+}
+
+// IsUnavailable reports whether QueryTeamsErrorResponse is Unavailable.
+func (s QueryTeamsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryTeamsErrorResponse
 }
 
 // SetAuthCsrfInvalid sets QueryTeamsErrorResponse to AuthCsrfInvalid.
@@ -68768,6 +73768,27 @@ func (s QueryTeamsErrorResponse) GetTeamProjectNotFound() (v TeamProjectNotFound
 func NewTeamProjectNotFoundQueryTeamsErrorResponse(v TeamProjectNotFound) QueryTeamsErrorResponse {
 	var s QueryTeamsErrorResponse
 	s.SetTeamProjectNotFound(v)
+	return s
+}
+
+// SetUnavailable sets QueryTeamsErrorResponse to Unavailable.
+func (s *QueryTeamsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryTeamsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryTeamsErrorResponse is Unavailable.
+func (s QueryTeamsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryTeamsErrorResponse returns new QueryTeamsErrorResponse from Unavailable.
+func NewUnavailableQueryTeamsErrorResponse(v Unavailable) QueryTeamsErrorResponse {
+	var s QueryTeamsErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -68976,6 +73997,7 @@ type QueryUsersErrorResponse struct {
 	Internal             Internal
 	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 	UserNotFound         UserNotFound
 	UserPermissionDenied UserPermissionDenied
 }
@@ -68990,6 +74012,7 @@ const (
 	InternalQueryUsersErrorResponse             QueryUsersErrorResponseType = "internal"
 	NotImplementedQueryUsersErrorResponse       QueryUsersErrorResponseType = "not_implemented"
 	ReqInvalidQueryUsersErrorResponse           QueryUsersErrorResponseType = "req.invalid"
+	UnavailableQueryUsersErrorResponse          QueryUsersErrorResponseType = "unavailable"
 	UserNotFoundQueryUsersErrorResponse         QueryUsersErrorResponseType = "user.not_found"
 	UserPermissionDeniedQueryUsersErrorResponse QueryUsersErrorResponseType = "user.permission_denied"
 )
@@ -69015,6 +74038,11 @@ func (s QueryUsersErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether QueryUsersErrorResponse is ReqInvalid.
 func (s QueryUsersErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidQueryUsersErrorResponse
+}
+
+// IsUnavailable reports whether QueryUsersErrorResponse is Unavailable.
+func (s QueryUsersErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryUsersErrorResponse
 }
 
 // IsUserNotFound reports whether QueryUsersErrorResponse is UserNotFound.
@@ -69129,6 +74157,27 @@ func (s QueryUsersErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidQueryUsersErrorResponse(v ReqInvalid) QueryUsersErrorResponse {
 	var s QueryUsersErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets QueryUsersErrorResponse to Unavailable.
+func (s *QueryUsersErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryUsersErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryUsersErrorResponse is Unavailable.
+func (s QueryUsersErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryUsersErrorResponse returns new QueryUsersErrorResponse from Unavailable.
+func NewUnavailableQueryUsersErrorResponse(v Unavailable) QueryUsersErrorResponse {
+	var s QueryUsersErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -69370,6 +74419,59 @@ func (*QueryUsersResponse) queryUsersRes() {}
 type QueryUsersUnauthorized ErrorDetails
 
 func (*QueryUsersUnauthorized) queryUsersRes() {}
+
+// Merged schema.
+// Ref: #
+type RelInUse struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelInUseDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelInUse) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelInUse) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelInUse) GetDetails() OptRelInUseDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelInUse) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelInUse) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelInUse) SetDetails(val OptRelInUseDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelInUseDetails map[string]jx.Raw
+
+func (s *RelInUseDetails) init() RelInUseDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
 
 // Merged schema.
 // Ref: #
@@ -71384,11 +76486,13 @@ type RemoveOriginErrorResponse struct {
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
+	NotImplemented         NotImplemented
 	OriginInvalid          OriginInvalid
 	OriginNotFound         OriginNotFound
 	OriginPermissionDenied OriginPermissionDenied
 	ProjMissingID          ProjMissingID
 	ReqInvalid             ReqInvalid
+	Unavailable            Unavailable
 }
 
 // RemoveOriginErrorResponseType is oneOf type of RemoveOriginErrorResponse.
@@ -71399,11 +76503,13 @@ const (
 	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
 	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
+	NotImplementedRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "not_implemented"
 	OriginInvalidRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "origin.invalid"
 	OriginNotFoundRemoveOriginErrorResponse         RemoveOriginErrorResponseType = "origin.not_found"
 	OriginPermissionDeniedRemoveOriginErrorResponse RemoveOriginErrorResponseType = "origin.permission_denied"
 	ProjMissingIDRemoveOriginErrorResponse          RemoveOriginErrorResponseType = "proj.missing_id"
 	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
+	UnavailableRemoveOriginErrorResponse            RemoveOriginErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
@@ -71419,6 +76525,11 @@ func (s RemoveOriginErrorResponse) IsEvtInvalid() bool {
 // IsInternal reports whether RemoveOriginErrorResponse is Internal.
 func (s RemoveOriginErrorResponse) IsInternal() bool {
 	return s.Type == InternalRemoveOriginErrorResponse
+}
+
+// IsNotImplemented reports whether RemoveOriginErrorResponse is NotImplemented.
+func (s RemoveOriginErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRemoveOriginErrorResponse
 }
 
 // IsOriginInvalid reports whether RemoveOriginErrorResponse is OriginInvalid.
@@ -71444,6 +76555,11 @@ func (s RemoveOriginErrorResponse) IsProjMissingID() bool {
 // IsReqInvalid reports whether RemoveOriginErrorResponse is ReqInvalid.
 func (s RemoveOriginErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRemoveOriginErrorResponse
+}
+
+// IsUnavailable reports whether RemoveOriginErrorResponse is Unavailable.
+func (s RemoveOriginErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRemoveOriginErrorResponse
 }
 
 // SetAuthUnauthorized sets RemoveOriginErrorResponse to AuthUnauthorized.
@@ -71506,6 +76622,27 @@ func (s RemoveOriginErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRemoveOriginErrorResponse(v Internal) RemoveOriginErrorResponse {
 	var s RemoveOriginErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RemoveOriginErrorResponse to NotImplemented.
+func (s *RemoveOriginErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRemoveOriginErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RemoveOriginErrorResponse is NotImplemented.
+func (s RemoveOriginErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from NotImplemented.
+func NewNotImplementedRemoveOriginErrorResponse(v NotImplemented) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -71614,6 +76751,27 @@ func NewReqInvalidRemoveOriginErrorResponse(v ReqInvalid) RemoveOriginErrorRespo
 	return s
 }
 
+// SetUnavailable sets RemoveOriginErrorResponse to Unavailable.
+func (s *RemoveOriginErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRemoveOriginErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RemoveOriginErrorResponse is Unavailable.
+func (s RemoveOriginErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from Unavailable.
+func NewUnavailableRemoveOriginErrorResponse(v Unavailable) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // RemoveOriginErrorResponseStatusCode wraps RemoveOriginErrorResponse with StatusCode.
 type RemoveOriginErrorResponseStatusCode struct {
 	StatusCode int
@@ -71673,6 +76831,7 @@ type RemovePreviewErrorResponse struct {
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // RemovePreviewErrorResponseType is oneOf type of RemovePreviewErrorResponse.
@@ -71687,6 +76846,7 @@ const (
 	InternalRemovePreviewErrorResponse            RemovePreviewErrorResponseType = "internal"
 	NotImplementedRemovePreviewErrorResponse      RemovePreviewErrorResponseType = "not_implemented"
 	ReqInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "req.invalid"
+	UnavailableRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RemovePreviewErrorResponse is AuthUnauthorized.
@@ -71722,6 +76882,11 @@ func (s RemovePreviewErrorResponse) IsNotImplemented() bool {
 // IsReqInvalid reports whether RemovePreviewErrorResponse is ReqInvalid.
 func (s RemovePreviewErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRemovePreviewErrorResponse
+}
+
+// IsUnavailable reports whether RemovePreviewErrorResponse is Unavailable.
+func (s RemovePreviewErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRemovePreviewErrorResponse
 }
 
 // SetAuthUnauthorized sets RemovePreviewErrorResponse to AuthUnauthorized.
@@ -71868,6 +77033,27 @@ func (s RemovePreviewErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidRemovePreviewErrorResponse(v ReqInvalid) RemovePreviewErrorResponse {
 	var s RemovePreviewErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RemovePreviewErrorResponse to Unavailable.
+func (s *RemovePreviewErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRemovePreviewErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RemovePreviewErrorResponse is Unavailable.
+func (s RemovePreviewErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from Unavailable.
+func NewUnavailableRemovePreviewErrorResponse(v Unavailable) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -72598,9 +77784,11 @@ type RevokeMySessionErrorResponse struct {
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
+	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
 	SessNotFound        SessNotFound
 	SessProjectMismatch SessProjectMismatch
+	Unavailable         Unavailable
 }
 
 // RevokeMySessionErrorResponseType is oneOf type of RevokeMySessionErrorResponse.
@@ -72612,9 +77800,11 @@ const (
 	AuthUnauthorizedRevokeMySessionErrorResponse    RevokeMySessionErrorResponseType = "auth.unauthorized"
 	EvtInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "evt.invalid"
 	InternalRevokeMySessionErrorResponse            RevokeMySessionErrorResponseType = "internal"
+	NotImplementedRevokeMySessionErrorResponse      RevokeMySessionErrorResponseType = "not_implemented"
 	ReqInvalidRevokeMySessionErrorResponse          RevokeMySessionErrorResponseType = "req.invalid"
 	SessNotFoundRevokeMySessionErrorResponse        RevokeMySessionErrorResponseType = "sess.not_found"
 	SessProjectMismatchRevokeMySessionErrorResponse RevokeMySessionErrorResponseType = "sess.project_mismatch"
+	UnavailableRevokeMySessionErrorResponse         RevokeMySessionErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether RevokeMySessionErrorResponse is AuthCsrfInvalid.
@@ -72637,6 +77827,11 @@ func (s RevokeMySessionErrorResponse) IsInternal() bool {
 	return s.Type == InternalRevokeMySessionErrorResponse
 }
 
+// IsNotImplemented reports whether RevokeMySessionErrorResponse is NotImplemented.
+func (s RevokeMySessionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeMySessionErrorResponse
+}
+
 // IsReqInvalid reports whether RevokeMySessionErrorResponse is ReqInvalid.
 func (s RevokeMySessionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRevokeMySessionErrorResponse
@@ -72650,6 +77845,11 @@ func (s RevokeMySessionErrorResponse) IsSessNotFound() bool {
 // IsSessProjectMismatch reports whether RevokeMySessionErrorResponse is SessProjectMismatch.
 func (s RevokeMySessionErrorResponse) IsSessProjectMismatch() bool {
 	return s.Type == SessProjectMismatchRevokeMySessionErrorResponse
+}
+
+// IsUnavailable reports whether RevokeMySessionErrorResponse is Unavailable.
+func (s RevokeMySessionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRevokeMySessionErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RevokeMySessionErrorResponse to AuthCsrfInvalid.
@@ -72736,6 +77936,27 @@ func NewInternalRevokeMySessionErrorResponse(v Internal) RevokeMySessionErrorRes
 	return s
 }
 
+// SetNotImplemented sets RevokeMySessionErrorResponse to NotImplemented.
+func (s *RevokeMySessionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeMySessionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeMySessionErrorResponse is NotImplemented.
+func (s RevokeMySessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from NotImplemented.
+func NewNotImplementedRevokeMySessionErrorResponse(v NotImplemented) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets RevokeMySessionErrorResponse to ReqInvalid.
 func (s *RevokeMySessionErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidRevokeMySessionErrorResponse
@@ -72796,6 +78017,27 @@ func (s RevokeMySessionErrorResponse) GetSessProjectMismatch() (v SessProjectMis
 func NewSessProjectMismatchRevokeMySessionErrorResponse(v SessProjectMismatch) RevokeMySessionErrorResponse {
 	var s RevokeMySessionErrorResponse
 	s.SetSessProjectMismatch(v)
+	return s
+}
+
+// SetUnavailable sets RevokeMySessionErrorResponse to Unavailable.
+func (s *RevokeMySessionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRevokeMySessionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RevokeMySessionErrorResponse is Unavailable.
+func (s RevokeMySessionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRevokeMySessionErrorResponse returns new RevokeMySessionErrorResponse from Unavailable.
+func NewUnavailableRevokeMySessionErrorResponse(v Unavailable) RevokeMySessionErrorResponse {
+	var s RevokeMySessionErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -72901,14 +78143,13 @@ func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDet
 }
 
 type RevokeReleaseConflictDetailsOriginsItem struct {
-	// The origin, as scheme and host.
-	Origin url.URL `json:"origin"`
+	Origin Origin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() url.URL {
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() Origin {
 	return s.Origin
 }
 
@@ -72918,7 +78159,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val url.URL) {
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
 	s.Origin = val
 }
 
@@ -72929,11 +78170,17 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
-	Type             RevokeReleaseErrorResponseType // switch on this field
-	AuthUnauthorized AuthUnauthorized
-	Internal         Internal
-	NotImplemented   NotImplemented
-	ReqInvalid       ReqInvalid
+	Type                RevokeReleaseErrorResponseType // switch on this field
+	AuthUnauthorized    AuthUnauthorized
+	EvtInvalid          EvtInvalid
+	Internal            Internal
+	NotImplemented      NotImplemented
+	RelInUse            RelInUse
+	RelNotFound         RelNotFound
+	RelPermissionDenied RelPermissionDenied
+	RelProjectNotFound  RelProjectNotFound
+	ReqInvalid          ReqInvalid
+	Unavailable         Unavailable
 }
 
 // RevokeReleaseErrorResponseType is oneOf type of RevokeReleaseErrorResponse.
@@ -72941,15 +78188,26 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
-	AuthUnauthorizedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "auth.unauthorized"
-	InternalRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "internal"
-	NotImplementedRevokeReleaseErrorResponse   RevokeReleaseErrorResponseType = "not_implemented"
-	ReqInvalidRevokeReleaseErrorResponse       RevokeReleaseErrorResponseType = "req.invalid"
+	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
+	EvtInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "evt.invalid"
+	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
+	NotImplementedRevokeReleaseErrorResponse      RevokeReleaseErrorResponseType = "not_implemented"
+	RelInUseRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "rel.in_use"
+	RelNotFoundRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "rel.not_found"
+	RelPermissionDeniedRevokeReleaseErrorResponse RevokeReleaseErrorResponseType = "rel.permission_denied"
+	RelProjectNotFoundRevokeReleaseErrorResponse  RevokeReleaseErrorResponseType = "rel.project_not_found"
+	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
+	UnavailableRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
 func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRevokeReleaseErrorResponse
+}
+
+// IsEvtInvalid reports whether RevokeReleaseErrorResponse is EvtInvalid.
+func (s RevokeReleaseErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRevokeReleaseErrorResponse
 }
 
 // IsInternal reports whether RevokeReleaseErrorResponse is Internal.
@@ -72962,9 +78220,34 @@ func (s RevokeReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRevokeReleaseErrorResponse
 }
 
+// IsRelInUse reports whether RevokeReleaseErrorResponse is RelInUse.
+func (s RevokeReleaseErrorResponse) IsRelInUse() bool {
+	return s.Type == RelInUseRevokeReleaseErrorResponse
+}
+
+// IsRelNotFound reports whether RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRevokeReleaseErrorResponse
+}
+
+// IsRelPermissionDenied reports whether RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) IsRelPermissionDenied() bool {
+	return s.Type == RelPermissionDeniedRevokeReleaseErrorResponse
+}
+
+// IsRelProjectNotFound reports whether RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) IsRelProjectNotFound() bool {
+	return s.Type == RelProjectNotFoundRevokeReleaseErrorResponse
+}
+
 // IsReqInvalid reports whether RevokeReleaseErrorResponse is ReqInvalid.
 func (s RevokeReleaseErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRevokeReleaseErrorResponse
+}
+
+// IsUnavailable reports whether RevokeReleaseErrorResponse is Unavailable.
+func (s RevokeReleaseErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRevokeReleaseErrorResponse
 }
 
 // SetAuthUnauthorized sets RevokeReleaseErrorResponse to AuthUnauthorized.
@@ -72985,6 +78268,27 @@ func (s RevokeReleaseErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, o
 func NewAuthUnauthorizedRevokeReleaseErrorResponse(v AuthUnauthorized) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetEvtInvalid sets RevokeReleaseErrorResponse to EvtInvalid.
+func (s *RevokeReleaseErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRevokeReleaseErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RevokeReleaseErrorResponse is EvtInvalid.
+func (s RevokeReleaseErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from EvtInvalid.
+func NewEvtInvalidRevokeReleaseErrorResponse(v EvtInvalid) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -73030,6 +78334,90 @@ func NewNotImplementedRevokeReleaseErrorResponse(v NotImplemented) RevokeRelease
 	return s
 }
 
+// SetRelInUse sets RevokeReleaseErrorResponse to RelInUse.
+func (s *RevokeReleaseErrorResponse) SetRelInUse(v RelInUse) {
+	s.Type = RelInUseRevokeReleaseErrorResponse
+	s.RelInUse = v
+}
+
+// GetRelInUse returns RelInUse and true boolean if RevokeReleaseErrorResponse is RelInUse.
+func (s RevokeReleaseErrorResponse) GetRelInUse() (v RelInUse, ok bool) {
+	if !s.IsRelInUse() {
+		return v, false
+	}
+	return s.RelInUse, true
+}
+
+// NewRelInUseRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelInUse.
+func NewRelInUseRevokeReleaseErrorResponse(v RelInUse) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelInUse(v)
+	return s
+}
+
+// SetRelNotFound sets RevokeReleaseErrorResponse to RelNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRevokeReleaseErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RevokeReleaseErrorResponse is RelNotFound.
+func (s RevokeReleaseErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelNotFound.
+func NewRelNotFoundRevokeReleaseErrorResponse(v RelNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelPermissionDenied sets RevokeReleaseErrorResponse to RelPermissionDenied.
+func (s *RevokeReleaseErrorResponse) SetRelPermissionDenied(v RelPermissionDenied) {
+	s.Type = RelPermissionDeniedRevokeReleaseErrorResponse
+	s.RelPermissionDenied = v
+}
+
+// GetRelPermissionDenied returns RelPermissionDenied and true boolean if RevokeReleaseErrorResponse is RelPermissionDenied.
+func (s RevokeReleaseErrorResponse) GetRelPermissionDenied() (v RelPermissionDenied, ok bool) {
+	if !s.IsRelPermissionDenied() {
+		return v, false
+	}
+	return s.RelPermissionDenied, true
+}
+
+// NewRelPermissionDeniedRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelPermissionDenied.
+func NewRelPermissionDeniedRevokeReleaseErrorResponse(v RelPermissionDenied) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelPermissionDenied(v)
+	return s
+}
+
+// SetRelProjectNotFound sets RevokeReleaseErrorResponse to RelProjectNotFound.
+func (s *RevokeReleaseErrorResponse) SetRelProjectNotFound(v RelProjectNotFound) {
+	s.Type = RelProjectNotFoundRevokeReleaseErrorResponse
+	s.RelProjectNotFound = v
+}
+
+// GetRelProjectNotFound returns RelProjectNotFound and true boolean if RevokeReleaseErrorResponse is RelProjectNotFound.
+func (s RevokeReleaseErrorResponse) GetRelProjectNotFound() (v RelProjectNotFound, ok bool) {
+	if !s.IsRelProjectNotFound() {
+		return v, false
+	}
+	return s.RelProjectNotFound, true
+}
+
+// NewRelProjectNotFoundRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from RelProjectNotFound.
+func NewRelProjectNotFoundRevokeReleaseErrorResponse(v RelProjectNotFound) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetRelProjectNotFound(v)
+	return s
+}
+
 // SetReqInvalid sets RevokeReleaseErrorResponse to ReqInvalid.
 func (s *RevokeReleaseErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidRevokeReleaseErrorResponse
@@ -73048,6 +78436,27 @@ func (s RevokeReleaseErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidRevokeReleaseErrorResponse(v ReqInvalid) RevokeReleaseErrorResponse {
 	var s RevokeReleaseErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RevokeReleaseErrorResponse to Unavailable.
+func (s *RevokeReleaseErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRevokeReleaseErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RevokeReleaseErrorResponse is Unavailable.
+func (s RevokeReleaseErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from Unavailable.
+func NewUnavailableRevokeReleaseErrorResponse(v Unavailable) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -73085,9 +78494,11 @@ type RevokeSessionErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	SessNotFound         SessNotFound
 	SessPermissionDenied SessPermissionDenied
+	Unavailable          Unavailable
 }
 
 // RevokeSessionErrorResponseType is oneOf type of RevokeSessionErrorResponse.
@@ -73098,9 +78509,11 @@ const (
 	AuthUnauthorizedRevokeSessionErrorResponse     RevokeSessionErrorResponseType = "auth.unauthorized"
 	EvtInvalidRevokeSessionErrorResponse           RevokeSessionErrorResponseType = "evt.invalid"
 	InternalRevokeSessionErrorResponse             RevokeSessionErrorResponseType = "internal"
+	NotImplementedRevokeSessionErrorResponse       RevokeSessionErrorResponseType = "not_implemented"
 	ReqInvalidRevokeSessionErrorResponse           RevokeSessionErrorResponseType = "req.invalid"
 	SessNotFoundRevokeSessionErrorResponse         RevokeSessionErrorResponseType = "sess.not_found"
 	SessPermissionDeniedRevokeSessionErrorResponse RevokeSessionErrorResponseType = "sess.permission_denied"
+	UnavailableRevokeSessionErrorResponse          RevokeSessionErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RevokeSessionErrorResponse is AuthUnauthorized.
@@ -73118,6 +78531,11 @@ func (s RevokeSessionErrorResponse) IsInternal() bool {
 	return s.Type == InternalRevokeSessionErrorResponse
 }
 
+// IsNotImplemented reports whether RevokeSessionErrorResponse is NotImplemented.
+func (s RevokeSessionErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedRevokeSessionErrorResponse
+}
+
 // IsReqInvalid reports whether RevokeSessionErrorResponse is ReqInvalid.
 func (s RevokeSessionErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRevokeSessionErrorResponse
@@ -73131,6 +78549,11 @@ func (s RevokeSessionErrorResponse) IsSessNotFound() bool {
 // IsSessPermissionDenied reports whether RevokeSessionErrorResponse is SessPermissionDenied.
 func (s RevokeSessionErrorResponse) IsSessPermissionDenied() bool {
 	return s.Type == SessPermissionDeniedRevokeSessionErrorResponse
+}
+
+// IsUnavailable reports whether RevokeSessionErrorResponse is Unavailable.
+func (s RevokeSessionErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRevokeSessionErrorResponse
 }
 
 // SetAuthUnauthorized sets RevokeSessionErrorResponse to AuthUnauthorized.
@@ -73193,6 +78616,27 @@ func (s RevokeSessionErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalRevokeSessionErrorResponse(v Internal) RevokeSessionErrorResponse {
 	var s RevokeSessionErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets RevokeSessionErrorResponse to NotImplemented.
+func (s *RevokeSessionErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedRevokeSessionErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if RevokeSessionErrorResponse is NotImplemented.
+func (s RevokeSessionErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedRevokeSessionErrorResponse returns new RevokeSessionErrorResponse from NotImplemented.
+func NewNotImplementedRevokeSessionErrorResponse(v NotImplemented) RevokeSessionErrorResponse {
+	var s RevokeSessionErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -73259,6 +78703,27 @@ func NewSessPermissionDeniedRevokeSessionErrorResponse(v SessPermissionDenied) R
 	return s
 }
 
+// SetUnavailable sets RevokeSessionErrorResponse to Unavailable.
+func (s *RevokeSessionErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRevokeSessionErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RevokeSessionErrorResponse is Unavailable.
+func (s RevokeSessionErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRevokeSessionErrorResponse returns new RevokeSessionErrorResponse from Unavailable.
+func NewUnavailableRevokeSessionErrorResponse(v Unavailable) RevokeSessionErrorResponse {
+	var s RevokeSessionErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // RevokeSessionErrorResponseStatusCode wraps RevokeSessionErrorResponse with StatusCode.
 type RevokeSessionErrorResponseStatusCode struct {
 	StatusCode int
@@ -73306,14 +78771,22 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
-	Type                RollbackDeploymentErrorResponseType // switch on this field
-	AuthUnauthorized    AuthUnauthorized
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ReqInvalid          ReqInvalid
+	Type                 RollbackDeploymentErrorResponseType // switch on this field
+	AuthUnauthorized     AuthUnauthorized
+	DepConflict          DepConflict
+	DepInvalid           DepInvalid
+	DepNotFound          DepNotFound
+	DepPermissionDenied  DepPermissionDenied
+	EnvProjectNotFound   EnvProjectNotFound
+	EvtInvalid           EvtInvalid
+	Internal             Internal
+	NotImplemented       NotImplemented
+	ProjNotFound         ProjNotFound
+	ProjOriginNotAllowed ProjOriginNotAllowed
+	RelNotFound          RelNotFound
+	RelRevoked           RelRevoked
+	ReqInvalid           ReqInvalid
+	Unavailable          Unavailable
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -73321,18 +78794,36 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
-	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
-	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
-	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
+	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
+	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
+	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
+	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
+	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
+	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
+	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
+	NotImplementedRollbackDeploymentErrorResponse       RollbackDeploymentErrorResponseType = "not_implemented"
+	ProjNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "proj.not_found"
+	ProjOriginNotAllowedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "proj.origin_not_allowed"
+	RelNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.not_found"
+	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
+	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
+	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
 )
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
 func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
 	return s.Type == AuthUnauthorizedRollbackDeploymentErrorResponse
+}
+
+// IsDepConflict reports whether RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) IsDepConflict() bool {
+	return s.Type == DepConflictRollbackDeploymentErrorResponse
+}
+
+// IsDepInvalid reports whether RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) IsDepInvalid() bool {
+	return s.Type == DepInvalidRollbackDeploymentErrorResponse
 }
 
 // IsDepNotFound reports whether RollbackDeploymentErrorResponse is DepNotFound.
@@ -73350,6 +78841,11 @@ func (s RollbackDeploymentErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRollbackDeploymentErrorResponse
 }
 
+// IsEvtInvalid reports whether RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRollbackDeploymentErrorResponse
+}
+
 // IsInternal reports whether RollbackDeploymentErrorResponse is Internal.
 func (s RollbackDeploymentErrorResponse) IsInternal() bool {
 	return s.Type == InternalRollbackDeploymentErrorResponse
@@ -73360,9 +78856,34 @@ func (s RollbackDeploymentErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedRollbackDeploymentErrorResponse
 }
 
+// IsProjNotFound reports whether RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) IsProjNotFound() bool {
+	return s.Type == ProjNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s RollbackDeploymentErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedRollbackDeploymentErrorResponse
+}
+
+// IsRelNotFound reports whether RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundRollbackDeploymentErrorResponse
+}
+
+// IsRelRevoked reports whether RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedRollbackDeploymentErrorResponse
+}
+
 // IsReqInvalid reports whether RollbackDeploymentErrorResponse is ReqInvalid.
 func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidRollbackDeploymentErrorResponse
+}
+
+// IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
+func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableRollbackDeploymentErrorResponse
 }
 
 // SetAuthUnauthorized sets RollbackDeploymentErrorResponse to AuthUnauthorized.
@@ -73383,6 +78904,48 @@ func (s RollbackDeploymentErrorResponse) GetAuthUnauthorized() (v AuthUnauthoriz
 func NewAuthUnauthorizedRollbackDeploymentErrorResponse(v AuthUnauthorized) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetDepConflict sets RollbackDeploymentErrorResponse to DepConflict.
+func (s *RollbackDeploymentErrorResponse) SetDepConflict(v DepConflict) {
+	s.Type = DepConflictRollbackDeploymentErrorResponse
+	s.DepConflict = v
+}
+
+// GetDepConflict returns DepConflict and true boolean if RollbackDeploymentErrorResponse is DepConflict.
+func (s RollbackDeploymentErrorResponse) GetDepConflict() (v DepConflict, ok bool) {
+	if !s.IsDepConflict() {
+		return v, false
+	}
+	return s.DepConflict, true
+}
+
+// NewDepConflictRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepConflict.
+func NewDepConflictRollbackDeploymentErrorResponse(v DepConflict) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepConflict(v)
+	return s
+}
+
+// SetDepInvalid sets RollbackDeploymentErrorResponse to DepInvalid.
+func (s *RollbackDeploymentErrorResponse) SetDepInvalid(v DepInvalid) {
+	s.Type = DepInvalidRollbackDeploymentErrorResponse
+	s.DepInvalid = v
+}
+
+// GetDepInvalid returns DepInvalid and true boolean if RollbackDeploymentErrorResponse is DepInvalid.
+func (s RollbackDeploymentErrorResponse) GetDepInvalid() (v DepInvalid, ok bool) {
+	if !s.IsDepInvalid() {
+		return v, false
+	}
+	return s.DepInvalid, true
+}
+
+// NewDepInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepInvalid.
+func NewDepInvalidRollbackDeploymentErrorResponse(v DepInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepInvalid(v)
 	return s
 }
 
@@ -73449,6 +79012,27 @@ func NewEnvProjectNotFoundRollbackDeploymentErrorResponse(v EnvProjectNotFound) 
 	return s
 }
 
+// SetEvtInvalid sets RollbackDeploymentErrorResponse to EvtInvalid.
+func (s *RollbackDeploymentErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRollbackDeploymentErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RollbackDeploymentErrorResponse is EvtInvalid.
+func (s RollbackDeploymentErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from EvtInvalid.
+func NewEvtInvalidRollbackDeploymentErrorResponse(v EvtInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
 // SetInternal sets RollbackDeploymentErrorResponse to Internal.
 func (s *RollbackDeploymentErrorResponse) SetInternal(v Internal) {
 	s.Type = InternalRollbackDeploymentErrorResponse
@@ -73491,6 +79075,90 @@ func NewNotImplementedRollbackDeploymentErrorResponse(v NotImplemented) Rollback
 	return s
 }
 
+// SetProjNotFound sets RollbackDeploymentErrorResponse to ProjNotFound.
+func (s *RollbackDeploymentErrorResponse) SetProjNotFound(v ProjNotFound) {
+	s.Type = ProjNotFoundRollbackDeploymentErrorResponse
+	s.ProjNotFound = v
+}
+
+// GetProjNotFound returns ProjNotFound and true boolean if RollbackDeploymentErrorResponse is ProjNotFound.
+func (s RollbackDeploymentErrorResponse) GetProjNotFound() (v ProjNotFound, ok bool) {
+	if !s.IsProjNotFound() {
+		return v, false
+	}
+	return s.ProjNotFound, true
+}
+
+// NewProjNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjNotFound.
+func NewProjNotFoundRollbackDeploymentErrorResponse(v ProjNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetProjNotFound(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets RollbackDeploymentErrorResponse to ProjOriginNotAllowed.
+func (s *RollbackDeploymentErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if RollbackDeploymentErrorResponse is ProjOriginNotAllowed.
+func (s RollbackDeploymentErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedRollbackDeploymentErrorResponse(v ProjOriginNotAllowed) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetRelNotFound sets RollbackDeploymentErrorResponse to RelNotFound.
+func (s *RollbackDeploymentErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundRollbackDeploymentErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if RollbackDeploymentErrorResponse is RelNotFound.
+func (s RollbackDeploymentErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelNotFound.
+func NewRelNotFoundRollbackDeploymentErrorResponse(v RelNotFound) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets RollbackDeploymentErrorResponse to RelRevoked.
+func (s *RollbackDeploymentErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedRollbackDeploymentErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if RollbackDeploymentErrorResponse is RelRevoked.
+func (s RollbackDeploymentErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from RelRevoked.
+func NewRelRevokedRollbackDeploymentErrorResponse(v RelRevoked) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetRelRevoked(v)
+	return s
+}
+
 // SetReqInvalid sets RollbackDeploymentErrorResponse to ReqInvalid.
 func (s *RollbackDeploymentErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidRollbackDeploymentErrorResponse
@@ -73509,6 +79177,27 @@ func (s RollbackDeploymentErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool)
 func NewReqInvalidRollbackDeploymentErrorResponse(v ReqInvalid) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets RollbackDeploymentErrorResponse to Unavailable.
+func (s *RollbackDeploymentErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableRollbackDeploymentErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if RollbackDeploymentErrorResponse is Unavailable.
+func (s RollbackDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from Unavailable.
+func NewUnavailableRollbackDeploymentErrorResponse(v Unavailable) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -76827,7 +82516,9 @@ type SetUserPasswordErrorResponse struct {
 	AuthUnauthorized            AuthUnauthorized
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
+	NotImplemented              NotImplemented
 	ReqInvalid                  ReqInvalid
+	Unavailable                 Unavailable
 	UserConflict                UserConflict
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
@@ -76845,7 +82536,9 @@ const (
 	AuthUnauthorizedSetUserPasswordErrorResponse            SetUserPasswordErrorResponseType = "auth.unauthorized"
 	EvtInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "evt.invalid"
 	InternalSetUserPasswordErrorResponse                    SetUserPasswordErrorResponseType = "internal"
+	NotImplementedSetUserPasswordErrorResponse              SetUserPasswordErrorResponseType = "not_implemented"
 	ReqInvalidSetUserPasswordErrorResponse                  SetUserPasswordErrorResponseType = "req.invalid"
+	UnavailableSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "unavailable"
 	UserConflictSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.conflict"
 	UserInvalidSetUserPasswordErrorResponse                 SetUserPasswordErrorResponseType = "user.invalid"
 	UserNotFoundSetUserPasswordErrorResponse                SetUserPasswordErrorResponseType = "user.not_found"
@@ -76870,9 +82563,19 @@ func (s SetUserPasswordErrorResponse) IsInternal() bool {
 	return s.Type == InternalSetUserPasswordErrorResponse
 }
 
+// IsNotImplemented reports whether SetUserPasswordErrorResponse is NotImplemented.
+func (s SetUserPasswordErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedSetUserPasswordErrorResponse
+}
+
 // IsReqInvalid reports whether SetUserPasswordErrorResponse is ReqInvalid.
 func (s SetUserPasswordErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidSetUserPasswordErrorResponse
+}
+
+// IsUnavailable reports whether SetUserPasswordErrorResponse is Unavailable.
+func (s SetUserPasswordErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableSetUserPasswordErrorResponse
 }
 
 // IsUserConflict reports whether SetUserPasswordErrorResponse is UserConflict.
@@ -76973,6 +82676,27 @@ func NewInternalSetUserPasswordErrorResponse(v Internal) SetUserPasswordErrorRes
 	return s
 }
 
+// SetNotImplemented sets SetUserPasswordErrorResponse to NotImplemented.
+func (s *SetUserPasswordErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedSetUserPasswordErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if SetUserPasswordErrorResponse is NotImplemented.
+func (s SetUserPasswordErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from NotImplemented.
+func NewNotImplementedSetUserPasswordErrorResponse(v NotImplemented) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets SetUserPasswordErrorResponse to ReqInvalid.
 func (s *SetUserPasswordErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidSetUserPasswordErrorResponse
@@ -76991,6 +82715,27 @@ func (s SetUserPasswordErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
 func NewReqInvalidSetUserPasswordErrorResponse(v ReqInvalid) SetUserPasswordErrorResponse {
 	var s SetUserPasswordErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets SetUserPasswordErrorResponse to Unavailable.
+func (s *SetUserPasswordErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableSetUserPasswordErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if SetUserPasswordErrorResponse is Unavailable.
+func (s SetUserPasswordErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableSetUserPasswordErrorResponse returns new SetUserPasswordErrorResponse from Unavailable.
+func NewUnavailableSetUserPasswordErrorResponse(v Unavailable) SetUserPasswordErrorResponse {
+	var s SetUserPasswordErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -80581,12 +86326,14 @@ type UpdateTeamErrorResponse struct {
 	AuthUnauthorized     AuthUnauthorized
 	EvtInvalid           EvtInvalid
 	Internal             Internal
+	NotImplemented       NotImplemented
 	ReqInvalid           ReqInvalid
 	TeamAlreadyExists    TeamAlreadyExists
 	TeamNameInvalid      TeamNameInvalid
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamPermissionDenied TeamPermissionDenied
 	TeamProjectNotFound  TeamProjectNotFound
+	Unavailable          Unavailable
 }
 
 // UpdateTeamErrorResponseType is oneOf type of UpdateTeamErrorResponse.
@@ -80598,12 +86345,14 @@ const (
 	AuthUnauthorizedUpdateTeamErrorResponse     UpdateTeamErrorResponseType = "auth.unauthorized"
 	EvtInvalidUpdateTeamErrorResponse           UpdateTeamErrorResponseType = "evt.invalid"
 	InternalUpdateTeamErrorResponse             UpdateTeamErrorResponseType = "internal"
+	NotImplementedUpdateTeamErrorResponse       UpdateTeamErrorResponseType = "not_implemented"
 	ReqInvalidUpdateTeamErrorResponse           UpdateTeamErrorResponseType = "req.invalid"
 	TeamAlreadyExistsUpdateTeamErrorResponse    UpdateTeamErrorResponseType = "team.already_exists"
 	TeamNameInvalidUpdateTeamErrorResponse      UpdateTeamErrorResponseType = "team.name_invalid"
 	TeamTeamNotFoundUpdateTeamErrorResponse     UpdateTeamErrorResponseType = "team.team_not_found"
 	TeamPermissionDeniedUpdateTeamErrorResponse UpdateTeamErrorResponseType = "team.permission_denied"
 	TeamProjectNotFoundUpdateTeamErrorResponse  UpdateTeamErrorResponseType = "team.project_not_found"
+	UnavailableUpdateTeamErrorResponse          UpdateTeamErrorResponseType = "unavailable"
 )
 
 // IsAuthCsrfInvalid reports whether UpdateTeamErrorResponse is AuthCsrfInvalid.
@@ -80623,6 +86372,11 @@ func (s UpdateTeamErrorResponse) IsEvtInvalid() bool {
 
 // IsInternal reports whether UpdateTeamErrorResponse is Internal.
 func (s UpdateTeamErrorResponse) IsInternal() bool { return s.Type == InternalUpdateTeamErrorResponse }
+
+// IsNotImplemented reports whether UpdateTeamErrorResponse is NotImplemented.
+func (s UpdateTeamErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedUpdateTeamErrorResponse
+}
 
 // IsReqInvalid reports whether UpdateTeamErrorResponse is ReqInvalid.
 func (s UpdateTeamErrorResponse) IsReqInvalid() bool {
@@ -80652,6 +86406,11 @@ func (s UpdateTeamErrorResponse) IsTeamPermissionDenied() bool {
 // IsTeamProjectNotFound reports whether UpdateTeamErrorResponse is TeamProjectNotFound.
 func (s UpdateTeamErrorResponse) IsTeamProjectNotFound() bool {
 	return s.Type == TeamProjectNotFoundUpdateTeamErrorResponse
+}
+
+// IsUnavailable reports whether UpdateTeamErrorResponse is Unavailable.
+func (s UpdateTeamErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableUpdateTeamErrorResponse
 }
 
 // SetAuthCsrfInvalid sets UpdateTeamErrorResponse to AuthCsrfInvalid.
@@ -80735,6 +86494,27 @@ func (s UpdateTeamErrorResponse) GetInternal() (v Internal, ok bool) {
 func NewInternalUpdateTeamErrorResponse(v Internal) UpdateTeamErrorResponse {
 	var s UpdateTeamErrorResponse
 	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets UpdateTeamErrorResponse to NotImplemented.
+func (s *UpdateTeamErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedUpdateTeamErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if UpdateTeamErrorResponse is NotImplemented.
+func (s UpdateTeamErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from NotImplemented.
+func NewNotImplementedUpdateTeamErrorResponse(v NotImplemented) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetNotImplemented(v)
 	return s
 }
 
@@ -80864,6 +86644,27 @@ func NewTeamProjectNotFoundUpdateTeamErrorResponse(v TeamProjectNotFound) Update
 	return s
 }
 
+// SetUnavailable sets UpdateTeamErrorResponse to Unavailable.
+func (s *UpdateTeamErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableUpdateTeamErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if UpdateTeamErrorResponse is Unavailable.
+func (s UpdateTeamErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableUpdateTeamErrorResponse returns new UpdateTeamErrorResponse from Unavailable.
+func NewUnavailableUpdateTeamErrorResponse(v Unavailable) UpdateTeamErrorResponse {
+	var s UpdateTeamErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
 // UpdateTeamErrorResponseStatusCode wraps UpdateTeamErrorResponse with StatusCode.
 type UpdateTeamErrorResponseStatusCode struct {
 	StatusCode int
@@ -80932,9 +86733,11 @@ type UpdateVariablesErrorResponse struct {
 	VarInvalidName      VarInvalidName
 	VarInvalidValue     VarInvalidValue
 	VarNoProjectID      VarNoProjectID
+	NotImplemented      NotImplemented
 	ProjNotFound        ProjNotFound
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
+	Unavailable         Unavailable
 	VarLimitExceeded    VarLimitExceeded
 	VarNotFound         VarNotFound
 	VarPermissionDenied VarPermissionDenied
@@ -80954,9 +86757,11 @@ const (
 	VarInvalidNameUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.invalid_name"
 	VarInvalidValueUpdateVariablesErrorResponse     UpdateVariablesErrorResponseType = "var.invalid_value"
 	VarNoProjectIDUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "var.no_project_id"
+	NotImplementedUpdateVariablesErrorResponse      UpdateVariablesErrorResponseType = "not_implemented"
 	ProjNotFoundUpdateVariablesErrorResponse        UpdateVariablesErrorResponseType = "proj.not_found"
 	ReqInvalidUpdateVariablesErrorResponse          UpdateVariablesErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "enc_key.unknown_alg"
+	UnavailableUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "unavailable"
 	VarLimitExceededUpdateVariablesErrorResponse    UpdateVariablesErrorResponseType = "var.limit_exceeded"
 	VarNotFoundUpdateVariablesErrorResponse         UpdateVariablesErrorResponseType = "var.not_found"
 	VarPermissionDeniedUpdateVariablesErrorResponse UpdateVariablesErrorResponseType = "var.permission_denied"
@@ -81007,6 +86812,11 @@ func (s UpdateVariablesErrorResponse) IsVarNoProjectID() bool {
 	return s.Type == VarNoProjectIDUpdateVariablesErrorResponse
 }
 
+// IsNotImplemented reports whether UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedUpdateVariablesErrorResponse
+}
+
 // IsProjNotFound reports whether UpdateVariablesErrorResponse is ProjNotFound.
 func (s UpdateVariablesErrorResponse) IsProjNotFound() bool {
 	return s.Type == ProjNotFoundUpdateVariablesErrorResponse
@@ -81020,6 +86830,11 @@ func (s UpdateVariablesErrorResponse) IsReqInvalid() bool {
 // IsEncKeyUnknownAlg reports whether UpdateVariablesErrorResponse is EncKeyUnknownAlg.
 func (s UpdateVariablesErrorResponse) IsEncKeyUnknownAlg() bool {
 	return s.Type == EncKeyUnknownAlgUpdateVariablesErrorResponse
+}
+
+// IsUnavailable reports whether UpdateVariablesErrorResponse is Unavailable.
+func (s UpdateVariablesErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableUpdateVariablesErrorResponse
 }
 
 // IsVarLimitExceeded reports whether UpdateVariablesErrorResponse is VarLimitExceeded.
@@ -81226,6 +87041,27 @@ func NewVarNoProjectIDUpdateVariablesErrorResponse(v VarNoProjectID) UpdateVaria
 	return s
 }
 
+// SetNotImplemented sets UpdateVariablesErrorResponse to NotImplemented.
+func (s *UpdateVariablesErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedUpdateVariablesErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if UpdateVariablesErrorResponse is NotImplemented.
+func (s UpdateVariablesErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from NotImplemented.
+func NewNotImplementedUpdateVariablesErrorResponse(v NotImplemented) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetProjNotFound sets UpdateVariablesErrorResponse to ProjNotFound.
 func (s *UpdateVariablesErrorResponse) SetProjNotFound(v ProjNotFound) {
 	s.Type = ProjNotFoundUpdateVariablesErrorResponse
@@ -81286,6 +87122,27 @@ func (s UpdateVariablesErrorResponse) GetEncKeyUnknownAlg() (v EncKeyUnknownAlg,
 func NewEncKeyUnknownAlgUpdateVariablesErrorResponse(v EncKeyUnknownAlg) UpdateVariablesErrorResponse {
 	var s UpdateVariablesErrorResponse
 	s.SetEncKeyUnknownAlg(v)
+	return s
+}
+
+// SetUnavailable sets UpdateVariablesErrorResponse to Unavailable.
+func (s *UpdateVariablesErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableUpdateVariablesErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if UpdateVariablesErrorResponse is Unavailable.
+func (s UpdateVariablesErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableUpdateVariablesErrorResponse returns new UpdateVariablesErrorResponse from Unavailable.
+func NewUnavailableUpdateVariablesErrorResponse(v Unavailable) UpdateVariablesErrorResponse {
+	var s UpdateVariablesErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 
@@ -86790,7 +92647,9 @@ type VerifyChallengeProofErrorResponse struct {
 	AuthUnauthorized            AuthUnauthorized
 	EvtInvalid                  EvtInvalid
 	Internal                    Internal
+	NotImplemented              NotImplemented
 	ReqInvalid                  ReqInvalid
+	Unavailable                 Unavailable
 	UserAlreadyExists           UserAlreadyExists
 	UserInvalid                 UserInvalid
 	UserNotFound                UserNotFound
@@ -86814,7 +92673,9 @@ const (
 	AuthUnauthorizedVerifyChallengeProofErrorResponse            VerifyChallengeProofErrorResponseType = "auth.unauthorized"
 	EvtInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "evt.invalid"
 	InternalVerifyChallengeProofErrorResponse                    VerifyChallengeProofErrorResponseType = "internal"
+	NotImplementedVerifyChallengeProofErrorResponse              VerifyChallengeProofErrorResponseType = "not_implemented"
 	ReqInvalidVerifyChallengeProofErrorResponse                  VerifyChallengeProofErrorResponseType = "req.invalid"
+	UnavailableVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "unavailable"
 	UserAlreadyExistsVerifyChallengeProofErrorResponse           VerifyChallengeProofErrorResponseType = "user.already_exists"
 	UserInvalidVerifyChallengeProofErrorResponse                 VerifyChallengeProofErrorResponseType = "user.invalid"
 	UserNotFoundVerifyChallengeProofErrorResponse                VerifyChallengeProofErrorResponseType = "user.not_found"
@@ -86873,9 +92734,19 @@ func (s VerifyChallengeProofErrorResponse) IsInternal() bool {
 	return s.Type == InternalVerifyChallengeProofErrorResponse
 }
 
+// IsNotImplemented reports whether VerifyChallengeProofErrorResponse is NotImplemented.
+func (s VerifyChallengeProofErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedVerifyChallengeProofErrorResponse
+}
+
 // IsReqInvalid reports whether VerifyChallengeProofErrorResponse is ReqInvalid.
 func (s VerifyChallengeProofErrorResponse) IsReqInvalid() bool {
 	return s.Type == ReqInvalidVerifyChallengeProofErrorResponse
+}
+
+// IsUnavailable reports whether VerifyChallengeProofErrorResponse is Unavailable.
+func (s VerifyChallengeProofErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableVerifyChallengeProofErrorResponse
 }
 
 // IsUserAlreadyExists reports whether VerifyChallengeProofErrorResponse is UserAlreadyExists.
@@ -87118,6 +92989,27 @@ func NewInternalVerifyChallengeProofErrorResponse(v Internal) VerifyChallengePro
 	return s
 }
 
+// SetNotImplemented sets VerifyChallengeProofErrorResponse to NotImplemented.
+func (s *VerifyChallengeProofErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedVerifyChallengeProofErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if VerifyChallengeProofErrorResponse is NotImplemented.
+func (s VerifyChallengeProofErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from NotImplemented.
+func NewNotImplementedVerifyChallengeProofErrorResponse(v NotImplemented) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
 // SetReqInvalid sets VerifyChallengeProofErrorResponse to ReqInvalid.
 func (s *VerifyChallengeProofErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidVerifyChallengeProofErrorResponse
@@ -87136,6 +93028,27 @@ func (s VerifyChallengeProofErrorResponse) GetReqInvalid() (v ReqInvalid, ok boo
 func NewReqInvalidVerifyChallengeProofErrorResponse(v ReqInvalid) VerifyChallengeProofErrorResponse {
 	var s VerifyChallengeProofErrorResponse
 	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets VerifyChallengeProofErrorResponse to Unavailable.
+func (s *VerifyChallengeProofErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableVerifyChallengeProofErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if VerifyChallengeProofErrorResponse is Unavailable.
+func (s VerifyChallengeProofErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableVerifyChallengeProofErrorResponse returns new VerifyChallengeProofErrorResponse from Unavailable.
+func NewUnavailableVerifyChallengeProofErrorResponse(v Unavailable) VerifyChallengeProofErrorResponse {
+	var s VerifyChallengeProofErrorResponse
+	s.SetUnavailable(v)
 	return s
 }
 

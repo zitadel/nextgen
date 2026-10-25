@@ -5,6 +5,7 @@ package integration_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
 
 const (
@@ -66,6 +68,22 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 	}, api.CreateDeploymentParams{ProjectID: api.ProjectID(f.project)})
 	require.NoError(t, err)
 	return resp
+}
+
+// deployPreview deploys the release to previewOrigin through the service: the
+// API does not take preview targets yet.
+func (f deploymentFixture) deployPreview(t *testing.T, releaseID api.ReleaseID) *service.CreateDeploymentOutput {
+	t.Helper()
+	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+		ProjectID:  f.project,
+		ReleaseID:  string(releaseID),
+		OriginKind: domain.DeploymentOriginKindPreview,
+		Origins:    []string{previewOrigin},
+		Reason:     domain.DeploymentReasonDeploy,
+		PreviewTTL: time.Hour,
+	})
+	require.NoError(t, err)
+	return out
 }
 
 // refused asserts the create answered with the response type of its status
@@ -216,14 +234,6 @@ func TestCreateDeployment(t *testing.T) {
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
-		// Deploying to preview URLs lands on top of this.
-		"a preview URL": {
-			req: &api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{previewOrigin},
-			},
-			wantType: &api.CreateDeploymentErrorResponseStatusCode{}, wantCode: domain.ErrNotImplemented().Code,
-		},
 		"an unknown release": {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID("rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"),
@@ -246,6 +256,192 @@ func TestCreateDeployment(t *testing.T) {
 			Targets:   api.DeploymentTargetsRequest{"primary"},
 		})
 		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
+	})
+}
+
+func (f deploymentFixture) rollback(t *testing.T, deploymentID api.DeploymentID, req api.RollbackDeploymentRequest) api.RollbackDeploymentRes {
+	t.Helper()
+	resp, err := f.client.RollbackDeployment(t.Context(), api.NewOptRollbackDeploymentRequest(req),
+		api.RollbackDeploymentParams{ProjectID: api.ProjectID(f.project), DeploymentID: deploymentID})
+	require.NoError(t, err)
+	return resp
+}
+
+// TestRollbackDeployment rolls back to an earlier primary deployment. The
+// subtests share one project and run in order: each builds on what the one
+// before deployed.
+func TestRollbackDeployment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	resp := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	first := resp.(*api.CreateDeploymentCreated)
+	resp = fixture.deploy(t, fixture.otherRelease(t))
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+	second := resp.(*api.CreateDeploymentCreated)
+
+	var rolledBack *api.RollbackDeploymentCreated
+	t.Run("re-deploys the release with rollback_to naming the deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{
+			Message:              api.NewOptString("phone_number broke sign-up"),
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		rolledBack = resp.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, fixture.release.ID, rolledBack.ReleaseID)
+		assert.Equal(t, api.DeploymentKindPrimary, rolledBack.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, rolledBack.Status)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, origins(rolledBack.Targets))
+		assert.Equal(t, api.DeploymentReasonRollback, rolledBack.Metadata.Reason)
+		rollbackTo, _ := rolledBack.Metadata.RollbackTo.Get()
+		assert.Equal(t, first.ID, rollbackTo)
+		message, _ := rolledBack.Metadata.Message.Get()
+		assert.Equal(t, "phone_number broke sign-up", message)
+	})
+
+	t.Run("again is a no-op", func(t *testing.T) {
+		resp := fixture.rollback(t, first.ID, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentOK{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, rolledBack.ID, resp.(*api.RollbackDeploymentOK).ID)
+	})
+
+	t.Run("a stale guard conflicts with the newest primary deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, second.ID, api.RollbackDeploymentRequest{
+			ExpectedDeploymentID: api.NewOptDeploymentID(second.ID),
+		})
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		newest := resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment
+		require.False(t, newest.Null)
+		assert.Equal(t, rolledBack.ID, newest.Value.ID)
+	})
+
+	t.Run("covers a primary origin added since", func(t *testing.T) {
+		fixture.addOrigin(t, domain.Origin{Pattern: "https://acme.com", Kind: domain.OriginKindPrimary})
+		resp := fixture.rollback(t, second.ID, api.RollbackDeploymentRequest{})
+		require.IsType(t, &api.RollbackDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.RollbackDeploymentCreated)
+		assert.Equal(t, second.ReleaseID, got.ReleaseID)
+		assert.Equal(t, []string{"https://acme.com", appOrigin, wwwOrigin}, origins(got.Targets))
+	})
+
+	t.Run("an unknown deployment", func(t *testing.T) {
+		resp := fixture.rollback(t, "dep_01KX4SB9C8E1F0N9WD3P2E4YM5", api.RollbackDeploymentRequest{})
+		assertAuthzStatus(t, resp, http.StatusNotFound, domain.ErrDeploymentNotFound().Code)
+	})
+
+	t.Run("a project with no primary origin", func(t *testing.T) {
+		alone := deploymentFixture{releaseFixture: newReleaseFixture(t)}
+		alone.addOrigin(t, domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimary})
+		created := alone.create(t, &api.CreateReleaseRequest{Pointers: alone.pointers()})
+		require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+		resp := alone.deploy(t, created.(*api.CreateReleaseCreated).ID)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		require.NoError(t, harness.EnsureProjectService(t).RemoveOrigin(t.Context(), alone.project, appOrigin))
+
+		rollback := alone.rollback(t, resp.(*api.CreateDeploymentCreated).ID, api.RollbackDeploymentRequest{})
+		assertAuthzError(t, rollback, domain.ErrDeploymentInvalid().Code)
+	})
+}
+
+// TestRevokeRelease revokes a release once nothing serves it, refuses while
+// an origin does, and keeps a revoked release out of every deploy.
+func TestRevokeRelease(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	revoke := func(t *testing.T, id api.ReleaseID) api.RevokeReleaseRes {
+		t.Helper()
+		resp, err := fixture.client.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: project, ReleaseID: id})
+		require.NoError(t, err)
+		return resp
+	}
+
+	deployed := fixture.deploy(t, fixture.release.ID)
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	live := deployed.(*api.CreateDeploymentCreated)
+
+	t.Run("refused while the primary origins serve it", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
+		conflict := resp.(*api.RevokeReleaseConflict)
+		assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), conflict.Code)
+		var served []string
+		for _, origin := range conflict.Details.Origins {
+			assert.Equal(t, live.ID, origin.DeploymentID)
+			served = append(served, string(origin.Origin))
+		}
+		assert.Equal(t, origins(live.Targets), served)
+	})
+
+	other := fixture.otherRelease(t)
+	replaced := fixture.deploy(t, other)
+	require.IsType(t, &api.CreateDeploymentCreated{}, replaced, helpers.MustMarshal(t, replaced))
+
+	t.Run("refused while a live preview serves it", func(t *testing.T) {
+		preview := fixture.deployPreview(t, fixture.release.ID)
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.RevokeReleaseConflict{}, resp, helpers.MustMarshal(t, resp))
+		conflict := resp.(*api.RevokeReleaseConflict)
+		require.Len(t, conflict.Details.Origins, 1)
+		assert.Equal(t, api.Origin(previewOrigin), conflict.Details.Origins[0].Origin)
+		assert.Equal(t, api.DeploymentID(preview.Deployment.ID), conflict.Details.Origins[0].DeploymentID)
+
+		// The preview moves on to the other release, so nothing serves it.
+		fixture.deployPreview(t, other)
+	})
+
+	var revokedAt time.Time
+	t.Run("revokes once nothing serves it", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.Release{}, resp, helpers.MustMarshal(t, resp))
+		got := resp.(*api.Release)
+		assert.Equal(t, fixture.release.ID, got.ID)
+		require.False(t, got.RevokedAt.Null, helpers.MustMarshal(t, got))
+		assert.WithinDuration(t, time.Now(), got.RevokedAt.Value, time.Minute)
+		revokedAt = got.RevokedAt.Value
+
+		read, err := fixture.client.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: project, ReleaseID: fixture.release.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, read, helpers.MustMarshal(t, read))
+		assert.Equal(t, revokedAt, read.(*api.Release).RevokedAt.Value)
+	})
+
+	t.Run("again keeps the first revocation", func(t *testing.T) {
+		resp := revoke(t, fixture.release.ID)
+		require.IsType(t, &api.Release{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, revokedAt, resp.(*api.Release).RevokedAt.Value)
+	})
+
+	t.Run("a revoked release does not deploy", func(t *testing.T) {
+		resp := fixture.deploy(t, fixture.release.ID)
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ReleaseRevokedConflictDeploymentConflict, resp.(*api.DeploymentConflict).Type)
+	})
+
+	t.Run("the history keeps its deployments", func(t *testing.T) {
+		read, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: live.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, read, helpers.MustMarshal(t, read))
+		assert.Equal(t, api.DeploymentStatusInactive, read.(*api.Deployment).Status)
+	})
+
+	t.Run("an unknown release", func(t *testing.T) {
+		status, code, _, ok := errorResponseParts(t, revoke(t, "rel_01KX5N7C9D2E7F0N9WD3P2E4YM6"))
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+	})
+
+	t.Run("another project's release", func(t *testing.T) {
+		// Own token and project; the release is another project's, and the
+		// lookup is scoped to the project, so it reads as unknown.
+		theirs := newDeploymentFixture(t)
+		status, code, _, ok := errorResponseParts(t, revoke(t, theirs.release.ID))
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
 	})
 }
 
@@ -376,7 +572,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 	fixture := newReleaseFixture(t)
 	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: fixture.pointers()})
 	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
-	releaseID := created.(*api.CreateReleaseCreated).ID
 	project := api.ProjectID(fixture.project)
 
 	expectNotImplemented := func(t *testing.T, resp any) {
@@ -398,36 +593,11 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 		expectNotImplemented(t, resp)
 	})
 
-	t.Run("rollback", func(t *testing.T) {
-		resp, err := fixture.client.RollbackDeployment(t.Context(),
-			api.NewOptRollbackDeploymentRequest(api.RollbackDeploymentRequest{
-				Message: api.NewOptString("phone_number broke sign-up"),
-			}),
-			api.RollbackDeploymentParams{
-				ProjectID:    project,
-				DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5",
-			})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
 	t.Run("variables", func(t *testing.T) {
 		resp, err := fixture.client.GetDeploymentVariables(t.Context(), api.GetDeploymentVariablesParams{
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("create to preview URLs", func(t *testing.T) {
-		resp, err := fixture.client.CreateDeployment(t.Context(),
-			&api.CreateDeploymentRequest{
-				ReleaseID: api.NewOptReleaseID(releaseID),
-				Targets:   api.DeploymentTargetsRequest{"https://acme-git-sso-acmeinc.vercel.app"},
-				TTL:       api.NewOptPreviewTTL("168h"),
-			},
-			api.CreateDeploymentParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
@@ -507,5 +677,104 @@ func TestDeploymentsCheckAccessBeforeNotImplemented(t *testing.T) {
 		})
 		require.NoError(t, err)
 		expectError(t, resp, http.StatusForbidden, domain.ErrDeploymentPermissionDenied().Code)
+	})
+}
+
+// TestCreatePreviewDeployment deploys to preview URLs and reads the
+// deployments back. The subtests share one project and run in order.
+func TestCreatePreviewDeployment(t *testing.T) {
+	t.Parallel()
+
+	const shaOrigin = "https://acme-k3x9v2-acmeinc.vercel.app"
+	fixture := newDeploymentFixture(t)
+	releaseID := fixture.release.ID
+	project := api.ProjectID(fixture.project)
+
+	preview := func(t *testing.T, req *api.CreateDeploymentRequest) *api.CreateDeploymentCreated {
+		t.Helper()
+		req.ReleaseID = api.NewOptReleaseID(releaseID)
+		resp := fixture.createDeployment(t, req)
+		require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.CreateDeploymentCreated)
+	}
+	get := func(t *testing.T, id api.DeploymentID) *api.Deployment {
+		t.Helper()
+		resp, err := fixture.client.GetDeploymentById(t.Context(), api.GetDeploymentByIdParams{ProjectID: project, DeploymentID: id})
+		require.NoError(t, err)
+		require.IsType(t, &api.Deployment{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.Deployment)
+	}
+
+	first := preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{shaOrigin, previewOrigin}})
+
+	t.Run("each URL serves the deployment", func(t *testing.T) {
+		assert.Equal(t, api.DeploymentKindPreview, first.Kind)
+		assert.Equal(t, api.DeploymentStatusLive, first.Status)
+		assert.Equal(t, []string{previewOrigin, shaOrigin}, origins(first.Targets))
+		assert.Equal(t, api.DeploymentStatusLive, get(t, first.ID).Status)
+	})
+
+	var renewed *api.CreateDeploymentCreated
+	t.Run("the same release again writes a new deployment", func(t *testing.T) {
+		renewed = preview(t, &api.CreateDeploymentRequest{Targets: api.DeploymentTargetsRequest{previewOrigin}})
+		assert.NotEqual(t, first.ID, renewed.ID)
+		assert.Equal(t, api.DeploymentStatusLive, get(t, first.ID).Status, "it still serves the other URL")
+	})
+
+	t.Run("the live view narrows each to the URLs it serves", func(t *testing.T) {
+		resp, err := fixture.client.ListDeployments(t.Context(), api.ListDeploymentsParams{ProjectID: project, Live: api.NewOptBool(true)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, resp, helpers.MustMarshal(t, resp))
+		byID := map[api.DeploymentID]api.Deployment{}
+		for _, item := range resp.(*api.ListDeploymentsResponse).Deployments {
+			byID[item.ID] = item
+		}
+		require.Contains(t, byID, renewed.ID)
+		require.Contains(t, byID, first.ID)
+		assert.Equal(t, []string{previewOrigin}, origins(byID[renewed.ID].Targets))
+		assert.Equal(t, []string{shaOrigin}, origins(byID[first.ID].Targets))
+	})
+
+	t.Run("the guard is the newest deployment to any of the URLs", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID:            api.NewOptReleaseID(releaseID),
+			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			ExpectedDeploymentID: api.NewOptDeploymentID(first.ID),
+		})
+		require.IsType(t, &api.DeploymentConflict{}, resp, helpers.MustMarshal(t, resp))
+		replaced := resp.(*api.DeploymentConflict).DeploymentGuardConflict.Details.Deployment
+		require.False(t, replaced.Null)
+		assert.Equal(t, renewed.ID, replaced.Value.ID)
+
+		guarded := preview(t, &api.CreateDeploymentRequest{
+			Targets:              api.DeploymentTargetsRequest{previewOrigin, shaOrigin},
+			ExpectedDeploymentID: api.NewOptDeploymentID(renewed.ID),
+		})
+		assert.Equal(t, api.DeploymentStatusInactive, get(t, first.ID).Status, "both of its URLs moved on")
+		assert.Equal(t, api.DeploymentStatusLive, get(t, guarded.ID).Status)
+	})
+
+	t.Run("a URL no preview pattern matches", func(t *testing.T) {
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin, "https://acme.example"},
+		})
+		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
+	})
+
+	t.Run("a ttl is accepted", func(t *testing.T) {
+		preview(t, &api.CreateDeploymentRequest{
+			Targets: api.DeploymentTargetsRequest{previewOrigin},
+			TTL:     api.NewOptPreviewTTL("1h"),
+		})
+	})
+
+	t.Run("a loopback URL is never a preview", func(t *testing.T) {
+		fixture.addOrigin(t, domain.Origin{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview})
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{"http://localhost:3000"},
+		})
+		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 }

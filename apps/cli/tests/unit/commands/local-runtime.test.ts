@@ -514,6 +514,7 @@ describe("local runtime commands", () => {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
         console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
+        next_actions: string[];
         next_commands: string[];
       };
     };
@@ -536,6 +537,9 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.console.sign_in_url).toBeUndefined();
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_actions).toContainEqual(
+      expect.stringContaining(expectedPublicCliCommand("logs --follow")),
+    );
 
     const runtime = await readRuntimeMetadata(cwd);
     expect(runtime).toMatchObject({
@@ -830,7 +834,7 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("start")]);
+    expect(envelope.next_commands).toEqual([expectedPublicCliCommand(`start --cwd ${cwd}`)]);
   });
 
   it("stop succeeds without suggesting a restart", async () => {
@@ -866,7 +870,7 @@ describe("local runtime commands", () => {
       data: { next_commands?: string[] };
     };
     expect(envelope.status).toBe("ok");
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("stop")]);
+    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand(`stop --cwd ${cwd}`)]);
   });
 
   it("stop --all reports only discovered CLI-managed runtime candidates", async () => {
@@ -992,7 +996,9 @@ describe("local runtime commands", () => {
       next_commands?: string[];
     };
     expect(envelope.status).toBe("error");
-    expect(envelope.next_commands).toEqual([expectedPublicCliCommand("reset --force")]);
+    expect(envelope.next_commands).toEqual([
+      expectedPublicCliCommand(`reset --force --cwd ${cwd}`),
+    ]);
   });
 });
 
@@ -1035,7 +1041,7 @@ function startHealthServer() {
     const http = require("node:http");
     const port = Number(process.env.FAKE_DOCKER_HEALTH_PORT);
     const server = http.createServer((req, res) => {
-      if (req.url === "/healthz") {
+      if (req.url === "/readyz") {
         res.writeHead(200).end("ok");
         return;
       }
@@ -1117,7 +1123,7 @@ const http = require("node:http");
 const address = process.env.NEXTGEN_SERVER_ADDRESS || ":8080";
 const port = Number(address.split(":").at(-1));
 const server = http.createServer((req, res) => {
-  if (req.url === "/healthz") {
+  if (req.url === "/readyz") {
     res.writeHead(200).end("ok");
     return;
   }
@@ -1165,7 +1171,7 @@ const child = childProcess.spawn(process.execPath, ["-e", \`
   const http = require("node:http");
   const port = Number(process.env.FOREIGN_HEALTH_PORT);
   const server = http.createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -1208,7 +1214,7 @@ async function readDockerCalls(logPath: string): Promise<string[][]> {
 
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }

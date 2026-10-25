@@ -5,7 +5,7 @@ import { FormSheet, FormSheetForm } from "@/components/form-sheet";
 import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { Separator } from "@/components/ui/separator";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
@@ -27,7 +27,6 @@ import {
 } from "@/lib/schema";
 
 const SECTION = "flex flex-col gap-4";
-const LABEL = "text-foreground";
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
 const LABEL_ROW = "flex w-full items-center gap-2";
@@ -171,7 +170,7 @@ function AddUserForm({
       <div className={SECTION}>
         <Field>
           <div className={LABEL_ROW}>
-            <FieldLabel className={LABEL}>User Schema</FieldLabel>
+            <FieldLabel>User Schema</FieldLabel>
           </div>
           <SchemaPicker
             id="user-schema"
@@ -226,12 +225,10 @@ function SchemaInput({
   return (
     <Field>
       <div className={LABEL_ROW}>
-        <FieldLabel htmlFor={id} className={LABEL}>
-          {field.label}
-        </FieldLabel>
+        <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         {/* A sibling of the label, not part of it, so the accessible name stays
             the field name; requiredness itself reaches AT via `required`. */}
-        {!field.required && <MetaItem>Optional</MetaItem>}
+        {!field.required && <FieldOptionalIndicator />}
       </div>
       <Input
         id={id}

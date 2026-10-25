@@ -232,26 +232,29 @@ describe("project admins", () => {
     expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
   });
 
-  const OWNING_TEAM_LINE = "You have admin access as a member of this Project’s owning Team.";
+  const NOT_LISTED_LINE =
+    "Your access to this Project isn’t a grant of your own, so you aren’t listed here.";
 
-  it("tells the owner their access comes through the owning team", async () => {
-    // Whoever reaches this page can manage the project; with no grant of their
-    // own, that access is the owning team's. The line stays once admins exist.
+  it("tells a viewer with no grant of their own why they are not listed", async () => {
+    // Whoever reaches this page has access to the project, but not where it
+    // comes from: the owning team, a team grant, the platform's operators. So
+    // the line names no source. It stays once admins exist.
     stubProject([grant({ user: grantUser({ identifier: "colleague@acme.com" }) })]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().getByText(OWNING_TEAM_LINE)).toBeInTheDocument();
+    expect(admins().getByText(NOT_LISTED_LINE)).toBeInTheDocument();
+    expect(admins().queryByText(/owning Team/)).not.toBeInTheDocument();
     expect(admins().getByText("colleague@acme.com")).toBeInTheDocument();
   });
 
-  it("does not claim owning-team access for a granted admin", async () => {
+  it("says nothing about a granted admin's access", async () => {
     // The session fixture signs in as `user_test`.
     stubProject([grant({ user: { user_id: "user_test" } })]);
     await renderProject();
 
     await screen.findByRole("region", { name: "Admins" });
-    expect(admins().queryByText(OWNING_TEAM_LINE)).not.toBeInTheDocument();
+    expect(admins().queryByText(NOT_LISTED_LINE)).not.toBeInTheDocument();
   });
 
   it("grants by the address that was typed, on the route's project", async () => {

@@ -125,6 +125,25 @@ live in `src/components/typography.ts`. A mutation's pending and error state
 comes from `useSubmit` (`src/hooks/use-submit.ts`), and cursor paging from
 `useLoadMore` (`src/hooks/use-load-more.ts`) with the `LoadMore` button.
 
+## Page wrapper — one top for every screen
+
+Every console screen renders inside `Page` (`src/components/layout.tsx`): lists,
+resource details, configuration panels, settings and System. It owns the page
+gutter and, above all, the distance under the top bar, so no screen measures its
+own. Do not add a per-screen wrapper with its own padding.
+
+| Region | Value |
+| --- | --- |
+| Page top | 20px at `lg`, 16px below |
+| Page gutter | 16px; 24px from `sm` with `inset="panel"` |
+| Page bottom | 32px |
+| Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
+| Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
+
+`inset="panel"` is for the configuration-panel screens (User schemas, Login
+flows, Identity providers), whose single card the design insets by 24px on the
+sides. It changes the sides only, never the top.
+
 ## Resource list layout — one shell for every list screen
 
 Every list frame draws the same shell: one page gutter, one cell padding, one
@@ -133,7 +152,7 @@ compose it rather than restating the numbers per screen.
 
 Every list screen is a table on this shell, User schemas and Login flows
 included (D17; the earlier card of rows broke on narrow widths). A screen
-composes `ResourcePage`, `ResourceTitle` (with the Add button as its `action`,
+composes `Page`, `ResourceTitle` (with the Add button as its `action`,
 beside the title at every width, D19), then `ResourceHeaderRow` +
 `ResourceHeadCell`, `ResourceRow`, `ResourceEmptyRow` and `LoadMore`. A
 fractional grid takes `RESOURCE_TABLE_FIXED`, which scrolls the table inside
@@ -141,10 +160,9 @@ its card below 576px rather than squeezing the cells.
 
 | Region | Value |
 | --- | --- |
-| Page gutter | 16px — the same inset as the table |
-| Page top | 20px at `lg`, 16px below — the page-header block |
+| Page | `Page` — 16px gutter, the same inset as the table; 20px top at `lg` |
 | Header gutter | 24px at `lg`, the page gutter plus 8px; 16px below it |
-| Title row | 24px, or 36px with the Add button beside the title |
+| Title row | 36px with or without the Add button (`PAGE_TITLE_ROW`) — every screen's title sits on this line |
 | Table top | 20px under the title row at `lg`, 16px below |
 | Table head | 56px tall, 24px leading / 16px trailing inset |
 | Table cell | 56px tall, 24px inset, 8px block padding |
@@ -153,10 +171,11 @@ its card below 576px rather than squeezing the cells.
 
 Two things are deliberately **not** shared, because the designs genuinely differ:
 
-- **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
-  the Users table is schema-driven, so it has no fixed grid to share. It shows
-  each value once (D20): its ID column absorbs the slack and truncates, so the
-  default schema fits 1024px, and a schema with more columns scrolls.
+- **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
+  clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
+  slack and truncate (D20, D21). The Users table is schema-driven, so it has
+  no fixed grid to share: the default schema fits 1024px, and a schema with
+  more columns scrolls.
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
@@ -175,7 +194,7 @@ the design even though its box measures correctly.
 Detail screens come in three compositions, and each has one shell:
 
 - **Resource detail** (Users, Teams, Project settings): a title row over body
-  cards. Compose `DetailPage` + `DetailHeader` from
+  cards. Compose `Page` + `DetailHeader` from
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
   body card with a titled section is a `DetailSection`; a single name field with
   its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
@@ -184,10 +203,10 @@ Detail screens come in three compositions, and each has one shell:
   `h1`.
 - **Configuration panel** (User schemas, Login flows): the whole screen is one
   `DetailPanel` headed by a `PanelTitle` (both in
-  `src/components/detail-page.tsx`), inside `DETAIL_PANEL_PAGE`
+  `src/components/detail-page.tsx`), inside `<Page inset="panel">`
   (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
-  centred column `--zl-container-settings` wide. Compose `DetailPage` +
+  centred column `--zl-container-settings` wide. Compose `Page` +
   `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
   no header gutter, then `SettingsCard` (`src/components/settings-card.tsx`)
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
@@ -199,7 +218,7 @@ copyable, and the created date.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
-| Page gutter   | 16px, 22px from the navbar — as the list shell        |
+| Page          | `Page` — 16px gutter, 20px top at `lg`, as every screen |
 | Header gutter | 24px — the page gutter plus 8px                        |
 | Title lockup  | 36px icon tile, 12px to a 24/24 display-face title     |
 | Header card   | 20px inset, 14px block, values centred on the rule     |

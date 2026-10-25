@@ -16,6 +16,12 @@
 
 ## Decisions
 
+### D22 · The sidebar lists every screen, and asks for a project when one is needed — 2026-10-23 · [standing]
+As in Vercel, the sidebar lists the project's screens before a project is selected, rather than Projects alone. Opening one without a selection goes to Projects first: the page is headed "Continue to Teams" (or whichever screen), that screen's entry is the one marked in the sidebar, and choosing a project goes on to it. Arriving at the console (`/`) with nothing selected lands on Projects itself, not on the way to Users, since it asked for no screen. Amends Console ADR 0001.
+
+### D21 · The Projects list tells many projects apart — 2026-10-23 · [standing]
+Projects is where the console lands whenever several projects can be chosen, and a platform operator acts on every project of the deployment, so the one-project list of D11 no longer fits. Each row carries the project's generated mark (the project switcher's), its name with its site's host under it (D20's pattern), its ID, which takes the slack and copies, and its created date. A list that fits on one page reads by name; a longer one keeps the server's order and is found by search, which shows as soon as there is a project. New project sits beside the title (D19) and opens a drawer (D15) with the CLI's setup command, since a project is created from the app it connects. The top bar carries no project switcher on Projects: the page is that list at full size, with its own search, so the selected project is marked "Current" in it instead. Supersedes the list half of D11.
+
 ### D20 · The Users table shows each value once — 2026-10-20 · [standing]
 The User cell carries the display name with the identifier under it, so there is no Identifier column, and a schema column that only repeats a row's name or identifier is dropped (under the default schema, the email). The ID column gives way first and truncates. Refines D4. The console's landing (`/`) is Users, where people who just signed up appear.
 
@@ -28,8 +34,8 @@ Every console surface (cards, tables, panels, dialogs, drawers, alerts, tab stri
 ### D17 · Every directory is a resource table — 2026-10-07 · [standing]
 User schemas and Login flows draw the same data table as Users, Teams and Projects: a name column with the resource icon, the resource's own columns, a date, and the row menu. The stacked card rows broke on narrow widths. Supersedes D7 and the schema half of D0a. The schema id leaves the list row for the detail header card, which matches Login flows (refines D10).
 
-### D16 · Profile shows the account email only, read-only — 2026-09-30 · [standing]
-Claiming asks for nothing but an email address, and the email cannot be changed, so Settings → Profile is one disabled field with no Save. Name fields are not pulled in from the schema.
+### D16 · Profile is generated from the person's own schema; the identifier is read-only — 2026-09-30, amended 2026-10-16 · [standing]
+Claiming asks for nothing but an email address, and the identifier cannot be changed, so the schema's `x-identifier` (the email by default) is a disabled field. Amended: Profile is generated from the person's own user schema as Add user is — every property is a row; strings and numbers are editable and saved through `PATCH /users/me`, anything a text input cannot round-trip (a boolean) is read-only. The platform project's schema adds an optional `name` designated as `x-display`, so the people operating Zitadel can name themselves; the account menu offers it while none is set.
 
 ### D15 · Create uses a right-side drawer — 2026-07-31 · [standing]
 Adding a resource (e.g. a user) opens a drawer from the right — the shadcn/ui default interaction pattern. Fields relevant to the current context (e.g. team) are preselected.

@@ -5,7 +5,7 @@ description: >-
   agent-friendly `zitadel` CLI. Use when the user wants to add login,
   registration, or session handling, create a Zitadel project, scaffold auth
   for a Next.js, Nuxt, SvelteKit, SolidStart, Qwik Router, TanStack Start, React,
-  Vue, Angular, Solid, Svelte, or Qwik app, or plan and apply Zitadel config
+  Vue, Angular, Solid, Svelte, or Qwik app, or build and deploy Zitadel config
   changes from repo state.
 ---
 
@@ -67,11 +67,32 @@ upgrade, so upgrade the app and rerun rather than retrying.
   drops records or fields, so you end up reasoning from partial data. It is
   finite — read it whole, or narrow it *at the source*: use a `list` verb's
   `filter_fields` and pagination to fetch fewer records, or pipe to `jq` to pull
-  just what you need (e.g. `… resources --json | jq '.data.resources[].name'`).
+  just what you need (e.g. `… resources --json | jq '.data.items[].topic'`).
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
   working directory.
+- **Server and project.** A command that talks to a project reads
+  `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
+  first source that has it: `--server` (the URL only), `--env-file <path>`, the
+  process environment, `.env.<env>.local`, `.env.local`, `.env.<env>`, `.env`,
+  then `.zitadel/secret`. Only the default `development` environment reads
+  `.env.local` and `.zitadel/secret` (setup's project); `--env-file` reads that
+  file and the process environment only.
+  `<env>` is `--env`, else `ZITADEL_ENV`, else a hosting platform's own signal
+  (`VERCEL_ENV`, or Netlify's `CONTEXT` inside a Netlify build), else
+  `development`. A missing value fails with `E_VALIDATION` naming the variable
+  and the files it looked in; there is no cloud default outside `setup`, and
+  the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
+  each value came from; `zitadel env add <name>` binds another environment to a
+  project.
+- **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
+  and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
+  where the app is served, a `preview` pattern (it may hold a `*`) is where
+  pull-request builds run. They need the project secret, not the preview token.
+  An empty list admits every origin, so removing the last one opens the project
+  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
+  a preview pattern leaves its live previews served until they expire.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -122,9 +143,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `${{ NAME }}` reference to a project variable is not a secret and may stay on
   argv (a connection's `client_secret` takes nothing else); write it in single
   quotes, since inside double quotes the shell reads `${` as its own expansion.
-- **Streams.** Capture stdout and stderr separately when scripting. The machine
-  contract is one parseable JSON object on stdout; installer, audit, and
-  package-manager progress belongs on stderr.
+- **Streams.** Capture stdout and stderr separately when scripting, into files
+  outside the app directory: `setup` scaffolds a new app only into an empty
+  directory. The machine contract is one parseable JSON object on stdout;
+  installer, audit, and package-manager progress belongs on stderr.
 
 ## Discovering commands
 
@@ -147,7 +169,7 @@ npx @zitadel/cli@latest api ls --json        # every API operation, its paramete
 
 `--help` groups the surface into project commands (create a project and scaffold
 auth), local-server commands (run a local Zitadel), configuration commands
-(`plan`/`apply` plus the config resources), and resource commands (the uniform
+(`deploy` plus the config resources), and resource commands (the uniform
 `<resource> <verb>` surface). Read the groups from `--help` rather than from
 memory, since they change as the CLI gains commands.
 
@@ -181,19 +203,10 @@ Each invocation prints one JSON object:
   success: a warning usually means a follow-up step is needed.
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
-- `plan` and `apply` emit `data.changes`: one row per touched resource
-  (`{kind, action, file, id?, previous_id?, moved_from?}`, action ∈ create/
-  update/revision/delete/move). A `move` is a file that took over a resource
-  from a removed one (`moved_from`). Plan rows preview; apply rows report, with
-  the resulting platform ids. Use it to verify an edit did what you intended.
-  `data.unsupported_deletions` counts removed files whose resource cannot be
-  deleted yet (they are kept, and are not part of `total`); on `apply` the files
-  are listed in `data.unsupported_deletion_files`.
-- `apply` leaves the files under `.zitadel/` as written: what the server stores
-  is never written back, and a field a file leaves out reads as the server's
-  default, so `plan` reports no change after an `apply`. `data.files_updated`
-  lists the one rewrite: a flow whose `user_schema` pinned a schema revision id
-  the apply superseded, re-pinned to the new revision's id.
+- `deploy` emits `data.content_hash` (the release digest), `data.origins`
+  (the origins it went live on) and `data.resources` (how many it pinned). A
+  re-run on unchanged config returns the same digest. Use it to confirm what
+  went live.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -208,11 +221,12 @@ Common error codes point at their own fix in `next_commands`:
   `details` often lists the missing or available values.
 - `E_CREDENTIAL_MISSING`: a connection's `client_id` or `client_secret` names a
   project variable that does not exist; `details.variable` is the name. Publish it
-  with `variables set NAME --project-level` (add `--secret` for the secret), then retry.
+  with `variable set NAME` (add `--secret` for the secret), then retry.
 - `E_LOCAL_SERVER_NOT_RUNNING`: start the local runtime, then retry with
   `--server local`.
-- `E_NOT_FOUND`: an HTTP 404 — a missing resource, or a `--server` that is not a
-  Zitadel platform API. Follow `next_commands`.
+- `E_NOT_FOUND`: an HTTP 404 — a missing resource, an operation the server's
+  version does not have (`details.body.code` is `req.not_found`), or a
+  `--server` that is not a Zitadel platform API. Follow `next_commands`.
 - `E_PORT_IN_USE`: the requested local runtime port already has a listener; stop
   that process or choose another port.
 
@@ -276,7 +290,7 @@ like. Read the current sets from `setup --help`, but know the traps:
   enabled**; `passkey-first` leads with a passkey. Neither one gives you
   password-only. If the developer does not want passkeys, turn them off
   yourself: set `x-auth-methods.passkey.enabled` to `false` in
-  `.zitadel/schemas/*.json`, then `apply`.
+  `.zitadel/schemas/*.json`, then `deploy`.
 
 Translate the developer's answers into the right axis values, then **verify
 against what actually deployed**: read the live schema back
@@ -291,13 +305,12 @@ invocation) or were explicitly told to just set it up.
 ## Answering the user
 
 Report what changed, in the user's terms — not how you drove the CLI. The
-flags, `--json`, the `plan`/`apply` split, exit codes, and the number of
+flags, `--json`, the deploy flow, exit codes, and the number of
 commands you ran are your internal business; the user asked for an outcome, not
 a transcript. Say what they got.
 
 - Good: "Added an optional phone number to your user schema and deployed it."
-- Avoid: "I ran `plan` and `apply`, both with `--non-interactive --json`, and
-  both returned ok."
+- Avoid: "I ran `deploy` with `--non-interactive --json` and it returned ok."
 
 Quote a command or flag only when the user asks *how* something works, or when
 they need to run something themselves. Otherwise keep the mechanics out of the
@@ -314,8 +327,7 @@ npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest start --non-interactive --json
 npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 npx @zitadel/cli@latest doctor --non-interactive --json
-npx @zitadel/cli@latest plan --non-interactive --json
-npx @zitadel/cli@latest apply --non-interactive --json
+npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
 
 `setup` scaffolds into an empty directory, or patches an existing app project
@@ -347,15 +359,18 @@ replaces a file at a path setup writes, but not the app's root component or
 request boundary at another path.
 
 The app may also live in a subdirectory of the one `start` ran in: `setup`,
-`console`, `--server local` and `doctor` read `.zitadel/local/` from the working
+`console`, `logs`, `--server local` and `doctor` read `.zitadel/local/` from the working
 directory or the nearest parent that has it (up to the home directory), so
 `mkdir my-app && cd my-app` after `start` works too. `doctor` checks that
 server and its port, but runs its project checks in the working directory, so run
 it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). `stop`,
-`reset`, `logs` and `status` read only the working directory's
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). A
+local server is healthy once its `/readyz` answers, which takes its database
+answering too: `start` waits for that, and the commands that read a server
+treat one whose database does not answer as unhealthy. `stop`,
+`reset` and `status` read only the working directory's
 `.zitadel/local/`, so run them where `start` ran. On a local
 server that hosts the platform project, `setup` attaches the project to the
 local admin's team and ends `data.next_commands` with `console`; when it finds
@@ -363,10 +378,10 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
-When `setup --sso` or `sso enable` adds a social sign-in provider, the user
+When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, the user
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
-`sso enable`, verbatim. Each connection has its own URI, so a URI from another
+`auth-method sso enable`, verbatim. Each connection has its own URI, so a URI from another
 provider or an older CLI version does not work.
 
 The same results carry the connection's `claim_mapping` (user attribute to
@@ -391,6 +406,14 @@ After `setup`, follow `data.next_commands` to start the app. Prove the generated
 auth flow in a visible browser by registering a unique user, logging out, logging
 back in with the same email/password, and ending on the signed-in profile page.
 Do not treat a rendered login or registration form as completion.
+
+When a step against the local server fails without saying why (the login says a
+sign-in provider "is not available right now", or a request returns 500), the
+server logged the cause. Read it with `logs --level warn --json`: `data.logs`
+holds the warnings and errors, and `--tail` counts only those lines. `logs
+--follow` streams the log for a person at a terminal, with warnings yellow and
+errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
+running, name it in `data.next_actions`.
 
 To move a set-up app to another dev port (the dev server exits with
 `EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
@@ -441,14 +464,14 @@ and warns that no way to sign in would be left. A method that is enabled but not
 offered by any active flow is reported in `warnings` (and in `data.not_offered`
 for password and passkey). Every command reports `data.changed`, the
 project-relative files it wrote (on a dry run, the files it would write), empty
-when nothing changed. Follow `data.next_commands` (`plan`, `apply`, and
-`variables set` when a credential did not reach the project) to publish the
+when nothing changed. Follow `data.next_commands` (`deploy --dry-run`, `deploy`, and
+`variable set` when a credential did not reach the project) to publish the
 change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
-then re-run `plan` and `apply`. See the reference below for driving the login UI
+then re-run `deploy`. See the reference below for driving the login UI
 and the config-sync details.
 
 ## Reference files

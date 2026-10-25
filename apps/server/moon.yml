@@ -14,10 +14,15 @@ fileGroups:
     - "/api/**/*.yaml"
     - "/api/**/*.json"
     # Also compiled in through //go:embed or read by tests: the config defaults
-    # (incl. presets), the integration-test fixtures and the events catalog.
+    # (incl. presets), the error page and the design tokens it inlines, the
+    # integration-test fixtures, the events catalog and the product analytics
+    # catalog.
     - "/packages/config/defaults/**/*"
+    - "/internal/errorpage/*"
+    - "/packages/design-tokens/src/generated/tokens.css"
     - "/internal/**/*.json"
     - "/docs/design/api/events-catalog.md"
+    - "/docs/product-analytics-events.yaml"
     - "/api/.ogen.yaml"
     - "/scripts/check-go-generate.mjs"
     - "/scripts/generate-meta-schemas.ts"
@@ -132,9 +137,8 @@ tasks:
     deps:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
-      # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      # a concurrent console build can emptyOutDir the placeholder.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -165,7 +169,6 @@ tasks:
     deps:
       - "check-generate"
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # The Biome config the launcher check runs against.
@@ -186,11 +189,10 @@ tasks:
       - "format"
       - "vet"
       - "lint"
-      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      # The test binary embeds the console's dist (//go:embed all:dist). Listed here
       # and not only reached through vet: vet has no outputs, so moon would not
       # hash these builds through it and a UI change would replay a cached run.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
@@ -231,9 +233,8 @@ tasks:
       # lane run beside it reads half-written files. vet, lint and build wait
       # for it the same way.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -242,7 +243,7 @@ tasks:
       # before go's cache mattered.
       cache: false
       # ci.yml's graph step (`moon ci --downstream deep`) runs it whenever it is
-      # affected, as a dependent of the UI builds. The "Run Go integration tests
+      # affected, as a dependent of the console build. The "Run Go integration tests
       # (postgres)" step runs it only when the graph did not, as when ci-mode
       # forces a full run for a workflow-only edit, which no lane lists as
       # input.
@@ -257,18 +258,17 @@ tasks:
     # replaying results recorded by an emulator execution. A benchmark number
     # was nearly read off a run that never happened.
     #
-    # -parallel is deliberately NOT pinned to 1. The emulator serves one
-    # transaction at a time, so tests running concurrently within a package force
-    # the aborts that prove the abort-retry path still works. Pinning it hid the
-    # missing retry rather than fixing it (#788); do not put it back.
+    # -parallel is deliberately NOT pinned to 1. Tests running concurrently
+    # within a package put transactions in real contention, on top of the
+    # aborts a spanner_integration build injects on purpose (#788); pinning it
+    # hid a missing retry rather than fixing it. Do not put it back.
     #
-    # -p 1 stays, but not for isolation: testdb.SpannerDSN starts a fresh
-    # emulator testcontainer per package, so each package already has its own
-    # database in its own process. What the flag buys is not running three
-    # emulators at once. Dropping it would overlap stmttest and the spanner
-    # dialect package with integration_test and save roughly 40 seconds, which
-    # is a poor trade against three concurrent emulator containers on a
-    # developer laptop.
+    # -p is left at its default, so the three packages run at once. Each still
+    # gets its own database: with ZITADEL_TEST_SPANNER_INSTANCE set (spanner.yml
+    # points it at Spanner Omni) every package provisions one on that instance,
+    # because one shared database failed on tests reading each other's
+    # leftovers (#1011). Without it, each package starts its own emulator
+    # container, so a local run starts three at once.
     command: "go"
     args:
       - "test"
@@ -276,25 +276,23 @@ tasks:
       - "-count=1"
       - "-tags"
       - "spanner_integration"
-      # Same budget as test-postgres. The emulator's planner is still slow on the
-      # authz list predicate, which real Cloud Spanner answers in ~40ms, but the
-      # lane no longer lets rows pile up in front of it: tests delete their own
-      # project when they finish, and the one test that reads lists against the
-      # whole database runs serially, so it meets an almost empty one. The
-      # integration_test package takes about 111s in CI, so this leaves roughly
-      # five times headroom and a genuine hang surfaces again instead of sitting
-      # inside a 20 minute window. See #1011.
+      # Per package. Against Spanner Omni each package first spends about six
+      # minutes creating and migrating its database (#1011), and spanner.yml
+      # runs all three on one engine on a 4-vCPU runner. A hang still surfaces
+      # well inside that job's 60 minutes.
       - "-timeout"
-      - "10m"
-      - "-p"
-      - "1"
-      - "./..."
+      - "30m"
+      # Only the packages that open a Spanner database. Under this tag every
+      # other package has no Spanner test; internal/bootstrap/users builds on it
+      # but runs against Postgres, which test-postgres covers.
+      - "./internal/api/integration_test/"
+      - "./internal/storage/dialect/spanner/"
+      - "./internal/storage/stmttest/"
     deps:
       # check-generate rewrites api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # Belt-and-braces, not the thing protecting this lane: with cache: false
@@ -313,10 +311,10 @@ tasks:
       cache: false
       # Runs in .github/workflows/spanner.yml, never in ci.yml. "skip" keeps
       # `moon ci` from pulling it in: --downstream deep selects it as a
-      # dependent of the UI builds whenever the server or a UI changes, and
-      # its ~3.5 minutes then held up the whole PR graph. In CI, `moon run`
-      # refuses a skipped task ("No tasks found"); spanner.yml runs it with
-      # `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
+      # dependent of the console build whenever the server or the console
+      # changes, and its ~3.5 minutes then held up the whole PR graph. In CI,
+      # `moon run` refuses a skipped task ("No tasks found"); spanner.yml runs
+      # it with `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
       runInCI: "skip"
 
   test-sqlite:
@@ -337,9 +335,8 @@ tasks:
     deps:
       # check-generate rewrites api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -356,12 +353,11 @@ tasks:
     command: "node scripts/server-build.mjs"
     deps:
       - "check-generate"
-      # The binary embeds both UI dists (//go:embed all:dist in
-      # internal/staticui/*/embed.go). These deps order the UI builds before
-      # the Go compile, so a batched invocation can never embed a half-written
-      # dist.
+      # The binary embeds the console's dist (//go:embed all:dist in
+      # internal/staticui/console/embed.go). This dep orders the console build
+      # before the Go compile, so a batched invocation can never embed a
+      # half-written dist.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # The embedded dist bytes participate in the hash directly, so staticui

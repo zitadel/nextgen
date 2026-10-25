@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Users } from "lucide-react";
+import { Braces } from "lucide-react";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "user schema" },
   loaderDeps: projectScopeDeps,
   // Schema ids are unique per project only (the seeded default carries the same
   // `$id` everywhere), and an ambiguous id resolves in the caller's own project
@@ -36,10 +36,10 @@ function SchemaDetail() {
   const methods = schemaAuthMethods(schema);
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <PanelTitle icon={Users} title={name} />
+          <PanelTitle icon={Braces} title={name} />
           {/* The same header card as Login flows. The design draws a third
               value, `EXPIRES AT`; nothing on the schema resource backs it. */}
           <MetaCard>
@@ -122,7 +122,7 @@ function SchemaDetail() {
           </TabsContent>
         </Tabs>
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

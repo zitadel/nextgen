@@ -73,6 +73,10 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    // Projects itself rather than the way to Users: arriving at the console
+    // asked for no screen (D22).
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("keeps a scoped deep link's target while the person picks a project", async () => {
@@ -124,7 +128,7 @@ describe("landing routes", () => {
 
   it("asks for the person's projects once for the guard and the switcher", async () => {
     // The Projects screen pages the list itself (`limit`); the guard and the
-    // switcher share one unpaged read.
+    // switcher share one unpaged read. System is a screen with both.
     let unpaged = 0;
     server.use(
       http.get("http://localhost/api/users/me/projects", ({ request }) => {
@@ -134,9 +138,9 @@ describe("landing routes", () => {
         });
       }),
     );
-    const router = await renderAt("/");
+    server.use(http.get("*/api/readyz", () => HttpResponse.text("ok")));
+    await renderAt("/system");
 
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     const pill = await screen.findByRole("button", { name: "Switch project" });
     await waitFor(() => expect(pill).toHaveTextContent("Select a project"));
     expect(unpaged).toBe(1);
@@ -199,9 +203,9 @@ describe("landing routes", () => {
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
   });
 
-  it("lands on Profile from settings", async () => {
+  it("lands on Settings from settings", async () => {
     // Settings has no landing page of its own; the account dropdown's target
-    // forwards to the first settings screen.
+    // forwards to the profile, its only screen.
     server.use(
       http.get("http://localhost/api/users/me", () =>
         HttpResponse.json({ id: "user_1", attributes: { email: "maya@example.com" } }),
@@ -210,10 +214,8 @@ describe("landing routes", () => {
     const router = await renderAt("/settings");
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
-    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
-    // No screen claims WORKSPACE, so the heading is absent and no Admins row
-    // survives from when that screen lived here.
-    expect(screen.queryByRole("navigation", { name: "WORKSPACE" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    // No Admins row survives from when that screen lived here.
     expect(screen.queryByRole("link", { name: /Admins/ })).not.toBeInTheDocument();
   });
 });
