@@ -18,9 +18,8 @@ import { configureZitadel, getApi } from "@zitadel/api/config";
  *   public-plane calls) the runtime-discovered publishable key.
  *
  * Nothing is mounted at `/api` in the binary (Console ADR 0002 §4); the
- * embedded build targets the origin root, as the hosted login shell does
- * (`apps/login-ui/src/main.ts`). `VITE_CONSOLE_API_BASE` remains the escape
- * hatch for a deployment that mounts the API elsewhere.
+ * embedded build targets the origin root. `VITE_CONSOLE_API_BASE` remains the
+ * escape hatch for a deployment that mounts the API elsewhere.
  *
  * No project id is configured here. The project the console signs into is
  * learnt at boot from `/console/runtime.json` (Console ADR 0004 §3), in

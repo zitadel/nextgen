@@ -137,9 +137,8 @@ tasks:
     deps:
       - "check-generate"
       # Same embed race as test/build: go vet compiles //go:embed all:dist while
-      # a concurrent console/login-ui build can emptyOutDir the placeholder.
+      # a concurrent console build can emptyOutDir the placeholder.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -170,7 +169,6 @@ tasks:
     deps:
       - "check-generate"
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # The Biome config the launcher check runs against.
@@ -191,11 +189,10 @@ tasks:
       - "format"
       - "vet"
       - "lint"
-      # The test binary embeds both UI dists (//go:embed all:dist). Listed here
+      # The test binary embeds the console's dist (//go:embed all:dist). Listed here
       # and not only reached through vet: vet has no outputs, so moon would not
       # hash these builds through it and a UI change would replay a cached run.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
@@ -236,9 +233,8 @@ tasks:
       # lane run beside it reads half-written files. vet, lint and build wait
       # for it the same way.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -247,7 +243,7 @@ tasks:
       # before go's cache mattered.
       cache: false
       # ci.yml's graph step (`moon ci --downstream deep`) runs it whenever it is
-      # affected, as a dependent of the UI builds. The "Run Go integration tests
+      # affected, as a dependent of the console build. The "Run Go integration tests
       # (postgres)" step runs it only when the graph did not, as when ci-mode
       # forces a full run for a workflow-only edit, which no lane lists as
       # input.
@@ -295,9 +291,8 @@ tasks:
     deps:
       # check-generate rewrites api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # Belt-and-braces, not the thing protecting this lane: with cache: false
@@ -316,10 +311,10 @@ tasks:
       cache: false
       # Runs in .github/workflows/spanner.yml, never in ci.yml. "skip" keeps
       # `moon ci` from pulling it in: --downstream deep selects it as a
-      # dependent of the UI builds whenever the server or a UI changes, and
-      # its ~3.5 minutes then held up the whole PR graph. In CI, `moon run`
-      # refuses a skipped task ("No tasks found"); spanner.yml runs it with
-      # `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
+      # dependent of the console build whenever the server or the console
+      # changes, and its ~3.5 minutes then held up the whole PR graph. In CI,
+      # `moon run` refuses a skipped task ("No tasks found"); spanner.yml runs
+      # it with `moon exec --ignore-ci-checks`. Local `moon run` is unaffected.
       runInCI: "skip"
 
   test-sqlite:
@@ -340,9 +335,8 @@ tasks:
     deps:
       # check-generate rewrites api/generated; see test-postgres.
       - "check-generate"
-      # Order UI builds before go test so //go:embed all:dist has files.
+      # Order the console build before go test so //go:embed all:dist has files.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
     options:
@@ -359,12 +353,11 @@ tasks:
     command: "node scripts/server-build.mjs"
     deps:
       - "check-generate"
-      # The binary embeds both UI dists (//go:embed all:dist in
-      # internal/staticui/*/embed.go). These deps order the UI builds before
-      # the Go compile, so a batched invocation can never embed a half-written
-      # dist.
+      # The binary embeds the console's dist (//go:embed all:dist in
+      # internal/staticui/console/embed.go). This dep orders the console build
+      # before the Go compile, so a batched invocation can never embed a
+      # half-written dist.
       - "console:build"
-      - "login-ui:build"
     inputs:
       - "@group(serverInputs)"
       # The embedded dist bytes participate in the hash directly, so staticui

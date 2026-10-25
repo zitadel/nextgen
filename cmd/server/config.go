@@ -184,8 +184,6 @@ type ServerConfig struct {
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
-	LoginEnabled   bool   `mapstructure:"login_enabled"`
-	LoginPath      string `mapstructure:"login_path"`
 	// PublicBase is the origin this deployment is reachable at from a browser.
 	// It only feeds user-facing URLs (claim and dashboard); schema identity
 	// stays on schema.builtin_public_base, which is an identifier namespace,
@@ -201,22 +199,13 @@ type ServerConfig struct {
 }
 
 func (c ServerConfig) Validate() error {
-	// ensure there are no path collisions between idp callbacks and console/login paths
-	for _, ui := range []struct {
-		enabled bool
-		key     string
-		path    string
-	}{
-		{c.ConsoleEnabled, "server.console_path", c.ConsolePath},
-		{c.LoginEnabled, "server.login_path", c.LoginPath},
-	} {
-		if !ui.enabled {
-			continue
-		}
-		for _, prefix := range api.IDPCallbackPathPrefixes() {
-			if ui.path == prefix || strings.HasPrefix(ui.path, prefix+"/") {
-				return fmt.Errorf("%s %q must not be %s or under it: the path is reserved for the sign-in provider callback", ui.key, ui.path, prefix)
-			}
+	// ensure there are no path collisions between idp callbacks and the console path
+	if !c.ConsoleEnabled {
+		return nil
+	}
+	for _, prefix := range api.IDPCallbackPathPrefixes() {
+		if c.ConsolePath == prefix || strings.HasPrefix(c.ConsolePath, prefix+"/") {
+			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for the sign-in provider callback", c.ConsolePath, prefix)
 		}
 	}
 	return nil
