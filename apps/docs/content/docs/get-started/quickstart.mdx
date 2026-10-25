@@ -59,7 +59,7 @@ When it scaffolds a new app, setup asks which framework to use. Scripted runs pa
 
 Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point: the schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
 
-Setup writes the app files, `.env.example`, `.env.local` (with the project id and the project secret), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
+Setup writes the app files, `.env.example`, `.env.local` (read by your app, with the project id and the project secret), `.env.development.local` (read by the CLI: the server, project and credentials), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
 The pages and the request boundary (Next.js's `proxy.ts`, for example) that setup writes are yours to change. Setup records each one, and `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` brings back only a file that is missing, never one you changed.
 
@@ -98,11 +98,11 @@ npx @zitadel/cli@latest console
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:
 
 ```sh
-npx @zitadel/cli@latest plan
-npx @zitadel/cli@latest apply
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
-[Edit the login flow and schema](/docs/guides/plan-apply) walks through adding a `company` field to registration.
+See [Deploy](/docs/guides/deploy) for a walkthrough that adds a `company` field to registration.
 
 ## Stop or reset
 

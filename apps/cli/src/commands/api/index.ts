@@ -159,7 +159,7 @@ export default class Api extends BaseCommand {
   /** Choose an operation the CLI can call: its part of the API, then the operation. */
   private async chooseOperation(): Promise<string> {
     const callable = OPERATIONS.filter((operation) => uncallable(operation) === undefined);
-    const retry = "zitadel api ls --json";
+    const retry = this.suggestUnscoped("api ls --json");
     const tag = await this.input({
       kind: "select",
       name: "operation",
@@ -198,7 +198,9 @@ export default class Api extends BaseCommand {
         kind: "text",
         name,
         message: name,
-        retry: `zitadel api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
+        retry: this.suggestUnscoped(
+          `api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
+        ),
         parse: (value: string) =>
           value.trim() === ""
             ? { ok: false as const, problem: `${name} cannot be empty` }

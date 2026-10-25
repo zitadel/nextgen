@@ -7,6 +7,7 @@ import { interruptSignal } from "../interrupt";
 import { isObject } from "../json";
 import type { LocalAdmin } from "./admin-credential";
 import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
+import { unscopedCommand } from "../suggestion";
 
 /**
  * Signing the local admin in without a browser.
@@ -101,7 +102,7 @@ async function signIn(
         // `zitadel start` adopts a healthy running server untouched, so it
         // cannot fix this on its own: the server has to stop first.
         hint: "Stop it with `zitadel stop`, then run `zitadel start` so it boots with the platform project and the local admin.",
-        nextCommands: ["zitadel stop", "zitadel start"],
+        nextCommands: [unscopedCommand("stop"), unscopedCommand("start")],
         details: { server_url: serverUrl },
       },
     );
@@ -167,6 +168,6 @@ function isProofRejected(error: unknown): boolean {
 function adminNotFound(): ZitadelError {
   return new ZitadelError("E_AUTH", "The local server could not find the local admin", {
     hint: "Check `zitadel logs` first: a server that failed the lookup reports it the same way. If the logs show no error, the local data directory predates the local admin — `zitadel reset --force` deletes the local data so `zitadel start` can import it again.",
-    nextCommands: ["zitadel logs"],
+    nextCommands: [unscopedCommand("logs")],
   });
 }

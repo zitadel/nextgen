@@ -5,6 +5,34 @@ import type { Parsed } from "@zitadel/config/idp";
 import { escapeControlCharacters } from "./api-client";
 import { ZitadelError } from "./errors";
 
+/** The kinds of value a name can hold: what primary deploys freeze, and what preview deploys freeze. */
+export type VariableKind = "primary" | "preview";
+
+/**
+ * The query a variable write or delete takes: the project and, for `--preview`,
+ * the kind. Without a kind the platform's default applies: a plain value is
+ * stored for both kinds and a secret for the primary kind only, and a delete
+ * removes both.
+ */
+export type VariableScope = { project_id: string; kind?: "preview" };
+
+/** The scope a variable write or delete addresses, from the project and `--preview`. */
+export function variableScope(projectId: string, preview: boolean): VariableScope {
+  return preview ? { project_id: projectId, kind: "preview" } : { project_id: projectId };
+}
+
+/**
+ * The scope of a read. A read names one kind, because the platform answers a
+ * name with a value per kind and the two are never merged: `--preview` reads the
+ * preview values, and without it the primary ones.
+ */
+export function variableReadScope(
+  projectId: string,
+  preview: boolean,
+): { project_id: string; kind: VariableKind } {
+  return { project_id: projectId, kind: preview ? "preview" : "primary" };
+}
+
 /**
  * A variable as the platform reports it. A non-secret carries its value; a
  * secret carries none, because a read answers `{"secret": true}` and never
@@ -14,18 +42,32 @@ export type VariableRow = {
   name: string;
   secret: boolean;
   value?: string | number | boolean;
+  /**
+   * What the name's preview kind holds, on the inventory the default `list`
+   * prints. Absent means the name holds no preview value — which is not the
+   * same as holding an empty one, so the two render differently (#1617).
+   */
+  preview?: { secret: boolean; value?: string | number | boolean };
 };
 
 /** One value on the wire: a bare scalar, or `{"secret": true}` for a secret. */
 export type VariableValue = NonNullable<GetVariable200["primary"]>;
 
-/** The primary values of a read, keyed by name. */
-export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+/** The values of one kind in a read, keyed by name. */
+export function valuesOfKind(
+  body: GetVariables200,
+  kind: VariableKind,
+): Record<string, VariableValue> {
   return Object.fromEntries(
     Object.entries(body).flatMap(([name, byKind]) =>
-      byKind.primary === undefined ? [] : [[name, byKind.primary]],
+      byKind[kind] === undefined ? [] : [[name, byKind[kind]]],
     ),
   );
+}
+
+/** The primary values of a read, keyed by name. */
+export function primaryValues(body: GetVariables200): Record<string, VariableValue> {
+  return valuesOfKind(body, "primary");
 }
 
 /**
@@ -51,6 +93,64 @@ export function toVariableRows(values: Record<string, VariableValue>): VariableR
 
 /** Stands in for a secret's value, which the platform never discloses. */
 const SECRET_MARKER = "(secret)";
+
+/** Stands in for a kind the name holds no value for at all. */
+const NO_VALUE = "-";
+
+/**
+ * Every name on the project with the primary value it holds and the preview
+ * value beside it, sorted by name. A read without a kind answers both, so one
+ * request covers the inventory; a name is listed when either kind holds a
+ * value, so a preview-only name does not disappear (#1617).
+ */
+export function toInventoryRows(body: GetVariables200): VariableRow[] {
+  return Object.entries(body)
+    .map(([name, byKind]) => {
+      const primary =
+        byKind.primary === undefined ? undefined : toVariableRow(name, byKind.primary);
+      const preview =
+        byKind.preview === undefined ? undefined : toVariableRow(name, byKind.preview);
+      return {
+        name,
+        secret: primary?.secret ?? false,
+        ...(primary?.value === undefined ? {} : { value: primary.value }),
+        ...(preview === undefined
+          ? {}
+          : {
+              preview: {
+                secret: preview.secret,
+                ...(preview.value === undefined ? {} : { value: preview.value }),
+              },
+            }),
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * {@link variableCells} plus the preview column, for the inventory. A kind the
+ * name holds nothing for prints `-`: an empty cell would read as an empty
+ * value, and a secret prints its marker in either column.
+ */
+export function variableInventoryCells(
+  rows: ReadonlyArray<VariableRow>,
+): Array<{ name: string; value: string; preview: string }> {
+  const cell = (
+    held: { secret: boolean; value?: string | number | boolean } | undefined,
+  ): string =>
+    held === undefined
+      ? NO_VALUE
+      : held.secret
+        ? SECRET_MARKER
+        : held.value === undefined
+          ? NO_VALUE
+          : renderScalar(held.value);
+  return rows.map((row) => ({
+    name: row.name,
+    value: cell(row.value === undefined && !row.secret ? undefined : row),
+    preview: cell(row.preview),
+  }));
+}
 
 /**
  * Render a stored scalar for a terminal.
@@ -178,7 +278,7 @@ export function parseVariableValue(
 
 /**
  * Read a value from stdin, for the non-interactive path
- * (`variables set NAME --project-level --secret < secret.txt`).
+ * (`variable set NAME --secret < secret.txt`).
  *
  * A single trailing newline is stripped — a here-doc or `echo` adds one and it
  * is not part of the credential — but nothing else is trimmed, because
