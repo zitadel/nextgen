@@ -19,6 +19,11 @@ export default defineConfig({
   plugins: [
     libraryBuild(import.meta.dirname),
     qwik,
-    dts({ tsconfigPath: "./tsconfig.lib.json", afterDiagnostic: failOnDiagnostics }),
+    dts({
+      tsconfigPath: "./tsconfig.lib.json",
+      // A test-only declaration and the test helpers are not part of the package.
+      exclude: ["src/**/*.spec.*", "src/**/__tests__/**", "src/browser-commands.d.ts"],
+      afterDiagnostic: failOnDiagnostics,
+    }),
   ],
 });

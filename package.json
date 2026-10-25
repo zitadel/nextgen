@@ -26,6 +26,7 @@
     "smoke-container": "node scripts/smoke-container.mjs"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
     "@biomejs/biome": "catalog:",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",

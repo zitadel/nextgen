@@ -83,7 +83,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only --exclude-entrypoints=./avatar.css",
     "cem": "cem analyze",
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
