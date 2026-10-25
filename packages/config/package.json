@@ -94,7 +94,7 @@
   "scripts": {
     "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
     "prebuild": "node --run sync-schemas",
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "pretypecheck": "node --run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run sync-schemas",

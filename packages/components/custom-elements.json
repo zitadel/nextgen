@@ -6370,7 +6370,24 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/index.ts",
-      "declarations": [],
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "defaultTemplate",
+          "type": {
+            "text": "string"
+          },
+          "default": "defaultTemplateSource"
+        },
+        {
+          "kind": "variable",
+          "name": "layoutChromeCss",
+          "type": {
+            "text": "string"
+          },
+          "default": "layoutChromeCssSource"
+        }
+      ],
       "exports": [
         {
           "kind": "js",
@@ -6568,16 +6585,16 @@
           "kind": "js",
           "name": "defaultTemplate",
           "declaration": {
-            "name": "default",
-            "module": "./templates/default.liquid"
+            "name": "defaultTemplate",
+            "module": "src/orchestrator/index.ts"
           }
         },
         {
           "kind": "js",
           "name": "layoutChromeCss",
           "declaration": {
-            "name": "default",
-            "module": "./templates/layout-chrome.css?inline"
+            "name": "layoutChromeCss",
+            "module": "src/orchestrator/index.ts"
           }
         },
         {
