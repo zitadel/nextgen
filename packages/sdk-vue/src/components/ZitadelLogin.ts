@@ -17,8 +17,8 @@ import { defineComponent, h, type PropType, ref, toRaw } from "vue";
 // stringified attribute).
 import "@zitadel/components";
 
-import type { WithZitadelWidgetAttributes } from "../types";
-import { forceAttr } from "./forceAttr";
+import type { WithZitadelWidgetAttributes } from "../types.js";
+import { forceAttr } from "./forceAttr.js";
 
 const Base = defineComponent({
   name: "ZitadelLogin",

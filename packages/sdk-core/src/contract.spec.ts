@@ -1175,29 +1175,55 @@ describe("server SDK test titles", () => {
 });
 
 /**
- * These SDKs emit their declarations file by file, so a relative import without
- * its `.js` extension stays one in `dist/*.d.ts`, where Node's ES module
- * resolution (TypeScript's `node16`) cannot find the file it names.
+ * Every SDK built by the shared `libraryBuild` emits its declarations file by
+ * file with the specifiers as written, so a relative import without its `.js`
+ * extension stays one in `dist/*.d.ts`, where Node's ES module resolution
+ * (TypeScript's `node16`) cannot find the file it names. A framework component
+ * (`.svelte`, `.vue`) or an asset keeps its own extension.
  */
-describe("server SDK sources ↔ declaration imports", () => {
+describe("SDK sources ↔ declaration imports", () => {
   const packagesDir = `${resolve(process.cwd(), "..")}/`;
-
-  it.each(["sdk-sveltekit", "sdk-qwik-router", "sdk-solid-start", "sdk-tanstack-start"])(
-    "%s names every relative import with its .js extension",
-    (dir) => {
-      const src = `${packagesDir}${dir}/src`;
-      const bare = readdirSync(src, { recursive: true, encoding: "utf8" })
-        .filter((file) => /\.tsx?$/.test(file) && !file.startsWith("__tests__"))
-        .flatMap((file) =>
-          [
-            ...readFileSync(`${src}/${file}`, "utf8").matchAll(
-              /\bfrom\s+["'](\.{1,2}\/[^"']*)["']/g,
-            ),
-          ]
-            .map((match) => `${file}: ${match[1]}`)
-            .filter((specifier) => !specifier.endsWith(".js")),
-        );
-      expect(bare).toEqual([]);
-    },
+  const sdks = readdirSync(packagesDir).filter(
+    (dir) =>
+      dir.startsWith("sdk-") &&
+      existsSync(`${packagesDir}${dir}/vite.config.ts`) &&
+      readFileSync(`${packagesDir}${dir}/vite.config.ts`, "utf8").includes("libraryBuild("),
   );
+  const specifiers = /(?:\bfrom\s+|\bimport\s*\(\s*|^\s*import\s+)["'](\.{1,2}\/[^"']*)["']/gm;
+  const comments = /\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm;
+
+  it("covers the SDKs built by the shared library build", () => {
+    expect(sdks).toEqual(expect.arrayContaining(["sdk-core", "sdk-next", "sdk-angular"]));
+  });
+
+  it.each(sdks)("%s names every relative import with its .js extension", (dir) => {
+    const src = `${packagesDir}${dir}/src`;
+    const bare = readdirSync(src, { recursive: true, encoding: "utf8" })
+      .filter(
+        (file) =>
+          /\.(m?tsx?|svelte|vue)$/.test(file) &&
+          !/(^|\/)__tests__\//.test(file) &&
+          !/\.(spec|test)\.[^.]+$/.test(file),
+      )
+      .flatMap((file) =>
+        [...readFileSync(`${src}/${file}`, "utf8").replace(comments, "").matchAll(specifiers)]
+          .map((match) => `${file}: ${match[1]}`)
+          .filter((specifier) => !/\.(js|svelte|vue|json|css)$/.test(specifier)),
+      );
+    expect(bare).toEqual([]);
+  });
+
+  it("finds a bare specifier in an import, a dynamic import and a re-export", () => {
+    const source = [
+      'import { a } from "./a";',
+      'import "./b";',
+      'const c = await import("../c");',
+      'export * from "./d";',
+      'export { e } from "./e.js";',
+      'import F from "./F.svelte";',
+      '/** import { g } from "./g"; */',
+    ].join("\n");
+    const found = [...source.replace(comments, "").matchAll(specifiers)].map((m) => m[1]);
+    expect(found).toEqual(["./a", "./b", "../c", "./d", "./e.js", "./F.svelte"]);
+  });
 });

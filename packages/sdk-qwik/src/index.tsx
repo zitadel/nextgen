@@ -14,7 +14,7 @@ import type {
 
 // Installs the early event buffer before the elements register (and so before any
 // of them can emit); keep it directly above the components import.
-import "./early-events";
+import "./early-events.js";
 // Registers <zitadel-login>, <zitadel-logout> and <zitadel-session> in the browser.
 // The edge build of the components package has no elements, so this does nothing there.
 import "@zitadel/components";
@@ -28,12 +28,12 @@ import {
   type ZitadelProject,
 } from "@zitadel/api/config";
 
-import { listenWithReplay, WRAPPER_MARKER } from "./early-events";
-import type { ZitadelWidgetAttributes } from "./types";
+import { listenWithReplay, WRAPPER_MARKER } from "./early-events.js";
+import type { ZitadelWidgetAttributes } from "./types.js";
 
 export { configureZitadel, getApi, getZitadelConfig };
 export type { ZitadelConfig, ZitadelProject };
-export * from "./types";
+export * from "./types.js";
 
 // Re-exported so scaffolded apps can wire the business copy overlay without a
 // direct @zitadel/components dependency (strict package managers reject those).
