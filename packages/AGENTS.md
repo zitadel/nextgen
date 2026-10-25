@@ -53,6 +53,8 @@ change needs a changeset, and the whole train versions together.
   body, and every edge project declaration must read the same. Only the
   glue above a block, which hands a request or a render to the framework, is
   the framework's own.
+- **Every SDK type-checks its built declarations**: `src/dts.test.ts` is one
+  file copied byte for byte into each `sdk-*`, enforced by the contract spec.
 - **One Agent Skill per framework SDK**, at `<pkg>/skills/<name>/SKILL.md`,
   plus `skills/zitadel-components/SKILL.md` for `@zitadel/components`; the
   top-level `skills/zitadel` routes to them. A new framework SDK adds its

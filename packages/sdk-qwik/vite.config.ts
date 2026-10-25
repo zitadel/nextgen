@@ -28,7 +28,6 @@ export default defineConfig({
       tsconfigPath: "./tsconfig.lib.json",
       include: ["src"],
       exclude: ["src/**/*.spec.*", "src/**/__tests__/**", "src/browser-commands.d.ts"],
-      bundleTypes: true,
     }),
   ],
 });

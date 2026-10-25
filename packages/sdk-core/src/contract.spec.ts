@@ -1172,3 +1172,15 @@ describe("server SDK test titles", () => {
     });
   });
 });
+
+describe("declaration specs ↔ SDK packages", () => {
+  // Vitest runs with the package directory as cwd; `import.meta.url` is rewritten under jsdom.
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const sdkDirs = readdirSync(packagesDir).filter((dir) => dir.startsWith("sdk-"));
+  const spec = (dir: string): string => `${packagesDir}${dir}/src/dts.test.ts`;
+
+  it.each(sdkDirs)("%s carries the shared src/dts.test.ts byte for byte", (dir) => {
+    expect(existsSync(spec(dir))).toBe(true);
+    expect(readFileSync(spec(dir), "utf8")).toBe(readFileSync(spec("sdk-core"), "utf8"));
+  });
+});
