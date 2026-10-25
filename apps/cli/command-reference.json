@@ -1557,51 +1557,7 @@
       ]
     },
     {
-      "id": "variables delete",
-      "group": "Configuration commands",
-      "description": "Delete one variable from the project.",
-      "args": [
-        {
-          "name": "name",
-          "description": "Variable name to delete.",
-          "required": true
-        }
-      ],
-      "flags": [
-        {
-          "name": "force",
-          "char": "f",
-          "description": "Delete the variable without the confirmation prompt. Required when non-interactive.",
-          "type": "boolean"
-        },
-        {
-          "name": "env",
-          "char": "e",
-          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
-          "type": "option"
-        },
-        {
-          "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
-          "type": "option"
-        },
-        {
-          "name": "project-level",
-          "description": "Address the project level. Required: it is the only owner the CLI can address today.",
-          "type": "boolean"
-        }
-      ],
-      "examples": [
-        {
-          "command": "variables delete GOOGLE_CLIENT_ID --project-level"
-        },
-        {
-          "command": "variables delete GOOGLE_CLIENT_ID --project-level --force"
-        }
-      ]
-    },
-    {
-      "id": "variables get",
+      "id": "variable get",
       "group": "Configuration commands",
       "description": "Get one variable from the project.",
       "args": [
@@ -1613,6 +1569,11 @@
       ],
       "flags": [
         {
+          "name": "preview",
+          "description": "Read the preview value instead of the primary one.",
+          "type": "boolean"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1622,28 +1583,31 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
-        },
-        {
-          "name": "project-level",
-          "description": "Address the project level. Required: it is the only owner the CLI can address today.",
-          "type": "boolean"
         }
       ],
       "examples": [
         {
-          "command": "variables get GOOGLE_CLIENT_ID --project-level"
+          "command": "variable get GOOGLE_CLIENT_ID"
         },
         {
-          "command": "variables get GOOGLE_CLIENT_ID --project-level --json"
+          "command": "variable get API_URL --preview"
+        },
+        {
+          "command": "variable get GOOGLE_CLIENT_ID --json"
         }
       ]
     },
     {
-      "id": "variables list",
+      "id": "variable list",
       "group": "Configuration commands",
       "description": "List the variables entered on the project.",
       "args": [],
       "flags": [
+        {
+          "name": "preview",
+          "description": "List the preview values instead of the primary ones.",
+          "type": "boolean"
+        },
         {
           "name": "plain",
           "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
@@ -1659,24 +1623,109 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
-        },
-        {
-          "name": "project-level",
-          "description": "Address the project level. Required: it is the only owner the CLI can address today.",
-          "type": "boolean"
         }
       ],
       "examples": [
         {
-          "command": "variables list --project-level"
+          "command": "variable list"
         },
         {
-          "command": "variables list --project-level --json"
+          "command": "variable list --preview"
+        },
+        {
+          "command": "variable list --json"
         }
       ]
     },
     {
-      "id": "variables set",
+      "id": "variable resolve",
+      "group": "Configuration commands",
+      "description": "Show the variables the live deployment froze for a target.",
+      "args": [],
+      "flags": [
+        {
+          "name": "origin",
+          "description": "The origin whose live deployment to read.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "variable resolve"
+        },
+        {
+          "command": "variable resolve --origin https://app.acme.com"
+        },
+        {
+          "command": "variable resolve --json"
+        }
+      ]
+    },
+    {
+      "id": "variable rm",
+      "group": "Configuration commands",
+      "description": "Remove one variable from the project.",
+      "args": [
+        {
+          "name": "name",
+          "description": "Variable name to remove.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "preview",
+          "description": "Remove the preview value alone, leaving the primary one standing.",
+          "type": "boolean"
+        },
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Remove the variable without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "variable rm GOOGLE_CLIENT_ID"
+        },
+        {
+          "command": "variable rm API_URL --preview"
+        },
+        {
+          "command": "variable rm GOOGLE_CLIENT_ID --force"
+        }
+      ]
+    },
+    {
+      "id": "variable set",
       "group": "Configuration commands",
       "description": "Set one variable on the project.",
       "args": [
@@ -1684,6 +1733,10 @@
           "name": "name",
           "description": "Variable name (letters, digits and underscores).",
           "required": true
+        },
+        {
+          "name": "value",
+          "description": "The value, for a plain (non-secret) variable."
         }
       ],
       "flags": [
@@ -1704,6 +1757,11 @@
           "default": "string"
         },
         {
+          "name": "preview",
+          "description": "Write the preview value alone, leaving the primary one as it is.",
+          "type": "boolean"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -1713,22 +1771,20 @@
           "name": "env-file",
           "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
           "type": "option"
-        },
-        {
-          "name": "project-level",
-          "description": "Address the project level. Required: it is the only owner the CLI can address today.",
-          "type": "boolean"
         }
       ],
       "examples": [
         {
-          "command": "variables set GOOGLE_CLIENT_ID --project-level"
+          "command": "variable set GOOGLE_CLIENT_ID 1234.apps.googleusercontent.com"
         },
         {
-          "command": "variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt"
+          "command": "variable set GOOGLE_CLIENT_SECRET --secret < secret.txt"
         },
         {
-          "command": "variables set SESSION_TTL --project-level --as number"
+          "command": "variable set SESSION_TTL 3600 --as number"
+        },
+        {
+          "command": "variable set API_URL https://preview.acme.com --preview"
         }
       ]
     },

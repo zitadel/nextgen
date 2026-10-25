@@ -73,7 +73,7 @@ Three rules make that shape hold:
 2. **Observe by running a command.** A spec's subject is how the CLI behaves,
    not how it stores things, so what a command did is checked by running
    another one: `idps list`, `schemas list`, `flow-definitions list`,
-   `variables list --project-level`, `deployment list`. Never `.zitadel/state.json` and
+   `variable list`, `deployment list`. Never `.zitadel/state.json` and
    never the mock's own store — a corrupt file matters only insofar as a later
    command surfaces it, and that surfacing is the assertion.
 

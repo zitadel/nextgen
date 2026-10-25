@@ -58,7 +58,7 @@ function validateConnection(data: object, file: string, suggest: StepContext["su
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variables set NAME --project-level --secret")}\`.`
+          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variable set NAME --secret")}\`.`
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -148,9 +148,7 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${name}, which the project does not have`,
         {
           hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [
-            suggest(`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}`),
-          ],
+          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
           details: { variable: name, field, file },
         },
       );
@@ -163,9 +161,7 @@ function checkCredentialVariables(
           hint: wantsSecret
             ? "The client secret must be a secret variable: publish it with the command below."
             : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          nextCommands: [
-            suggest(`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}`),
-          ],
+          nextCommands: [suggest(`variable set ${name}${wantsSecret ? " --secret" : ""}`)],
           details: { variable: name, field, file, secret: isSecret },
         },
       );

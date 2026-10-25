@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * The `variables` commands record per-command dimensions. `catalog.test.ts`
+ * The `variable` commands record per-command dimensions. `catalog.test.ts`
  * checks that the event catalog lists each one; these check that boolean names
  * carry an `is_`/`has_`/`dry_`/`non_` prefix and that nothing that identifies a
  * person, a machine, or a credential is recorded.
@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
  * is *called*, which is the part that reaches the analytics tools and cannot be
  * renamed later without breaking saved reports.
  */
-const commandsDir = join(import.meta.dirname, "../../../../src/commands/variables");
+const commandsDir = join(import.meta.dirname, "../../../../src/commands/variable");
 
 /** The dimension names each command passes to `recordTelemetry`. */
 async function recordedDimensions(): Promise<Map<string, string[]>> {
@@ -32,7 +32,7 @@ async function recordedDimensions(): Promise<Map<string, string[]>> {
   return new Map(entries);
 }
 
-describe("variables telemetry dimensions", () => {
+describe("variable telemetry dimensions", () => {
   it("names booleans with the documented prefixes", async () => {
     for (const [file, keys] of await recordedDimensions()) {
       for (const key of keys) {
@@ -66,13 +66,19 @@ describe("variables telemetry dimensions", () => {
     }
   });
 
-  it("covers every variables command that has a dimension to record", async () => {
+  it("covers every variable command that has a dimension to record", async () => {
     const recorded = await recordedDimensions();
-    expect([...recorded.keys()].sort()).toEqual(["delete.ts", "get.ts", "list.ts", "set.ts"]);
-    // `delete` records none: with one owner and no per-command shape to report,
-    // the lifecycle events already carry everything true of the run.
-    expect(recorded.get("delete.ts")).toEqual([]);
-    for (const command of ["get.ts", "list.ts", "set.ts"]) {
+    expect([...recorded.keys()].sort()).toEqual([
+      "get.ts",
+      "list.ts",
+      "resolve.ts",
+      "rm.ts",
+      "set.ts",
+    ]);
+    // `rm` records none: with no per-command shape to report, the lifecycle
+    // events already carry everything true of the run.
+    expect(recorded.get("rm.ts")).toEqual([]);
+    for (const command of ["get.ts", "list.ts", "resolve.ts", "set.ts"]) {
       expect(recorded.get(command)?.length, `${command} records no dimensions`).toBeGreaterThan(0);
     }
   });
