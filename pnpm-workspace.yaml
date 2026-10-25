@@ -220,6 +220,7 @@ skills:
 # platform, pnpm 12's check reinstalls them all over an install made with
 # --os=current --cpu=current, which breaks the Vercel services' shared node_modules.
 verifyDepsBeforeRun: false
-# 0.1.0 was published less than the minimumReleaseAge ago; drop this entry once it is older.
+# @mridang/vite-plugin-nuxt-module 0.1.0 (2026-10-25) is younger than the one-day
+# minimumReleaseAge; drop this entry once it is older.
 minimumReleaseAgeExclude:
-  - "@mridang/vite-plugin-nuxt-module@0.1.0"
+  - "@mridang/vite-plugin-nuxt-module"

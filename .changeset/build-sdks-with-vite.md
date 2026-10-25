@@ -13,4 +13,4 @@
 "@zitadel/sdk-tanstack-start": patch
 ---
 
-The SDKs now ship unminified ES modules with source maps, so stack traces and debuggers point at the SDK's own source. Their exports, types and behavior are unchanged, except that `@zitadel/sdk-angular` now ships its entry as `dist/public-api.js` and its types as `dist/public-api.d.ts`, so a deep import of `dist/types/public-api.d.ts` moves.
+The SDKs now ship source maps (only `@zitadel/sdk-core` did before), and the React, Vue, Solid, Svelte, Qwik and Angular SDKs no longer minify their ES modules, so stack traces and debuggers point at the SDK's own source. Their exports, types and behavior are unchanged, except that `@zitadel/sdk-angular` now ships its entry as `dist/public-api.js` and its types as `dist/public-api.d.ts`, so a deep import of `dist/types/public-api.d.ts` moves.
