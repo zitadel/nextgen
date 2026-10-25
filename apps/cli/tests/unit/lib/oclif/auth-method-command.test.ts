@@ -248,7 +248,7 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
 });
 
 describe("auth-method passkey disable run from inside the Project", () => {
-  it("suggests plan and apply without --cwd", async () => {
+  it("suggests a dry run and a deploy without --cwd", async () => {
     const cwd = await passkeyOnlyProject();
     await writeJson(
       cwd,
@@ -262,6 +262,13 @@ describe("auth-method passkey disable run from inside the Project", () => {
       AuthMethodPasskeyDisable.run(["--no-telemetry", "--non-interactive"], config),
     );
 
-    expect(envelope).toMatchObject({ data: { next_args: [["plan"], ["apply"]] } });
+    expect(envelope).toMatchObject({
+      data: {
+        next_args: [
+          ["deploy", "--dry-run"],
+          ["deploy", "-m", "<what changed>"],
+        ],
+      },
+    });
   });
 });

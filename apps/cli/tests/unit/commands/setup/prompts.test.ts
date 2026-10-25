@@ -174,7 +174,7 @@ describe("ServerPrompt", () => {
   });
 
   it("offers and preselects the detected local Zitadel server", async () => {
-    // `zitadel start` ran here: runtime metadata + /healthz say localhost:8080.
+    // `zitadel start` ran here: runtime metadata + /readyz say localhost:8080.
     vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce("http://localhost:8080");
     vi.mocked(select).mockResolvedValueOnce("http://localhost:8080" as never);
 

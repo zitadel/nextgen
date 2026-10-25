@@ -3,6 +3,7 @@ import type { ComponentProps, MouseEvent, ReactNode } from "react";
 
 import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,9 +32,9 @@ import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
  * | Head label    | display face, 12/16, 0.72px tracking, `foreground`  |
  * | Row icon      | 16px, stroke 1.5, `muted-foreground`, 10px to label |
  *
- * Column widths stay with each screen: Teams is a fixed 248px grid, Projects
- * thirds, and the Users table is schema-driven (its ID column takes the slack),
- * so it has no fixed grid to share.
+ * Column widths stay with each screen: Teams is a fixed 248px grid, while the
+ * Users and Projects tables let their ID column take the slack
+ * (`ResourceIdCell`); Users is schema-driven, so it has no fixed grid to share.
  */
 
 /**
@@ -78,6 +79,31 @@ export const RESOURCE_CELL = "h-14 px-6 py-2";
 
 /** A body cell holding secondary text. */
 export const RESOURCE_CELL_MUTED = "text-muted-foreground h-14 truncate px-6 py-2 text-sm";
+
+// The row's copy button rests hidden and shows on the row's hover or its own
+// focus, so a keyboard reaches it; where there is no hover it always shows.
+// The row needs the `group` class for the hover.
+const ROW_COPY =
+  "shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100";
+
+/**
+ * A row's ID cell. It takes whatever width the other columns leave
+ * (`w-full max-w-0`) and truncates inside it, so a table of a few short
+ * columns fits a 1024px window without scrolling. The tooltip keeps the whole
+ * id, and the copy button copies it however much of it shows.
+ */
+export function ResourceIdCell({ id, name }: { id: string; name: string }) {
+  return (
+    <TableCell className={`${RESOURCE_CELL} w-full max-w-0 min-w-40`}>
+      <span className="flex items-center gap-1">
+        <span className="text-foreground min-w-0 truncate text-sm" title={id}>
+          {id}
+        </span>
+        <CopyButton value={id} label={`Copy the ID of ${name}`} className={ROW_COPY} />
+      </span>
+    </TableCell>
+  );
+}
 
 /** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";

@@ -14,6 +14,15 @@ type Graph struct {
 	Assignments []*domain.AuthzAssignment
 	Memberships []*domain.AuthzMembershipEdge
 	Resources   []*domain.ResourceScope
+	// ActiveUsers are the users whose status is active. Only the platform
+	// operator path reads it (ADR 075 §3).
+	ActiveUsers map[UserKey]bool
+}
+
+// UserKey names a user in its home project.
+type UserKey struct {
+	ProjectID string
+	UserID    string
 }
 
 // OracleCheck applies MVP rules: direct+closure, team membership expand, bounded TTU.
@@ -71,9 +80,16 @@ func (g *Graph) OracleList(projectID, principalHomeProjectID string, principalTy
 	return out
 }
 
-// OracleListParams applies OracleList then the sk_team_ team constraint.
+// OracleListParams applies OracleList, widened to every row of the kind for a
+// platform operator (ADR 075 §3), then the sk_team_ team constraint, which the
+// SQL applies to both halves of the list predicate.
 func (g *Graph) OracleListParams(p domain.AuthzListObjectsParams) []string {
-	ids := g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
+	var ids []string
+	if p.PlatformOperatorEligible() && g.OraclePlatformOperator(p.PlatformCheckParams()) {
+		ids = g.resourceIDs(p.ProjectID, p.ResourceKind)
+	} else {
+		ids = g.OracleList(p.ProjectID, p.HomeProjectID(), p.PrincipalType, p.PrincipalID, p.ResourceKind, p.ObjectType, p.Relation)
+	}
 	if p.ConstraintTeamID == "" {
 		return ids
 	}
@@ -113,6 +129,52 @@ func (g *Graph) listedObjectInConstraintTeam(p domain.AuthzListObjectsParams, id
 		}
 		return false
 	}
+}
+
+// OraclePlatformOperator mirrors CheckPlatformOperator (ADR 075 §3): a
+// tuple-to-userset edge on the implied platform tupleset whose relation closes
+// to the checked one, a direct, active user assignment in the platform project
+// that closes to the edge's source, and the user active there.
+func (g *Graph) OraclePlatformOperator(p domain.AuthzPlatformCheckParams) bool {
+	if !g.ActiveUsers[UserKey{ProjectID: p.PlatformProjectID, UserID: p.UserID}] {
+		return false
+	}
+	now := time.Now()
+	for _, edge := range g.Edges {
+		if edge.Kind != compiler.TermTupleToUserset ||
+			edge.Tupleset.Type != edge.Target.Type ||
+			edge.Tupleset.Name != domain.AuthzTuplesetPlatform ||
+			edge.Source.Type != domain.AuthzObjectTypePlatform ||
+			!g.implies(edge.Target.Type, edge.Target.Name, p.ObjectType, p.Relation) {
+			continue
+		}
+		for _, a := range g.Assignments {
+			if a.ProjectID == p.PlatformProjectID && assignmentActive(a, now) &&
+				a.ScopeKind == domain.AuthzScopeKindProject &&
+				a.PrincipalType == domain.AuthzPrincipalTypeUser && a.PrincipalID == p.UserID &&
+				g.implies(a.ObjectType, a.Relation, edge.Source.Type, edge.Source.Name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// resourceIDs lists every resource of kind in the project, once each.
+func (g *Graph) resourceIDs(projectID string, kind domain.ResourceKind) []string {
+	out := make([]string, 0)
+	seen := map[string]struct{}{}
+	for _, r := range g.Resources {
+		if r.ProjectID != projectID || r.ResourceKind != kind {
+			continue
+		}
+		if _, ok := seen[r.ResourceID]; ok {
+			continue
+		}
+		seen[r.ResourceID] = struct{}{}
+		out = append(out, r.ResourceID)
+	}
+	return out
 }
 
 // OracleFoothold mirrors HasAuthzProjectFoothold.

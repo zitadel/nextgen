@@ -230,7 +230,9 @@ describe("setup command", () => {
       command: "npm install",
     });
     expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+    expect(json.data.next_commands[2]).toMatch(
+      /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+    );
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -443,7 +445,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   // A bootstrapped local server hosts its own platform project and claim
@@ -469,7 +473,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   // The probe behind the real-run local nudge: only a runtime document
@@ -544,7 +550,9 @@ describe("setup command", () => {
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
       expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+      expect(json.data.next_commands[2]).toMatch(
+        /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+      );
     },
   );
 
@@ -588,7 +596,7 @@ describe("setup command", () => {
             name: "demo",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -601,7 +609,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;
@@ -661,7 +669,9 @@ describe("setup command", () => {
       team_id?: string;
     };
     expect(secret.team_id).toBeUndefined();
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   it("says the project went unattached when a local platform server has no local admin here", async () => {
@@ -1169,6 +1179,7 @@ describe("setup --dev-port on an app already set up", () => {
   type MovedFile = {
     scripts?: { dev?: string };
     environments?: unknown;
+    primary_origins?: unknown;
     preview_origins?: unknown;
     project_id?: string;
   };
@@ -1202,14 +1213,13 @@ describe("setup --dev-port on an app already set up", () => {
     );
     expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
       development: { issuer: "http://localhost:3101" },
-      preview: { issuer_pattern: ["http://localhost:3101"] },
     });
-    expect((await readJsonFile(cwd, ".zitadel/secret")).preview_origins).toEqual([
+    expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
     expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3101", kind: "preview" },
+      { pattern: "http://localhost:3101", kind: "primary" },
     ]);
   });
 
@@ -1239,7 +1249,7 @@ describe("setup --dev-port on an app already set up", () => {
     const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
     expect(json.data.moved).toBe(false);
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3000", kind: "preview" },
+      { pattern: "http://localhost:3000", kind: "primary" },
     ]);
   });
 

@@ -16,16 +16,13 @@ export const publicPackages = PUBLIC_RELEASE_PACKAGES.map((pkg) => ({
   root: `${pkg.dir}/`,
 }));
 
-// The console and login UI publish no npm package of their own — they are built
-// into the server container, so a user-visible change there ships inside
-// `@zitadel/server` and belongs in the release notes. They are deliberately not
-// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: they are never
-// packed or published, they only make a changeset mandatory. See
+// The console publishes no npm package of its own — it is built into the
+// server container, so a user-visible change there ships inside
+// `@zitadel/server` and belongs in the release notes. It is deliberately not
+// in PUBLIC_RELEASE_PACKAGES or the changesets fixed group: it is never packed
+// or published, it only makes a changeset mandatory. See
 // `.changeset/README.md#when-a-change-needs-a-changeset`.
-export const embeddedServerSurfaces = [
-  { name: "@zitadel/server", root: "apps/console/" },
-  { name: "@zitadel/server", root: "apps/login-ui/" },
-];
+export const embeddedServerSurfaces = [{ name: "@zitadel/server", root: "apps/console/" }];
 
 const publicPackageNames = publicPackages.map((pkg) => pkg.name);
 const publicPackageNameSet = new Set(publicPackageNames);

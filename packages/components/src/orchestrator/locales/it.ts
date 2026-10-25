@@ -218,6 +218,8 @@ export const it: Locale = {
   "error.field_format": "Inserisci un valore valido per {0}.",
   "error.field_min_length": "{0} è troppo corto.",
   "error.field_max_length": "{0} è troppo lungo.",
+  "error.field_min_length_value": "{0} deve contenere almeno {1} caratteri.",
+  "error.field_max_length_value": "{0} può contenere al massimo {1} caratteri.",
   "error.field_invalid": "Controlla {0}.",
 
   // --- Alert a livello di modulo ---

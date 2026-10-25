@@ -57,13 +57,12 @@ tasks:
       runInCI: false
 
   # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
-  # cross-compiled for linux, with both UI dists embedded, in the release
+  # cross-compiled for linux, with the console's dist embedded, in the release
   # Dockerfile. Needs Docker, so it stays out of CI.
   build-local-image:
     command: "node scripts/build-local-runtime-image.mjs"
     deps:
       - "console:build"
-      - "login-ui:build"
     options:
       cache: false
       runInCI: false

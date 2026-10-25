@@ -15,6 +15,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
 type policyFixture struct {
@@ -55,7 +56,7 @@ func (f *policyFixture) publish(config map[string]any) (*domain.Policy, error) {
 
 func TestPolicyService_FirstPublishCreates(t *testing.T) {
 	f := newPolicyFixture(t)
-	f.statements.EXPECT().GetPolicy(gomock.Any(), "proj_1", service.OperationPasswordSet).Return(nil, new(database.NoRowFoundError))
+	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).Return(nil, new(database.NoRowFoundError))
 	f.statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p *domain.Policy) error {
 		assert.JSONEq(t, `{"min_length":12}`, string(p.Config))
 		p.ID, p.RevisionID = "pol_1", "polrev_1"
@@ -79,7 +80,7 @@ func TestPolicyService_LaterPublishRevisesUnderTheLock(t *testing.T) {
 	f := newPolicyFixture(t)
 	created := time.Date(2026, 10, 20, 9, 0, 0, 0, time.UTC)
 	gomock.InOrder(
-		f.statements.EXPECT().GetPolicy(gomock.Any(), "proj_1", service.OperationPasswordSet).
+		f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).
 			Return(&domain.Policy{ProjectID: "proj_1", ID: "pol_1", CreatedAt: created}, nil),
 		f.statements.EXPECT().LockPolicy(gomock.Any(), "proj_1", "pol_1").Return(nil),
 		f.statements.EXPECT().RevisePolicy(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p *domain.Policy) error {
@@ -115,9 +116,82 @@ func TestPolicyService_InvalidConfigIsRefusedBeforeStorage(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrPolicyInvalid(nil, nil))
 }
 
+// A refused publish lists every violation in its details, settings first,
+// then the config rules with the settings they read.
+func TestPolicyService_InvalidConfigListsViolations(t *testing.T) {
+	f := newPolicyFixture(t)
+	_, err := f.publish(map[string]any{"min_length": 20, "max_length": 10, "history_depth": 9})
+
+	var de domain.Error
+	require.ErrorAs(t, err, &de)
+	assert.Equal(t, domain.PolicyInvalidDetails{Violations: []domain.PolicyViolation{
+		{Setting: "history_depth"},
+		{ConfigRule: "min_length_not_above_max_length", Settings: []string{"max_length", "min_length"}},
+	}}, de.Details)
+
+	_, err = f.svc.Publish(t.Context(), service.PublishPolicyInput{ProjectID: "proj_1", Operation: "no.such.operation", Config: map[string]any{}})
+	require.ErrorAs(t, err, &de)
+	assert.Nil(t, de.Details, "an unknown operation names no setting or rule")
+}
+
+func TestPolicyService_Get(t *testing.T) {
+	f := newPolicyFixture(t)
+	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByID("proj_1", "pol_1")).Return(&domain.Policy{ID: "pol_1"}, nil)
+	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByID("proj_1", "pol_unknown")).Return(nil, new(database.NoRowFoundError))
+
+	got, err := f.svc.Get(t.Context(), "proj_1", "pol_1")
+	require.NoError(t, err)
+	assert.Equal(t, "pol_1", got.ID)
+
+	_, err = f.svc.Get(t.Context(), "proj_1", "pol_unknown")
+	assert.ErrorIs(t, err, domain.ErrPolicyNotFound())
+}
+
+func TestPolicyService_List(t *testing.T) {
+	f := newPolicyFixture(t)
+	f.statements.EXPECT().ListPolicies(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+			assert.Equal(t, policystore.ListOptions("proj_1", service.OperationPasswordSet, 2).Filter, opts.Filter)
+			assert.Equal(t, policystore.FirstPublishedFirst(), opts.Pagination.OrderBy)
+			assert.Equal(t, uint32(2), opts.Pagination.Limit)
+			assert.Equal(t, []byte("cursor"), opts.Pagination.Cursor)
+			return &database.ListResult[*domain.Policy]{Items: []*domain.Policy{{ID: "pol_1"}}, NextCursor: []byte("next")}, nil
+		})
+
+	got, err := f.svc.List(t.Context(), service.ListPoliciesInput{ProjectID: "proj_1", Operation: service.OperationPasswordSet, Limit: 2, PageToken: "cursor"})
+	require.NoError(t, err)
+	assert.Len(t, got.Items, 1)
+	assert.Equal(t, "next", got.NextPageToken)
+}
+
+func TestPolicyService_ListRevisions(t *testing.T) {
+	t.Run("pages the policy's revisions newest first", func(t *testing.T) {
+		f := newPolicyFixture(t)
+		gomock.InOrder(
+			f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByID("proj_1", "pol_1")).Return(&domain.Policy{ID: "pol_1"}, nil),
+			f.statements.EXPECT().ListPolicyRevisions(gomock.Any(), "proj_1", "pol_1", gomock.Any()).DoAndReturn(
+				func(_ context.Context, _, _ string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+					assert.Equal(t, policystore.NewestRevisionFirst(), page.OrderBy)
+					return &database.ListResult[*domain.Policy]{Items: []*domain.Policy{{RevisionID: "polrev_2"}, {RevisionID: "polrev_1"}}}, nil
+				}),
+		)
+		got, err := f.svc.ListRevisions(t.Context(), service.ListPolicyRevisionsInput{ProjectID: "proj_1", ID: "pol_1"})
+		require.NoError(t, err)
+		assert.Len(t, got.Items, 2)
+		assert.Empty(t, got.NextPageToken)
+	})
+
+	t.Run("an unknown policy is not found, not an empty page", func(t *testing.T) {
+		f := newPolicyFixture(t) // no list expectation: the list must not run
+		f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByID("proj_1", "pol_unknown")).Return(nil, new(database.NoRowFoundError))
+		_, err := f.svc.ListRevisions(t.Context(), service.ListPolicyRevisionsInput{ProjectID: "proj_1", ID: "pol_unknown"})
+		assert.ErrorIs(t, err, domain.ErrPolicyNotFound())
+	})
+}
+
 func TestPolicyService_ConcurrentFirstPublishIsAConflict(t *testing.T) {
 	f := newPolicyFixture(t)
-	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
+	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	f.statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(&database.UniqueError{})
 
 	_, err := f.publish(map[string]any{})
@@ -127,26 +201,26 @@ func TestPolicyService_ConcurrentFirstPublishIsAConflict(t *testing.T) {
 func TestPolicyService_ResolvePolicy(t *testing.T) {
 	f := newPolicyFixture(t)
 
-	f.statements.EXPECT().GetPolicy(gomock.Any(), "proj_none", service.OperationPasswordSet).Return(nil, new(database.NoRowFoundError))
+	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_none", service.OperationPasswordSet)).Return(nil, new(database.NoRowFoundError))
 	none, err := f.svc.ResolvePolicy(t.Context(), "proj_none", service.OperationPasswordSet)
 	require.NoError(t, err)
 	assert.Nil(t, none, "no stored policy means no policy")
 
-	f.statements.EXPECT().GetPolicy(gomock.Any(), "proj_1", service.OperationPasswordSet).
+	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).
 		Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":12}`)}, nil)
 	inst, err := f.svc.ResolvePolicy(t.Context(), "proj_1", service.OperationPasswordSet)
 	require.NoError(t, err)
 	require.NotNil(t, inst)
 	assert.Equal(t, json.Number("12"), inst.Config["min_length"])
 
-	f.statements.EXPECT().GetPolicy(gomock.Any(), "proj_err", gomock.Any()).Return(nil, errors.New("down"))
+	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, errors.New("down"))
 	_, err = f.svc.ResolvePolicy(t.Context(), "proj_err", service.OperationPasswordSet)
 	assert.Error(t, err, "a storage failure is an error, so the gate fails closed")
 }
 
 func TestPolicyService_StoresCanonicalSettings(t *testing.T) {
 	f := newPolicyFixture(t)
-	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
+	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
 	f.statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p *domain.Policy) error {
 		assert.JSONEq(t, `{"min_length":12,"max_length":32}`, string(p.Config), "numbers are stored in canonical form")
 		return nil

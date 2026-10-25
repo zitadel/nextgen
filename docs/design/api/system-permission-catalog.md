@@ -236,6 +236,12 @@ Planned permissions once specified:
 Until endpoints exist, treat `billing.*` as reserved catalog names — do not
 grant them via `team.write`.
 
+### Platform (deployment-wide)
+
+| Permission | Intended operations | Notes |
+|---|---|---|
+| `platform.operator` | Every operation `project.admin` allows, on every project of the deployment; `GET /users/me/projects` lists every project | [ADR 075](../../adrs/075-platform-operators.md). Users of the platform project only, never a team or a secret; issued only by the `platform.operators` configuration. Not a role on the platform project: `project.admin` there grants none of it ([ADR 053 §9](../../adrs/053-cross-project-principals.md#9-deployment-wide-operators-are-a-separate-authority)). |
+
 ### Apps
 
 > **Verb model:** manage — `write` = create + update (no `app.create`); `delete` separate. No `app.manage` permission.

@@ -8,14 +8,15 @@ import (
 )
 
 // CheckReady proves the prerequisite every command has: a server at base
-// that answers /healthz. The harness never starts or stops a server — the
-// provisioning tool of the lane does — so a missing one is reported here,
-// once and plainly, rather than as a transport error inside the first
-// provisioning call or as a wall of failed iterations.
+// whose /readyz answers, which takes its database answering too. The harness
+// never starts or stops a server — the provisioning tool of the lane does —
+// so a missing one is reported here, once and plainly, rather than as a
+// transport error inside the first provisioning call or as a wall of failed
+// iterations.
 func CheckReady(ctx context.Context, base string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/healthz", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/readyz", nil)
 	if err != nil {
 		return err
 	}
@@ -26,7 +27,7 @@ func CheckReady(ctx context.Context, base string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("no healthy server at %s: /healthz answered %s", base, resp.Status)
+		return fmt.Errorf("no healthy server at %s: /readyz answered %s", base, resp.Status)
 	}
 	return nil
 }

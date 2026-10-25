@@ -3,7 +3,7 @@ import { join } from "node:path";
 import consola from "consola";
 
 import { ZitadelError } from "../errors";
-import { publicCliCommand } from "../public-cli";
+import { unscopedCommand } from "../suggestion";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -478,7 +478,7 @@ export class LocalServer {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [publicCliCommand("start", this.cliVersion)],
+        nextCommands: [unscopedCommand("start", this.cliVersion)],
       });
     }
     return runtime;

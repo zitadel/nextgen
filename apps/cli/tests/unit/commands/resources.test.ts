@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
+  definitionOf,
   describeBody,
   parseFilter,
   parseSort,
@@ -67,6 +68,13 @@ describe("resource registry", () => {
     for (const [topic, resource] of entries()) {
       expect(COMMANDS[`${topic}:list`], `${topic}:list`).toBeDefined();
       expect(COMMANDS[`${topic}:get`], `${topic}:get`).toBeDefined();
+      // `release` is the one topic that mixes generated reads (list/get) with
+      // hand-written verbs (create/revoke) under one singular topic, so the
+      // "a write command exists iff the registry declares it" invariant does
+      // not hold for it — the hand-written release create lives in src/index.ts.
+      if (topic === "release") {
+        continue;
+      }
       expect(Boolean(COMMANDS[`${topic}:create`])).toBe(Boolean(resource.create));
       expect(Boolean(COMMANDS[`${topic}:update`])).toBe(Boolean(resource.update));
       const deleteVerb = resource.delete?.verb ?? "delete";
@@ -74,23 +82,49 @@ describe("resource registry", () => {
     }
   });
 
-  it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
+  it("gives every generated command --env and --env-file, and no --environment flag", () => {
+    const generated = Object.entries(COMMANDS).filter(
+      ([, command]) => definitionOf(command) !== undefined,
+    );
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).toEqual(expect.arrayContaining(["env", "env-file"]));
       expect(Object.keys(flags), id).not.toContain("environment");
       expect(
-        Object.values(flags).map((flag) => flag.char),
+        Object.entries(flags)
+          .filter(([, flag]) => flag.char === "e")
+          .map(([name]) => name),
         id,
-      ).not.toContain("e");
+      ).toEqual(["env"]);
     }
+  });
+
+  it("reads the project and credential of --env-file", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
+    const file = join(cwd, "staging.env");
+    await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
+    let seen: { project?: string | null; authorization?: string | null } = {};
+    server.use(
+      http.post(`${SERVER}/teams/query`, ({ request }) => {
+        seen = {
+          project: new URL(request.url).searchParams.get("project_id"),
+          authorization: request.headers.get("authorization"),
+        };
+        return HttpResponse.json({ teams: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["teams", "list", "--env-file", file]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
   });
 
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
   it.each([
-    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a read verb", ["users", "list", "--environment", "prod"]],
     ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
   ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();
@@ -1394,7 +1428,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "release", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1700,5 +1734,17 @@ describe("flow definitions list the current flows", () => {
     await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
 
     expect(url?.searchParams.get("revisions")).toBe("all");
+  });
+});
+
+describe("the release resource", () => {
+  it("lists whether each release is revoked", () => {
+    expect(RESOURCES.release.columns).toContain("revoked_at");
+  });
+
+  it("shows a release's content hash and revocation", () => {
+    expect(RESOURCES.release.detail).toEqual(
+      expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
   });
 });

@@ -17,9 +17,9 @@
   "envMode": "strict",
   // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
   // build. Turbo leaves them out in the Vite service's build, where Vercel
-  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the storybook's
-  // and the server's, so the same packages got other keys there than in the
-  // console's build and were built twice per deployment. No build here reads
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the server's, so
+  // the same packages got other keys there than in the console's build and
+  // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
@@ -214,7 +214,7 @@
     "//#server": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["@zitadel/console#build"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
@@ -227,7 +227,7 @@
     "//#server-debug": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["@zitadel/console#build"],
       "inputs": [
         "scripts/run-server-debug.mjs",
         "scripts/server-build.mjs",
@@ -236,11 +236,11 @@
       ],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
-    // The local runtime image: the server cross-compiled for linux with both
-    // UI dists embedded. Needs Docker, so it stays out of CI.
+    // The local runtime image: the server cross-compiled for linux with the
+    // console's dist embedded. Needs Docker, so it stays out of CI.
     "//#build-local-image": {
       "cache": false,
-      "dependsOn": ["@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["@zitadel/console#build"],
       "inputs": ["scripts/build-local-runtime-image.mjs", "scripts/dev-process.mjs", "Dockerfile"],
       "passThroughEnv": ["ZITADEL_*", "DOCKER_*", "GOFLAGS"]
     },

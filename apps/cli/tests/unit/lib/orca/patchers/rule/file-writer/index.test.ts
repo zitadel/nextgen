@@ -228,6 +228,14 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("BAR=2");
   });
 
+  it("creates the file with the requested mode", async () => {
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "1" }, mode: 0o600 }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect((await stat(join(dir, ".env.local"))).mode & 0o777).toBe(0o600);
+  });
+
   it("only adds keys not already present", async () => {
     await writeFile(join(dir, ".env.local"), "FOO=existing\n");
     await scaffold(
@@ -238,6 +246,33 @@ describe("scaffold - merge-env", () => {
     expect(text).toContain("FOO=existing");
     expect(text).not.toContain("FOO=new");
     expect(text).toContain("BAZ=3");
+  });
+
+  it("replaces an existing value in place when told to overwrite", async () => {
+    await writeFile(join(dir, ".env.local"), "# kept\nFOO=stale\nOTHER=1\n");
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("# kept\nFOO=fresh\nOTHER=1\n");
+  });
+
+  it("quotes a value that would not read back bare", async () => {
+    await scaffold(plan({ kind: "merge-env", path: ".env.local", entries: { SECRET: "a#b" } }), {
+      cwd: dir,
+      dryRun: false,
+      force: false,
+    });
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toContain("SECRET='a#b'");
+  });
+
+  it("leaves the file alone under --dry-run even when told to overwrite", async () => {
+    await writeFile(join(dir, ".env.local"), "FOO=stale\n");
+    await scaffold(
+      plan({ kind: "merge-env", path: ".env.local", entries: { FOO: "fresh" }, overwrite: true }),
+      { cwd: dir, dryRun: true, force: false },
+    );
+    expect(await readFile(join(dir, ".env.local"), "utf8")).toBe("FOO=stale\n");
   });
 
   it("writes the comment above the entries once, and not again on a later merge", async () => {
@@ -269,6 +304,35 @@ describe("scaffold - merge-env", () => {
       { cwd: dir, dryRun: false, force: false },
     );
     expect(result.filesSkipped).toEqual([join(dir, ".env.local")]);
+  });
+
+  it("re-asserts the mode when rewriting an existing secret-bearing file at a loose mode", async () => {
+    await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
+    await scaffold(
+      plan({
+        kind: "merge-env",
+        path: ".env.development.local",
+        entries: { BAR: "2" },
+        mode: 0o600,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect((await stat(join(dir, ".env.development.local"))).mode & 0o777).toBe(0o600);
+  });
+
+  it("re-asserts the mode even when there is nothing to add", async () => {
+    await writeFile(join(dir, ".env.development.local"), "FOO=1\n", { mode: 0o644 });
+    const result = await scaffold(
+      plan({
+        kind: "merge-env",
+        path: ".env.development.local",
+        entries: { FOO: "1" },
+        mode: 0o600,
+      }),
+      { cwd: dir, dryRun: false, force: false },
+    );
+    expect(result.filesSkipped).toEqual([join(dir, ".env.development.local")]);
+    expect((await stat(join(dir, ".env.development.local"))).mode & 0o777).toBe(0o600);
   });
 });
 

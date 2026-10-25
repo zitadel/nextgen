@@ -5,6 +5,15 @@
 > **Context:** Interactive authentication persistence for nextgen
 
 > **Note:** Identifier column types for **SESSION**, **AUTH_ATTEMPT**, and **CHECK** are defined in [ADR 011](011-resource-identifiers.md) (ephemeral `BIGINT` identity in storage, decimal string in Go). The ER diagram below still uses logical `string` labels until tables are migrated and the diagram is refreshed.
+>
+> **Note (2026-10-24):** the tables are migrated and differ from the diagram;
+> read migrations `000006`–`000008` for the shipped shape. Ids are `TEXT`
+> ([ADR 047](047-dialect-id-generation.md) replaced the `BIGINT` class of ADR
+> 011). There is no AUTHENTICATOR table: credentials live in per-kind tables
+> such as `user_passwords` and `user_passkeys`. A check has no
+> `authenticator_id` or `supersedes`; it is unique per
+> `(auth_attempt_id, type)`. Expiry is checked on read; nothing sweeps expired
+> rows yet.
 
 ## Context
 
