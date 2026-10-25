@@ -39,3 +39,13 @@ tasks:
   test:
     deps:
       - "build"
+
+  # The same deps as build: The declaration pass resolves the workspace
+  # packages, which need api's generated client and the built dependencies.
+  dev:
+    command: "corepack pnpm run dev"
+    deps:
+      - "sdk-core:build"
+    options:
+      persistent: true
+      runInCI: false

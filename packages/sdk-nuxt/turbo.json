@@ -12,16 +12,10 @@
     // build never shares an invocation with demo-nuxt (see the release order
     // in tools/release/turbo.json).
     "build": {
-      "dependsOn": [
-        "@zitadel/components#build",
-        "@zitadel/sdk-core#build"
-      ]
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": [
-        "@zitadel/components#build-release",
-        "@zitadel/sdk-core#build-release"
-      ]
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
     },
     "test": {
       "dependsOn": ["build"]
@@ -29,10 +23,7 @@
     // The declaration pass resolves the workspace packages, which need
     // api's generated client and the built dependencies.
     "dev": {
-      "dependsOn": [
-        "@zitadel/components#build",
-        "@zitadel/sdk-core#build"
-      ]
+      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     }
   }
 }
