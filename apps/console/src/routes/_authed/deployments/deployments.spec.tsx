@@ -171,7 +171,7 @@ describe("deployments list", () => {
       );
       await renderAt("/deployments");
 
-      expect(await screen.findByText("Not authorized")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "No access" })).toBeInTheDocument();
       expect(screen.queryByText("This project has no deployments.")).not.toBeInTheDocument();
     } finally {
       errorSpy.mockRestore();

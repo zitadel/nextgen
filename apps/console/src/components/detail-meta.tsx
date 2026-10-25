@@ -45,13 +45,13 @@ export function MetaCard({
   );
 }
 
-/** One labelled value in a detail header card, optionally copyable. */
 /** The value line: 13/19 on most headers, 12/16 where the frame draws the smaller card. */
 const VALUE_SIZE = {
   md: "text-[13px] leading-[19px]",
   sm: "text-xs leading-4",
 } as const;
 
+/** One labelled value in a detail header, optionally copyable. */
 export function MetaValue({
   label,
   value,

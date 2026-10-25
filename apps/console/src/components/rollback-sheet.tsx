@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldContent, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -170,7 +170,7 @@ function RollbackForm({
         <Field>
           <div className={LABEL_ROW}>
             <FieldLabel htmlFor={messageId}>Message</FieldLabel>
-            <MetaItem>Optional</MetaItem>
+            <FieldOptionalIndicator />
           </div>
           <Textarea
             id={messageId}

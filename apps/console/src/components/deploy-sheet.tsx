@@ -12,7 +12,7 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -251,7 +251,7 @@ function DeployForm({
             <FieldLabel htmlFor={messageId}>Message</FieldLabel>
             {/* A sibling of the label, not part of it, so the accessible name
                 stays the field name. */}
-            <MetaItem>Optional</MetaItem>
+            <FieldOptionalIndicator />
           </div>
           <Textarea
             id={messageId}
