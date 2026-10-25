@@ -2037,8 +2037,8 @@ Show local Zitadel server logs.
 ```
 USAGE
   $ zitadel logs [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--tail
-    <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--level
+    debug|info|warn|error] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2050,8 +2050,11 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --follow           Follow logs.
-      --tail=<value>     [default: 200] Number of lines to show.
+      --follow           Keep printing lines as the server writes them.
+      --level=<option>   Show only lines at this level or above.
+                         <options: debug|info|warn|error>
+      --tail=<value>     [default: 200] Number of lines to show, counting only
+                         those --level shows.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -2060,6 +2063,15 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Show local Zitadel server logs.
+
+  On a terminal, warnings are yellow and errors red. Run it in the directory
+  `zitadel start` ran in, or one inside it: the server is found from the nearest
+  `.zitadel/local/` on the way up.
+
+EXAMPLES
+  $ zitadel logs --follow
+
+  $ zitadel logs --level warn
 ```
 
 ## `zitadel origin add PATTERN`
