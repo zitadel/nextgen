@@ -84,7 +84,6 @@ export default class Start extends BaseCommand {
           urls: {
             api: serverUrl,
             console: `${serverUrl}/ui/console/`,
-            login: `${serverUrl}/ui/login/`,
           },
           ...nextCommandsData([unscopedCommand("start", this.meta.cliVersion)]),
         },
@@ -211,7 +210,6 @@ function readyData(
     urls: {
       api: metadata.server_url,
       console: `${metadata.server_url}/ui/console/`,
-      login: `${metadata.server_url}/ui/login/`,
     },
     ...(console ? { console } : {}),
     next_actions: [

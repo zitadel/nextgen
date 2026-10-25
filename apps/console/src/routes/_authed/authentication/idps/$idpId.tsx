@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "identity provider" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);

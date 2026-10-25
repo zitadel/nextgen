@@ -61,6 +61,8 @@ Setup also asks how users should sign in and scaffolds the matching schema and l
 
 Setup writes the app files, `.env.example`, `.env.local` (read by your app, with the project id and the project secret), `.env.development.local` (read by the CLI: the server, project and credentials), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
 
+The pages and the request boundary (Next.js's `proxy.ts`, for example) that setup writes are yours to change. Setup records each one, and `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` brings back only a file that is missing, never one you changed.
+
 Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`: there is nothing to [claim](/docs/concepts/project-team-user#claim).
 
 ## Add Zitadel to an existing app

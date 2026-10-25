@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -72,7 +73,27 @@ type flowTestWorld struct {
 	ssoProviders       *domainmock.MockFlowSSOProviderResolver
 	ssoIdentities      *domainmock.MockFlowSSOIdentityService
 	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
+	passwords          *fakePasswordPolicy
 	sm                 *domain.FlowStateMachineRuntime
+}
+
+// fakePasswordPolicy answers the password length bounds; the zero value is a
+// project without a policy.
+type fakePasswordPolicy struct {
+	minLength, maxLength int
+	err                  error
+	calls                int
+}
+
+func (f *fakePasswordPolicy) PasswordLengthBounds(context.Context, string) (int, int, error) {
+	f.calls++
+	if f.err != nil {
+		return 0, 0, f.err
+	}
+	if f.maxLength == 0 {
+		return f.minLength, domain.MaxPasswordLength, nil
+	}
+	return f.minLength, f.maxLength, nil
 }
 
 func newFlowTestWorld(t *testing.T) *flowTestWorld {
@@ -92,6 +113,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 	ssoProviders := domainmock.NewMockFlowSSOProviderResolver(mock)
 	ssoIdentities := domainmock.NewMockFlowSSOIdentityService(mock)
 	ssoRedirects := domainmock.NewMockFlowSSORedirectIssuer(mock)
+	passwords := &fakePasswordPolicy{}
 
 	resolver := domain.NewSchemaFieldResolver()
 
@@ -106,6 +128,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		ssoProviders,
 		ssoIdentities,
 		ssoRedirects,
+		passwords,
 		now,
 	)
 
@@ -118,6 +141,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		ssoProviders:       ssoProviders,
 		ssoIdentities:      ssoIdentities,
 		ssoRedirects:       ssoRedirects,
+		passwords:          passwords,
 		sm:                 sm,
 	}
 }
@@ -4529,12 +4553,13 @@ func TestFlowStateMachine_Process_PasskeyOnPasswordStepSkipsPasswordCheck(t *tes
 	const challengeID = "ch-1"
 	const rpid = "example.com"
 
-	// The password field is required with min_length 8, so an empty value
-	// trips "required" and a short one trips the length rule. Both are the
-	// browser's form state, not something the user submitted.
+	// The password field is required, so an empty value trips "required". A
+	// sign-in step carries no length rule, so a short value trips nothing of
+	// its own. Each is the browser's form state, not something the user
+	// submitted.
 	passwordFields := map[string]string{
 		"empty box":                  "",
-		"below the length minimum":   "short",
+		"a short value":              "short",
 		"the identifier left behind": email,
 	}
 
@@ -4864,6 +4889,9 @@ func TestFlowStateMachine_RenderAfterReload_StillPairsTheIdentifier(t *testing.T
 	assert.Equal(t, email, reloaded.Step.Identifier.Value)
 	require.Len(t, reloaded.Step.Fields, 1)
 	assert.Equal(t, domain.AutocompleteCurrentPassword, reloaded.Step.Fields[0].Autocomplete)
+	assert.Nil(t, reloaded.Step.Fields[0].Validation,
+		"a sign-in step carries no length rule: a stored password may predate a stricter policy")
+	assert.Zero(t, w.passwords.calls, "a sign-in step does not read the password policy")
 }
 
 func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testing.T) {
@@ -4910,6 +4938,81 @@ func TestFlowStateMachine_MultiStepRegister_PasswordStepIsANewPassword(t *testin
 	assert.Equal(t, email, result.Step.Identifier.Value)
 }
 
+// walkToSetPassword starts the multi-step sign-up and submits the profile
+// step, which leads to the step that sets the password.
+func walkToSetPassword(t *testing.T, w *flowTestWorld) (*domain.FlowDefinition, domain.FlowStepResult, error) {
+	t.Helper()
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_01TEST", nil)
+	w.authAttemptService.EXPECT().
+		SubmitIdentifier(gomock.Any(), gomock.Any()).
+		Return("", domain.ErrAuthAttemptProofRejected(nil)).
+		Times(1)
+
+	def := multiStepSignupDefinition()
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeRegister,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	result, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "newcomer@example.com"},
+	})
+	return def, result, err
+}
+
+// A step that sets a password shows the project's policy bounds and refuses
+// a candidate below them on the step itself, before the step that creates
+// the user.
+func TestFlowStateMachine_NewPasswordStepCarriesThePolicyBounds(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	w.passwords.minLength, w.passwords.maxLength = 12, 32
+
+	def, result, err := walkToSetPassword(t, w)
+	require.NoError(t, err)
+	require.Equal(t, "set-password", result.Step.Name)
+	require.Len(t, result.Step.Fields, 1)
+	assert.Equal(t, &domain.FlowFieldValidation{MinLength: 12, MaxLength: 32}, result.Step.Fields[0].Validation)
+	assert.Equal(t, 1, w.passwords.calls, "rendering the step reads the policy once")
+
+	refused, err := w.sm.Process(t.Context(), def, result.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"x-auth-methods#password": "ninechars"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "set-password", refused.Step.Name)
+	require.NotNil(t, refused.Step.Error)
+	assert.Equal(t, "error.x-auth-methods#password_min_length", *refused.Step.Error)
+}
+
+// Without a policy a new password has no minimum, and the cap is its maximum.
+func TestFlowStateMachine_NewPasswordStepWithoutPolicy(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+
+	_, result, err := walkToSetPassword(t, w)
+	require.NoError(t, err)
+	require.Len(t, result.Step.Fields, 1)
+	assert.Equal(t, &domain.FlowFieldValidation{MaxLength: domain.MaxPasswordLength}, result.Step.Fields[0].Validation)
+}
+
+// A policy that cannot be read fails the step, as the gate fails the write.
+func TestFlowStateMachine_NewPasswordStepFailsClosed(t *testing.T) {
+	t.Parallel()
+	w := newFlowTestWorld(t)
+	w.passwords.err = errors.New("storage down")
+
+	_, _, err := walkToSetPassword(t, w)
+	require.ErrorIs(t, err, w.passwords.err)
+}
+
 func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	t.Parallel()
 	w := newFlowTestWorld(t)
@@ -4940,6 +5043,15 @@ func TestFlowStateMachine_SingleCardLogin_NeedsNoPairingHint(t *testing.T) {
 	}
 	assert.Equal(t, domain.AutocompleteUsername, byName["email"])
 	assert.Equal(t, domain.AutocompleteCurrentPassword, byName["x-auth-methods#password"])
+
+	// Signing in verifies the password the user has: no policy bounds, and
+	// the policy is not read at all.
+	for _, f := range start.Step.Fields {
+		if f.Name == "x-auth-methods#password" {
+			assert.Nil(t, f.Validation)
+		}
+	}
+	assert.Zero(t, w.passwords.calls)
 }
 
 // ssoRenderWorld is a test world sitting on the sso step of

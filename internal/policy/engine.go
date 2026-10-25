@@ -2,7 +2,6 @@ package policy
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -209,7 +208,7 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 	}
 	// Every problem is reported at once: the setting problems, and the
 	// config rules whose settings are all valid.
-	var problems []error
+	var problems []Violation
 	b.values, problems = settingValues(ct.Template, inst.Config)
 	b.configVars = configActivation(b.values)
 	for _, rule := range ct.configRules {
@@ -221,11 +220,15 @@ func (e *Engine) Bind(ctx context.Context, operation string, inst *Instance) (*B
 			return nil, err
 		}
 		if !held {
-			problems = append(problems, fmt.Errorf("config rule %q does not hold", rule.Name))
+			problems = append(problems, Violation{
+				ConfigRule: rule.Name,
+				Settings:   slices.Clone(rule.reads),
+				Reason:     fmt.Sprintf("config rule %q does not hold", rule.Name),
+			})
 		}
 	}
 	if len(problems) > 0 {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidInstance, errors.Join(problems...))
+		return nil, &invalidInstanceError{violations: problems}
 	}
 	for _, rule := range ct.rules {
 		if rule.active(b.values) {

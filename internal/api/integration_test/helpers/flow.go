@@ -51,6 +51,7 @@ func (h *Harness) EnsureFlowStateMachine(t testing.TB) *domain.FlowStateMachineR
 			service.NewFlowSSOProviderResolver(h.EnsureIDPConnectionService(t)),
 			service.NewFlowSSOIdentityResolver(h.EnsureServiceDB(t), h.EnsureIDPConnectionService(t), h.EnsureUserService(t), h.EnsureSchemaStore(t), h.EnsureProjectHashers(t), h.EnsurePasswordPolicy(t)),
 			service.NewFlowSSORedirectIssuer(h.EnsureIDPConnectionService(t), h.EnsureAuthAttemptService(t), h.EnsureKeyService(t), h.EnsureVariableService(t), h.EnsureHttpClient(t)),
+			h.EnsurePasswordPolicy(t),
 			time.Now,
 		)
 	}

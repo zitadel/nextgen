@@ -34,10 +34,13 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  * project manageable; deactivating *that* is the lockout path, and #1231 guards
  * it.
  *
- * **The viewer's own access is a line above the table.** The project resource
- * does not name its owning team (#1462 is the follow-up that shows that access
- * here), so it is inferred: whoever reaches this page can manage the project,
- * and when no grant is theirs, that access is the owning team's.
+ * **The viewer's own access is a line above the table** when no grant listed
+ * is theirs. Reaching this page takes access to the project, but nothing here
+ * says where it comes from: membership in the owning team (#1462 is the
+ * follow-up that shows that access here), a team grant listed below, or the
+ * deployment's platform operators (root ADR 075) all reach a project with no
+ * grant naming the person. So the line says only that their access is not a
+ * grant of their own, and names no source.
  *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
@@ -59,13 +62,13 @@ export function ProjectAdmins({
 }: {
   projectId: string;
   grants: Grant[];
-  /** The signed-in user, to tell their own grant from the owning team's access. */
+  /** The signed-in user, to tell their own grant from access that comes some other way. */
   viewerUserId?: string;
   /** Called after a grant was added or removed, to reload the page's data. */
   onChanged: () => void;
 }) {
   const rows = grants.map(toAdminRow);
-  const viaOwningTeam = !grants.some((grant) => grant.user?.user_id === viewerUserId);
+  const notListed = !grants.some((grant) => grant.user?.user_id === viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <DetailSection
@@ -73,9 +76,9 @@ export function ProjectAdmins({
       titleId="project-admins"
       className="mt-8"
       note={
-        viaOwningTeam && (
+        notListed && (
           <p className="text-muted-foreground text-sm">
-            You have admin access as a member of this Project’s owning Team.
+            Your access to this Project isn’t a grant of your own, so you aren’t listed here.
           </p>
         )
       }

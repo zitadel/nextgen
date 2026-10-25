@@ -25,7 +25,7 @@ class World {
   record: Fake | undefined;
   takenPorts = new Set<number>();
   alive = new Set<number>();
-  /** Origins that answer /healthz, whoever answers them. */
+  /** Origins that answer /readyz, whoever answers them. */
   healthy = new Set<string>();
   launched: number[] = [];
   /** The recorded servers whose identity was asked about. */
