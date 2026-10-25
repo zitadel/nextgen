@@ -17,9 +17,9 @@
   "envMode": "strict",
   // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
   // build. Turbo leaves them out in the Vite service's build, where Vercel
-  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the storybook's
-  // and the server's, so the same packages got other keys there than in the
-  // console's build and were built twice per deployment. No build here reads
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the server's, so
+  // the same packages got other keys there than in the console's build and
+  // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [

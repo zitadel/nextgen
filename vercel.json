@@ -30,20 +30,6 @@
         }
       ]
     },
-    "storybook": {
-      "root": "apps/storybook",
-      "framework": "storybook",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build",
-      "devCommand": "NODE_ENV=production storybook build --output-dir node_modules/.cloud-dev --quiet && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
-      "outputDirectory": "dist",
-      "rewrites": [
-        {
-          "source": "/storybook/:path(.*)?",
-          "destination": "/:path"
-        }
-      ]
-    },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
@@ -100,11 +86,6 @@
       "permanent": false
     },
     {
-      "source": "/storybook",
-      "destination": "/storybook/",
-      "permanent": true
-    },
-    {
       "source": "/changelog/",
       "destination": "/changelog",
       "permanent": true
@@ -121,12 +102,6 @@
       "source": "/console/(.*)",
       "destination": {
         "service": "console"
-      }
-    },
-    {
-      "source": "/storybook/(.*)",
-      "destination": {
-        "service": "storybook"
       }
     },
     {

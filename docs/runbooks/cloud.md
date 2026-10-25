@@ -22,13 +22,12 @@ not run them.
 
 ## Layout
 
-One Vercel deployment, six [services](https://vercel.com/docs/services):
+One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the storybook's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` and the login UI at `/ui/login/` |
+| `server` | Go preset; `apps/cloud/build.sh` builds the login UI the server embeds (with turbo), compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` and the login UI at `/ui/login/` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
-| `storybook` | Storybook; `turbo run build` | `/storybook/*` (bare `/storybook` redirects to the slash form) |
 | `docs` | Next.js; `turbo run build` for `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, then `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
 | `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
@@ -48,11 +47,6 @@ the build's base and the console path together.
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
 the server's service ping go there, so released CLIs and servers depend on
 the path: keep it, ahead of the server's catch-all.
-
-The storybook, the login surface's component workbench, is deployed only
-here. Its orchestrator stories mock the API in the browser with a service
-worker scoped to `/storybook/`, so the mock never answers for the console
-or the login UI on the same origin.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console or the
@@ -394,8 +388,7 @@ only at debug level.
 
 [`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs) builds what the
 services read from disk (the login UI the server embeds, the packages the
-console's, the storybook's and the docs' builds import, the docs' generated
-sources), mints a
+console's and the docs' builds import, the docs' generated sources), mints a
 throwaway master key and root admin under `.zitadel/local/cloud/` on the first
 run, and starts `vercel dev`. Sign in to `/console/` with the login in
 `.zitadel/local/cloud/admin.json`. The SQLite database lives beside it, so a
@@ -411,12 +404,11 @@ not use:
   builder takes the build command's binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
-- The `console` and `storybook` services' `devCommand` builds them and serves
-  the build behind the same service rewrites a deployment serves it behind.
-  Their dev servers cannot sit behind those rewrites, so their live loops stay
-  `moon run console:dev-real` and `moon run storybook:dev`. `NODE_ENV` is set
-  because `vercel dev` runs dev commands under `development`, which makes
-  `vite build` a development build.
+- The `console` service's `devCommand` builds it and serves the build behind
+  the same service rewrites a deployment serves it behind. Its dev server
+  cannot sit behind those rewrites, so its live loop stays
+  `moon run console:dev-real`. `NODE_ENV` is set because `vercel dev` runs dev
+  commands under `development`, which makes `vite build` a development build.
 - The `schemas` service's `devCommand` renders the built-in schemas and serves
   them (`--serve`): `vercel dev` wants a dev server for every service, a
   static one too, and refuses to start without one.
@@ -526,10 +518,10 @@ project and imports the root admin.
 - **Signing in:** `/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the login UI.
-- **Turbo's remote cache:** the console, storybook and login UI builds, and
-  the package builds the docs and the website start with, read and write the
-  team's remote cache, production and previews in separate entries; each
-  build's log shows `cache hit` or `cache miss` per task, and
+- **Turbo's remote cache:** the console and login UI builds, and the package
+  builds the docs and the website start with, read and write the team's
+  remote cache, production and previews in separate entries; each build's
+  log shows `cache hit` or `cache miss` per task, and
   the deployment's Run Summary shows why a task missed. A build with a
   result that is wrong although its inputs are right (a broken or planted
   entry) is fixed by a team owner clearing the cache (team Settings → Build

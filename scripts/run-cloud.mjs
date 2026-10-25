@@ -12,11 +12,10 @@
  *   it in dev and starts it on $PORT; a deployment runs build.sh instead,
  *   which compiles the same package. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
- * - console and storybook: their `devCommand` builds them and serves the
- *   build, as the deployment serves it, behind the same service rewrites.
- *   Their dev servers cannot sit behind those rewrites: the console's live
- *   loop stays `moon run console:dev-real`, storybook's `moon run
- *   storybook:dev`.
+ * - console: its `devCommand` builds it and serves the build, as the
+ *   deployment serves it, behind the same service rewrites. Its dev server
+ *   cannot sit behind those rewrites: the console's live loop stays
+ *   `moon run console:dev-real`.
  *
  * What only a local run needs comes from here: the builds the dev servers
  * read from disk (build.sh builds the login UI in a deployment), a throwaway
@@ -66,7 +65,7 @@ try {
     NEXTGEN_INSTRUMENTATION_LOG_FORMAT: process.env.NEXTGEN_INSTRUMENTATION_LOG_FORMAT || "text",
     GOFLAGS: [process.env.GOFLAGS, "-tags=noconsole"].filter(Boolean).join(" "),
   };
-  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /storybook/, /ui/login/`);
+  console.log(`[cloud] ${origin}/ (website), /docs, /console/, /ui/login/`);
   console.log(`[cloud] root admin: ${join(localDir, "admin.json")}`);
   const vercel = await vercelCli();
   console.log(`[cloud] Vercel CLI ${vercel.version} (${vercel.source})`);
@@ -191,8 +190,8 @@ async function ensureLocalSecrets() {
 
 /**
  * What the services' dev commands read from disk: the login UI the server
- * embeds, the packages the console's, the storybook's and the docs' builds
- * import, and the docs' generated sources. Two calls, because under turbo every named task
+ * embeds, the packages the console's and the docs' builds import, and the
+ * docs' generated sources. Two calls, because under turbo every named task
  * runs in every named package.
  */
 async function buildPrerequisites() {
