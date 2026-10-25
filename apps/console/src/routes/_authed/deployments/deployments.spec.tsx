@@ -39,7 +39,19 @@ function deployment(id: string, overrides: Record<string, unknown> = {}) {
 
 /** `GET /deployments`: the project's history, newest first. */
 function serveDeployments(history: unknown[] = []) {
-  server.use(http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: history })));
+  server.use(
+    http.get(DEPLOYMENTS_URL, ({ request }) => HttpResponse.json(liveOrAll(request, history))),
+  );
+}
+
+/** `GET /deployments?live=true` answers the live deployments only, as the server does. */
+function liveOrAll(request: Request, history: unknown[]) {
+  const live = new URL(request.url).searchParams.get("live") === "true";
+  return {
+    deployments: live
+      ? history.filter((entry) => (entry as { status: string }).status === "live")
+      : history,
+  };
 }
 
 /** One entry of `GET /releases`. */
@@ -155,7 +167,8 @@ describe("deployments list", () => {
     );
     await renderAt("/deployments");
     await screen.findByText("This project has no deployments.");
-    expect(seen).toEqual(["proj_test"]);
+    expect(seen).not.toHaveLength(0);
+    expect(new Set(seen)).toEqual(new Set(["proj_test"]));
   });
 
   it("leaves a refused read to the route's error state", async () => {
@@ -320,6 +333,29 @@ describe("rollback from a row", () => {
     await userEvent.click(await screen.findByRole("menuitem", { name: item }));
   }
 
+  it("knows the live release when its row is not on the page", async () => {
+    // The page holds a superseded primary row of the live release and no live
+    // primary row: previews newer than it fill the page.
+    const page = [
+      deployment("dep_preview", { kind: "preview", release_id: "rel_1" }),
+      deployment("dep_same", { release_id: "rel_2", status: "inactive" }),
+    ];
+    server.use(
+      http.get(DEPLOYMENTS_URL, ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.get("live") === "true"
+            ? { deployments: [deployment("dep_live", { release_id: "rel_2" })] }
+            : { deployments: page },
+        ),
+      ),
+    );
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for dep_same" }));
+    expect(await screen.findByRole("menuitem", { name: "View release" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Rollback" })).not.toBeInTheDocument();
+  });
+
   it("rolls back to a superseded deployment, naming the live one", async () => {
     const history = [
       deployment("dep_live", { release_id: "rel_2" }),
@@ -330,8 +366,10 @@ describe("rollback from a row", () => {
     let posted: { deploymentId: string; body: unknown } | undefined;
     server.use(
       http.get(DEPLOYMENTS_URL, ({ request }) => {
-        expect(new URL(request.url).searchParams.getAll("expand")).toEqual(["release"]);
-        return HttpResponse.json({ deployments: history });
+        const params = new URL(request.url).searchParams;
+        // The page carries each release; the live read needs only the ids.
+        if (params.get("live") !== "true") expect(params.getAll("expand")).toEqual(["release"]);
+        return HttpResponse.json(liveOrAll(request, history));
       }),
       http.post(DEPLOYMENTS_URL.replace(/$/, "/:id/rollback"), async ({ request, params }) => {
         posted = { deploymentId: String(params.id), body: await request.json() };

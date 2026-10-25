@@ -1,10 +1,8 @@
-import { Link as LinkIcon } from "lucide-react";
 import { Fragment } from "react";
 
+import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
 import { DetailSection } from "@/components/detail-page";
-import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { OriginLink } from "@/components/origin-link";
 import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/date";
 import { type Deployment, KIND_LABEL } from "@/lib/deployment";
@@ -44,30 +42,18 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
         <span className="text-sm leading-5 text-muted-foreground">
           {KIND_LABEL[deployment.kind]}
         </span>
-        {deployment.status === "live" ? (
-          <StatusBadge status="active" />
-        ) : (
-          <Badge variant="secondary">Superseded</Badge>
-        )}
+        <DeploymentStatusBadge status={deployment.status} />
       </div>
       <ul className="flex min-w-0 flex-1 flex-col gap-1">
         {deployment.targets.map((target) => (
           <li key={target.origin} className="flex min-w-0">
-            {/* The origin opens what it serves. Foreground, not the link
-                colour: the design draws it as text with a glyph, flush with
-                the column. `px-0!`: the size's `has-[>svg]:px-1.5` is a
-                variant and out-specifies a plain `px-0`. */}
-            <Button
-              asChild
-              variant="link"
-              size="xs"
-              className="h-6 max-w-full px-0! text-sm font-normal text-foreground"
-            >
-              <a href={target.origin} target="_blank" rel="noreferrer">
-                <LinkIcon aria-hidden className="text-muted-foreground" />
-                <span className="truncate">{target.origin}</span>
-              </a>
-            </Button>
+            {/* Foreground, not the link colour: the design draws it as text
+                with a glyph, flush with the column. */}
+            <OriginLink
+              origin={target.origin}
+              className="text-sm font-normal text-foreground"
+              iconClassName="text-muted-foreground"
+            />
           </li>
         ))}
       </ul>

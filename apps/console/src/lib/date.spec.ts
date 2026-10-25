@@ -9,6 +9,8 @@ describe("formatRecent", () => {
     expect(formatRecent("2026-10-15T06:00:00Z", now)).toBe("6h ago");
     expect(formatRecent("2026-10-15T11:48:00Z", now)).toBe("12m ago");
     expect(formatRecent("2026-10-15T11:59:30Z", now)).toBe("just now");
+    // Stamped by a server whose clock the browser trails.
+    expect(formatRecent("2026-10-15T12:00:02Z", now)).toBe("just now");
   });
 
   it("reads anything older, or in the future, against the calendar", () => {

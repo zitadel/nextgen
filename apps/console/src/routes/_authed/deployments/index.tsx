@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
-import { Layers3, Link as LinkIcon, Plus } from "lucide-react";
+import { Layers3, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { DeploySheet } from "@/components/deploy-sheet";
+import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
+import { OriginLink } from "@/components/origin-link";
 import { RollbackSheet } from "@/components/rollback-sheet";
 
 import {
@@ -23,8 +25,6 @@ import {
   RowMenu,
 } from "@/components/resource-list";
 import { Page } from "@/components/layout";
-import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -37,6 +37,7 @@ import {
   KIND_LABEL,
   listProjectDeployments,
   releaseRevoked,
+  livePrimaryReleaseId,
 } from "@/lib/deployment";
 import {
   projectScopeDeps,
@@ -55,11 +56,19 @@ import {
  * closes. A primary row's menu redeploys its release or rolls back to it.
  */
 export const Route = createFileRoute("/_authed/deployments/")({
-  // Order 6: Login flows sits at 5, with Branding nested under it; Project
-  // settings stays last at 7.
+  // After Branding, as the design's sidebar places it.
   staticData: { scope: "project", nav: { label: "Deployments", order: 7, icon: Layers3 } },
   loaderDeps: projectScopeDeps,
-  loader: ({ deps }) => listProjectDeployments(requireProjectScope(deps.project)),
+  // The live primary release is read on its own: the newest page is not
+  // guaranteed to hold the live primary row once previews outnumber it.
+  loader: async ({ deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const [page, liveReleaseId] = await Promise.all([
+      listProjectDeployments(projectId),
+      livePrimaryReleaseId(projectId),
+    ]);
+    return { ...page, liveReleaseId };
+  },
   component: DeploymentsScreen,
 });
 
@@ -74,11 +83,8 @@ function DeploymentsScreen() {
     "Could not load more deployments.",
   );
   const deployments = [...loaded.items, ...paging.extra];
-  // The newest primary deployment is the live one, and it is on the first
-  // page: a superseded row of its release has nothing to roll back to.
-  const liveReleaseId = deployments.find(
-    (deployment) => deployment.kind === "primary" && deployment.status === "live",
-  )?.release_id;
+  // A superseded row of the live release has nothing to roll back to.
+  const liveReleaseId = loaded.liveReleaseId;
 
   return (
     <Page>
@@ -181,11 +187,7 @@ function DeploymentRowItem({
         <Targets deployment={deployment} />
       </TableCell>
       <TableCell className={RESOURCE_CELL}>
-        {deployment.status === "live" ? (
-          <StatusBadge status="active" />
-        ) : (
-          <Badge variant="secondary">Superseded</Badge>
-        )}
+        <DeploymentStatusBadge status={deployment.status} />
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>
         <time dateTime={deployment.deployed_at}>{formatRecent(deployment.deployed_at)}</time>
@@ -251,17 +253,11 @@ function Targets({ deployment }: { deployment: Deployment }) {
           <ul className="flex flex-col gap-1">
             {origins.map((origin) => (
               <li key={origin} className="flex min-w-0 items-center gap-1">
-                <Button
-                  asChild
-                  variant="link"
-                  size="xs"
-                  className="h-6 min-w-0 px-0! text-xs font-normal text-foreground"
-                >
-                  <a href={origin} target="_blank" rel="noreferrer">
-                    <LinkIcon aria-hidden className="text-muted-foreground" />
-                    <span className="truncate">{origin}</span>
-                  </a>
-                </Button>
+                <OriginLink
+                  origin={origin}
+                  className="min-w-0 text-xs font-normal text-foreground"
+                  iconClassName="text-muted-foreground"
+                />
                 <CopyButton value={origin} label={`Copy ${origin}`} className="size-6 shrink-0" />
               </li>
             ))}

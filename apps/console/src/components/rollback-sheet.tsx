@@ -1,12 +1,11 @@
-import { Layers3, Link as LinkIcon } from "lucide-react";
+import { Layers3 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { CHOICE_CARD } from "@/components/deploy-sheet";
+import { CHOICE_CARD, LABEL_ROW, LEGEND, SECTION } from "@/components/deploy-sheet";
+import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
 import { FormSheet, FormSheetForm } from "@/components/form-sheet";
-import { StatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { OriginLink } from "@/components/origin-link";
 import { Field, FieldContent, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -24,14 +23,9 @@ import {
 } from "@/lib/deployment";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 
-const SECTION = "flex flex-col gap-4";
-const LABEL_ROW = "flex w-full items-center gap-2";
-/** The field label's face, on the legend and on the summary's heading. */
-const LEGEND = "font-serif text-sm leading-5 font-normal";
 /** The live deployment, as a card that is not a choice: the chosen card's face. */
 const SUMMARY_CARD =
   "flex flex-col gap-3 rounded-md border border-input bg-primary/5 p-3 dark:bg-primary/10";
-const LINK = "h-6 max-w-full px-0! text-muted-foreground";
 
 /** What a rolled-back deployment says. */
 export const ROLLED_BACK_MESSAGE = "Deployment rolled back";
@@ -219,11 +213,7 @@ function DeploymentFacts({
         <span className="text-sm leading-none font-medium text-foreground">
           {KIND_LABEL[deployment.kind]}
         </span>
-        {deployment.status === "live" ? (
-          <StatusBadge status="active" />
-        ) : (
-          <Badge variant="secondary">Superseded</Badge>
-        )}
+        <DeploymentStatusBadge status={deployment.status} />
       </div>
       {dated && (
         <time
@@ -242,14 +232,7 @@ function DeploymentFacts({
         </li>
         {deployment.targets.map((target) => (
           <li key={target.origin} className="flex min-w-0">
-            {/* `px-0!`: the size's `has-[>svg]:px-1.5` is a variant and
-                out-specifies a plain `px-0`. */}
-            <Button asChild variant="link" size="xs" className={LINK}>
-              <a href={target.origin} target="_blank" rel="noreferrer">
-                <LinkIcon aria-hidden />
-                <span className="truncate">{target.origin}</span>
-              </a>
-            </Button>
+            <OriginLink origin={target.origin} className="text-muted-foreground" />
           </li>
         ))}
       </ul>

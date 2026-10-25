@@ -22,17 +22,21 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
  */
 export function describeError(cause: unknown, fallback: string): string {
   if (cause instanceof ApiError) {
-    const body = cause.body;
-    if (body && typeof body === "object") {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim() !== "") {
-        const fields = namedFields(body as Record<string, unknown>);
-        return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
-      }
+    const body = errorBody(cause);
+    const message = body?.message;
+    if (body && typeof message === "string" && message.trim() !== "") {
+      const fields = namedFields(body);
+      return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
     }
     return fallback;
   }
   return cause instanceof Error ? cause.message : fallback;
+}
+
+/** The error payload of a failed request, when it carried one. */
+function errorBody(cause: ApiError): Record<string, unknown> | undefined {
+  const body = cause.body;
+  return body && typeof body === "object" ? (body as Record<string, unknown>) : undefined;
 }
 
 /** The fields an error payload names, from its producer's `details`. */
@@ -68,9 +72,6 @@ export async function nullOnForbidden<T>(read: Promise<T>): Promise<T | null> {
  * differently by code, such as a refusal with its own dialog.
  */
 export function errorCode(cause: unknown): string | undefined {
-  if (!(cause instanceof ApiError)) return undefined;
-  const body = cause.body;
-  if (!body || typeof body !== "object") return undefined;
-  const code = (body as Record<string, unknown>).code;
+  const code = cause instanceof ApiError ? errorBody(cause)?.code : undefined;
   return typeof code === "string" ? code : undefined;
 }

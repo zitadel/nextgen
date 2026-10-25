@@ -1,9 +1,8 @@
-import { Layers3, Link as LinkIcon } from "lucide-react";
+import { Layers3 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { FormSheet, FormSheetForm } from "@/components/form-sheet";
-import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldContent,
@@ -25,19 +24,21 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
+import { OriginLink } from "@/components/origin-link";
 import { deployToPrimary, listPrimaryOrigins, livePrimaryReleaseId } from "@/lib/deployment";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 import { listDeployableReleases, type ReleaseSummary } from "@/lib/release";
 
-const SECTION = "flex flex-col gap-4";
+/** The drawer's sections, label rows and legends, shared with the Rollback drawer. */
+export const SECTION = "flex flex-col gap-4";
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
-const LABEL_ROW = "flex w-full items-center gap-2";
+export const LABEL_ROW = "flex w-full items-center gap-2";
 /**
  * The field label's face, on the legend of the targets group. The legend keeps
  * its own 12px under it: a `legend` sits outside the fieldset's flex gap.
  */
-const LEGEND = "font-serif text-sm leading-5 font-normal";
+export const LEGEND = "font-serif text-sm leading-5 font-normal";
 /**
  * A choice card, shared with the Rollback drawer: the label's own card
  * styling, at the design's 12px inset. `p-3!`: the label's `[&>*]:data-[slot=field]:p-4` is a variant
@@ -136,11 +137,16 @@ function DeployForm({
   const primaryId = useId();
   const messageId = useId();
   const [releases, setReleases] = useState<ReleaseSummary[] | undefined>(undefined);
+  // Whether the project has a release that could be deployed at all, before
+  // the live one is left out: the empty picker says which it is.
+  const [anyDeployable, setAnyDeployable] = useState(false);
   const [origins, setOrigins] = useState<string[] | undefined>(undefined);
   const [releaseId, setReleaseId] = useState(release?.id ?? "");
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
 
+  // The id, not the object: a row passes a fresh literal on every render.
+  const pinnedId = release?.id;
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -148,12 +154,15 @@ function DeployForm({
         // The releases are read only when there is a choice to make.
         const [primary, options, liveId] = await Promise.all([
           listPrimaryOrigins(projectId),
-          release ? undefined : listDeployableReleases(projectId),
-          release ? undefined : livePrimaryReleaseId(projectId),
+          pinnedId ? undefined : listDeployableReleases(projectId),
+          pinnedId ? undefined : livePrimaryReleaseId(projectId),
         ]);
         if (cancelled) return;
         setOrigins(primary);
-        if (options) setReleases(options.filter((option) => option.id !== liveId));
+        if (options) {
+          setAnyDeployable(options.length > 0);
+          setReleases(options.filter((option) => option.id !== liveId));
+        }
       } catch (cause) {
         if (!cancelled) setLoadError(describeError(cause, "Could not load the project."));
       }
@@ -161,7 +170,7 @@ function DeployForm({
     return () => {
       cancelled = true;
     };
-  }, [projectId, release]);
+  }, [projectId, pinnedId]);
 
   const options = release ? [release] : (releases ?? []);
   const loading = origins === undefined || (!release && releases === undefined);
@@ -218,7 +227,9 @@ function DeployForm({
           </Select>
           {nothingToDeploy && (
             <p className="text-xs leading-4 text-muted-foreground">
-              Every release is already deployed to the primary origins.
+              {anyDeployable
+                ? "Every release is already deployed to the primary origins."
+                : "This project has no release to deploy."}
             </p>
           )}
         </Field>
@@ -284,19 +295,7 @@ function PrimaryOrigins({ origins }: { origins: string[] | undefined }) {
     <ul className="flex flex-col gap-1">
       {origins.map((origin) => (
         <li key={origin} className="flex min-w-0">
-          {/* `px-0!`: the size's `has-[>svg]:px-1.5` is a variant and
-              out-specifies a plain `px-0`. */}
-          <Button
-            asChild
-            variant="link"
-            size="xs"
-            className="h-6 max-w-full px-0! text-muted-foreground"
-          >
-            <a href={origin} target="_blank" rel="noreferrer">
-              <LinkIcon aria-hidden />
-              <span className="truncate">{origin}</span>
-            </a>
-          </Button>
+          <OriginLink origin={origin} className="text-muted-foreground" />
         </li>
       ))}
     </ul>
