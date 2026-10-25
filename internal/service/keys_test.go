@@ -187,6 +187,37 @@ func TestKeyService_GetCrypter(t *testing.T) {
 			require.ErrorAs(t, err, &de)
 			assert.Equal(t, domain.ErrEncryptionKeyNotFound().Code, de.Code)
 		})
+
+		// Every credential is decrypted through this read, so the class of a
+		// storage failure decides what an authenticated request answers: an
+		// unavailable store is a 503, only an unclassified failure is internal.
+		for _, tc := range []struct {
+			name     string
+			storeErr error
+			wantCode string
+		}{
+			{"unavailable", database.NewUnavailableError(errors.New("retry budget spent")), domain.ErrUnavailable().Code},
+			{"unclassified", errors.New("connection refused"), domain.ErrInternal(nil).Code},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+
+				// ARRANGE
+				svc, statements, _ := newMockedKeyService(t)
+				statements.EXPECT().
+					GetEncryptionKey(gomock.Any(), gomock.Any()).
+					Return(nil, tc.storeErr)
+
+				// ACT
+				_, err := svc.GetEncryptionKey(t.Context(), "enc_key_1", jose.A256GCM)
+
+				// ASSERT
+				var de domain.Error
+				require.ErrorAs(t, err, &de)
+				assert.Equal(t, tc.wantCode, de.Code)
+				assert.ErrorIs(t, err, tc.storeErr)
+			})
+		}
 	})
 }
 

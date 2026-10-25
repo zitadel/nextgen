@@ -1,8 +1,14 @@
-# ADR 004: CLI Agent Contract and SKILLS.md
+# ADR 004: CLI Agent Contract and SKILL.md
 
-> **Status:** Proposed
+> **Status:** Accepted — 2026-10-24 (originally Proposed 2026-04-26)
 > **Date:** 2026-04-26
 > **Context:** Machine-readable CLI DevEx
+>
+> **Amendment (2026-10-24):** in effect. `SKILL.md` is the agent guidance, the
+> CLI emits the `--json` envelope with `next_commands`, and
+> `zitadel commands --json` lists the command metadata. ADRs 064 and 071 build
+> on this contract. No command is marked experimental today; the rule applies
+> when a half-built surface ships.
 
 ## Decision
 

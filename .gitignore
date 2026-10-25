@@ -111,9 +111,6 @@ nextgen-data/
 !/internal/staticui/console/dist/
 /internal/staticui/console/dist/*
 !/internal/staticui/console/dist/.gitkeep
-!/internal/staticui/login/dist/
-/internal/staticui/login/dist/*
-!/internal/staticui/login/dist/.gitkeep
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 

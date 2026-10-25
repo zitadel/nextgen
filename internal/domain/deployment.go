@@ -14,6 +14,10 @@ const (
 // MaxDeploymentTargets caps the origins one deployment covers.
 const MaxDeploymentTargets = 50
 
+// DefaultPreviewTTL is how long a preview stays live after the deployment
+// that writes it.
+const DefaultPreviewTTL = 7 * 24 * time.Hour
+
 // DeploymentReason records why a deployment was created.
 //
 //go:generate go tool enumer -type DeploymentReason -transform snake -trimprefix DeploymentReason -sql -json
@@ -215,37 +219,43 @@ const DeploymentTargetPrimary = "primary"
 // ResolveDeploymentTargets resolves deploymentTargets against projectOrigins
 // into the deployment's kind and origins. The primary keyword covers every
 // primary origin, which are deployed as a whole, so naming one is invalid,
-// and primary and preview targets never mix.
+// and primary and preview targets never mix. A preview URL must match a
+// preview pattern and is never a loopback origin.
 func ResolveDeploymentTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
+	if slices.Contains(deploymentTargets, DeploymentTargetPrimary) {
+		return resolvePrimaryTarget(projectOrigins, deploymentTargets)
+	}
+	return resolvePreviewTargets(projectOrigins, deploymentTargets)
+}
+
+func resolvePrimaryTarget(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
+	if len(deploymentTargets) > 1 {
+		return 0, nil, ErrDeploymentInvalid().WithMessage("primary origins and preview URLs cannot be mixed")
+	}
 	var primary []string
 	for _, o := range projectOrigins {
 		if o.Kind == OriginKindPrimary {
 			primary = append(primary, o.Pattern)
 		}
 	}
-
-	keyword := false
-	var previews []string
-	for _, target := range deploymentTargets {
-		switch {
-		case target == DeploymentTargetPrimary:
-			keyword = true
-		case slices.Contains(primary, target):
-			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy primary origins with the primary keyword")
-		default:
-			previews = append(previews, target)
-		}
-	}
-	if keyword && len(previews) > 0 {
-		return 0, nil, ErrDeploymentInvalid().WithMessage("primary origins and preview URLs cannot be mixed")
-	}
-	if len(previews) > 0 {
-		// TODO(#1572): match previews against the project's preview patterns.
-		return 0, nil, ErrNotImplemented()
-	}
 	if len(primary) == 0 {
 		return 0, nil, ErrDeploymentInvalid().WithMessage("the project has no primary origin")
 	}
 	// TODO(#1572): cap primary origins at MaxDeploymentTargets.
 	return DeploymentOriginKindPrimary, primary, nil
+}
+
+func resolvePreviewTargets(projectOrigins []Origin, deploymentTargets []string) (DeploymentOriginKind, []string, error) {
+	for _, target := range deploymentTargets {
+		entry, ok := MatchOrigin(projectOrigins, target)
+		switch {
+		case ok && entry.Kind == OriginKindPrimary:
+			return 0, nil, ErrDeploymentInvalid().WithMessage("deploy primary origins with the primary keyword")
+		case ok && entry.Kind == OriginKindPreview && !IsLoopbackOrigin(target):
+			continue
+		default:
+			return 0, nil, ErrProjectOriginNotAllowed(map[string]string{"origin": target})
+		}
+	}
+	return DeploymentOriginKindPreview, deploymentTargets, nil
 }

@@ -299,3 +299,27 @@ func TestSetPasswordAction_NoGateFailsClosed(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, domain.ErrInternal(nil).Code, derr.Code)
 }
+
+func TestPasswordPolicy_LengthBounds(t *testing.T) {
+	for name, tt := range map[string]struct {
+		gate     *service.PasswordPolicy
+		min, max int
+	}{
+		"no policy: no minimum, the cap as maximum": {gate: noPolicyGate(t), max: domain.MaxPasswordLength},
+		"both bounds":            {gate: newGate(t, fixedPolicy{config: map[string]any{"min_length": 12, "max_length": 32}}, nil, nil), min: 12, max: 32},
+		"only a minimum":         {gate: newGate(t, fixedPolicy{config: map[string]any{"min_length": 12}}, nil, nil), min: 12, max: domain.MaxPasswordLength},
+		"history is not a bound": {gate: newGate(t, fixedPolicy{config: map[string]any{"history_depth": 4}}, nil, nil), max: domain.MaxPasswordLength},
+	} {
+		t.Run(name, func(t *testing.T) {
+			minLength, maxLength, err := tt.gate.PasswordLengthBounds(t.Context(), "p")
+			require.NoError(t, err)
+			assert.Equal(t, tt.min, minLength)
+			assert.Equal(t, tt.max, maxLength)
+		})
+	}
+
+	_, _, err := newGate(t, failingPolicy{}, nil, nil).PasswordLengthBounds(t.Context(), "p")
+	derr, ok := errors.AsType[domain.Error](err)
+	require.True(t, ok)
+	assert.Equal(t, domain.ErrInternal(nil).Code, derr.Code, "a policy that cannot be read fails closed")
+}

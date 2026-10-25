@@ -120,13 +120,13 @@
     "consola": "^3.4.2",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
+    "picocolors": "^1.1.1",
+    "rosie-skills": "catalog:",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
     "undici": "^7.29.1",
     "wrap-ansi": "^7.0.0",
-    "zod": "catalog:",
-    "picocolors": "^1.1.1",
-    "rosie-skills": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -140,6 +140,7 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   }
 }

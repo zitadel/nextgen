@@ -61,7 +61,6 @@ if (command === "start") {
         urls: {
           api: "http://localhost:" + port,
           console: "http://localhost:" + port + "/ui/console/",
-          login: "http://localhost:" + port + "/ui/login/",
         },
       },
       warnings: [],

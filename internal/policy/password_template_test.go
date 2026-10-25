@@ -229,6 +229,33 @@ func TestPasswordSet_ValidateInstance(t *testing.T) {
 	assert.ErrorContains(t, err, `"max_length"`)
 }
 
+// Every violation is reported at once, typed, so the API can list them: the
+// settings by name, then the config rules with the settings they read. A rule
+// whose settings are themselves invalid is not evaluated.
+func TestPasswordSet_Violations(t *testing.T) {
+	e, err := policy.New()
+	require.NoError(t, err)
+
+	err = e.ValidateInstance(t.Context(), passwordInstance(t, `{"min_length":30,"max_length":10,"history_depth":9,"min_lenght":1}`))
+	require.ErrorIs(t, err, policy.ErrInvalidInstance)
+	violations := policy.Violations(err)
+	require.Len(t, violations, 3)
+	assert.Equal(t, "history_depth", violations[0].Setting)
+	assert.Equal(t, "min_lenght", violations[1].Setting)
+	assert.Equal(t, policy.Violation{
+		ConfigRule: "min_length_not_above_max_length",
+		Settings:   []string{"max_length", "min_length"},
+		Reason:     `config rule "min_length_not_above_max_length" does not hold`,
+	}, violations[2])
+
+	err = e.ValidateInstance(t.Context(), passwordInstance(t, `{"min_length":0,"max_length":10}`))
+	violations = policy.Violations(err)
+	require.Len(t, violations, 1, "the rule does not run while min_length is out of bounds")
+	assert.Equal(t, "min_length", violations[0].Setting)
+
+	assert.Nil(t, policy.Violations(e.ValidateInstance(t.Context(), nil)), "a missing instance names no setting or rule")
+}
+
 func TestBound_Settings(t *testing.T) {
 	e, err := policy.New()
 	require.NoError(t, err)

@@ -24,13 +24,20 @@ export class ApiError extends Error {
   readonly status: number;
   readonly url: string;
   readonly body: unknown;
+  /**
+   * The server's ID for the request, from its `X-Request-Id` header: the
+   * reference that finds the request in the server's logs, to show beside the
+   * error. `undefined` when the response carried none, as from a proxy.
+   */
+  readonly requestId: string | undefined;
 
-  constructor(status: number, url: string, body: unknown, message: string) {
+  constructor(status: number, url: string, body: unknown, message: string, requestId?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.url = url;
     this.body = body;
+    this.requestId = requestId;
   }
 }
 
@@ -144,7 +151,13 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
 
   if (!res.ok) {
     const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
-    throw new ApiError(res.status, url, parsed, message);
+    throw new ApiError(
+      res.status,
+      url,
+      parsed,
+      message,
+      res.headers.get("x-request-id") || undefined,
+    );
   }
 
   return parsed as T;
