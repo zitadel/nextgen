@@ -466,7 +466,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),

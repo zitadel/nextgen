@@ -146,7 +146,8 @@ docker compose up -d
 | Surface            | URL                               |
 | ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Health             | http://localhost:8080/healthz     |
+| Liveness probe     | http://localhost:8080/livez       |
+| Readiness probe    | http://localhost:8080/readyz      |
 
 A fresh Compose server has no project and no user yet, so this console shows
 its setup prompt until you seed one (see

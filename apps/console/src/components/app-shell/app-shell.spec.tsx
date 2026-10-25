@@ -47,8 +47,8 @@ const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", 
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
 const MY_PROJECTS = "*/api/users/me/projects";
-// System, the portal screen that needs no project, reads the server's health.
-const HEALTH = "*/api/healthz";
+// System, the portal screen that needs no project, reads the server's readiness.
+const READY = "*/api/readyz";
 // `/` lands on Users, so most tests read it once a project is selected.
 const USERS_QUERY = "*/api/users/query";
 // Some tests open on Teams to prove a switch keeps the screen.
@@ -583,7 +583,7 @@ describe("project pill", () => {
       http.get("*/api/projects/proj_9", () =>
         HttpResponse.json({ message: "project not found" }, { status: 404 }),
       ),
-      http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+      http.get(READY, () => HttpResponse.text("ok")),
     );
     renderShell(scopedPath("/system", "proj_9"));
 
@@ -638,7 +638,7 @@ describe("project pill", () => {
     server.use(
       http.get(MY_PROJECTS, RIVER_AND_DELTA),
       // System is the portal screen that needs no project.
-      http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+      http.get(READY, () => HttpResponse.text("ok")),
     );
     const router = renderShell(scopedPath("/system", "proj_1"));
 
@@ -728,7 +728,7 @@ describe("project pill", () => {
             : { projects: [{ id: "proj_1", name: "River" }], next_page_token: "page-2" },
         ),
       ),
-      http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+      http.get(READY, () => HttpResponse.text("ok")),
     );
     renderShell(scopedPath("/system", "proj_1"));
 
@@ -764,7 +764,7 @@ describe("project pill", () => {
   it("says there are no projects instead of loading forever", async () => {
     server.use(
       http.get(MY_PROJECTS, () => HttpResponse.json({ projects: [] })),
-      http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+      http.get(READY, () => HttpResponse.text("ok")),
     );
     // System, which reads no list of its own, so the pill is all that answers.
     renderShell("/system");
@@ -782,7 +782,7 @@ describe("project pill", () => {
     try {
       server.use(
         http.get(MY_PROJECTS, () => new HttpResponse(null, { status: 500 })),
-        http.get(HEALTH, () => HttpResponse.json({ status: "ok" })),
+        http.get(READY, () => HttpResponse.text("ok")),
       );
       renderShell("/system");
 
