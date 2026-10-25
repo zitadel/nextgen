@@ -62,7 +62,7 @@ func TestRequestEventMiddleware_SkipsMissingProjectID(t *testing.T) {
 	h := WithRequestEventMiddleware(buf, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/livez", nil))
 	time.Sleep(40 * time.Millisecond)
 	assert.Equal(t, uint64(0), buf.Flushed())
 	assert.Equal(t, 0, buf.Len())

@@ -22302,9 +22302,8 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) getHealthRes() {}
-func (*ErrorDetailsStatusCode) getLiveRes()   {}
-func (*ErrorDetailsStatusCode) getReadyRes()  {}
+func (*ErrorDetailsStatusCode) getLiveRes()  {}
+func (*ErrorDetailsStatusCode) getReadyRes() {}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -33315,116 +33314,6 @@ type GetGrantUnauthorized ErrorDetails
 
 func (*GetGrantUnauthorized) getGrantRes() {}
 
-// GetHealthErrorResponse represents sum type.
-type GetHealthErrorResponse struct {
-	Type       GetHealthErrorResponseType // switch on this field
-	Internal   Internal
-	ReqInvalid ReqInvalid
-}
-
-// GetHealthErrorResponseType is oneOf type of GetHealthErrorResponse.
-type GetHealthErrorResponseType string
-
-// Possible values for GetHealthErrorResponseType.
-const (
-	InternalGetHealthErrorResponse   GetHealthErrorResponseType = "internal"
-	ReqInvalidGetHealthErrorResponse GetHealthErrorResponseType = "req.invalid"
-)
-
-// IsInternal reports whether GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) IsInternal() bool { return s.Type == InternalGetHealthErrorResponse }
-
-// IsReqInvalid reports whether GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetHealthErrorResponse
-}
-
-// SetInternal sets GetHealthErrorResponse to Internal.
-func (s *GetHealthErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetHealthErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalGetHealthErrorResponse returns new GetHealthErrorResponse from Internal.
-func NewInternalGetHealthErrorResponse(v Internal) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets GetHealthErrorResponse to ReqInvalid.
-func (s *GetHealthErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetHealthErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidGetHealthErrorResponse returns new GetHealthErrorResponse from ReqInvalid.
-func NewReqInvalidGetHealthErrorResponse(v ReqInvalid) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// GetHealthErrorResponseStatusCode wraps GetHealthErrorResponse with StatusCode.
-type GetHealthErrorResponseStatusCode struct {
-	StatusCode int
-	Response   GetHealthErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *GetHealthErrorResponseStatusCode) GetResponse() GetHealthErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *GetHealthErrorResponseStatusCode) SetResponse(val GetHealthErrorResponse) {
-	s.Response = val
-}
-
-func (*GetHealthErrorResponseStatusCode) getHealthRes() {}
-
-type GetHealthOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s GetHealthOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-func (*GetHealthOK) getHealthRes() {}
-
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
 	Type                GetIdpByIdErrorResponseType // switch on this field
@@ -36024,6 +35913,22 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetReadyServiceUnavailable struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s GetReadyServiceUnavailable) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*GetReadyServiceUnavailable) getReadyRes() {}
 
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {

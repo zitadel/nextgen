@@ -18,7 +18,7 @@ export const workspaceRoot = join(import.meta.dirname, "..");
 
 /**
  * Fail-fast timeouts, so a wedged or unresponsive server ends a lane with a
- * clear error instead of hanging it. A stale server answering `/healthz` can
+ * clear error instead of hanging it. A stale server answering `/readyz` can
  * let readiness pass against the wrong instance; these caps turn that into a
  * quick failure. Spread `e2eTimeouts` at the top level of `defineConfig` and
  * `e2eActionTimeouts` into `use`.
