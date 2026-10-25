@@ -60,7 +60,7 @@
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "h3": "catalog:",
+    "h3": "^1.15.3",
     "nuxt": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

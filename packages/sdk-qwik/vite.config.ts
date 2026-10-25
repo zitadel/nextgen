@@ -15,5 +15,6 @@ const qwik = [qwikVite()]
   );
 
 export default defineConfig({
+  build: { target: "es2020" },
   plugins: [libraryBuild(import.meta.dirname), qwik, dts({ tsconfigPath: "./tsconfig.lib.json" })],
 });

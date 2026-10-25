@@ -23,19 +23,15 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Build an SDK with plain Vite**: its `vite.config.ts` lists
-  `libraryBuild()` (`vite.shared.mjs`), the framework's Vite plugin and
-  `unplugin-dts` (`svelteTypes()` for `.svelte`). `sdk-angular` has no
-  `unplugin-dts`: Analog's plugin writes its `.d.ts`.
+- **Build an SDK with plain Vite**: `libraryBuild()` (`vite.shared.mjs`), the framework's
+  plugin and `unplugin-dts` (`svelteTypes()` for Svelte; Analog writes Angular's).
 - **Add an entry point to `exports` and give it a source, never to a config**:
   `libraryBuild()` derives the entries from `exports` and fails on any warning.
 - **Allow a warning code only with a comment saying why.**
 - **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
   into shared chunks and strip the directive. Re-test the App Router split.
-- **`sdk-nuxt` builds with the published `@mridang/vite-plugin-nuxt-module`**: its
-  `vite.config.ts` lists `nuxtModule({ extension: ".js", entry })`, and the plugin
-  writes what `nuxt-module-build` writes. The entries beside `src/module.ts` go in `entry`,
-  not in `exports`; `src/runtime` is built file by file.
+- **Build `sdk-nuxt` with `nuxtModule()`** from `@mridang/vite-plugin-nuxt-module`; list
+  the entries beside `src/module.ts` in its `entry`, not in `exports`.
 - **Check `sdk-angular` templates in `typecheck`, not the build**: Analog's plugin
   does not type-check templates, so `ngc --noEmit` enforces `strictTemplates`.
 - **The non-SDK packages build with `tsdown`.**

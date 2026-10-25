@@ -356,9 +356,6 @@ catalogs:
     fumadocs-ui:
       specifier: npm:@fumadocs/base-ui@^16.17.1
       version: 16.17.1
-    h3:
-      specifier: ^1.15.3
-      version: 1.15.11
     jsdom:
       specifier: ^29.0.2
       version: 29.0.2
@@ -695,7 +692,7 @@ importers:
         version: 4.23.8(@types/node@24.19.1)(supports-color@8.1.1)
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1235,7 +1232,7 @@ importers:
         version: 8.42.0(@faker-js/faker@10.6.0)(@modelcontextprotocol/server@2.3.1)(@tanstack/react-query@5.100.6(react@19.2.8))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(prettier@3.9.10)(swr@2.4.1(react@19.2.8))(typedoc-plugin-markdown@4.11.0(typedoc@0.28.19(typescript@6.0.3)))(typedoc@0.28.19(typescript@6.0.3))(typescript@6.0.3)(zod@4.4.3)
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -1293,7 +1290,7 @@ importers:
         version: 1.60.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
@@ -1372,7 +1369,7 @@ importers:
         version: 2.0.2
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -1412,7 +1409,7 @@ importers:
         version: 8.20.0
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -1430,7 +1427,7 @@ importers:
         version: 24.19.1
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -1650,7 +1647,7 @@ importers:
         version: 7.29.7(supports-color@8.1.1)
       '@mridang/vite-plugin-nuxt-module':
         specifier: ^0.1.0
-        version: 0.1.0(47c15ba703b05f7a6da84f5125bc2ea3)
+        version: 0.1.0(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))
       '@nuxt/kit':
         specifier: 'catalog:'
         version: 4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3)))
@@ -1664,7 +1661,7 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
       h3:
-        specifier: 'catalog:'
+        specifier: ^1.15.3
         version: 1.15.11
       nuxt:
         specifier: 'catalog:'
@@ -2149,7 +2146,7 @@ importers:
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
       tsdown:
         specifier: 'catalog:'
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+        version: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
       tslib:
         specifier: 'catalog:'
         version: 2.8.1
@@ -2208,9 +2205,6 @@ packages:
     peerDependenciesMeta:
       zone.js:
         optional: true
-
-  '@andrewbranch/untar.js@1.0.4':
-    resolution: {integrity: sha512-pVXSwPsLuw8IGLo2Di0EaOfsk+ntVvpkk942J/sHYIkwvtKUakEcPh7HBgZ6tuimgzKSEHgCvO4XgQ05DEbwDw==}
 
   '@angular-devkit/architect@0.2202.3':
     resolution: {integrity: sha512-/605FxTg8Kt5fqNuIBVZMfuiNwIf+CTNsiYnHY85/7OTqCNkEwdkXKc3DiFM2KlR/AV2g64GkvHgHqxHzYh34g==}
@@ -2355,10 +2349,6 @@ packages:
       '@angular/core': 22.2.3
       '@angular/platform-browser': 22.2.3
       rxjs: ^6.5.3 || ^7.4.0
-
-  '@arethetypeswrong/core@0.18.5':
-    resolution: {integrity: sha512-9ytjzGwxjm9Uz7I9avfbt5vlQt6uk9uRRESzJjqrznl6WKvI6dwYTo+vJ3U02Wrq/mR3iql/PzhvHhKdJIAjDQ==}
-    engines: {node: '>=20'}
 
   '@asamuzakjp/css-color@5.1.11':
     resolution: {integrity: sha512-KVw6qIiCTUQhByfTd78h2yD1/00waTmm9uy/R7Ck/ctUyAPj+AEDLkQIdJW0T8+qGgj3j5bpNKK7Q3G+LedJWg==}
@@ -2822,9 +2812,6 @@ packages:
         optional: true
       commander:
         optional: true
-
-  '@braidai/lang@1.1.2':
-    resolution: {integrity: sha512-qBcknbBufNHlui137Hft8xauQMTZDKdophmLFv05r2eNmdIv/MlPuP4TdUknHG68UdWLgVZwgxVe735HzJNIwA==}
 
   '@bramus/specificity@2.4.2':
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
@@ -4229,9 +4216,6 @@ packages:
     resolution: {integrity: sha512-1g7G0knRX2iV/voDu54yxrGqw5Dk0w2oIYb7dgJq8IkOi+m7wbD8Q3QpPFjh0C01G58S88dqGn03len6UPCXsg==}
     cpu: [x64]
     os: [win32]
-
-  '@loaderkit/resolve@1.0.6':
-    resolution: {integrity: sha512-G8FdIoF5CypfwmD9rl8BXod5HDn8JqB0CCNBXDTaRZ+yRYhARrrSToX1zg1zy9jX3zLqigsELwhT4gNtkdQAUg==}
 
   '@manypkg/find-root@3.1.0':
     resolution: {integrity: sha512-BcSqCyKhBVZ5YkSzOiheMCV41kqAFptW6xGqYSTjkVTl9XQpr+pqHhwgGCOHQtjDCv7Is6EFyA14Sm5GVbVABA==}
@@ -9683,9 +9667,6 @@ packages:
   citty@0.2.2:
     resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
 
-  cjs-module-lexer@1.4.3:
-    resolution: {integrity: sha512-9z8TZaGM1pfswYeXrUpzPrkx8UnWYdhJclsiYMm6x/w5+nN+8Tf/LnAgfLGQCm59qAOxU8WwHEq2vNwF6i4j+Q==}
-
   class-variance-authority@0.7.1:
     resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
@@ -10647,9 +10628,6 @@ packages:
 
   fetchdts@0.2.0:
     resolution: {integrity: sha512-PJb4ZTGT2/wK78RmVrxZITStWabhZlKBsL52VOgq+c7clEkdHdEB+0rtzrXCbZJqeYJj+IwNWYqB5/G6vouA6A==}
-
-  fflate@0.8.3:
-    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   figures@3.2.0:
     resolution: {integrity: sha512-yaduQFRKLXYOGgEn6AZau90j3ggSOyiqXU0F9JZfeXYhNa+Jk4X+s45A2zg5jns87GAFa34BBm2kXw4XpNcbdg==}
@@ -14884,11 +14862,6 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.6.1-rc:
-    resolution: {integrity: sha512-E3b2+1zEFu84jB0YQi9BORDjz9+jGbwwy1Zi3G0LUNw7a7cePUrHMRNy8aPh53nXpkFGVHSxIZo5vKTfYaFiBQ==}
-    engines: {node: '>=14.17'}
-    hasBin: true
-
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
@@ -15554,29 +15527,6 @@ packages:
       vite:
         optional: true
 
-  vue-sfc-transformer@0.3.1:
-    resolution: {integrity: sha512-GxRDX31O3B20+nZ+8TS5yNlGqSTE3VPvTwyAukyLPdpZUprrdFXmKgJmBRFtaJdS3hcxgWI8NBR/k6KuQiPsVQ==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      '@volar/typescript': ^2.4.0
-      '@vue/compiler-core': ^3.5.13
-      '@vue/language-core': ^3.0.0
-      esbuild: ^0.28.1
-      rolldown: '>=1.0.0-beta.0'
-      typescript: '>=5.0.0'
-      vue: ^3.5.13
-    peerDependenciesMeta:
-      '@volar/typescript':
-        optional: true
-      '@vue/language-core':
-        optional: true
-      esbuild:
-        optional: true
-      rolldown:
-        optional: true
-      typescript:
-        optional: true
-
   vue-sonner@1.3.2:
     resolution: {integrity: sha512-UbZ48E9VIya3ToiRHAZUbodKute/z/M1iT8/3fU8zEbwBRE11AKuHikssv18LMk2gTTr6eMQT4qf6JoLHWuj/A==}
 
@@ -15917,9 +15867,6 @@ snapshots:
     optionalDependencies:
       zone.js: 0.16.2
 
-  '@andrewbranch/untar.js@1.0.4':
-    optional: true
-
   '@angular-devkit/architect@0.2202.3(chokidar@5.0.0)':
     dependencies:
       '@angular-devkit/core': 22.2.3(chokidar@5.0.0)
@@ -16070,18 +16017,6 @@ snapshots:
       '@angular/platform-browser': 22.2.3(@angular/common@22.2.3(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.2))(rxjs@7.8.2))(@angular/core@22.2.3(@angular/compiler@22.2.3)(rxjs@7.8.2)(zone.js@0.16.2))
       rxjs: 7.8.2
       tslib: 2.8.1
-
-  '@arethetypeswrong/core@0.18.5':
-    dependencies:
-      '@andrewbranch/untar.js': 1.0.4
-      '@loaderkit/resolve': 1.0.6
-      cjs-module-lexer: 1.4.3
-      fflate: 0.8.3
-      lru-cache: 11.5.1
-      semver: 7.8.5
-      typescript: 5.6.1-rc
-      validate-npm-package-name: 5.0.1
-    optional: true
 
   '@asamuzakjp/css-color@5.1.11':
     dependencies:
@@ -16819,9 +16754,6 @@ snapshots:
       cac: 6.7.14
       citty: 0.2.2
       commander: 15.0.0
-
-  '@braidai/lang@1.1.2':
-    optional: true
 
   '@bramus/specificity@2.4.2':
     dependencies:
@@ -18193,11 +18125,6 @@ snapshots:
   '@lmdb/lmdb-win32-x64@3.5.6':
     optional: true
 
-  '@loaderkit/resolve@1.0.6':
-    dependencies:
-      '@braidai/lang': 1.1.2
-    optional: true
-
   '@manypkg/find-root@3.1.0':
     dependencies:
       '@manypkg/tools': 2.1.2
@@ -18370,7 +18297,7 @@ snapshots:
   '@moonrepo/core-windows-x64-msvc@2.6.1':
     optional: true
 
-  '@mridang/vite-plugin-nuxt-module@0.1.0(47c15ba703b05f7a6da84f5125bc2ea3)':
+  '@mridang/vite-plugin-nuxt-module@0.1.0(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))':
     dependencies:
       picomatch: 4.0.7
       rolldown: 1.2.12
@@ -18383,7 +18310,6 @@ snapshots:
       sass: 1.104.1
       sass-embedded: 1.104.1
       typescript: 6.0.3
-      vue-sfc-transformer: 0.3.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/compiler-core@3.5.44)(@vue/language-core@3.2.8)(esbuild@0.28.1)(rolldown@1.2.12)(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3))
       vue-tsc: 3.2.8(typescript@6.0.3)
     transitivePeerDependencies:
       - '@typescript/native-preview'
@@ -22541,7 +22467,7 @@ snapshots:
       lightningcss: 1.33.0
       postcss-load-config: 6.0.1(jiti@2.7.0)(postcss@8.5.30)(tsx@4.21.0)(yaml@2.9.1)
       rolldown: 1.2.12
-      tsdown: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
+      tsdown: 0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
     optionalDependencies:
       postcss: 8.5.30
       postcss-modules: 6.0.1(postcss@8.5.30)
@@ -24378,9 +24304,6 @@ snapshots:
 
   citty@0.2.2: {}
 
-  cjs-module-lexer@1.4.3:
-    optional: true
-
   class-variance-authority@0.7.1:
     dependencies:
       clsx: 2.1.1
@@ -25460,9 +25383,6 @@ snapshots:
       picomatch: 4.0.7
 
   fetchdts@0.2.0: {}
-
-  fflate@0.8.3:
-    optional: true
 
   figures@3.2.0:
     dependencies:
@@ -31311,7 +31231,7 @@ snapshots:
 
   ts-simple-type@2.0.0-next.0: {}
 
-  tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3)):
+  tsdown@0.23.0(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3)):
     dependencies:
       cac: 7.0.0
       defu: 6.1.7
@@ -31328,7 +31248,6 @@ snapshots:
       unconfig-core: 7.5.0
       verkit: 0.4.1
     optionalDependencies:
-      '@arethetypeswrong/core': 0.18.5
       '@tsdown/css': 0.23.0(jiti@2.7.0)(postcss-modules@6.0.1(postcss@8.5.30))(postcss@8.5.30)(sass-embedded@1.104.1)(sass@1.104.1)(tsdown@0.23.0)(tsx@4.21.0)(yaml@2.9.1)
       publint: 0.3.25
       tsx: 4.21.0
@@ -31405,9 +31324,6 @@ snapshots:
     optional: true
 
   typescript@5.4.5: {}
-
-  typescript@5.6.1-rc:
-    optional: true
 
   typescript@6.0.3: {}
 
@@ -32413,19 +32329,6 @@ snapshots:
       - rollup
       - unloader
       - webpack
-
-  vue-sfc-transformer@0.3.1(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/compiler-core@3.5.44)(@vue/language-core@3.2.8)(esbuild@0.28.1)(rolldown@1.2.12)(typescript@6.0.3)(vue@3.5.44(typescript@6.0.3)):
-    dependencies:
-      '@vue/compiler-core': 3.5.44
-      tinyglobby: 0.2.17
-      vue: 3.5.44(typescript@6.0.3)
-    optionalDependencies:
-      '@volar/typescript': 2.4.28(typescript@6.0.3)
-      '@vue/language-core': 3.2.8
-      esbuild: 0.28.1
-      rolldown: 1.2.12
-      typescript: 6.0.3
-    optional: true
 
   vue-sonner@1.3.2:
     optional: true
