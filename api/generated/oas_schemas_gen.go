@@ -13733,7 +13733,7 @@ type CreateDeploymentRequest struct {
 	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// Preview URLs only. Each preview stays live for 7 days (`7d`) from this
+	// Preview URLs only. Each preview stays live for 7 days (`P7D`) from this
 	// deployment; a sent value is accepted but not applied.
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
@@ -69179,7 +69179,7 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
-type PreviewTTL string
+type PreviewTTL ogenx.ISODuration
 
 // Merged schema.
 // Ref: #

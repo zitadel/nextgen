@@ -3816,24 +3816,6 @@ func (s *CreateDeploymentRequest) Validate() error {
 		})
 	}
 	if err := func() error {
-		if value, ok := s.TTL.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "ttl",
-			Error: err,
-		})
-	}
-	if err := func() error {
 		if value, ok := s.Reason.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -10455,26 +10437,6 @@ func (s *Preview) Validate() error {
 	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
-	}
-	return nil
-}
-
-func (s PreviewTTL) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
-		MaxLength:     0,
-		MaxLengthSet:  false,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^[1-9][0-9]{0,5}[mhd]$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
 	}
 	return nil
 }

@@ -95735,9 +95735,9 @@ func (s *Preview) UnmarshalJSON(data []byte) error {
 
 // Encode encodes PreviewTTL as json.
 func (s PreviewTTL) Encode(e *jx.Encoder) {
-	unwrapped := string(s)
+	unwrapped := ogenx.ISODuration(s)
 
-	e.Str(unwrapped)
+	json.EncodeNative(e, unwrapped)
 }
 
 // Decode decodes PreviewTTL from json.
@@ -95745,10 +95745,10 @@ func (s *PreviewTTL) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PreviewTTL to nil")
 	}
-	var unwrapped string
+	var unwrapped ogenx.ISODuration
 	if err := func() error {
-		v, err := d.Str()
-		unwrapped = string(v)
+		v, err := json.DecodeNative[ogenx.ISODuration](d)
+		unwrapped = v
 		if err != nil {
 			return err
 		}
