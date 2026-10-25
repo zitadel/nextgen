@@ -244,13 +244,13 @@ journey through them stays worth running.
 
 An orchestrator asks two questions apart: whether to restart a process, and
 whether to send it requests. One endpoint answers each, and `/healthz`, a
-third name for the first, goes at 1.0.0.
+third name for the first, is removed.
 
 | Endpoint | Answers | Checks |
 | --- | --- | --- |
 | `/livez` | `200 ok` while the process serves HTTP | nothing behind it: a liveness probe that checked the database would restart every instance when the database blips |
 | `/readyz` | `200 ok` when the server can serve requests, `503 fail` when it cannot | that the database answers, within a short timeout |
-| `/healthz` | as today, with a `Deprecation` header, until 1.0.0 | what `/livez` checks, so released CLIs keep finding a server that is up |
+| `/healthz` | removed: `404`, as any path the server does not serve (ADR 076) | — |
 
 - **The fix:** `/readyz` checks the database and answers `503 fail` when it
   cannot reach it, `/livez` keeps checking nothing, and the spec documents
@@ -260,9 +260,11 @@ third name for the first, goes at 1.0.0.
   and `setup`, the test kit's wait and the benchmark harness wait for
   `/readyz`, so a wait covers the database too; the console's System screen
   reads it; the README and the quick start name `/livez` and `/readyz`.
-- **`/healthz` stays until 1.0.0,** as ADR 077 keeps the old root paths, and
-  answers as `/livez` does: a released CLI that probes it keeps working, and a
-  liveness probe someone pointed at it never starts restarting instances.
+- **`/healthz` is removed, with no deprecation period.** Each release of the
+  CLI and the test kit pins the server version it runs, so `zitadel start` and
+  `withZitadel` from before the removal keep running a server that still
+  answers `/healthz`. The server's changeset lists the removal as breaking:
+  liveness probes move to `/livez`, readiness probes to `/readyz`.
 - **A probe stays cheap:** one round trip on the pool, bounded by its
   timeout. Probes are skipped by the request events (ADR 048).
 - **On the cloud nothing probes the function.** `/readyz` there serves the
@@ -384,7 +386,8 @@ render and accessibility. It leaves the deployment.
 1. Add the three existing `(Production)` statuses to the `cloud` project's
    Deployment Checks (§3): a setting, no code.
 2. The probes (§5): `/readyz` checks the database, the repository's readers
-   move to it, and `/healthz` gets its `Deprecation` header.
+   move to it, and `/healthz` is removed. Shipped in
+   [#2308](https://github.com/zitadel/nextgen/pull/2308).
 3. The server and website suites (§2), each joining the production checks as
    it lands.
 4. The docs' live examples, with the docs' suite checking they render; then
@@ -424,6 +427,9 @@ render and accessibility. It leaves the deployment.
 - A self-hosted readiness probe on `/readyz` takes every instance out of its
   load balancer while the database is down, the requests that need no
   database with them. Nearly every request needs it anyway.
+- Anything still on `/healthz` gets `404`: a liveness probe there restarts its
+  instance until it moves to `/livez`, and a CLI or test kit from before the
+  removal sees a newer server as down until it is updated.
 - Preview databases collect a project and two users per run until preview
   cleanup is automated; today it is by hand (runbook).
 - The preview journey depends on anonymous creation, sign-up and claim staying
@@ -459,8 +465,10 @@ render and accessibility. It leaves the deployment.
 - **One health endpoint that checks everything.** A liveness probe on it
   would restart every instance whenever the database blips. Rejected: two
   probes (§5).
-- **Removing `/healthz` now.** Released CLIs probe it. Rejected: it stays,
-  deprecated, until 1.0.0 (§5).
+- **Keeping `/healthz`, deprecated, until 1.0.0, as ADR 077 keeps the old root
+  paths.** Only a CLI or test kit from before the removal, run against a newer
+  server, would still need it: each release runs the server it pins. Rejected:
+  it is removed (§5).
 - **A journey per admin task, across every screen.** It repeats the lanes'
   tests of each write, takes minutes, and fails without naming the screen.
   Rejected: one journey covers what crosses people (§1).
