@@ -171,10 +171,11 @@ its card below 576px rather than squeezing the cells.
 
 Two things are deliberately **not** shared, because the designs genuinely differ:
 
-- **Column widths.** Teams sits on a fixed 248px grid, Projects on thirds, and
-  the Users table is schema-driven, so it has no fixed grid to share. It shows
-  each value once (D20): its ID column absorbs the slack and truncates, so the
-  default schema fits 1024px, and a schema with more columns scrolls.
+- **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
+  clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
+  slack and truncate (D20, D21). The Users table is schema-driven, so it has
+  no fixed grid to share: the default schema fits 1024px, and a schema with
+  more columns scrolls.
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 

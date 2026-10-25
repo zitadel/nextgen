@@ -156,8 +156,21 @@ type EventClientMetadata struct {
 
 // EventMetadata is the events.metadata JSON object.
 type EventMetadata struct {
-	Client *EventClientMetadata `json:"client,omitempty"`
+	Client        *EventClientMetadata        `json:"client,omitempty"`
+	Authorization *EventAuthorizationMetadata `json:"authorization,omitempty"`
 }
+
+// EventAuthorizationMetadata is events.metadata.authorization: the path that
+// authorized the request, when it was not a grant on the protected project
+// (ADR 053 §8, ADR 075 §5).
+type EventAuthorizationMetadata struct {
+	Path               string `json:"path"`
+	ActorHomeProjectID string `json:"actor_home_project_id,omitempty"`
+}
+
+// EventAuthorizationPathPlatformOperator marks a request the platform operator
+// relation authorized (ADR 075 §5).
+const EventAuthorizationPathPlatformOperator = "platform_operator"
 
 // EventField enumerates filterable/sortable Event columns.
 type EventField uint8

@@ -16,6 +16,7 @@
 import { MANDATORY_GATES_TAG } from "@zitadel/config/template";
 import { Liquid } from "liquidjs";
 
+import type { CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 import type { FlowError } from "./template-context.js";
 import type { Locale } from "./locales/en.js";
 import { hookName } from "../internal/hook-name.js";
@@ -261,7 +262,16 @@ export type FlowErrorKeyContext = {
    * hiding the error. Omit to skip the check (pure lookups).
    */
   fields?: readonly string[];
+  /**
+   * The validation each of the step's fields carries, by name. A length key
+   * whose field carries its bound names it ("at least 12 characters") instead
+   * of the generic "too short".
+   */
+  validations?: Readonly<Record<string, FieldValidation | undefined>>;
 };
+
+/** The validation a step field carries, as the API generates it. */
+type FieldValidation = NonNullable<CreateFlow201StepFieldsItem["validation"]>;
 
 /**
  * Rule-suffix fallbacks for the server's field-validation keys
@@ -274,10 +284,26 @@ export type FlowErrorKeyContext = {
  * that suffix takes the format wording; `_unknown_field` (a submitted
  * name that is not a step field) takes the catch-all.
  */
-const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{ suffix: string; generic: string }> = [
+const FLOW_ERROR_RULE_FALLBACKS: ReadonlyArray<{
+  suffix: string;
+  generic: string;
+  /**
+   * For a length rule: the catalog entry that names the field's bound as
+   * `{1}`, and where the bound sits in the field's validation.
+   */
+  withBound?: { key: string; bound: (validation: FieldValidation) => number | undefined };
+}> = [
   { suffix: "_required", generic: "error.field_required" },
-  { suffix: "_min_length", generic: "error.field_min_length" },
-  { suffix: "_max_length", generic: "error.field_max_length" },
+  {
+    suffix: "_min_length",
+    generic: "error.field_min_length",
+    withBound: { key: "error.field_min_length_value", bound: (v) => v.min_length },
+  },
+  {
+    suffix: "_max_length",
+    generic: "error.field_max_length",
+    withBound: { key: "error.field_max_length_value", bound: (v) => v.max_length },
+  },
   { suffix: "_format", generic: "error.field_format" },
   { suffix: "_invalid", generic: "error.field_format" },
   { suffix: "_unknown_field", generic: "error.field_invalid" },
@@ -320,13 +346,25 @@ function localiseFlowErrorKey(key: string, ctx: FlowErrorKeyContext): FlowError 
     // alert filters.
     return inlineField !== undefined ? { field: inlineField, text_key: key } : { text_key: key };
   }
-  for (const { suffix, generic } of FLOW_ERROR_RULE_FALLBACKS) {
+  for (const { suffix, generic, withBound } of FLOW_ERROR_RULE_FALLBACKS) {
     if (!key.endsWith(suffix)) continue;
     const field = key.slice("error.".length, key.length - suffix.length);
     if (field === "") break;
-    const template =
-      ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.";
-    const message = capitaliseFirst(interpolate(template, [fieldLabel(ctx, field)]));
+    const label = fieldLabel(ctx, field);
+    // A length rule names the field's bound when the field carries a
+    // positive one and the locale has the wording; otherwise the generic
+    // sentence.
+    const validation = ctx.validations?.[field];
+    const bound = withBound && validation ? withBound.bound(validation) : undefined;
+    const boundTemplate = withBound ? ctx.locale[withBound.key] : undefined;
+    const message = capitaliseFirst(
+      typeof bound === "number" && bound > 0 && boundTemplate !== undefined
+        ? interpolate(boundTemplate, [label, String(bound)])
+        : interpolate(
+            ctx.locale[generic] ?? ctx.locale[FLOW_ERROR_CATCH_ALL_KEY] ?? "Please check {0}.",
+            [label],
+          ),
+    );
     // Route inline when the step renders this field (the inline outlet exists);
     // otherwise keep it a banner message so it can never silently vanish. A
     // fields-less pure lookup can't confirm the outlet, so it stays a banner.

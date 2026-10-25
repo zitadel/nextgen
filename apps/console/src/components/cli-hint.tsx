@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { DEFAULT_SERVER } from "@zitadel/config/server";
+
 import { InlineCode } from "@/components/ui/inline-code";
 
 /**
@@ -13,12 +15,6 @@ const CLI = "npx @zitadel/cli@latest";
 export const CLI_DEPLOY = `${CLI} deploy`;
 
 /**
- * The server the CLI targets when nothing names one: its hosted default
- * (`DEFAULT_SERVER` in `apps/cli/src/lib/server.ts`). Keep the two in step.
- */
-const CLI_DEFAULT_SERVER = "https://preview.zitadel.com";
-
-/**
  * `setup`: creates a project and connects the app in the current directory.
  * It names the server unless that is the CLI's default: the CLI takes its
  * server from `--server`, `ZITADEL_SERVER` or `zitadel.json` and otherwise
@@ -27,7 +23,7 @@ const CLI_DEFAULT_SERVER = "https://preview.zitadel.com";
  * local admin's team as with `--server local`.
  */
 export function cliSetup(server: string): string {
-  return server === CLI_DEFAULT_SERVER ? `${CLI} setup` : `${CLI} setup --server ${server}`;
+  return server === DEFAULT_SERVER ? `${CLI} setup` : `${CLI} setup --server ${server}`;
 }
 
 /**

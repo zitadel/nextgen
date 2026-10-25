@@ -59,13 +59,13 @@ describe("send", () => {
   it("sends no bearer when there is no secret", async () => {
     let authorization: string | null = "unset";
     server.use(
-      http.get(`${SERVER}/healthz`, ({ request }) => {
+      http.get(`${SERVER}/livez`, ({ request }) => {
         authorization = request.headers.get("authorization");
         return HttpResponse.json({ status: "ok" });
       }),
     );
 
-    await send(SERVER, undefined, requestFor("getHealth"));
+    await send(SERVER, undefined, requestFor("getLive"));
 
     expect(authorization).toBeNull();
   });

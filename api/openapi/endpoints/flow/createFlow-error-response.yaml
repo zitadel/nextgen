@@ -16,6 +16,7 @@ content:
         - $ref: '../../components/schemas/errors/internal.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/proj-not_found.yaml'
         - $ref: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../components/schemas/errors/proj-preview_not_live.yaml'
@@ -24,6 +25,7 @@ content:
         - $ref: '../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -39,6 +41,7 @@ content:
           internal: '../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../components/schemas/errors/tkn-invalid.yaml'
           tkn.invalid_tknid: '../../components/schemas/errors/tkn-invalid_tknid.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           proj.not_found: '../../components/schemas/errors/proj-not_found.yaml'
           proj.origin_not_allowed: '../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../components/schemas/errors/proj-preview_not_live.yaml'
@@ -47,6 +50,7 @@ content:
           rel.revoked: '../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       att.invalid_request:
         summary: att.invalid_request
@@ -108,6 +112,11 @@ content:
         value:
           code: tkn.invalid_tknid
           message: 'token identifiers do not match token type'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       proj.not_found:
         summary: proj.not_found
         value:
@@ -148,3 +157,8 @@ content:
         value:
           code: enc_key.unknown_alg
           message: 'unsupported encryption algorithm'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

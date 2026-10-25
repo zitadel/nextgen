@@ -78,7 +78,7 @@ func newSweepCommand(gs *state.GlobalState) *cobra.Command {
 
 The target is --state (a target bootstrap already provisioned) or --base (a
 running server, provisioned from --fixtures first). Either way the server
-must already be up and answering /healthz; the sweep never starts one.`,
+must already be up and answering /readyz; the sweep never starts one.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			dir := out

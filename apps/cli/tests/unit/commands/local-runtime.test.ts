@@ -1041,7 +1041,7 @@ function startHealthServer() {
     const http = require("node:http");
     const port = Number(process.env.FAKE_DOCKER_HEALTH_PORT);
     const server = http.createServer((req, res) => {
-      if (req.url === "/healthz") {
+      if (req.url === "/readyz") {
         res.writeHead(200).end("ok");
         return;
       }
@@ -1123,7 +1123,7 @@ const http = require("node:http");
 const address = process.env.NEXTGEN_SERVER_ADDRESS || ":8080";
 const port = Number(address.split(":").at(-1));
 const server = http.createServer((req, res) => {
-  if (req.url === "/healthz") {
+  if (req.url === "/readyz") {
     res.writeHead(200).end("ok");
     return;
   }
@@ -1171,7 +1171,7 @@ const child = childProcess.spawn(process.execPath, ["-e", \`
   const http = require("node:http");
   const port = Number(process.env.FOREIGN_HEALTH_PORT);
   const server = http.createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -1214,7 +1214,7 @@ async function readDockerCalls(logPath: string): Promise<string[][]> {
 
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }

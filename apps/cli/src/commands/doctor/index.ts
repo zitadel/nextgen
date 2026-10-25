@@ -705,7 +705,7 @@ async function checkRuntime(
       );
     }
     if (!(await checkLocalServerHealth(runtime.server_url))) {
-      throw new Error(`${runtime.server_url} did not respond to /healthz`);
+      throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
     return `${runtime.server_url} is healthy`;
   });
