@@ -19,7 +19,7 @@ import { PLATFORM_PROJECT_ID, readPlatformRuntime } from "./runtime";
  */
 
 /**
- * Every call here runs after the server answered `/healthz`, so a stall means a
+ * Every call here runs after the server answered `/readyz`, so a stall means a
  * wedged server rather than a slow start. Without a bound, `zitadel start`
  * would hang on a socket that accepts and never answers.
  */

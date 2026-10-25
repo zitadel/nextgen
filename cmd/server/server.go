@@ -468,7 +468,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
@@ -720,7 +720,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
-	// Off: an incoming traceparent is not used. See ADR 079.
+	// Off: an incoming traceparent is not used. See ADR 080.
 	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
@@ -928,7 +928,7 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 // unchanged, so traceparent, tracestate and baggage are ignored and every
 // request starts a new trace. When set, the caller's context is extracted
 // ahead of everything else, so the request logs and the server span both see
-// it. ADR 079 records the decision.
+// it. ADR 080 records the decision.
 func withIncomingTraceContext(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, next http.Handler) http.Handler {
 	if !cfg.TrustRemoteSpans {
 		return next

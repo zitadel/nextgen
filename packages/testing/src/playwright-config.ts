@@ -193,7 +193,8 @@ export function withZitadel(
   };
   const supervisorEntry: WebServerEntry = {
     command: `node ${JSON.stringify(resolveEntry("supervisor"))}`,
-    url: `http://localhost:${port}/healthz`,
+    // Ready, not alive: /readyz answers once the instance's database does.
+    url: `http://localhost:${port}/readyz`,
     reuseExistingServer: false,
     cwd: configDir,
     stdout: "pipe",

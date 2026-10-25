@@ -176,7 +176,7 @@ so is everything ZITADEL does for that request. A caller that sends
 behind a proxy, gateway or mesh you control that strips or overwrites these
 headers at the edge, never when untrusted callers can reach ZITADEL directly,
 because any of them could force every request to be recorded. The decision is
-recorded in [ADR 079](../adrs/079-incoming-trace-context.md).
+recorded in [ADR 080](../adrs/080-incoming-trace-context.md).
 
 ```yaml
 instrumentation:

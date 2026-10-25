@@ -360,7 +360,7 @@ describe("claim", () => {
   describe("--server local", () => {
     // These talk to a real socket on an ephemeral port. msw's platform
     // handlers match any origin, so they would otherwise swallow the stub's
-    // claim routes and `onUnhandledRequest: "error"` would reject `/healthz`.
+    // claim routes and `onUnhandledRequest: "error"` would reject `/readyz`.
     beforeEach(() => {
       server.use(http.all(/^http:\/\/localhost:\d+\//, () => passthrough()));
     });
@@ -429,7 +429,7 @@ describe("claim", () => {
 });
 
 /**
- * A minimal stand-in for a local Zitadel server: enough of `/healthz` for
+ * A minimal stand-in for a local Zitadel server: enough of `/readyz` for
  * `resolveLocalServer` to accept it, and a claim pair that completes on the
  * first poll. msw is bypassed here because the request goes to localhost with
  * a port only known at runtime; a real socket is simpler than reshaping the
@@ -438,7 +438,7 @@ describe("claim", () => {
 async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
-    if (url === "/healthz") {
+    if (url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }

@@ -14,7 +14,7 @@ import (
 //
 // Extraction adopts the caller's sampled flag along with its trace ID, and
 // the tracer provider's sampler may honour it. Only install this where the
-// callers are trusted, see ADR 079. It must run before whatever starts the
+// callers are trusted, see ADR 080. It must run before whatever starts the
 // server span.
 func WithRemoteTraceContext(propagator propagation.TextMapPropagator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

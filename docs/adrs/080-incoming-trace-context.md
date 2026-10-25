@@ -1,4 +1,4 @@
-# ADR 079: Incoming Trace Context Is Ignored Unless `trust_remote_spans` Is On
+# ADR 080: Incoming Trace Context Is Ignored Unless `trust_remote_spans` Is On
 
 > **Status:** Proposed
 > **Date:** 2026-10-06

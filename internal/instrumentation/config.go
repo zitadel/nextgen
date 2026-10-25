@@ -129,7 +129,7 @@ type ErrorConfig struct {
 // from an incoming traceparent, tracestate and baggage; it is off by default,
 // so the incoming context is ignored and every request starts a new trace.
 // Trusting it also trusts the caller's sampled flag, so enable it only behind a
-// trusted proxy or mesh (ADR 079).
+// trusted proxy or mesh (ADR 080).
 type TraceConfig struct {
 	Fraction         float64              `mapstructure:"fraction"`
 	Exporter         zotel.ExporterConfig `mapstructure:"exporter"`
