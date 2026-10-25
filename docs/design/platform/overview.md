@@ -170,7 +170,7 @@ For customers who specifically *want* a redirect-to-Zitadel auth pattern — eit
 
 Pro-gated because DNS validation, cert rotation, and abuse takedown response all have ongoing operational cost. This is the only level where Zitadel hosts UI under a branded domain on the customer's behalf.
 
-Customization ownership — categories, first-iteration vs later, and the presentation models — is in [`../branding/customization-strategy.md`](../branding/customization-strategy.md) ([ADR 057](../../adrs/057-login-customization-categories.md)). ADR 057, amended to drop Zitadel-served login, leaves two models, embedded and fully custom: the customer's application presents every login. [ADR 079](../../adrs/079-customer-hosted-login-and-oidc-provider.md) (Proposed) withdraws this level's Zitadel-rendered login and meets its goal with a login app the customer deploys on the branded host.
+Customization ownership — categories, first-iteration vs later, and the presentation models — is in [`../branding/customization-strategy.md`](../branding/customization-strategy.md) ([ADR 057](../../adrs/057-login-customization-categories.md)). ADR 057, amended to drop Zitadel-served login, leaves two models, embedded and fully custom: the customer's application presents every login. [ADR 080](../../adrs/080-customer-hosted-login-and-oidc-provider.md) (Proposed) withdraws this level's Zitadel-rendered login and meets its goal with a login app the customer deploys on the branded host.
 
 ### Level 4 — White-label multi-tenant mapping  *(deferred)*
 

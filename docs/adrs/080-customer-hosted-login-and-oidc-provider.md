@@ -1,4 +1,4 @@
-# ADR 079: The Login Lives in the Customer's App and Becomes Its OIDC Provider
+# ADR 080: The Login Lives in the Customer's App and Becomes Its OIDC Provider
 
 > **Status:** Proposed
 > **Date:** 2026-10-24

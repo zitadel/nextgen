@@ -86,11 +86,11 @@ describe("zitadel api without an operation, at a terminal", () => {
 
 describe("zitadel api for an operation that needs no credential", () => {
   it("runs where no project was set up", async () => {
-    const envelope = await apiIn(await makeProject(), "getHealth", "--dry-run");
+    const envelope = await apiIn(await makeProject(), "getLive", "--dry-run");
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/healthz" },
+      data: { url: "http://localhost:8080/livez" },
     });
   });
 });

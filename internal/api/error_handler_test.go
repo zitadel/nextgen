@@ -789,7 +789,7 @@ func TestOgenMethodNotAllowed(t *testing.T) {
 
 	t.Run("wrong method", func(t *testing.T) {
 		t.Parallel()
-		req := httptest.NewRequest(http.MethodDelete, "/healthz", nil)
+		req := httptest.NewRequest(http.MethodDelete, "/livez", nil)
 		// A path the API defines is an API URL, browser or not.
 		req.Header.Set("Accept", "text/html")
 		rec := httptest.NewRecorder()
@@ -803,7 +803,7 @@ func TestOgenMethodNotAllowed(t *testing.T) {
 
 	t.Run("CORS preflight", func(t *testing.T) {
 		t.Parallel()
-		req := httptest.NewRequest(http.MethodOptions, "/healthz", nil)
+		req := httptest.NewRequest(http.MethodOptions, "/livez", nil)
 		req.Header.Set("Access-Control-Request-Method", "GET")
 		rec := httptest.NewRecorder()
 		srv.ServeHTTP(rec, req)
