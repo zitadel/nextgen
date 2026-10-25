@@ -13254,6 +13254,7 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
 	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -13269,21 +13270,6 @@ type CreateDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
-	Type                CreateDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid     AuthCsrfInvalid
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	RelRevoked          RelRevoked
-	ReqInvalid          ReqInvalid
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -13291,6 +13277,7 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
@@ -13306,20 +13293,6 @@ const (
 	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
-	AuthCsrfInvalidCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedCreateDeploymentErrorResponse    CreateDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedCreateDeploymentErrorResponse CreateDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "evt.invalid"
-	InternalCreateDeploymentErrorResponse            CreateDeploymentErrorResponseType = "internal"
-	NotImplementedCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundCreateDeploymentErrorResponse        CreateDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundCreateDeploymentErrorResponse         CreateDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
@@ -13400,6 +13373,8 @@ func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
 func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateDeploymentErrorResponse
+}
+
 // SetAuthCsrfInvalid sets CreateDeploymentErrorResponse to AuthCsrfInvalid.
 func (s *CreateDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
 	s.Type = AuthCsrfInvalidCreateDeploymentErrorResponse
@@ -78306,6 +78281,8 @@ func (s RevokeReleaseErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RevokeReleaseErrorResponse is Unavailable.
 func (s RevokeReleaseErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRevokeReleaseErrorResponse
+}
+
 // SetAuthCsrfInvalid sets RevokeReleaseErrorResponse to AuthCsrfInvalid.
 func (s *RevokeReleaseErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
 	s.Type = AuthCsrfInvalidRevokeReleaseErrorResponse
@@ -78849,6 +78826,7 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
 	Type                 RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -78864,21 +78842,6 @@ type RollbackDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
-	Type                RollbackDeploymentErrorResponseType // switch on this field
-	AuthCsrfInvalid     AuthCsrfInvalid
-	AuthUnauthorized    AuthUnauthorized
-	DepConflict         DepConflict
-	DepInvalid          DepInvalid
-	DepNotFound         DepNotFound
-	DepPermissionDenied DepPermissionDenied
-	EnvProjectNotFound  EnvProjectNotFound
-	EvtInvalid          EvtInvalid
-	Internal            Internal
-	NotImplemented      NotImplemented
-	ProjNotFound        ProjNotFound
-	RelNotFound         RelNotFound
-	RelRevoked          RelRevoked
-	ReqInvalid          ReqInvalid
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -78886,6 +78849,7 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
@@ -78901,20 +78865,6 @@ const (
 	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
 	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
-	AuthCsrfInvalidRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
-	AuthUnauthorizedRollbackDeploymentErrorResponse    RollbackDeploymentErrorResponseType = "auth.unauthorized"
-	DepConflictRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.conflict"
-	DepInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.invalid"
-	DepNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "dep.not_found"
-	DepPermissionDeniedRollbackDeploymentErrorResponse RollbackDeploymentErrorResponseType = "dep.permission_denied"
-	EnvProjectNotFoundRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "env.project_not_found"
-	EvtInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "evt.invalid"
-	InternalRollbackDeploymentErrorResponse            RollbackDeploymentErrorResponseType = "internal"
-	NotImplementedRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "not_implemented"
-	ProjNotFoundRollbackDeploymentErrorResponse        RollbackDeploymentErrorResponseType = "proj.not_found"
-	RelNotFoundRollbackDeploymentErrorResponse         RollbackDeploymentErrorResponseType = "rel.not_found"
-	RelRevokedRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "rel.revoked"
-	ReqInvalidRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "req.invalid"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -78995,6 +78945,8 @@ func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
 func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRollbackDeploymentErrorResponse
+}
+
 // SetAuthCsrfInvalid sets RollbackDeploymentErrorResponse to AuthCsrfInvalid.
 func (s *RollbackDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
 	s.Type = AuthCsrfInvalidRollbackDeploymentErrorResponse
