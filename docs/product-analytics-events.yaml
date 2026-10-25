@@ -335,6 +335,18 @@ properties:
   failed_checks:
     type: string
     description: The failed checks' names, comma-separated, never their messages.
+  credential:
+    type: string
+    description: Which credential a command connected with, `project` or `preview`; never a token.
+  has_env_file:
+    type: boolean
+    description: Whether `--env-file` was given; never the file's path.
+  resources:
+    type: number
+    description: How many resources the release pinned; never a handle or a digest.
+  origin_count:
+    type: number
+    description: How many origins a deployment went live on; never an origin.
   is_secret:
     type: boolean
     description: Whether a variable is secret; never its name or value.
@@ -473,13 +485,13 @@ components:
         - files_written_count
         - package_manager
       branding:eject: [design]
-      plan: [creates, updates, deletes, revisions, total]
-      apply: [creates, updates, deletes, revisions, total]
+      deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
       start: [runtime]
-      variables:get: [is_secret]
-      variables:list: [variable_count]
-      variables:set: [is_secret]
+      variable:get: [is_secret]
+      variable:list: [variable_count]
+      variable:set: [is_secret]
+      variable:resolve: [variable_count]
       api: [operation, is_paginated]
       claim: [claim_outcome, poll_count, browser_opened]
     profile:

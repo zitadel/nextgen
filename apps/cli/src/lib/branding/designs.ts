@@ -1,7 +1,7 @@
 import { BRANDING_DESIGNS, type BrandingDesign } from "@zitadel/config/defaults";
 
 import { ZitadelError } from "../errors";
-import { publicCliCommand } from "../public-cli";
+import { unscopedCommand } from "../suggestion";
 
 /**
  * Human-facing name and one-line hint for each shipped login design, shown by
@@ -48,7 +48,7 @@ export function resolveBrandingDesign(design: string, cliVersion: string): Brand
       `The ${design} design was retired: it was page layout, not widget structure`,
       {
         hint: `${PAGE_LAYOUT_HINT} To own the widget's structure, eject one of: ${catalog}.`,
-        nextCommands: [publicCliCommand("branding eject --design centered", cliVersion)],
+        nextCommands: [unscopedCommand("branding eject --design centered", cliVersion)],
       },
     );
   }
@@ -70,7 +70,7 @@ export function setupDesignRemovedError(cliVersion: string): ZitadelError {
       hint:
         `Rerun setup without --design. ${PAGE_LAYOUT_HINT} ` +
         `To own the widget's structure after setup, eject one of: ${BRANDING_DESIGNS.join(", ")}.`,
-      nextCommands: [publicCliCommand("branding eject", cliVersion)],
+      nextCommands: [unscopedCommand("branding eject", cliVersion)],
     },
   );
 }

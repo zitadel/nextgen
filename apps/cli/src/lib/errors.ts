@@ -1,4 +1,5 @@
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import type { SuggestedCommand } from "./suggestion";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -51,7 +52,8 @@ export const EXIT_CODES: Record<ZitadelErrorCode, number> = {
  */
 export type ZitadelErrorOptions = {
   hint?: string;
-  nextCommands?: string[];
+  /** Built by the `lib/suggestion` builders, so a project command keeps its selector. */
+  nextCommands?: readonly SuggestedCommand[];
   details?: unknown;
 };
 
@@ -64,7 +66,7 @@ export type ZitadelErrorOptions = {
 export class ZitadelError extends Error {
   readonly code: ZitadelErrorCode;
   readonly hint?: string;
-  readonly nextCommands?: string[];
+  readonly nextCommands?: readonly SuggestedCommand[];
   readonly details?: unknown;
 
   constructor(code: ZitadelErrorCode, message: string, opts: ZitadelErrorOptions = {}) {
@@ -125,12 +127,23 @@ export function toZitadelError(error: unknown): ZitadelError {
         : apiErrorMessage(error);
       return new ZitadelError("E_NOT_FOUND", message, { details });
     }
-    const code: ZitadelErrorCode =
-      error.status === 401 || error.status === 403
+    // A 409 is the platform refusing because of the state it holds — a
+    // release still served, a deploy that raced in, a revoked release — not
+    // because the request was malformed, so it is a conflict.
+    // A 403 naming an origin the project does not hold is a refused target,
+    // not a bad credential: re-authenticating would never fix it.
+    const originRefused =
+      error.status === 403 &&
+      (error.body as { code?: unknown } | undefined)?.code === "proj.origin_not_allowed";
+    const code: ZitadelErrorCode = originRefused
+      ? "E_VALIDATION"
+      : error.status === 401 || error.status === 403
         ? "E_AUTH"
-        : error.status >= 500
-          ? "E_NETWORK"
-          : "E_VALIDATION";
+        : error.status === 409
+          ? "E_CONFLICT"
+          : error.status >= 500
+            ? "E_NETWORK"
+            : "E_VALIDATION";
     // The platform names the fields it rejected, and the message does not
     // repeat them: `idp.field_immutable` says only "the field is fixed for the
     // life of the connection", which leaves the reader to guess which of a
@@ -185,7 +198,7 @@ export function toZitadelError(error: unknown): ZitadelError {
       hint:
         error.reason === "timeout"
           ? "The server accepted the connection but did not answer in time. Check that it is healthy, then retry."
-          : "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
+          : "Check your connection and the server URL (ZITADEL_URL or --server).",
       details: { url: error.url, reason: error.reason },
     });
   }
