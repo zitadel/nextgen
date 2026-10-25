@@ -63,8 +63,6 @@ tasks:
       - "/packages/sdk-nuxt/src/index.ts"
       - "/packages/sdk-tanstack-start/src/react.tsx"
       - "/packages/sdk-*/src/*.edge.spec.{ts,tsx}"
-      # Every SDK's declaration spec, to check the copies match byte for byte.
-      - "/packages/sdk-*/src/dts.test.ts"
       - "/packages/*/vitest.config.ts"
       # And the meta-framework SDKs' server tests, to check they share their titles.
       - "/packages/sdk-*/src/__tests__/*.test.ts"

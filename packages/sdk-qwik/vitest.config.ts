@@ -41,7 +41,7 @@ export default defineConfig({
           globals: true,
           setupFiles: ["src/test-setup.ts"],
           include: ["src/**/*.{test,spec}.{ts,tsx}"],
-          exclude: ["src/**/*.ssr.spec.tsx", "src/dts.test.ts", edgeSpecs],
+          exclude: ["src/**/*.ssr.spec.tsx", edgeSpecs],
           browser: {
             enabled: true,
             provider: playwright(),
@@ -59,7 +59,7 @@ export default defineConfig({
           name: "ssr",
           globals: true,
           environment: "node",
-          include: ["src/**/*.ssr.spec.tsx", "src/dts.test.ts"],
+          include: ["src/**/*.ssr.spec.tsx"],
         },
       },
       // Runs the edge specs in the edge-runtime VM; see edgeProject in vitest.shared.mjs.
