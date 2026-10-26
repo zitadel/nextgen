@@ -28,5 +28,15 @@
     "Email": "pinned-user@example.com",
     "EmailVerified": true,
     "PreferredLanguage": "en"
+  },
+  "rollback-user": {
+    "ID": "rollback-user",
+    "Username": "rollback-user",
+    "Password": "journey-pass",
+    "FirstName": "Rollback",
+    "LastName": "User",
+    "Email": "rollback-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
   }
 }

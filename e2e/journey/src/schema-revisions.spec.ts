@@ -27,9 +27,11 @@ import {
  * before a schema deploy and one created after it must both sign in, with a
  * password and through the SSO provider, and neither record may change. A
  * revision that is released but not deployed must not take new users.
+ * Rolling back to the first release (#2115) moves new registrations back to
+ * revision 1 and changes no user: everyone still signs in both ways.
  * Its own Playwright project runs it after the other specs, because it leaves
- * the app with SSO enabled, an IdP connection and schema revision 3 released
- * but revision 2 deployed.
+ * the app with SSO enabled, an IdP connection, schema revision 3 released and
+ * the first release, pinning revision 1, deployed again.
  */
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
@@ -40,7 +42,8 @@ const mockPassword = "journey-pass";
 const userA = { username: "rev1-user", email: "rev1-user@example.com" };
 const userB = { username: "rev2-user", email: "rev2-user@example.com" };
 const userC = { username: "pinned-user", email: "pinned-user@example.com" };
-// The app password both users get through the API.
+const userD = { username: "rollback-user", email: "rollback-user@example.com" };
+// The app password every user gets through the API.
 const { password } = identity();
 
 let metadata: JourneyMetadata & { localRuntimeUrl: string };
@@ -54,14 +57,23 @@ type UserRecord = Awaited<ReturnType<ZitadelClient["getUserByID"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
 let recordC: UserRecord;
+let recordD: UserRecord;
+let releaseA: string;
 
 /**
  * Builds a release from `.zitadel/` and deploys it to the project's primary
  * origins. Setup registered the app's own dev URL as one, so the release is
- * what the browser's sign-in is served.
+ * what the browser's sign-in is served. Returns the release's id.
  */
-async function deploy(message: string): Promise<void> {
-  await runCli(metadata, ["deploy", "-m", message, "--non-interactive", "--json"]);
+async function deploy(message: string): Promise<string> {
+  const envelope = (await runCli(metadata, [
+    "deploy",
+    "-m",
+    message,
+    "--non-interactive",
+    "--json",
+  ])) as { data: { release_id: string } };
+  return envelope.data.release_id;
 }
 
 test.beforeAll(async () => {
@@ -97,7 +109,7 @@ test("enables the mock provider", async () => {
     ],
     OIDC_MOCK_CLIENT_SECRET,
   );
-  await deploy("enable the mock provider");
+  releaseA = await deploy("enable the mock provider");
 
   objectType = (await readSchemaFile()).objectType as string;
   revision1 = await latestRevision();
@@ -147,35 +159,82 @@ test("registers user C through the provider on the deployed revision 2", async (
 });
 
 test("all sign in with the password", async ({ page }) => {
-  for (const user of [userA, userB, userC]) {
+  await expectPasswordSignIns(page, [userA, userB, userC]);
+});
+
+test("all sign in through the provider", async ({ page }) => {
+  await expectProviderSignIns(page, [userA, userB, userC]);
+});
+
+test("user records are unchanged", async () => {
+  await expectRecordsUnchanged([
+    [recordA, revision1],
+    [recordB, revision2],
+    [recordC, revision2],
+  ]);
+});
+
+test("rolls back to the release pinning revision 1", async () => {
+  // Bare, rollback undoes the last deploy: revision 3 was only released, so
+  // that deploy is the one of revision 2, and release A is served again.
+  const envelope = (await runCli(metadata, [
+    "deployment",
+    "rollback",
+    "--force",
+    "--non-interactive",
+    "--json",
+  ])) as { data: { release_id: string } };
+  expect(envelope.data.release_id).toBe(releaseA);
+});
+
+test("registers user D through the provider on revision 1 after the rollback", async ({ page }) => {
+  recordD = await registerThroughProvider(page, userD, revision1);
+});
+
+test("all sign in with the password after the rollback", async ({ page }) => {
+  await expectPasswordSignIns(page, [userA, userB, userC, userD]);
+});
+
+test("all sign in through the provider after the rollback", async ({ page }) => {
+  await expectProviderSignIns(page, [userA, userB, userC, userD]);
+});
+
+test("the rollback changed no user record", async () => {
+  await expectRecordsUnchanged([
+    [recordA, revision1],
+    [recordB, revision2],
+    [recordC, revision2],
+    [recordD, revision1],
+  ]);
+});
+
+async function expectPasswordSignIns(page: Page, users: { email: string }[]): Promise<void> {
+  for (const user of users) {
     await gotoLogin(page);
     await loginWithPassword(page, { email: user.email, password });
     await expectSignedIn(page);
     await logout(page);
   }
-});
+}
 
-test("all sign in through the provider", async ({ page }) => {
-  for (const user of [userA, userB, userC]) {
+async function expectProviderSignIns(page: Page, users: { username: string }[]): Promise<void> {
+  for (const user of users) {
     // A linked user goes straight to done: no collection step.
     await signInAtProvider(page, user.username);
     await expectSignedIn(page);
     await logout(page);
   }
-});
+}
 
-test("user records are unchanged", async () => {
-  for (const [record, revision] of [
-    [recordA, revision1],
-    [recordB, revision2],
-    [recordC, revision2],
-  ] as const) {
+/** Each user still has the revision, attributes and update time it was recorded with. */
+async function expectRecordsUnchanged(expected: (readonly [UserRecord, string])[]): Promise<void> {
+  for (const [record, revision] of expected) {
     const now = await client.getUserByID(record.id);
     expect(now.schema).toBe(revision);
     expect(now.attributes).toEqual(record.attributes);
     expect(now.metadata.updated_at).toBe(record.metadata.updated_at);
   }
-});
+}
 
 function schemaFile(): string {
   return join(metadata.appDir, ".zitadel/schemas/default-human-user.json");
