@@ -97,6 +97,26 @@ Don't change the port in only one of these places. Starting the app with `PORT=3
   <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
+## Protect a route
+
+Next.js runs the middleware only on routes the `matcher` covers, so a route needs sign-in only when it is in both `protectedRoutes` and the `matcher`. To protect another route, add it to both in `proxy.ts`:
+
+```ts
+export function proxy(req: NextRequest) {
+  return nextgenMiddleware(req, {
+    url: process.env.ZITADEL_URL,
+    protectedRoutes: ["/profile", "/orders*"],
+    loginPath: "/login",
+  });
+}
+
+export const config = {
+  matcher: ["/__nextgen/:path*", "/profile/:path*", "/orders/:path*"],
+};
+```
+
+A `protectedRoutes` entry with a trailing `*` matches every path that starts with it.
+
 ## Usage
 
 Read auth state in a server component:

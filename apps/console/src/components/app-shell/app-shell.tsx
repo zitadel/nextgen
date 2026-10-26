@@ -20,7 +20,7 @@ import {
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { useNavItems } from "./use-nav-items";
+import { useNavItems, useRequestedNavItem } from "./use-nav-items";
 import type { NavView } from "@/nav";
 import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
 
@@ -63,7 +63,7 @@ export function AppShell({
         {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
             about an account screen. */}
-        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} />}
+        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} userId={user?.userId} />}
         {children}
       </SidebarInset>
     </SidebarProvider>
@@ -183,8 +183,10 @@ function SettingsHeader() {
  * Console ADR 0001). Portal is the project's screens; Settings holds the
  * person's profile alone while accounts are not surfaced (Console ADR 0005
  * §3). A row stays marked on the screens beneath it, so a resource's detail
- * keeps its list marked. Design-only entries (`DESIGN_ONLY_NAV`, empty today)
- * render disabled.
+ * keeps its list marked. While Projects asks for a project on the way to a
+ * screen (`?next=`), that screen's row is the marked one, as it is what the
+ * person opened. Design-only entries (`DESIGN_ONLY_NAV`, empty today) render
+ * disabled.
  *
  * Rows keep their height and a 2px gap in both sidebar states, so collapsing
  * moves nothing vertically.
@@ -192,6 +194,7 @@ function SettingsHeader() {
 function NavList({ view, label }: { view: NavView; label: string }) {
   const items = useNavItems(view);
   const matchRoute = useMatchRoute();
+  const requested = useRequestedNavItem(items);
 
   return (
     <SidebarGroup role="navigation" aria-label={label} className="pt-4 pb-0">
@@ -201,7 +204,7 @@ function NavList({ view, label }: { view: NavView; label: string }) {
             {to ? (
               <SidebarMenuButton
                 asChild
-                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
                 <Link to={to} title={name}>
@@ -234,10 +237,11 @@ function NavList({ view, label }: { view: NavView; label: string }) {
  * sidebar's brand header. The collapse toggle lives in the sidebar and the
  * theme in the account menu, so the bar carries neither.
  */
-function ContextBar({ onSearch }: { onSearch: () => void }) {
+function ContextBar({ onSearch, userId }: { onSearch: () => void; userId?: string }) {
   return (
     <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-2 md:px-4">
-      <ContextSwitcher />
+      {/* The signed-in person, whose recent projects the switcher keeps. */}
+      <ContextSwitcher userId={userId} />
       {/* Hidden on phones, as in the proposal: ⌘K still opens it, and the bar
           needs the width for the switchers. */}
       <div className="hidden w-75 justify-end sm:flex">

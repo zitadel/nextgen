@@ -1,60 +1,65 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Boxes, Search } from "lucide-react";
+import { Boxes, Plus, Search } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { consoleSessionProject, validateNextSearch } from "@/auth/session";
+import { useNavItems, useRequestedNavItem } from "@/components/app-shell/use-nav-items";
+import { NewProjectSheet } from "@/components/new-project-sheet";
+import { ProjectMark } from "@/components/project-mark";
 import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
   RESOURCE_HEADER,
-  RESOURCE_ROW_ICON,
-  RESOURCE_ROW_LINK,
-  RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
+  ResourceIdCell,
   ResourceMenuHead,
   ResourceRow,
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { CliCommand, CliHint, cliSetup } from "@/components/cli-hint";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
-import { serverOrigin } from "@/lib/server-origin";
-import { useMyProjects, useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
+import { byName, primaryHost, useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
 import { Page } from "@/components/layout";
 
 /**
  * Projects overview — every project the person can act on.
  *
- * The sidebar's first entry, above the selected project's contents. It is not
- * scoped (`staticData.scope`), so it is listed with or without a selection and
- * is the one entry while nothing is selected. The top bar shows no project
- * switcher here: this list is where a project is chosen, and it marks the
- * selected one. It is where the console lands when there are several
- * projects and none is selected yet (`routes/_authed.tsx`). The
- * guard then passes the screen it was asked for as `?next=`, and a row goes
- * back there with the project selected.
+ * The sidebar's first entry, above the project's screens. It is where the
+ * console lands when there are several projects and none is selected yet
+ * (`routes/_authed/index.tsx`), and where the `_authed` guard sends a screen
+ * that needs a project while none is selected, passing it as `?next=`. The
+ * page is then the way to that screen — `Continue to Teams`, with Teams marked
+ * in the sidebar (D22) — and a row goes on there with the project selected.
  *
  * A row opens the project — selects it and goes to its first screen — rather
  * than a detail page: the project's own page is `Project settings` in the
  * sidebar once it is selected, and the row menu links there directly.
  *
- * Once the person's projects run past one page it carries a search, matched on
- * the server across every project they can act on (`name_contains`), never
- * against the rows already loaded: an account with many projects finds one by
- * name rather than by paging. A list that fits on one page needs none. "One
- * page" is the first page the project switcher reads (`useMyProjects`), so the
- * two offer a search to the same people.
+ * The list can hold every project of a deployment — a platform operator acts
+ * on all of them — so a row tells projects apart the way the project switcher
+ * does (D21): the project's generated mark, its name with its site's host
+ * beneath, and its ID. Complete on its first page, the list reads by name;
+ * a longer one keeps the server's order, by id, so `Load more` appends to the
+ * rows shown rather than reshuffling them. The search is matched on the server
+ * across every project the person can act on (`name_contains`), never against
+ * the rows already loaded.
+ *
+ * The top bar shows no project switcher here: this list, with its search, is
+ * the switcher's job done at full size, so the selected project is marked in it
+ * (`Current`) rather than named above it.
  */
 export const Route = createFileRoute("/_authed/projects/")({
   // Order 1: above Teams (2), the first of the selected project's screens.
@@ -91,25 +96,23 @@ type ProjectsSearch = { next?: string; q?: string };
  */
 const PAGE_SIZE = 25;
 
-/** Three equal columns; the trailing one carries the row menu. */
-const COLUMN = "w-1/3";
+/** The Name cell clamps at 280px and truncates, as the Users table's User cell does. */
+const NAME_CLAMP = "max-w-70";
 
 function ProjectsScreen() {
   const loaded = Route.useLoaderData();
   const navigate = useNavigate({ from: Route.fullPath });
   const selected = useProjectScope();
   const selectTarget = useSelectProjectTarget();
+  // Opened on the way to a screen that needs a project (`?next=`), the page
+  // names that screen, as the sidebar marks it (D22).
+  const requested = useRequestedNavItem(useNavItems());
   const search = Route.useSearch();
   const onSearch = useCallback(
     (q: string) =>
       void navigate({ search: (prev) => ({ ...prev, q: q || undefined }), replace: true }),
     [navigate],
   );
-  // Latched for the screen's lifetime: a cleared search drops `?q=` before the
-  // full list is back, and the field must not unmount in between.
-  const mine = useMyProjects();
-  const [searchable, setSearchable] = useState(false);
-  if (!searchable && (mine?.more || search.q)) setSearchable(true);
 
   const paging = useLoadMore(
     loaded,
@@ -127,16 +130,42 @@ function ProjectsScreen() {
     },
     "Could not load more projects.",
   );
-  const projects = [...loaded.projects, ...paging.extra];
+  // A page with no token after it is the whole list, so it can read by name;
+  // the server's order is by id, which reads as no order at all.
+  const projects = loaded.nextPageToken
+    ? [...loaded.projects, ...paging.extra]
+    : byName(loaded.projects);
+
+  // Latched for the screen's lifetime: a cleared search drops `?q=` before the
+  // full list is back, and the field must not unmount in between. A person
+  // with no projects has nothing to search.
+  const [searchable, setSearchable] = useState(false);
+  if (!searchable && (projects.length > 0 || search.q)) setSearchable(true);
 
   return (
     <Page>
-      <ResourceTitle>Projects</ResourceTitle>
-      {/* Until a project is selected the sidebar lists only this screen, so the
-          page says why and what to do about it. */}
-      {!selected && projects.length > 0 && (
+      <ResourceTitle
+        action={
+          <NewProjectSheet>
+            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                `px-2.5`, as on the Users title. */}
+            <Button className="shrink-0 gap-1.5 px-2.5!">
+              <Plus aria-hidden />
+              New project
+            </Button>
+          </NewProjectSheet>
+        }
+      >
+        {requested ? `Continue to ${requested.nav.label}` : "Projects"}
+      </ResourceTitle>
+      {/* Until a project is selected the project's screens ask for one first,
+          so the page says what choosing one is for, or, on the way to one of
+          them, that choosing goes on there. */}
+      {projects.length > 0 && (requested || !selected) && (
         <p className={`${RESOURCE_HEADER} text-muted-foreground mt-2 text-sm`}>
-          Select a project to manage its teams, users and login flows.
+          {requested
+            ? "Choose a project to continue."
+            : "Select a project to manage its teams, users and login flows."}
         </p>
       )}
       {searchable && (
@@ -145,57 +174,78 @@ function ProjectsScreen() {
         </div>
       )}
 
+      {/* As the Users table: the Name cell clamps, the ID takes the slack and
+          truncates first, and the date and row menu keep their own width. */}
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
-        {/* Three equal columns, as the design lays them out; the trailing one
-            carries the row menu. */}
-        <Table className={RESOURCE_TABLE_FIXED}>
+        <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell className={COLUMN}>Name</ResourceHeadCell>
-              <ResourceHeadCell className={COLUMN}>Created</ResourceHeadCell>
-              <ResourceMenuHead className={COLUMN} />
+              <ResourceHeadCell>Name</ResourceHeadCell>
+              <ResourceHeadCell>ID</ResourceHeadCell>
+              <ResourceHeadCell>Created</ResourceHeadCell>
+              <ResourceMenuHead className="w-15" />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {projects.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>
+              <ResourceEmptyRow colSpan={4}>
                 {loaded.q ? `No projects match “${loaded.q}”.` : "No projects yet."}
               </ResourceEmptyRow>
             ) : (
-              projects.map((project) => (
-                // The whole row opens the project: selects it and lands on its
-                // first screen, or on the screen `?next=` names — the same
-                // target as the switcher's row. The name
-                // is a real link so the row is reachable by keyboard and the
-                // target shows in the status bar; the row handler is the pointer
-                // affordance on top of it, and `opensRow` keeps it out of the
-                // link's way.
-                <ResourceRow
-                  key={project.id}
-                  aria-current={project.id === selected ? "true" : undefined}
-                  onOpen={() => void navigate(selectTarget(project.id))}
-                >
-                  <TableCell className={`${RESOURCE_CELL} truncate`}>
-                    <Link {...selectTarget(project.id)} className={RESOURCE_ROW_LINK}>
-                      <Boxes aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-                      {project.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className={RESOURCE_CELL_MUTED}>
-                    {formatDate(project.created_at)}
-                  </TableCell>
-                  <TableCell className={`${RESOURCE_CELL} text-right`}>
-                    <RowActions projectId={project.id} name={project.name} />
-                  </TableCell>
-                </ResourceRow>
-              ))
+              projects.map((project) => {
+                const host = primaryHost(project.origins);
+                return (
+                  // The whole row opens the project: selects it and lands on its
+                  // first screen, or on the screen `?next=` names — the same
+                  // target as the switcher's row. The name is a real link so the
+                  // row is reachable by keyboard and the target shows in the
+                  // status bar; the row handler is the pointer affordance on top
+                  // of it, and `opensRow` keeps it out of the link's way.
+                  <ResourceRow
+                    key={project.id}
+                    className="group"
+                    aria-current={project.id === selected ? "true" : undefined}
+                    onOpen={() => void navigate(selectTarget(project.id))}
+                  >
+                    {/* The mark and the host are the project switcher's: what
+                        tells two projects of one name apart (D20's pattern of
+                        a second line under the name). */}
+                    <TableCell className={`${RESOURCE_CELL} ${NAME_CLAMP} text-sm`}>
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <ProjectMark projectId={project.id} className="size-6" />
+                        <span className="min-w-0">
+                          {/* The bar has no project pill here, so the list
+                              says which project the other screens open (D21). */}
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <Link
+                              {...selectTarget(project.id)}
+                              className="text-foreground min-w-0 truncate font-medium underline-offset-2 hover:underline"
+                            >
+                              {project.name}
+                            </Link>
+                            {project.id === selected && <Badge variant="secondary">Current</Badge>}
+                          </span>
+                          {host && (
+                            <span className="text-muted-foreground block truncate text-xs">
+                              {host}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </TableCell>
+                    <ResourceIdCell id={project.id} name={project.name} />
+                    <TableCell className={RESOURCE_CELL_MUTED}>
+                      {formatDate(project.created_at)}
+                    </TableCell>
+                    <TableCell className={`${RESOURCE_CELL} text-right`}>
+                      <RowActions projectId={project.id} name={project.name} />
+                    </TableCell>
+                  </ResourceRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
-        <CliHint>
-          Create a project and connect your app with{" "}
-          <CliCommand>{cliSetup(serverOrigin())}</CliCommand>.
-        </CliHint>
       </div>
 
       <LoadMore paging={paging} />

@@ -15458,6 +15458,45 @@ func (c *MockVariableServiceGetDecryptedVariablesCall) DoAndReturn(f func(contex
 	return c
 }
 
+// GetDeploymentVariables mocks base method.
+func (m *MockVariableService) GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeploymentVariables", ctx, projectID, deploymentID)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeploymentVariables indicates an expected call of GetDeploymentVariables.
+func (mr *MockVariableServiceMockRecorder) GetDeploymentVariables(ctx, projectID, deploymentID any) *MockVariableServiceGetDeploymentVariablesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeploymentVariables", reflect.TypeOf((*MockVariableService)(nil).GetDeploymentVariables), ctx, projectID, deploymentID)
+	return &MockVariableServiceGetDeploymentVariablesCall{Call: call}
+}
+
+// MockVariableServiceGetDeploymentVariablesCall wrap *gomock.Call
+type MockVariableServiceGetDeploymentVariablesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceGetDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockVariableServiceGetDeploymentVariablesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceGetDeploymentVariablesCall) Do(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockVariableServiceGetDeploymentVariablesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceGetDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockVariableServiceGetDeploymentVariablesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // GetVariables mocks base method.
 func (m *MockVariableService) GetVariables(ctx context.Context, owner domain.VariableOwner, kind *domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error) {
 	m.ctrl.T.Helper()

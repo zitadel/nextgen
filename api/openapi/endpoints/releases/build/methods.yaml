@@ -1,5 +1,6 @@
 post:
   operationId: buildRelease
+  x-zitadel-cli: deploy
   summary: Build a release from files
   description: |
     Builds a release from the resources of `.zitadel/` as authored on disk,
@@ -11,7 +12,9 @@ post:
     allocates nothing, however long ago it was built. Otherwise every resource is compared against the
     project's newest revision of the same handle: unchanged content reuses
     that revision, changed content allocates a new one, and the request
-    answers `201` with the new release. Metadata is excluded from the
+    answers `201` with the new release. A policy whose config matches only an
+    older revision allocates a new one too, so a request that resolves no
+    release, which reads the newest revision, applies it as well. Metadata is excluded from the
     comparison, so the same content under a different `message` is the same
     release.
 
@@ -25,8 +28,8 @@ post:
 
     Building writes revisions, so besides `release.write` it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
-    `flow_definition.write`, `branding.write` and `idp.write`, as the
-    per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+    `flow_definition.write`, `branding.write`, `idp.write` and
+    `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
     naming the kind. An empty kind needs no scope.
 
     Building a release does not deploy it. A release is not tied to an
@@ -112,6 +115,10 @@ post:
                       scopes:
                         - openid
                         - email
+                policies:
+                  - operation: auth.factor.password.set
+                    config:
+                      min_length: 12
                 branding:
                   layout: centered
                   liquid_template: '<main>{{ step.name }}</main>'

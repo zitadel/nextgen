@@ -1,7 +1,10 @@
 # ADR 070: CLI Commands to Enable and Disable Sign-In Methods
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-10-09)
 > **Date:** 2026-10-09
+>
+> **Amendment (2026-10-24):** shipped in #1492 as
+> `zitadel auth-method {password,passkey,sso} {enable,disable}`.
 > **Context:** [#1488](https://github.com/zitadel/nextgen/issues/1488)
 > **Relates to:** [ADR 064](064-cli-resource-commands.md)
 

@@ -3652,6 +3652,42 @@ func (s *ConfigurationBundle) Validate() error {
 		})
 	}
 	if err := func() error {
+		if s.Policies == nil {
+			return nil // optional
+		}
+		if err := (validate.Array{
+			MinLength:    0,
+			MinLengthSet: false,
+			MaxLength:    50,
+			MaxLengthSet: true,
+		}).ValidateLength(len(s.Policies)); err != nil {
+			return errors.Wrap(err, "array")
+		}
+		var failures []validate.FieldError
+		for i, elem := range s.Policies {
+			if err := func() error {
+				if err := elem.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				failures = append(failures, validate.FieldError{
+					Name:  fmt.Sprintf("[%d]", i),
+					Error: err,
+				})
+			}
+		}
+		if len(failures) > 0 {
+			return &validate.Error{Fields: failures}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "policies",
+			Error: err,
+		})
+	}
+	if err := func() error {
 		if value, ok := s.Branding.Get(); ok {
 			if err := func() error {
 				if err := value.Validate(); err != nil {
@@ -3812,24 +3848,6 @@ func (s *CreateDeploymentRequest) Validate() error {
 	}(); err != nil {
 		failures = append(failures, validate.FieldError{
 			Name:  "targets",
-			Error: err,
-		})
-	}
-	if err := func() error {
-		if value, ok := s.TTL.Get(); ok {
-			if err := func() error {
-				if err := value.Validate(); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return err
-			}
-		}
-		return nil
-	}(); err != nil {
-		failures = append(failures, validate.FieldError{
-			Name:  "ttl",
 			Error: err,
 		})
 	}
@@ -10528,6 +10546,24 @@ func (s *PreviewRemovedEvent) Validate() error {
 			Error: err,
 		})
 	}
+	if err := func() error {
+		if value, ok := s.Metadata.Get(); ok {
+			if err := func() error {
+				if err := value.Validate(); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "metadata",
+			Error: err,
+		})
+	}
 	if len(failures) > 0 {
 		return &validate.Error{Fields: failures}
 	}
@@ -10581,26 +10617,6 @@ func (s PreviewRemovedEventDelegationType) Validate() error {
 	default:
 		return errors.Errorf("invalid value: %v", s)
 	}
-}
-
-func (s PreviewTTL) Validate() error {
-	alias := (string)(s)
-	if err := (validate.String{
-		MinLength:     0,
-		MinLengthSet:  false,
-		MaxLength:     0,
-		MaxLengthSet:  false,
-		Email:         false,
-		Hostname:      false,
-		Regex:         regexMap["^[1-9][0-9]{0,5}[mhd]$"],
-		MinNumeric:    0,
-		MinNumericSet: false,
-		MaxNumeric:    0,
-		MaxNumericSet: false,
-	}).Validate(string(alias)); err != nil {
-		return errors.Wrap(err, "string")
-	}
-	return nil
 }
 
 func (s *ProjectCreatedEvent) Validate() error {
@@ -12921,6 +12937,8 @@ func (s ReleasePointerKind) Validate() error {
 	case "branding":
 		return nil
 	case "idp":
+		return nil
+	case "policy":
 		return nil
 	default:
 		return errors.Errorf("invalid value: %v", s)

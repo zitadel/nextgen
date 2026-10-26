@@ -40,7 +40,6 @@ const (
 	GetFlowDefinitionOperation             OperationName = "GetFlowDefinition"
 	GetFlowStepOperation                   OperationName = "GetFlowStep"
 	GetGrantOperation                      OperationName = "GetGrant"
-	GetHealthOperation                     OperationName = "GetHealth"
 	GetIdpByIdOperation                    OperationName = "GetIdpById"
 	GetIdpRevisionByIdOperation            OperationName = "GetIdpRevisionById"
 	GetLiveOperation                       OperationName = "GetLive"

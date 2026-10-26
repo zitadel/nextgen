@@ -97,33 +97,6 @@ const SDK_VUE_CLASS = [
   "sdk-vue:test",
   "sdk-vue:typecheck",
 ];
-const LOGIN_UI_CLASS = [
-  "e2e:all",
-  "e2e:console-embedded",
-  "e2e:console-platform",
-  "e2e:console-real",
-  "e2e:demo-next-real",
-  "login-ui:build",
-  "login-ui:build-release",
-  "login-ui:dev",
-  "login-ui:lint",
-  "login-ui:preview",
-  "login-ui:test",
-  "login-ui:typecheck",
-  "release:pack",
-  "release:publish",
-  "release:snapshot",
-  "server:build",
-  "server:lint",
-  "server:test",
-  "server:test-postgres",
-  "server:test-spanner",
-  "server:test-sqlite",
-  "server:vet",
-  "testing:test-integration",
-  "workspace:build-local-image",
-  "workspace:smoke-container",
-];
 const TESTING_KIT_CLASS = [
   "e2e:all",
   "e2e:console-embedded",
@@ -184,12 +157,6 @@ const COMPONENTS_CLASS = [
   "e2e:demo-nuxt-mock",
   "e2e:journey",
   "e2e:journey-local",
-  "login-ui:build",
-  "login-ui:build-release",
-  "login-ui:dev",
-  "login-ui:preview",
-  "login-ui:test",
-  "login-ui:typecheck",
   "release:build-public-packages",
   "release:pack",
   "release:publish",
@@ -436,19 +403,6 @@ test("console spec edit runs the console suites and the snapshot, on one framewo
   assert.deepEqual(journeys(gates), [false, false, false, false]);
   assert.equal(matrix, "single");
   assert.equal(gates.go_tests, false);
-});
-
-test("login-ui change runs all journeys on a single framework, and the Go tests", () => {
-  // The server's test binary embeds the login UI build, so server:test moves.
-  const { gates, matrix } = resolveGates({
-    mode: "full",
-    files: ["apps/login-ui/src/main.ts"],
-    targets: LOGIN_UI_CLASS,
-  });
-  assert.deepEqual(journeys(gates), [true, true, true, true]);
-  assert.equal(matrix, "single");
-  assert.equal(gates.go_tests, true);
-  assert.equal(gates.suites_console, true);
 });
 
 test("testing-kit change runs all journeys with the full matrix", () => {

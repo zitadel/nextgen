@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
@@ -34,9 +35,11 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
@@ -45,8 +48,8 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
-	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -305,19 +308,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
+	// The console previews a project's login from the public base, so opening
+	// a flow admits its origin for every project; no later step does.
+	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	releaseService := service.NewReleaseService(
-		serviceDBPool,
-		schemaService,
-		flowDefinitionSvc,
-		brandingService,
-		idpConnectionService,
-		builtinBases,
-	)
 	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -331,6 +332,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
 	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
@@ -423,7 +434,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
-	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService)
+	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
+		Version:    build.Version(),
+		Commit:     build.Commit(),
+		Dialect:    databaseDialectName(cfg),
+		OnVercel:   os.Getenv("VERCEL") == "1",
+		PublicBase: cfg.Server.PublicBase,
+	})
+	pinger.Start()
+	defer pinger.Close()
+
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -448,11 +469,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService),
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
 		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
-		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider())...)
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
@@ -467,7 +488,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           mux,
+		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -534,6 +555,25 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	return base.String(), nil
 }
 
+// publicOrigin is the browser origin of the deployment's public base: where
+// its console runs. A browser never spells out the scheme's default port, so
+// neither does this.
+func publicOrigin(publicBase string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	host := base.Host
+	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
+		host = strings.TrimSuffix(host, ":"+port)
+	}
+	origin, err := domain.NormalizeOrigin(base.Scheme + "://" + host)
+	if err != nil {
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
+}
+
 // ----------------------------- CONFIG --------------------------------------
 
 // configOverride sets a value that outranks the config file and the
@@ -572,8 +612,6 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
-	v.SetDefault("server.login_enabled", true)
-	v.SetDefault("server.login_path", "/ui/login")
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -662,6 +700,11 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.enabled", true)
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	v.SetDefault("service_ping.enabled", false)
+	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
+	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
+	v.SetDefault("service_ping.mixpanel_token", serviceping.DefaultMixpanelToken)
+	v.SetDefault("service_ping.interval", 24*time.Hour)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -676,6 +719,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("instrumentation.log.errors.report_location", true)
 	v.SetDefault("instrumentation.log.errors.stack_trace", true)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
+	// Off: an incoming traceparent is not used. See ADR 080.
+	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -785,8 +830,9 @@ func mustBindEnv(v *viper.Viper, key string) {
 // ----------------------------- HTTP --------------------------------------
 
 // apiServerOptions are the options of the ogen API server that buildHTTPMux
-// mounts, shared with the test of that chain.
-func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider) []oasapi.ServerOption {
+// mounts, shared with the test of that chain. home is the way on that the
+// error page of a path nothing answers offers a person (ADR 076).
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
 	return []oasapi.ServerOption{
 		oasapi.WithMiddleware(
 			middleware.AddOperationIdToContext(),
@@ -795,23 +841,25 @@ func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.
 		oasapi.WithMeterProvider(meterProvider),
 		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
 		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithNotFound(api.OgenNotFound(home)),
+		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
+}
+
+// consoleLink is the console's start page as an error page's way on. The
+// path is where the console lives even when this server does not serve it:
+// the hosted cloud runs it as a service of its own, and the claim and
+// dashboard links the server hands out assume the same.
+func consoleLink(consolePath string) *errorpage.Link {
+	consolePath = strings.TrimSuffix(consolePath, "/")
+	if consolePath == "" {
+		return nil
+	}
+	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
 func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
-
-	if cfg.LoginEnabled {
-		if err := login.ValidateDist(); err != nil {
-			return nil, err
-		}
-		loginHandler, err := login.Handler(cfg.LoginPath)
-		if err != nil {
-			return nil, fmt.Errorf("build login UI handler: %w", err)
-		}
-		mux.Handle(cfg.LoginPath, loginHandler)
-		mux.Handle(cfg.LoginPath+"/", loginHandler)
-	}
 
 	if cfg.ConsoleEnabled {
 		if err := console.ValidateDist(); err != nil {
@@ -825,20 +873,19 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	// Pre-session runtime metadata for the embedded UI surfaces (Console
-	// ADR 0004 §3). Named for the console, which carries it first, but it
-	// describes the deployment — the default project and its publishable key
-	// — and the hosted login shell resolves the project it signs into from
-	// the same two fields, so it is mounted for either surface rather than
-	// only alongside the console. Registered as an exact path, so it wins
-	// over the catch-all API mount below.
-	if cfg.ConsoleEnabled || cfg.LoginEnabled {
-		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
-	}
+	// Pre-session runtime metadata for the console (Console ADR 0004 §3): the
+	// default project and its publishable key. Mounted whether or not this
+	// binary serves the console, because a console served elsewhere reads it
+	// from here: the hosted cloud's console service, and the console's dev
+	// server through its proxy. Registered as an exact path, so it wins over
+	// the catch-all API mount below.
+	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 
 	chain := func(h http.Handler, redactQuery ...string) http.Handler {
 		return middleware.Chain(h,
-			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
 			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
@@ -858,6 +905,19 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
+}
+
+// withIncomingTraceContext decides what an incoming trace context means for
+// the server span. Unless cfg.TrustRemoteSpans is set it returns next
+// unchanged, so traceparent, tracestate and baggage are ignored and every
+// request starts a new trace. When set, the caller's context is extracted
+// ahead of everything else, so the request logs and the server span both see
+// it. ADR 080 records the decision.
+func withIncomingTraceContext(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, next http.Handler) http.Handler {
+	if !cfg.TrustRemoteSpans {
+		return next
+	}
+	return middleware.WithRemoteTraceContext(propagator)(next)
 }
 
 // ----------------------------- STORAGE --------------------------------------
@@ -897,6 +957,19 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
 	return dialect, nil
+}
+
+// databaseDialectName names the configured dialect without connecting, for
+// the service ping; an unconfigured database is the sqlite default.
+func databaseDialectName(cfg Config) string {
+	if len(cfg.Database.Raw) == 0 {
+		return "sqlite"
+	}
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return "unknown"
+	}
+	return dialect.Name()
 }
 
 func defaultSQLitePath(dataDir string) string {

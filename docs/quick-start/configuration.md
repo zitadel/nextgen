@@ -15,9 +15,8 @@ Example file: [`docs/operations/nextgen.example.yaml`](../operations/nextgen.exa
 | `server.generate_master_key` | `NEXTGEN_SERVER_GENERATE_MASTER_KEY` | `true`                                                          | Mint a master key when none is configured and the master key directory is empty; `false` (or `--disable-master-key-generation`) fails the start instead |
 | `server.console_enabled` | `NEXTGEN_SERVER_CONSOLE_ENABLED` | `true`                                                              | Serve embedded management console                                                                      |
 | `server.console_path`    | `NEXTGEN_SERVER_CONSOLE_PATH`    | `/ui/console`                                                       | Console URL prefix                                                                                     |
-| `server.login_enabled`   | `NEXTGEN_SERVER_LOGIN_ENABLED`   | `true`                                                              | Serve embedded login shell                                                                             |
-| `server.login_path`      | `NEXTGEN_SERVER_LOGIN_PATH`      | `/ui/login`                                                         | Login URL prefix                                                                                       |
 | `server.public_base`     | `NEXTGEN_SERVER_PUBLIC_BASE`     | `https://nextgen.zitadel.cloud`                                     | Public origin browsers reach this deployment at; feeds the claim and dashboard URLs. Set to `http://localhost:8080` when running the server locally by hand; the CLI runtime (`zitadel start`) sets it itself. |
+| `server.request_id_header` | `NEXTGEN_SERVER_REQUEST_ID_HEADER` | — (unset)                                                      | A header a proxy in front of the server sets to its own ID for each request, such as Vercel's `x-vercel-id`. The server then uses that ID in its logs, `X-Request-Id`, audit events and error pages. Set it only behind a proxy that overwrites the header, or a client chooses its own ID. |
 
 ## Platform
 
@@ -139,13 +138,14 @@ instrumentation:
 
 ## Tracing
 
-| YAML key                                        | Environment                                             | Default | Description                                 |
-| ----------------------------------------------- | ------------------------------------------------------- | ------- | ------------------------------------------- |
-| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                        |
-| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`     |
-| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http` |
-| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent |
-| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced  |
+| YAML key                                        | Environment                                             | Default | Description                                    |
+| ----------------------------------------------- | ------------------------------------------------------- | ------- | ---------------------------------------------- |
+| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                           |
+| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`        |
+| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http`    |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent    |
+| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced     |
+| `instrumentation.trace.trust_remote_spans`      | `NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS`      | `false` | Continue the caller's trace from `traceparent` |
 
 - `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
   `exporter.google_project_id`), `auto`.
@@ -161,6 +161,20 @@ instrumentation:
   is idle.
 - A traced request keeps all of its spans, including one span per database
   statement.
+
+With `trust_remote_spans` off (the default), an incoming `traceparent`,
+`tracestate` or `baggage` header is ignored and every request starts a new
+trace, sampled by `fraction`.
+
+With it on, the server span becomes a child of the caller's span and joins the
+caller's trace ID. That also trusts the caller's sampled flag: a caller that
+sends `sampled=1` is recorded and exported **whatever `fraction` says**, and
+so is everything ZITADEL does for that request. A caller that sends
+`sampled=0` is still sampled by `fraction`. Turn it on only when ZITADEL sits
+behind a proxy, gateway or mesh you control that strips or overwrites these
+headers at the edge, never when untrusted callers can reach ZITADEL directly,
+because any of them could force every request to be recorded. The decision is
+recorded in [ADR 080](../adrs/080-incoming-trace-context.md).
 
 ```yaml
 instrumentation:

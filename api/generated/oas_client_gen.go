@@ -57,7 +57,9 @@ type Invoker interface {
 	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one, and the request
-	// answers `201` with the new release. Metadata is excluded from the
+	// answers `201` with the new release. A policy whose config matches only an
+	// older revision allocates a new one too, so a request that resolves no
+	// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 	// comparison, so the same content under a different `message` is the same
 	// release.
 	// A structurally malformed request is refused while decoding with
@@ -69,8 +71,9 @@ type Invoker interface {
 	// `rel.unresolved_reference`, naming the pointer and the handle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write` and `idp.write`, as the
-	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// `flow_definition.write`, `branding.write`, `idp.write` and
+	// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+	// permission_denied`,
 	// naming the kind. An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an
 	// origin, and the same release can later be deployed to any number of
@@ -95,10 +98,10 @@ type Invoker interface {
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 	// also include session_id and that session's session_token to add factors to an existing session.
 	// The project comes from the project secret. A body `project_id` that disagrees
-	// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
-	// same way as other runtime operations and seals it; with no browser `Origin`
-	// and nothing deployed to the resolved target the response is `409` with
-	// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
+	// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
+	// filled only when create runs with a runtime resolution already on the
+	// context (the flow create path); this HTTP entry point does not resolve
+	// Origin or refuse a revoked release itself.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -132,7 +135,7 @@ type Invoker interface {
 	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 	// a primary origin named exactly; `primary` mixed with preview URLs;
 	// `primary` on a project with no primary origin; `ttl` with `primary`;
-	// `ttl` above the project's maximum.
+	// `ttl` above 365 days (`P365D`).
 	// - `400 dep.variables_missing`: a referenced variable has no value for
 	// the kind; `details` names the kind and every missing variable.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -160,7 +163,10 @@ type Invoker interface {
 	// pattern with no live preview answers `403` with `proj.preview_not_live`;
 	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
 	// revoked release answers `409` with `rel.revoked`. A request with no
-	// `Origin` passes the gate and still needs a deployment target.
+	// `Origin` passes the gate and still needs a deployment target. A loopback
+	// origin passes it too, and so does the server's own origin, from which its
+	// console previews a project's login; a step submitted from the server's
+	// own origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -217,8 +223,7 @@ type Invoker interface {
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
 	// - Idempotency-safe within a 5-minute window (see conventions)
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
+	// Revoke refusal for a sealed release happens at handoff exchange, not here.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
@@ -423,8 +428,6 @@ type Invoker interface {
 	// challenges issued so far, and any errors preventing progress.
 	// Use this for polling during long-running factor verifications (e.g., waiting for
 	// a federated IdP callback or a device flow).
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
@@ -521,12 +524,6 @@ type Invoker interface {
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
-	// GetHealth invokes getHealth operation.
-	//
-	// Check whether the server is healthy.
-	//
-	// GET /healthz
-	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById invokes getIdpById operation.
 	//
 	// Reads a connection by its id, at its newest revision.
@@ -545,7 +542,10 @@ type Invoker interface {
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive invokes getLive operation.
 	//
-	// Check whether the server is started.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	// Point a liveness probe here. It never checks the database, so an outage
+	// of the database does not restart every instance; `GET /readyz` takes an
+	// instance out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -627,7 +627,10 @@ type Invoker interface {
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady invokes getReady operation.
 	//
-	// Check whether the server is ready to accept requests.
+	// Answers whether the server can serve requests, which takes its database answering within a second.
+	// Point a readiness probe here, so that a server whose database does not
+	// answer gets no requests until it does. The check is one round trip to the
+	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
@@ -726,8 +729,6 @@ type Invoker interface {
 	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 	// including method, metadata, and any UI hints. The client then verifies the proof
 	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -1193,8 +1194,6 @@ type Invoker interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On successful verification, the factor is written to the auth attempt.
 	// The attempt moves to the next pending challenge or completes if all required factors are verified.
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)
@@ -1540,7 +1539,9 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
-// answers `201` with the new release. Metadata is excluded from the
+// answers `201` with the new release. A policy whose config matches only an
+// older revision allocates a new one too, so a request that resolves no
+// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 // comparison, so the same content under a different `message` is the same
 // release.
 // A structurally malformed request is refused while decoding with
@@ -1552,8 +1553,9 @@ func (c *Client) sendBeginUserPasskeyRegistration(ctx context.Context, request *
 // `rel.unresolved_reference`, naming the pointer and the handle.
 // Building writes revisions, so besides `release.write` it needs the write
 // scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write`, `branding.write` and `idp.write`, as the
-// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// `flow_definition.write`, `branding.write`, `idp.write` and
+// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+// permission_denied`,
 // naming the kind. An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
@@ -1847,10 +1849,10 @@ func (c *Client) sendCompleteClaim(ctx context.Context, request *CompleteClaimRe
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 // also include session_id and that session's session_token to add factors to an existing session.
 // The project comes from the project secret. A body `project_id` that disagrees
-// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
-// same way as other runtime operations and seals it; with no browser `Origin`
-// and nothing deployed to the resolved target the response is `409` with
-// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
+// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
+// filled only when create runs with a runtime resolution already on the
+// context (the flow create path); this HTTP entry point does not resolve
+// Origin or refuse a revoked release itself.
 //
 // POST /auth_attempts
 func (c *Client) CreateAuthAttempt(ctx context.Context, request *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error) {
@@ -2131,7 +2133,7 @@ func (c *Client) sendCreateBranding(ctx context.Context, request *Branding, para
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 // a primary origin named exactly; `primary` mixed with preview URLs;
 // `primary` on a project with no primary origin; `ttl` with `primary`;
-// `ttl` above the project's maximum.
+// `ttl` above 365 days (`P365D`).
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -2293,7 +2295,10 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // pattern with no live preview answers `403` with `proj.preview_not_live`;
 // nothing deployed to the target answers `409` with `rel.not_deployed`; a
 // revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate and still needs a deployment target.
+// `Origin` passes the gate and still needs a deployment target. A loopback
+// origin passes it too, and so does the server's own origin, from which its
+// console previews a project's login; a step submitted from the server's
+// own origin is still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -2706,8 +2711,7 @@ func (c *Client) sendCreateGrant(ctx context.Context, request *CreateGrantReques
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
 // - Idempotency-safe within a 5-minute window (see conventions)
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
+// Revoke refusal for a sealed release happens at handoff exchange, not here.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (c *Client) CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error) {
@@ -4833,8 +4837,6 @@ func (c *Client) sendFinishUserPasskeyRegistration(ctx context.Context, request 
 // challenges issued so far, and any errors preventing progress.
 // Use this for polling during long-running factor verifications (e.g., waiting for
 // a federated IdP callback or a device flow).
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // GET /auth_attempts/{attempt_id}
 func (c *Client) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error) {
@@ -6277,80 +6279,6 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 	return result, nil
 }
 
-// GetHealth invokes getHealth operation.
-//
-// Check whether the server is healthy.
-//
-// GET /healthz
-func (c *Client) GetHealth(ctx context.Context) (GetHealthRes, error) {
-	res, err := c.sendGetHealth(ctx)
-	return res, err
-}
-
-func (c *Client) sendGetHealth(ctx context.Context) (res GetHealthRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getHealth"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/healthz"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetHealthOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/healthz"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetHealthResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
 // GetIdpById invokes getIdpById operation.
 //
 // Reads a connection by its id, at its newest revision.
@@ -6673,7 +6601,10 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 
 // GetLive invokes getLive operation.
 //
-// Check whether the server is started.
+// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+// Point a liveness probe here. It never checks the database, so an outage
+// of the database does not restart every instance; `GET /readyz` takes an
+// instance out of rotation instead.
 //
 // GET /livez
 func (c *Client) GetLive(ctx context.Context) (GetLiveRes, error) {
@@ -7892,7 +7823,10 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 
 // GetReady invokes getReady operation.
 //
-// Check whether the server is ready to accept requests.
+// Answers whether the server can serve requests, which takes its database answering within a second.
+// Point a readiness probe here, so that a server whose database does not
+// answer gets no requests until it does. The check is one round trip to the
+// database.
 //
 // GET /readyz
 func (c *Client) GetReady(ctx context.Context) (GetReadyRes, error) {
@@ -9348,8 +9282,6 @@ func (c *Client) sendInitClaim(ctx context.Context, params InitClaimParams) (res
 // (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 // including method, metadata, and any UI hints. The client then verifies the proof
 // by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (c *Client) IssueChallenge(ctx context.Context, request *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error) {
@@ -16101,8 +16033,6 @@ func (c *Client) sendUpdateVariables(ctx context.Context, request UpdateVariable
 // - `recovery_code` method: { recovery_code: "…" }
 // On successful verification, the factor is written to the auth attempt.
 // The attempt moves to the next pending challenge or completes if all required factors are verified.
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (c *Client) VerifyChallengeProof(ctx context.Context, request *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error) {

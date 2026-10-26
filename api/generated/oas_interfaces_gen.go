@@ -209,10 +209,6 @@ type GetGrantRes interface {
 	getGrantRes()
 }
 
-type GetHealthRes interface {
-	getHealthRes()
-}
-
 type GetIdpByIdRes interface {
 	getIdpByIdRes()
 }

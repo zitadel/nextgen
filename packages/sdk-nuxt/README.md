@@ -1,6 +1,6 @@
 # @zitadel/sdk-nuxt
 
-Nuxt module, Nitro middleware, and helpers for Nextgen Auth.
+Nuxt module, Nitro middleware, and helpers for Zitadel.
 
 ## Installation
 

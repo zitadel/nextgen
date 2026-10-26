@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -34,6 +35,9 @@ type Config struct {
 	HTTPClient httputil.ClientConfig `mapstructure:"httpclient"`
 	// Origins configures write validation for project origin patterns.
 	Origins OriginsConfig `mapstructure:"origins"`
+	// ServicePing reports the deployment's version and dialect to Vercel
+	// Web Analytics and Mixpanel (proof of concept, off by default).
+	ServicePing serviceping.Config `mapstructure:"service_ping"`
 }
 
 // OriginsConfig is the instance-level origins policy. SharedHosts maps a shared
@@ -180,32 +184,28 @@ type ServerConfig struct {
 
 	ConsoleEnabled bool   `mapstructure:"console_enabled"`
 	ConsolePath    string `mapstructure:"console_path"`
-	LoginEnabled   bool   `mapstructure:"login_enabled"`
-	LoginPath      string `mapstructure:"login_path"`
 	// PublicBase is the origin this deployment is reachable at from a browser.
 	// It only feeds user-facing URLs (claim and dashboard); schema identity
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+	// RequestIDHeader names a header that a proxy in front of the server sets
+	// to its own ID for each request, such as Vercel's x-vercel-id. The server
+	// then uses that ID as the request ID, so its logs, events and error pages
+	// quote the ID the proxy's logs show. Empty, the server mints its own. Set
+	// it only behind a proxy that overwrites the header: otherwise a client
+	// chooses its own request ID.
+	RequestIDHeader string `mapstructure:"request_id_header"`
 }
 
 func (c ServerConfig) Validate() error {
-	// ensure there are no path collisions between idp callbacks and console/login paths
-	for _, ui := range []struct {
-		enabled bool
-		key     string
-		path    string
-	}{
-		{c.ConsoleEnabled, "server.console_path", c.ConsolePath},
-		{c.LoginEnabled, "server.login_path", c.LoginPath},
-	} {
-		if !ui.enabled {
-			continue
-		}
-		for _, prefix := range api.IDPCallbackPathPrefixes() {
-			if ui.path == prefix || strings.HasPrefix(ui.path, prefix+"/") {
-				return fmt.Errorf("%s %q must not be %s or under it: the path is reserved for the sign-in provider callback", ui.key, ui.path, prefix)
-			}
+	// ensure there are no path collisions between idp callbacks and the console path
+	if !c.ConsoleEnabled {
+		return nil
+	}
+	for _, prefix := range api.IDPCallbackPathPrefixes() {
+		if c.ConsolePath == prefix || strings.HasPrefix(c.ConsolePath, prefix+"/") {
+			return fmt.Errorf("server.console_path %q must not be %s or under it: the path is reserved for the sign-in provider callback", c.ConsolePath, prefix)
 		}
 	}
 	return nil

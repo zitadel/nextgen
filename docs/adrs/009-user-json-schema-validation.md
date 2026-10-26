@@ -1,8 +1,15 @@
 # ADR 009: User JSON Schema Validation
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-04-30)
 > **Date:** 2026-04-30
 > **Context:** Dynamic users and schema-driven validation
+>
+> **Amendment (2026-10-24):** the user API validates against the bound schema
+> on every write, and `PATCH /users/{user_id}` moves a user to another schema
+> by validating the merged attributes against it before commit (#1180).
+> One rule the decision below does not state: a move must keep the same
+> `objectType` (#2036). Schemas have no update endpoint, so a published
+> version does not change.
 >
 > **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the API
 > property is `schema`, not `$schema`, and it sits on an envelope beside the
@@ -12,7 +19,7 @@
 
 Users are dynamic objects stored in the EAV model described in [ADR 008](008-users-eav-store.md). Attribute payloads must be validated so writes remain coherent with tenant-defined structure and constraints.
 
-JSON Schema is the validation mechanism. The server resolves schemas per instance from persisted definitions and applies them when user data is created or updated. HTTP user APIs are not implemented yet; this ADR records the contract and migration expectations for when they are.
+JSON Schema is the validation mechanism. The server resolves schemas per instance from persisted definitions and applies them when user data is created or updated. This ADR records the contract and migration expectations the HTTP user API follows.
 
 **Why not automatic schema migration:** Moving a user from schema A to B is not a generic server concern. New schemas may introduce required fields the system cannot invent, change uniqueness or org-scoped rules, or require business logic only the customer controls. The product therefore does not offer automatic cross-schema transformation.
 

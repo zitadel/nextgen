@@ -41,10 +41,19 @@ func (h Handler) CreateSession(ctx context.Context, req *api.CreateSessionReques
 }
 
 func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, params api.ExchangeHandoffParams) (api.ExchangeHandoffRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if queryProjectID := string(params.ProjectID); queryProjectID != "" && queryProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
 	input, err := exchangeInputFromRequest(req, params)
 	if err != nil {
 		return nil, err
 	}
+	input.ProjectID = scopeCtx.ProjectID
 	session, err := h.sessionService.Exchange(ctx, input)
 	if err != nil {
 		return nil, err

@@ -38,20 +38,13 @@ export class DependencyVersionCheck implements SanityCheck {
         message: `CLI version ${ctx.cliVersion} is not an exact release; skipping the pin comparison`,
       };
     }
-    let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
-    try {
-      pkg = JSON.parse(await readFile(join(ctx.cwd, "package.json"), "utf8")) as typeof pkg;
-    } catch {
+    const exact = await exactZitadelPins(ctx.cwd);
+    if (exact === undefined) {
       // A missing or unparsable package.json is the dependency check's
       // failure to report; double-flagging the same root cause helps nobody.
       return { ...base, status: "pass", message: "no package.json to compare pins against" };
     }
-    const declared = Object.entries({
-      ...(pkg.dependencies ?? {}),
-      ...(pkg.devDependencies ?? {}),
-    }).filter(([name]) => name.startsWith("@zitadel/"));
-    const exact = declared.filter(([, version]) => semver.valid(version.trim()) !== null);
-    const mismatched = exact.filter(([, version]) => !semver.eq(version.trim(), ctx.cliVersion));
+    const mismatched = exact.filter(([, version]) => !semver.eq(version, ctx.cliVersion));
     if (mismatched.length > 0) {
       // Repair with the project's own package manager and an exact-save flag:
       // a bare `npm install` would switch managers on a pnpm/yarn/bun project
@@ -97,4 +90,23 @@ export class DependencyVersionCheck implements SanityCheck {
   async fix(_ctx: CheckContext): Promise<void> {
     return;
   }
+}
+
+/**
+ * The `@zitadel/*` dependencies `package.json` pins to an exact version, as
+ * `[name, version]`, or undefined without a readable `package.json`. Ranges,
+ * dist-tags and `file:`/`workspace:` specifiers are left out: they express a
+ * resolution choice, not a train.
+ */
+export async function exactZitadelPins(cwd: string): Promise<Array<[string, string]> | undefined> {
+  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string> };
+  try {
+    pkg = JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as typeof pkg;
+  } catch {
+    return undefined;
+  }
+  return Object.entries({ ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) })
+    .filter(([name]) => name.startsWith("@zitadel/"))
+    .map(([name, version]): [string, string] => [name, version.trim()])
+    .filter(([, version]) => semver.valid(version) !== null);
 }

@@ -200,7 +200,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary"},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -208,7 +208,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{appOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -216,7 +216,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -794,11 +794,28 @@ func TestCreatePreviewDeployment(t *testing.T) {
 		refused(t, resp, &api.CreateDeploymentForbidden{}, domain.ErrProjectOriginNotAllowed(nil).Code)
 	})
 
-	t.Run("a ttl is accepted", func(t *testing.T) {
-		preview(t, &api.CreateDeploymentRequest{
+	t.Run("a ttl sets the expiry", func(t *testing.T) {
+		deployed := preview(t, &api.CreateDeploymentRequest{
 			Targets: api.DeploymentTargetsRequest{previewOrigin},
-			TTL:     api.NewOptPreviewTTL("1h"),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(90 * time.Minute)),
 		})
+		got, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		assert.WithinDuration(t, deployed.DeployedAt.Add(90*time.Minute), got.ExpiresAt, time.Second)
+	})
+
+	t.Run("a ttl above the maximum writes nothing", func(t *testing.T) {
+		before, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{previewOrigin},
+			TTL:       api.NewOptPreviewTTL(api.PreviewTTL(366 * 24 * time.Hour)),
+		})
+		refused(t, resp, &api.CreateDeploymentBadRequest{}, domain.ErrDeploymentInvalid().Code)
+		after, err := harness.EnsureServiceDB(t).Statements().GetPreview(t.Context(), fixture.project, previewOrigin)
+		require.NoError(t, err)
+		assert.Equal(t, before.ExpiresAt, after.ExpiresAt)
 	})
 
 	t.Run("a loopback URL is never a preview", func(t *testing.T) {

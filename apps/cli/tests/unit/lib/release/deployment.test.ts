@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+
+import { listLiveDeployments, servesPrimary } from "../../../../src/lib/release/deployment";
+
+/** A client whose live list is split over pages of one deployment each. */
+function pagedClient(ids: string[]) {
+  const seen: Array<Record<string, unknown>> = [];
+  return {
+    seen,
+    client: {
+      listDeployments: async (params: Record<string, unknown>) => {
+        seen.push(params);
+        const index = params.page_token === undefined ? 0 : Number(params.page_token);
+        return {
+          deployments: [{ id: ids[index], targets: [] }],
+          next_page_token: index + 1 < ids.length ? String(index + 1) : null,
+        };
+      },
+    } as never,
+  };
+}
+
+describe("listLiveDeployments", () => {
+  it("drains every page", async () => {
+    const { client } = pagedClient(["dep_1", "dep_2", "dep_3"]);
+
+    const live = await listLiveDeployments(client, "proj_1");
+
+    expect(live.map((deployment) => deployment.id)).toEqual(["dep_1", "dep_2", "dep_3"]);
+  });
+
+  it("asks only for live deployments, narrowed to an origin when given", async () => {
+    const { client, seen } = pagedClient(["dep_1"]);
+
+    await listLiveDeployments(client, "proj_1", { origin: "https://app.acme.com" });
+
+    expect(seen[0]).toMatchObject({
+      project_id: "proj_1",
+      live: true,
+      origin: "https://app.acme.com",
+    });
+  });
+});
+
+describe("servesPrimary", () => {
+  it("is true for a deployment with an unexpiring target", () => {
+    expect(servesPrimary({ targets: [{ origin: "https://a", expires_at: null }] } as never)).toBe(
+      true,
+    );
+  });
+
+  it("is false for a preview deployment", () => {
+    expect(
+      servesPrimary({
+        targets: [{ origin: "https://pr-1", expires_at: "2026-12-01T00:00:00Z" }],
+      } as never),
+    ).toBe(false);
+  });
+});

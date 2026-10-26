@@ -7,7 +7,7 @@ The `zitadel` CLI sends anonymous usage analytics: which commands run, how they 
 
 ## What it sends
 
-Every command sends two events to [Mixpanel](https://mixpanel.com), in its EU region (`api-eu.mixpanel.com`):
+Every command sends two events to [Mixpanel](https://mixpanel.com), in its EU region, through the Zitadel cloud (`preview.zitadel.com/telemetry/mixpanel` passes them on to `api-eu.mixpanel.com`):
 
 - `cli_command_started`, once the command has read its flags.
 - `cli_command_completed` when it finishes, with its `status` and `duration_ms`, or `cli_command_failed` when it fails, with its error code as `reason` (such as `E_NETWORK`), its `exit_code` and `duration_ms`.
@@ -16,6 +16,7 @@ Each event carries:
 
 | Property | What it holds |
 | --- | --- |
+| `surface` | The Zitadel component that sent it: always `cli`. |
 | `command` | The command, such as `variables:set`. |
 | `cli_version`, `node_version` | The versions of the CLI and of Node.js. |
 | `os`, `$os`, `arch` | The platform, such as `darwin`, `Mac OS X` and `arm64`. |
@@ -32,8 +33,8 @@ Some commands add what they did, as counts and fixed values:
 
 | Command | Adds |
 | --- | --- |
-| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether it created the app, skipped the install or was given a port, how many files it wrote, and the last step it reached. |
-| `plan`, `apply` | How many resources it creates, updates and deletes, and how many revisions. |
+| `setup` | The framework, renderer, package manager, preset and use case, the sign-in provider (its slug, `custom`, `none` or `multiple`), whether a minimum password length was set (never the value), whether it created the app, skipped the install or was given a port, how many files it wrote, and the last step it reached. |
+| `deploy` | How many resources the release pinned, and how many origins it went live on. |
 | `doctor` | How many checks ran, failed and warned, and the names of the checks that failed. |
 | `start` | The runtime: `binary` or `docker`. |
 | `claim` | How the claim ended, how often it polled, and whether it opened a browser. |
@@ -42,9 +43,13 @@ Some commands add what they did, as counts and fixed values:
 
 Run a command with `--debug` to see each event on stderr before it is sent.
 
+### The copy for Vercel Web Analytics
+
+Each event also goes, as a copy, to Vercel Web Analytics on the Zitadel cloud (`preview.zitadel.com`). The copy keeps at most eight properties: `surface`, `cli_version`, `server_kind`, `command`, `status`, `reason`, `host_agent` and `non_interactive`. Vercel records a location (country, region and city) worked out from the IP address the copy comes from. Runs in CI send no copy.
+
 ## What it never sends
 
-Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource id, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
+Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource id, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead. The [Vercel copy](#the-copy-for-vercel-web-analytics) is located by its IP address.
 
 ## The install id
 
