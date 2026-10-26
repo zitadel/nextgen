@@ -76,7 +76,7 @@ function SchemaDetail() {
                 trigger is `px-2`, so the effect is that the heading and `SCHEMA` line
                 up with the tab *label* and the tab's box sits just outside it. */}
             <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch lg:pl-2">
-              <div className="flex flex-col gap-4.5 lg:w-[468px] lg:shrink-0">
+              <div className="flex flex-col gap-4 lg:w-[468px] lg:shrink-0">
                 <h2 className={HEADING_MD}>Field definitions</h2>
                 <SchemaFieldsPanel schema={schema} />
               </div>
