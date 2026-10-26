@@ -150,7 +150,10 @@ read as the user's.
 `--fix` overwrites them. The `meta-schemas` check compares each file with what
 this CLI writes, as parsed JSON and with the CLI version in its command
 mentions masked, and warns on a missing or outdated file; the fix writes the
-current version and leaves files the CLI does not ship alone. This is the one
+current version and leaves files the CLI does not ship alone. It writes
+nothing through a symlink, and nothing when the project pins a `@zitadel/*`
+package to a newer version than the running CLI: that newer train is the one
+`deploy` uses, so its own `doctor --fix` writes the folder. This is the one
 exception to restore-missing-only. It destroys no user work: a hand-edited
 copy only makes the editor disagree with what `deploy` enforces, which is the
 drift the check exists to remove. Only `setup` writes the folder, so without

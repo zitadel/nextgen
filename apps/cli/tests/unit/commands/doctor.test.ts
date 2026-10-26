@@ -910,6 +910,28 @@ describe("advisoryForWarnings", () => {
 
     expect(advice).toBeUndefined();
   });
+
+  it("does not suggest this CLI's doctor --fix when the project pins a newer version", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "newer",
+      details: {
+        missing: [],
+        outdated: [".zitadel/meta/branding.json"],
+        newer_pin: { name: "@zitadel/sdk-next", version: "9.9.9" },
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
+  });
 });
 
 describe("failureAdvice for a runtime found in a parent directory", () => {

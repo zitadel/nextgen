@@ -431,8 +431,9 @@ describe("MetaSchemasCheck", () => {
     expect(outcome.details).toEqual({
       missing: [],
       outdated: [],
-      unreadable: [{ path: metaFile("branding.json"), reason: "symbolic link" }],
+      linked: [metaFile("branding.json")],
     });
+    expect(outcome.message).toContain(`${metaFile("branding.json")} is a symbolic link`);
     expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
       '{"project_secret": "sk_proj_test"}\n',
     );
@@ -451,8 +452,41 @@ describe("MetaSchemasCheck", () => {
     const outcome = await check.run(ctxFor(cwd));
 
     expect(outcome.status).toBe("warn");
-    expect(outcome.details).toMatchObject({ missing: [], outdated: [] });
+    expect(outcome.details).toEqual({ missing: [], outdated: [], linked: [".zitadel/meta"] });
     expect(await readdir(elsewhere)).toEqual(before);
+  });
+
+  it("passes a symlinked .zitadel/meta/ that holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    const shared = await makeProject();
+    await writeMetaSchemas(shared);
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(join(shared, ".zitadel/meta"), join(cwd, ".zitadel/meta"));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("writes nothing when the project pins a newer @zitadel/* version", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "a newer dialect"}\n');
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ dependencies: { "@zitadel/sdk-next": "0.2.0" } }),
+    );
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.details).toMatchObject({
+      outdated: [metaFile("flow-definition.json")],
+      newer_pin: { name: "@zitadel/sdk-next", version: "0.2.0" },
+    });
+    expect(outcome.message).not.toContain("doctor --fix writes");
+    expect(await readFile(join(cwd, metaFile("flow-definition.json")), "utf8")).toBe(
+      '{"title": "a newer dialect"}\n',
+    );
   });
 
   it("warns on a schema that differs from this CLI's", async () => {

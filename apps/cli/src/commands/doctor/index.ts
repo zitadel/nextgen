@@ -771,15 +771,22 @@ function claimWindowClosed(check: CheckOutcome): boolean {
 }
 
 /**
- * Whether the meta-schemas warning lists a missing or outdated file, which
- * `--fix` writes. One the CLI cannot read only gets the warning's reason.
+ * Whether the meta-schemas warning lists a missing or outdated file that this
+ * CLI's `--fix` writes: not when the project pins a newer `@zitadel/*`
+ * version, whose own doctor writes them. A file behind a symlink, or one the
+ * CLI cannot read, only gets the warning's reason.
  */
 function hasRepairableMetaSchemas(check: CheckOutcome | undefined): boolean {
   if (check?.status !== "warn") {
     return false;
   }
-  const details = check.details as { missing?: unknown[]; outdated?: unknown[] } | undefined;
-  return (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0;
+  const details = check.details as
+    | { missing?: unknown[]; outdated?: unknown[]; newer_pin?: unknown }
+    | undefined;
+  return (
+    details?.newer_pin === undefined &&
+    (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0
+  );
 }
 
 function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {
