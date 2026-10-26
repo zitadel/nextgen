@@ -197,7 +197,7 @@ export default class Api extends Promptable(BaseCommand) {
       filled[name] = await this.input({
         kind: "text",
         name,
-        message: `What should ${name} be?`,
+        message: `What is the value of ${name}?`,
         retry: this.suggestUnscoped(
           `api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
         ),
