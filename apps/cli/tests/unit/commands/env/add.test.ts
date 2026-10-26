@@ -185,14 +185,6 @@ describe("env add", () => {
       expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
     });
 
-    it("still names the deploy under --no-deploy, which only stops it asking", async () => {
-      const cwd = await makeProject("next");
-
-      const { envelope } = await add(cwd, "--no-deploy");
-
-      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
-    });
-
     it("says what the environment serves until something is deployed to it", async () => {
       const cwd = await makeProject("next");
 
@@ -311,24 +303,6 @@ describe("env add", () => {
 
     const envelope = parseJson(result.stdout) as { next_commands?: string[] };
     expect(envelope.next_commands?.[0]).toContain("--project proj_existing");
-  });
-
-  it("keeps --no-deploy in the retry it suggests for a missing server", async () => {
-    const cwd = await makeProject("next");
-
-    const result = await runCliForTest([
-      "env",
-      "add",
-      "staging",
-      "--no-deploy",
-      "--cwd",
-      cwd,
-      "--non-interactive",
-      "--json",
-    ]);
-
-    const envelope = parseJson(result.stdout) as { next_commands?: string[] };
-    expect(envelope.next_commands?.[0]).toContain("--no-deploy");
   });
 
   it("names --cwd once in the retry it suggests for a missing server", async () => {
@@ -764,14 +738,6 @@ describe("env add asked on a terminal", () => {
     const envelope = (await adding(cwd)) as { warnings: string[] };
 
     expect(envelope.warnings.join("\n")).toContain("deploy -m");
-  });
-
-  it("never asks under --no-deploy", async () => {
-    const cwd = await makeDeployableProject();
-
-    await adding(cwd, "--no-deploy");
-
-    expect(confirm).not.toHaveBeenCalled();
   });
 
   it("never asks for a project it only bound", async () => {

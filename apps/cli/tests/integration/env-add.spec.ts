@@ -154,15 +154,6 @@ describe("env add", () => {
         expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
       });
 
-      it("deploys nothing under --no-deploy", async () => {
-        const app = await aSetUpApp();
-        await app.run([...ADD, "--no-deploy"]);
-
-        const listed = await app.run(["deployment", "list", "--env", "production", "--json"]);
-
-        expect(app.envelopeOf<{ items: unknown[] }>(listed).data.items).toEqual([]);
-      });
-
       it("tells the caller to deploy to the environment it added", async () => {
         const app = await aSetUpApp();
 

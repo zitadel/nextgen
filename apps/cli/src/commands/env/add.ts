@@ -83,12 +83,6 @@ export default class EnvAdd extends BaseCommand {
         "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
     }),
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
-    deploy: Flags.boolean({
-      allowNo: true,
-      default: true,
-      description:
-        "Offer to deploy .zitadel/ to the project this creates, so the environment serves it rather than the server's defaults. Use --no-deploy to never ask.",
-    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -145,7 +139,6 @@ export default class EnvAdd extends BaseCommand {
                 ? []
                 : [shellOption("--app-url", flags["app-url"])]),
               ...(flags.force ? ["--force"] : []),
-              ...(flags.deploy === false ? ["--no-deploy"] : []),
             ].join(" "),
           ),
         });
@@ -269,16 +262,13 @@ export default class EnvAdd extends BaseCommand {
     // and its origin are all at hand. A bound project (`--project`) is
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
-    // the envelope instead. The question does not go through `this.input`:
-    // that one answers a confirm when `--force` is given, and here `--force`
-    // permits overwriting the env file, so it must never answer it.
+    // the envelope instead — there is no flag to deploy without being asked,
+    // because an agent that wants one runs `deploy` itself. The question does
+    // not go through `this.input`: that one answers a confirm when `--force`
+    // is given, and here `--force` permits overwriting the env file, so it
+    // must never answer it.
     let deployment: DeployedRelease | undefined;
-    if (
-      createdProject &&
-      flags.deploy !== false &&
-      !nonInteractive &&
-      projectSecret !== undefined
-    ) {
+    if (createdProject && !nonInteractive && projectSecret !== undefined) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
