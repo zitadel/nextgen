@@ -122,6 +122,49 @@ func TestAuthzResolver_OracleAgreement(t *testing.T) {
 			require.NoError(t, err)
 			assert.ElementsMatchf(t, wantList, gotList, "list user=%s", u)
 		}
+
+		// By id: the foothold narrows to the target (#2112), so the decision on
+		// every RSI row and team, for a relation held and one not held, must
+		// match the oracle's scoped arms.
+		targets := append([]*domain.ResourceScope{}, resources...)
+		targets = append(targets, domain.NewTeamResourceScope(projectID, teamA), domain.NewTeamResourceScope(projectID, teamB))
+		for _, u := range users {
+			for _, target := range targets {
+				for _, relation := range []string{"viewer", "editor"} {
+					req := resolver.Request{
+						PrincipalType: domain.AuthzPrincipalTypeUser,
+						PrincipalID:   u,
+						ProjectID:     projectID,
+						ObjectType:    "project",
+						Relation:      relation,
+						ResourceID:    target.ResourceID,
+					}
+					params := domain.AuthzCheckParams{
+						CatalogID:     domain.SystemCatalogID,
+						ProjectID:     projectID,
+						PrincipalType: domain.AuthzPrincipalTypeUser,
+						PrincipalID:   u,
+						ObjectType:    "project",
+						Relation:      relation,
+						ResourceID:    target.ResourceID,
+					}
+					if target.TeamID != nil {
+						req.ResourceTeamID = *target.TeamID
+						params.ResourceTeamID = *target.TeamID
+					}
+					want := resolver.DecisionNotFound
+					switch {
+					case g.OracleCheckParams(params):
+						want = resolver.DecisionAllow
+					case g.OracleFootholdParams(params):
+						want = resolver.DecisionForbidden
+					}
+					dec, err := resolver.New().Check(t.Context(), d.stmts, req)
+					require.NoError(t, err)
+					assert.Equalf(t, want, dec, "by-id %s user=%s target=%s", relation, u, target.ResourceID)
+				}
+			}
+		}
 	})
 }
 
