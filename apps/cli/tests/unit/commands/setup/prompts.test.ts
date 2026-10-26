@@ -274,6 +274,9 @@ describe("PasswordPolicyPrompt", () => {
     const out = await new PasswordPolicyPrompt().ask(baseAnswers(), ctx);
 
     expect(out.passwordMinLength).toBe(12);
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
+      "Would you like to set a minimum password length? Leave it empty or enter 0 for none; you can change it in .zitadel/policies/ later.",
+    );
   });
 
   it("records an empty answer as none, and preselects no value", async () => {
@@ -303,6 +306,9 @@ describe("PickFrameworkPrompt", () => {
     const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
 
     expect(id).toBe("next");
+    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+      "Which framework would you like to scaffold?",
+    );
   });
 
   it("throws E_VALIDATION on Ctrl-C", async () => {

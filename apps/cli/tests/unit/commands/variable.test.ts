@@ -11,9 +11,10 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/pla
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { cancel, confirm, isCancel, text } from "@clack/prompts";
 
 import VariableRm from "../../../src/commands/variable/rm";
+import VariableSet from "../../../src/commands/variable/set";
 import { DEFAULT_SERVER } from "../../../src/lib/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal as asPerson } from "../../helpers/terminal";
@@ -979,6 +980,21 @@ describe("variable rm asked on a terminal", () => {
 
     expect(cancel).toHaveBeenCalledWith("Cancelled.");
     expect(seen.deleted).toBe(false);
+  });
+});
+
+describe("variable set asked on a terminal", () => {
+  it("asks what the value should be, as a question", async () => {
+    const cwd = await makeProject();
+    vi.mocked(text).mockResolvedValueOnce("support@acme.example" as never);
+
+    await asPerson(() =>
+      VariableSet.run(["SUPPORT_EMAIL", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+    ).catch(() => undefined);
+
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
+      "What should the value of SUPPORT_EMAIL be?",
+    );
   });
 });
 
