@@ -248,7 +248,7 @@ func TestCreateUser(t *testing.T) {
 			})
 
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-				harness.EnsureTestServer(t).URL+"/users?project_id="+project.ID, strings.NewReader(body))
+				harness.APIBaseURL(t)+"/users?project_id="+project.ID, strings.NewReader(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
@@ -886,7 +886,7 @@ func TestPatchUser(t *testing.T) {
 		// The request schema requires at least one property, so the generated
 		// client cannot express an empty patch — raw request.
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
-			harness.EnsureTestServer(t).URL+"/users/"+user.ID, strings.NewReader(`{}`))
+			harness.APIBaseURL(t)+"/users/"+user.ID, strings.NewReader(`{}`))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+harness.ProjectSecret(t, project))
@@ -1128,7 +1128,7 @@ func TestPatchMyUser(t *testing.T) {
 		// The generated client refuses to send an unauthenticated request, so
 		// exercise the server's missing-credential path with a raw request.
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPatch,
-			harness.EnsureTestServer(t).URL+"/users/me", strings.NewReader(`{"attributes":{"nickname":"Nobody"}}`))
+			harness.APIBaseURL(t)+"/users/me", strings.NewReader(`{"attributes":{"nickname":"Nobody"}}`))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 
@@ -1314,7 +1314,7 @@ func TestGetMyUser(t *testing.T) {
 
 		// The generated client refuses to send an unauthenticated request, so
 		// exercise the server's missing-credential path with a raw request.
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.EnsureTestServer(t).URL+"/users/me", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.APIBaseURL(t)+"/users/me", nil)
 		require.NoError(t, err)
 
 		resp, err := harness.EnsureHttpClient(t).Do(req)

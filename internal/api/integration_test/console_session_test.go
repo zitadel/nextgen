@@ -829,7 +829,7 @@ func TestConsoleManagementBearerIgnoresStaleCookie(t *testing.T) {
 
 	console := harness.EnsurePlatformProject(t)
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/teams?project_id="+console.ID,
+		harness.APIBaseURL(t)+"/teams?project_id="+console.ID,
 		strings.NewReader(`{"name":"`+helpers.TeamName()+`"}`))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
@@ -861,7 +861,7 @@ func TestConsoleSessionRevokedStopsAuthorizing(t *testing.T) {
 	queryUsers := func() int {
 		t.Helper()
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			harness.EnsureTestServer(t).URL+"/users/query?project_id="+home.ID, strings.NewReader(`{}`))
+			harness.APIBaseURL(t)+"/users/query?project_id="+home.ID, strings.NewReader(`{}`))
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(cookie)

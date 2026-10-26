@@ -369,9 +369,10 @@ function operationSamples(
   };
 }
 
-// The page's cURL calls the page's own origin, the spec's server; the
-// Markdown's the local server the spec names, as lib/sdk-sample.ts does.
-const curlServer = "http://localhost:8080";
+// The page's cURL calls the page's own origin under the spec's server,
+// /api/v1; the Markdown's the local server the spec names, as
+// lib/sdk-sample.ts does, under the same prefix.
+const curlServer = "http://localhost:8080/api/v1";
 
 // cURL as the page generates it. An operation a project secret authenticates
 // sends it as the bearer, from the variable the TypeScript sample reads; one

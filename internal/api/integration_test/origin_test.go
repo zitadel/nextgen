@@ -132,7 +132,7 @@ func TestOriginsAddRemove(t *testing.T) {
 		console := harness.EnsurePlatformProject(t)
 		claimerID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
 		cookie := platformSessionCookie(t, claimerID).Value
-		base := harness.EnsureTestServer(t).URL
+		base := harness.APIBaseURL(t)
 
 		body := []byte(`{"pattern":"https://session.example.com","kind":"primary"}`)
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,

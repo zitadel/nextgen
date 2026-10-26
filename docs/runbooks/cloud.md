@@ -26,7 +26,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
+| `server` | Go preset; `apps/cloud/build.sh` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | `/api/*`, the API, and every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build` for `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, then `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there), and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
@@ -42,6 +42,11 @@ same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
 The server's `/console/runtime.json` lies under the console's path, so its
 rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
+
+`/api/*` is the API's ([ADR 077](../adrs/077-api-path-prefix.md)): its
+rewrite to the server comes first, so no service can take a path under it.
+Until 1.0.0 the server also answers the API's root paths, with a
+`Deprecation` header, through the catch-all.
 
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
@@ -79,8 +84,9 @@ document for editors and people under the same path on this project:
   in the other.
 - **The routes:** the top-level rewrite sends `/schemas/v1/*` to the service,
   ahead of the server's catch-all; a name that is no built-in is the
-  service's 404. The API keeps `/schemas` and `/schemas/{id}`: a schema id
-  never holds a slash.
+  service's 404. The API keeps `/api/v1/schemas` and `/api/v1/schemas/{id}`,
+  and until 1.0.0 `/schemas` and `/schemas/{id}`: a schema id never holds a
+  slash.
 - **zitadel.com** answers for the namespace itself by forwarding
   `/schemas/v1/:path*` to this project, or by running
   `node scripts/render-builtin-schemas.mjs` in its own build. Until it does,
@@ -285,12 +291,13 @@ service's contract suite against the deployment, today the docs'
 ([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
 schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
-signs nobody in: it checks how `vercel.json` routes the console's paths and
-the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
+signs nobody in: it checks how `vercel.json` routes the console's paths, the
+API's prefix and the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
-rendering, checks the headers `vercel.json` gives them, and that `/schemas`
-still reaches the API; it needs no browser.
+rendering, checks the headers `vercel.json` gives them, and that
+`/api/v1/schemas`, and until 1.0.0 `/schemas`, reach the API; it needs no
+browser.
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
