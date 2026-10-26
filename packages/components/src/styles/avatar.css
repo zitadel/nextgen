@@ -9,7 +9,11 @@
    turning steadily about its centre. Each person starts from their own angle
    (`--zl-avatar-base`) and point in the motion (`--zl-avatar-phase`), so a
    list of avatars never moves in step. Every name carries the `zl-` prefix:
-   the widget registers the angles on the host page's document. */
+   the console loads these rules on its document.
+
+   `<zl-avatar>` holds still (`zl-avatar.css`). Its shadow root ignores
+   `@property`, so the angles are unregistered there and fall back to 0deg,
+   leaving the gradient at the person's own angle. */
 @property --zl-avatar-turn {
   syntax: "<angle>";
   inherits: false;
@@ -55,7 +59,10 @@
 .zl-avatar {
   border-radius: 9999px;
   background-image: linear-gradient(
-    calc(var(--zl-avatar-base) + var(--zl-avatar-turn) + var(--zl-avatar-sway-a) + var(--zl-avatar-sway-b)),
+    calc(
+      var(--zl-avatar-base) + var(--zl-avatar-turn, 0deg) + var(--zl-avatar-sway-a, 0deg) +
+        var(--zl-avatar-sway-b, 0deg)
+    ),
     var(--zl-avatar-from) 15%,
     var(--zl-avatar-to) 85%
   );
