@@ -29,8 +29,9 @@ type MetaSchemaDrift = {
  * They are CLI-owned generated output (ADR 042's amendment), never read by
  * `deploy` or the server, so a stale file only misleads the editor: that is
  * a warning, not a failure, and `--fix` rewrites them. A file there the CLI
- * does not ship is left alone, and one it cannot read is reported, not
- * touched. {@link metaSchemaState} decides what counts as outdated.
+ * does not ship is left alone, and one it cannot read, or reaches through a
+ * symlink, is reported, not touched. {@link metaSchemaState} decides what
+ * counts as outdated.
  *
  * Implements {@link SanityCheck} directly: the abstract base can only pass or
  * fail.
@@ -88,7 +89,9 @@ async function drift(ctx: CheckContext): Promise<MetaSchemaDrift> {
   for (const file of projectMetaSchemas(ctx.cliVersion)) {
     try {
       const state = await metaSchemaState(ctx.cwd, file);
-      if (state !== "current") {
+      if (state === "linked") {
+        result.unreadable.push({ path: file.path, reason: "symbolic link" });
+      } else if (state !== "current") {
         result[state].push(file);
       }
     } catch (error) {

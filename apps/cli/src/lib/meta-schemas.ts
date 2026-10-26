@@ -10,7 +10,7 @@
  * way out ({@link normalizePublicCliJson}), so they differ between CLI
  * versions.
  */
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
@@ -26,8 +26,11 @@ export type ProjectMetaSchema = {
   contents: string;
 };
 
-/** How a project's copy of one meta-schema compares with this CLI's. */
-export type MetaSchemaState = "current" | "missing" | "outdated";
+/**
+ * How a project's copy of one meta-schema compares with this CLI's. `linked`
+ * means a symlink sits on its path, so it is neither compared nor written.
+ */
+export type MetaSchemaState = "current" | "missing" | "outdated" | "linked";
 
 /** Every meta-schema file a project should hold, as this CLI version writes it. */
 export function projectMetaSchemas(cliVersion: string): ReadonlyArray<ProjectMetaSchema> {
@@ -47,11 +50,20 @@ export function projectMetaSchemas(cliVersion: string): ReadonlyArray<ProjectMet
  * command mentions masked, so a release that left the dialect alone does not
  * either. A file that does not parse is outdated. Any read error other than a
  * missing file (a directory in its place, no permission) is thrown.
+ *
+ * A symlink at the file or at a directory on its way (`.zitadel`,
+ * `.zitadel/meta`) makes it `linked`: a missing or outdated file is
+ * overwritten, and through a link that write would land on whatever the link
+ * names, such as `.zitadel/secret` or a file outside the project. The CLI
+ * never writes a link there, so one is reported, never followed.
  */
 export async function metaSchemaState(
   cwd: string,
   file: ProjectMetaSchema,
 ): Promise<MetaSchemaState> {
+  if (await hasLinkOnPath(cwd, file.path)) {
+    return "linked";
+  }
   let text: string;
   try {
     text = await readFile(join(cwd, file.path), "utf8");
@@ -70,4 +82,26 @@ export async function metaSchemaState(
   return isDeepStrictEqual(maskPublicCliVersion(held), maskPublicCliVersion(file.body))
     ? "current"
     : "outdated";
+}
+
+/**
+ * Whether a segment of the project-relative `path`, the last one included, is
+ * a symlink. Checked without following links, and up to the first segment
+ * that does not exist, since nothing below it can be a link yet.
+ */
+async function hasLinkOnPath(cwd: string, path: string): Promise<boolean> {
+  const segments = path.split("/");
+  for (let end = 1; end <= segments.length; end++) {
+    try {
+      if ((await lstat(join(cwd, ...segments.slice(0, end)))).isSymbolicLink()) {
+        return true;
+      }
+    } catch (error) {
+      if (isErrno(error, "ENOENT")) {
+        return false;
+      }
+      throw error;
+    }
+  }
+  return false;
 }

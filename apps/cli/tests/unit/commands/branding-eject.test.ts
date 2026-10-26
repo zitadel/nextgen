@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -109,6 +109,21 @@ describe("branding eject", () => {
     );
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
     expect(meta).toBe(expected?.contents);
+  });
+
+  it("writes nothing through a dialect meta-schema that is a symlink", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await symlink("../secret", join(cwd, ".zitadel/meta/branding.json"));
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, ".zitadel/meta/branding.json"))).isSymbolicLink()).toBe(true);
   });
 
   it("--design minimal writes the card-less template on the centered layout", async () => {

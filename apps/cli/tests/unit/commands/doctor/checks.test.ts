@@ -1,4 +1,15 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -403,6 +414,45 @@ describe("MetaSchemasCheck", () => {
       unreadable: [{ path: metaFile("branding.json"), reason: "EISDIR" }],
     });
     expect(outcome.message).not.toContain("doctor --fix");
+  });
+
+  it("reports a schema that is a symlink, and fix leaves its target alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await rm(join(cwd, metaFile("branding.json")));
+    await symlink("../secret", join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      unreadable: [{ path: metaFile("branding.json"), reason: "symbolic link" }],
+    });
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, metaFile("branding.json")))).isSymbolicLink()).toBe(true);
+  });
+
+  it("writes nothing through a symlinked .zitadel/meta/", async () => {
+    const cwd = await makeProject();
+    const elsewhere = await makeProject();
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(elsewhere, join(cwd, ".zitadel/meta"));
+    const before = await readdir(elsewhere);
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toMatchObject({ missing: [], outdated: [] });
+    expect(await readdir(elsewhere)).toEqual(before);
   });
 
   it("warns on a schema that differs from this CLI's", async () => {
