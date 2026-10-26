@@ -513,7 +513,7 @@ describe("local runtime commands", () => {
       data: {
         runtime: { backend: string; pid: number; log_path: string; server_package: string };
         urls: { api: string };
-        console: { signed_in_as: string; sign_in_url?: string; error?: string; hint?: string };
+        console?: unknown;
         next_actions: string[];
         next_commands: string[];
       };
@@ -527,15 +527,10 @@ describe("local runtime commands", () => {
     });
     expect(envelope.data.runtime.pid).toBeGreaterThan(0);
     binaryPids.push(envelope.data.runtime.pid);
-    // The fake server hosts no platform project, so no sign-in link can be
-    // minted: the envelope says why and stops advertising `zitadel console`,
-    // which would fail the same way.
-    expect(envelope.data.console).toMatchObject({
-      signed_in_as: expect.any(String),
-      error: expect.stringContaining("platform project"),
-      hint: expect.stringContaining("zitadel stop"),
-    });
-    expect(envelope.data.console.sign_in_url).toBeUndefined();
+    // The console is not part of what `start` reports: it has nothing to show
+    // before setup attaches a project, so `console` is where its link comes from.
+    expect(envelope.data.console).toBeUndefined();
+    expect(envelope.data.urls).toMatchObject({ console: `${serverUrl}/ui/console/` });
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_actions).toContainEqual(
       expect.stringContaining(expectedPublicCliCommand("logs --follow")),
@@ -643,7 +638,7 @@ describe("local runtime commands", () => {
       };
       expect(envelope.status).toBe("ok");
       binaryPids.push(envelope.data.runtime.pid);
-      // No admin, so nothing to sign in as and nothing to suggest.
+      // No admin, and no console in the report either way.
       expect(envelope.data.console).toBeUndefined();
       expect(envelope.data.next_commands).toEqual([
         expectedPublicCliCommand("setup --server local"),
@@ -694,11 +689,10 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain(
-      "Run setup in this directory or one inside it",
+      "Run setup in this directory or a subdirectory",
     );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
-    // As in the binary case: no platform project on the fake server, so no
-    // link and no `console` suggestion.
+    // As in the binary case: setup is the only next step, and no `console` one.
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
