@@ -55,8 +55,9 @@ export async function completeLogin(
   // guard resolves the session again on the way into the layout. Returning at
   // the URL change leaves those in flight, and they interrupt whatever the
   // caller navigates to next ("Navigation to /x is interrupted by another
-  // navigation to /"). The shell's own navigation renders only once the guard
+  // navigation to /"). The shell's account menu renders only once the guard
   // has let the layout through, so waiting for it waits for the sign-in to
-  // have finished landing.
-  await page.getByRole("navigation", { name: "Primary" }).waitFor();
+  // have finished landing. The account menu rather than the sidebar: the
+  // landing may be Projects, the home, which draws no sidebar.
+  await page.getByRole("button", { name: /^Account:/ }).waitFor();
 }

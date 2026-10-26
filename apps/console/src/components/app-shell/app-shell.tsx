@@ -1,4 +1,4 @@
-import { Link, useMatchRoute } from "@tanstack/react-router";
+import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -20,9 +20,9 @@ import {
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
 import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
-import { useNavItems, useRequestedNavItem } from "./use-nav-items";
+import { useNavItems } from "./use-nav-items";
 import type { NavView } from "@/nav";
-import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
+import { SETTINGS_PATH, type ShellUser, UserMenuButton, UserMenuItem } from "./user-menu";
 
 /**
  * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
@@ -32,6 +32,10 @@ import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
  * sits at the top of the content column in the portal view, and is absent from
  * the Settings view, which the design draws without one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
+ *
+ * Projects is the console's home and draws no sidebar (`HomeShell`): the
+ * sidebar is the selected project's screens, and the home is above every
+ * project rather than inside one.
  */
 export function AppShell({
   children,
@@ -46,9 +50,19 @@ export function AppShell({
 }) {
   const matchRoute = useMatchRoute();
   const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+  const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
   // The palette is the shell's, not the bar's: ⌘K opens it in the Settings
   // view too, which draws no bar.
   const [searchOpen, setSearchOpen] = useSearchShortcut();
+
+  if (atHome) {
+    return (
+      <HomeShell user={user} onSignOut={onSignOut} onSearch={() => setSearchOpen(true)}>
+        <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+        {children}
+      </HomeShell>
+    );
+  }
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
@@ -67,6 +81,44 @@ export function AppShell({
         {children}
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+/** The console's home: Projects, the one screen drawn without the sidebar. */
+const HOME_ROUTE = "/_authed/projects/";
+
+/**
+ * The home's chrome: one 56px bar, ruled underneath like the portal's, with
+ * the logo on the left and search and the account on the right. No project
+ * switcher, since the page is that list at full size (D21), and no sidebar,
+ * since its screens are a project's and none is open here.
+ */
+function HomeShell({
+  children,
+  user,
+  onSignOut,
+  onSearch,
+}: {
+  children: ReactNode;
+  user?: ShellUser;
+  onSignOut?: () => void;
+  onSearch: () => void;
+}) {
+  return (
+    <div className="flex min-h-svh w-full flex-col bg-background">
+      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-sm">
+        <Link to="/projects" aria-label="Home" className="inline-flex items-center text-foreground">
+          <ZitadelLogo className="h-[21px] w-auto" />
+        </Link>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="hidden w-75 justify-end sm:flex">
+            <SearchTrigger onOpen={onSearch} />
+          </div>
+          <UserMenuButton user={user} onSignOut={onSignOut} />
+        </div>
+      </header>
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
   );
 }
 
@@ -133,12 +185,13 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
   );
 }
 
-/** Logo lockup and the collapse toggle; the toggle alone in the rail. */
+/** Logo lockup, linking home, and the collapse toggle; the toggle alone in the rail. */
 function BrandHeader() {
   return (
     <SidebarHeader className={BRAND_HEADER}>
+      {/* Home is Projects, the list of every project, from any screen. */}
       <Link
-        to="/"
+        to="/projects"
         aria-label="Home"
         className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
       >
@@ -183,10 +236,9 @@ function SettingsHeader() {
  * Console ADR 0001). Portal is the project's screens; Settings holds the
  * person's profile alone while accounts are not surfaced (Console ADR 0005
  * §3). A row stays marked on the screens beneath it, so a resource's detail
- * keeps its list marked. While Projects asks for a project on the way to a
- * screen (`?next=`), that screen's row is the marked one, as it is what the
- * person opened. Design-only entries (`DESIGN_ONLY_NAV`, empty today) render
- * disabled.
+ * keeps its list marked. Projects is not a row: it is the home, behind the
+ * logo and the project switcher's `All projects`. Design-only entries
+ * (`DESIGN_ONLY_NAV`, empty today) render disabled.
  *
  * Rows keep their height and a 2px gap in both sidebar states, so collapsing
  * moves nothing vertically.
@@ -194,7 +246,6 @@ function SettingsHeader() {
 function NavList({ view, label }: { view: NavView; label: string }) {
   const items = useNavItems(view);
   const matchRoute = useMatchRoute();
-  const requested = useRequestedNavItem(items);
 
   return (
     <SidebarGroup role="navigation" aria-label={label} className="pt-4 pb-0">
@@ -204,7 +255,7 @@ function NavList({ view, label }: { view: NavView; label: string }) {
             {to ? (
               <SidebarMenuButton
                 asChild
-                isActive={requested ? requested.to === to : !!matchRoute({ to, fuzzy: to !== "/" })}
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
                 tooltip={name}
               >
                 <Link to={to} title={name}>

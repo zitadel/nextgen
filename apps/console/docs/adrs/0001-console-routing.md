@@ -204,6 +204,11 @@ the sidebar.
 > a project goes on to it. `/` without a selection lands on Projects itself
 > rather than by way of Users, since arriving asked for no screen.
 
+> **Amendment (2026-10-26, design decision D24):** Projects is no longer a
+> sidebar entry (`staticData.nav`); it is the console's home, opened by the
+> logo and the project switcher's `All projects`, and the shell draws it
+> without the sidebar. The sidebar holds the selected project's screens only.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
