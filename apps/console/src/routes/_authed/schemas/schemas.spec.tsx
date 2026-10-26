@@ -336,7 +336,7 @@ describe("user schema detail", () => {
     expect(await table().findByRole("cell", { name: "email" })).toBeInTheDocument();
   });
 
-  it("badges the identifier and display properties, nested ones by their path", async () => {
+  it("badges the x-identifier and x-display properties, nested ones by their path", async () => {
     const designated = {
       ...BUSINESS,
       "x-identifier": "email",
@@ -352,11 +352,11 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Business" });
 
     const table = () => within(screen.getByRole("table"));
-    expect(table().getByRole("cell", { name: "email Identifier" })).toBeInTheDocument();
-    expect(table().queryByText("Display name")).not.toBeInTheDocument();
+    expect(table().getByRole("cell", { name: "email x-identifier" })).toBeInTheDocument();
+    expect(table().queryByText("x-display")).not.toBeInTheDocument();
 
     await userEvent.click(table().getByRole("button", { name: "address" }));
-    expect(await table().findByRole("cell", { name: "city Display name" })).toBeInTheDocument();
+    expect(await table().findByRole("cell", { name: "city x-display" })).toBeInTheDocument();
     expect(table().getByRole("cell", { name: "street" })).toBeInTheDocument();
   });
 

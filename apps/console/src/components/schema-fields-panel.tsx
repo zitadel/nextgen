@@ -33,8 +33,9 @@ const ROOT_LABEL = "Schema";
  * breadcrumb segment; the breadcrumb walks back up.
  *
  * The leaf the schema's `x-identifier` names, and each of its `x-display`
- * parts, carries a badge beside its key, so what signs a user in and what
- * names them reads off the table rather than only off the document.
+ * parts, carries that keyword as a badge beside its key, so what signs a user
+ * in and what names them reads off the table rather than only off the
+ * document — in the words the users table's hover card uses.
  *
  * D14 also calls for a search field once an attribute list gets long. Nothing
  * here is long yet — the shipped presets define one to four properties — so the
@@ -100,7 +101,7 @@ const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-rin
 const HEAD_CELL = PANEL_HEAD_CELL;
 const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
 
-const DESIGNATION_LABELS = { identifier: "Identifier", display: "Display name" } as const;
+const DESIGNATION_LABELS = { identifier: "x-identifier", display: "x-display" } as const;
 
 function PropertyRow({
   property,
@@ -131,7 +132,9 @@ function PropertyRow({
           // separates the two in the cell's accessible name.
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">{property.key}</span>{" "}
-            <Badge variant="secondary">{DESIGNATION_LABELS[designation]}</Badge>
+            <Badge variant="secondary" className="font-mono font-normal">
+              {DESIGNATION_LABELS[designation]}
+            </Badge>
           </span>
         ) : (
           property.key
