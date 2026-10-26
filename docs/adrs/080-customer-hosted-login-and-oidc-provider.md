@@ -113,9 +113,9 @@ path differ.
 ### 5. The issuer is the app's origin
 
 The issuer is the origin an authorization request reached the app on, as the
-server derives it from the forwarded headers. The request records it, and
-its code and tokens carry it as `iss` wherever the token request arrives
-(OpenID Connect Core §3.1.3.7).
+server derives it from the forwarded headers; a back-channel request names
+it in its path instead (§6). The authorization request records it, and its
+code and tokens carry it as `iss` (OpenID Connect Core §3.1.3.7).
 
 Only a loopback origin while developing, or an origin a primary pattern of
 the project names, can be an issuer. A project without patterns admits every
@@ -138,10 +138,20 @@ server, outside the resource API; the cloud's catch-all already receives it
 ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
 and `.well-known/oauth-authorization-server`
 ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)). The server names the
-other endpoints when it builds them, and the metadata lists them under the
-app's proxy path (`/__nextgen/oauth/{project_id}/…`), since a static rewrite
-can put the project in a path but cannot add a header. Like provider
-sign-in's callback, this assumes the default `/__nextgen` prefix.
+other endpoints when it builds them, and the metadata lists them in two
+places:
+
+- **The browser's,** authorization and end session, under the app's proxy
+  path (`/__nextgen/oauth/{project_id}/…`), since they need the issuer's
+  cookies and a static rewrite can put the project in a path but cannot add
+  a header. Like provider sign-in's callback, this assumes the default
+  `/__nextgen` prefix.
+- **The back channel,** token, JWKS, userinfo, revocation and registration,
+  on the server's public origin (`server.public_base`), under a path that
+  names the issuer. A refresh or a service's token request never runs
+  through the login app, the server knows the issuer without a forwarded
+  header, and a code or refresh token from another issuer fails there. These
+  endpoints answer CORS without credentials.
 
 ### 7. What the scaffold reserves
 
@@ -179,12 +189,17 @@ login app itself there (ADR 081 §3). The §6 documents exist only while it is
 on; before, the server answers the 404 above, and `doctor` reports an app on
 the switch whose boundary lacks the reserved paths. The login-only setup mode
 of step 4 in the [Recommended sequence](#recommended-sequence) is the same
-switch, on from the start.
+switch, on from the start, and declares the issuer login-only (ADR 081 §9).
 
 ### 8. How an authorization request reaches the login page
 
 1. The authorization endpoint validates the client and its redirect URI; if
    either fails, it answers the error page (ADR 076) and redirects nowhere.
+   It refuses a request whose
+   [Fetch Metadata](https://www.w3.org/TR/fetch-metadata/) marks it as
+   anything but a top-level navigation, unless it says `prompt=none`, which
+   never shows consent, so no script on the issuer's origin can accept a
+   consent in the background.
 2. It stores the request (`auth_requests` in the
    [auth flows design](../design/api/authn-and-auth-flows.md#oidc-compatibility))
    and redirects (`303`) to the issuer's login path with an opaque handle:
@@ -250,10 +265,15 @@ client's origin or none, so:
 - The flow an `auth_request_id` opens must run on the recorded issuer's
   origin (§5), and seals the deployment the request resolved there, so the
   request and the flow read one release.
-- The code and its grants carry that deployment for token, userinfo and
-  refresh, which never resolve from an `Origin` or fall back to the project
-  default target ([#1616](https://github.com/zitadel/nextgen/issues/1616)).
-  A revoked release ends them, as it ends a sealed flow.
+- The code carries that deployment to the token endpoint, which never
+  resolves from an `Origin` or falls back to the project default target
+  ([#1616](https://github.com/zitadel/nextgen/issues/1616)). A refresh and
+  userinfo resolve the newest deployment to the token's issuer instead and
+  never widen the grant: an app or an API gone from it fails the request, a
+  scope gone from it drops out of the token, and no refresh adds one
+  ([RFC 6749](https://www.rfc-editor.org/rfc/rfc6749) §6). So removing an
+  app, an API, a scope or a claim rule reaches live grants at their next
+  refresh. A revoked release ends its flows and codes.
 - A preview URL ([#1312](https://github.com/zitadel/nextgen/issues/1312))
   signs users in but is never an issuer, so OIDC changes are tested on
   loopback or a primary origin kept for staging.
@@ -393,11 +413,11 @@ prefix routes `/oauth/` beside `/api/`.
    `X-Zitadel-Login-Path`, the `matcher` and dev proxy entries and their
    `doctor` migration, the widget's handle and completion rule, and
    `X-Zitadel-Client`.
-3. The authorization server: the switch and its file (§7), declared and
-   registered apps (ADR 081 §3), stored requests, a flow cookie per flow,
-   per-project signing keys, the authorization code flow with PKCE and `iss`,
-   codes and grants that carry their deployment, metadata, JWKS, token and
-   userinfo.
+3. The authorization server (ADR 081's step 2): the switch and its file
+   (§7), stored requests, a flow cookie per flow, per-project signing keys,
+   the authorization code flow with PKCE and `iss`, codes that carry their
+   deployment and refreshes that resolve the newest, metadata, and JWKS,
+   token and userinfo on the server's origin.
 4. The self-host path: a login-only setup mode, Nuxt first, and a compose
    example that runs that app on its own hostname beside the server
    ([compose quick start](../quick-start/docker-compose.md)).
@@ -426,19 +446,25 @@ from outside a browser request.
 
 - `/__nextgen` becomes part of public endpoint URLs, so renaming it breaks
   clients that copied them.
+- The back channel names the server's host (§6): a relying party that
+  copies the token URL instead of reading the metadata breaks when the
+  customer leaves the cloud, and a self-hosted server must be reachable by
+  relying parties (open question 9).
 - Moving the login app to another domain changes the issuer, which relying
   parties pin, and the passkeys' relying-party ID;
   [ADR 038](038-user-credential-migration-and-recovery.md)'s related origins
   help with the latter.
-- The login app becomes availability-critical for every relying party. The
-  Console does not depend on it (§1),
-  but under §1's fallback, restricting the customer project's origins to the
-  app's locks operators out of the Console after the first step
+- The login app becomes availability-critical for every sign-in, though not
+  for refreshes and service tokens (§6). The Console does not depend on it
+  (§1), but under §1's fallback, restricting the customer project's origins
+  to the app's locks operators out of the Console after the first step
   ([#2297](https://github.com/zitadel/nextgen/pull/2297)).
-- The authorization response passes through the login page's scripts, as
-  credentials do; PKCE and client authentication make a code read there
-  useless, and a login-only app with a strict content security policy limits
-  those scripts.
+- Every script on the issuer's origin acts with the user's session: it can
+  start an authorization request with its own PKCE verifier, drive the flow
+  and redeem the code for any public client, and with open registration for
+  a client it brings. §8 keeps it from accepting a consent in the
+  background, and open registration needs a login-only issuer (ADR 081 §9);
+  an issuer that serves a whole app trusts every script that app loads.
 - Silent SSO costs one load of the login page (§8). `prompt=none` in an
   iframe works only for clients on the issuer's site, since a cross-site
   frame gets neither the session nor the flow cookie; others use refresh
@@ -466,12 +492,12 @@ from outside a browser request.
 7. An SPA as a relying party: a public client that holds its tokens in the
    browser, under the OAuth guidance for browser-based apps, or a backend
    that holds them for it.
-8. Whether a refresh keeps the deployment sealed at sign-in until the grant
-   ends, as §10 has it, or moves to the newest deployment to the issuer's
-   origin, which would carry a configuration fix to long-lived grants.
-9. Can the passkey relying-party ID be the registrable domain rather than
+8. Can the passkey relying-party ID be the registrable domain rather than
    the full hostname (`passkeyRPFromOrigin`), so moving the login between
    subdomains keeps passkeys? ADR 038's related origins are the other lever.
+9. Whether a project may keep its back channel under the app (§6), for a
+   server only its operators reach or a customer who wants no Zitadel host
+   in its metadata.
 
 ## Rejected alternatives
 
@@ -504,6 +530,11 @@ from outside a browser request.
 - **The issuer on Zitadel's host,** such as `zitadel.cloud/p/<project>`:
   tokens and passkeys tied to Zitadel's domain break when the customer
   leaves the cloud.
+- **Every endpoint under the app:** every refresh and service token would
+  depend on the login app's availability and, on serverless hosts, bill an
+  invocation of it, and DPoP would rebuild `htu` from forwarded headers.
+  Discovery fixes only the issuer, and Google's endpoints sit on hosts other
+  than `accounts.google.com` too.
 
 ## Non-goals
 

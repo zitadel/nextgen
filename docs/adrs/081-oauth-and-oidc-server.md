@@ -6,9 +6,9 @@
 > and which part the server, the SDKs, the web components and the customer's
 > configuration each own.
 > **Builds on:** [ADR 080](080-customer-hosted-login-and-oidc-provider.md),
-> which runs the authorization server on the server behind the login app's
-> origin, and [ADR 037](037-token-lifecycle.md), which fixes token formats,
-> lifetimes and rotation.
+> which runs the authorization server on the server with the login app's
+> origin as its issuer, and [ADR 037](037-token-lifecycle.md), which fixes
+> token formats, lifetimes and rotation.
 > **Adopts:** the app half of
 > [`identity-surface.md`](../design/cli/identity-surface.md), and the IdP
 > connection's shape, one document for the file and the API
@@ -38,8 +38,9 @@
 - Claims come from the user schema, from rules, and from a signed hook per
   protected API that the server calls in the customer's backend, never from
   the browser.
-- Third-party apps get consent from the first release. Client ID metadata
-  documents, which MCP clients use, follow in the next.
+- The first release serves MCP clients: consent, protected APIs and client
+  ID metadata documents on a login-only issuer. Declared apps, claim rules,
+  dynamic registration and services follow.
 - Every decision a developer makes has a file, a command and an SDK call or
   element (§12), where an agent finds flows and schemas.
 
@@ -120,8 +121,11 @@ connection id. The slug is what a flow's `audience.app_ids`, a protected API
 - **Declared:** the developer's own apps, the login app and its relying
   parties (ADR 080 §12) among them, are files in the release, validated
   against `.zitadel/meta/app.json` and synced by a `ResourceSyncer` like the
-  connection's (`mutable`, not `revisioned`; deletion decided with the
-  connection's). `plan` shows a redirect URI change before it ships, and a
+  connection's (`mutable`, not `revisioned`). Removing a file drops the app
+  from the next release, and once that serves the issuer, its grants end at
+  their next refresh (ADR 080 §10); deleting the stored document is decided
+  with the connection's ([#1013](https://github.com/zitadel/nextgen/issues/1013)).
+  `plan` shows a redirect URI change before it ships, and a
   staging project gets the apps from the release instead of by hand. The
   credential is never in the file: a declared app authenticates with
   `private_key_jwt`, its public key in the file, or with a client secret the
@@ -153,15 +157,15 @@ protected API (§10).
 ### 4. Issuer and deployment without a browser
 
 A client credentials request has no authorization request to fix its issuer
-(ADR 080 §5). Its issuer is the origin the token request reached through the
-proxy, under the same rule: a primary pattern or loopback, never the server's
-own origin or a preview. It resolves the newest deployment to that origin, as
-a flow on that origin would, never from the request's `Origin` header and
-never from the project default target. A refresh keeps the issuer and the
-deployment of its refresh token (ADR 080 §10). The authorization endpoint
-resolves a deployment the same way, from the origin it reached, since a
-declared app and its redirect URIs are in the release (§3), and the flow it
-opens seals that deployment.
+(ADR 080 §5). Its issuer is the one its token endpoint's path names
+(ADR 080 §6), under the same rule: a primary pattern or loopback, never the
+server's own origin or a preview. It resolves the newest deployment to that
+origin, as a flow on that origin would, never from the request's `Origin`
+header and never from the project default target. A refresh keeps the issuer
+of its refresh token and resolves the newest deployment to it, never widening
+the grant (ADR 080 §10). The authorization endpoint resolves a deployment
+from the origin it reached, since a declared app and its redirect URIs are in
+the release (§3), and the flow it opens seals that deployment.
 
 ### 5. Protected APIs and scopes
 
@@ -243,31 +247,38 @@ that user.
 
 ### 9. Registration
 
-- **First release:** apps are declared in files or registered through the
-  API, the Console or the CLI's resource command (§3), first- and third-party
-  alike.
-- **Next release:** client ID metadata documents. A client uses an HTTPS URL as
-  its `client_id`, and the server fetches and validates the JSON document
-  behind it when an authorization request names it: HTTPS only, no private or
+- **Declared or registered:** in files, or through the API, the Console or
+  the CLI's resource command (§3), first- and third-party alike.
+- **Client ID metadata documents:** a client uses an HTTPS URL as its
+  `client_id`, and the server fetches and validates the JSON document behind
+  it when an authorization request names it: HTTPS only, no private or
   special-use addresses, limits on size and time, and caching. Such clients
   are third-party.
-- **With it, for compatibility:** dynamic client registration (RFC 7591), for
+- **Dynamic client registration** (RFC 7591), kept for compatibility with
   clients that register no other way.
 - Both are **off by default** in each project, because open registration is an
   abuse surface (ADR 078); a project turns them on in its OAuth settings
   (§12). A client registered either way belongs to the issuer's project,
   which answers #375's question of how dynamically registered clients map to
   projects.
+- Both need a **login-only issuer.** Any script on the issuer's origin acts
+  with the user's session (ADR 080's risks), so with open registration it
+  could bring its own client, accept that client's consent itself and keep a
+  refresh token. The release accepts either switch only when the OAuth
+  settings declare the issuer login-only; the SDK then serves the login page
+  with a strict content security policy and `frame-ancestors 'none'`, and
+  `doctor` warns when the app serves other pages.
 
 ### 10. MCP
 
 An MCP server is a protected API (§5) that a customer's app hosts; its hook
 (§6) adds the tenant claim its tools need. With §5 and §9, any MCP client can
 use it. The client finds the issuer in the protected-resource metadata the
-SDK serves and the endpoints under ADR 080's reserved paths, registers with a
-client ID metadata document, and gets a token for the MCP server's URI with
-PKCE and `resource`. MCP's enterprise-managed authorization builds on token
-exchange and comes with it (§11).
+SDK serves and the issuer's metadata under ADR 080's reserved paths,
+registers with a client ID metadata document on a login-only issuer (§9),
+and gets a token for the MCP server's URI with PKCE and `resource`. MCP's
+enterprise-managed authorization builds on token exchange and comes with it
+(§11).
 
 ### 11. Later
 
@@ -288,7 +299,7 @@ schemas.
 
 | To | File | Command | SDK or element |
 |---|---|---|---|
-| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 080 §7), the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel oauth enable`, which writes the file as ADR 070's commands write theirs; `doctor` checks the reserved paths | Nothing: the SDK already forwards the paths |
+| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 080 §7), the login-only declaration and the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel oauth enable`, which writes the file as ADR 070's commands write theirs; `doctor` checks the reserved paths, and that a login-only issuer serves only the login | Nothing: the SDK already forwards the paths, and sets a login-only issuer's content security policy |
 | Declare an app | `.zitadel/apps/<slug>.json` (§3) | `zitadel apps create`, or `setup --sign-in-with` for a relying party (ADR 080 §12); `plan` and `apply` | A relying party configures its proxy with the issuer and its client id; `auth()` and the session elements are unchanged |
 | Let a customer register an app | None | The product's own UI calls `POST /apps` through the proxy with the admin's session; `apps` resource commands for operators | None |
 | Protect an API | `.zitadel/apis/<slug>.json` (§5) | `zitadel apis create` | `protectResource({ api })` verifies bearers and serves the API's metadata |
@@ -298,19 +309,25 @@ schemas.
 ## Recommended sequence
 
 1. This ADR, with ADR 080.
-2. The first release, with ADR 080's steps 3 and 5: the OAuth settings file
-   and its switch; declared apps with their meta-schema, syncer and commands,
-   and registered apps through the API; web, SPA and native kinds, first- and
-   third-party; the standard scopes released by `x-claim`; the code flow with
-   PKCE and refresh rotation; discovery, JWKS, userinfo and end session;
-   consent, its me endpoints and the connected-apps element.
-3. Protected APIs: their files, resource indicators, per-API scopes and
-   lifetimes, claim rules, the claims hook and its scaffolded handler, refresh
-   token revocation, and the SDK's verification and protected-resource
-   metadata.
-4. Client ID metadata documents and dynamic registration. MCP clients work
-   from here.
+2. The first release serves MCP clients, with ADR 080's steps 3 and 5: the
+   OAuth settings file with its switch, which declares the login app
+   (ADR 080 §7), and the login-only declaration; client ID metadata
+   documents; the code flow with PKCE and refresh rotation for public
+   clients; discovery, JWKS, token and userinfo; consent, its me endpoints
+   and the connected-apps element; and protected APIs with their files,
+   resource indicators and scopes, and the SDK's verification and
+   protected-resource metadata.
+3. Declared apps with their commands, registered apps through the API, and
+   confidential web apps with client secrets; the standard scopes released by
+   `x-claim`; per-API lifetimes, claim rules, the claims hook and its
+   scaffolded handler; refresh token revocation.
+4. Dynamic registration, for MCP clients that register no other way.
 5. Service apps: client credentials and `private_key_jwt`.
+
+From step 2 on, an e2e lane runs the OpenID Foundation's
+[conformance suite](https://gitlab.com/openid/conformance-suite) against a
+scaffolded issuer, with the OP test plans for what has shipped, since the
+protocol spans the server, the SDK proxy and the widget.
 
 ## Consequences
 
@@ -319,11 +336,13 @@ schemas.
 - Each part has one owner, and customers shape scopes and claims without
   writing protocol code.
 - OAuth 2.1 from the start leaves no weak grant to retire later.
-- MCP clients work against a customer's app after step 4, without the custom
-  auth proxies #375 describes.
+- MCP clients work against a customer's app from the first release (step 2),
+  without the custom auth proxies #375 describes.
 - Claims are decided where tokens are signed, so a user cannot forge them.
 - The product's own apps travel with the release: a staging project gets them
   from `apply`, and `plan` shows a redirect URI change before it ships.
+- A removed app, API, scope or claim rule reaches live grants at their next
+  refresh (ADR 080 §10).
 - Each decision has one home (§12), so `resources --json`, the scaffolded
   READMEs and the skill can describe it.
 
@@ -338,9 +357,6 @@ schemas.
   app into the release is an explicit step (open question 6).
 - Without introspection, an access token stays valid until it expires, five
   minutes by default (ADR 037), even after its consent is revoked.
-- Claim rules ship with a release, and a refresh token keeps the deployment
-  it was sealed with (ADR 080 open question 8), so a rule change reaches
-  existing sign-ins only when their refresh tokens end.
 - Client ID metadata documents make the server fetch URLs that clients
   choose; the guards in §9 must hold.
 - A client that calls two APIs keeps two access tokens.
@@ -384,8 +400,9 @@ schemas.
   drops them: they put tokens in URLs or hand passwords to clients.
 - **Several audiences per access token.** Each API could replay a token at the
   others.
-- **Dynamic registration on by default.** Anyone could create clients in a
-  project (ADR 078).
+- **Open registration on by default, or on an issuer that serves more than
+  the login.** Anyone could create clients in a project (ADR 078), and any
+  script on a shared origin could consent for one (§9).
 - **Calling consents grants.** ADR 032's grants are permissions.
 
 ## Non-goals
@@ -393,7 +410,8 @@ schemas.
 - SAML and SCIM.
 - Roles and permissions in tokens (#425), and organizations inside a project.
 - Agent identity beyond token exchange (#375).
-- OpenID certification and the FAPI profiles.
+- OpenID certification, though the conformance suite runs in an e2e lane
+  ([Recommended sequence](#recommended-sequence)), and the FAPI profiles.
 
 ## Documentation impact
 
