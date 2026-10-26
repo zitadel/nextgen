@@ -433,7 +433,11 @@ than one:
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
-project. When they refuse, they write and publish nothing, on a dry run too.
+project. A provider added by `sso enable` is configured locally, not live: its
+`data.title` says so, `data.next_actions` says to deploy, and `data.next_commands`
+holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
+application exists. `data.title` claims the credentials are stored on the project
+only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
