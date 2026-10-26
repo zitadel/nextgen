@@ -55,8 +55,9 @@
     a yes or no, and "Which framework would you like to scaffold?" for a choice.
   - Add where the answer comes from or where it goes, in the same message: "It
     will be stored on the project as GOOGLE_CLIENT_SECRET."
-  - A confirmation names the thing and what happens: "Revoke rel_1? Its content
-    can never be served again."
+  - A confirmation that acts on something may be a short direct question, as
+    long as it names the thing and, when it is not obvious, what happens:
+    "Delete user usr_1?" or "Revoke rel_1? Its content can never be served again."
   - Ask the same thing the same way in every command that asks it.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
