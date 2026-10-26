@@ -24,6 +24,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
@@ -747,14 +748,14 @@ func TestOgenErrorHandlerMalformedCredentialHeader(t *testing.T) {
 	}
 }
 
-// errorStubHandler answers GET /healthz with err, or panics with panicValue.
+// errorStubHandler answers GET /livez with err, or panics with panicValue.
 type errorStubHandler struct {
 	api.UnimplementedHandler
 	err        error
 	panicValue any
 }
 
-func (h errorStubHandler) GetHealth(context.Context) (api.GetHealthRes, error) {
+func (h errorStubHandler) GetLive(context.Context) (api.GetLiveRes, error) {
 	if h.panicValue != nil {
 		panic(h.panicValue)
 	}
@@ -824,7 +825,7 @@ func enableErrorOrigins(t *testing.T) {
 func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 	enableErrorOrigins(t)
 	rec, records := serveAndRecordLogs(t, errorStubHandler{err: errors.New("disk on fire")}, nil,
-		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Len(t, records, 1)
@@ -832,7 +833,7 @@ func TestOgenErrorHandlerLogsServerFaultOnce(t *testing.T) {
 	require.Equal(t, "ERROR", record["level"])
 	require.Equal(t, "api error", record["msg"])
 	require.EqualValues(t, http.StatusInternalServerError, record["status"])
-	require.Equal(t, "getHealth", record["operation_id"])
+	require.Equal(t, "getLive", record["operation_id"])
 	require.Equal(t, "req_1", record["request_id"])
 	logged, ok := record["error"].(map[string]any)
 	require.True(t, ok, "error must be logged as a group: %v", record["error"])
@@ -849,7 +850,7 @@ func TestOgenErrorHandlerLogsClientErrorAtInfo(t *testing.T) {
 	enableErrorOrigins(t)
 	err := domain.ErrProjectNotFound().WithParent(errors.New("no rows in result set"))
 	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
-		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusNotFound, rec.Code)
 	require.Len(t, records, 1)
@@ -892,7 +893,7 @@ func TestOgenErrorHandlerLogsDecodeReason(t *testing.T) {
 func TestOgenErrorHandlerLogOmitsDetails(t *testing.T) {
 	err := domain.ErrUserAlreadyExists().WithDetails(domain.UserAttributesDetails{Keys: []domain.AttributeKey{"email"}})
 	rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
-		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusConflict, rec.Code)
 	require.Contains(t, rec.Body.String(), "attributes.email")
@@ -953,7 +954,7 @@ func TestOgenErrorHandlerLogsClientCancelAtWarn(t *testing.T) {
 				cancel()
 			}
 			rec, records := serveAndRecordLogs(t, errorStubHandler{err: err}, nil,
-				httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+				httptest.NewRequestWithContext(ctx, http.MethodGet, "/livez", nil))
 
 			require.Equal(t, http.StatusInternalServerError, rec.Code)
 			require.Len(t, records, 1)
@@ -1044,3 +1045,138 @@ func (h recordingHandler) Handle(_ context.Context, r slog.Record) error {
 func (h recordingHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
 
 func (h recordingHandler) WithGroup(string) slog.Handler { return h }
+
+// newRouterTestServer is newErrorHandlerTestServer with the answers to a path
+// or method no operation takes, as the server mounts them (ADR 076).
+func newRouterTestServer(t *testing.T, home *errorpage.Link) *api.Server {
+	t.Helper()
+	srv, err := api.NewServer(&Handler{}, NewSecurityHandler(nil),
+		api.WithErrorHandler(OgenErrorHandler),
+		api.WithNotFound(OgenNotFound(home)),
+		api.WithMethodNotAllowed(OgenMethodNotAllowed),
+	)
+	require.NoError(t, err)
+	return srv
+}
+
+// A path no operation matches answers a program with the envelope, so a client
+// can tell a path this server lacks from a server that is not a Zitadel API,
+// and a person with the error page.
+func TestOgenNotFound(t *testing.T) {
+	t.Parallel()
+	srv := newRouterTestServer(t, &errorpage.Link{Label: "Open the console", Href: "/ui/console/"})
+
+	for _, accept := range []string{"", "*/*", "application/json"} {
+		t.Run("accept "+accept, func(t *testing.T) {
+			t.Parallel()
+			req := httptest.NewRequest(http.MethodGet, "/no-such-path", nil)
+			if accept != "" {
+				req.Header.Set("Accept", accept)
+			}
+			rec := httptest.NewRecorder()
+			srv.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusNotFound, rec.Code)
+			require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+			require.Equal(t, "Accept", rec.Header().Get("Vary"))
+			require.JSONEq(t, `{"code":"req.not_found","message":"No API operation matches this path."}`, rec.Body.String())
+		})
+	}
+
+	t.Run("a browser navigation", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodGet, "/no-such-path", nil)
+		req.Header.Set("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
+		require.Equal(t, "Accept", rec.Header().Get("Vary"))
+		require.Contains(t, rec.Body.String(), `<h1 class="error-title">Page not found</h1>`)
+		require.Contains(t, rec.Body.String(), `href="/ui/console/"`)
+	})
+
+	t.Run("a form post", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodPost, "/no-such-path", nil)
+		req.Header.Set("Accept", "text/html")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+		require.JSONEq(t, `{"code":"req.not_found","message":"No API operation matches this path."}`, rec.Body.String())
+	})
+}
+
+// A path the API defines answers the envelope for a method its operations do
+// not take, with the methods they do, while a CORS preflight keeps ogen's 204.
+func TestOgenMethodNotAllowed(t *testing.T) {
+	t.Parallel()
+	srv := newRouterTestServer(t, nil)
+
+	t.Run("wrong method", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodDelete, "/livez", nil)
+		// A path the API defines is an API URL, browser or not.
+		req.Header.Set("Accept", "text/html")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+		require.Equal(t, "GET", rec.Header().Get("Allow"))
+		require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+		require.JSONEq(t, `{"code":"req.method_not_allowed","message":"The operations at this path do not accept this method."}`, rec.Body.String())
+	})
+
+	t.Run("CORS preflight", func(t *testing.T) {
+		t.Parallel()
+		req := httptest.NewRequest(http.MethodOptions, "/livez", nil)
+		req.Header.Set("Access-Control-Request-Method", "GET")
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+		require.Equal(t, "GET", rec.Header().Get("Access-Control-Allow-Methods"))
+		require.Empty(t, rec.Header().Get("Allow"))
+		require.Empty(t, rec.Body.String())
+	})
+}
+
+// A parameter that will not decode is named in details, as a body field is,
+// so the req.invalid message never points at details that are not there.
+func TestOgenErrorHandlerNamesTheInvalidParameter(t *testing.T) {
+	t.Parallel()
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
+	srv := newErrorHandlerTestServer(t, tokenService)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/123", nil)
+	req.Header.Set("Authorization", "Bearer credential")
+	rec := httptest.NewRecorder()
+	srv.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.JSONEq(t,
+		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["user_id"]}}}`,
+		rec.Body.String(),
+	)
+}
+
+func TestInvalidRequestFields(t *testing.T) {
+	t.Parallel()
+
+	param := &ogenerrors.DecodeParamsError{Err: &ogenerrors.DecodeParamError{
+		Name: "user_id", In: "path", Err: errors.New(`pattern "^user_" does not match "123"`),
+	}}
+	require.Equal(t, []string{"user_id"}, invalidRequestFields(param))
+
+	body := &ogenerrors.DecodeRequestError{Err: &validate.Error{Fields: []validate.FieldError{
+		{Name: "attributes", Error: &validate.Error{Fields: []validate.FieldError{{Name: "email", Error: errors.New("required")}}}},
+	}}}
+	require.Equal(t, []string{"attributes.email"}, invalidRequestFields(body))
+
+	require.Nil(t, invalidRequestFields(&ogenerrors.DecodeRequestError{Err: errors.New("unexpected end of JSON input")}))
+}

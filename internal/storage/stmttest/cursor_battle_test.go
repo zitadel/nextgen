@@ -5,6 +5,7 @@ package stmttest
 import (
 	"cmp"
 	"context"
+	"crypto/rand"
 	"slices"
 	"strings"
 	"testing"
@@ -66,10 +67,12 @@ func newTestEncryptionKey(id, projectID string) *domain.EncryptionKey {
 func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("projects", func(t *testing.T) { battleProjects(t, d) })
+		t.Run("projects_name", func(t *testing.T) { battleProjectsByName(t, d) })
 		t.Run("teams", func(t *testing.T) { battleTeams(t, d) })
 		t.Run("grants", func(t *testing.T) { battleGrants(t, d) })
 		t.Run("grants_expires_at", func(t *testing.T) { battleGrantsExpiresAt(t, d) })
 		t.Run("authorized_projects", func(t *testing.T) { battleAuthorizedProjects(t, d) })
+		t.Run("authorized_projects_name", func(t *testing.T) { battleAuthorizedProjectsByName(t, d) })
 		t.Run("users", func(t *testing.T) { battleUsers(t, d) })
 		t.Run("tokens", func(t *testing.T) { battleTokens(t, d) })
 		t.Run("sessions", func(t *testing.T) { battleSessions(t, d) })
@@ -181,6 +184,25 @@ func battleProjects(t *testing.T, d dialect) {
 	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 
+// battleProjectsByName drains ListProjects under a name search and nothing
+// else, ordered by id: what a platform operator's search runs, since every
+// project is theirs to act on (ADR 075 §6).
+func battleProjectsByName(t *testing.T, d dialect) {
+	t.Helper()
+	needle := strings.ToLower(rand.Text())
+	want := make([]string, 0, 5)
+	for range 5 {
+		want = append(want, ensureNamedProject(t, d.stmts, "Battle "+strings.ToUpper(needle)))
+	}
+	slices.Sort(want)
+	filter := database.StringContainsFold(database.Col(domain.ProjectFieldName), needle)
+	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListProjects(t.Context(), &database.ListOptions[domain.ProjectField]{
+			Filter: filter, Pagination: page,
+		})
+	}, func(p *domain.Project) string { return p.ID }, 2)
+}
+
 func battleTeams(t *testing.T, d dialect) {
 	t.Helper()
 	projectID := ensureProject(t, d.stmts)
@@ -235,7 +257,34 @@ func battleAuthorizedProjects(t *testing.T, d dialect) {
 	}
 	slices.Sort(want)
 	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, page)
+		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+			Pagination: page,
+		})
+	}, func(p *domain.Project) string { return p.ID }, 2)
+}
+
+// battleAuthorizedProjectsByName drains the authorized-projects query under a
+// name search: neither a reachable project whose name does not match nor a
+// match the user cannot reach may land on any page (ADR 053 §6).
+func battleAuthorizedProjectsByName(t *testing.T, d dialect) {
+	t.Helper()
+	u := seedAuthorizedUser(t, d.stmts)
+	needle := strings.ToLower(rand.Text())
+	want := make([]string, 0, 5)
+	for range 5 {
+		customer := ensureNamedProject(t, d.stmts, "Battle "+strings.ToUpper(needle))
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(customer, u.teamID)))
+		want = append(want, customer)
+	}
+	other := ensureNamedProject(t, d.stmts, "Battle other")
+	require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(other, u.teamID)))
+	ensureNamedProject(t, d.stmts, "Battle "+needle)
+	slices.Sort(want)
+	filter := database.StringContainsFold(database.Col(domain.ProjectFieldName), needle)
+	drainIncarnation(t, want, authorizedProjectsOrderAsc, func(page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+			Filter: filter, Pagination: page,
+		})
 	}, func(p *domain.Project) string { return p.ID }, 2)
 }
 

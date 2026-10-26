@@ -9,7 +9,7 @@ import { AbstractSanityCheck, type CheckContext, type CheckOutcome } from "./typ
 /**
  * Verifies local schema config files round-trip through the canonical
  * `schemaConfigSchema` from `@zitadel/config/schemas` — the same Zod the
- * sync engine validates with, so doctor and `apply` can never disagree
+ * release pipeline validates with, so doctor and `deploy` can never disagree
  * about a file. The union enforces the `kind` discriminator
  * (`user-schema` / `schema-url`) and the `metaSchema`/`x-auth-methods`/etc.
  * fields the platform requires.

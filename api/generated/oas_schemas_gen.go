@@ -9927,6 +9927,8 @@ type BuildReleaseErrorResponse struct {
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
 	SchNotFound              SchNotFound
 	NotImplemented           NotImplemented
+	PolInvalid               PolInvalid
+	PolRevisionConflict      PolRevisionConflict
 	RelInvalid               RelInvalid
 	RelNotFound              RelNotFound
 	RelPermissionDenied      RelPermissionDenied
@@ -9956,6 +9958,8 @@ const (
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
 	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
 	NotImplementedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "not_implemented"
+	PolInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "pol.invalid"
+	PolRevisionConflictBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "pol.revision_conflict"
 	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
@@ -10030,6 +10034,16 @@ func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
 // IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
 func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedBuildReleaseErrorResponse
+}
+
+// IsPolInvalid reports whether BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) IsPolInvalid() bool {
+	return s.Type == PolInvalidBuildReleaseErrorResponse
+}
+
+// IsPolRevisionConflict reports whether BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) IsPolRevisionConflict() bool {
+	return s.Type == PolRevisionConflictBuildReleaseErrorResponse
 }
 
 // IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
@@ -10347,6 +10361,48 @@ func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok boo
 func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolInvalid sets BuildReleaseErrorResponse to PolInvalid.
+func (s *BuildReleaseErrorResponse) SetPolInvalid(v PolInvalid) {
+	s.Type = PolInvalidBuildReleaseErrorResponse
+	s.PolInvalid = v
+}
+
+// GetPolInvalid returns PolInvalid and true boolean if BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) GetPolInvalid() (v PolInvalid, ok bool) {
+	if !s.IsPolInvalid() {
+		return v, false
+	}
+	return s.PolInvalid, true
+}
+
+// NewPolInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolInvalid.
+func NewPolInvalidBuildReleaseErrorResponse(v PolInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolInvalid(v)
+	return s
+}
+
+// SetPolRevisionConflict sets BuildReleaseErrorResponse to PolRevisionConflict.
+func (s *BuildReleaseErrorResponse) SetPolRevisionConflict(v PolRevisionConflict) {
+	s.Type = PolRevisionConflictBuildReleaseErrorResponse
+	s.PolRevisionConflict = v
+}
+
+// GetPolRevisionConflict returns PolRevisionConflict and true boolean if BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) GetPolRevisionConflict() (v PolRevisionConflict, ok bool) {
+	if !s.IsPolRevisionConflict() {
+		return v, false
+	}
+	return s.PolRevisionConflict, true
+}
+
+// NewPolRevisionConflictBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolRevisionConflict.
+func NewPolRevisionConflictBuildReleaseErrorResponse(v PolRevisionConflict) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolRevisionConflict(v)
 	return s
 }
 
@@ -12331,9 +12387,9 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // same release on any project.
 // A handle names one resource of its kind in a bundle. Two schemas with the
 // same `objectType`, two flow definitions with the same `name`, two IDP
-// connections with the same `slug`, or a schema without an `objectType`
-// refuse the release with `rel.invalid`, with an
-// entry for each such resource.
+// connections with the same `slug`, two policies for the same `operation`,
+// or a schema without an `objectType` refuse the release with `rel.invalid`,
+// with an entry for each such resource.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
 // resource, and the release it builds pins at most 50, the most a release
@@ -12360,6 +12416,18 @@ type ConfigurationBundle struct {
 	// as `${{ NAME }}` references to variables, never as values, so a bundle
 	// carries no credentials.
 	Idps []IdpConnection `json:"idps"`
+	// Operation policies, one per `.zitadel/policies/<operation>.json`, each
+	// the body `POST /policies` takes. The handle is `operation`: a project
+	// has one policy per operation. An unknown setting or a value outside a
+	// setting's bounds is refused while the request is decoded, with
+	// `req.invalid` and no `details.resources`; a config the operation's
+	// template refuses beyond that, such as settings that contradict each
+	// other, gets a `rel.invalid` entry.
+	// A request served this release reads the policy revision it pins for
+	// the operation, as it reads the user schema, branding and identity
+	// providers, once the release pins a flow; a release that pins a flow
+	// and no policy for an operation means no policy for it.
+	Policies []PublishPolicyRequest `json:"policies"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
@@ -12381,6 +12449,11 @@ func (s *ConfigurationBundle) GetIdps() []IdpConnection {
 	return s.Idps
 }
 
+// GetPolicies returns the value of Policies.
+func (s *ConfigurationBundle) GetPolicies() []PublishPolicyRequest {
+	return s.Policies
+}
+
 // GetBranding returns the value of Branding.
 func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
@@ -12399,6 +12472,11 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 // SetIdps sets the value of Idps.
 func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
 	s.Idps = val
+}
+
+// SetPolicies sets the value of Policies.
+func (s *ConfigurationBundle) SetPolicies(val []PublishPolicyRequest) {
+	s.Policies = val
 }
 
 // SetBranding sets the value of Branding.
@@ -12474,10 +12552,6 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
-type CreateAuthAttemptConflict ErrorDetails
-
-func (*CreateAuthAttemptConflict) createAuthAttemptRes() {}
-
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type                CreateAuthAttemptErrorResponseType // switch on this field
@@ -12487,6 +12561,7 @@ type CreateAuthAttemptErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
+	ProjMismatch        ProjMismatch
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
@@ -12503,6 +12578,7 @@ const (
 	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
 	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
 	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
+	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
 	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
@@ -12536,6 +12612,11 @@ func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether CreateAuthAttemptErrorResponse is NotImplemented.
 func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateAuthAttemptErrorResponse
+}
+
+// IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12679,6 +12760,27 @@ func NewNotImplementedCreateAuthAttemptErrorResponse(v NotImplemented) CreateAut
 	return s
 }
 
+// SetProjMismatch sets CreateAuthAttemptErrorResponse to ProjMismatch.
+func (s *CreateAuthAttemptErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchCreateAuthAttemptErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjMismatch.
+func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
 // SetReqInvalid sets CreateAuthAttemptErrorResponse to ReqInvalid.
 func (s *CreateAuthAttemptErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateAuthAttemptErrorResponse
@@ -12769,10 +12871,6 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 }
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
-
-type CreateAuthAttemptForbidden ErrorDetails
-
-func (*CreateAuthAttemptForbidden) createAuthAttemptRes() {}
 
 // Request to create a new authentication attempt.
 // Ref: #
@@ -13733,8 +13831,8 @@ type CreateDeploymentRequest struct {
 	// `sha256:` prefix.
 	ContentHash OptReleaseContentHash    `json:"content_hash"`
 	Targets     DeploymentTargetsRequest `json:"targets"`
-	// Preview URLs only. Each preview stays live for 7 days (`7d`) from this
-	// deployment; a sent value is accepted but not applied.
+	// Preview URLs only. How long each preview stays live from this
+	// deployment; omitted, 7 days (`P7D`).
 	TTL OptPreviewTTL `json:"ttl"`
 	// Why this deployment happens. Omitted, the server records `deploy`.
 	Reason OptDeploymentReason `json:"reason"`
@@ -22245,16 +22343,15 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
+func (*ErrorDetails) createAuthAttemptRes()    {}
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
-func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
-func (*ErrorDetails) issueChallengeRes()       {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
 func (*ErrorDetails) listMyPasskeysRes()       {}
@@ -22302,9 +22399,8 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) getHealthRes() {}
-func (*ErrorDetailsStatusCode) getLiveRes()   {}
-func (*ErrorDetailsStatusCode) getReadyRes()  {}
+func (*ErrorDetailsStatusCode) getLiveRes()  {}
+func (*ErrorDetailsStatusCode) getReadyRes() {}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -22337,6 +22433,7 @@ type Event struct {
 	OriginRemovedEvent              OriginRemovedEvent
 	PolicyCreatedEvent              PolicyCreatedEvent
 	PolicyUpdatedEvent              PolicyUpdatedEvent
+	PreviewRemovedEvent             PreviewRemovedEvent
 	ProjectCreatedEvent             ProjectCreatedEvent
 	ProjectDeletedEvent             ProjectDeletedEvent
 	ProjectUpdatedEvent             ProjectUpdatedEvent
@@ -22387,6 +22484,7 @@ const (
 	OriginRemovedEventEvent              EventType = "origin.removed"
 	PolicyCreatedEventEvent              EventType = "policy.created"
 	PolicyUpdatedEventEvent              EventType = "policy.updated"
+	PreviewRemovedEventEvent             EventType = "preview.removed"
 	ProjectCreatedEventEvent             EventType = "project.created"
 	ProjectDeletedEventEvent             EventType = "project.deleted"
 	ProjectUpdatedEventEvent             EventType = "project.updated"
@@ -22489,6 +22587,9 @@ func (s Event) IsPolicyCreatedEvent() bool { return s.Type == PolicyCreatedEvent
 
 // IsPolicyUpdatedEvent reports whether Event is PolicyUpdatedEvent.
 func (s Event) IsPolicyUpdatedEvent() bool { return s.Type == PolicyUpdatedEventEvent }
+
+// IsPreviewRemovedEvent reports whether Event is PreviewRemovedEvent.
+func (s Event) IsPreviewRemovedEvent() bool { return s.Type == PreviewRemovedEventEvent }
 
 // IsProjectCreatedEvent reports whether Event is ProjectCreatedEvent.
 func (s Event) IsProjectCreatedEvent() bool { return s.Type == ProjectCreatedEventEvent }
@@ -23069,6 +23170,27 @@ func NewPolicyUpdatedEventEvent(v PolicyUpdatedEvent) Event {
 	return s
 }
 
+// SetPreviewRemovedEvent sets Event to PreviewRemovedEvent.
+func (s *Event) SetPreviewRemovedEvent(v PreviewRemovedEvent) {
+	s.Type = PreviewRemovedEventEvent
+	s.PreviewRemovedEvent = v
+}
+
+// GetPreviewRemovedEvent returns PreviewRemovedEvent and true boolean if Event is PreviewRemovedEvent.
+func (s Event) GetPreviewRemovedEvent() (v PreviewRemovedEvent, ok bool) {
+	if !s.IsPreviewRemovedEvent() {
+		return v, false
+	}
+	return s.PreviewRemovedEvent, true
+}
+
+// NewPreviewRemovedEventEvent returns new Event from PreviewRemovedEvent.
+func NewPreviewRemovedEventEvent(v PreviewRemovedEvent) Event {
+	var s Event
+	s.SetPreviewRemovedEvent(v)
+	return s
+}
+
 // SetProjectCreatedEvent sets Event to ProjectCreatedEvent.
 func (s *Event) SetProjectCreatedEvent(v ProjectCreatedEvent) {
 	s.Type = ProjectCreatedEventEvent
@@ -23454,9 +23576,17 @@ func (*Event) getEventRes() {}
 // live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
+	// What authorized the request, when it was not a grant on the event's
+	// project (ADR 053 §8). Every event of such a request carries it.
+	Authorization OptEventMetadataAuthorization `json:"authorization"`
 	// Observed HTTP requestor context on Path A request.api only.
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
+}
+
+// GetAuthorization returns the value of Authorization.
+func (s *EventMetadata) GetAuthorization() OptEventMetadataAuthorization {
+	return s.Authorization
 }
 
 // GetClient returns the value of Client.
@@ -23467,6 +23597,11 @@ func (s *EventMetadata) GetClient() OptEventMetadataClient {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
 	return s.AdditionalProps
+}
+
+// SetAuthorization sets the value of Authorization.
+func (s *EventMetadata) SetAuthorization(val OptEventMetadataAuthorization) {
+	s.Authorization = val
 }
 
 // SetClient sets the value of Client.
@@ -23488,6 +23623,72 @@ func (s *EventMetadataAdditional) init() EventMetadataAdditional {
 		*s = m
 	}
 	return m
+}
+
+// What authorized the request, when it was not a grant on the event's
+// project (ADR 053 §8). Every event of such a request carries it.
+type EventMetadataAuthorization struct {
+	// `platform_operator`: the deployment's platform operator relation
+	// (ADR 075), which administers every project.
+	Path EventMetadataAuthorizationPath `json:"path"`
+	// The project the actor's user belongs to.
+	ActorHomeProjectID OptString `json:"actor_home_project_id"`
+}
+
+// GetPath returns the value of Path.
+func (s *EventMetadataAuthorization) GetPath() EventMetadataAuthorizationPath {
+	return s.Path
+}
+
+// GetActorHomeProjectID returns the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) GetActorHomeProjectID() OptString {
+	return s.ActorHomeProjectID
+}
+
+// SetPath sets the value of Path.
+func (s *EventMetadataAuthorization) SetPath(val EventMetadataAuthorizationPath) {
+	s.Path = val
+}
+
+// SetActorHomeProjectID sets the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) SetActorHomeProjectID(val OptString) {
+	s.ActorHomeProjectID = val
+}
+
+// `platform_operator`: the deployment's platform operator relation
+// (ADR 075), which administers every project.
+type EventMetadataAuthorizationPath string
+
+const (
+	EventMetadataAuthorizationPathPlatformOperator EventMetadataAuthorizationPath = "platform_operator"
+)
+
+// AllValues returns all EventMetadataAuthorizationPath values.
+func (EventMetadataAuthorizationPath) AllValues() []EventMetadataAuthorizationPath {
+	return []EventMetadataAuthorizationPath{
+		EventMetadataAuthorizationPathPlatformOperator,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventMetadataAuthorizationPath) MarshalText() ([]byte, error) {
+	switch s {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
+	switch EventMetadataAuthorizationPath(data) {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		*s = EventMetadataAuthorizationPathPlatformOperator
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Observed HTTP requestor context on Path A request.api only.
@@ -23709,6 +23910,8 @@ type ExchangeHandoffErrorResponse struct {
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
 	NotImplemented          NotImplemented
+	ProjMismatch            ProjMismatch
+	RelRevoked              RelRevoked
 	ReqInvalid              ReqInvalid
 	SessExchangeConflict    SessExchangeConflict
 	SessInvalidHandoffToken SessInvalidHandoffToken
@@ -23733,6 +23936,8 @@ const (
 	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
 	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedExchangeHandoffErrorResponse          ExchangeHandoffErrorResponseType = "not_implemented"
+	ProjMismatchExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "proj.mismatch"
+	RelRevokedExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "rel.revoked"
 	ReqInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "req.invalid"
 	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
 	SessInvalidHandoffTokenExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.invalid_handoff_token"
@@ -23786,6 +23991,16 @@ func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
 // IsNotImplemented reports whether ExchangeHandoffErrorResponse is NotImplemented.
 func (s ExchangeHandoffErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedExchangeHandoffErrorResponse
+}
+
+// IsProjMismatch reports whether ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchExchangeHandoffErrorResponse
+}
+
+// IsRelRevoked reports whether ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedExchangeHandoffErrorResponse
 }
 
 // IsReqInvalid reports whether ExchangeHandoffErrorResponse is ReqInvalid.
@@ -24014,6 +24229,48 @@ func (s ExchangeHandoffErrorResponse) GetNotImplemented() (v NotImplemented, ok 
 func NewNotImplementedExchangeHandoffErrorResponse(v NotImplemented) ExchangeHandoffErrorResponse {
 	var s ExchangeHandoffErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMismatch sets ExchangeHandoffErrorResponse to ProjMismatch.
+func (s *ExchangeHandoffErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchExchangeHandoffErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from ProjMismatch.
+func NewProjMismatchExchangeHandoffErrorResponse(v ProjMismatch) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
+// SetRelRevoked sets ExchangeHandoffErrorResponse to RelRevoked.
+func (s *ExchangeHandoffErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedExchangeHandoffErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from RelRevoked.
+func NewRelRevokedExchangeHandoffErrorResponse(v RelRevoked) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -31936,6 +32193,8 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -31978,6 +32237,8 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "unavailable"
@@ -32113,6 +32374,16 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundGetFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedGetFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether GetFlowStepErrorResponse is ReqInvalid.
@@ -32690,6 +32961,48 @@ func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErro
 	return s
 }
 
+// SetRelNotFound sets GetFlowStepErrorResponse to RelNotFound.
+func (s *GetFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundGetFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundGetFlowStepErrorResponse(v RelNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets GetFlowStepErrorResponse to RelRevoked.
+func (s *GetFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedGetFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedGetFlowStepErrorResponse(v RelRevoked) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelRevoked(v)
+	return s
+}
+
 // SetReqInvalid sets GetFlowStepErrorResponse to ReqInvalid.
 func (s *GetFlowStepErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidGetFlowStepErrorResponse
@@ -33235,116 +33548,6 @@ func (*GetGrantNotFound) getGrantRes() {}
 type GetGrantUnauthorized ErrorDetails
 
 func (*GetGrantUnauthorized) getGrantRes() {}
-
-// GetHealthErrorResponse represents sum type.
-type GetHealthErrorResponse struct {
-	Type       GetHealthErrorResponseType // switch on this field
-	Internal   Internal
-	ReqInvalid ReqInvalid
-}
-
-// GetHealthErrorResponseType is oneOf type of GetHealthErrorResponse.
-type GetHealthErrorResponseType string
-
-// Possible values for GetHealthErrorResponseType.
-const (
-	InternalGetHealthErrorResponse   GetHealthErrorResponseType = "internal"
-	ReqInvalidGetHealthErrorResponse GetHealthErrorResponseType = "req.invalid"
-)
-
-// IsInternal reports whether GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) IsInternal() bool { return s.Type == InternalGetHealthErrorResponse }
-
-// IsReqInvalid reports whether GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetHealthErrorResponse
-}
-
-// SetInternal sets GetHealthErrorResponse to Internal.
-func (s *GetHealthErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetHealthErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalGetHealthErrorResponse returns new GetHealthErrorResponse from Internal.
-func NewInternalGetHealthErrorResponse(v Internal) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets GetHealthErrorResponse to ReqInvalid.
-func (s *GetHealthErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetHealthErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidGetHealthErrorResponse returns new GetHealthErrorResponse from ReqInvalid.
-func NewReqInvalidGetHealthErrorResponse(v ReqInvalid) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// GetHealthErrorResponseStatusCode wraps GetHealthErrorResponse with StatusCode.
-type GetHealthErrorResponseStatusCode struct {
-	StatusCode int
-	Response   GetHealthErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *GetHealthErrorResponseStatusCode) GetResponse() GetHealthErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *GetHealthErrorResponseStatusCode) SetResponse(val GetHealthErrorResponse) {
-	s.Response = val
-}
-
-func (*GetHealthErrorResponseStatusCode) getHealthRes() {}
-
-type GetHealthOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s GetHealthOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-func (*GetHealthOK) getHealthRes() {}
 
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
@@ -35945,6 +36148,22 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetReadyServiceUnavailable struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s GetReadyServiceUnavailable) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*GetReadyServiceUnavailable) getReadyRes() {}
 
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {
@@ -50615,6 +50834,52 @@ func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
 	return d
 }
 
+// NewOptEventMetadataAuthorization returns new OptEventMetadataAuthorization with value set to v.
+func NewOptEventMetadataAuthorization(v EventMetadataAuthorization) OptEventMetadataAuthorization {
+	return OptEventMetadataAuthorization{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadataAuthorization is optional EventMetadataAuthorization.
+type OptEventMetadataAuthorization struct {
+	Value EventMetadataAuthorization
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadataAuthorization was set.
+func (o OptEventMetadataAuthorization) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadataAuthorization) Reset() {
+	var v EventMetadataAuthorization
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadataAuthorization) SetTo(v EventMetadataAuthorization) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadataAuthorization) Get() (v EventMetadataAuthorization, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadataAuthorization) Or(d EventMetadataAuthorization) EventMetadataAuthorization {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptEventMetadataClient returns new OptEventMetadataClient with value set to v.
 func NewOptEventMetadataClient(v EventMetadataClient) OptEventMetadataClient {
 	return OptEventMetadataClient{
@@ -56357,6 +56622,69 @@ func (o OptNilPolicyUpdatedEventActorType) Or(d PolicyUpdatedEventActorType) Pol
 	return d
 }
 
+// NewOptNilPreviewRemovedEventActorType returns new OptNilPreviewRemovedEventActorType with value set to v.
+func NewOptNilPreviewRemovedEventActorType(v PreviewRemovedEventActorType) OptNilPreviewRemovedEventActorType {
+	return OptNilPreviewRemovedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilPreviewRemovedEventActorType is optional nullable PreviewRemovedEventActorType.
+type OptNilPreviewRemovedEventActorType struct {
+	Value PreviewRemovedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilPreviewRemovedEventActorType was set.
+func (o OptNilPreviewRemovedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilPreviewRemovedEventActorType) Reset() {
+	var v PreviewRemovedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilPreviewRemovedEventActorType) SetTo(v PreviewRemovedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilPreviewRemovedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilPreviewRemovedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v PreviewRemovedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilPreviewRemovedEventActorType) Get() (v PreviewRemovedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilPreviewRemovedEventActorType) Or(d PreviewRemovedEventActorType) PreviewRemovedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilProjectCreatedEventActorType returns new OptNilProjectCreatedEventActorType with value set to v.
 func NewOptNilProjectCreatedEventActorType(v ProjectCreatedEventActorType) OptNilProjectCreatedEventActorType {
 	return OptNilProjectCreatedEventActorType{
@@ -59024,6 +59352,52 @@ func (o OptPolicyUpdatedEventDelegationType) Or(d PolicyUpdatedEventDelegationTy
 	return d
 }
 
+// NewOptPreviewRemovedEventDelegationType returns new OptPreviewRemovedEventDelegationType with value set to v.
+func NewOptPreviewRemovedEventDelegationType(v PreviewRemovedEventDelegationType) OptPreviewRemovedEventDelegationType {
+	return OptPreviewRemovedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptPreviewRemovedEventDelegationType is optional PreviewRemovedEventDelegationType.
+type OptPreviewRemovedEventDelegationType struct {
+	Value PreviewRemovedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptPreviewRemovedEventDelegationType was set.
+func (o OptPreviewRemovedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptPreviewRemovedEventDelegationType) Reset() {
+	var v PreviewRemovedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptPreviewRemovedEventDelegationType) SetTo(v PreviewRemovedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptPreviewRemovedEventDelegationType) Get() (v PreviewRemovedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptPreviewRemovedEventDelegationType) Or(d PreviewRemovedEventDelegationType) PreviewRemovedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptPreviewTTL returns new OptPreviewTTL with value set to v.
 func NewOptPreviewTTL(v PreviewTTL) OptPreviewTTL {
 	return OptPreviewTTL{
@@ -59202,6 +59576,52 @@ func (o OptProjClaimWindowExpiredDetails) Get() (v ProjClaimWindowExpiredDetails
 
 // Or returns value if set, or given parameter if does not.
 func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) ProjClaimWindowExpiredDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptProjMismatchDetails returns new OptProjMismatchDetails with value set to v.
+func NewOptProjMismatchDetails(v ProjMismatchDetails) OptProjMismatchDetails {
+	return OptProjMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjMismatchDetails is optional ProjMismatchDetails.
+type OptProjMismatchDetails struct {
+	Value ProjMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjMismatchDetails was set.
+func (o OptProjMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjMismatchDetails) Reset() {
+	var v ProjMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjMismatchDetails) SetTo(v ProjMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjMismatchDetails) Get() (v ProjMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjMismatchDetails) Or(d ProjMismatchDetails) ProjMismatchDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -69149,7 +69569,486 @@ func (s *Preview) SetCreatedAt(val time.Time) {
 	s.CreatedAt = val
 }
 
-type PreviewTTL string
+// PreviewRemoved2XX is 2XX pattern response for PreviewRemoved operation.
+type PreviewRemoved2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PreviewRemoved2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PreviewRemoved2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PreviewRemoved2XX) previewRemovedRes() {}
+
+// PreviewRemovedDef is default response for PreviewRemoved operation.
+type PreviewRemovedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *PreviewRemovedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *PreviewRemovedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*PreviewRemovedDef) previewRemovedRes() {}
+
+// Merged schema.
+// Ref: #
+type PreviewRemovedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category PreviewRemovedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilPreviewRemovedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptPreviewRemovedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                            `json:"delegation_id"`
+	Grantor        OptString                            `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString      `json:"flow_id"`
+	Metadata OptEventMetadata  `json:"metadata"`
+	Payload  EmptyEventPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *PreviewRemovedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *PreviewRemovedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *PreviewRemovedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *PreviewRemovedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *PreviewRemovedEvent) GetCategory() PreviewRemovedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *PreviewRemovedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *PreviewRemovedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *PreviewRemovedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *PreviewRemovedEvent) GetActorType() OptNilPreviewRemovedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *PreviewRemovedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *PreviewRemovedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *PreviewRemovedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *PreviewRemovedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *PreviewRemovedEvent) GetDelegationType() OptPreviewRemovedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *PreviewRemovedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *PreviewRemovedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *PreviewRemovedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *PreviewRemovedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *PreviewRemovedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *PreviewRemovedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *PreviewRemovedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *PreviewRemovedEvent) GetPayload() EmptyEventPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *PreviewRemovedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *PreviewRemovedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *PreviewRemovedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *PreviewRemovedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *PreviewRemovedEvent) SetCategory(val PreviewRemovedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *PreviewRemovedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *PreviewRemovedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *PreviewRemovedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *PreviewRemovedEvent) SetActorType(val OptNilPreviewRemovedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *PreviewRemovedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *PreviewRemovedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *PreviewRemovedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *PreviewRemovedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *PreviewRemovedEvent) SetDelegationType(val OptPreviewRemovedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *PreviewRemovedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *PreviewRemovedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *PreviewRemovedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *PreviewRemovedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *PreviewRemovedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *PreviewRemovedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *PreviewRemovedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *PreviewRemovedEvent) SetPayload(val EmptyEventPayload) {
+	s.Payload = val
+}
+
+type PreviewRemovedEventActorType string
+
+const (
+	PreviewRemovedEventActorTypeHuman   PreviewRemovedEventActorType = "human"
+	PreviewRemovedEventActorTypeService PreviewRemovedEventActorType = "service"
+	PreviewRemovedEventActorTypeSystem  PreviewRemovedEventActorType = "system"
+	PreviewRemovedEventActorTypeAgent   PreviewRemovedEventActorType = "agent"
+)
+
+// AllValues returns all PreviewRemovedEventActorType values.
+func (PreviewRemovedEventActorType) AllValues() []PreviewRemovedEventActorType {
+	return []PreviewRemovedEventActorType{
+		PreviewRemovedEventActorTypeHuman,
+		PreviewRemovedEventActorTypeService,
+		PreviewRemovedEventActorTypeSystem,
+		PreviewRemovedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventActorTypeHuman:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeService:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeSystem:
+		return []byte(s), nil
+	case PreviewRemovedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventActorType) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventActorType(data) {
+	case PreviewRemovedEventActorTypeHuman:
+		*s = PreviewRemovedEventActorTypeHuman
+		return nil
+	case PreviewRemovedEventActorTypeService:
+		*s = PreviewRemovedEventActorTypeService
+		return nil
+	case PreviewRemovedEventActorTypeSystem:
+		*s = PreviewRemovedEventActorTypeSystem
+		return nil
+	case PreviewRemovedEventActorTypeAgent:
+		*s = PreviewRemovedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type PreviewRemovedEventCategory string
+
+const (
+	PreviewRemovedEventCategoryRequest PreviewRemovedEventCategory = "request"
+	PreviewRemovedEventCategoryAuth    PreviewRemovedEventCategory = "auth"
+	PreviewRemovedEventCategorySession PreviewRemovedEventCategory = "session"
+	PreviewRemovedEventCategoryAdmin   PreviewRemovedEventCategory = "admin"
+	PreviewRemovedEventCategoryEntity  PreviewRemovedEventCategory = "entity"
+	PreviewRemovedEventCategorySignal  PreviewRemovedEventCategory = "signal"
+)
+
+// AllValues returns all PreviewRemovedEventCategory values.
+func (PreviewRemovedEventCategory) AllValues() []PreviewRemovedEventCategory {
+	return []PreviewRemovedEventCategory{
+		PreviewRemovedEventCategoryRequest,
+		PreviewRemovedEventCategoryAuth,
+		PreviewRemovedEventCategorySession,
+		PreviewRemovedEventCategoryAdmin,
+		PreviewRemovedEventCategoryEntity,
+		PreviewRemovedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventCategoryRequest:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryAuth:
+		return []byte(s), nil
+	case PreviewRemovedEventCategorySession:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryAdmin:
+		return []byte(s), nil
+	case PreviewRemovedEventCategoryEntity:
+		return []byte(s), nil
+	case PreviewRemovedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventCategory) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventCategory(data) {
+	case PreviewRemovedEventCategoryRequest:
+		*s = PreviewRemovedEventCategoryRequest
+		return nil
+	case PreviewRemovedEventCategoryAuth:
+		*s = PreviewRemovedEventCategoryAuth
+		return nil
+	case PreviewRemovedEventCategorySession:
+		*s = PreviewRemovedEventCategorySession
+		return nil
+	case PreviewRemovedEventCategoryAdmin:
+		*s = PreviewRemovedEventCategoryAdmin
+		return nil
+	case PreviewRemovedEventCategoryEntity:
+		*s = PreviewRemovedEventCategoryEntity
+		return nil
+	case PreviewRemovedEventCategorySignal:
+		*s = PreviewRemovedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type PreviewRemovedEventDelegationType string
+
+const (
+	PreviewRemovedEventDelegationTypeDirect    PreviewRemovedEventDelegationType = "direct"
+	PreviewRemovedEventDelegationTypeDelegated PreviewRemovedEventDelegationType = "delegated"
+	PreviewRemovedEventDelegationTypePatShared PreviewRemovedEventDelegationType = "pat_shared"
+	PreviewRemovedEventDelegationTypeExchanged PreviewRemovedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all PreviewRemovedEventDelegationType values.
+func (PreviewRemovedEventDelegationType) AllValues() []PreviewRemovedEventDelegationType {
+	return []PreviewRemovedEventDelegationType{
+		PreviewRemovedEventDelegationTypeDirect,
+		PreviewRemovedEventDelegationTypeDelegated,
+		PreviewRemovedEventDelegationTypePatShared,
+		PreviewRemovedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s PreviewRemovedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case PreviewRemovedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case PreviewRemovedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *PreviewRemovedEventDelegationType) UnmarshalText(data []byte) error {
+	switch PreviewRemovedEventDelegationType(data) {
+	case PreviewRemovedEventDelegationTypeDirect:
+		*s = PreviewRemovedEventDelegationTypeDirect
+		return nil
+	case PreviewRemovedEventDelegationTypeDelegated:
+		*s = PreviewRemovedEventDelegationTypeDelegated
+		return nil
+	case PreviewRemovedEventDelegationTypePatShared:
+		*s = PreviewRemovedEventDelegationTypePatShared
+		return nil
+	case PreviewRemovedEventDelegationTypeExchanged:
+		*s = PreviewRemovedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type PreviewTTL ogenx.ISODuration
 
 // Merged schema.
 // Ref: #
@@ -69304,6 +70203,59 @@ func (*ProjClaimWindowExpired) initClaimRes() {}
 type ProjClaimWindowExpiredDetails map[string]jx.Raw
 
 func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjMismatch) GetDetails() OptProjMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjMismatch) SetDetails(val OptProjMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjMismatchDetails map[string]jx.Raw
+
+func (s *ProjMismatchDetails) init() ProjMismatchDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -75754,6 +76706,8 @@ type ReleasePointer struct {
 	// `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
+	// - `policy` — the policy's `operation`, so a project's password policy
+	// is one resource however often it is revised
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -75808,6 +76762,7 @@ const (
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
+	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -75817,6 +76772,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
 		ReleasePointerKindIdp,
+		ReleasePointerKindPolicy,
 	}
 }
 
@@ -75830,6 +76786,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindBranding:
 		return []byte(s), nil
 	case ReleasePointerKindIdp:
+		return []byte(s), nil
+	case ReleasePointerKindPolicy:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -75850,6 +76808,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindIdp:
 		*s = ReleasePointerKindIdp
+		return nil
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -76796,6 +77757,7 @@ type RemovePreviewErrorResponse struct {
 	DepNotFound         DepNotFound
 	DepPermissionDenied DepPermissionDenied
 	EnvProjectNotFound  EnvProjectNotFound
+	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
 	ReqInvalid          ReqInvalid
@@ -76811,6 +77773,7 @@ const (
 	DepNotFoundRemovePreviewErrorResponse         RemovePreviewErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRemovePreviewErrorResponse RemovePreviewErrorResponseType = "dep.permission_denied"
 	EnvProjectNotFoundRemovePreviewErrorResponse  RemovePreviewErrorResponseType = "env.project_not_found"
+	EvtInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "evt.invalid"
 	InternalRemovePreviewErrorResponse            RemovePreviewErrorResponseType = "internal"
 	NotImplementedRemovePreviewErrorResponse      RemovePreviewErrorResponseType = "not_implemented"
 	ReqInvalidRemovePreviewErrorResponse          RemovePreviewErrorResponseType = "req.invalid"
@@ -76835,6 +77798,11 @@ func (s RemovePreviewErrorResponse) IsDepPermissionDenied() bool {
 // IsEnvProjectNotFound reports whether RemovePreviewErrorResponse is EnvProjectNotFound.
 func (s RemovePreviewErrorResponse) IsEnvProjectNotFound() bool {
 	return s.Type == EnvProjectNotFoundRemovePreviewErrorResponse
+}
+
+// IsEvtInvalid reports whether RemovePreviewErrorResponse is EvtInvalid.
+func (s RemovePreviewErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidRemovePreviewErrorResponse
 }
 
 // IsInternal reports whether RemovePreviewErrorResponse is Internal.
@@ -76938,6 +77906,27 @@ func (s RemovePreviewErrorResponse) GetEnvProjectNotFound() (v EnvProjectNotFoun
 func NewEnvProjectNotFoundRemovePreviewErrorResponse(v EnvProjectNotFound) RemovePreviewErrorResponse {
 	var s RemovePreviewErrorResponse
 	s.SetEnvProjectNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets RemovePreviewErrorResponse to EvtInvalid.
+func (s *RemovePreviewErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidRemovePreviewErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if RemovePreviewErrorResponse is EvtInvalid.
+func (s RemovePreviewErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidRemovePreviewErrorResponse returns new RemovePreviewErrorResponse from EvtInvalid.
+func NewEvtInvalidRemovePreviewErrorResponse(v EvtInvalid) RemovePreviewErrorResponse {
+	var s RemovePreviewErrorResponse
+	s.SetEvtInvalid(v)
 	return s
 }
 
@@ -83153,6 +84142,10 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -83195,6 +84188,10 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
@@ -83330,6 +84327,26 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSubmitFlowStepErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSubmitFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
@@ -83904,6 +84921,90 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SubmitFlowStepErrorResponse to ProjOriginNotAllowed.
+func (s *SubmitFlowStepErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSubmitFlowStepErrorResponse(v ProjOriginNotAllowed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SubmitFlowStepErrorResponse to ProjPreviewNotLive.
+func (s *SubmitFlowStepErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotFound sets SubmitFlowStepErrorResponse to RelNotFound.
+func (s *SubmitFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSubmitFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundSubmitFlowStepErrorResponse(v RelNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SubmitFlowStepErrorResponse to RelRevoked.
+func (s *SubmitFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSubmitFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedSubmitFlowStepErrorResponse(v RelRevoked) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 

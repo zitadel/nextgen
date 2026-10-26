@@ -209,10 +209,6 @@ type GetGrantRes interface {
 	getGrantRes()
 }
 
-type GetHealthRes interface {
-	getHealthRes()
-}
-
 type GetIdpByIdRes interface {
 	getIdpByIdRes()
 }
@@ -407,6 +403,10 @@ type PolicyCreatedRes interface {
 
 type PolicyUpdatedRes interface {
 	policyUpdatedRes()
+}
+
+type PreviewRemovedRes interface {
+	previewRemovedRes()
 }
 
 type ProjectCreatedRes interface {

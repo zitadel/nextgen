@@ -229,7 +229,6 @@ tasks:
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
     options:

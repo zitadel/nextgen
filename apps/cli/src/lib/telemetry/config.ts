@@ -1,7 +1,7 @@
 import { ciFlag } from "./dimensions/ci-flag";
 
 /**
- * Resolves the Mixpanel ingestion token and API host for a CLI invocation.
+ * Resolves the Mixpanel ingestion token and endpoint for a CLI invocation.
  *
  * The token is a *write-only* project token: it can ingest events but cannot
  * read data back, so — unlike the project service-key — it is safe to ship
@@ -31,13 +31,24 @@ const DEV_TELEMETRY_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
  */
 const PROD_TELEMETRY_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
 
-/** Mixpanel API hosts by data-residency region. */
-const HOSTS = {
-  us: "api.mixpanel.com",
-  eu: "api-eu.mixpanel.com",
+/** The hosted cloud's address, where released CLIs send their events. */
+export const CLOUD_HOST = "preview.zitadel.com";
+
+/**
+ * Where events go, by data-residency region. Our projects are in the EU and
+ * take events through the cloud: the repo-root `vercel.json` forwards
+ * `/telemetry/mixpanel/*` to `api-eu.mixpanel.com`, so released CLIs name our
+ * host rather than Mixpanel's. A US project is reached directly.
+ */
+const ENDPOINTS = {
+  us: { host: "api.mixpanel.com", path: "" },
+  eu: { host: CLOUD_HOST, path: "/telemetry/mixpanel" },
 } as const;
 
-export type TelemetryRegion = keyof typeof HOSTS;
+export type TelemetryRegion = keyof typeof ENDPOINTS;
+
+/** The Mixpanel client's host, and the path its requests start with. */
+export type TelemetryEndpoint = { readonly host: string; readonly path: string };
 
 /**
  * Decide which project the events belong to.
@@ -54,7 +65,7 @@ export type TelemetryRegion = keyof typeof HOSTS;
  * Ambient `NODE_ENV` is deliberately NOT consulted: a run with
  * `NODE_ENV=development` must not silently switch projects.
  */
-function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
+export function resolveChannel(env: NodeJS.ProcessEnv): "development" | "production" {
   const explicit = (env.ZITADEL_TELEMETRY_ENV ?? "").trim().toLowerCase();
   if (explicit === "development") {
     return "development";
@@ -85,13 +96,13 @@ export function resolveTelemetryToken(env: NodeJS.ProcessEnv): string | undefine
 }
 
 /**
- * Resolve the Mixpanel API host from `ZITADEL_TELEMETRY_REGION`. Defaults to the
- * EU host, because the Zitadel Mixpanel projects live in the EU data-residency
- * region. Set `ZITADEL_TELEMETRY_REGION=us` for a US-hosted project — events
- * sent to the wrong host are silently dropped, so verify the first event lands
- * in Live View.
+ * Resolve where events go from `ZITADEL_TELEMETRY_REGION`. Defaults to the EU
+ * region, where the Zitadel Mixpanel projects live. Set
+ * `ZITADEL_TELEMETRY_REGION=us` for a US-hosted project — events sent to the
+ * wrong region are silently dropped, so verify the first event lands in Live
+ * View.
  */
-export function resolveTelemetryHost(env: NodeJS.ProcessEnv): string {
+export function resolveTelemetryEndpoint(env: NodeJS.ProcessEnv): TelemetryEndpoint {
   const region = (env.ZITADEL_TELEMETRY_REGION ?? "eu").trim().toLowerCase();
-  return region === "us" ? HOSTS.us : HOSTS.eu;
+  return region === "us" ? ENDPOINTS.us : ENDPOINTS.eu;
 }

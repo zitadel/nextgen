@@ -16,7 +16,7 @@ import (
 func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
 	errreport.EnableStack(false)
 	rec, records := serveAndRecordLogs(t, errorStubHandler{panicValue: "boom"}, nil,
-		httptest.NewRequest(http.MethodGet, "/healthz", nil))
+		httptest.NewRequest(http.MethodGet, "/livez", nil))
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 	require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -26,7 +26,7 @@ func TestWithRecoverAnswersPanicWithInternalError(t *testing.T) {
 	require.Equal(t, "ERROR", record["level"])
 	require.Equal(t, "api error", record["msg"])
 	require.EqualValues(t, http.StatusInternalServerError, record["status"])
-	require.Equal(t, "getHealth", record["operation_id"])
+	require.Equal(t, "getLive", record["operation_id"])
 	require.Equal(t, "req_1", record["request_id"])
 	logged := record["error"].(map[string]any)
 	require.Equal(t, "internal", logged["code"])
@@ -41,7 +41,7 @@ func TestWithRecoverLogsPanicAtErrorAfterTheClientLeft(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, records := serveAndRecordLogs(t, errorStubHandler{panicValue: "boom"}, nil,
-		httptest.NewRequestWithContext(ctx, http.MethodGet, "/healthz", nil))
+		httptest.NewRequestWithContext(ctx, http.MethodGet, "/livez", nil))
 
 	require.Len(t, records, 1)
 	require.Equal(t, "ERROR", records[0]["level"])

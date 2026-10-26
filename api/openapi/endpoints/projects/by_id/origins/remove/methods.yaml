@@ -1,5 +1,6 @@
 post:
   operationId: removeOrigin
+  x-zitadel-cli: origin rm
   summary: Remove an origin pattern
   description: |
     Removes one pattern from the project's origins. Requests from URLs only

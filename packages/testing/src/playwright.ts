@@ -67,13 +67,14 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
         );
       }
       // Wait, don't read-once: the supervisor's Playwright readiness URL is
-      // the instance's /healthz, which answers as soon as the *server* is up
-      // — the handshake lands only after *bootstrap* (project, schema,
-      // flows) completes a moment later. Suites with an `app` entry never
-      // see the gap (the app runner waits for the handshake before the app
-      // reports ready), but in app-less mode the first worker can get here
-      // first. Bootstrap after health is seconds at most, so the default
-      // wait is generous; a bootstrap failure surfaces as this timeout.
+      // the instance's /readyz, which answers as soon as the *server* and its
+      // database are up — the handshake lands only after *bootstrap*
+      // (project, schema, flows) completes a moment later. Suites with an
+      // `app` entry never see the gap (the app runner waits for the handshake
+      // before the app reports ready), but in app-less mode the first worker
+      // can get here first. Bootstrap after readiness is seconds at most, so
+      // the default wait is generous; a bootstrap failure surfaces as this
+      // timeout.
       await use(connectZitadel(await waitForHandshake(handshakePath)));
     },
     // `auto`: every worker waits for the bootstrapped instance before its

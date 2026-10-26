@@ -9,8 +9,8 @@
  */
 
 /* Widget-first: the default host is content-sized and paints nothing —
-   the embedding app owns the page. `variant="page"` (hosted shell,
-   scaffolded login routes) opts into the full-page chrome. The
+   the embedding app owns the page. `variant="page"` (scaffolded login
+   routes) opts into the full-page chrome. The
    `--zl-page-min-height` custom property overrides the height in both
    modes (a host-set value always wins over the variant default). */
 :host {

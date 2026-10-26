@@ -8,9 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
 func TestDeploymentErrorResponseStatuses(t *testing.T) {
@@ -118,4 +121,45 @@ func TestDeploymentAccessRow(t *testing.T) {
 		domain.ErrEnvironmentProjectNotFound().Code)
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", deploymentAccess, opRead),
 		domain.ErrDeploymentNotFound().Code)
+
+	// A foothold without a project-wide read is Forbidden, which this gate
+	// answers as permission denied. The handler that chooses the gate is
+	// TestListPreviewsRefusesAPartialGrant.
+	member := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+	assertDomainCode(t,
+		requireProjectAccess(member, stubAuthzStmts{allowCheck: new(false), foothold: new(true)}, "proj_a", deploymentAccess, opRead),
+		domain.ErrDeploymentPermissionDenied().Code)
+}
+
+// A partial grant must not reach the preview list. The list cannot apply the
+// row filter requireProjectListAccess would attach, so the handler refuses
+// before it asks the service.
+func TestListPreviewsRefusesAPartialGrant(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+	stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, true, nil)
+
+	svcPool := servicemocks.NewMockPool(ctrl)
+	svcStmts := servicemocks.NewMockAllStatements(ctrl)
+	svcPool.EXPECT().Statements().Return(svcStmts).AnyTimes()
+
+	h := Handler{
+		pool:              service.NewPool(pool),
+		deploymentService: service.NewDeploymentService(service.NewPool(svcPool)),
+	}
+	member := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+
+	_, err := h.ListPreviews(member, api.ListPreviewsParams{ProjectID: "proj_a"})
+	assertDomainCode(t, err, domain.ErrDeploymentPermissionDenied().Code)
 }

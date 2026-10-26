@@ -35,7 +35,7 @@ func WithRecover(next http.Handler) http.Handler {
 			if tw.wroteHeader {
 				panic(http.ErrAbortHandler)
 			}
-			writeErrorDetails(w, http.StatusInternalServerError, domainErrorDetails(domain.ErrInternal(nil)))
+			writeErrorResponse(w, internalErrorResponse(domain.ErrInternal(nil)))
 		}()
 		next.ServeHTTP(tw, r)
 	})

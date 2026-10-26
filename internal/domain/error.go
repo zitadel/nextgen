@@ -160,6 +160,20 @@ func ErrRequestInvalid() Error {
 	return newError("req.invalid", "The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.", nil, nil)
 }
 
+// ErrRequestNotFound is the answer to a path no API operation matches. It is
+// raised by the router, before any operation runs, so no operation lists it
+// (ADR 076).
+func ErrRequestNotFound() Error {
+	return newError("req.not_found", "No API operation matches this path.", nil, nil)
+}
+
+// ErrRequestMethodNotAllowed is the answer to a path whose operations do not
+// take the request's method; the response's Allow header lists the ones they
+// take (ADR 076).
+func ErrRequestMethodNotAllowed() Error {
+	return newError("req.method_not_allowed", "The operations at this path do not accept this method.", nil, nil)
+}
+
 // serverFaultCodes are the codes that mean the server, or a system it depends
 // on, failed to do its part, rather than the client asking for something it
 // cannot have. A code that can also be caused by client input, such as an
