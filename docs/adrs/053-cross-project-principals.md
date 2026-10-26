@@ -333,8 +333,11 @@ exception for project secrets does not extend to foreign human sessions.
 > an unknown id, so a principal granted on one team cannot confirm another
 > team or its users exist. Creates, project operations and lists keep the
 > project-wide foothold; they answer before any id is looked up, and the list
-> partial view depends on it. `TestConsoleSessionTeamScopedCannotProbeOtherTeams`
-> pins the case.
+> partial view depends on it. Deletes keep two existing exceptions: an
+> operator project secret gets `204` for an id that names nothing (D10's
+> delete idempotency), and `DELETE /teams/{id}` answers every refusal with
+> `403`. `TestConsoleSessionTeamScopedCannotProbeOtherTeams` pins the case for
+> a session.
 
 ### 8. Audit events are written in the protected project
 

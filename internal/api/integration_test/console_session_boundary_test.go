@@ -224,6 +224,8 @@ func TestConsoleSessionTeamScopedCannotProbeOtherTeams(t *testing.T) {
 		"rename team B":   {http.MethodPatch, "/teams/" + teamB, "/teams/" + unknownLike(teamB), `{"name":"x"}`},
 		"get a user in B": {http.MethodGet, "/users/" + userInB, "/users/" + unknownLike(userInB), ""},
 		"list B's roster": {http.MethodGet, "/users/" + userInB + "/teams", "/users/" + unknownLike(userInB) + "/teams", ""},
+		// A session holds no operator scope, so delete gets no idempotent 204.
+		"delete a user in B": {http.MethodDelete, "/users/" + userInB, "/users/" + unknownLike(userInB), ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
