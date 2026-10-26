@@ -200,7 +200,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary"},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -208,7 +208,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{appOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -216,7 +216,7 @@ func TestCreateDeployment(t *testing.T) {
 			req: &api.CreateDeploymentRequest{
 				ReleaseID: api.NewOptReleaseID(releaseID),
 				Targets:   api.DeploymentTargetsRequest{"primary", previewOrigin},
-				TTL:       api.NewOptPreviewTTL("1h"),
+				TTL:       api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 			},
 			wantType: &api.CreateDeploymentBadRequest{}, wantCode: domain.ErrDeploymentInvalid().Code,
 		},
@@ -765,7 +765,7 @@ func TestCreatePreviewDeployment(t *testing.T) {
 	t.Run("a ttl is accepted", func(t *testing.T) {
 		preview(t, &api.CreateDeploymentRequest{
 			Targets: api.DeploymentTargetsRequest{previewOrigin},
-			TTL:     api.NewOptPreviewTTL("1h"),
+			TTL:     api.NewOptPreviewTTL(api.PreviewTTL(time.Hour)),
 		})
 	})
 

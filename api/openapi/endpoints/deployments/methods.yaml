@@ -63,7 +63,7 @@ post:
               targets:
                 - https://acme-git-sso-acmeinc.vercel.app
                 - https://acme-k3x9v2-acmeinc.vercel.app
-              ttl: 168h
+              ttl: P7D
   responses:
     '200':
       description: |

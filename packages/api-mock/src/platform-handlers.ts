@@ -1098,21 +1098,20 @@ const DEFAULT_PREVIEW_TTL = "P7D";
 
 /** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
 function isoDurationMs(ttl: string): number | undefined {
-  // The shapes preview-ttl.yaml admits: whole days, or a time part in hours,
-  // minutes or seconds. Weeks (`P4W`) are their own ISO form and are accepted
-  // too; months and years are not, having no fixed length.
-  const match = /^P(?:(\d+)W|(\d+)D|(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)$/.exec(ttl);
+  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // and a time part in hours, minutes or fractional seconds. Weeks, months and
+  // years are not among them, so the mock refuses what the server would.
+  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
   if (!match) {
     return undefined;
   }
-  const [, weeks, days, tDays, hours, minutes, seconds] = match;
-  // `PT` on its own carries no components and is not a duration.
-  if ([weeks, days, tDays, hours, minutes, seconds].every((part) => part === undefined)) {
+  const [, days, hours, minutes, seconds] = match;
+  // A bare `P` or `PT` carries no components and is not a duration.
+  if ([days, hours, minutes, seconds].every((part) => part === undefined)) {
     return undefined;
   }
   return (
-    Number(weeks ?? 0) * 604_800_000 +
-    Number(days ?? tDays ?? 0) * 86_400_000 +
+    Number(days ?? 0) * 86_400_000 +
     Number(hours ?? 0) * 3_600_000 +
     Number(minutes ?? 0) * 60_000 +
     Number(seconds ?? 0) * 1_000
