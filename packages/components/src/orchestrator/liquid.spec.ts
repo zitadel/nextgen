@@ -832,6 +832,30 @@ describe("localiseFlowErrorKeys", () => {
     ]);
   });
 
+  it("names the bound a length error's field carries", () => {
+    const validations = { "x-auth-methods#password": { min_length: 12, max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at least 12 characters." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_max_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at most 64 characters." }]);
+  });
+
+  it("keeps the generic length message when the field carries no such bound", () => {
+    // A max_length bound does not name a min_length violation.
+    const validations = { "x-auth-methods#password": { max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password is too short." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", {
+        ...ctx,
+        validations: {},
+      }),
+    ).toEqual([{ message: "Password is too short." }]);
+  });
+
   it("covers every rule suffix's generic fallback, including unknown_field", () => {
     expect(localiseFlowErrorKeys("error.nickname_max_length", ctx)).toEqual([
       { message: "Nickname is too long." },

@@ -4,6 +4,14 @@
 > **Date:** 2026-08-02
 > **Context:** The widgets' locale dictionaries and copy overlays (`businessLocales`), the branding-revision resource (ADR 040 / the templates track), and the CLI scaffold templates.
 > **Relates to:** [ADR 040](040-tenant-login-templates-editable-config.md)
+>
+> **Note (2026-10-24):** two premises below have moved. Releases have shipped
+> (#1858, #2044), so a flow already resolves branding through the deployed
+> release rather than the latest revision, and there are no environments
+> ([ADR 068](068-project-is-the-data-boundary.md)): read "effective for the
+> environment" as "in the deployed release". [ADR 057](057-login-customization-categories.md)
+> treats translations as their own setting, tracked in
+> [#1038](https://github.com/zitadel/nextgen/issues/1038).
 
 ## Context
 

@@ -73,6 +73,10 @@ describe("landing routes", () => {
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
+    // Projects itself rather than the way to Users: arriving at the console
+    // asked for no screen (D22).
+    expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
+    expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
   });
 
   it("keeps a scoped deep link's target while the person picks a project", async () => {
@@ -134,7 +138,7 @@ describe("landing routes", () => {
         });
       }),
     );
-    server.use(http.get("*/api/healthz", () => HttpResponse.json({ status: "ok" })));
+    server.use(http.get("*/api/readyz", () => HttpResponse.text("ok")));
     await renderAt("/system");
 
     const pill = await screen.findByRole("button", { name: "Switch project" });

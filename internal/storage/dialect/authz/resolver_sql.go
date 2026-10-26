@@ -56,10 +56,20 @@ func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID, homeProjectID
 }
 
 // WriteCheckAuthz emits SELECT (allowed), (foothold) in one round-trip.
+//
+// A Check that names a target (ResourceID, a by-id route after its RSI lookup)
+// gets the target's foothold: only a path that could cover that resource turns
+// a denial into 403, so a resource outside every authorized scope answers like
+// an unknown id (ADR 053 §7). Without a target (creates, project operations,
+// lists) the foothold stays project-wide; the list partial view depends on it.
 func WriteCheckAuthz(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("SELECT (")
 	writeCheckAllowed(w, env, params)
 	w.WriteString("), ")
+	if params.ResourceID != "" {
+		writeTargetFoothold(w, env, params)
+		return
+	}
 	writeFoothold(w, env, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 }
 
@@ -179,12 +189,19 @@ func writeListAuthzRSIBase(w ArgWriter, env Env, params domain.AuthzListObjectsP
 }
 
 // writeConstantVisibilityArms writes the arms that cannot reference r: their
-// truth value is fixed once the bind arguments are bound.
+// truth value is fixed once the bind arguments are bound. The platform operator
+// arm joins them for a user homed in the platform project, so a materialized
+// list agrees with the resolver's Check, which asks it second (ADR 075 §3).
 func writeConstantVisibilityArms(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	writeProjectScopedClosureExists(w, env, params)
 	w.WriteString(`
     OR `)
 	writeFullTTUExists(w, env, params)
+	if params.PlatformOperatorEligible() {
+		w.WriteString(`
+    OR `)
+		writePlatformOperatorExists(w, env, params.PlatformCheckParams())
+	}
 }
 
 // writeCorrelatedVisibilityArms writes the arms that do reference r, and so must
@@ -375,6 +392,74 @@ func writeFoothold(w ArgWriter, env Env, projectID, homeProjectID string, princi
 	w.WriteArg(ptype)
 	w.WriteString(` = 'user'
     )
+)`)
+}
+
+// writeTargetFoothold is writeFoothold narrowed to one target: an active
+// assignment whose scope covers it (project-wide, its team, or the resource
+// itself), a membership of the user in the target team or the target's team,
+// or the user's own record.
+func writeTargetFoothold(w ArgWriter, env Env, params domain.AuthzCheckParams) {
+	ptype := params.PrincipalType.String()
+	w.WriteString(`(
+    EXISTS (
+        SELECT 1
+        FROM `)
+	writeTable(w, env, "authz_assignments")
+	w.WriteString(` a
+        WHERE a.project_id = `)
+	w.WriteArg(params.ProjectID)
+	w.WriteString(`
+          AND a.revoked_at IS NULL
+          AND `)
+	writeExpiresActive(w, env, "a")
+	w.WriteString(`
+          AND (a.scope_kind = 'project'`)
+	if params.ResourceTeamID != "" {
+		w.WriteString(`
+               OR (a.scope_kind = 'team' AND a.scope_team_id = `)
+		w.WriteArg(params.ResourceTeamID)
+		w.WriteString(`)`)
+	}
+	w.WriteString(`
+               OR (a.scope_kind = 'resource' AND a.scope_resource_id = `)
+	w.WriteArg(params.ResourceID)
+	w.WriteString(`))
+          AND `)
+	writePrincipalMatch(w, env, "a", ptype, params.PrincipalID, params.HomeProjectID())
+	w.WriteString(`
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM `)
+	writeTable(w, env, "authz_membership_edges")
+	w.WriteString(` e
+        WHERE e.project_id = `)
+	w.WriteArg(params.ProjectID)
+	w.WriteString(`
+          AND e.member_type = 'user'
+          AND e.member_id = `)
+	w.WriteArg(params.PrincipalID)
+	w.WriteString(`
+          AND `)
+	w.WriteArg(ptype)
+	w.WriteString(` = 'user'
+          AND e.set_type = 'team'
+          AND (e.set_id = `)
+	w.WriteArg(params.ResourceID)
+	if params.ResourceTeamID != "" {
+		w.WriteString(` OR e.set_id = `)
+		w.WriteArg(params.ResourceTeamID)
+	}
+	w.WriteString(`)
+    )
+    OR (`)
+	w.WriteArg(ptype)
+	w.WriteString(` = 'user' AND `)
+	w.WriteArg(params.ResourceID)
+	w.WriteString(` = `)
+	w.WriteArg(params.PrincipalID)
+	w.WriteString(`)
 )`)
 }
 

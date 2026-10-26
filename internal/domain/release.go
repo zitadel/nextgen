@@ -27,6 +27,7 @@ const (
 	ReleasePointerKindFlowDefinition
 	ReleasePointerKindBranding
 	ReleasePointerKindIDP
+	// TODO(#1441): password policy joins once it is a release pointer kind.
 )
 
 // ReleaseBrandingHandle is the handle every branding pointer carries. Branding

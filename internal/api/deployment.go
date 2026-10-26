@@ -51,7 +51,7 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if err != nil {
 		return nil, err
 	}
-	// Created or not, the deployment is the project's newest primary one.
+	// Created or not, the deployment is the newest to its targets.
 	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
 	if result.Created {
 		created := api.CreateDeploymentCreated(resp)

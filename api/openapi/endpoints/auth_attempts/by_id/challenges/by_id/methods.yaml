@@ -12,9 +12,6 @@ post:
     
     On successful verification, the factor is written to the auth attempt.
     The attempt moves to the next pending challenge or completes if all required factors are verified.
-
-    Reuses the deployment sealed when the attempt was created. If that release
-    was revoked since, the response is `409` with `rel.revoked`.
   tags:
     - Authentication Attempts
   security:
@@ -44,16 +41,16 @@ post:
             $ref: ../../../auth-attempt-response.yaml
     '409':
       description: |
-        The sealed release was revoked (`rel.revoked`).
+        The proof was rejected (`att.proof_rejected`).
       content:
         application/json:
           schema:
             $ref: ../../../../../components/error-details.yaml
           examples:
-            revoked:
-              summary: The sealed release was revoked
+            proof_rejected:
+              summary: The proof was rejected
               value:
-                code: rel.revoked
-                message: 'the release this attempt runs on was revoked'
+                code: att.proof_rejected
+                message: 'the submitted proof was rejected'
     default:
       $ref: verifyChallengeProof-error-response.yaml

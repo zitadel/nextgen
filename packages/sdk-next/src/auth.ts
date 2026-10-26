@@ -58,8 +58,8 @@ const checkOpaqueSession = cache(
  *   not add a backend round-trip after the first call.
  * - **Opaque encrypted tokens** are validated against the backend's
  *   `GET /sessions/me`, which also supplies the user's identity (`userId`,
- *   `email`, `name`). The lookup is deduplicated per render pass via React
- *   `cache()`.
+ *   `identifier`, `identifierProperty`, `display`). The lookup is deduplicated
+ *   per render pass via React `cache()`.
  *
  * The header alone is never proof of anything: on routes the middleware
  * `matcher` does not cover, the middleware cannot refuse a forged

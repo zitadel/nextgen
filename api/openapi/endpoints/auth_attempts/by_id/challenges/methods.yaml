@@ -8,9 +8,6 @@ post:
     (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
     including method, metadata, and any UI hints. The client then verifies the proof
     by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
-
-    Reuses the deployment sealed when the attempt was created. If that release
-    was revoked since, the response is `409` with `rel.revoked`.
   tags:
     - Authentication Attempts
   security:
@@ -31,18 +28,5 @@ post:
         application/json:
           schema:
             $ref: challenge-response.yaml
-    '409':
-      description: |
-        The sealed release was revoked (`rel.revoked`).
-      content:
-        application/json:
-          schema:
-            $ref: ../../../../components/error-details.yaml
-          examples:
-            revoked:
-              summary: The sealed release was revoked
-              value:
-                code: rel.revoked
-                message: 'the release this attempt runs on was revoked'
     default:
       $ref: issueChallenge-error-response.yaml

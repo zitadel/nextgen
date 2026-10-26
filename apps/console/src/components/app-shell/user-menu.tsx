@@ -5,8 +5,9 @@ import { useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -43,14 +44,15 @@ const THEMES: { value: ThemePreference; label: string; icon: LucideIcon }[] = [
  * theme are the popover's own colour and would leave the choice invisible.
  */
 const THEME_SEGMENT =
-  "size-6 justify-center rounded-sm p-0 text-muted-foreground data-[highlighted]:bg-foreground/5 aria-checked:bg-foreground/10 aria-checked:text-foreground";
+  "size-6 justify-center rounded-sm p-0 text-muted-foreground data-[highlighted]:bg-foreground/5 data-[state=checked]:bg-foreground/10 data-[state=checked]:text-foreground";
 
 /**
  * Theme, as a segmented control on one row — System, Light, Dark, drawn as icons. It lives
  * here rather than in the top bar so the bar holds context and search only,
  * and so the Settings view, which has no top bar, can change it too.
  *
- * The segments are menu items (`menuitemradio`), not loose buttons: a menu
+ * The segments are the menu's radio items (`DropdownMenuRadioGroup`, so
+ * Radix owns `menuitemradio` and its checked state), not loose buttons: a menu
  * moves focus with the arrow keys and swallows Tab, so only items are
  * reachable from the keyboard. Choosing one keeps the menu open, so the
  * change can be seen and undone in place.
@@ -63,27 +65,27 @@ function ThemeRow() {
     // the label lines up with theirs.
     <div className="flex h-10 items-center justify-between gap-2 px-3">
       <span className="text-sm">Theme</span>
-      <DropdownMenuGroup
+      <DropdownMenuRadioGroup
         aria-label="Theme"
+        value={preference}
+        onValueChange={(value) => setPreference(value as ThemePreference)}
         className="flex gap-0.5 rounded-md border border-foreground/10 p-0.5"
       >
         {THEMES.map((theme) => (
-          <DropdownMenuItem
+          <DropdownMenuRadioItem
             key={theme.value}
-            role="menuitemradio"
-            aria-checked={preference === theme.value}
+            value={theme.value}
+            indicator={false}
             aria-label={theme.label}
             title={theme.label}
             className={THEME_SEGMENT}
-            onSelect={(event) => {
-              event.preventDefault();
-              setPreference(theme.value);
-            }}
+            // Choosing keeps the menu open, so the change can be seen and undone.
+            onSelect={(event) => event.preventDefault()}
           >
             <theme.icon aria-hidden />
-          </DropdownMenuItem>
+          </DropdownMenuRadioItem>
         ))}
-      </DropdownMenuGroup>
+      </DropdownMenuRadioGroup>
     </div>
   );
 }
@@ -135,7 +137,7 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             onPointerEnter={() => setHovered(true)}
             onPointerLeave={() => setHovered(false)}
           >
-            {/* 24px in the footer row, generated from the user id. */}
+            {/* 24px in the footer row, generated from the identifier. */}
             <UserAvatar seed={seed} fast={hovered || open} />
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">

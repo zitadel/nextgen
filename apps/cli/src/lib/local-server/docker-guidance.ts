@@ -1,9 +1,10 @@
 import { publicCliCommand } from "../public-cli";
+import { shellCommand, type SuggestedCommand, unscopedCommand } from "../suggestion";
 
 export type DockerRuntimeGuidance = {
   hint: string;
   nextActions: string[];
-  nextCommands: string[];
+  nextCommands: SuggestedCommand[];
 };
 
 export function dockerUnavailableMessage(error: unknown): string {
@@ -23,6 +24,6 @@ export function dockerRuntimeGuidance(
       `Run \`docker version\`, then rerun \`${publicCliCommand(retryCommand, cliVersion)}\`.`,
       "If you are not using the managed local runtime, run setup with `--server <url>` instead.",
     ],
-    nextCommands: ["docker version", publicCliCommand(retryCommand, cliVersion)],
+    nextCommands: [shellCommand("docker version"), unscopedCommand(retryCommand, cliVersion)],
   };
 }

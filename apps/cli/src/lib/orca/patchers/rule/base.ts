@@ -1,14 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import {
-  metaSchemaFiles,
-  META_SCHEMA_DIR,
-  PROJECT_FILE_SCHEMA_REF,
-} from "@zitadel/config/meta-schemas";
+import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
-import { normalizePublicCliJson } from "../../../public-cli";
+import { projectMetaSchemas } from "../../../meta-schemas";
 import { DEFAULT_SERVER } from "../../../server";
 import { portFromIssuer } from "../../detectors/port";
 import { configIssuerOp, envIssuerOp } from "./dev-port-move";
@@ -193,7 +189,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
-      envBackups: [".env.local"],
+      envBackups: [".env.local", ".env.development.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
@@ -323,6 +319,26 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_URL: ctx.server,
         },
       },
+      // What the CLI reads, as opposed to `.env.local`, which the app reads.
+      {
+        kind: "merge-env",
+        path: ".env.development.local",
+        mode: 0o600,
+        // The CLI's own file: a value a prompt saved here before setup ran
+        // must give way to the project setup just created.
+        overwrite: true,
+        entries: {
+          ZITADEL_URL: ctx.server,
+          ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
+          ZITADEL_PREVIEW_TOKEN: ctx.project.preview_secret,
+          // The setup issuer, so the SSO recovery command (which pins
+          // `--env-file .env.development.local`) resolves the local origin
+          // rather than falling through to a production `ZITADEL_ISSUER` in
+          // the process environment.
+          ZITADEL_ISSUER: ctx.issuer,
+        },
+      },
       {
         kind: "write",
         path: ".zitadel/state.json",
@@ -336,12 +352,8 @@ export abstract class AbstractRulePatcher implements Patcher {
       // `zitadel …` mentions are rewritten to the runnable public form on the
       // way out — the shared source keeps the bare spelling the server wants.
       { kind: "mkdir", path: META_SCHEMA_DIR },
-      ...metaSchemaFiles().map(
-        (file): FileOp => ({
-          kind: "write",
-          path: `${META_SCHEMA_DIR}/${file.name}`,
-          contents: `${JSON.stringify(normalizePublicCliJson(file.body, ctx.cliVersion), null, 2)}\n`,
-        }),
+      ...projectMetaSchemas(ctx.cliVersion).map(
+        (file): FileOp => ({ kind: "write", path: file.path, contents: file.contents }),
       ),
       ...guidanceOps(ctx),
     ];
@@ -403,17 +415,6 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
-  const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  const previewPatterns = ctx.project.origins
-    .filter((origin) => origin.kind === "preview")
-    .map((origin) => origin.pattern);
-  if (previewPatterns.length > 0) {
-    // Preview patterns are already full origins (scheme://host[:port]); don't
-    // prepend a scheme or it doubles up (https://http://localhost:3000).
-    environments.preview = {
-      issuer_pattern: [...previewPatterns],
-    };
-  }
   return {
     // The copy setup writes into .zitadel/meta/, so an editor validates the
     // file offline against the CLI version that wrote it.
@@ -422,7 +423,6 @@ function projectConfig(ctx: PatchContext): Record<string, unknown> {
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
-    environments,
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
     ...(ctx.useCase === undefined ? {} : { useCase: ctx.useCase }),
   };

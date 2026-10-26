@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 import { ZitadelError, isErrno } from "../../errors";
+import { unscopedCommand } from "../../suggestion";
 import {
   EMPTY_ENV,
   EMPTY_SUMMARY,
@@ -514,7 +515,7 @@ function dockerError(action: string, args: string[], cause: unknown): ZitadelErr
       : { command: ["docker", ...args], cause };
   return new ZitadelError("E_VALIDATION", `${action} failed`, {
     hint: "Check that Docker is installed, running, and reachable from this shell.",
-    nextCommands: ["zitadel doctor"],
+    nextCommands: [unscopedCommand("doctor")],
     details,
   });
 }

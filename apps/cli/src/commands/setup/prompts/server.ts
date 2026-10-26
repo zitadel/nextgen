@@ -14,9 +14,9 @@ const CUSTOM = "__custom__";
  * local server we detected, or a custom URL.
  *
  * Before asking, it looks for a healthy local Zitadel server the same way the
- * rest of the CLI does (`LocalServer.detectUrl`: the runtime metadata that
- * `zitadel start` wrote to `.zitadel/local/runtime.json`, falling back to a
- * `/healthz` probe on the default localhost port). A detected server becomes
+ * rest of the CLI does (`LocalServer.detectUrl`: the server the runtime
+ * metadata `zitadel start` wrote to `.zitadel/local/runtime.json` names, when
+ * its own process answers a `/readyz` probe). A detected server becomes
  * an extra option in the choice list *and* the preselected answer — a user
  * who just ran `zitadel start` almost certainly wants it, and `start`'s own
  * next-step hint says `setup --server local`. Picking it writes the URL
@@ -80,8 +80,8 @@ export class ServerPrompt implements SetupPrompt {
 }
 
 /**
- * Wraps {@link LocalServer.detectUrl} in a spinner: the unhealthy paths
- * block on up to two 1.5s `/healthz` probes, long enough that the wizard
+ * Wraps {@link LocalServer.detectUrl} in a spinner: the `/readyz` probe of a
+ * server that does not answer takes up to 1.5s, long enough that the wizard
  * should say what it is doing.
  */
 async function detectLocalServer(cwd: string): Promise<string | undefined> {

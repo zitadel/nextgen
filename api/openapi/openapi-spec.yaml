@@ -114,8 +114,6 @@ tags:
       that a secret is held, never what it is.
 
 paths:
-  /healthz:
-    $ref: endpoints/healthz/methods.yaml
   /livez:
     $ref: endpoints/livez/methods.yaml
   /readyz:
@@ -234,6 +232,10 @@ paths:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
+  /policies/{policy_id}:
+    $ref: endpoints/policies/by_id/methods.yaml
+  /policies/{policy_id}/revisions:
+    $ref: endpoints/policies/by_id/revisions/methods.yaml
   /policies/revisions/{revision_id}:
     $ref: endpoints/policies/revisions/by_id/methods.yaml
   /releases:

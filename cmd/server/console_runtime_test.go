@@ -183,6 +183,10 @@ func (f *fakeProjectService) ListAuthorized(context.Context, service.ListAuthori
 	panic("unused")
 }
 
+func (f *fakeProjectService) ListEveryProject(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	panic("unused")
+}
+
 func (f *fakeProjectService) Delete(context.Context, string) error {
 	panic("unused")
 }
