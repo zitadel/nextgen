@@ -110,8 +110,10 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	if err != nil {
 		return nil, err
 	}
-	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
-		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs needs a ttl")
+	if entity.OriginKind == domain.DeploymentOriginKindPreview {
+		if _, err = domain.ResolvePreviewTTL(&input.PreviewTTL); err != nil {
+			return nil, err
+		}
 	}
 
 	for attempt := 1; ; attempt++ {
@@ -146,15 +148,14 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	if input.TTL != nil && kind == domain.DeploymentOriginKindPrimary {
-		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
-	}
 	var ttl time.Duration
 	if kind == domain.DeploymentOriginKindPreview {
-		ttl = domain.DefaultPreviewTTL
-		if input.TTL != nil {
-			ttl = *input.TTL
+		ttl, err = domain.ResolvePreviewTTL(input.TTL)
+		if err != nil {
+			return nil, err
 		}
+	} else if input.TTL != nil {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
 	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,

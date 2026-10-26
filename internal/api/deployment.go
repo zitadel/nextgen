@@ -31,11 +31,7 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		Targets:   req.Targets,
 	}
 	if ttl, ok := req.TTL.Get(); ok {
-		parsed := time.Duration(ttl)
-		if err := domain.ValidatePreviewTTL(parsed); err != nil {
-			return nil, err
-		}
-		input.TTL = &parsed
+		input.TTL = new(time.Duration(ttl))
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))

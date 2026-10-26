@@ -301,6 +301,23 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 		expectProjectOrigins(statements, appPrimary)
 		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for primary origins", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for preview URLs", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, previewPattern)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "at most 365 days")
 	})
 
 	t.Run("an exact primary origin", func(t *testing.T) {
@@ -445,6 +462,15 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		svc, _ := newMockedDeploymentService(t)
 		input := deploymentInput()
 		input.OriginKind = domain.DeploymentOriginKindPreview
+		_, err := svc.Create(t.Context(), input)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
+
+	t.Run("a preview ttl above the maximum never reaches storage", func(t *testing.T) {
+		svc, _ := newMockedDeploymentService(t)
+		input := deploymentInput()
+		input.OriginKind = domain.DeploymentOriginKindPreview
+		input.PreviewTTL = domain.MaxPreviewTTL + time.Second
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
