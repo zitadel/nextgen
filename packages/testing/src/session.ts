@@ -1,6 +1,8 @@
 import type { ZitadelClient } from "@zitadel/api/client";
 import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/generated/model";
 
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
+
 import type { SeedContext } from "./seed";
 import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
@@ -134,7 +136,7 @@ async function flowFetch(
   path: string,
   body: Record<string, unknown>,
 ): Promise<CreateFlow201> {
-  const response = await fetch(`${handle.baseUrl}${path}`, {
+  const response = await fetch(`${apiBaseUrl(handle.baseUrl)}${path}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",

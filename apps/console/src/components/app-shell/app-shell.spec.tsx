@@ -46,15 +46,15 @@ const NEVER_SHOWN = ["App groups", "Applications", "Analytics", "Activity Log", 
 
 // `GET /users/me/projects` is the authorized-projects query (#1228): what the
 // signed-in person can act on, read with the session cookie.
-const MY_PROJECTS = "*/api/users/me/projects";
+const MY_PROJECTS = "*/api/v1/users/me/projects";
 // System, the portal screen that needs no project, reads the server's readiness.
-const READY = "*/api/readyz";
+const READY = "*/api/v1/readyz";
 // `/` lands on Users, so most tests read it once a project is selected.
-const USERS_QUERY = "*/api/users/query";
+const USERS_QUERY = "*/api/v1/users/query";
 // Some tests open on Teams to prove a switch keeps the screen.
-const TEAMS_QUERY = "*/api/teams/query";
+const TEAMS_QUERY = "*/api/v1/teams/query";
 // `/settings` lands on the profile, which reads the signed-in person's own record.
-const MY_USER = "*/api/users/me";
+const MY_USER = "*/api/v1/users/me";
 beforeEach(() => {
   // The switcher's recent projects live in localStorage: none carry over.
   localStorage.clear();
@@ -282,7 +282,7 @@ describe("team switcher", () => {
   it("names the open team and switches to another", async () => {
     server.use(
       http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: TEAMS })),
-      http.get("*/api/teams/:teamId", ({ params }) =>
+      http.get("*/api/v1/teams/:teamId", ({ params }) =>
         HttpResponse.json(TEAMS.find((team) => team.id === params.teamId)),
       ),
     );
@@ -303,7 +303,7 @@ describe("team switcher", () => {
     const created: unknown[] = [];
     server.use(
       http.post(TEAMS_QUERY, () => HttpResponse.json({ teams: TEAMS })),
-      http.get("*/api/teams/:teamId", ({ params }) =>
+      http.get("*/api/v1/teams/:teamId", ({ params }) =>
         HttpResponse.json(
           TEAMS.find((team) => team.id === params.teamId) ?? {
             ...TEAMS[0],
@@ -312,7 +312,7 @@ describe("team switcher", () => {
           },
         ),
       ),
-      http.post("*/api/teams", async ({ request }) => {
+      http.post("*/api/v1/teams", async ({ request }) => {
         created.push(await request.json());
         return HttpResponse.json({ ...TEAMS[0], id: "team_new", name: "Acme Labs" });
       }),
@@ -580,7 +580,7 @@ describe("project pill", () => {
           next_page_token: "page-2",
         }),
       ),
-      http.get("*/api/projects/proj_9", () =>
+      http.get("*/api/v1/projects/proj_9", () =>
         HttpResponse.json({ message: "project not found" }, { status: 404 }),
       ),
       http.get(READY, () => HttpResponse.text("ok")),
@@ -695,7 +695,9 @@ describe("project pill", () => {
         return HttpResponse.json({ projects: [{ id: "proj_9", name: "Zephyr" }] });
       }),
       // Chosen, it is named by reading it: it is not on the first page.
-      http.get("*/api/projects/proj_9", () => HttpResponse.json({ id: "proj_9", name: "Zephyr" })),
+      http.get("*/api/v1/projects/proj_9", () =>
+        HttpResponse.json({ id: "proj_9", name: "Zephyr" }),
+      ),
     );
     const router = renderShell(scopedPath("/teams", "proj_2"));
 
@@ -906,7 +908,7 @@ describe("search", () => {
         }
         return HttpResponse.json({ teams: [] });
       }),
-      http.get("*/api/teams/team_s", () =>
+      http.get("*/api/v1/teams/team_s", () =>
         HttpResponse.json({
           id: "team_s",
           name: "Support",
@@ -942,7 +944,7 @@ describe("search", () => {
         return HttpResponse.json({ projects: [{ id: "proj_9", name: "Zephyr" }] });
       }),
       // Off the first page, the pill names the selection by reading it.
-      http.get("*/api/projects/proj_9", () =>
+      http.get("*/api/v1/projects/proj_9", () =>
         HttpResponse.json({
           id: "proj_9",
           name: "Zephyr",

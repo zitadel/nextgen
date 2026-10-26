@@ -14,15 +14,15 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 const PROJECT_ID = "proj_1";
-const PROJECT_URL = `http://localhost/api/projects/${PROJECT_ID}`;
+const PROJECT_URL = `http://localhost/api/v1/projects/${PROJECT_ID}`;
 // The page also reads the project's grants for its admins section (#1238); an
 // empty list keeps these tests about the project itself. The person can act on
 // the project, so the context switcher names it from their list rather than by
 // its id while its own read is in flight.
 beforeEach(() =>
   server.use(
-    http.post("http://localhost/api/grants/query", () => HttpResponse.json({ grants: [] })),
-    http.get("http://localhost/api/users/me/projects", () =>
+    http.post("http://localhost/api/v1/grants/query", () => HttpResponse.json({ grants: [] })),
+    http.get("http://localhost/api/v1/users/me/projects", () =>
       HttpResponse.json({ projects: [{ id: PROJECT_ID, name: "River" }] }),
     ),
   ),

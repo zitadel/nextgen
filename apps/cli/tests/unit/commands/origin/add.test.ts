@@ -19,7 +19,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   requests = [];
   server.use(
-    http.post(`${SERVER}/projects/:id/origins`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects/:id/origins`, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       requests.push(body);
       return HttpResponse.json(body, { status: 201 });

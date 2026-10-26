@@ -601,7 +601,7 @@ describe("setup command pre-flight", () => {
     expect(json.status).toBe("error");
     expect(json.code).toBe("E_CONFLICT");
     expect(json.message).toContain("App.tsx");
-    expect(capture.requests).not.toContain("POST /projects");
+    expect(capture.requests).not.toContain("POST /api/v1/projects");
     expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
     expect(existsSync(join(cwd, ".zitadel/secret"))).toBe(false);
     expect(await readFile(join(cwd, "src/App.tsx"), "utf8")).toBe(ownApp);
@@ -629,7 +629,7 @@ describe("setup command pre-flight", () => {
       const json = parseJson(res.stdout) as { code: string; message: string };
       expect(json.code).toBe("E_CONFLICT");
       expect(json.message).toContain(named);
-      expect(capture.requests).not.toContain("POST /projects");
+      expect(capture.requests).not.toContain("POST /api/v1/projects");
       expect(existsSync(join(cwd, "zitadel.json"))).toBe(false);
     },
   );
@@ -698,7 +698,7 @@ describe("setup command pre-flight", () => {
     // and no branding revision is created on the platform.
     expect(existsSync(join(cwd, ".zitadel/branding"))).toBe(false);
     expect(json.data.files_written.some((file) => file.includes(".zitadel/branding/"))).toBe(false);
-    expect(capture.requests).not.toContain("POST /branding");
+    expect(capture.requests).not.toContain("POST /api/v1/branding");
     // The envelope no longer carries a design, and the look guidance must not
     // claim a revision is live.
     expect(json.data).not.toHaveProperty("design");
@@ -1043,7 +1043,7 @@ async function startCreateProjectCaptureServer(
   const server = createServer(async (req, res) => {
     const path = new URL(req.url ?? "/", "http://localhost").pathname;
     requests.push(`${req.method ?? "GET"} ${path}`);
-    if (req.method === "POST" && path === "/projects") {
+    if (req.method === "POST" && path === "/api/v1/projects") {
       const chunks: Buffer[] = [];
       for await (const chunk of req) {
         chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
@@ -1064,13 +1064,13 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/schemas" && rejectsSchemas) {
+    if (req.method === "POST" && path === "/api/v1/schemas" && rejectsSchemas) {
       res
         .writeHead(500, { "content-type": "application/json" })
         .end(JSON.stringify({ code: "internal", message: "boom" }));
       return;
     }
-    if (req.method === "POST" && path === "/schemas") {
+    if (req.method === "POST" && path === "/api/v1/schemas") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "sch_test",
@@ -1079,7 +1079,7 @@ async function startCreateProjectCaptureServer(
       );
       return;
     }
-    if (req.method === "POST" && path === "/flow_definitions") {
+    if (req.method === "POST" && path === "/api/v1/flow_definitions") {
       res.writeHead(201, { "content-type": "application/json" }).end(
         JSON.stringify({
           id: "flow_test",

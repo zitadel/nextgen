@@ -1,4 +1,5 @@
 import { apiCsrfRejectionHandlerFor, apiCsrfTokenFor, getApiAuthToken } from "./auth";
+import { API_PREFIX } from "./base-url";
 
 /** The header the session-bound CSRF token travels in (ADR 053 §5). */
 export const CSRF_HEADER = "X-Zitadel-CSRF";
@@ -8,6 +9,9 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /** The code the server answers a refused CSRF check with. */
 const CSRF_INVALID = "auth.csrf_invalid";
+
+/** The code the server answers a path no operation of its version has with (ADR 076). */
+const ROUTE_NOT_FOUND = "req.not_found";
 
 /**
  * Framework-neutral failure type the orval-generated client throws on
@@ -150,7 +154,13 @@ export async function customFetch<T>(url: string, options: RequestInit): Promise
   }
 
   if (!res.ok) {
-    const message = `${options.method ?? "GET"} ${url} returned ${res.status}`;
+    // Every operation this client calls is one the spec has, so a server that
+    // knows no such path is another version, most likely one from before the
+    // API moved under its prefix.
+    const message =
+      res.status === 404 && apiErrorCode(parsed) === ROUTE_NOT_FOUND
+        ? `${options.method ?? "GET"} ${url} returned 404 (${ROUTE_NOT_FOUND}): the server has no such operation; a server older than this client does not serve the API under ${API_PREFIX}`
+        : `${options.method ?? "GET"} ${url} returned ${res.status}`;
     throw new ApiError(
       res.status,
       url,

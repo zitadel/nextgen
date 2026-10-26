@@ -1,4 +1,5 @@
 import type { VerifyChallengeProofBody } from "@zitadel/api/generated/model";
+import { apiBaseUrl } from "@zitadel/api/runtime/base-url";
 import { ApiError, request } from "@zitadel/api/runtime/fetch";
 
 import { createZitadelClient } from "../api-client";
@@ -58,7 +59,7 @@ export async function adminSessionCookie(serverUrl: string, admin: LocalAdmin): 
   // only as a Set-Cookie header, which that client does not expose. `request`
   // still types its failures and honours Ctrl-C the way the client does.
   const { res } = await request(
-    `${serverUrl}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
+    `${apiBaseUrl(serverUrl)}/sessions/exchange?project_id=${encodeURIComponent(PLATFORM_PROJECT_ID)}`,
     {
       ...localAdminRequest(serverUrl, {
         "content-type": "application/json",

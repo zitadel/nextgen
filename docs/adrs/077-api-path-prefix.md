@@ -1,6 +1,7 @@
 # ADR 077: The Resource API Under `/api/v1/`
 
-> **Status:** Accepted — 2026-10-25 (originally Proposed 2026-10-23)
+> **Status:** Implemented — 2026-10-26 (accepted 2026-10-25, originally
+> Proposed 2026-10-23)
 > **Date:** 2026-10-23
 > **Context:** Where the resource API's routes live on a host it shares with
 > the console, the website, the docs and the protocol endpoints, and whether

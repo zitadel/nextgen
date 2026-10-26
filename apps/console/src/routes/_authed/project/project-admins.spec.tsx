@@ -28,10 +28,10 @@ const { NEUTRAL_MESSAGE, SELF_MESSAGE } = await import("@/components/add-admin-d
  * never the console's own (platform) project.
  */
 const PROJECT_ID = "proj_1";
-const PROJECTS_URL = "http://localhost/api/projects";
-const GRANTS_URL = "http://localhost/api/grants";
+const PROJECTS_URL = "http://localhost/api/v1/projects";
+const GRANTS_URL = "http://localhost/api/v1/grants";
 const GRANTS_QUERY_URL = `${GRANTS_URL}/query`;
-const USERS_QUERY_URL = "http://localhost/api/users/query";
+const USERS_QUERY_URL = "http://localhost/api/v1/users/query";
 /** The signed-in address, read from the fixture rather than restated here. */
 const SELF = makeTestSession().user?.identifier ?? "";
 

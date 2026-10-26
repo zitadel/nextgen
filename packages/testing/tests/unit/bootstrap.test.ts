@@ -21,7 +21,7 @@ interface Captured {
 const captured: Captured = {};
 
 const server = setupServer(
-  http.post(`${BASE}/projects`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/projects`, async ({ request }) => {
     captured.projectBody = (await request.json()) as Record<string, unknown>;
     return HttpResponse.json(
       {
@@ -35,12 +35,12 @@ const server = setupServer(
       { status: 201 },
     );
   }),
-  http.post(`${BASE}/schemas`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/schemas`, async ({ request }) => {
     captured.schemaBody = (await request.json()) as Record<string, unknown>;
     captured.schemaAuth = request.headers.get("authorization");
     return HttpResponse.json({ id: "sch_1" }, { status: 201 });
   }),
-  http.post(`${BASE}/flow_definitions`, async ({ request }) => {
+  http.post(`${BASE}/api/v1/flow_definitions`, async ({ request }) => {
     captured.flowBody = (await request.json()) as Record<string, unknown>;
     captured.flowAuth = request.headers.get("authorization");
     return HttpResponse.json({ id: "flowdef_1" }, { status: 201 });
@@ -94,7 +94,7 @@ describe("bootstrapProject", () => {
 
   it("propagates API errors with status", async () => {
     server.use(
-      http.post(`${BASE}/projects`, () =>
+      http.post(`${BASE}/api/v1/projects`, () =>
         HttpResponse.json({ code: "req.invalid", message: "nope" }, { status: 400 }),
       ),
     );
@@ -103,7 +103,9 @@ describe("bootstrapProject", () => {
 
   it("fails clearly when the server omits the project secret", async () => {
     server.use(
-      http.post(`${BASE}/projects`, () => HttpResponse.json({ id: "proj_1" }, { status: 201 })),
+      http.post(`${BASE}/api/v1/projects`, () =>
+        HttpResponse.json({ id: "proj_1" }, { status: 201 }),
+      ),
     );
     await expect(bootstrapProject({ baseUrl: BASE })).rejects.toThrow(/project secret/);
   });

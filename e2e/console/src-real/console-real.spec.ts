@@ -50,7 +50,7 @@ test("searches the projects on the server", async ({ page, zitadel, seed }) => {
 
   const searched = page.waitForRequest((request) => {
     const url = new URL(request.url());
-    return url.pathname === "/api/users/me/projects" && url.searchParams.has("name_contains");
+    return url.pathname === "/api/v1/users/me/projects" && url.searchParams.has("name_contains");
   });
   await page.goto(`/projects?q=${encodeURIComponent(needle)}`);
   expect(new URL((await searched).url()).searchParams.get("name_contains")).toBe(needle);
@@ -115,7 +115,7 @@ test("keeps the project credential out of browser requests and resources", async
   // request carries no bearer — and the proxy adding one on the way through
   // must not show up here either.
   const responsePromise = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/users/me/projects",
+    (response) => new URL(response.url()).pathname === "/api/v1/users/me/projects",
   );
 
   await page.goto("/projects");
@@ -251,7 +251,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   // before the submit, where there was no such row either — an assertion that
   // cannot fail.
   const refreshed = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/grants/query" && response.ok(),
+    (response) => new URL(response.url()).pathname === "/api/v1/grants/query" && response.ok(),
   );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
 

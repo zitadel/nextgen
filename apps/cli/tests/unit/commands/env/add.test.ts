@@ -19,7 +19,7 @@ afterAll(() => server.close());
 beforeEach(() => {
   created = [];
   server.use(
-    http.post(`${SERVER}/projects`, async ({ request }) => {
+    http.post(`${SERVER}/api/v1/projects`, async ({ request }) => {
       created.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json(
         {

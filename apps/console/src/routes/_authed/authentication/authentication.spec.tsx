@@ -14,10 +14,10 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const IDPS_QUERY = "*/api/idps/query";
-const IDP_BY_ID = "*/api/idps/:id";
-const SCHEMAS = "*/api/schemas";
-const FLOWS = "*/api/flow_definitions";
+const IDPS_QUERY = "*/api/v1/idps/query";
+const IDP_BY_ID = "*/api/v1/idps/:id";
+const SCHEMAS = "*/api/v1/schemas";
+const FLOWS = "*/api/v1/flow_definitions";
 
 const CREATED_AT = "2026-07-12T16:59:04Z";
 const UPDATED_AT = "2026-08-01T09:00:00Z";
