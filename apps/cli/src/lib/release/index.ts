@@ -29,4 +29,3 @@ export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
  */
 export const DEPLOY_ARGS = "deploy -m '<what changed>'";
 export { type ListedDeployment, listLiveDeployments, servesPrimary } from "./deployment";
-export { runInitialDeploy, type InitialDeployOutcome } from "./initial-deploy";
