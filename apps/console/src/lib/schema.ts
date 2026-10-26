@@ -306,18 +306,18 @@ const AUTH_METHOD_LABELS: Record<string, string> = {
 };
 
 /**
- * What a leaf property is designated as (ADR 058): the schema's
- * `x-identifier`, one of its `x-display` parts, or nothing. Both name a leaf
- * by its dot-joined attribute path, so a nested one is found by its full path.
+ * The keyword that designates a leaf property (ADR 058): `x-identifier`, one
+ * of the `x-display` parts, or nothing. Both name a leaf by its dot-joined
+ * attribute path, so a nested one is found by its full path.
  */
 export function schemaDesignation(
   schema: UserSchema,
   path: string[],
-): "identifier" | "display" | undefined {
+): "x-identifier" | "x-display" | undefined {
   const joined = path.join(".");
-  if (field(schema, "x-identifier") === joined) return "identifier";
+  if (field(schema, "x-identifier") === joined) return "x-identifier";
   const display = schema["x-display"];
-  if (Array.isArray(display) && display.includes(joined)) return "display";
+  if (Array.isArray(display) && display.includes(joined)) return "x-display";
   return undefined;
 }
 

@@ -101,15 +101,13 @@ const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-rin
 const HEAD_CELL = PANEL_HEAD_CELL;
 const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
 
-const DESIGNATION_LABELS = { identifier: "x-identifier", display: "x-display" } as const;
-
 function PropertyRow({
   property,
   designation,
   onDrillIn,
 }: {
   property: SchemaProperty;
-  designation: keyof typeof DESIGNATION_LABELS | undefined;
+  designation: ReturnType<typeof schemaDesignation>;
   onDrillIn: () => void;
 }) {
   return (
@@ -133,7 +131,7 @@ function PropertyRow({
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate">{property.key}</span>{" "}
             <Badge variant="secondary" className="font-mono font-normal">
-              {DESIGNATION_LABELS[designation]}
+              {designation}
             </Badge>
           </span>
         ) : (
