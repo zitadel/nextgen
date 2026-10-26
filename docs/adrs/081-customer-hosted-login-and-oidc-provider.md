@@ -1,4 +1,4 @@
-# ADR 080: The Login Lives in the Customer's App and Becomes Its OIDC Provider
+# ADR 081: The Login Lives in the Customer's App and Becomes Its OIDC Provider
 
 > **Status:** Proposed
 > **Date:** 2026-10-24
@@ -181,15 +181,15 @@ from `doctor --fix`, which `doctor` warns about. Nothing else is reserved.
 
 Reserving the paths makes no app an issuer. A project turns its
 authorization server on in the release, with one field of
-`.zitadel/oauth.json` (ADR 081 §12) that `zitadel oauth enable` (working
+`.zitadel/oauth.json` (ADR 082 §12) that `zitadel oauth enable` (working
 name) writes as ADR 070's commands write theirs: a local edit, live with the
 next `apply`, so the repository shows that the app is an issuer and, under
 `.zitadel/apps/`, which apps sign in with it. Turning it on declares the
-login app itself there (ADR 081 §3). The §6 documents exist only while it is
+login app itself there (ADR 082 §3). The §6 documents exist only while it is
 on; before, the server answers the 404 above, and `doctor` reports an app on
 the switch whose boundary lacks the reserved paths. The login-only setup mode
 of step 4 in the [Recommended sequence](#recommended-sequence) is the same
-switch, on from the start, and declares the issuer login-only (ADR 081 §9).
+switch, on from the start, and declares the issuer login-only (ADR 082 §9).
 
 ### 8. How an authorization request reaches the login page
 
@@ -222,7 +222,7 @@ switch, on from the start, and declares the issuer login-only (ADR 081 §9).
    `acr_values` stay for step-up.
 6. Every response of a flow bound to an authorization request carries the
    requesting app: its id, name, logo, redirect host and party, from the app
-   document (ADR 081 §3). The widget puts it in the template context
+   document (ADR 082 §3). The widget puts it in the template context
    (ADR 021) and on `zitadel-flow-step`, so a page can say what the user is
    signing in to, and the engine takes `audience.app_ids` and the app's
    branding (app → team → project) from it, which no widget hint supplies
@@ -260,7 +260,7 @@ its first step. `/authorize` has no `Origin`, and a token request carries the
 client's origin or none, so:
 
 - The authorization endpoint resolves the newest deployment to the origin it
-  reached (§5), where a declared app and its redirect URIs live (ADR 081
+  reached (§5), where a declared app and its redirect URIs live (ADR 082
   §3); a registered app is data and needs none.
 - The flow an `auth_request_id` opens must run on the recorded issuer's
   origin (§5), and seals the deployment the request resolved there, so the
@@ -292,7 +292,7 @@ as reserved and the validator refuses, as it refuses the engine-injected
 `back` action
 ([`flow_definition_validator.go`](../../internal/domain/flow_definition_validator.go)).
 Their payload is documented with the step: the app's name, logo and redirect
-host (§8), the requested scopes with their text keys (ADR 081 §5), the
+host (§8), the requested scopes with their text keys (ADR 082 §5), the
 accounts to choose from, and accept and deny actions. A widget template or a
 `zitadel-flow-step` listener sees them like any step; a fully custom UI (§1)
 renders them itself, and the engine completes no request whose step it
@@ -303,7 +303,7 @@ session exists if the app's document asks for it; signing in as someone else
 replaces the session at the exchange. Consent comes last, when the app
 requires it for scopes not yet granted, on every request if its document
 says so, or when the request says `prompt=consent`. Consents are kept per
-user, app and scope. A first-party app (ADR 081 §3) needs no consent unless
+user, app and scope. A first-party app (ADR 082 §3) needs no consent unless
 the request asks for it. The widget renders both from the step payload in a
 widget release; a request that needs a step the calling widget predates (§13)
 fails with an error to the client.
@@ -324,10 +324,10 @@ instead of a login page.
 
 - The SDK sends protected routes to the issuer's authorization endpoint from
   its metadata, with PKCE, `state`, `nonce` and a `resource` that defaults to
-  the issuer's own API when it declares one (ADR 081 §5), and answers the
+  the issuer's own API when it declares one (ADR 082 §5), and answers the
   callback and sign-out under `/__nextgen`, reserving no root path.
 - The CLI declares the app as a first-party web app of the issuer's project
-  (ADR 081 §3), with redirect URIs on its origins, so its users are that
+  (ADR 082 §3), with redirect URIs on its origins, so its users are that
   project's. Inside the issuer's repository it writes
   `.zitadel/apps/<slug>.json`; elsewhere it registers the app through the API
   and prints the file, and a registered app whose slug a file later declares
@@ -413,7 +413,7 @@ prefix routes `/oauth/` beside `/api/`.
    `X-Zitadel-Login-Path`, the `matcher` and dev proxy entries and their
    `doctor` migration, the widget's handle and completion rule, and
    `X-Zitadel-Client`.
-3. The authorization server (ADR 081's step 2): the switch and its file
+3. The authorization server (ADR 082's step 2): the switch and its file
    (§7), stored requests, a flow cookie per flow, per-project signing keys,
    the authorization code flow with PKCE and `iss`, codes that carry their
    deployment and refreshes that resolve the newest, metadata, and JWKS,
@@ -439,7 +439,7 @@ from outside a browser request.
   authorization server at the app's origin, and the apps behind one login app
   share a passkey relying-party ID.
 - The repository shows that an app is an issuer and which apps sign in with
-  it (§7, ADR 081 §3), and a relying party keeps one session with the login
+  it (§7, ADR 082 §3), and a relying party keeps one session with the login
   app (§12).
 
 ### Negative / Risks
@@ -463,7 +463,7 @@ from outside a browser request.
   start an authorization request with its own PKCE verifier, drive the flow
   and redeem the code for any public client, and with open registration for
   a client it brings. §8 keeps it from accepting a consent in the
-  background, and open registration needs a login-only issuer (ADR 081 §9);
+  background, and open registration needs a login-only issuer (ADR 082 §9);
   an issuer that serves a whole app trusts every script that app loads.
 - Silent SSO costs one load of the login page (§8). `prompt=none` in an
   iframe works only for clients on the issuer's site, since a cross-site
@@ -540,11 +540,11 @@ from outside a browser request.
 
 - SAML and SCIM.
 - Token formats, claims and lifetimes (ADR 037), the ID token included, and
-  the app document beyond what §12 needs (ADR 081 §3).
+  the app document beyond what §12 needs (ADR 082 §3).
 - What else MCP clients need: protected-resource metadata
   ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)), client registration
   and resource indicators ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)).
-- Logout propagation to third-party relying parties (ADR 081 §11).
+- Logout propagation to third-party relying parties (ADR 082 §11).
 - Level 2's cookie subdomain and Level 4's hostname mapping.
 
 ## Documentation impact
@@ -557,7 +557,7 @@ On acceptance:
   paragraph, Level 2's endpoints and issuer, and Levels 3 and 4;
 - [`configuration-surface.md`](../design/platform/configuration-surface.md):
   §6 and §7 replace "Proxy endpoints (scaffolded on demand)", §5 and §4
-  what it says about `iss` and magic-link hostnames, and ADR 081 its split
+  what it says about `iss` and magic-link hostnames, and ADR 082 its split
   table's app rows;
 - [`resource-map.md`](../design/api/resource-map.md#hosted-protocol-surfaces)'s
   hosted protocol surfaces, and
