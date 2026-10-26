@@ -833,6 +833,10 @@ type AuthzCatalogStatements interface {
 //     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
 //     It answers from the protected project's grants only; params.PlatformProjectID is ignored.
+//     With a ResourceID the foothold covers that target only (an assignment scoped
+//     project-wide, to ResourceTeamID or to ResourceID, a membership in the target
+//     team or the target's team, or the user's own record; #2112); without one it
+//     is HasAuthzProjectFoothold.
 //   - CheckPlatformOperator: the deployment-wide operator path (ADR 075 §3), which the
 //     resolver asks when CheckAuthz did not allow.
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.

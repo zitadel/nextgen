@@ -354,9 +354,10 @@ func TestVariableSetStatements_ProjectDeleteCascades(t *testing.T) {
 	})
 }
 
-// The link insert is SQL in the same transaction as CreateDeployment. It has
-// to see that row: Spanner SQL cannot see a buffered mutation, so the
-// deployment insert is DML.
+// The link insert is SQL in the same transaction as CreateDeployment, before
+// that transaction commits. A link after CreateDeployment returns does not
+// prove it: that insert runs against a committed row. Spanner SQL cannot see
+// a buffered mutation, so the deployment insert is DML.
 func TestVariableSetStatements_LinkSeesTheDeploymentItFollows(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		f := newVariableSetFixture(t, d)
