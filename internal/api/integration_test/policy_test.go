@@ -380,3 +380,93 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 		assert.Equal(t, "error.x-auth-methods#password_min_length", errVal)
 	})
 }
+
+// TestPasswordPolicyFollowsTheRelease runs register flows the way a browser on
+// the project's origin does, so each resolves the release deployed there, and
+// reads the minimum the password step shows, which comes from the same
+// resolver the gate uses.
+func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
+	t.Parallel()
+
+	const origin = "https://policy.acme.test"
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), project.ID, domain.Origin{Pattern: origin, Kind: domain.OriginKindPrimary})
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	deploy := func(t *testing.T, policies ...api.PublishPolicyRequest) {
+		t.Helper()
+		built, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{
+				FlowDefinitions: []api.FlowDefinition{passwordRegisterFlowDefinition("human-user")},
+				Policies:        policies,
+			},
+		}, api.BuildReleaseParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		var releaseID api.ReleaseID
+		switch r := built.(type) {
+		case *api.BuildReleaseCreated:
+			releaseID = r.ID
+		case *api.BuildReleaseOK:
+			releaseID = r.ID
+		default:
+			require.Fail(t, "build refused", helpers.MustMarshal(t, built))
+		}
+		resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		switch resp.(type) {
+		case *api.CreateDeploymentCreated, *api.CreateDeploymentOK:
+		default:
+			require.Fail(t, "deploy refused", helpers.MustMarshal(t, resp))
+		}
+	}
+	// shownMinimum opens a register flow from from ("" for none) and returns
+	// the minimum its password step shows, 0 without a policy.
+	shownMinimum := func(t *testing.T, from string) int {
+		t.Helper()
+		body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
+		require.NoError(t, err)
+		resp, raw := postFlow(t, "/flow", body, from, nil)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
+		var opened api.FlowResponse
+		require.NoError(t, opened.UnmarshalJSON(raw), string(raw))
+		for _, field := range opened.Step.Fields {
+			if field.Name == "x-auth-methods#password" {
+				return field.Validation.Or(api.FieldValidation{}).MinLength.Or(0)
+			}
+		}
+		require.Fail(t, "no password field", string(raw))
+		return 0
+	}
+	minimum := func(n int) api.PublishPolicyRequest {
+		return passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(n)})
+	}
+
+	deploy(t, minimum(12))
+	assert.Equal(t, 12, shownMinimum(t, origin), "the deployed release's policy applies")
+
+	// Building without deploying, or publishing on the side, changes the
+	// newest revision but not what the deployed release serves.
+	_, err = client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+		Bundle: api.ConfigurationBundle{
+			FlowDefinitions: []api.FlowDefinition{passwordRegisterFlowDefinition("human-user")},
+			Policies:        []api.PublishPolicyRequest{minimum(16)},
+		},
+	}, api.BuildReleaseParams{ProjectID: api.ProjectID(project.ID)})
+	require.NoError(t, err)
+	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(20)}))
+	assert.Equal(t, 12, shownMinimum(t, origin), "a release that was only built does not apply")
+	assert.Equal(t, 20, shownMinimum(t, ""), "a request that resolves no release gets the newest revision")
+
+	deploy(t)
+	assert.Equal(t, 0, shownMinimum(t, origin), "a release without the policy means no policy, not the newest")
+
+	deploy(t, minimum(12))
+	assert.Equal(t, 12, shownMinimum(t, origin), "deploying it again brings it back")
+}

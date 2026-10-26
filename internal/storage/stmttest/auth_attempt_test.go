@@ -111,3 +111,20 @@ func TestAuthAttemptStatements_SetSSOFactorRoundTrip(t *testing.T) {
 		assert.False(t, factor.GetLastVerifiedAt().IsZero())
 	})
 }
+
+func TestAuthAttemptStatements_RuntimeSealRoundTrip(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		attempt := &domain.AuthAttempt{
+			ProjectID:    projectID,
+			DeploymentID: "dep_seal1",
+			ReleaseID:    "rel_seal1",
+		}
+		require.NoError(t, d.stmts.CreateAuthAttempt(t.Context(), attempt))
+
+		got, err := d.stmts.GetAuthAttemptByID(t.Context(), projectID, attempt.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "dep_seal1", got.DeploymentID)
+		assert.Equal(t, "rel_seal1", got.ReleaseID)
+	})
+}

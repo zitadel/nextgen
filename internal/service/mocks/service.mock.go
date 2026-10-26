@@ -1660,6 +1660,45 @@ func (c *MockAllStatementsDeleteJSONSchemaByIDCall) DoAndReturn(f func(context.C
 	return c
 }
 
+// DeleteLivePreview mocks base method.
+func (m *MockAllStatements) DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteLivePreview", ctx, projectID, origin, now)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteLivePreview indicates an expected call of DeleteLivePreview.
+func (mr *MockAllStatementsMockRecorder) DeleteLivePreview(ctx, projectID, origin, now any) *MockAllStatementsDeleteLivePreviewCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLivePreview", reflect.TypeOf((*MockAllStatements)(nil).DeleteLivePreview), ctx, projectID, origin, now)
+	return &MockAllStatementsDeleteLivePreviewCall{Call: call}
+}
+
+// MockAllStatementsDeleteLivePreviewCall wrap *gomock.Call
+type MockAllStatementsDeleteLivePreviewCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteLivePreviewCall) Return(deleted bool, err error) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.Return(deleted, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteLivePreviewCall) Do(f func(context.Context, string, string, time.Time) (bool, error)) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteLivePreviewCall) DoAndReturn(f func(context.Context, string, string, time.Time) (bool, error)) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DeleteOriginByPattern mocks base method.
 func (m *MockAllStatements) DeleteOriginByPattern(ctx context.Context, projectID, pattern string) (bool, *domain.Origin, error) {
 	m.ctrl.T.Helper()
@@ -1696,45 +1735,6 @@ func (c *MockAllStatementsDeleteOriginByPatternCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteOriginByPatternCall) DoAndReturn(f func(context.Context, string, string) (bool, *domain.Origin, error)) *MockAllStatementsDeleteOriginByPatternCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// DeletePreview mocks base method.
-func (m *MockAllStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePreview", ctx, projectID, origin)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeletePreview indicates an expected call of DeletePreview.
-func (mr *MockAllStatementsMockRecorder) DeletePreview(ctx, projectID, origin any) *MockAllStatementsDeletePreviewCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePreview", reflect.TypeOf((*MockAllStatements)(nil).DeletePreview), ctx, projectID, origin)
-	return &MockAllStatementsDeletePreviewCall{Call: call}
-}
-
-// MockAllStatementsDeletePreviewCall wrap *gomock.Call
-type MockAllStatementsDeletePreviewCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeletePreviewCall) Return(deleted bool, err error) *MockAllStatementsDeletePreviewCall {
-	c.Call = c.Call.Return(deleted, err)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeletePreviewCall) Do(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeletePreviewCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeletePreviewCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeletePreviewCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -15454,6 +15454,45 @@ func (c *MockVariableServiceGetDecryptedVariablesCall) Do(f func(context.Context
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockVariableServiceGetDecryptedVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, *domain.DeploymentOriginKind, ...string) ([]*domain.Variable, error)) *MockVariableServiceGetDecryptedVariablesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetDeploymentVariables mocks base method.
+func (m *MockVariableService) GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDeploymentVariables", ctx, projectID, deploymentID)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDeploymentVariables indicates an expected call of GetDeploymentVariables.
+func (mr *MockVariableServiceMockRecorder) GetDeploymentVariables(ctx, projectID, deploymentID any) *MockVariableServiceGetDeploymentVariablesCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDeploymentVariables", reflect.TypeOf((*MockVariableService)(nil).GetDeploymentVariables), ctx, projectID, deploymentID)
+	return &MockVariableServiceGetDeploymentVariablesCall{Call: call}
+}
+
+// MockVariableServiceGetDeploymentVariablesCall wrap *gomock.Call
+type MockVariableServiceGetDeploymentVariablesCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceGetDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockVariableServiceGetDeploymentVariablesCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceGetDeploymentVariablesCall) Do(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockVariableServiceGetDeploymentVariablesCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceGetDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockVariableServiceGetDeploymentVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

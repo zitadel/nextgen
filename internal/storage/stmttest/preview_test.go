@@ -86,16 +86,35 @@ func TestPreviewStatements_Delete(t *testing.T) {
 		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 		dep := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 
-		deleted, err := d.stmts.DeletePreview(t.Context(), projectID, gitOrigin)
+		now := time.Now()
+		deleted, err := d.stmts.DeleteLivePreview(t.Context(), projectID, gitOrigin, now)
 		require.NoError(t, err)
 		assert.True(t, deleted)
-		deleted, err = d.stmts.DeletePreview(t.Context(), projectID, gitOrigin)
+		deleted, err = d.stmts.DeleteLivePreview(t.Context(), projectID, gitOrigin, now)
 		require.NoError(t, err)
 		assert.False(t, deleted)
 
 		_, err = d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		assert.Equal(t, []string{dep.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, gitOrigin)))
+	})
+}
+
+// Removing spares an expired preview, which the sweep deletes.
+func TestPreviewStatements_DeleteLiveSparesAnExpiredPreview(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		t0 := time.Now().UTC().Truncate(time.Microsecond)
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, t0.Add(time.Minute), t0))
+
+		// At the instant of expiry the preview is no longer live.
+		deleted, err := d.stmts.DeleteLivePreview(t.Context(), projectID, gitOrigin, t0.Add(time.Minute))
+		require.NoError(t, err)
+		assert.False(t, deleted)
+
+		swept, err := d.stmts.DeleteExpiredPreview(t.Context(), projectID, gitOrigin, t0.Add(time.Minute))
+		require.NoError(t, err)
+		assert.True(t, swept)
 	})
 }
 

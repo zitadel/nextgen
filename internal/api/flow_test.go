@@ -468,7 +468,6 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 		t.Run(tt.name, func(t *testing.T) {
 			ts := newTestServer(t, tt.middleware...)
 			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-			ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: tt.origin, Kind: domain.OriginKindPrimary}}}, nil)
 			ts.fake.submitResult = domain.FlowStepResult{
 				State:           state,
 				Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
@@ -547,7 +546,6 @@ func TestSubmitFlowStep_SSO_HandedOffAttemptIsAConflict(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
-	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}}, nil)
 
 	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 		"action":          "sso",
@@ -624,8 +622,6 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			requestOrigin := origin
 			if tt.noOrigin {
 				requestOrigin = ""
-			} else {
-				ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}}, nil)
 			}
 
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)

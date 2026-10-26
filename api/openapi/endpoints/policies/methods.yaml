@@ -1,5 +1,6 @@
 get:
   operationId: listPolicies
+  x-zitadel-cli: policies list
   summary: List policies
   description: |
     Lists the project's policies, one per operation, each as its newest

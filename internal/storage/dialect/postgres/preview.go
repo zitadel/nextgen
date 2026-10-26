@@ -19,6 +19,7 @@ const (
 		` ON CONFLICT (project_id, origin) DO UPDATE SET expires_at = EXCLUDED.expires_at`
 	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM zitadel_nextgen.previews`
 	deletePreviewStmt        = `DELETE FROM zitadel_nextgen.previews WHERE project_id = $1 AND origin = $2`
+	deleteLivePreviewStmt    = deletePreviewStmt + ` AND expires_at > $3`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= $3`
 )
 
@@ -81,9 +82,9 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Preview]{Items: items, NextCursor: nextCursor}, nil
 }
 
-// DeletePreview implements [service.PreviewStatements].
-func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	return ps.delete(ctx, deletePreviewStmt, projectID, origin)
+// DeleteLivePreview implements [service.PreviewStatements].
+func (ps previewStatements) DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
+	return ps.delete(ctx, deleteLivePreviewStmt, projectID, origin, now)
 }
 
 // DeleteExpiredPreview implements [service.PreviewStatements].

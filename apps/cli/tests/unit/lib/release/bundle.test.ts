@@ -57,6 +57,32 @@ describe("buildBundle", () => {
     expect(bundle).not.toHaveProperty("brandings");
   });
 
+  it("carries policy files under `policies`, named in step with their files", async () => {
+    const cwd = await project({
+      ".zitadel/policies/auth.factor.password.set.json": {
+        $schema: "../meta/policy.json",
+        operation: "auth.factor.password.set",
+        config: { min_length: 12 },
+      },
+    });
+
+    const { bundle, resourceCount, policyFiles } = await buildBundle(cwd);
+
+    expect(resourceCount).toBe(1);
+    expect(bundle.policies).toEqual([
+      { operation: "auth.factor.password.set", config: { min_length: 12 } },
+    ]);
+    expect(policyFiles).toEqual(["auth.factor.password.set.json"]);
+  });
+
+  it("leaves `policies` out when there are none, so a server without the kind takes it", async () => {
+    const cwd = await project({ ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
+
+    const { bundle } = await buildBundle(cwd);
+
+    expect(bundle).not.toHaveProperty("policies");
+  });
+
   it("refuses an empty .zitadel/ directory", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-bundle-empty-"));
     dir = cwd;

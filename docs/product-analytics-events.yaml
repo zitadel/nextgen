@@ -295,6 +295,11 @@ properties:
     description: >-
       An `IDP_PROVIDERS` slug, `custom` for a developer-described connection
       (never its slug), `none` or `multiple`.
+  password_policy:
+    type: string
+    description: >-
+      `set` when `setup` put a minimum length into the password policy, else
+      `empty`. Never the value.
   files_written_count:
     type: number
     description: How many files `setup` wrote.
@@ -481,6 +486,7 @@ components:
         - preset
         - use_case
         - sso
+        - password_policy
         - step
         - files_written_count
         - package_manager

@@ -86,6 +86,29 @@ func testVariable(t *testing.T, name string, owner domain.VariableOwner, value a
 	return v
 }
 
+func TestVariableService_GetDeploymentVariables(t *testing.T) {
+	t.Run("returns the frozen set", func(t *testing.T) {
+		svc, statements, _, _ := newMockedVariableService(t)
+		set := &domain.VariableSet{ProjectID: "proj-1", Hash: "abc"}
+		statements.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").Return(set, nil)
+
+		got, err := svc.GetDeploymentVariables(t.Context(), "proj-1", "dep_1")
+		require.NoError(t, err)
+		assert.Same(t, set, got)
+	})
+
+	t.Run("a deployment with no set is not an internal error", func(t *testing.T) {
+		svc, statements, _, _ := newMockedVariableService(t)
+		statements.EXPECT().GetDeploymentVariables(gomock.Any(), "proj-1", "dep_1").
+			Return(nil, database.NewNoRowFoundError(nil))
+
+		_, err := svc.GetDeploymentVariables(t.Context(), "proj-1", "dep_1")
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, domain.ErrInternal(nil))
+		assert.ErrorContains(t, err, "no frozen variables")
+	})
+}
+
 func TestVariableService_GetVariables(t *testing.T) {
 	t.Run("passes the owner and names through", func(t *testing.T) {
 		svc, statements, _, _ := newMockedVariableService(t)
