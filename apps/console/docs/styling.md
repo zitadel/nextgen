@@ -140,6 +140,10 @@ own. Do not add a per-screen wrapper with its own padding.
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
 
+Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
+inside `Page`: capped and centred, so the table does not stretch across the
+window.
+
 `inset="panel"` is for the configuration-panel screens (User schemas, Login
 flows, Identity providers), whose single card the design insets by 24px on the
 sides. It changes the sides only, never the top.

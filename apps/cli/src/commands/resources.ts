@@ -107,7 +107,8 @@ const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
  */
 export const RESOURCES = {
   users: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 1,
     singular: "user",
     idField: "id",
     // `identifier` is the user's login handle (their email under the default
@@ -149,7 +150,8 @@ export const RESOURCES = {
   },
 
   teams: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 2,
     singular: "team",
     idField: "id",
     columns: ["id", "name", "status", "created_at"],
@@ -178,7 +180,7 @@ export const RESOURCES = {
   },
 
   sessions: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "session",
     idField: "session_id",
     columns: ["session_id", "state", "user_id", "created_at", "expires_at"],
@@ -204,7 +206,7 @@ export const RESOURCES = {
   },
 
   events: {
-    group: CommandGroups.resources,
+    group: CommandGroups.diagnostics,
     singular: "event",
     idField: "id",
     columns: ["id", "event_type", "category", "actor_id", "occurred_at"],
@@ -261,7 +263,8 @@ export const RESOURCES = {
   },
 
   grants: {
-    group: CommandGroups.resources,
+    group: CommandGroups.usersAndTeams,
+    groupOrder: 3,
     singular: "grant",
     idField: "id",
     columns: ["id", "user.user_id", "team.team_id", "relation", "created_at", "expires_at"],
@@ -302,7 +305,7 @@ export const RESOURCES = {
   // The revision routes are not modelled here — the CLI has no grammar for a
   // sub-resource listing yet, so `idps revisions` is deliberately absent.
   idps: {
-    group: CommandGroups.resources,
+    group: CommandGroups.authentication,
     singular: "identity provider connection",
     idField: "id",
     columns: ["id", "slug", "definition.protocol", "definition.display_name", "created_at"],
@@ -341,7 +344,7 @@ export const RESOURCES = {
   },
 
   projects: {
-    group: CommandGroups.resources,
+    group: CommandGroups.configuration,
     singular: "project",
     idField: "id",
     columns: ["id", "name", "created_at"],

@@ -114,7 +114,8 @@ export async function relPathForHandle(
  * rebuilds the same release.
  */
 export default class Pull extends EnvironmentCommand {
-  static override description = "Rebuild .zitadel/ from the revisions a released snapshot pins.";
+  static override description =
+    "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
   static override examples = [

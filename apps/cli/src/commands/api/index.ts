@@ -29,8 +29,7 @@ const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
  * it.
  */
 export default class Api extends BaseCommand {
-  static override group = CommandGroups.resources;
-  static override groupOrder = 1;
+  static override group = CommandGroups.diagnostics;
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
   static override examples = [
