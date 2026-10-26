@@ -34,7 +34,8 @@ import { PAGE_TITLE, PAGE_TITLE_ROW } from "./typography";
  *
  * Column widths stay with each screen: Teams is a fixed 248px grid, while the
  * Users and Projects tables let their ID column take the slack
- * (`ResourceIdCell`); Users is schema-driven, so it has no fixed grid to share.
+ * (`ResourceIdCell`); Users takes the properties a viewer pins, so it has no
+ * fixed grid to share.
  */
 
 /**
@@ -73,6 +74,42 @@ export function ResourceTitle({ children, action }: { children: ReactNode; actio
 /** The card the table sits on. */
 export const RESOURCE_TABLE_WRAP =
   "border-sidebar-border bg-card overflow-x-auto rounded-md border";
+
+/**
+ * The card of a table whose leading and trailing columns stay put while the
+ * rest scrolls under them. It is the `scroll` group the sticky cells read
+ * `data-scroll-start` / `data-scroll-end` from (`useScrollEdges`).
+ */
+export const RESOURCE_TABLE_SCROLL = "group/scroll";
+
+/**
+ * The leading column, pinned to the card's left edge from 640px. Its 1px
+ * divider shows only while a column is scrolled under it.
+ *
+ * Below 640px it scrolls with the rest: a phone's card is about 300px wide,
+ * and a pinned identity column (up to 280px) beside the pinned menu would
+ * leave no room for any column between them.
+ */
+export const RESOURCE_STICKY_START =
+  "sm:sticky sm:left-0 sm:z-10 bg-card sm:group-data-[scroll-start]/scroll:shadow-[inset_-1px_0_0_var(--color-border)]";
+
+/**
+ * The trailing column (the row menu), pinned to the card's right edge so the
+ * menu is reachable at any width. Its divider shows while columns run on
+ * under it.
+ */
+export const RESOURCE_STICKY_END =
+  "sticky right-0 z-10 bg-card group-data-[scroll-end]/scroll:shadow-[inset_1px_0_0_var(--color-border)]";
+
+/**
+ * A body cell of a sticky column. It must be opaque, or the scrolled cells
+ * show through it, so the row's translucent hover and open-menu fills
+ * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
+ * layered over it. The row needs the `group` class. It fades with the row's
+ * own `transition-colors`, or it would snap while the rest of the row fades.
+ */
+export const RESOURCE_STICKY_BODY =
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";

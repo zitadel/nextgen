@@ -467,6 +467,38 @@ describe("standard-attribute tests ↔ SDK specs", () => {
 });
 
 /**
+ * A published package's declaration map names its `../src` files, so it only
+ * resolves when the package publishes `src` as well; otherwise it is a file in
+ * every tarball that points at nothing.
+ */
+describe("published packages ↔ declaration maps", () => {
+  const packagesDir = `${resolve(process.cwd(), "..")}/`;
+  const published = readdirSync(packagesDir).filter((dir) => {
+    const path = `${packagesDir}${dir}/package.json`;
+    return (
+      existsSync(path) &&
+      (JSON.parse(readFileSync(path, "utf8")) as { private?: boolean }).private !== true
+    );
+  });
+
+  it("covers the published packages", () => {
+    expect(published).toEqual(expect.arrayContaining(["api", "components", "sdk-core"]));
+  });
+
+  it.each(published)("%s emits declaration maps only beside its sources", (dir) => {
+    const { files = [] } = JSON.parse(
+      readFileSync(`${packagesDir}${dir}/package.json`, "utf8"),
+    ) as {
+      files?: string[];
+    };
+    const tsconfig = `${packagesDir}${dir}/tsconfig.lib.json`;
+    const maps =
+      existsSync(tsconfig) && /"declarationMap"\s*:\s*true/.test(readFileSync(tsconfig, "utf8"));
+    expect(maps && !files.some((file) => file === "src" || file.startsWith("src/"))).toBe(false);
+  });
+});
+
+/**
  * Apps go through their SDK. Each SDK that renders the widgets lists
  * `@zitadel/components` as its own dependency, so the elements load from the SDK
  * and the app never installs or imports `components` by name; no SDK's docs tell

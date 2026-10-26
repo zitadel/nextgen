@@ -8,8 +8,7 @@
     // `.ts`-only today but the setting keeps the SDK Qwik-authorable.
     "jsx": "react-jsx",
     "jsxImportSource": "@qwik.dev/core",
-    "declaration": true,
-    "declarationMap": true
+    "declaration": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

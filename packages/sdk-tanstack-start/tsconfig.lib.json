@@ -5,8 +5,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "types": ["node", "react"],
-    "declaration": true,
-    "declarationMap": true
+    "declaration": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

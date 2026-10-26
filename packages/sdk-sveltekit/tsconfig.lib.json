@@ -4,8 +4,7 @@
     "rootDir": "src",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"],
-    "declaration": true,
-    "declarationMap": true
+    "declaration": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [

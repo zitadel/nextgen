@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
+import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { advisoryForWarnings } from "../../../src/commands/doctor/index";
@@ -59,14 +60,18 @@ async function doctor(cwd: string, extra: string[] = []) {
  * Builds a well-formed managed project that should pass every doctor check
  * runnable without the platform: config/secret parse + match, 0600 secret,
  * gitignore + env.example coverage, a Next.js framework signature, a valid
- * user schema, a Zitadel SDK dependency, and an owning team recorded by
- * `zitadel claim` (without it the claim check warns, which is its own test
- * below).
+ * user schema, a Zitadel SDK dependency, the editor meta-schemas this CLI
+ * writes, and an owning team recorded by `zitadel claim` (without it the
+ * claim check warns, which is its own test below).
  */
 async function makeHealthyProject(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
+  await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+  for (const file of projectMetaSchemas(cliVersion.version)) {
+    await writeFile(join(cwd, file.path), file.contents);
+  }
   await mkdir(join(cwd, "app/login"), { recursive: true });
   await mkdir(join(cwd, "app/register"), { recursive: true });
   await mkdir(join(cwd, "app/profile"), { recursive: true });
@@ -847,6 +852,7 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       cliVersion.version,
       environmentSelectorSuffix({ server: "https://a.example" }),
+      environmentSelectorSuffix({}),
     );
 
     expect(advice?.nextCommands).toEqual([
@@ -859,9 +865,72 @@ describe("advisoryForWarnings", () => {
       [claimWarning],
       cliVersion.version,
       environmentSelectorSuffix({}),
+      environmentSelectorSuffix({}),
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+
+  it("suggests doctor --fix for outdated editor schemas in the directory doctor checked", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "outdated",
+      details: { missing: [], outdated: [".zitadel/meta/branding.json"] },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({ cwd: "apps/web" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+  });
+
+  it("does not suggest doctor --fix for an editor schema it cannot read", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "unreadable",
+      details: {
+        missing: [],
+        outdated: [],
+        unreadable: [{ path: ".zitadel/meta/branding.json", reason: "EACCES" }],
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
+  });
+
+  it("does not suggest this CLI's doctor --fix when the project pins a newer version", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "newer",
+      details: {
+        missing: [],
+        outdated: [".zitadel/meta/branding.json"],
+        newer_pin: { name: "@zitadel/sdk-next", version: "9.9.9" },
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
   });
 });
 

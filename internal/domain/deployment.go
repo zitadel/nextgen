@@ -15,8 +15,25 @@ const (
 const MaxDeploymentTargets = 50
 
 // DefaultPreviewTTL is how long a preview stays live after the deployment
-// that writes it.
+// that writes it, when the deployment gives no ttl.
 const DefaultPreviewTTL = 7 * 24 * time.Hour
+
+// MaxPreviewTTL caps the ttl a deployment may give.
+const MaxPreviewTTL = 365 * 24 * time.Hour
+
+// ResolvePreviewTTL picks the lifetime a preview deploy renews.
+// When requested is nil, DefaultPreviewTTL is used. Otherwise requested
+// must be positive and at most MaxPreviewTTL.
+func ResolvePreviewTTL(requested *time.Duration) (time.Duration, error) {
+	if requested == nil {
+		return DefaultPreviewTTL, nil
+	}
+	if *requested <= 0 || *requested > MaxPreviewTTL {
+		return 0, ErrDeploymentInvalid().WithMessage(fmt.Sprintf(
+			"ttl must be positive and at most %d days", MaxPreviewTTL/(24*time.Hour)))
+	}
+	return *requested, nil
+}
 
 // DeploymentReason records why a deployment was created.
 //
