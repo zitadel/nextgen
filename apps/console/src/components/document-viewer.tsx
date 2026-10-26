@@ -36,8 +36,8 @@ const ACCENT_TAB = "data-[state=active]:bg-accent";
  * `compact` is the viewer inside a popover (a user's attributes on the Users
  * list). Those are data rather than configuration, so it drops the CLI hint;
  * it runs edge to edge under the popover's header instead of in a bordered
- * box of its own, starts the tab labels on the code's 16px inset, and caps the
- * code at a popover's height. The active tab takes `accent`: on `popover` a
+ * box of its own, starts the tab labels on the Fields list's 16px inset, and
+ * frames the source in a bordered code block capped at a popover's height. The active tab takes `accent`: on `popover` a
  * `muted` fill is the surface's own colour in dark mode and would not show.
  *
  * `fields` adds a Fields tab before JSON and YAML, open first: the same
@@ -78,7 +78,7 @@ export function DocumentViewer({
     >
       {/* 4px vertical inset: the header is 48px around a 40px tab strip.
           Compact, the 5px start inset plus the strip's 3px and the trigger's
-          8px put the first label on the code's 16px. */}
+          8px put the first label on the Fields list's 16px. */}
       <div
         className={cn(
           "flex items-center justify-between border-b border-border py-1",
@@ -123,7 +123,10 @@ export function DocumentViewer({
         hidden={view === "fields"}
         className={cn(
           "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
-          compact ? "max-h-80" : "max-h-[32rem]",
+          // Compact, the source sits in a bordered code block of its own, on
+          // the page canvas, as the schema screen frames it: it reads as text
+          // to copy, apart from the Fields list on the popover's surface.
+          compact ? "m-3 max-h-72 rounded-md border border-border bg-background" : "max-h-[32rem]",
         )}
       >
         {/* Plain until the grammars compile — same face, size and leading, so
