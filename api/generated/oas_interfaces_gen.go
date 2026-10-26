@@ -405,6 +405,10 @@ type PolicyUpdatedRes interface {
 	policyUpdatedRes()
 }
 
+type PreviewRemovedRes interface {
+	previewRemovedRes()
+}
+
 type ProjectCreatedRes interface {
 	projectCreatedRes()
 }

@@ -562,6 +562,52 @@ func TestDeploymentReads(t *testing.T) {
 	})
 }
 
+// TestPreviews deploys to two preview URLs, then lists and removes them.
+func TestPreviews(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	project := api.ProjectID(fixture.project)
+	origins := []string{previewOrigin, "https://acme-k3x9v2-acmeinc.vercel.app"}
+
+	resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
+		Targets:   api.DeploymentTargetsRequest(origins),
+		TTL:       api.NewOptPreviewTTL(api.PreviewTTL(168 * time.Hour)),
+	})
+	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
+
+	list := func(t *testing.T) []string {
+		t.Helper()
+		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPreviewsResponse{}, resp, helpers.MustMarshal(t, resp))
+		var listed []string
+		for _, p := range resp.(*api.ListPreviewsResponse).Previews {
+			assert.True(t, p.ExpiresAt.After(p.CreatedAt))
+			listed = append(listed, string(p.Origin))
+		}
+		return listed
+	}
+	remove := func(t *testing.T, origin string) {
+		t.Helper()
+		resp, err := fixture.client.RemovePreview(t.Context(),
+			&api.RemovePreviewRequest{Origin: api.Origin(origin)},
+			api.RemovePreviewParams{ProjectID: project})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemovePreviewNoContent{}, resp, helpers.MustMarshal(t, resp))
+	}
+
+	assert.ElementsMatch(t, origins, list(t))
+
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+
+	// Again, with nothing left to remove.
+	remove(t, origins[0])
+	assert.Equal(t, origins[1:], list(t))
+}
+
 // TestDeploymentsNotImplemented pins the deployment operations not served
 // yet to 501. Each request goes through the
 // real server, so the new shapes decode and the access check still runs
@@ -598,20 +644,6 @@ func TestDeploymentsNotImplemented(t *testing.T) {
 			ProjectID:    project,
 			DeploymentID: "dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",
 		})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("list previews", func(t *testing.T) {
-		resp, err := fixture.client.ListPreviews(t.Context(), api.ListPreviewsParams{ProjectID: project})
-		require.NoError(t, err)
-		expectNotImplemented(t, resp)
-	})
-
-	t.Run("remove a preview", func(t *testing.T) {
-		resp, err := fixture.client.RemovePreview(t.Context(),
-			&api.RemovePreviewRequest{Origin: "https://acme-git-sso-acmeinc.vercel.app"},
-			api.RemovePreviewParams{ProjectID: project})
 		require.NoError(t, err)
 		expectNotImplemented(t, resp)
 	})
