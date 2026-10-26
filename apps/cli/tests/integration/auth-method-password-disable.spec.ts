@@ -45,10 +45,12 @@ describe("auth-method password disable", () => {
 
       it("leaves nothing to publish when it refuses", async () => {
         const app = await aSetUpApp();
+        const before = await app.publishData();
 
         await app.disableMethod("password");
 
-        expect(await app.plan()).toReportNothingToDo();
+        const after = await app.deployData();
+        expect(after.content_hash).toBe(before.content_hash);
       });
     });
 

@@ -54,7 +54,7 @@ export async function moveDevPort(opts: {
   const client = createZitadelClient({ baseUrl: source, token: secret.project_secret });
   if (!dryRun) {
     try {
-      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "preview" });
+      await client.addOrigin(secret.project_id, { pattern: issuer, kind: "primary" });
     } catch (error) {
       const normalized = toZitadelError(error);
       throw new ZitadelError(normalized.code, `Could not allow ${issuer} for this project`, {
@@ -74,10 +74,17 @@ export async function moveDevPort(opts: {
 
   let staleOrigin: string | undefined;
   if (!dryRun) {
-    const previewOrigins = replaceOrigin(secret.preview_origins, previousIssuer, issuer);
+    // The app's own origin is primary, so the move rewrites that list. An
+    // older secret that still carries the issuer as a preview pattern is
+    // rewritten too, so the stale URL is not left behind either way.
+    const rewrite = (patterns: string[]): string[] =>
+      replaceOrigin(patterns, previousIssuer, issuer).filter(
+        (pattern) => typeof pattern === "string",
+      );
     await writeZitadelSecret(cwd, {
       ...secret,
-      preview_origins: previewOrigins.filter((pattern) => typeof pattern === "string"),
+      primary_origins: rewrite(secret.primary_origins),
+      preview_origins: rewrite(secret.preview_origins),
     });
     const manifest = await readScaffoldManifest(cwd);
     if (manifest !== undefined) {

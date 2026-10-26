@@ -1,5 +1,5 @@
 import { ZitadelError, toZitadelError } from "../../errors";
-import { publicCliCommand } from "../../public-cli";
+import { unscopedCommand } from "../../suggestion";
 import { listenersForPort, type TcpListener } from "../../prober/ports";
 import { dockerRuntimeGuidance, dockerUnavailableMessage } from "../docker-guidance";
 import { DEFAULT_LOCAL_SERVER_PORT, localServerUrl } from "../runtime";
@@ -36,9 +36,9 @@ function startupCleanupFailedError(
       hint: "Inspect the local runtime process and stop it manually, then rerun `zitadel start`.",
       nextCommands: unique([
         ...(startupError.nextCommands ?? []),
-        publicCliCommand("stop --all", cliVersion),
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("stop --all", cliVersion),
+        unscopedCommand("logs", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ]),
       details: {
         startup_error: {
@@ -93,8 +93,8 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
         : new ZitadelError("E_NETWORK", "Local Zitadel server did not become healthy", {
             hint: "Inspect the local runtime logs, then reset the local runtime if needed.",
             nextCommands: [
-              publicCliCommand("logs", cliVersion),
-              publicCliCommand("reset --force", cliVersion),
+              unscopedCommand("logs", cliVersion),
+              unscopedCommand("reset --force", cliVersion),
             ],
             details: {
               ...details,
@@ -121,7 +121,7 @@ export async function startFailure(error: unknown, cliVersion: string): Promise<
   if (error instanceof NoFreePortError) {
     return new ZitadelError("E_PORT_IN_USE", error.message, {
       hint: "Free a port, or choose one with --port.",
-      nextCommands: [publicCliCommand("start --port 9080", cliVersion)],
+      nextCommands: [unscopedCommand("start --port 9080", cliVersion)],
       details: { first_port: error.firstPort },
     });
   }
@@ -144,8 +144,8 @@ function portInUseError(
   return new ZitadelError("E_PORT_IN_USE", `Port ${String(port)} is already in use`, {
     hint: `Stop the process using ${serverUrl}, run \`zitadel stop --all\` for managed local runtimes, or choose another port.`,
     nextCommands: [
-      publicCliCommand("stop --all", cliVersion),
-      publicCliCommand(`start --port ${String(fallbackPort)}`, cliVersion),
+      unscopedCommand("stop --all", cliVersion),
+      unscopedCommand(`start --port ${String(fallbackPort)}`, cliVersion),
     ],
     details: { port, server_url: serverUrl, listeners },
   });
@@ -168,8 +168,8 @@ function serverExitedError(
     {
       hint: "Inspect the local runtime logs, then retry after fixing the startup error.",
       nextCommands: [
-        publicCliCommand("logs", cliVersion),
-        publicCliCommand("reset --force", cliVersion),
+        unscopedCommand("logs", cliVersion),
+        unscopedCommand("reset --force", cliVersion),
       ],
       details: { ...details, server_url: serverUrl, ...(logTail ? { log_tail: logTail } : {}) },
     },
@@ -177,6 +177,6 @@ function serverExitedError(
 }
 
 /** Removes repeats while keeping order, for suggested commands. */
-function unique(values: string[]): string[] {
+function unique<T extends string>(values: T[]): T[] {
   return [...new Set(values)];
 }

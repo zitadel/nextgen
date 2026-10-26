@@ -6,11 +6,13 @@
     "typecheck": {
       "dependsOn": ["build"]
     },
+    // src/components.ts re-exports the sdk-react wrappers, so tsc reads its
+    // built dist; sdk-react's build waits for components and sdk-core.
     "build": {
-      "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/sdk-react#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
+      "dependsOn": ["@zitadel/sdk-react#build-release"]
     },
     "test": {
       "dependsOn": ["build"]

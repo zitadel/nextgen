@@ -9,7 +9,6 @@ import { DEFAULT_LOCAL_SERVER_URL, readRuntimeMetadata } from "../lib/local-serv
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
 
 /**
  * `zitadel console` — open the local console signed in as the local
@@ -49,7 +48,7 @@ export default class Console extends BaseCommand {
     if (!admin) {
       throw new ZitadelError("E_VALIDATION", "No local admin in this directory or its parents", {
         hint: "Run this from the directory `zitadel start` ran in, or one inside it. If the server was never started, run `zitadel start` first; it creates the local admin the console signs in as.",
-        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
+        nextCommands: [this.suggestUnscoped("start")],
       });
     }
 

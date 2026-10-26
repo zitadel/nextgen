@@ -168,14 +168,14 @@ describe("auth-method sso disable", () => {
     ]);
   });
 
-  it("lists plan and apply, with --cwd, as the next commands after a change", async () => {
+  it("lists a dry run and a deploy, with --cwd, as the next commands after a change", async () => {
     const cwd = await makeProject(passwordAndGoogle, ["google"]);
 
     const { envelope } = await run(cwd, "--provider", "google");
 
     expect(envelope.data?.next_args).toEqual([
-      ["plan", "--cwd", expect.any(String)],
-      ["apply", "--cwd", expect.any(String)],
+      ["deploy", "--dry-run", "--cwd", expect.any(String)],
+      ["deploy", "-m", "<what changed>", "--cwd", expect.any(String)],
     ]);
   });
 
