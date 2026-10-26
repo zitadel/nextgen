@@ -20,15 +20,17 @@ vi.mock("@/components/branding/login-preview", () => ({
   LoginPreview: ({
     journey,
     flowName,
+    theme,
     state,
     onStates,
   }: {
     journey: string;
     flowName: string;
+    theme: string;
     state: string;
     onStates?: (states: string[]) => void;
   }) => (
-    <div data-testid="preview" data-flow={flowName} data-state={state}>
+    <div data-testid="preview" data-flow={flowName} data-theme={theme} data-state={state}>
       {journey}
       {/* Stands in for the served step arriving with no required field. */}
       <button
@@ -230,6 +232,20 @@ describe("branding screen", () => {
       expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),
     );
     expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
+  });
+
+  it("names the previewed theme and switches it", async () => {
+    serveRevision();
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-theme", "revision");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    // The revision's own mode, which the preview follows until a side is pinned.
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent("auto");
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Dark" }));
+
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-theme", "dark");
+    expect(screen.getByRole("button", { name: "Previewed theme: Dark" })).toBeInTheDocument();
   });
 
   it("switches the previewed state", async () => {

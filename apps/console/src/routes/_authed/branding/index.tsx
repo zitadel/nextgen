@@ -1,5 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Paintbrush, Smartphone, Sun, Workflow } from "lucide-react";
+import {
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Paintbrush,
+  Smartphone,
+  Sun,
+  SunMoon,
+  Workflow,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +21,14 @@ import { SettingsPanel } from "@/components/branding/settings-panel";
 import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -109,6 +126,14 @@ const STATE_LABELS: Record<PreviewState, string> = {
  */
 type PreviewTheme = "light" | "dark" | "revision";
 
+// The menu's order, with the user menu's icons, so the trigger shows the side
+// on screen. Keyed like `STATE_LABELS`, so a new side has to be labelled here.
+const THEMES: Record<PreviewTheme, { label: string; icon: LucideIcon }> = {
+  revision: { label: "From branding", icon: SunMoon },
+  light: { label: "Light", icon: Sun },
+  dark: { label: "Dark", icon: Moon },
+};
+
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
   // What the operator last picked; `activeJourney` below is what renders.
@@ -150,6 +175,7 @@ function BrandingScreen() {
   const activeState = states && !states.includes(state) ? "default" : state;
   // Unset, a widget follows the visitor: the panel shows `auto` for it too.
   const revisionMode = revision.theme?.mode ?? "auto";
+  const activeTheme = THEMES[theme];
 
   return (
     <Page fill>
@@ -228,19 +254,40 @@ function BrandingScreen() {
             >
               {narrow ? <Smartphone /> : <Monitor />}
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Switch the previewed theme"
-              onClick={() => setTheme(nextTheme(theme))}
-              title={
-                theme === "revision"
-                  ? `Theme: ${revisionMode} (from the branding in use)`
-                  : `Theme: ${theme}`
-              }
-            >
-              <Sun />
-            </Button>
+            {/* A menu rather than a cycling button: three sides behind one
+                glyph left the operator guessing which one was on screen. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Previewed theme: ${activeTheme.label}`}
+                  title={`Theme: ${activeTheme.label}`}
+                >
+                  <activeTheme.icon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Previewed theme</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={theme}
+                  onValueChange={(value) => setTheme(value as PreviewTheme)}
+                >
+                  {Object.entries(THEMES).map(([id, entry]) => (
+                    <DropdownMenuRadioItem key={id} value={id}>
+                      <entry.icon aria-hidden />
+                      {entry.label}
+                      {/* What a visitor gets: the revision's own mode. */}
+                      {id === "revision" && (
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {revisionMode}
+                        </span>
+                      )}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -280,9 +327,4 @@ function BrandingScreen() {
       </div>
     </Page>
   );
-}
-
-function nextTheme(current: PreviewTheme): PreviewTheme {
-  if (current === "revision") return "light";
-  return current === "light" ? "dark" : "revision";
 }
