@@ -283,6 +283,24 @@ export class ScaffoldedApp {
     await writeFile(join(this.path, "notes.md"), "a note to self\n");
   }
 
+  /**
+   * The paths setup's commit put under version control. Read from git because
+   * that is the behaviour: a secret that reaches version control cannot be
+   * scrubbed later, so what is tracked is the claim being made.
+   */
+  async trackedFiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["-c", "core.quotePath=false", "ls-files", "-z"],
+        { cwd: this.path },
+      );
+      return stdout.split("\0").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
   /** The subjects of the project's commits, newest first, or [] without a repo. */
   async commitSubjects(): Promise<string[]> {
     try {

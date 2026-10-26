@@ -1075,6 +1075,16 @@ export default class Setup extends BaseCommand {
     const outcome = await ensureInitialCommit(cwd);
     if (outcome.kind === "created" || outcome.kind === "committed") {
       consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      // git cannot commit without an author, so one was invented to get the
+      // commit the release needs. Said out loud rather than left in the
+      // developer's history unmentioned, with the one command that fixes it.
+      if (outcome.fallbackIdentity) {
+        reportWarning(
+          "This machine has no git user.name/user.email, so the commit was authored as " +
+            "Zitadel Setup <setup@zitadel.local>. Set your identity and run " +
+            "`git commit --amend --reset-author` to put your own name on it.",
+        );
+      }
     }
     if (outcome.kind === "unavailable") {
       reportWarning(

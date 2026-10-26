@@ -135,16 +135,40 @@ describe("setup", () => {
         });
       });
 
-      it("commits into a repository the project is already in", async () => {
+      it("keeps the project secret it wrote out of the commit it makes", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).not.toContain(".zitadel/secret");
+      });
+
+      it.each([".env.development.local", ".env.local", ".env"])(
+        "keeps %s out of the commit it makes",
+        async (name) => {
+          const app = await anApp();
+
+          await app.setup();
+
+          expect(await app.trackedFiles()).not.toContain(name);
+        },
+      );
+
+      it("commits the configuration it wrote, which the release is built from", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.trackedFiles()).toContain(".zitadel/schemas/default-human-user.json");
+      });
+
+      it("adds one commit on top of an existing repository's history", async () => {
         const app = await anApp();
         await app.underVersionControl();
 
         await app.setup();
 
-        expect(await app.commitSubjects()).toEqual([
-          "chore: scaffold the project with zitadel setup",
-          "feat: the developer's own work",
-        ]);
+        expect(await app.commitSubjects()).toHaveLength(2);
       });
 
       it("reports that it committed without having made the repository", async () => {

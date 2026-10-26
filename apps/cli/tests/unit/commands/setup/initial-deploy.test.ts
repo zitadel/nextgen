@@ -8,6 +8,7 @@ import defaultHumanUser from "@zitadel/config/defaults/default-human-user.json" 
 };
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ensureInitialCommit } from "../../../../src/commands/setup/initial-commit";
 import {
   INITIAL_DEPLOY_MESSAGE,
   runInitialDeploy,
@@ -53,6 +54,15 @@ function aWorkingPlatform(overrides: Partial<Record<string, unknown>> = {}): Zit
   } as unknown as ZitadelClient;
 }
 
+/** Commits the project the way setup does before building the release. */
+async function committed(cwd: string): Promise<string> {
+  const outcome = await ensureInitialCommit(cwd);
+  if (outcome.kind !== "created") {
+    throw new Error(`arranging the commit failed: ${JSON.stringify(outcome)}`);
+  }
+  return outcome.sha;
+}
+
 function deployIn(cwd: string, client: ZitadelClient): ReturnType<typeof runInitialDeploy> {
   return runInitialDeploy({
     cwd,
@@ -96,12 +106,37 @@ describe("runInitialDeploy", () => {
 
     it("records the commit the project was committed at", async () => {
       const cwd = await aConfiguredProject();
+      const sha = await committed(cwd);
       const client = aWorkingPlatform();
 
       await deployIn(cwd, client);
 
-      // No repository here, so there is no commit to record: the field is
-      // omitted rather than sent empty, and `git_dirty` is false.
+      expect(client.buildRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ git_sha: sha, git_dirty: false }),
+        { project_id: "prj_1" },
+      );
+    });
+
+    it("records the tree as dirty when the configuration is uncommitted", async () => {
+      const cwd = await aConfiguredProject();
+      await committed(cwd);
+      await writeFile(join(cwd, "notes.md"), "edited after the commit\n");
+      const client = aWorkingPlatform();
+
+      await deployIn(cwd, client);
+
+      expect(client.buildRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ git_dirty: true }),
+        { project_id: "prj_1" },
+      );
+    });
+
+    it("omits the commit entirely when the project is in no repository", async () => {
+      const cwd = await aConfiguredProject();
+      const client = aWorkingPlatform();
+
+      await deployIn(cwd, client);
+
       expect(client.buildRelease).toHaveBeenCalledWith(
         expect.not.objectContaining({ git_sha: expect.anything() }),
         { project_id: "prj_1" },

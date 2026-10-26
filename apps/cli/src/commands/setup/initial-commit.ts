@@ -13,9 +13,10 @@ const run = promisify(execFile);
 export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with zitadel setup";
 
 /**
- * Identity used only when the machine has none configured. A commit cannot be
- * made without one, and refusing to commit would leave the first release
- * without a `git_sha` — the whole reason the commit exists.
+ * Identity used only when the machine has none configured, because git refuses
+ * to commit without one and no commit means no `git_sha` — the whole reason
+ * this exists. It is reported back so setup can say the commit needs its author
+ * corrected, rather than leaving an invented name in the history unmentioned.
  */
 const FALLBACK_IDENTITY = { name: "Zitadel Setup", email: "setup@zitadel.local" };
 
@@ -31,12 +32,12 @@ function isSecretPath(path: string): boolean {
 /** What {@link ensureInitialCommit} did, for setup to report. */
 export type InitialCommitOutcome =
   /** There was no repository, so one was created and the project committed. */
-  | { readonly kind: "created"; readonly sha: string }
+  | { readonly kind: "created"; readonly sha: string; readonly fallbackIdentity: boolean }
   /** The project was already in a repository, and was committed into it. */
-  | { readonly kind: "committed"; readonly sha: string }
+  | { readonly kind: "committed"; readonly sha: string; readonly fallbackIdentity: boolean }
   /** `--no-git`, or a dry run. */
   | { readonly kind: "skipped" }
-  /** git is missing, or init/add/commit failed. */
+  /** git is missing, or init/add/commit failed, or a secret would have been committed. */
   | { readonly kind: "unavailable"; readonly reason: string };
 
 /** One entry of `git status --porcelain`, split into what it means. */
@@ -44,7 +45,9 @@ type Change = { readonly path: string; readonly untracked: boolean };
 
 /**
  * Paths the CLI writes itself, which therefore do not count as the
- * developer's uncommitted work.
+ * developer's uncommitted work. Matched against a path already made relative
+ * to the project directory, never the repository root: in a monorepo the two
+ * differ, and comparing the wrong one refuses every subdirectory project.
  *
  * `start` appends `.zitadel/local/` to `.gitignore` and writes the runtime
  * files under it, and it runs immediately before `setup` on the documented
@@ -55,9 +58,19 @@ function isCliOwned(path: string): boolean {
   return path === ".gitignore" || path === ".zitadel" || path.startsWith(".zitadel/");
 }
 
-/** Run git in `cwd`; throws with git's own stderr when it fails. */
+/**
+ * Run git in `cwd`, returning its stdout.
+ *
+ * `core.quotePath=false` stops git C-quoting any path holding a non-ASCII byte
+ * or a space (`"caf\303\251.txt"`). A quoted path is not the path: it matches
+ * no pathspec and no suffix test, so a secret under such a name would be
+ * neither recognised nor unstaged.
+ */
 async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await run("git", args, { cwd, maxBuffer: 16 * 1024 * 1024 });
+  const { stdout } = await run("git", ["-c", "core.quotePath=false", ...args], {
+    cwd,
+    maxBuffer: 16 * 1024 * 1024,
+  });
   return stdout;
 }
 
@@ -71,11 +84,27 @@ async function insideRepository(cwd: string): Promise<boolean> {
   }
 }
 
-/** Whether git has an author identity it can commit with. */
+/**
+ * Where the project sits inside its repository (`apps/web/`, or `""` at the
+ * root). `git status` reports paths from the repository root whatever
+ * directory it runs in, so this is what turns one into a project-relative path.
+ */
+async function projectPrefix(cwd: string): Promise<string> {
+  try {
+    return (await git(cwd, ["rev-parse", "--show-prefix"])).trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Whether git has an author identity of the developer's own to commit with. */
 async function hasIdentity(cwd: string): Promise<boolean> {
   try {
-    const email = (await git(cwd, ["config", "--get=user.email"])).trim();
-    const name = (await git(cwd, ["config", "--get=user.name"])).trim();
+    // `--get` takes its key as a separate argument. Written as `--get=user.email`
+    // git exits 129 and this reports "no identity" on every machine, so every
+    // commit would be attributed to FALLBACK_IDENTITY.
+    const email = (await git(cwd, ["config", "--get", "user.email"])).trim();
+    const name = (await git(cwd, ["config", "--get", "user.name"])).trim();
     return email !== "" && name !== "";
   } catch {
     return false;
@@ -83,21 +112,49 @@ async function hasIdentity(cwd: string): Promise<boolean> {
 }
 
 /**
- * Everything git considers a change in `cwd`, untracked files included. An
- * untracked file counts: setup stages the whole tree, so one left lying about
- * would be swept into setup's commit, which is exactly what must not happen.
+ * Everything git considers a change under the project directory, untracked
+ * files included. An untracked file counts: setup stages the whole project, so
+ * one left lying about would be swept into setup's commit.
+ *
+ * Scoped to `.` so that in a monorepo a sibling package's work-in-progress —
+ * which `git add` here would never touch — does not refuse the setup.
  */
 async function changes(cwd: string): Promise<Change[]> {
-  const stdout = await git(cwd, ["status", "--porcelain"]);
-  return stdout
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => ({
-      // Porcelain v1 is `XY <path>`: the status is the first two columns and
-      // the path starts at the fourth, so a path with spaces survives intact.
-      path: line.slice(3).trim(),
-      untracked: line.slice(0, 2) === "??",
-    }));
+  const stdout = await git(cwd, ["status", "--porcelain", "-z", "--", "."]);
+  const fields = stdout.split("\0");
+  const found: Change[] = [];
+  for (let index = 0; index < fields.length; index += 1) {
+    const entry = fields[index];
+    if (entry === undefined || entry === "") {
+      continue;
+    }
+    const status = entry.slice(0, 2);
+    // A rename or copy is one record carrying two NUL-terminated paths, the
+    // destination then the source. Read the destination and step over the
+    // source, or it would be taken for a record of its own.
+    if (status.includes("R") || status.includes("C")) {
+      index += 1;
+    }
+    found.push({ path: entry.slice(3), untracked: status === "??" });
+  }
+  return found;
+}
+
+/** The paths staged in `cwd`, relative to it and never quoted. */
+async function stagedPaths(cwd: string): Promise<string[]> {
+  // `--relative` both restricts the list to this directory and reports each
+  // path relative to it, which is what `git reset -- <path>` resolves against:
+  // a repository-root path handed back to reset from a subdirectory matches
+  // nothing, exits 0, and leaves the file staged.
+  const stdout = await git(cwd, [
+    "diff",
+    "--cached",
+    "-z",
+    "--name-only",
+    "--no-renames",
+    "--relative",
+  ]);
+  return stdout.split("\0").filter((path) => path !== "");
 }
 
 /**
@@ -118,7 +175,13 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
   }
   let dirty: Change[];
   try {
-    dirty = (await changes(cwd)).filter((change) => !isCliOwned(change.path));
+    const prefix = await projectPrefix(cwd);
+    dirty = (await changes(cwd))
+      .map((change) => ({
+        ...change,
+        path: change.path.startsWith(prefix) ? change.path.slice(prefix.length) : change.path,
+      }))
+      .filter((change) => !isCliOwned(change.path));
   } catch {
     // git answered the repository probe but not this; leave it to the commit,
     // which reports its own failure without stopping setup.
@@ -154,10 +217,10 @@ function plural(list: readonly unknown[]): string {
  * against this commit instead of reporting that no diff is available.
  *
  * A repository is created only when there is none; an existing one is used as
- * it stands, never nested inside. Either way the commit covers the whole tree,
- * which is safe because {@link assertCleanWorktree} has already refused a
- * repository with anything uncommitted: everything there is to commit by this
- * point is what setup itself wrote.
+ * it stands, never nested inside. Either way the commit covers the project
+ * directory, which is safe because {@link assertCleanWorktree} has already
+ * refused a repository with anything uncommitted: everything there is to commit
+ * by this point is what setup itself wrote.
  *
  * Nothing here prompts, so it behaves the same interactively and in CI, and no
  * failure is fatal: the worst case is the first release carrying no commit,
@@ -173,25 +236,28 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     // `.gitignore` is the first line of defence and the scaffold writes one,
     // but a secret committed once cannot be scrubbed later, so the staged set
     // is checked rather than trusted.
-    const staged = (await git(cwd, ["diff", "--cached", "--name-only"]))
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line !== "");
+    const staged = await stagedPaths(cwd);
     const secrets = staged.filter(isSecretPath);
     if (secrets.length > 0) {
       await git(cwd, ["reset", "--quiet", "--", ...secrets]);
     }
+    // Unstaging is verified rather than assumed. `git reset` reports success
+    // for a pathspec that matched nothing, so a path the index does not hold
+    // under that spelling would leave the secret staged and silently commit it.
+    const stillStaged = (await stagedPaths(cwd)).filter(isSecretPath);
+    if (stillStaged.length > 0) {
+      return {
+        kind: "unavailable",
+        reason: `${stillStaged[0]} could not be kept out of the commit, so nothing was committed`,
+      };
+    }
     if (staged.length === secrets.length) {
       return { kind: "unavailable", reason: "there was nothing to commit" };
     }
-    const identity = (await hasIdentity(cwd))
-      ? []
-      : [
-          "-c",
-          `user.name=${FALLBACK_IDENTITY.name}`,
-          "-c",
-          `user.email=${FALLBACK_IDENTITY.email}`,
-        ];
+    const fallbackIdentity = !(await hasIdentity(cwd));
+    const identity = fallbackIdentity
+      ? ["-c", `user.name=${FALLBACK_IDENTITY.name}`, "-c", `user.email=${FALLBACK_IDENTITY.email}`]
+      : [];
     // Signing is disabled for this commit alone: a configured GPG key would
     // otherwise block setup on a passphrase prompt it never asked for.
     await git(cwd, [
@@ -206,6 +272,7 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     return {
       kind: existing ? "committed" : "created",
       sha: (await git(cwd, ["rev-parse", "HEAD"])).trim(),
+      fallbackIdentity,
     };
   } catch (error) {
     return { kind: "unavailable", reason: messageOf(error) };
@@ -214,7 +281,10 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
 
 /** git's own stderr where it has one, so the warning names the real cause. */
 function messageOf(error: unknown): string {
-  const stderr = (error as { stderr?: unknown }).stderr;
+  const stderr =
+    typeof error === "object" && error !== null
+      ? (error as { stderr?: unknown }).stderr
+      : undefined;
   if (typeof stderr === "string" && stderr.trim() !== "") {
     return stderr.trim().split("\n")[0] ?? stderr.trim();
   }
