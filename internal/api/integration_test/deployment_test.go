@@ -573,7 +573,7 @@ func TestPreviews(t *testing.T) {
 	resp := fixture.createDeployment(t, &api.CreateDeploymentRequest{
 		ReleaseID: api.NewOptReleaseID(fixture.release.ID),
 		Targets:   api.DeploymentTargetsRequest(origins),
-		TTL:       api.NewOptPreviewTTL("168h"),
+		TTL:       api.NewOptPreviewTTL(api.PreviewTTL(168 * time.Hour)),
 	})
 	require.IsType(t, &api.CreateDeploymentCreated{}, resp, helpers.MustMarshal(t, resp))
 
