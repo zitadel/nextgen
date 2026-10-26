@@ -30,6 +30,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
 import { type Deployment, listReleaseDeployments } from "@/lib/deployment";
+import type { PolicySetting } from "@/lib/policy";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import {
   type PointerGroup,
@@ -239,19 +240,44 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
                 </Badge>
               </span>
             </AccordionTrigger>
-            <AccordionContent className="pt-4 pb-4">
+            <AccordionContent className="flex flex-col gap-4 pt-4 pb-4">
               {pointer.document === undefined ? (
                 <p className="text-sm text-muted-foreground">
                   This revision could not be read, so its document cannot be shown.
                 </p>
               ) : (
-                <DocumentViewer document={pointer.document} noun={group.noun} />
+                <>
+                  {pointer.settings && <PolicySettingsRows settings={pointer.settings} />}
+                  <DocumentViewer document={pointer.document} noun={group.noun} />
+                </>
               )}
             </AccordionContent>
           </AccordionItem>
         ))}
       </Accordion>
     </section>
+  );
+}
+
+/**
+ * A policy's settings above its document: 28px rows with the label in a 200px
+ * column, ruled off from each other with 8px either side of the rule.
+ */
+function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
+  return (
+    <dl className="flex flex-col gap-2">
+      {settings.map((setting, index) => (
+        <Fragment key={setting.label}>
+          {index > 0 && <Separator />}
+          <div className="flex min-h-7 items-center gap-4 sm:gap-0">
+            <dt className="shrink-0 text-sm leading-5 text-muted-foreground sm:w-50">
+              {setting.label}
+            </dt>
+            <dd className="min-w-0 text-sm leading-5 text-foreground">{setting.value}</dd>
+          </div>
+        </Fragment>
+      ))}
+    </dl>
   );
 }
 

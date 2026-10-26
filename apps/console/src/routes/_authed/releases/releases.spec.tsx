@@ -157,6 +157,50 @@ describe("release detail", () => {
     expect(within(region).getByText(/Edit the definition locally/)).toBeInTheDocument();
   });
 
+  it("summarises a pinned policy's settings above its document", async () => {
+    serveDeployments();
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_1" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_1`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
+        return HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: { min_length: 15, history_depth: 4 },
+          created_at: CREATED_AT,
+          updated_at: CREATED_AT,
+        });
+      }),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(await screen.findByRole("heading", { name: "Policies" })).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: /^Password policy polrev_1$/ });
+    await userEvent.click(trigger);
+
+    const region = await screen.findByRole("region", { name: /^Password policy polrev_1$/ });
+    expect(within(region).getByText("Length").nextElementSibling?.textContent).toBe(
+      "At least 15 characters",
+    );
+    expect(within(region).getByText("History").nextElementSibling?.textContent).toBe("Enabled");
+    // The document is the file the CLI publishes, not the revision's envelope.
+    const source = region.querySelector("pre")?.textContent ?? "";
+    expect(source).toContain('"operation": "auth.factor.password.set"');
+    expect(source).toContain('"min_length": 15');
+    expect(source).not.toContain("polrev_1");
+    expect(within(region).getByText(/Edit the policy locally/)).toBeInTheDocument();
+  });
+
   it("keeps the screen when a pinned revision cannot be read", async () => {
     serveDeployments();
     server.use(

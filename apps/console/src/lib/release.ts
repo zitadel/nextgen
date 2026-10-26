@@ -7,6 +7,7 @@ import type {
 
 import { api } from "@/api/zitadel";
 import { flowDisplayName, humanise } from "./flow-definition";
+import { type PolicySetting, policyDisplayName, policyDocument, policySettings } from "./policy";
 import { type UserSchema, schemaDisplayName } from "./schema";
 
 /**
@@ -45,6 +46,7 @@ export const POINTER_KINDS: readonly {
   { kind: "flow_definition", label: "Login flows", noun: "definition" },
   { kind: "branding", label: "Branding", noun: "branding" },
   { kind: "idp", label: "Identity providers", noun: "connection" },
+  { kind: "policy", label: "Policies", noun: "policy" },
 ];
 
 /** A pointer with the revision it names read, or not. */
@@ -56,6 +58,8 @@ export interface ResolvedPointer {
   name: string;
   /** `undefined` when the revision could not be read for this caller. */
   document: unknown;
+  /** A policy's settings, summarised above its document; other kinds have none. */
+  settings?: PolicySetting[];
 }
 
 /**
@@ -65,8 +69,9 @@ export interface ResolvedPointer {
  * screen: the release is still what the operator came for, and the handle
  * still says which resource the pointer pins.
  *
- * Schema ids are unique per project only, so that read names the selected
- * project; the flow and branding reads take the revision id alone.
+ * Schema, identity provider and policy ids are unique per project only, so
+ * those reads name the selected project; the flow and branding reads take the
+ * revision id alone.
  */
 export async function resolvePointer(
   pointer: ReleasePointer,
@@ -95,6 +100,17 @@ export async function resolvePointer(
       case "idp": {
         const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
         return { ...base, name: humanise(pointer.handle), document: body.definition };
+      }
+      case "policy": {
+        const revision = await api.getPolicyRevision(pointer.revision_id, {
+          project_id: projectId,
+        });
+        return {
+          ...base,
+          name: policyDisplayName(revision.operation),
+          document: policyDocument(revision),
+          settings: policySettings(revision),
+        };
       }
     }
   } catch {
