@@ -2,7 +2,14 @@ import { Layers3 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { FormSheet, FormSheetForm } from "@/components/form-sheet";
+import {
+  FormSheet,
+  FormSheetForm,
+  SHEET_CHOICE_CARD,
+  SHEET_LABEL_ROW,
+  SHEET_LEGEND,
+  SHEET_SECTION,
+} from "@/components/form-sheet";
 import {
   Field,
   FieldContent,
@@ -25,30 +32,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
 import { OriginLink } from "@/components/origin-link";
-import { deployToPrimary, listPrimaryOrigins, livePrimaryReleaseId } from "@/lib/deployment";
+import {
+  type Deployment,
+  deployToPrimary,
+  listPrimaryOrigins,
+  livePrimaryDeployment,
+} from "@/lib/deployment";
 import { useRequiredProjectScope } from "@/lib/project-scope";
 import { listDeployableReleases, type ReleaseSummary } from "@/lib/release";
-
-/** The drawer's sections, label rows and legends, shared with the Rollback drawer. */
-export const SECTION = "flex flex-col gap-4";
-// The design wraps the label in a row so a marker can sit beside it, rather
-// than appending to the label text itself.
-export const LABEL_ROW = "flex w-full items-center gap-2";
-/**
- * The field label's face, on the legend of the targets group. The legend keeps
- * its own 12px under it: a `legend` sits outside the fieldset's flex gap.
- */
-export const LEGEND = "font-serif text-sm leading-5 font-normal";
-/**
- * A choice card, shared with the Rollback drawer: the label's own card
- * styling, at the design's 12px inset. `p-3!`: the label's `[&>*]:data-[slot=field]:p-4` is a variant
- * and out-specifies a plain `p-3`. The chosen card keeps the input border; the
- * label's own `border-primary` is a solid highlight the design does not draw.
- * The card's text is the sans face: the label it sits in is the display face,
- * which its children would inherit.
- */
-export const CHOICE_CARD =
-  "font-sans has-data-[state=checked]:border-input [&>*]:data-[slot=field]:p-3!";
 
 const RELEASE_TRIGGER =
   "w-full *:data-[slot=select-value]:flex-1 *:data-[slot=select-value]:text-left";
@@ -57,12 +48,16 @@ const RELEASE_TRIGGER =
 export const DEPLOYED_MESSAGE = "Release deployed";
 /** What a redeployed release says. */
 export const REDEPLOYED_MESSAGE = "Release redeployed";
+/** What a deploy says when the server answers with the deployment that was already live. */
+export const ALREADY_LIVE_MESSAGE =
+  "This release is already live on the primary origins with the same origins and values, so no new deployment was recorded.";
 
 /**
  * The drawer's two intents share one form; the copy differs. A redeploy is a
- * deploy of the same release to the same targets again: on the primary
- * origins the server writes nothing and answers with the live deployment,
- * on a preview it refreshes the URL.
+ * deploy of the same release to the same targets again: a real deployment
+ * when the primary origins or the frozen variable values changed since, and
+ * otherwise answered with the deployment that is live, which the drawer
+ * reports as such.
  */
 export type DeployIntent = "deploy" | "redeploy";
 
@@ -77,20 +72,23 @@ const COPY: Record<DeployIntent, { title: string; submit: string; done: string }
  *
  * Opened from a release's header the release is that one. Opened from the
  * Deployments directory's **New deployment** the operator picks one of the
- * project's releases that is not revoked and not already live on the primary
- * origins, since deploying that one again changes nothing; with none left
+ * project's releases that is not revoked, the live one included: deploying
+ * it again is how a changed origin or variable value goes live. With none
  * the picker says so. **Redeploy**, from either menu, is the same drawer for
  * the release in hand with its own copy.
  *
  * Where it goes is the project's primary origins, which is what
  * `POST /deployments` resolves `primary` to; the card lists them so the
  * operator deploys to what they see. The design also draws a **Preview** card
- * taking a URL; the server does not deploy to preview URLs yet, so that card
- * waits for it (#1857).
+ * taking a URL; the drawer does not offer it yet, so previews are deployed
+ * from the CLI.
  *
- * Deploying the release the origins already serve writes nothing on the
- * server, which answers with the live deployment; the drawer reports it as
- * deployed either way, because it is.
+ * The deployment that is live when the drawer opens goes along as the one
+ * this deploy replaces, so one that lands meanwhile refuses the deploy
+ * instead of being deployed over. Deploying the release the origins already
+ * serve with the same origins and values writes nothing on the server, which
+ * answers with that live deployment; the drawer recognises it and says so
+ * rather than reporting a deployment that did not happen.
  */
 export function DeploySheet({
   children,
@@ -137,10 +135,10 @@ function DeployForm({
   const primaryId = useId();
   const messageId = useId();
   const [releases, setReleases] = useState<ReleaseSummary[] | undefined>(undefined);
-  // Whether the project has a release that could be deployed at all, before
-  // the live one is left out: the empty picker says which it is.
-  const [anyDeployable, setAnyDeployable] = useState(false);
   const [origins, setOrigins] = useState<string[] | undefined>(undefined);
+  // What the primary origins served when the drawer opened; sent with the
+  // deploy as the deployment it replaces.
+  const [live, setLive] = useState<Deployment | undefined>(undefined);
   const [releaseId, setReleaseId] = useState(release?.id ?? "");
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
@@ -152,17 +150,15 @@ function DeployForm({
     void (async () => {
       try {
         // The releases are read only when there is a choice to make.
-        const [primary, options, liveId] = await Promise.all([
+        const [primary, current, options] = await Promise.all([
           listPrimaryOrigins(projectId),
+          livePrimaryDeployment(projectId),
           pinnedId ? undefined : listDeployableReleases(projectId),
-          pinnedId ? undefined : livePrimaryReleaseId(projectId),
         ]);
         if (cancelled) return;
         setOrigins(primary);
-        if (options) {
-          setAnyDeployable(options.length > 0);
-          setReleases(options.filter((option) => option.id !== liveId));
-        }
+        setLive(current);
+        if (options) setReleases(options);
       } catch (cause) {
         if (!cancelled) setLoadError(describeError(cause, "Could not load the project."));
       }
@@ -177,8 +173,14 @@ function DeployForm({
   const nothingToDeploy = !release && releases !== undefined && releases.length === 0;
 
   const deploy = useSubmit(async () => {
-    await deployToPrimary(projectId, releaseId, message.trim() || undefined);
-    toast.success(copy.done);
+    const deployed = await deployToPrimary(projectId, releaseId, {
+      message: message.trim() || undefined,
+      expectedDeploymentId: live?.id,
+    });
+    // The client sees the body, not the status: the deployment that was
+    // live answered back is the server's `200`, nothing written.
+    if (live !== undefined && deployed.id === live.id) toast.info(ALREADY_LIVE_MESSAGE);
+    else toast.success(copy.done);
     onClose();
     await onDeployed();
   }, "The release could not be deployed.");
@@ -193,7 +195,7 @@ function DeployForm({
       onSubmit={() => void deploy.run()}
       onClose={onClose}
     >
-      <div className={SECTION}>
+      <div className={SHEET_SECTION}>
         <Field>
           <FieldLabel htmlFor={releaseFieldId}>Release</FieldLabel>
           {/* Fixed to the release the drawer was opened from, where it was. */}
@@ -227,9 +229,7 @@ function DeployForm({
           </Select>
           {nothingToDeploy && (
             <p className="text-xs leading-4 text-muted-foreground">
-              {anyDeployable
-                ? "Every release is already deployed to the primary origins."
-                : "This project has no release to deploy."}
+              This project has no release to deploy.
             </p>
           )}
         </Field>
@@ -237,13 +237,13 @@ function DeployForm({
         <Separator />
 
         <FieldSet>
-          <FieldLegend variant="label" className={LEGEND}>
+          <FieldLegend variant="label" className={SHEET_LEGEND}>
             Deploy to
           </FieldLegend>
           {/* One card, checked: the server deploys to primary origins only, and
               the card is where the preview choice slots in. */}
           <RadioGroup value="primary" aria-label="Deploy to">
-            <FieldLabel htmlFor={primaryId} className={CHOICE_CARD}>
+            <FieldLabel htmlFor={primaryId} className={SHEET_CHOICE_CARD}>
               <Field orientation="horizontal">
                 <FieldContent className="gap-3">
                   <FieldTitle className="leading-none">Primary</FieldTitle>
@@ -258,7 +258,7 @@ function DeployForm({
         <Separator />
 
         <Field>
-          <div className={LABEL_ROW}>
+          <div className={SHEET_LABEL_ROW}>
             <FieldLabel htmlFor={messageId}>Message</FieldLabel>
             {/* A sibling of the label, not part of it, so the accessible name
                 stays the field name. */}

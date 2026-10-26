@@ -32,6 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { formatRecent } from "@/lib/date";
+import { cn } from "@/lib/utils";
 import {
   type Deployment,
   KIND_LABEL,
@@ -106,15 +107,16 @@ function DeploymentsScreen() {
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
         {/* The design draws five near-equal columns around a short id; a real
             release id is thirty characters, and it is the one thing in the row
-            that must not clip, so its column takes a third. */}
-        <Table className={RESOURCE_TABLE_FIXED}>
+            that must not clip. Its column takes the width a full id needs at
+            the table's narrowest, and below that the table scrolls. */}
+        <Table className={cn(RESOURCE_TABLE_FIXED, "min-w-[54rem]")}>
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell className="w-[34%]">Release</ResourceHeadCell>
-              <ResourceHeadCell className="w-[18%]">Deployed to</ResourceHeadCell>
-              <ResourceHeadCell className="w-[16%]">Status</ResourceHeadCell>
-              <ResourceHeadCell className="w-[20%]">Deployed</ResourceHeadCell>
-              <ResourceMenuHead className="w-[12%]" />
+              <ResourceHeadCell className="w-[43%]">Release</ResourceHeadCell>
+              <ResourceHeadCell className="w-[15%]">Deployed to</ResourceHeadCell>
+              <ResourceHeadCell className="w-[14%]">Status</ResourceHeadCell>
+              <ResourceHeadCell className="w-[18%]">Deployed</ResourceHeadCell>
+              <ResourceMenuHead className="w-[10%]" />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
@@ -154,8 +156,8 @@ function DeploymentRowItem({
   const params = { releaseId: deployment.release_id };
   const [redeployOpen, setRedeployOpen] = useState(false);
   const [rollbackOpen, setRollbackOpen] = useState(false);
-  // The drawer deploys to the primary origins; a preview row's redeploy
-  // waits on its Preview card. A revoked release cannot go live again.
+  // The drawer deploys to the primary origins only, so a preview row has no
+  // redeploy. A revoked release cannot go live again.
   const redeploy = deployment.kind === "primary" && !releaseRevoked(deployment);
   // Previews are deployed to again rather than rolled back; a revoked release
   // cannot go live again; and an earlier deployment of the live release would

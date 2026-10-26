@@ -45,6 +45,7 @@ export function RevokeReleaseDialog({
   open,
   onOpenChange,
   onRevoked,
+  onRefused,
 }: {
   releaseId: string;
   /** Whether an origin still serves the release. */
@@ -53,6 +54,11 @@ export function RevokeReleaseDialog({
   onOpenChange: (open: boolean) => void;
   /** Called once the release is revoked, so the caller reads it again. */
   onRevoked: () => void | Promise<void>;
+  /**
+   * Called when the server refuses because an origin took the release since
+   * the screen loaded, so the caller reads it again and shows that.
+   */
+  onRefused?: () => void | Promise<void>;
 }) {
   const [refused, setRefused] = useState(false);
   const blocked = inUse || refused;
@@ -78,7 +84,10 @@ export function RevokeReleaseDialog({
         {open && (
           <RevokeForm
             releaseId={releaseId}
-            onRefused={() => setRefused(true)}
+            onRefused={() => {
+              setRefused(true);
+              void onRefused?.();
+            }}
             onRevoked={onRevoked}
             onClose={() => onOpenChange(false)}
           />

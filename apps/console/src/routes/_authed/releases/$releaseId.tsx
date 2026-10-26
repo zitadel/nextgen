@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { BadgeCheck, Ellipsis, Layers3 } from "lucide-react";
+import { Ellipsis, GitCommitHorizontal, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
 import { api } from "@/api/zitadel";
@@ -45,9 +45,8 @@ import {
  * Release detail: the header, the configuration the release pins, where it
  * went, and its metadata.
  *
- * The header's menu redeploys the release, rolls back to it or revokes it; a
- * revoked release has no menu. A fresh deployment starts from the
- * deployments directory.
+ * The header's menu deploys the release, rolls back to it or revokes it; a
+ * revoked release has no menu.
  *
  * The pointers fail soft; the release and deployment reads are what the
  * route's error state reports.
@@ -75,16 +74,20 @@ export const Route = createFileRoute("/_authed/releases/$releaseId")({
 function ReleaseDetail() {
   const { release, groups, deployments } = Route.useLoaderData();
   const router = useRouter();
+  const live = deployments.some((deployment) => deployment.status === "live");
 
   return (
     <Page inset="panel">
       <div className="flex flex-col gap-6">
         <DetailPanel>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {/* One row from `xl`, not `lg` as the other detail headers: a 30-character
+              title beside a 30-character id, a date and the menu does not fit in
+              the row at 1024px, and a wrapped header reads worse than a stacked one. */}
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             {/* Stacks below `sm`, as the mobile frame puts the pill under the title. */}
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
               <PanelTitle icon={Layers3} title={release.id} />
-              <ReleaseStatusBadge status={releaseStatus(release)} />
+              <ReleaseStatusBadge status={releaseStatus(release)} live={live} />
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
@@ -103,6 +106,7 @@ function ReleaseDetail() {
                 <ReleaseActions
                   release={release}
                   deployments={deployments}
+                  inUse={live}
                   onChanged={() => router.invalidate()}
                 />
               )}
@@ -133,19 +137,24 @@ function ReleaseDetail() {
 
 /**
  * The header's menu: **Redeploy** is the deploy drawer for this release with
- * its own copy; **Rollback** opens the drawer with this release's newest
- * superseded primary deployment chosen, when it has one; **Revoke release**
- * asks first, and refuses at once while an origin serves it.
+ * its own copy, or **Deploy** with the plain copy while the primary origins
+ * have never served it; **Rollback** opens the drawer with this release's
+ * newest superseded primary deployment chosen, and is left out until the
+ * release has a primary deployment to go back to; **Revoke release** asks
+ * first, and refuses at once while an origin serves it.
  *
- * Both open by state, outside the menu, so the menu closes on select.
+ * Each opens by state, outside the menu, so the menu closes on select.
  */
 function ReleaseActions({
   release,
   deployments,
+  inUse,
   onChanged,
 }: {
   release: Release;
   deployments: Deployment[];
+  /** Whether an origin still serves the release, which refuses a revoke. */
+  inUse: boolean;
   onChanged: () => void | Promise<void>;
 }) {
   const [redeployOpen, setRedeployOpen] = useState(false);
@@ -154,7 +163,7 @@ function ReleaseActions({
   const superseded = deployments.find(
     (deployment) => deployment.kind === "primary" && deployment.status !== "live",
   );
-  const inUse = deployments.some((deployment) => deployment.status === "live");
+  const deployedToPrimary = deployments.some((deployment) => deployment.kind === "primary");
 
   return (
     <>
@@ -165,8 +174,12 @@ function ReleaseActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>Redeploy</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>
+            {deployedToPrimary ? "Redeploy" : "Deploy"}
+          </DropdownMenuItem>
+          {deployedToPrimary && (
+            <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={() => setRevokeOpen(true)}>
             Revoke release
@@ -175,7 +188,7 @@ function ReleaseActions({
       </DropdownMenu>
       <DeploySheet
         release={release}
-        intent="redeploy"
+        intent={deployedToPrimary ? "redeploy" : "deploy"}
         open={redeployOpen}
         onOpenChange={setRedeployOpen}
         onDeployed={onChanged}
@@ -192,6 +205,7 @@ function ReleaseActions({
         open={revokeOpen}
         onOpenChange={setRevokeOpen}
         onRevoked={onChanged}
+        onRefused={onChanged}
       />
     </>
   );
@@ -230,12 +244,14 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
                 <span className="text-sm leading-5 font-normal text-foreground">
                   {pointer.name}
                 </span>{" "}
-                {/* A schema's revision id can be a URL the operator authored;
-                    the badge clips it rather than widening the row. `shrink`
-                    overrides the pill's own `shrink-0`: a pill that will not
-                    shrink pushes the chevron out of the card on a phone. */}
+                {/* The commit glyph says the id names one revision of the
+                    resource, not that the revision is in any state. A schema's
+                    revision id can be a URL the operator authored; the badge
+                    clips it rather than widening the row. `shrink` overrides
+                    the pill's own `shrink-0`: a pill that will not shrink
+                    pushes the chevron out of the card on a phone. */}
                 <Badge variant="secondary" className="min-w-0 max-w-full shrink">
-                  <BadgeCheck aria-hidden="true" />
+                  <GitCommitHorizontal aria-hidden="true" />
                   <span className="truncate">{pointer.revisionId}</span>
                 </Badge>
               </span>

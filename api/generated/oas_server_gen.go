@@ -115,7 +115,7 @@ type Handler interface {
 	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 	// a primary origin named exactly; `primary` mixed with preview URLs;
 	// `primary` on a project with no primary origin; `ttl` with `primary`;
-	// `ttl` above the project's maximum.
+	// `ttl` above 365 days (`P365D`).
 	// - `400 dep.variables_missing`: a referenced variable has no value for
 	// the kind; `details` names the kind and every missing variable.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -842,6 +842,34 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/previews
 	ListPreviews(ctx context.Context, params ListPreviewsParams) (ListPreviewsRes, error)
+	// ListProjectAdmins implements listProjectAdmins operation.
+	//
+	// Lists the people who can administer the project, and how each of them
+	// gets that access. A person appears once, with one entry in `sources` per
+	// way they hold it:
+	// - `owning_team`: an active member of the team that owns the project
+	// (ADR 054 §2). Removing a grant does not remove this access; it ends
+	// only when the person leaves the team or the project changes owner.
+	// - `grant`: an unexpired `admin` grant on the project, either to the
+	// person (`grant_id` only) or to a team they are an active member of
+	// (`grant_id` and `team`). Revoking that grant removes this source.
+	// The list follows the authorization check: team membership is read from
+	// the same membership projection the check expands, so a person who left a
+	// team, or whose team or user was deactivated, is not listed through it.
+	// Grants that expired or carry a lower role are left out. A person whose
+	// only access is a `viewer` or `editor` grant is not an admin and is not
+	// listed. Like the check, the list does not look at a person's user status
+	// beyond that, so a direct grant to a suspended person is listed.
+	// A person whose access comes only through teams the caller is not a
+	// member of is left out, and a team the caller is not in is named by
+	// `team_id` only. The grant to such a team still shows in the project's
+	// grants.
+	// Ordered by `user_id` and paginated with `page_token`.
+	// Accepts either a project secret (`oauth2`) or a user-bound Console
+	// session cookie (`nextgenSession`) that can read the project.
+	//
+	// GET /projects/{project_id}/admins
+	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
 	// ListReleases implements listReleases operation.
 	//
 	// Lists the project's releases, newest first.

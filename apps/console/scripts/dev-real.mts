@@ -436,17 +436,11 @@ async function seedReleases(): Promise<string | null> {
     await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
     await post("/deployments", { release_id: first.id, targets: ["primary"] });
     await post("/deployments", { release_id: second.id, targets: ["primary"] });
-    try {
-      await post("/deployments", {
-        release_id: first.id,
-        targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
-        ttl: "168h",
-      });
-    } catch (error) {
-      // The server deploys to primary origins before it deploys to preview
-      // URLs; until it does, the screens show the two primary rows.
-      if (!(error instanceof Error && error.message.includes("answered 501"))) throw error;
-    }
+    await post("/deployments", {
+      release_id: first.id,
+      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : String(error);

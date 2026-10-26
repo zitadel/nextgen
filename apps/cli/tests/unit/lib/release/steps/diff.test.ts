@@ -50,9 +50,10 @@ function ctx(live: Live[], json = false): StepContext {
     dryRun: false,
     json,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], idps: [] },
+    bundle: { schemas: [], flow_definitions: [], idps: [], policies: [] },
     brandingSources: [],
     idpFiles: [],
+    policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
   };
 }

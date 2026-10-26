@@ -36,6 +36,27 @@ export function ZitadelMark({ size = 24, className, ...props }: IconProps) {
 }
 
 /**
+ * Whether the pointer was on a logo when it unmounted. Both shells draw the
+ * logo in the same spot, so following it from a project's screens home swaps
+ * one logo for another under a cursor that has not moved, and the new logo's
+ * `pointerenter` is that hover going on, not a new one to play for. Moving
+ * the pointer anywhere else ends the hand-over, so the next hover plays.
+ */
+let handedOver = false;
+
+function handOver() {
+  handedOver = true;
+  const end = (event: PointerEvent) => {
+    if (event.target instanceof Element && event.target.closest("a")?.querySelector(".logo")) {
+      return;
+    }
+    handedOver = false;
+    document.removeEventListener("pointermove", end);
+  };
+  document.addEventListener("pointermove", end);
+}
+
+/**
  * Full Zitadel logo lockup — mark plus wordmark — in the extended sidebar
  * header, animated as on the website's nav (`apps/website/app/logo.tsx`, kept
  * in step with it): the mark turns once and the letters roll in on a hover of
@@ -60,9 +81,24 @@ export function ZitadelLogo({ className }: { className?: string }) {
 
   useEffect(() => {
     const target = root.current?.closest("a") ?? root.current;
-    const play = () => setPlaying(true);
-    target?.addEventListener("pointerenter", play);
-    return () => target?.removeEventListener("pointerenter", play);
+    if (!target) return;
+    let inside = false;
+    const enter = () => {
+      inside = true;
+      // The hover that was on the logo this one replaced goes on here.
+      if (handedOver) handedOver = false;
+      else setPlaying(true);
+    };
+    const leave = () => {
+      inside = false;
+    };
+    target.addEventListener("pointerenter", enter);
+    target.addEventListener("pointerleave", leave);
+    return () => {
+      target.removeEventListener("pointerenter", enter);
+      target.removeEventListener("pointerleave", leave);
+      if (inside) handOver();
+    };
   }, []);
 
   return (

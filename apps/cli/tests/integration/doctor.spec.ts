@@ -152,6 +152,16 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain("app/login/page.tsx");
       });
 
+      it("points a project that lacks an editor schema at --fix", async () => {
+        const app = await aSetUpApp();
+        await app.lacksEditorSchema("branding");
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("doctor --fix");
+      });
+
       it("removes nothing while repairing", async () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile("app/login/page.tsx");
