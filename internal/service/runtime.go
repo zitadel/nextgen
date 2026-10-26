@@ -117,12 +117,8 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 		return nil, err
 	}
 	if dep == nil {
-		// An empty allowlist, loopback and the deployment's own origin admit
-		// without a stored pattern. Until the project default target lands, that
-		// open admission keeps the pre-resolution newest-revision path when
-		// nothing is deployed yet — the same interim createFlow uses for a
-		// missing Origin header.
-		// A primary/preview pattern match still refuses with rel.not_deployed.
+		// TODO(#1616): open admission with nothing deployed keeps the
+		// newest-revision path instead of rel.not_deployed.
 		if matched.open {
 			return nil, nil
 		}
