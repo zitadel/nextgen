@@ -872,9 +872,10 @@ func requireBriefError(t *testing.T, record map[string]any, code, message, paren
 	require.NotContains(t, logged, "stackTrace")
 }
 
-// A body ogen cannot decode is logged with ogen's reason, which the client
-// never sees: its body keeps the stable message.
-func TestOgenErrorHandlerLogsDecodeReason(t *testing.T) {
+// A body ogen cannot decode is logged as a body decode failure, without
+// ogen's reason, which can quote the input. The client body keeps the stable
+// message.
+func TestOgenErrorHandlerLogsDecodeKind(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/projects", strings.NewReader(`{"name":`))
 	req.Header.Set("Content-Type", "application/json")
 	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
@@ -886,7 +887,24 @@ func TestOgenErrorHandlerLogsDecodeReason(t *testing.T) {
 	require.Equal(t, "createProject", records[0]["operation_id"], "ogen fails before its middleware names the operation")
 	logged := records[0]["error"].(map[string]any)
 	require.Equal(t, "req.invalid", logged["code"])
-	require.Contains(t, logged["parent"], "unexpected EOF")
+	require.Equal(t, "decode body", logged["parent"])
+}
+
+// ogen's validation text can quote the rejected value, and a body can hold a
+// secret: the log names the rejected field, never the value.
+func TestOgenErrorHandlerLogOmitsRejectedValue(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/projects",
+		strings.NewReader(`{"name":"p","origins":[{"pattern":"https://a.example","kind":"s3cr3t-value-xyz"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, nil, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"fields":["origins.[0].kind"]`)
+	require.Len(t, records, 1)
+	logged, err := json.Marshal(records[0]["error"])
+	require.NoError(t, err)
+	require.NotContains(t, string(logged), "s3cr3t-value-xyz")
+	require.Contains(t, string(logged), "origins.[0].kind")
 }
 
 // Details are for the client: the log line never carries them.
@@ -1163,6 +1181,28 @@ func TestOgenErrorHandlerNamesTheInvalidParameter(t *testing.T) {
 		`{"code":"req.invalid","message":"The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.","details":{"details":{"fields":["user_id"]}}}`,
 		rec.Body.String(),
 	)
+}
+
+// The log names the parameter that will not decode, never its value. Not
+// parallel: serveAndRecordLogs changes globals.
+func TestOgenErrorHandlerLogsTheInvalidParameterName(t *testing.T) {
+	mock := gomock.NewController(t)
+	tokenService := mocks.NewMockTokenService(mock)
+	tokenService.EXPECT().IntrospectToken(gomock.Any(), "credential").
+		Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/users/s3cr3t-value-xyz", nil)
+	req.Header.Set("Authorization", "Bearer credential")
+	rec, records := serveAndRecordLogs(t, errorStubHandler{}, tokenService, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), `"fields":["user_id"]`)
+	require.Len(t, records, 1)
+	logged := records[0]["error"].(map[string]any)
+	require.Equal(t, "decode params: fields user_id", logged["parent"])
+	line, err := json.Marshal(logged)
+	require.NoError(t, err)
+	require.NotContains(t, string(line), "s3cr3t-value-xyz")
 }
 
 func TestInvalidRequestFields(t *testing.T) {

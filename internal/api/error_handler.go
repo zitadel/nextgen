@@ -264,11 +264,21 @@ func apiError(err error) (status int, logged domain.Error, details api.ErrorDeta
 		// (ADR 030). The parameter name or the field paths ogen rejected go
 		// into details, so the client still learns what to fix.
 		invalid := domain.ErrRequestInvalid()
-		if fields := invalidRequestFields(err); len(fields) > 0 {
+		fields := invalidRequestFields(err)
+		if len(fields) > 0 {
 			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
-		// The log keeps ogen's decode reason.
-		return http.StatusBadRequest, invalid.WithParent(err), domainErrorDetails(invalid)
+		// ogen's decode text can quote the rejected value, and a request body
+		// can hold a secret. The log gets the kind of failure and the field
+		// paths only, never the ogen error itself.
+		reason := "decode body"
+		if _, ok := errors.Into[*ogenerrors.DecodeParamsError](err); ok {
+			reason = "decode params"
+		}
+		if len(fields) > 0 {
+			reason += ": fields " + strings.Join(fields, ", ")
+		}
+		return http.StatusBadRequest, invalid.WithParent(errors.New(reason)), domainErrorDetails(invalid)
 	}
 
 	// Anything else is a domain error a handler returned, or an unknown error
