@@ -1996,9 +1996,15 @@ describe("api-mock releases and deployments", () => {
     });
     expect(contradicting.status).toBe(400);
     expect(((await contradicting.json()) as { code: string }).code).toBe("pol.invalid");
-    const unknown = await evaluate({ config: { min_lenght: 12 }, input: { password: "x" } });
-    expect(unknown.status).toBe(400);
-    expect(((await unknown.json()) as { code: string }).code).toBe("req.invalid");
+    for (const malformed of [
+      { config: { min_lenght: 12 }, input: { password: "x" } },
+      { config: {}, input: { password: "x", passwd: "x" } },
+      { config: { history_depth: 2 }, input: { password: "x" }, facts: { history_match: [true] } },
+    ]) {
+      const res = await evaluate(malformed);
+      expect(res.status, JSON.stringify(malformed)).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+    }
 
     const listed = (await (
       await fetch(`${BASE}/policies?project_id=${project.id}`, {

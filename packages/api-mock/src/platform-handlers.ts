@@ -132,7 +132,7 @@ import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/
 import { missingEndpoints } from "@zitadel/config/idp";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
-import type { z } from "zod";
+import { z } from "zod";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -732,6 +732,18 @@ function publishPolicyRevision(
   store.policies.set(record.id, record);
   return { record, revision };
 }
+
+/**
+ * The evaluate body as the server decodes it. The generated schema is not
+ * strict (orval's `strict.body: false`), so it would drop an unknown key the
+ * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
+ * here, while an extra top-level key is ignored, as on publish.
+ */
+const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
+  config: policyConfigSchema.shape.config,
+  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+});
 
 /** The server's length cap on a password (`domain.MaxPasswordLength`). */
 const MAX_PASSWORD_LENGTH = 64;
@@ -3057,17 +3069,11 @@ export function setupPlatformHandlers() {
       if (raw === null) {
         return HttpResponse.json(INVALID_JSON, { status: 400 });
       }
-      const body = parse(EvaluatePolicyBody, raw, "req.invalid");
+      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
       if (!body.ok) {
         return body.response;
       }
-      // Unknown settings are malformed, as on publish; the generated body
-      // schema would strip them, so the raw config is checked.
-      const config = parse(policyConfigSchema.shape.config, raw.config, "req.invalid");
-      if (!config.ok) {
-        return config.response;
-      }
-      if (policyRuleViolated(config.data)) {
+      if (policyRuleViolated(body.data.config)) {
         return HttpResponse.json(
           errorBody("pol.invalid", "policy: invalid", {
             details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
@@ -3075,7 +3081,7 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const decision = evaluatePasswordSet(config.data, body.data.input.password, {
+      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
         self_service: body.data.facts?.self_service ?? true,
         history_matches: body.data.facts?.history_matches ?? [],
       });
