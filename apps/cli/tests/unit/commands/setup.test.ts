@@ -1193,7 +1193,7 @@ describe("setup asked on a terminal", () => {
 
       expect(text).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining("Which port should your app run on?"),
+          message: expect.stringContaining("Which port should your app's local dev server run on?"),
         }),
       );
       expect(await readdir(cwd)).toEqual([]);
