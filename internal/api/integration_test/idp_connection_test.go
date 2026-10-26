@@ -501,20 +501,19 @@ func TestQueryIdpsPartialGrant(t *testing.T) {
 	require.IsType(t, &api.ListIdpRevisionsNotFound{}, hiddenRevisions, helpers.MustMarshal(t, hiddenRevisions))
 	assertAuthzError(t, hiddenRevisions, notFound)
 
-	denied := domain.ErrIDPConnectionPermissionDenied().Code
-
 	// A revision is read through the connection it belongs to, so the grant
-	// reaches the granted connection's revision and not the hidden one's; an
-	// unknown revision answers as the hidden one does.
+	// reaches the granted connection's revision and not the hidden one's; the
+	// hidden one is outside the grant's scope and answers exactly as an
+	// unknown revision does (#2112).
 	revision := f.getRevision(t, granted.RevisionID)
 	require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	assert.Equal(t, granted.RevisionID, revision.(*api.IdpResponse).RevisionID)
 	hiddenRevision := f.getRevision(t, hidden.RevisionID)
-	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, hiddenRevision, helpers.MustMarshal(t, hiddenRevision))
-	assertAuthzError(t, hiddenRevision, denied)
+	require.IsType(t, &api.GetIdpRevisionByIdNotFound{}, hiddenRevision, helpers.MustMarshal(t, hiddenRevision))
+	assertAuthzError(t, hiddenRevision, notFound)
 	unknownRevision := f.getRevision(t, "idprev_01KX4SB9C8E1F0N9WD3P2E4YM5")
-	require.IsType(t, &api.GetIdpRevisionByIdForbidden{}, unknownRevision, helpers.MustMarshal(t, unknownRevision))
-	assertAuthzError(t, unknownRevision, denied)
+	require.IsType(t, &api.GetIdpRevisionByIdNotFound{}, unknownRevision, helpers.MustMarshal(t, unknownRevision))
+	assert.Equal(t, helpers.MustMarshal(t, hiddenRevision), helpers.MustMarshal(t, unknownRevision))
 }
 
 // replaceSecretGrant swaps the project secret's seeded admin grant for a
