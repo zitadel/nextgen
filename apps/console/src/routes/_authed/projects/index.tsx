@@ -285,7 +285,7 @@ function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: strin
 /**
  * The row menu.
  *
- * `Project settings` goes straight to the project's own page, which the row
+ * `View project` goes straight to the project's own page, which the row
  * itself does not: the row opens the project's contents. There is no project
  * delete endpoint, so there is no destructive action here.
  */
@@ -294,7 +294,7 @@ function RowActions({ projectId, name }: { projectId: string; name: string }) {
     <RowMenu name={name}>
       <DropdownMenuItem asChild>
         <Link to="/project" search={{ project: projectId }}>
-          Project settings
+          View project
         </Link>
       </DropdownMenuItem>
     </RowMenu>

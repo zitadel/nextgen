@@ -48,7 +48,13 @@ async function renderProject(projectId = PROJECT_ID) {
 }
 
 function project(id = PROJECT_ID, name = "Acme") {
-  return { id, name, created_at: "2026-07-08T09:00:00Z", updated_at: "2026-07-08T09:00:00Z" };
+  return {
+    id,
+    name,
+    origins: [],
+    created_at: "2026-07-08T09:00:00Z",
+    updated_at: "2026-07-08T09:00:00Z",
+  };
 }
 
 function grant(overrides: Record<string, unknown> = {}) {
@@ -95,6 +101,9 @@ function stubProject(grants: Record<string, unknown>[], record = project()) {
   const queries: GrantsQuery[] = [];
   server.use(
     http.get(`${PROJECTS_URL}/:id`, () => HttpResponse.json(record)),
+    // The page's variables card reads alongside; none keeps these tests about
+    // the admins.
+    http.get("http://localhost/api/variables", () => HttpResponse.json({})),
     http.post(GRANTS_QUERY_URL, async ({ request }) => {
       const projectId = new URL(request.url).searchParams.get("project_id");
       queries.push({ projectId, body: (await request.json()) as Record<string, unknown> });
@@ -132,9 +141,15 @@ function admins() {
   return within(screen.getByRole("region", { name: "Admins" }));
 }
 
+/** Opens the Admins tab, where the grants and the Add button live. */
+async function openAdmins() {
+  await userEvent.click(await screen.findByRole("tab", { name: "Admins" }));
+  return within(await screen.findByRole("region", { name: "Admins" }));
+}
+
 async function openAddAdmin() {
-  await screen.findByRole("region", { name: "Admins" });
-  await userEvent.click(admins().getByRole("button", { name: "Add admin" }));
+  await openAdmins();
+  await userEvent.click(screen.getByRole("button", { name: "Add admin" }));
   const dialog = within(await screen.findByRole("dialog"));
   return {
     dialog,
@@ -155,7 +170,7 @@ describe("project admins", () => {
     ]);
     await renderProject();
 
-    const section = within(await screen.findByRole("region", { name: "Admins" }));
+    const section = await openAdmins();
     expect(queries).toHaveLength(1);
     expect(queries[0]).toMatchObject({ projectId: PROJECT_ID, body: { expand: ["principal"] } });
     expect(section.getByText("Maya Patel")).toBeInTheDocument();
@@ -176,6 +191,7 @@ describe("project admins", () => {
       project("proj_theirs", "Granted to me"),
     );
     await renderProject("proj_theirs");
+    await openAdmins();
 
     expect(await screen.findByRole("heading", { name: "Granted to me" })).toBeInTheDocument();
     expect(admins().getByText(SELF)).toBeInTheDocument();
@@ -187,7 +203,7 @@ describe("project admins", () => {
     stubProject([grant({ user: { user_id: "user_1" } })]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().getByText("user_1")).toBeInTheDocument();
   });
 
@@ -197,7 +213,7 @@ describe("project admins", () => {
     stubProject([grant({ relation: "viewer", user: grantUser({ identifier: "vi@acme.com" }) })]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().getByText("Viewer")).toBeInTheDocument();
   });
 
@@ -217,7 +233,7 @@ describe("project admins", () => {
     ]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().getByText("Platform")).toBeInTheDocument();
   });
 
@@ -227,9 +243,9 @@ describe("project admins", () => {
     stubProject([]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().getByText("No additional admins have been added.")).toBeInTheDocument();
-    expect(admins().getByRole("button", { name: "Add admin" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add admin" })).toBeInTheDocument();
   });
 
   const NOT_LISTED_LINE =
@@ -242,7 +258,7 @@ describe("project admins", () => {
     stubProject([grant({ user: grantUser({ identifier: "colleague@acme.com" }) })]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().getByText(NOT_LISTED_LINE)).toBeInTheDocument();
     expect(admins().queryByText(/owning Team/)).not.toBeInTheDocument();
     expect(admins().getByText("colleague@acme.com")).toBeInTheDocument();
@@ -253,7 +269,7 @@ describe("project admins", () => {
     stubProject([grant({ user: { user_id: "user_test" } })]);
     await renderProject();
 
-    await screen.findByRole("region", { name: "Admins" });
+    await openAdmins();
     expect(admins().queryByText(NOT_LISTED_LINE)).not.toBeInTheDocument();
   });
 
@@ -384,6 +400,7 @@ describe("project admins", () => {
     // click.
     stubProject([grant({ relation: "viewer", user: grantUser({ display: "Sasha Kim" }) })]);
     await renderProject();
+    await openAdmins();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Sasha Kim" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Remove viewer" }));
@@ -406,6 +423,7 @@ describe("project admins", () => {
       }),
     );
     await renderProject();
+    await openAdmins();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
@@ -426,6 +444,7 @@ describe("project admins", () => {
       ),
     );
     await renderProject();
+    await openAdmins();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
@@ -454,6 +473,7 @@ describe("project admins", () => {
       }),
     );
     await renderProject();
+    await openAdmins();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for Maya Patel" }));
     await userEvent.click(await screen.findByRole("menuitem", { name: "Remove admin" }));
