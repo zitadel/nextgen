@@ -126,6 +126,7 @@ const (
 	OriginRemovedOperation                 OperationName = "OriginRemoved"
 	PolicyCreatedOperation                 OperationName = "PolicyCreated"
 	PolicyUpdatedOperation                 OperationName = "PolicyUpdated"
+	PreviewRemovedOperation                OperationName = "PreviewRemoved"
 	ProjectCreatedOperation                OperationName = "ProjectCreated"
 	ProjectDeletedOperation                OperationName = "ProjectDeleted"
 	ProjectUpdatedOperation                OperationName = "ProjectUpdated"

@@ -324,8 +324,9 @@ type PreviewStatements interface {
 	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
 	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
 	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
-	// DeletePreview is idempotent.
-	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteLivePreview deletes only if the preview is still live at now, so
+	// an expired one is left for the sweep. Idempotent.
+	DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 	// DeleteExpiredPreview deletes only if the preview expired by now, so a
 	// racing renewal survives the sweep.
 	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
