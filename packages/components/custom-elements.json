@@ -625,7 +625,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Atom: `<zl-avatar>` — a person's generated avatar, the gradient the console\nshows for the same identifier (`src/avatar.ts`).\n\nValues:\n\n  size        24px (`--zl-spacing-6`); a template resizes the host\n  radius      full\n  surface     two `--zl-gradient-*-start` colours picked from `seed`\n\n`seed` is what the visitor typed, never a user id: the login must not\nconfirm that an account exists. Unlike the console's, it holds still: the\nlogin remounts it on every step and reload, where a moving gradient would\nrestart and jump.\n\nDecorative: the identifier always sits beside it, so it is hidden from\nassistive technology.",
+          "description": "Atom: `<zl-avatar>` — a person's generated avatar, the gradient the console\nshows for the same identifier (`src/avatar.ts`).\n\nValues:\n\n  size        24px (`--zl-spacing-6`); a template resizes the host\n  radius      full\n  surface     two `--zl-gradient-*-start` colours picked from `seed`\n\n`seed` is what the visitor typed, never a user id: the login must not\nconfirm that an account exists. It holds still (no\n`zl-avatar-moving`): the login remounts it on every step and reload, where\na moving gradient would restart and jump.\n\nDecorative: the identifier always sits beside it, so it is hidden from\nassistive technology.",
           "name": "ZlAvatar",
           "members": [
             {
