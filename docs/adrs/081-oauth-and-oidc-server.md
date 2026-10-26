@@ -9,12 +9,18 @@
 > which runs the authorization server on the server behind the login app's
 > origin, and [ADR 037](037-token-lifecycle.md), which fixes token formats,
 > lifetimes and rotation.
+> **Adopts:** the app half of
+> [`identity-surface.md`](../design/cli/identity-surface.md), and the IdP
+> connection's shape, one document for the file and the API
+> ([IdP area 1](../design/idp/1-resource-model.md)).
 > **Related:** [ADR 029](029-cryptography-secrets-and-key-lifecycle.md),
 > [ADR 032](032-permission-catalogs.md),
 > [ADR 036](036-api-credential-planes.md),
 > [ADR 039](039-signing-key-rotation-and-incident-response.md),
+> [ADR 062](062-per-environment-variables-and-secrets.md),
 > [ADR 064](064-cli-resource-commands.md),
 > [ADR 068](068-project-is-the-data-boundary.md),
+> [ADR 070](070-cli-auth-method-toggles.md),
 > [ADR 078](078-abuse-prevention-in-layers.md)
 
 ## TL;DR
@@ -25,12 +31,17 @@
 - OAuth 2.1 with OpenID Connect: the authorization code flow with PKCE for
   every client, client credentials for services, rotating refresh tokens. No
   implicit flow and no password grant.
-- Apps are project data of three kinds, each first- or third-party. Protected
-  APIs, scopes and claim rules are config.
-- Claims come from the user schema, from rules, and from a signed hook the
-  server calls in the customer's backend, never from the browser.
+- An app is one document whether a file or an API call writes it, as an IdP
+  connection is: the developer's own apps are files in the release, a
+  customer's apps and dynamically registered clients are data. Protected
+  APIs, scopes, claim rules and the project's OAuth settings are files too.
+- Claims come from the user schema, from rules, and from a signed hook per
+  protected API that the server calls in the customer's backend, never from
+  the browser.
 - Third-party apps get consent from the first release. Client ID metadata
   documents, which MCP clients use, follow in the next.
+- Every decision a developer makes has a file, a command and an SDK call or
+  element (§12), where an agent finds flows and schemas.
 
 ## Context
 
@@ -42,7 +53,20 @@ resource, ADR 036 puts per-app client credentials out of scope, and ADR 037
 fixes token formats without saying what goes into them. The
 [configuration surface](../design/platform/configuration-surface.md#the-split-config-vs-resources)
 puts client definitions and machine credentials on the data plane and
-everything that describes behavior in config.
+everything that describes behavior in config, and keeps allowed redirect URI
+patterns in config, which no one resource can satisfy.
+
+Two documents already draw the line this ADR needs. ADR 064 §1 decides config
+against data by owner, and names a customer-managed SSO connection as a
+resource that needs both paths. The
+[identity surface](../design/cli/identity-surface.md) splits apps that way:
+first-party apps and machine clients as `.zitadel/apps/<slug>.json`,
+customer-managed apps and dynamic registration through the runtime API. The
+IdP connection ships the shape both ask for: `.zitadel/idps/<slug>.json` is
+the body of `POST /idps`
+([`create-idp-request.yaml`](../../api/openapi/endpoints/idps/create-idp-request.yaml)),
+the CLI syncs the file, a role writes the API, and the server stores one
+resource either way.
 
 Customers building MCP servers ask for OAuth 2.1 and dynamic client
 registration ([#375](https://github.com/zitadel/nextgen/issues/375)). MCP's
@@ -59,10 +83,15 @@ documents, and keeps dynamic registration only for backwards compatibility.
 | Server | Validating requests, running the flow, minting and signing tokens with the project's keys (ADR 039), and storing apps, consents and refresh tokens. |
 | Server SDK, in the customer's app | The front door at the issuer (ADR 080 §7), verifying the server's tokens for the app's own APIs, and serving the claims hook (§6). |
 | Web components | `<zitadel-login>` renders sign-in, account choice and consent as steps of one flow (ADR 080 §11). A connected-apps component (working name `<zitadel-connected-apps>`) lists and revokes a user's consents. |
-| Configuration | Protected APIs, scopes, claim rules and token settings, in the release. Apps and consents are data. |
+| Configuration, in the release | The project's OAuth settings (§12), the developer's own apps (§3), and protected APIs with their scopes, claim rules and hooks (§5, §6). |
+| Data, through the API | A customer's apps, third parties added in the Console and dynamically registered clients (§3, §9), consents and refresh tokens. |
 
 A component decides nothing a token says, because the user controls the
-browser.
+browser. Where one kind of resource can have either owner, the owner decides
+the path, as ADR 064 §1 has it for SSO connections, and the resource is one
+document either way: a file the CLI syncs, or the same document an API call
+writes. Each path has one writer: a declared resource is read-only outside
+`apply` (ADR 064 §3), and a registered one is never in `.zitadel/`.
 
 ### 2. Protocol profile
 
@@ -80,8 +109,30 @@ browser.
 
 ### 3. Apps
 
-An app is a data-plane resource of a project (ADR 068), managed through the
-API, the Console and the CLI's resource commands (ADR 064):
+An app is one document, in the shape of `.zitadel/apps/<slug>.json`, whoever
+writes it, as an IdP connection is
+([IdP area 1](../design/idp/1-resource-model.md)): the file is the body of
+`POST /apps`, which creates the app or revises it by slug, and the server
+mints the client id at create and keeps it across revisions, as it keeps a
+connection id. The slug is what a flow's `audience.app_ids`, a protected API
+(§5) and branding name. Who owns the app decides the path (§1):
+
+- **Declared:** the developer's own apps, the login app and its relying
+  parties (ADR 080 §12) among them, are files in the release, validated
+  against `.zitadel/meta/app.json` and synced by a `ResourceSyncer` like the
+  connection's (`mutable`, not `revisioned`; deletion decided with the
+  connection's). `plan` shows a redirect URI change before it ships, and a
+  staging project gets the apps from the release instead of by hand. The
+  credential is never in the file: a declared app authenticates with
+  `private_key_jwt`, its public key in the file, or with a client secret the
+  file names as `${{ NAME }}` and the server reads from the project's
+  variables when the client authenticates (ADR 062). The server never
+  generates it.
+- **Registered:** a customer's app that the product's own UI creates through
+  the API, a third party an operator adds in the Console, and a client ID
+  metadata or dynamically registered client (§9) are data, written with the
+  same document and never in `.zitadel/`. The server generates a registered
+  app's secret, shows it once and stores it hashed.
 
 | Kind | Client type | Authenticates with | Grant types |
 |---|---|---|---|
@@ -89,11 +140,15 @@ API, the Console and the CLI's resource commands (ADR 064):
 | SPA or native app | public | PKCE only | authorization code, refresh token |
 | Service | confidential | client secret or `private_key_jwt` | client credentials |
 
-An app the customer registers for their own product, relying-party-mode apps
-included (ADR 080 §12), is **first-party** and skips consent unless the
-request asks for it. Every other app is **third-party** and always gets
-consent, which shows the app's name and its redirect host. The server
-generates client secrets, shows them once and stores them hashed.
+The party is a field of the document. A declared app is **first-party**
+unless its file says otherwise, and skips consent unless the request asks for
+it; a registered app is **third-party** unless the role that registers it
+says otherwise, and always gets consent, which shows the app's name and its
+redirect host. The document also carries what ADR 080 leaves to the app: the
+APIs it may call and its default `resource` (§5), its consent policy and
+whether account choice shows on a live session (ADR 080 §11), and a token
+lifetime (open question 3). An MCP server is not a kind of app; it is a
+protected API (§10).
 
 ### 4. Issuer and deployment without a browser
 
@@ -103,15 +158,22 @@ proxy, under the same rule: a primary pattern or loopback, never the server's
 own origin or a preview. It resolves the newest deployment to that origin, as
 a flow on that origin would, never from the request's `Origin` header and
 never from the project default target. A refresh keeps the issuer and the
-deployment of its refresh token (ADR 080 §10).
+deployment of its refresh token (ADR 080 §10). The authorization endpoint
+resolves a deployment the same way, from the origin it reached, since a
+declared app and its redirect URIs are in the release (§3), and the flow it
+opens seals that deployment.
 
 ### 5. Protected APIs and scopes
 
 - The OpenID Connect scopes `openid`, `profile`, `email`, `address`, `phone`
   and `offline_access` are built in.
-- A **protected API** is declared in config with its identifier (its
-  canonical URI), the scopes it defines and its access token lifetime. An app
-  may request only the scopes of APIs it is allowed to call.
+- A **protected API** is a file, `.zitadel/apis/<slug>.json`, validated
+  against `.zitadel/meta/api.json` and synced like an app (§3). It names the
+  API's identifier (its canonical URI), the scopes it defines with the text
+  keys their consent lines use (§8), its access token lifetime, its claim
+  rules and its claims hook (§6), and whether third-party apps may request
+  it. A declared app lists the APIs it calls; a registered app may request
+  only APIs open to third parties, and consent covers the rest.
 - Since scopes and APIs are config, the flow checks them against the
   deployment it seals (ADR 080 §10), and an unknown one ends it with
   `invalid_scope` or `invalid_target`.
@@ -121,27 +183,35 @@ deployment of its refresh token (ADR 080 §10).
   userinfo only; a request that names several resources fails.
 - The server SDK verifies access tokens for the APIs its app hosts against the
   issuer's JWKS (ADR 080 §14), and serves their protected-resource metadata
-  (RFC 9728). This answers ADR 080's open question 6.
+  (RFC 9728) under `/__nextgen`, named in `WWW-Authenticate` (RFC 9728 §5.1),
+  so the app gives up no third root path. This answers ADR 080's open
+  question 5.
 
 ### 6. Claims
 
 What a token says is decided on the server, where it is signed, in three
 layers:
 
-1. **Standard claims** come from the user schema. A claim mapping in config
-   names the schema property behind each OpenID Connect claim, and the
-   default schema ships with one (`givenName` → `given_name`, and so on). Each
-   scope the token carries releases its claims (OpenID Connect Core §5.4).
-2. **Claim rules** in config add claims for a scope or an API, from a user
-   property or a constant.
-3. **The claims hook** covers what rules cannot reach. A project may configure
-   an HTTPS hook that the server calls while it mints a token, with the user,
-   the app, the scopes and the API, under the same fetch guards as §9. The
-   server signs the call with the project's key; the server SDK can serve the
-   hook under `/__nextgen` and checks the signature against the issuer's
-   JWKS. The hook returns claims to add. It has a short timeout, and if it
-   fails, the token request fails, so a token never silently lacks a claim
-   the customer relies on.
+1. **Standard claims** come from the user schema. A property's `x-claim`
+   names the claim it releases
+   ([`user-property.json`](../../api/openapi/endpoints/schemas/user-property.json)),
+   beside `x-identifier` and `x-unique`, and the default schema gains them
+   (`givenName` → `given_name`, and so on). Each scope the token carries
+   releases its claims (OpenID Connect Core §5.4).
+2. **Claim rules** add claims for a scope or an API, from a user property or
+   a constant: a scope's rules in the project's OAuth settings (§12), an
+   API's in its file (§5).
+3. **The claims hook** covers what rules cannot reach. A protected API may
+   name an HTTPS hook that the server calls while it mints a token for that
+   API, with the user, the app, the scopes and the API, under the same fetch
+   guards as §9. The server signs the call with the project's key; the server
+   SDK serves the hook under `/__nextgen` from a handler the developer owns
+   (§12) and checks the signature against the issuer's JWKS. The hook returns
+   claims to add. It has a short timeout, and if it fails, the token request
+   fails, unless the API's file says its hook claims are optional; then the
+   token is minted without them and the failure is recorded. So a slow
+   backend fails the tokens of one API, never every sign-in, and a token
+   never silently lacks a claim the customer relies on.
 
 Rules and the hook cannot set reserved claims (`iss`, `sub`, `aud`, `exp`,
 `iat`, `nbf`, `jti`, `azp`, `client_id`, `scope`, `nonce`, `auth_time`, `acr`,
@@ -162,8 +232,9 @@ A consent records that a user let an app use some scopes. It is kept per user,
 app and scope, and is called a consent because ADR 032 uses *grant* for
 permissions. The flow engine inserts the consent step (ADR 080 §11) when a
 third-party app asks for scopes the user has not consented to, and whenever a
-request says `prompt=consent`. The scope descriptions on the screen come from
-config, translated with the release.
+request says `prompt=consent`, and on every request for an app whose
+document says so (§3). The scope descriptions on the screen come from the
+API's file (§5), translated with the release.
 
 A user lists and revokes their consents through me endpoints, which use the
 session cookie like the other me endpoints (ADR 036); the connected-apps
@@ -172,8 +243,9 @@ that user.
 
 ### 9. Registration
 
-- **First release:** apps are registered statically, through the API, the
-  Console or the CLI, first- and third-party alike.
+- **First release:** apps are declared in files or registered through the
+  API, the Console or the CLI's resource command (§3), first- and third-party
+  alike.
 - **Next release:** client ID metadata documents. A client uses an HTTPS URL as
   its `client_id`, and the server fetches and validates the JSON document
   behind it when an authorization request names it: HTTPS only, no private or
@@ -182,15 +254,17 @@ that user.
 - **With it, for compatibility:** dynamic client registration (RFC 7591), for
   clients that register no other way.
 - Both are **off by default** in each project, because open registration is an
-  abuse surface (ADR 078); a project turns them on in config. A client
-  registered either way belongs to the issuer's project, which answers #375's
-  question of how dynamically registered clients map to projects.
+  abuse surface (ADR 078); a project turns them on in its OAuth settings
+  (§12). A client registered either way belongs to the issuer's project,
+  which answers #375's question of how dynamically registered clients map to
+  projects.
 
 ### 10. MCP
 
-With §5 and §9, any MCP client can use an MCP server that a customer's app
-hosts. The client finds the issuer in the protected-resource metadata the SDK
-serves and the endpoints under ADR 080's reserved paths, registers with a
+An MCP server is a protected API (§5) that a customer's app hosts; its hook
+(§6) adds the tenant claim its tools need. With §5 and §9, any MCP client can
+use it. The client finds the issuer in the protected-resource metadata the
+SDK serves and the endpoints under ADR 080's reserved paths, registers with a
 client ID metadata document, and gets a token for the MCP server's URI with
 PKCE and `resource`. MCP's enterprise-managed authorization builds on token
 exchange and comes with it (§11).
@@ -198,25 +272,45 @@ exchange and comes with it (§11).
 ### 11. Later
 
 Device authorization (RFC 8628) for CLIs and TVs, token exchange (RFC 8693)
-for delegation and agents, back-channel logout, pushed authorization requests
-(RFC 9126), DPoP (RFC 9449), and the user's roles and permissions in tokens
-([#425](https://github.com/zitadel/nextgen/issues/425)).
+for delegation and agents, back-channel logout for third-party apps
+(first-party ones share the session, ADR 080 §12), pushed authorization
+requests (RFC 9126), DPoP (RFC 9449), and the user's roles and permissions in
+tokens ([#425](https://github.com/zitadel/nextgen/issues/425)).
+
+### 12. What a developer touches
+
+Every decision this ADR leaves to a developer has a file in the release, a
+command that writes or reads it, and, where the app takes part, an SDK call
+or an element; the names below are working names. The CLI describes each
+kind in `zitadel resources --json` and chains the commands in
+`next_commands` (ADR 064), so an agent finds them where it finds flows and
+schemas.
+
+| To | File | Command | SDK or element |
+|---|---|---|---|
+| Become an issuer | `.zitadel/oauth.json`, a singleton like branding: the switch (ADR 080 §7), the registration switches (§9), scope claim rules (§6) and token defaults | `zitadel oauth enable`, which writes the file as ADR 070's commands write theirs; `doctor` checks the reserved paths | Nothing: the SDK already forwards the paths |
+| Declare an app | `.zitadel/apps/<slug>.json` (§3) | `zitadel apps create`, or `setup --sign-in-with` for a relying party (ADR 080 §12); `plan` and `apply` | A relying party configures its proxy with the issuer and its client id; `auth()` and the session elements are unchanged |
+| Let a customer register an app | None | The product's own UI calls `POST /apps` through the proxy with the admin's session; `apps` resource commands for operators | None |
+| Protect an API | `.zitadel/apis/<slug>.json` (§5) | `zitadel apis create` | `protectResource({ api })` verifies bearers and serves the API's metadata |
+| Add claims from the backend | The hook's URL and policy in the API's file (§6) | `zitadel apis create --hook` scaffolds the handler | `defineClaimsHook()` in a scaffolded file the developer owns, served under `/__nextgen` |
+| Show and revoke consents | None | None | The connected-apps element (§8) |
 
 ## Recommended sequence
 
 1. This ADR, with ADR 080.
-2. The first release, with ADR 080's steps 3 and 5: web, SPA and native apps,
-   first- and third-party, registered statically; the standard scopes and the
-   claim mapping; the code flow with PKCE and refresh rotation; discovery,
-   JWKS, userinfo and end session; consent, its me endpoints and the
-   connected-apps component.
-3. Protected APIs: resource indicators, per-API scopes and lifetimes, claim
-   rules, refresh token revocation, and the SDK's verification and
-   protected-resource metadata.
+2. The first release, with ADR 080's steps 3 and 5: the OAuth settings file
+   and its switch; declared apps with their meta-schema, syncer and commands,
+   and registered apps through the API; web, SPA and native kinds, first- and
+   third-party; the standard scopes released by `x-claim`; the code flow with
+   PKCE and refresh rotation; discovery, JWKS, userinfo and end session;
+   consent, its me endpoints and the connected-apps element.
+3. Protected APIs: their files, resource indicators, per-API scopes and
+   lifetimes, claim rules, the claims hook and its scaffolded handler, refresh
+   token revocation, and the SDK's verification and protected-resource
+   metadata.
 4. Client ID metadata documents and dynamic registration. MCP clients work
    from here.
 5. Service apps: client credentials and `private_key_jwt`.
-6. The claims hook.
 
 ## Consequences
 
@@ -228,17 +322,24 @@ for delegation and agents, back-channel logout, pushed authorization requests
 - MCP clients work against a customer's app after step 4, without the custom
   auth proxies #375 describes.
 - Claims are decided where tokens are signed, so a user cannot forge them.
+- The product's own apps travel with the release: a staging project gets them
+  from `apply`, and `plan` shows a redirect URI change before it ships.
+- Each decision has one home (§12), so `resources --json`, the scaffolded
+  READMEs and the skill can describe it.
 
 ### Negative / Risks
 
 - Relying parties on the implicit flow or the password grant must move to the
   code flow with PKCE first.
 - The claims hook puts the customer's backend on the token path: a slow or
-  failing hook fails sign-ins and refreshes.
+  failing hook fails the tokens of its API, and the sign-ins that need one.
+- One shape, two writers: a declared app is read-only in the Console and the
+  API, a registered one cannot be edited as a file, and moving a registered
+  app into the release is an explicit step (open question 6).
 - Without introspection, an access token stays valid until it expires, five
   minutes by default (ADR 037), even after its consent is revoked.
 - Claim rules ship with a release, and a refresh token keeps the deployment
-  it was sealed with (ADR 080 open question 10), so a rule change reaches
+  it was sealed with (ADR 080 open question 8), so a rule change reaches
   existing sign-ins only when their refresh tokens end.
 - Client ID metadata documents make the server fetch URLs that clients
   choose; the guards in §9 must hold.
@@ -246,16 +347,19 @@ for delegation and agents, back-channel logout, pushed authorization requests
 
 ## Open questions
 
-1. Whether a hook may fail open, per hook, for claims nothing depends on.
-2. Whether userinfo calls the claims hook too, or answers only standard and
-   rule claims.
-3. Pairwise subject identifiers for third-party apps, so they cannot correlate
+1. Whether an app may name a hook for its ID token, as an API does for its
+   access token (§6), or ID tokens and userinfo carry standard and rule
+   claims only.
+2. Pairwise subject identifiers for third-party apps, so they cannot correlate
    users by `sub`.
-4. Which lifetime wins when an app and an API both set one.
-5. Which sources besides the user's schema properties claim rules may read:
+3. Which lifetime wins when an app and an API both set one.
+4. Which sources besides the user's schema properties claim rules may read:
    teams, the project, the app.
-6. Whether the connected-apps component is its own element or part of
+5. Whether the connected-apps component is its own element or part of
    `<zitadel-session>`, and its name.
+6. Whether the server slugs a registered app, so the Console,
+   `resources --json` and a later file can name it, and how a registered app
+   moves into the release.
 
 ## Rejected alternatives
 
@@ -263,6 +367,16 @@ for delegation and agents, back-channel logout, pushed authorization requests
   would sit on a page the customer builds, which could leave it out, and two
   elements would share one flow's state. One orchestrator keeps consent a step
   no page can drop (ADR 080 §11).
+- **Every app a data-plane resource,** as the configuration surface's split
+  table has it. The product's own apps would be the one part of the product
+  not in its repository: a staging project needs each registered again by
+  hand, `plan` cannot warn on a redirect URI change, and the identity surface
+  and ADR 064 §1 already decide otherwise.
+- **A second resource kind for declared apps.** The IdP connection shows one
+  document serving both writers; two kinds would need two meta-schemas, two
+  listings and a migration between them.
+- **A project-wide claims hook.** A slow backend would fail every sign-in, ID
+  tokens for apps that need no custom claim included.
 - **Claims decided by a web component.** The user controls the browser.
 - **Only rules, or only a hook.** Rules cannot reach data outside Zitadel; a
   hook alone makes every customer run a service for what a rule could add.
@@ -288,13 +402,18 @@ On acceptance:
 - the [glossary](../design/glossary.md): *app* gains its kinds and first- and
   third-party, and *consent*, *protected API* and *claims hook* get rows;
 - the [configuration surface](../design/platform/configuration-surface.md):
-  protected APIs, scopes, the claim mapping, claim rules, the hook and the
-  registration switches;
+  its split table, where the redirect URI and client definition rows become
+  declared apps in config and registered apps as data, and protected APIs,
+  `x-claim`, claim rules, the hook and the registration switches;
+- the [identity surface](../design/cli/identity-surface.md): its app half is
+  adopted (§3), and its `role: "server"` question stays open with SAML;
 - the [resource map](../design/api/resource-map.md): the app resource and the
   consent me endpoints;
 - the [auth flows design](../design/api/authn-and-auth-flows.md): Path 3 gains
   client credentials and the consent step.
 
-On implementation: the API spec, the CLI's
+On implementation: the API spec, the meta-schemas and READMEs for apps and
+APIs under [`packages/config/defaults/`](../../packages/config/defaults/),
+`zitadel resources --json`, the CLI's
 [`SKILL.md`](../../apps/cli/skills/zitadel-cli/SKILL.md), the SDK READMEs and
 the components README.
