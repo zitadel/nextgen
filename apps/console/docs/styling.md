@@ -109,7 +109,7 @@ Canonical examples:
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Tabs` |
-| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
@@ -173,9 +173,12 @@ Two things are deliberately **not** shared, because the designs genuinely differ
 
 - **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
   clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
-  slack and truncate (D20, D21). The Users table is schema-driven, so it has
-  no fixed grid to share: the default schema fits 1024px, and a schema with
-  more columns scrolls.
+  slack and truncate (D20, D21). The Users table takes the properties a viewer
+  pins, so it has no fixed grid to share, and bounds its width (D23): the
+  unpinned attributes share one 280px Attributes column, so the default
+  columns fit 1024px. Pinning enough columns scrolls the table under its
+  sticky row-menu column, and from 640px its sticky User column
+  (`RESOURCE_STICKY_END` / `RESOURCE_STICKY_START` with `useScrollEdges`).
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
