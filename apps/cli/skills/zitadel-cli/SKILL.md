@@ -207,6 +207,12 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `deployment rollback` emits `data.release_id` (the release live again),
+  `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
+  revisions that release pins; the `schema` one is what new registrations use.
+  Users keep their schema revision and attributes: a rollback does not migrate
+  them back. Without `data.pointers`, a warning says the release could not be
+  read.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
