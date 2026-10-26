@@ -35,14 +35,20 @@ describe("policy display", () => {
     expect(length({ min_length: 15 })).toBe("At least 15 characters");
     expect(length({ max_length: 32 })).toBe("At most 32 characters");
     expect(length({ min_length: 12, max_length: 32 })).toBe("12 to 32 characters");
-    expect(length({})).toBe("Off");
   });
 
   it("says whether history is checked, not how deep", () => {
     const history = (config: Parameters<typeof passwordPolicySettings>[0]) =>
       passwordPolicySettings(config).find((row) => row.label === "History")?.value;
     expect(history({ history_depth: 4 })).toBe("Enabled");
-    expect(history({ min_length: 15 })).toBe("Off");
+  });
+
+  it("gives a rule the config leaves out no row, so an empty config has none", () => {
+    expect(passwordPolicySettings({ history_depth: 4 }).map((row) => row.label)).toEqual([
+      "History",
+    ]);
+    expect(passwordPolicySettings({ min_length: 15 }).map((row) => row.label)).toEqual(["Length"]);
+    expect(passwordPolicySettings({})).toEqual([]);
   });
 
   it("shows the publish body, without the revision's ids", () => {

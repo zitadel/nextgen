@@ -50,25 +50,26 @@ export function policySettings(revision: PolicyRevision): PolicySetting[] {
 }
 
 /**
- * The password policy's settings as the design's two rows: the length rule
- * and whether history is checked. A rule the config leaves out is off, and the
- * 64 code-point cap applies either way, so a policy with no length setting is
- * one with no length rule of its own rather than no limit.
+ * The password policy's settings as the design's rows: the length rule and
+ * whether history is checked. A rule the config leaves out is off and gets no
+ * row, as a kind the release does not pin gets no group, so `{}` shows the
+ * document alone.
  */
 export function passwordPolicySettings(config: PasswordPolicyConfig): PolicySetting[] {
-  return [
-    { label: "Length", value: lengthRule(config) },
-    { label: "History", value: config.history_depth === undefined ? "Off" : "Enabled" },
-  ];
+  const rows: PolicySetting[] = [];
+  const length = lengthRule(config);
+  if (length) rows.push({ label: "Length", value: length });
+  if (config.history_depth !== undefined) rows.push({ label: "History", value: "Enabled" });
+  return rows;
 }
 
-function lengthRule({ min_length, max_length }: PasswordPolicyConfig): string {
+function lengthRule({ min_length, max_length }: PasswordPolicyConfig): string | undefined {
   if (min_length !== undefined && max_length !== undefined) {
     return `${min_length} to ${max_length} characters`;
   }
   if (min_length !== undefined) return `At least ${min_length} characters`;
   if (max_length !== undefined) return `At most ${max_length} characters`;
-  return "Off";
+  return undefined;
 }
 
 /**

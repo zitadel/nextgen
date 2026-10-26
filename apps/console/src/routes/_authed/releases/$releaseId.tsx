@@ -247,7 +247,9 @@ function PointerGroupSection({ group }: { group: PointerGroup }) {
                 </p>
               ) : (
                 <>
-                  {pointer.settings && <PolicySettingsRows settings={pointer.settings} />}
+                  {pointer.settings?.length ? (
+                    <PolicySettingsRows settings={pointer.settings} />
+                  ) : null}
                   <DocumentViewer document={pointer.document} noun={group.noun} />
                 </>
               )}
