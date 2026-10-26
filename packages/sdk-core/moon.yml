@@ -75,3 +75,7 @@ tasks:
       - "/apps/demo-*/package.json"
       - "/apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}"
       - "!/apps/demo-*/**/node_modules/**/*"
+      # And every published package's manifest and build config, to check it
+      # ships no declaration map without its sources.
+      - "/packages/*/package.json"
+      - "/packages/*/tsconfig.lib.json"

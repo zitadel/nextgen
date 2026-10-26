@@ -2,7 +2,7 @@ import { nonBlankString } from "../../flags";
 
 import { chosenColumns } from "../columns";
 import { fieldPaths } from "../paths";
-import { idArg, idValue } from "../shared";
+import { idArg, idName, idValue } from "../shared";
 import { renderDetail } from "../table";
 import type { GetSpec } from "../types";
 import type { CommandResult } from "../../types";
@@ -25,10 +25,11 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     options,
   }: OperationDefinition<Ctx, GetSpec<Ctx>>): OperationStatics {
     return {
-      description: `Get one ${resource.singular} by id.`,
+      // A resource addressed by more than an id says so, as its argument does.
+      description: `Get one ${resource.singular} by ${resource.idDescription ?? "id"}.`,
       examples: [
-        `<%= config.bin %> ${topic} get <id>`,
-        `<%= config.bin %> ${topic} get <id> --json`,
+        `<%= config.bin %> ${topic} get <${idName(resource)}>`,
+        `<%= config.bin %> ${topic} get <${idName(resource)}> --json`,
       ],
       flags: {
         fields: nonBlankString({
