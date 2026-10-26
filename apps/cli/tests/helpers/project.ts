@@ -579,6 +579,13 @@ export class ScaffoldedApp {
     expect(result, "origin add should have succeeded").toSucceed();
   }
 
+  /** How many deployments the project serves, as `deployment list` reports them. */
+  async liveDeploymentCount(): Promise<number> {
+    const result = await this.cli(["deployment", "list", "--json"]);
+    expect(result, "deployment list should have succeeded").toSucceed();
+    return this.envelopeOf<{ count: number }>(result).data.count;
+  }
+
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
   deploy(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
@@ -1278,10 +1285,17 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   return new ScaffoldedApp(path);
 }
 
-/** An app already through `setup`, for specs about the commands after it. */
+/**
+ * An app already through `setup`, for specs about the commands after it.
+ *
+ * Setup's own git commit and first deploy are turned off here: this is the
+ * arrange for every other command's spec, and those read a project whose
+ * release and deployment history is the one they make themselves. Setup's
+ * spec drives setup with them on, and owns what they do.
+ */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(extraArgs);
+  const result = await app.setup(["--no-git", "--no-deploy", ...extraArgs]);
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }

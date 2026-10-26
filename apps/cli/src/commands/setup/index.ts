@@ -98,6 +98,9 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
+import { ensureInitialCommit, type InitialCommitOutcome } from "./initial-commit";
+import { runInitialDeploy, type InitialDeployOutcome } from "./initial-deploy";
+import { DEPLOY_ARGS } from "../../lib/release";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -216,6 +219,18 @@ export default class Setup extends BaseCommand {
     }),
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
+    }),
+    git: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Initialise a git repository and make one commit when the project is not already in one, so the first release records a commit. Use --no-git to leave version control alone.",
+    }),
+    deploy: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Deploy the .zitadel/ files setup writes, so the project serves them from the start. Use --no-deploy to write them and publish later with `zitadel deploy`.",
     }),
     preset: Flags.string({
       description:
@@ -763,6 +778,20 @@ export default class Setup extends BaseCommand {
       package_manager: installOutcome.install.package_manager,
     });
 
+    // Version control first, then publish: a release records the commit it was
+    // built from, so one built before the commit exists carries no `git_sha`
+    // and the next deploy has no baseline to diff against. That ordering is why
+    // both happen here rather than being left to the developer (#1651).
+    const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
+    const initialDeploy = await this.deployInitialRelease({
+      cwd,
+      dryRun,
+      server: answers.server,
+      project,
+      selector: recoverySelector(flags.cwd),
+      enabled: flags.deploy !== false,
+    });
+
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
@@ -931,6 +960,26 @@ export default class Setup extends BaseCommand {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
+        // Whether setup put the project under version control, and the commit
+        // the first release was built from. `null` when the project was
+        // already in a repository, when `--no-git` was passed, or when git
+        // could not be used.
+        git: {
+          initialized: commit.kind === "created",
+          commit: commit.kind === "created" ? commit.sha : null,
+        },
+        // The first deployment, so the project serves the developer's own
+        // `.zitadel/` rather than the resources the server seeds beside a new
+        // project. `null` when setup did not get that far.
+        deployment:
+          initialDeploy?.kind === "deployed"
+            ? {
+                release_id: initialDeploy.releaseId,
+                content_hash: initialDeploy.contentHash,
+                deployment_id: initialDeploy.deploymentId,
+                origins: [...initialDeploy.origins],
+              }
+            : null,
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -994,6 +1043,87 @@ export default class Setup extends BaseCommand {
         ]),
       },
     });
+  }
+
+  /**
+   * Put the scaffolded project under version control, unless it already is or
+   * `--no-git` said not to. Narrated but never fatal: without the commit the
+   * first release simply records no provenance, which is what setup did before.
+   */
+  private async makeInitialCommit(
+    cwd: string,
+    dryRun: boolean,
+    enabled: boolean,
+  ): Promise<InitialCommitOutcome> {
+    if (!enabled) {
+      return { kind: "skipped" };
+    }
+    if (dryRun) {
+      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      return { kind: "skipped" };
+    }
+    const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind === "created") {
+      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+    }
+    if (outcome.kind === "unavailable") {
+      reportWarning(
+        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
+      );
+    }
+    return outcome;
+  }
+
+  /**
+   * Deploy what setup wrote, so the project is live off `.zitadel/` from the
+   * start. A failure here is reported rather than thrown: the project, its
+   * files and its credentials all exist and are worth keeping, and the deploy
+   * is one command away.
+   */
+  private async deployInitialRelease(opts: {
+    cwd: string;
+    dryRun: boolean;
+    server: string;
+    project: CreateProject201;
+    selector: EnvironmentSelector;
+    enabled: boolean;
+  }): Promise<InitialDeployOutcome | undefined> {
+    if (!opts.enabled) {
+      return undefined;
+    }
+    // A dry run writes nothing, and `--server mock` answers from fixtures and
+    // has no project to deploy to.
+    if (opts.dryRun) {
+      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      return undefined;
+    }
+    if (opts.server === "mock") {
+      return undefined;
+    }
+    consola.start("Deploying .zitadel/ to the project");
+    const json = this.jsonEnabled();
+    const outcome = await runInitialDeploy({
+      cwd: opts.cwd,
+      client: createZitadelClient({
+        baseUrl: opts.server,
+        token: opts.project.project_secret,
+      }),
+      projectId: opts.project.id,
+      env: this.meta.env,
+      json,
+      color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+      suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+    });
+    if (outcome.kind === "deployed") {
+      consola.success(
+        `Deployed ${outcome.contentHash} to ${outcome.origins.length} origin${outcome.origins.length === 1 ? "" : "s"}`,
+      );
+    } else {
+      reportWarning(
+        `The project was created and its files written, but the first deploy failed: ${outcome.message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish them.`,
+      );
+    }
+    return outcome;
   }
 
   /**

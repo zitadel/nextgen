@@ -683,6 +683,8 @@ describe("setup command pre-flight", () => {
       "--non-interactive",
       "--json",
       "--skip-install",
+      "--no-git",
+      "--no-deploy",
     ]);
 
     expect(res.exitCode).toBe(0);

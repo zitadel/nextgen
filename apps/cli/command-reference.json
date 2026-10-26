@@ -160,6 +160,20 @@
           "type": "boolean"
         },
         {
+          "name": "git",
+          "description": "Initialise a git repository and make one commit when the project is not already in one, so the first release records a commit. Use --no-git to leave version control alone.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
+        },
+        {
+          "name": "deploy",
+          "description": "Deploy the .zitadel/ files setup writes, so the project serves them from the start. Use --no-deploy to write them and publish later with `zitadel deploy`.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
+        },
+        {
           "name": "preset",
           "description": "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
           "type": "option",

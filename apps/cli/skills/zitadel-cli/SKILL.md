@@ -330,6 +330,25 @@ npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
 
+`setup` ends with an initial deployment, so the project serves the
+`.zitadel/` it just wrote rather than the fallback resources the server seeds
+beside a new project. Before building that release it puts the project under
+version control — `git init` and one commit, `chore: scaffold the project
+with zitadel setup` — but only when the directory is not already inside a
+repository: a project that has git is the developer's, and setup never commits
+into it. The order matters, because the release records the commit it was built
+from and the next `deploy` diffs `.zitadel/` against it; without the commit
+that deploy reports that no diff is available. Both steps run the same way
+non-interactively and in CI, since neither asks anything.
+
+`data.git` says what happened (`initialized`, and the `commit`, or null),
+and `data.deployment` carries the `release_id`, `content_hash`,
+`deployment_id` and `origins`, or is null. `--no-git` leaves version
+control alone; `--no-deploy` writes the files and leaves publishing to a later
+`deploy`. Neither step can fail setup: the project, its files and its
+credentials are already there, so a failure is reported as a warning naming the
+`deploy` to re-run.
+
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
 `.zitadel/local/` and the `.gitignore` line that ignores it — still counts as

@@ -7,6 +7,12 @@ import { usePlatformMock } from "../helpers/platform";
 import { aNewAppDirectory, anApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+
+/** The part of setup's envelope that says what it committed and published. */
+type SetupPublishData = {
+  git: { initialized: boolean; commit: string | null };
+  deployment: { deployment_id: string } | null;
+};
 useLocalServers();
 
 const SOCIAL_CREDENTIALS = {
@@ -102,6 +108,51 @@ describe("setup", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("deploys what it wrote, so the project serves the developer's files", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.liveDeploymentCount()).toBe(1);
+      });
+
+      it("deploys nothing under --no-deploy", async () => {
+        const app = await anApp();
+
+        await app.setup(["--no-deploy"]);
+
+        expect(await app.liveDeploymentCount()).toBe(0);
+      });
+
+      it("reports the commit it made and the deployment it published", async () => {
+        const app = await anApp();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupPublishData>(result).data).toMatchObject({
+          git: { initialized: true, commit: expect.stringMatching(/^[0-9a-f]{40}$/) },
+          deployment: { deployment_id: expect.any(String) },
+        });
+      });
+
+      it("records no commit under --no-git", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(app.envelopeOf<SetupPublishData>(result).data.git).toEqual({
+          initialized: false,
+          commit: null,
+        });
+      });
+
+      it("still deploys when it may not touch version control", async () => {
+        const app = await anApp();
+
+        await app.setup(["--no-git"]);
+
+        expect(await app.liveDeploymentCount()).toBe(1);
+      });
       it("scaffolds the project", async () => {
         const app = await anApp();
         const before = await app.snapshot();
@@ -522,6 +573,29 @@ describe("setup", () => {
 
           expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
         });
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("leaves the next deploy a commit to diff against", async () => {
+        const app = await anApp();
+        await app.setup();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("nickname");
+      });
+
+      it("reports no diff when nothing changed since setup", async () => {
+        const app = await anApp();
+        await app.setup();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("No changes to .zitadel/ since");
       });
     });
   });
