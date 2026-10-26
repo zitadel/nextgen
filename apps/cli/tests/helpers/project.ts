@@ -112,6 +112,16 @@ export interface RegisteredIdp {
   readonly slug: string;
 }
 
+export interface PublishedPolicy {
+  readonly id: string;
+  readonly operation: string;
+  readonly revision_id: string;
+  readonly config: Readonly<Record<string, number>>;
+}
+
+/** The operation the password policy guards, and its file's name. */
+export const PASSWORD_POLICY = "auth.factor.password.set";
+
 /**
  * What a command did to the project, as a tree rather than as content.
  *
@@ -751,6 +761,11 @@ export class ScaffoldedApp {
     return this.listed<RegisteredIdp>("idps");
   }
 
+  /** The policies the platform holds, each at its newest revision. */
+  publishedPolicies(): Promise<PublishedPolicy[]> {
+    return this.listed<PublishedPolicy>("policies");
+  }
+
   publishedSchemas(): Promise<PublishedSchema[]> {
     return this.listed<PublishedSchema>("schemas");
   }
@@ -927,6 +942,31 @@ export class ScaffoldedApp {
   async renameConnection(slug: string, name: string): Promise<void> {
     await this.copyConnection(slug, name);
     await this.removeConnection(slug);
+  }
+
+  /**
+   * Writes the password policy file, as the developer owning it would: named
+   * after its operation unless `name` says otherwise.
+   */
+  async writePasswordPolicy(
+    config: Record<string, number>,
+    { name = PASSWORD_POLICY, extra = {} }: { name?: string; extra?: Record<string, unknown> } = {},
+  ): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(name),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Removes the committed password policy file, as the developer owning it would. */
+  removePasswordPolicy(): Promise<void> {
+    return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
+  }
+
+  /** The project-relative path of a policy file, as a command reports it. */
+  policyFile(name: string = PASSWORD_POLICY): string {
+    return `.zitadel/policies/${name}.json`;
   }
 
   /** Edits the committed login flow, as the developer owning it would. */

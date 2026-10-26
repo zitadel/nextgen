@@ -3,38 +3,51 @@
 ## `.zitadel/policies/` and the CLI
 
 Instances are files the developer owns: `.zitadel/policies/<operation>.json`,
-one per guarded operation, with the editor `$schema` pointing at the
-`policy.json` meta-schema generated from the OpenAPI component.
+one per guarded operation and named after it. A file is the publish body
+(`POST /policies`) plus the editor `$schema`, which points at the
+`policy.json` meta-schema generated from the OpenAPI publish union:
 
-- `zitadel setup` offers a starter `auth.factor.password.set` instance
-  ([#1450](https://github.com/zitadel/nextgen/issues/1450)):
+```json
+{
+  "$schema": "../meta/policy.json",
+  "operation": "auth.factor.password.set",
+  "config": { "min_length": 15 }
+}
+```
 
-  ```json
-  {
-    "kind": "policy",
-    "operation": "auth.factor.password.set",
-    "config": { "min_length": 15 }
-  }
-  ```
-
-  15 is the NIST SP 800-63B minimum for a single-factor password, and #898's
-  former server default ([ADR 066, No server defaults](../../adrs/066-operation-policies.md#no-server-defaults)).
+- `zitadel setup` offers the file above as a starter
+  ([#1450](https://github.com/zitadel/nextgen/issues/1450)). 15 is the NIST
+  SP 800-63B minimum for a single-factor password, and #898's former server
+  default ([ADR 066, No server defaults](../../adrs/066-operation-policies.md#no-server-defaults)).
   Its values are the CLI's suggestion, not a server default, and a developer
   who skips it has no password policy: only the domain guards (non-empty, at
   most 64 code points) apply.
-- `zitadel plan` diffs the file against the stored revision and
-  `zitadel apply` publishes a new one through `POST /policies`. Both run the
-  same sync engine as schemas, flows and branding, with the `policy` kind
-  registered next to them (`PolicySyncer` in `apps/cli/src/lib/sync/`).
-- `zitadel policies list` and `zitadel policies get <id>` read revisions back.
-  Per [ADR 064](../../adrs/064-cli-resource-commands.md) a configuration
-  resource gets `list` and `get` only; the file is the writer.
+- `zitadel deploy` carries the files in the release bundle (`policies`,
+  [ADR 035](../../adrs/035-configuration-environments.md)). The release build
+  publishes a changed config as a new revision of the operation's policy and
+  pins it; an unchanged one reuses the newest revision. Like an IdP
+  connection, a policy keeps one id while the server keeps its revisions.
+- `zitadel policies list` and `zitadel policies get <id|operation>` read
+  policies back at their newest revision. Per
+  [ADR 064](../../adrs/064-cli-resource-commands.md) a configuration resource
+  gets `list` and `get` only; the file is the writer.
+- What applies follows the release (ADR 035,
+  [ADR 066](../../adrs/066-operation-policies.md#where-the-catalog-lives-and-how-an-operation-is-added)):
+  a sign-in or sign-up served a release that pins a flow gets the policy that
+  release pins, and none when it pins none, with no fallback to a stored
+  revision. Deleting the file and deploying switches the policy off there,
+  with the confirmation `deploy` asks for every removal, and a release that
+  was only built changes nothing. A request that resolves no release (a
+  password set through the API, or anything before the first deploy) still
+  gets the newest revision, as for every kind
+  ([#1616](https://github.com/zitadel/nextgen/issues/1616)), so
+  `"config": {}` is how to switch the rules off for those too.
 
-A file is validated locally against the operation-typed schema before it is
-sent: an unknown setting or a value outside the template's bounds fails
-`plan`, and the server's config rules (a minimum above the maximum) fail
-`apply`. There are no warnings: a value within the bounds is the project's
-choice.
+A file is validated locally against the operation-typed schema before
+anything is sent: an unknown setting, a value outside the template's bounds or
+a file not named after its operation fails `deploy`, and the server's config
+rules (a minimum above the maximum) fail the release build with `rel.invalid`.
+There are no warnings: a value within the bounds is the project's choice.
 
 ## Testing (not built yet)
 

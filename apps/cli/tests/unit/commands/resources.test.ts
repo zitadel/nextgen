@@ -436,6 +436,161 @@ describe("get rendering", () => {
     expect(res.stdout).toMatch(/email\s+user_1@example\.com/);
     expect(res.stdout).not.toContain("status");
   });
+
+  it("shows a policy's config, the setting a reader looks it up for", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, () =>
+        HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: { min_length: 12 },
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "policies",
+        "get",
+        "pol_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toMatch(/config\s+\{"min_length":12\}/);
+  });
+
+  it("shows an empty config, which says the policy enforces nothing", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, () =>
+        HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: {},
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "policies",
+        "get",
+        "pol_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toMatch(/config\s+\{\}/);
+  });
+});
+
+describe("policies", () => {
+  const policy = {
+    id: "pol_1",
+    revision_id: "polrev_1",
+    project_id: "proj_test",
+    operation: "auth.factor.password.set",
+    config: { min_length: 15 },
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("gets a policy by id", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
+        return HttpResponse.json(policy);
+      }),
+    );
+
+    const res = await run(cwd, ["policies", "get", "pol_1"]);
+
+    expect(res.exitCode).toBe(0);
+    expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
+  });
+
+  it("gets a policy by its operation through the list's filter", async () => {
+    const cwd = await makeProject();
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${SERVER}/policies`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json({ policies: [policy], next_page_token: null });
+      }),
+    );
+
+    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
+  });
+
+  it("answers E_NOT_FOUND for an operation the project has no policy for", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies`, () =>
+        HttpResponse.json({ policies: [], next_page_token: null }),
+      ),
+    );
+
+    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+
+    expect(res.exitCode).toBe(4);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
+
+  it("answers E_NOT_FOUND for a name that is neither an id nor an operation, without a request", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["policies", "get", "password"]);
+
+    expect(res.exitCode).toBe(4);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
+
+  it("lists policies narrowed to one operation", async () => {
+    const cwd = await makeProject();
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${SERVER}/policies`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json({ policies: [policy], next_page_token: null });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "policies",
+      "list",
+      "--filter",
+      "operation=auth.factor.password.set",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(1);
+  });
 });
 
 describe("users get / create / update / delete", () => {
