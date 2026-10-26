@@ -9927,6 +9927,8 @@ type BuildReleaseErrorResponse struct {
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
 	SchNotFound              SchNotFound
 	NotImplemented           NotImplemented
+	PolInvalid               PolInvalid
+	PolRevisionConflict      PolRevisionConflict
 	RelInvalid               RelInvalid
 	RelNotFound              RelNotFound
 	RelPermissionDenied      RelPermissionDenied
@@ -9956,6 +9958,8 @@ const (
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
 	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
 	NotImplementedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "not_implemented"
+	PolInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "pol.invalid"
+	PolRevisionConflictBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "pol.revision_conflict"
 	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
@@ -10030,6 +10034,16 @@ func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
 // IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
 func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedBuildReleaseErrorResponse
+}
+
+// IsPolInvalid reports whether BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) IsPolInvalid() bool {
+	return s.Type == PolInvalidBuildReleaseErrorResponse
+}
+
+// IsPolRevisionConflict reports whether BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) IsPolRevisionConflict() bool {
+	return s.Type == PolRevisionConflictBuildReleaseErrorResponse
 }
 
 // IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
@@ -10347,6 +10361,48 @@ func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok boo
 func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolInvalid sets BuildReleaseErrorResponse to PolInvalid.
+func (s *BuildReleaseErrorResponse) SetPolInvalid(v PolInvalid) {
+	s.Type = PolInvalidBuildReleaseErrorResponse
+	s.PolInvalid = v
+}
+
+// GetPolInvalid returns PolInvalid and true boolean if BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) GetPolInvalid() (v PolInvalid, ok bool) {
+	if !s.IsPolInvalid() {
+		return v, false
+	}
+	return s.PolInvalid, true
+}
+
+// NewPolInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolInvalid.
+func NewPolInvalidBuildReleaseErrorResponse(v PolInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolInvalid(v)
+	return s
+}
+
+// SetPolRevisionConflict sets BuildReleaseErrorResponse to PolRevisionConflict.
+func (s *BuildReleaseErrorResponse) SetPolRevisionConflict(v PolRevisionConflict) {
+	s.Type = PolRevisionConflictBuildReleaseErrorResponse
+	s.PolRevisionConflict = v
+}
+
+// GetPolRevisionConflict returns PolRevisionConflict and true boolean if BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) GetPolRevisionConflict() (v PolRevisionConflict, ok bool) {
+	if !s.IsPolRevisionConflict() {
+		return v, false
+	}
+	return s.PolRevisionConflict, true
+}
+
+// NewPolRevisionConflictBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolRevisionConflict.
+func NewPolRevisionConflictBuildReleaseErrorResponse(v PolRevisionConflict) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolRevisionConflict(v)
 	return s
 }
 
@@ -12331,9 +12387,9 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // same release on any project.
 // A handle names one resource of its kind in a bundle. Two schemas with the
 // same `objectType`, two flow definitions with the same `name`, two IDP
-// connections with the same `slug`, or a schema without an `objectType`
-// refuse the release with `rel.invalid`, with an
-// entry for each such resource.
+// connections with the same `slug`, two policies for the same `operation`,
+// or a schema without an `objectType` refuse the release with `rel.invalid`,
+// with an entry for each such resource.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
 // resource, and the release it builds pins at most 50, the most a release
@@ -12360,6 +12416,18 @@ type ConfigurationBundle struct {
 	// as `${{ NAME }}` references to variables, never as values, so a bundle
 	// carries no credentials.
 	Idps []IdpConnection `json:"idps"`
+	// Operation policies, one per `.zitadel/policies/<operation>.json`, each
+	// the body `POST /policies` takes. The handle is `operation`: a project
+	// has one policy per operation. An unknown setting or a value outside a
+	// setting's bounds is refused while the request is decoded, with
+	// `req.invalid` and no `details.resources`; a config the operation's
+	// template refuses beyond that, such as settings that contradict each
+	// other, gets a `rel.invalid` entry.
+	// A request served this release reads the policy revision it pins for
+	// the operation, as it reads the user schema, branding and identity
+	// providers, once the release pins a flow; a release that pins a flow
+	// and no policy for an operation means no policy for it.
+	Policies []PublishPolicyRequest `json:"policies"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
@@ -12381,6 +12449,11 @@ func (s *ConfigurationBundle) GetIdps() []IdpConnection {
 	return s.Idps
 }
 
+// GetPolicies returns the value of Policies.
+func (s *ConfigurationBundle) GetPolicies() []PublishPolicyRequest {
+	return s.Policies
+}
+
 // GetBranding returns the value of Branding.
 func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
@@ -12399,6 +12472,11 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 // SetIdps sets the value of Idps.
 func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
 	s.Idps = val
+}
+
+// SetPolicies sets the value of Policies.
+func (s *ConfigurationBundle) SetPolicies(val []PublishPolicyRequest) {
+	s.Policies = val
 }
 
 // SetBranding sets the value of Branding.
@@ -76014,6 +76092,8 @@ type ReleasePointer struct {
 	// `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
+	// - `policy` — the policy's `operation`, so a project's password policy
+	// is one resource however often it is revised
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -76068,6 +76148,7 @@ const (
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
+	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -76077,6 +76158,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
 		ReleasePointerKindIdp,
+		ReleasePointerKindPolicy,
 	}
 }
 
@@ -76090,6 +76172,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindBranding:
 		return []byte(s), nil
 	case ReleasePointerKindIdp:
+		return []byte(s), nil
+	case ReleasePointerKindPolicy:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -76110,6 +76194,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindIdp:
 		*s = ReleasePointerKindIdp
+		return nil
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)

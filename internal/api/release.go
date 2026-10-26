@@ -94,6 +94,7 @@ func requireBuildKindScopes(ctx context.Context, bundle api.ConfigurationBundle)
 		{len(bundle.Schemas) > 0, "schema.write", "schemas"},
 		{len(bundle.FlowDefinitions) > 0, "flow_definition.write", "flow_definitions"},
 		{len(bundle.Idps) > 0, "idp.write", "idps"},
+		{len(bundle.Policies) > 0, "policy.write", "policies"},
 		{bundle.Branding.IsSet(), "branding.write", "branding"},
 	}
 	for _, check := range checks {
@@ -159,6 +160,14 @@ func mapBuildReleaseRequest(projectID string, req *api.BuildReleaseRequest) (ser
 			return input, domain.ErrReleaseInvalid("idp is not serialisable", err)
 		}
 		input.IDPs = append(input.IDPs, service.BuildIDP{Index: i, Document: doc})
+	}
+
+	for i, item := range req.Bundle.Policies {
+		operation, config, err := fromAPIPublishPolicy(item)
+		if err != nil {
+			return input, err
+		}
+		input.Policies = append(input.Policies, service.BuildPolicy{Index: i, Operation: operation, Config: config})
 	}
 
 	if branding, ok := req.Bundle.Branding.Get(); ok {
