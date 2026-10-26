@@ -777,7 +777,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	t.Run("unknown expand is 400", func(t *testing.T) {
 		body := `{"expand":["nope"]}`
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-			harness.EnsureTestServer(t).URL+"/grants/query?project_id="+url.QueryEscape(project.ID),
+			harness.APIBaseURL(t)+"/grants/query?project_id="+url.QueryEscape(project.ID),
 			strings.NewReader(body),
 		)
 		require.NoError(t, err)
@@ -850,7 +850,7 @@ func assertGrantNotFound(t *testing.T, resp any) {
 func assertCreateGrantReqInvalid(t *testing.T, token, projectID, body string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		harness.EnsureTestServer(t).URL+"/grants?project_id="+url.QueryEscape(projectID),
+		harness.APIBaseURL(t)+"/grants?project_id="+url.QueryEscape(projectID),
 		strings.NewReader(body),
 	)
 	require.NoError(t, err)

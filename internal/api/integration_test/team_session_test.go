@@ -96,7 +96,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 	// before any handler runs.
 	t.Run("team delete refuses a raw session cookie", func(t *testing.T) {
 		cookie := platformSessionCookie(t, claimerID).Value
-		base := harness.EnsureTestServer(t).URL
+		base := harness.APIBaseURL(t)
 
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodDelete, base+"/teams/"+claimerTeamID, nil)
 		require.NoError(t, err)

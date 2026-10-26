@@ -5,9 +5,9 @@ import { expect, test } from "@playwright/test";
  * console service at /console/, the server's runtime document under that
  * path, and the old /ui/console links sent on. A wrong rule shows here by
  * name, where the browser test (console.browser.spec.ts) only times out on a
- * blank page. It also holds the Mixpanel proxy the CLI's usage analytics and
- * the server's service ping go through, which no other suite reaches, and
- * what answers a path no service serves.
+ * blank page. It also holds the API's prefix, the Mixpanel proxy the CLI's
+ * usage analytics and the server's service ping go through, which no other
+ * suite reaches, and what answers a path no service serves.
  */
 
 test("the server answers /console/runtime.json, under the console's path", async ({ request }) => {
@@ -46,6 +46,27 @@ test("/console and the old /ui/console links redirect, query kept", async ({ req
     }
   }
   expect(wrong).toEqual([]);
+});
+
+test("/api/v1/* is the server's API, and its root paths say they are deprecated", async ({
+  request,
+}) => {
+  // vercel.json sends /api/* to the server ahead of every other service
+  // (ADR 077). Until 1.0.0 the server also answers the API's root paths,
+  // through the catch-all, with a Deprecation header. Signed out, both
+  // spellings refuse GET /users/me with the API's envelope.
+  for (const route of ["/api/v1/users/me", "/users/me"]) {
+    const response = await request.get(route, { headers: { accept: "application/json" } });
+    expect(response.status(), route).toBe(401);
+    expect(await response.json(), route).toMatchObject({ code: "auth.unauthorized" });
+    const deprecation = response.headers().deprecation;
+    if (route.startsWith("/api/v1/")) {
+      expect(deprecation, route).toBeUndefined();
+    } else {
+      expect(deprecation, route).toMatch(/^@\d+$/);
+      expect(response.headers().link, route).toContain('rel="deprecation"');
+    }
+  }
 });
 
 test("/telemetry/mixpanel/* reaches Mixpanel's EU API", async ({ request }) => {
