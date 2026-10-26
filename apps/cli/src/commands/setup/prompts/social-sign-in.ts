@@ -18,6 +18,8 @@ import {
   providerOf,
   selectionName,
   validated,
+  parseClientId,
+  parseClientSecret,
 } from "@zitadel/config/idp";
 
 import {
@@ -26,7 +28,6 @@ import {
   callbackUriFor,
   loopbackIssuerWarning,
 } from "../../../lib/idp";
-import { clientIdQuestion, clientSecretQuestion } from "../../../lib/questions";
 import { reportWarning } from "../../../lib/warnings";
 import type { Asker } from "../../../lib/input";
 import { issuerFromPort } from "../../../lib/orca";
@@ -94,14 +95,17 @@ export class SocialSignInPrompt implements SetupPrompt {
       this.announce(entry, answers.devPort, endpoints?.issuer);
 
       const clientId = await ctx.input({
-        ...clientIdQuestion(entry.displayName),
+        kind: "text",
+        name: "client id",
+        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
+        parse: parseClientId,
         given: flagged?.credentials.clientId,
       });
       const secret = await ctx.input({
-        ...clientSecretQuestion({
-          provider: entry.displayName,
-          variable: credentialVariables(providerOf(selection).slug).clientSecret,
-        }),
+        kind: "secret",
+        name: "client secret",
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
+        parse: parseClientSecret,
         given: flagged?.credentials.secret,
       });
       collected.push({ selection, credentials: { clientId, secret }, endpoints });

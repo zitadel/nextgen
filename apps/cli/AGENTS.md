@@ -57,8 +57,7 @@
     will be stored on the project as GOOGLE_CLIENT_SECRET."
   - A confirmation names the thing and what happens: "Revoke rel_1? Its content
     can never be served again."
-  - Put a question that more than one command asks in `src/lib/questions.ts`,
-    so the wording cannot drift.
+  - Ask the same thing the same way in every command that asks it.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new

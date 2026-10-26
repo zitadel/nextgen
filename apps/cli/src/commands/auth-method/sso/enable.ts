@@ -1,5 +1,4 @@
 import type { Asker } from "../../../lib/input";
-import { clientIdQuestion, clientSecretQuestion } from "../../../lib/questions";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -19,6 +18,7 @@ import {
   providerOf,
   selectionName,
   validated,
+  parseClientSecret,
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../lib/api-client";
@@ -297,7 +297,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
       const piped = await this.input({
-        ...clientSecretQuestion({ provider: entry.displayName }),
+        kind: "secret",
+        name: "client secret",
+        message: `What is the client secret of your ${entry.displayName} OAuth app?`,
+        parse: parseClientSecret,
         stdin: true,
         optional: true,
       });
@@ -335,8 +338,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             })
           : undefined;
       const clientId = await this.input({
-        ...clientIdQuestion(entry.displayName),
+        kind: "text",
+        name: `client id for ${entry.displayName}`,
+        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
+        parse: parseClientId,
         given: flags["client-id"],
         retry: retryFor("<client-id>"),
       });
@@ -346,10 +352,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
       const secretValue = await this.input({
-        ...clientSecretQuestion({
-          provider: entry.displayName,
-          variable: scaffolded.clientSecret,
-        }),
+        kind: "secret",
+        name: `client secret for ${scaffolded.clientSecret}`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
+        parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
