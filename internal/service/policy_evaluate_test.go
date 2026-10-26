@@ -93,7 +93,7 @@ func TestPolicyService_Evaluate(t *testing.T) {
 func TestPolicyService_EvaluateChecksTheConfigLikeAPublish(t *testing.T) {
 	ctx := context.Background()
 	for name, in := range map[string]service.EvaluatePolicyInput{
-		"settings that contradict each other": evaluatePassword(map[string]any{"min_length": int64(20), "max_length": int64(10)}, "x", true),
+		"settings that contradict each other":   evaluatePassword(map[string]any{"min_length": int64(20), "max_length": int64(10)}, "x", true),
 		"a value outside the template's bounds": evaluatePassword(map[string]any{"min_length": int64(65)}, "x", true),
 		"an unknown setting":                    evaluatePassword(map[string]any{"min_lenght": int64(12)}, "x", true),
 		"no config":                             evaluatePassword(nil, "x", true),
