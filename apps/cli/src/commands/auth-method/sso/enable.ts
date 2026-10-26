@@ -1,3 +1,4 @@
+import type { Asker } from "../../../lib/input";
 import { clientIdQuestion, clientSecretQuestion } from "../../../lib/questions";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -36,11 +37,15 @@ import {
   type ConnectionPlan,
   type FlowFile,
   credentialVariablesOf,
+  askCustomSettings,
+  checkGivenCustomFlags,
+  type CustomFlagValues,
   customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
+  mappingNotes,
   planConnection,
   publishClientId,
   type PublishState,
@@ -100,7 +105,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // here names the next move. The check below does that instead.
     [ENABLE_FLAG_KEYS.provider]: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
-      description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for any other OpenID Connect provider.`,
+      description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for a custom OpenID Connect (OIDC) provider. In a terminal, a custom provider's settings are asked for when left out.`,
     }),
     [ENABLE_FLAG_KEYS.slug]: nonBlankString({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
@@ -131,7 +136,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // The credentials are published to the project, so the environment is
       // resolved, unlike for the other auth-method commands.
       resolveServer: true,
-      preflight: () => readProject(flags, this.environment.values.ZITADEL_ISSUER?.value),
+      preflight: () =>
+        readProject(
+          flags,
+          this.environment.values.ZITADEL_ISSUER?.value,
+          this.input,
+          !this.meta.nonInteractive,
+        ),
     });
     // Resolved before anything is asked for: being turned away after typing a
     // secret would mean typing it again.
@@ -371,6 +382,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // `wx` rather than a plain write: planConnection decided this file does
       // not exist, and anything that appeared since is not ours to overwrite.
       await writeFile(target, `${stableStringify(connection)}\n`, { flag: "wx" });
+      if (selection.kind === "custom") {
+        for (const note of mappingNotes({
+          file: plan.path,
+          provider: entry.displayName,
+          connection,
+        })) {
+          consola.info(note);
+        }
+      }
       // The id first: it is the half the developer can read back afterwards,
       // and a connection missing either credential fails the same way.
       clientIdState = await publishClientId({
@@ -575,6 +595,8 @@ type ProjectContext = {
 async function readProject(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   issuer: string | undefined,
+  ask: Asker,
+  interactive: boolean,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
   if (provider === undefined) {
@@ -584,9 +606,18 @@ async function readProject(
       hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
     });
   }
+  let values = customFlagValues(flags, ENABLE_FLAG_KEYS);
+  // A person at a terminal is asked for the connection's settings they left
+  // out, the way `setup` asks. The mistakes in the ones they gave are named
+  // under their flag first, so nobody is asked before being turned away. A
+  // script, or --non-interactive, is held to the flags and told which are missing.
+  if (provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values)) {
+    checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
+    values = await askCustomSettings(values, ask);
+  }
   const selection = selectionFromFlags(
     provider,
-    customFlagValues(flags, ENABLE_FLAG_KEYS),
+    values,
     ENABLE_FLAG_NAMES,
     customExample(ENABLE_FLAG_NAMES),
   );
@@ -597,6 +628,13 @@ async function readProject(
     });
   }
   return { selection, entry, issuer };
+}
+
+/** Whether a custom connection's name, button text and issuer were all given. */
+function hasAllCustomSettings(values: CustomFlagValues): boolean {
+  return (
+    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
+  );
 }
 
 /**

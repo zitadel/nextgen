@@ -245,6 +245,36 @@ describe("auth-method sso enable", () => {
     expect(result.stdout).not.toContain("Deploy the configuration");
   });
 
+  it("explains the claim mappings it wrote for a custom connection", async () => {
+    const cwd = await setUpProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    const output = `${result.stdout}${result.stderr}`;
+    expect(output).toContain("Claim mappings in .zitadel/idps/acme-sso.json.");
+    expect(output).toContain("email ← email");
+    expect(output).toContain("Mapping a value does not by itself mark it verified.");
+  });
+
   it("prints the callback URI on reuse in text mode", async () => {
     // The URI moved to one per connection after the first release; rerunning
     // the command on the existing connection is how a developer finds the one

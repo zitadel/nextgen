@@ -15,6 +15,9 @@
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
+export { askCustomSettings } from "./ask-custom";
+export { mappingNotes } from "./mapping-notes";
+
 export {
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,
