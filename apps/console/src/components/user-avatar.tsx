@@ -31,8 +31,10 @@ function setRate(element: HTMLElement | null, rate: number) {
  * rules, so it is the one the login shows. A picture can replace it once
  * users can upload one.
  *
- * Its gradient's direction wanders, unless the person asked for reduced
- * motion. With `fast` it moves `FAST` times quicker: the playback rate
+ * It moves: `zl-avatar-moving` opts into the shared drift of the gradient's
+ * direction (`@zitadel/components/avatar.css`).
+ *
+ * With `fast` it moves `FAST` times quicker: the playback rate
  * changes, not the duration, so the motion speeds up from where it is instead
  * of jumping. Either way the speed eases over `EASE_MS` rather than switching,
  * so it picks up like something pushed and coasts back to rest.
@@ -74,7 +76,7 @@ export function UserAvatar({
     <span
       ref={ref}
       aria-hidden
-      className={cn("zl-avatar size-6 shrink-0", className)}
+      className={cn("zl-avatar zl-avatar-moving size-6 shrink-0", className)}
       style={avatarVars(seed)}
     />
   );

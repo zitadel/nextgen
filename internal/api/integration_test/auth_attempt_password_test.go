@@ -80,8 +80,8 @@ func TestAuthAttemptIdentifierOnly_CannotHandoff(t *testing.T) {
 
 	handoffResp, err := client.CreateHandoff(t.Context(), api.CreateHandoffParams{AttemptID: attemptID})
 	require.NoError(t, err)
-	// createHandoff declares 409 explicitly (rel.revoked), so ogen decodes every
-	// 409 — including att.not_completed — as ErrorDetails rather than the default
+	// createHandoff declares 409 explicitly (att.not_completed), so ogen decodes
+	// that conflict as ErrorDetails rather than the default
 	// CreateHandoffErrorResponseStatusCode wrapper.
 	rejected, ok := handoffResp.(*api.ErrorDetails)
 	require.True(t, ok, "expected handoff refused, got %s", helpers.MustMarshal(t, handoffResp))
@@ -225,8 +225,8 @@ func requireProofRejected(t *testing.T, client *helpers.ApiClient, attemptID api
 		ChallengeID: challengeID,
 	})
 	require.NoError(t, err)
-	// Named 409 (rel.revoked) on this operation makes ogen decode every 409 as
-	// ErrorDetails, including att.proof_rejected which still answers 409.
+	// Named 409 (att.proof_rejected) on this operation makes ogen decode that
+	// conflict as ErrorDetails rather than the default status-code wrapper.
 	rejected, ok := verifyResp.(*api.ErrorDetails)
 	require.True(t, ok, "expected a rejection, got %s", helpers.MustMarshal(t, verifyResp))
 	require.Equal(t, api.ErrorCode("att.proof_rejected"), rejected.Code, helpers.MustMarshal(t, rejected))

@@ -42,8 +42,9 @@ bound that also feeds the estimator before a template may declare it.
 
 - Omitted means off. A setting the instance does not set switches off the
   rule that reads it, and an instance with an empty `config` enforces
-  nothing. Zitadel does not choose a value on the project's behalf; a starter
-  instance can be scaffolded by the CLI and skipped.
+  nothing. Zitadel does not choose a value on the project's behalf, neither
+  in the server nor in the CLI: setup scaffolds the instance empty and sets a
+  value only when the developer gives one.
 - Bounds are technical. A bound exists only where the server cannot go
   further: 64 code points is the domain's password cap
   (`domain.MaxPasswordLength`), and 4 passwords, the current one included,

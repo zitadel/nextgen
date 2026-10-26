@@ -15,5 +15,7 @@ properties:
     example: team_01KZZY8PX8K8ATNVDSMRCZY4N1
   name:
     type: string
-    description: The team's name. Absent when the team can no longer be loaded.
+    description: |
+      The team's name. Absent when the team can no longer be loaded, or where
+      the referencing endpoint leaves it out for a team the caller may not see.
     example: Platform admins

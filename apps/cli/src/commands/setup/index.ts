@@ -90,6 +90,11 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import {
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+  parsePasswordMinLength,
+} from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -233,6 +238,10 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
+    "password-min-length": nonBlankString({
+      description:
+        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+    }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
@@ -376,7 +385,6 @@ export default class Setup extends BaseCommand {
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
-
     this.recordTelemetry({
       framework: app.framework,
       renderer: flags.renderer ?? "react",
@@ -386,8 +394,13 @@ export default class Setup extends BaseCommand {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
+      // Read from the raw flag: it is parsed below, so a bad value fails after
+      // this step is recorded, like the other flags'. 0 sets none.
+      password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
+    // Read once: a bad value is refused here, before anything is created.
+    const passwordMinLengthFlag = passwordMinLengthFromFlag(flags["password-min-length"]);
 
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
@@ -405,6 +418,7 @@ export default class Setup extends BaseCommand {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
+      passwordMinLength: passwordMinLengthFlag,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -422,6 +436,7 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         ssoFromFlag: flags.sso !== undefined,
+        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
       for (const prompt of SETUP_PROMPTS) {
@@ -449,6 +464,8 @@ export default class Setup extends BaseCommand {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
+      // Whether a minimum went into the password policy, never the value.
+      password_policy: typeof answers.passwordMinLength === "number" ? "set" : "empty",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -549,6 +566,7 @@ export default class Setup extends BaseCommand {
               useCase: answers.useCase,
               devPort: answers.devPort,
               sso: answers.sso.map((answer) => answer.selection),
+              passwordMinLength: answers.passwordMinLength,
             },
           );
       consola.success(`Created project ${project.id}`);
@@ -599,6 +617,7 @@ export default class Setup extends BaseCommand {
               preset: answers.preset,
               useCase: answers.useCase,
               sso: answers.sso,
+              passwordMinLength: answers.passwordMinLength,
               cliVersion: this.meta.cliVersion,
             });
       } catch (error) {
@@ -622,13 +641,15 @@ export default class Setup extends BaseCommand {
           hint:
             cause.hint ??
             (newApp === undefined
-              ? "The project was created but its default schema/flow upload did not finish. " +
-                "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
-                "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+              ? "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default schema/flow upload did not finish, " +
-                "so setup removed the new app again. Re-run setup as before to start over."),
+              : "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload, so setup removed the new app again. " +
+                "Re-run setup as before to start over."),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -1370,6 +1391,12 @@ export type SetupRetryOptions = {
    * connection's `${{ NAME }}` from.
    */
   sso?: readonly ProviderSelection[];
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
 };
 
 /**
@@ -1393,6 +1420,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
+  }
+  if (opts.passwordMinLength !== undefined) {
+    parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
@@ -1437,6 +1467,18 @@ const isKnownSsoName = (name: string): boolean =>
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
+/**
+ * The `--password-min-length` a retry carries: the value it means, or nothing
+ * for one the parser refuses, which a retry would only be refused for again.
+ */
+function retryMinLength(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok ? parsed.value : undefined;
+}
+
 export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
@@ -1445,6 +1487,7 @@ export function retryOptionsFromFlags(flags: {
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
+  "password-min-length"?: string;
   sso?: string;
   "sso-client-id"?: string;
   "sso-slug"?: string;
@@ -1492,6 +1535,7 @@ export function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    passwordMinLength: retryMinLength(flags["password-min-length"]),
     // The provider survives on its own. A suggested retry carries `--sso`
     // without `--sso-client-id` -- the id is never put in command text -- so
     // requiring both here would drop the provider from the next suggestion if
@@ -1768,6 +1812,33 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
+ * Whether `--password-min-length` asks for a minimum, rather than none,
+ * nothing, or a value the parser refuses (setup fails on that just after).
+ */
+function setsMinLength(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok && typeof parsed.value === "number";
+}
+
+/**
+ * `--password-min-length`, read with the prompt's parser so the two cannot
+ * disagree. Refused before anything is created.
+ */
+function passwordMinLengthFromFlag(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  if (!parsed.ok) {
+    throw new ZitadelError("E_VALIDATION", `--password-min-length: ${parsed.problem}`);
+  }
+  return parsed.value;
+}
+
+/**
  * Map from the patcher's deterministic output paths to a short noun
  * phrase describing what the file is for. Anything not in the map falls
  * back to the bare path in the narration; add an entry here when a new
@@ -1787,6 +1858,9 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
+  ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
+  ".zitadel/policies/README.md": { subject: "the policies folder README" },
+  ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
@@ -1877,13 +1951,14 @@ export function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects and how it authenticates —
+  // change what the login collects, how it authenticates and what it enforces —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });
