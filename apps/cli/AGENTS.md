@@ -52,8 +52,9 @@
 
 ## Telemetry
 
-Anonymous product analytics through Mixpanel's Node SDK (`mixpanel`), plus a
-copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
+Anonymous product analytics: a copy of each event to Vercel Web Analytics
+(`src/lib/telemetry/vercel.ts`), and Mixpanel's Node SDK (`mixpanel`), which is
+paused.
 
 - Add no other analytics tool or SDK, browser SDK included.
 - The Vercel copy sends only `VERCEL_EVENT_KEYS` (`src/lib/oclif/command-telemetry.ts`),
@@ -73,12 +74,13 @@ copy of each event to Vercel Web Analytics (`src/lib/telemetry/vercel.ts`).
   built; CLI-specific properties live in `src/lib/oclif/command-telemetry.ts`.
 - Telemetry never writes to stdout and never fails a command. The first-run
   notice goes to stderr, in interactive mode only.
-- The baked-in ingestion tokens (`src/lib/telemetry/config.ts`) are write-only
-  and published on purpose. Without settings, events go to the production
-  project; `ZITADEL_TELEMETRY_ENV=development` selects the dev project, and CI
-  sets `DO_NOT_TRACK=1`.
-- Events for the EU projects go through the cloud's `/telemetry/mixpanel/*`
-  rewrite in `vercel.json`, which released CLIs depend on (`config.test.ts`).
+- Mixpanel is paused: `src/lib/telemetry/config.ts` bakes in no token, so only
+  `ZITADEL_TELEMETRY_TOKEN` sends to it. Bake one back in only for a project in
+  the region its endpoint names; tokens are write-only, published on purpose.
+- Without settings a run is production traffic; `ZITADEL_TELEMETRY_ENV=development`
+  (`scripts/run-cli.mjs` sets it) is not, and CI sets `DO_NOT_TRACK=1`.
+- Mixpanel events for the EU region go through the cloud's
+  `/telemetry/mixpanel/*` rewrite in `vercel.json` (`config.test.ts`).
 - `ci_provider` and `host_agent` also travel in the HTTP `User-Agent`
   (`src/lib/user-agent.ts`) and obey the same opt-out.
 - The docs' [telemetry page](../docs/content/docs/reference/cli/telemetry.mdx)
@@ -97,6 +99,7 @@ from `BaseCommand` for every command. Add a dimension rather than an event:
    [event catalog](../../docs/product-analytics-events.yaml) and on the
    telemetry page; `tests/unit/lib/telemetry/catalog.test.ts` fails when the
    code and the catalog disagree.
-4. Check that it arrives in Mixpanel's Live View. The region defaults to `eu`;
-   set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are silently
-   dropped.
+4. Check that it arrives in Mixpanel's Live View, with `ZITADEL_TELEMETRY_TOKEN`
+   naming the dev project while Mixpanel is paused. The region defaults to
+   `eu`; set `ZITADEL_TELEMETRY_REGION=us` for a US project, or events are
+   silently dropped.

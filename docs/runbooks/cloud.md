@@ -45,8 +45,8 @@ the build's base and the console path together.
 
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
-the server's service ping go there, so released CLIs and servers depend on
-the path: keep it, ahead of the server's catch-all.
+the server's service ping send to Mixpanel through it once Mixpanel is no
+longer paused: keep it, ahead of the server's catch-all.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
