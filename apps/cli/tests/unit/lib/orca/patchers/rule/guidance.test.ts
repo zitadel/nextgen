@@ -216,6 +216,13 @@ describe("guidance content", () => {
     expect(agents).not.toContain("`--zl-font-family-heading`");
   });
 
+  it("has a heading that replaces the widget's follow the login's steps", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("moves between sign-in and sign-up by itself");
+    expect(agents).toContain("must follow its `zitadel-flow-step` event");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');
