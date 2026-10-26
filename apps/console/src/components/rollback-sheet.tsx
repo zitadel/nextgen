@@ -2,9 +2,15 @@ import { Layers3 } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { toast } from "sonner";
 
-import { CHOICE_CARD, LABEL_ROW, LEGEND, SECTION } from "@/components/deploy-sheet";
 import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
-import { FormSheet, FormSheetForm } from "@/components/form-sheet";
+import {
+  FormSheet,
+  FormSheetForm,
+  SHEET_CHOICE_CARD,
+  SHEET_LABEL_ROW,
+  SHEET_LEGEND,
+  SHEET_SECTION,
+} from "@/components/form-sheet";
 import { OriginLink } from "@/components/origin-link";
 import { Field, FieldContent, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
@@ -124,9 +130,9 @@ function RollbackForm({
       onSubmit={() => void rollback.run()}
       onClose={onClose}
     >
-      <div className={SECTION}>
+      <div className={SHEET_SECTION}>
         <div className="flex flex-col gap-3">
-          <h3 className={LEGEND}>Current deployment</h3>
+          <h3 className={SHEET_LEGEND}>Current deployment</h3>
           {targets === undefined ? (
             <p className="text-xs leading-4 text-muted-foreground">Loading deployments…</p>
           ) : targets.current === undefined ? (
@@ -143,7 +149,7 @@ function RollbackForm({
         <Separator />
 
         <FieldSet>
-          <FieldLegend variant="label" className={LEGEND}>
+          <FieldLegend variant="label" className={SHEET_LEGEND}>
             Roll back to
           </FieldLegend>
           {targets !== undefined && targets.options.length === 0 ? (
@@ -162,7 +168,7 @@ function RollbackForm({
         <Separator />
 
         <Field>
-          <div className={LABEL_ROW}>
+          <div className={SHEET_LABEL_ROW}>
             <FieldLabel htmlFor={messageId}>Message</FieldLabel>
             <FieldOptionalIndicator />
           </div>
@@ -184,12 +190,17 @@ function RollbackForm({
 function RollbackOption({ deployment }: { deployment: Deployment }) {
   const id = useId();
   return (
-    <FieldLabel htmlFor={id} className={CHOICE_CARD}>
+    <FieldLabel htmlFor={id} className={SHEET_CHOICE_CARD}>
       <Field orientation="horizontal">
         <FieldContent className="gap-3">
           <DeploymentFacts deployment={deployment} dated />
         </FieldContent>
-        <RadioGroupItem value={deployment.id} id={id} aria-label={deployment.id} />
+        {/* Named by what tells two choices apart, which is not its id. */}
+        <RadioGroupItem
+          value={deployment.id}
+          id={id}
+          aria-label={`${deployment.release_id}, deployed ${formatDateTime(deployment.deployed_at)}`}
+        />
       </Field>
     </FieldLabel>
   );

@@ -1,7 +1,8 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -122,7 +123,8 @@ describe("release detail", () => {
     await renderAt("/releases/rel_1");
 
     expect(await screen.findByRole("heading", { name: "rel_1" })).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
+    // Nothing has been deployed, so no origin serves the release.
+    expect(screen.getByText("inactive")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Release ID" })).toBeInTheDocument();
 
     // One group per kind the release pins, in the design's order, each pointer
@@ -195,7 +197,7 @@ describe("release detail", () => {
 
     await screen.findByRole("heading", { name: "rel_1" });
     expect(screen.getByText("Revoked")).toBeInTheDocument();
-    expect(screen.queryByText("Active")).not.toBeInTheDocument();
+    expect(screen.queryByText("inactive")).not.toBeInTheDocument();
   });
 
   it("lists where the release went, marking what is still served", async () => {
@@ -217,16 +219,18 @@ describe("release detail", () => {
     ) as HTMLElement;
     const rows = within(card).getAllByRole("list");
     expect(rows).toHaveLength(2);
+    // The header says the release is live too: the preview still serves it.
+    expect(screen.getAllByText("live")).toHaveLength(2);
 
     // Newest first: the preview, still served.
     expect(within(card).getByText("Preview")).toBeInTheDocument();
-    expect(within(card).getByText("active")).toBeInTheDocument();
+    expect(within(card).getByText("live")).toBeInTheDocument();
     expect(
       within(card).getByRole("link", { name: "https://acme-k3x9v2.vercel.app" }),
     ).toHaveAttribute("href", "https://acme-k3x9v2.vercel.app");
     // Then the primary deployment, superseded, with each origin it named.
     expect(within(card).getByText("Primary")).toBeInTheDocument();
-    expect(within(card).getByText("Superseded")).toBeInTheDocument();
+    expect(within(card).getByText("inactive")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://app.acme.com" })).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "https://www.acme.com" })).toBeInTheDocument();
     expect(within(card).getByText(formatDateTime(DEPLOYED_AT))).toBeInTheDocument();
@@ -371,8 +375,12 @@ describe("release actions", () => {
 
   it("shows the server's refusal when an origin took the release meanwhile", async () => {
     servePointers();
+    let reads = 0;
     server.use(
-      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(`${API}/releases/rel_1`, () => {
+        reads += 1;
+        return HttpResponse.json(release());
+      }),
       http.get(DEPLOYMENTS_URL, () => HttpResponse.json({ deployments: [] })),
       http.post(`${API}/releases/rel_1/revoke`, () =>
         HttpResponse.json(
@@ -394,6 +402,8 @@ describe("release actions", () => {
       await screen.findByRole("alertdialog", { name: "Release cannot be revoked" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Release revoked")).not.toBeInTheDocument();
+    // The screen was stale, so it reads the release and its deployments again.
+    await waitFor(() => expect(reads).toBe(2));
   });
 
   it("rolls back to this release's superseded deployment from the header", async () => {
@@ -429,7 +439,9 @@ describe("release actions", () => {
     const inDrawer = within(drawer);
     // What the origins serve now, and this release's own deployment chosen.
     expect(await inDrawer.findByText("rel_2")).toBeInTheDocument();
-    const choice = inDrawer.getByRole("radio", { name: "dep_mine" });
+    const choice = inDrawer.getByRole("radio", {
+      name: `rel_1, deployed ${formatDateTime("2026-10-01T09:00:00Z")}`,
+    });
     expect(choice).toBeChecked();
     expect(inDrawer.getByText(formatDateTime("2026-10-01T09:00:00Z"))).toBeInTheDocument();
     await userEvent.type(inDrawer.getByLabelText("Message"), "phone_number broke sign-up");
@@ -490,7 +502,13 @@ describe("redeploy", () => {
     await inDrawer.findByRole("link", { name: "https://app.acme.com" });
     await userEvent.click(inDrawer.getByRole("button", { name: "Redeploy release" }));
 
-    expect(await screen.findByText("Release redeployed")).toBeInTheDocument();
-    expect(posted).toEqual({ release_id: "rel_1", targets: ["primary"] });
+    // Nothing changed, and the drawer says so instead of claiming a redeploy.
+    expect(await screen.findByText(ALREADY_LIVE_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByText("Release redeployed")).not.toBeInTheDocument();
+    expect(posted).toEqual({
+      release_id: "rel_1",
+      targets: ["primary"],
+      expected_deployment_id: "dep_live",
+    });
   });
 });

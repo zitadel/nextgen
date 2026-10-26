@@ -44,7 +44,7 @@ test("lists a built release and opens the configuration it pins", async ({
   await expect(row).toBeVisible();
   // The kind and the status come from the record the server wrote.
   await expect(row.getByText("Primary")).toBeVisible();
-  await expect(row.getByText("active")).toBeVisible();
+  await expect(row.getByText("live")).toBeVisible();
   await row.getByRole("link", { name: release.id }).click();
 
   await expect(page.getByRole("heading", { name: release.id })).toBeVisible();
@@ -92,8 +92,7 @@ test("deploys a release to the primary origins from the directory", async ({
   seed,
 }) => {
   await signIn(page, zitadel, await seed.user());
-  // Distinct: the drawer leaves out the release the origins already serve,
-  // and the pointer-set release above is live by now.
+  // Distinct, so its row is the one the deploy adds.
   const release = await createDistinctRelease(zitadel, `e2e deploy ${Date.now()}`);
   const origin = `https://${Date.now()}.deploy.acme.test`;
   await addPrimaryOrigin(zitadel, origin);
@@ -116,7 +115,7 @@ test("deploys a release to the primary origins from the directory", async ({
   const row = page.getByRole("row").filter({ hasText: release.id }).first();
   await expect(row).toBeVisible();
   await expect(row.getByText("Primary")).toBeVisible();
-  await expect(row.getByText("active")).toBeVisible();
+  await expect(row.getByText("live")).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
@@ -135,7 +134,7 @@ test("rolls the primary origins back to a superseded deployment", async ({
 
   await page.goto("/deployments");
   const superseded = page.getByRole("row").filter({ hasText: first.id }).first();
-  await expect(superseded.getByText("Superseded")).toBeVisible();
+  await expect(superseded.getByText("inactive")).toBeVisible();
   await superseded.getByRole("button", { name: /^Actions for / }).click();
   await page.getByRole("menuitem", { name: "Rollback" }).click();
 
@@ -150,7 +149,7 @@ test("rolls the primary origins back to a superseded deployment", async ({
   // The rollback is a new deployment of the first release, live on the origin.
   await expect(page.getByText("Deployment rolled back")).toBeVisible();
   const live = page.getByRole("row").filter({ hasText: first.id }).first();
-  await expect(live.getByText("active")).toBeVisible();
+  await expect(live.getByText("live")).toBeVisible();
   await expectNoErrorBoundary(page);
 });
 
@@ -206,9 +205,10 @@ test("redeploys a release from its row", async ({ page, zitadel, seed }) => {
   await expect(drawer.getByRole("link", { name: origin })).toBeVisible();
   await drawer.getByRole("button", { name: "Redeploy release" }).click();
 
-  // The origins serve the release already, so the server answers with the
-  // deployment that is live, and the row stays.
-  await expect(page.getByText("Release redeployed")).toBeVisible();
-  await expect(row.getByText("active")).toBeVisible();
+  // The origins serve the release already with the same values, so the
+  // server answers with the deployment that is live, the drawer says so
+  // rather than claiming a redeploy, and the row stays.
+  await expect(page.getByText(/already live on the primary origins/)).toBeVisible();
+  await expect(row.getByText("live")).toBeVisible();
   await expectNoErrorBoundary(page);
 });

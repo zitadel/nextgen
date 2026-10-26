@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import { ALREADY_LIVE_MESSAGE } from "@/components/deploy-sheet";
 import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
@@ -133,12 +134,12 @@ describe("deployments list", () => {
     // The origins are counted, with the kind under the count.
     expect(first.getByRole("button", { name: "1 origin" })).toBeInTheDocument();
     expect(first.getByText("Preview")).toBeInTheDocument();
-    expect(first.getByText("active")).toBeInTheDocument();
+    expect(first.getByText("live")).toBeInTheDocument();
 
     const second = within(secondRow);
     expect(second.getByRole("link", { name: "rel_1" })).toBeInTheDocument();
     expect(second.getByText("Primary")).toBeInTheDocument();
-    expect(second.getByText("Superseded")).toBeInTheDocument();
+    expect(second.getByText("inactive")).toBeInTheDocument();
     // Older than a day: the calendar date, not "ago".
     expect(second.getByText(formatDateTime(DEPLOYED_AT))).toBeInTheDocument();
   });
@@ -200,7 +201,7 @@ describe("new deployment", () => {
   ];
 
   it("deploys a picked release to the primary origins and lists the record", async () => {
-    // `rel_3` is live on the primary origins: deploying it again changes nothing.
+    // `rel_3` is live on the primary origins; it can be picked again.
     const history: unknown[] = [deployment("dep_live", { release_id: "rel_3" })];
     let posted: { projectId: string | null; body: unknown } | undefined;
     serveDeployments(history);
@@ -240,11 +241,11 @@ describe("new deployment", () => {
     const submit = inDrawer.getByRole("button", { name: "Deploy release" });
     expect(submit).toBeDisabled();
 
-    // The picker hides the revoked release and the one the origins serve.
+    // The picker hides the revoked release and keeps the one the origins serve.
     await userEvent.click(inDrawer.getByRole("combobox", { name: "Release" }));
     const listbox = await screen.findByRole("listbox");
     expect(within(listbox).queryByRole("option", { name: "rel_1" })).not.toBeInTheDocument();
-    expect(within(listbox).queryByRole("option", { name: "rel_3" })).not.toBeInTheDocument();
+    expect(within(listbox).getByRole("option", { name: "rel_3" })).toBeInTheDocument();
     await userEvent.click(within(listbox).getByRole("option", { name: "rel_2" }));
     await userEvent.type(inDrawer.getByLabelText("Message"), "Ship it");
     await userEvent.click(submit);
@@ -252,25 +253,62 @@ describe("new deployment", () => {
     expect(await screen.findByText("Release deployed")).toBeInTheDocument();
     expect(posted).toEqual({
       projectId: "proj_test",
-      body: { release_id: "rel_2", targets: ["primary"], message: "Ship it" },
+      body: {
+        release_id: "rel_2",
+        targets: ["primary"],
+        message: "Ship it",
+        expected_deployment_id: "dep_live",
+      },
     });
     // The drawer closes and the list reads again, so the record is a row.
     expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
     expect(await screen.findByRole("link", { name: "rel_2" })).toBeInTheDocument();
   });
 
-  it("says so when every release is already live", async () => {
-    serveDeployments([deployment("dep_live", { release_id: "rel_2" })]);
+  it("says so when the picked release was already live and nothing was written", async () => {
+    const live = deployment("dep_live", { release_id: "rel_2" });
+    serveDeployments([live]);
     serveProject(ORIGINS);
+    let posted: unknown;
     server.use(
       http.get(RELEASES_URL, () => HttpResponse.json({ releases: [releaseSummary("rel_2")] })),
+      http.post(DEPLOYMENTS_URL, async ({ request }) => {
+        posted = await request.json();
+        // The origins serve it with the same values: the server writes nothing.
+        return HttpResponse.json(live, { status: 200 });
+      }),
     );
     await renderAt("/deployments");
 
     await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
     const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
+    const inDrawer = within(drawer);
+    await userEvent.click(await inDrawer.findByRole("combobox", { name: "Release" }));
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByRole("option", { name: "rel_2" }),
+    );
+    await userEvent.click(inDrawer.getByRole("button", { name: "Deploy release" }));
+
+    expect(await screen.findByText(ALREADY_LIVE_MESSAGE)).toBeInTheDocument();
+    expect(screen.queryByText("Release deployed")).not.toBeInTheDocument();
+    expect(posted).toEqual({
+      release_id: "rel_2",
+      targets: ["primary"],
+      expected_deployment_id: "dep_live",
+    });
+    expect(screen.queryByRole("dialog", { name: "Deploy release" })).not.toBeInTheDocument();
+  });
+
+  it("says so when the project has no release", async () => {
+    serveDeployments();
+    serveProject(ORIGINS);
+    server.use(http.get(RELEASES_URL, () => HttpResponse.json({ releases: [] })));
+    await renderAt("/deployments");
+
+    await userEvent.click(await screen.findByRole("button", { name: "New deployment" }));
+    const drawer = await screen.findByRole("dialog", { name: "Deploy release" });
     expect(
-      await within(drawer).findByText("Every release is already deployed to the primary origins."),
+      await within(drawer).findByText("This project has no release to deploy."),
     ).toBeInTheDocument();
     expect(within(drawer).getByRole("combobox", { name: "Release" })).toBeDisabled();
     expect(within(drawer).getByRole("button", { name: "Deploy release" })).toBeDisabled();
@@ -391,8 +429,12 @@ describe("rollback from a row", () => {
     await pick("dep_old", "Rollback");
     const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
     const inDrawer = within(drawer);
-    expect(await inDrawer.findByRole("radio", { name: "dep_old" })).toBeChecked();
-    expect(inDrawer.queryByRole("radio", { name: "dep_same" })).not.toBeInTheDocument();
+    expect(
+      await inDrawer.findByRole("radio", {
+        name: `rel_1, deployed ${formatDateTime(DEPLOYED_AT)}`,
+      }),
+    ).toBeChecked();
+    expect(inDrawer.queryByRole("radio", { name: /rel_2/ })).not.toBeInTheDocument();
     await userEvent.click(inDrawer.getByRole("button", { name: "Rollback deployment" }));
 
     expect(await screen.findByText("Deployment rolled back")).toBeInTheDocument();
@@ -415,7 +457,11 @@ describe("rollback from a row", () => {
     await pick("dep_live", "Rollback");
     const drawer = await screen.findByRole("dialog", { name: "Rollback deployment" });
     const inDrawer = within(drawer);
-    expect(await inDrawer.findByRole("radio", { name: "dep_old" })).not.toBeChecked();
+    expect(
+      await inDrawer.findByRole("radio", {
+        name: `rel_1, deployed ${formatDateTime(DEPLOYED_AT)}`,
+      }),
+    ).not.toBeChecked();
     expect(inDrawer.getByRole("button", { name: "Rollback deployment" })).toBeDisabled();
   });
 
