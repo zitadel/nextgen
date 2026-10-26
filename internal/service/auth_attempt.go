@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -530,6 +531,10 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 func (s *authAttemptService) VerifyProof(ctx context.Context, input VerifyProofInput) (res *domain.AuthAttempt, err error) {
 	ctx, end := startSpan(ctx, "AuthAttemptService.VerifyProof")
 	defer end(&err)
+	if check, ok := authCheck(input.Proof); ok {
+		// err is the named result, so this sees the outcome of every return below.
+		defer func() { metrics.RecordAuthOutcome(ctx, check, authResult(err)) }()
+	}
 
 	attempt, err := s.stmts.Statements().GetAuthAttemptByID(ctx, input.ProjectID, input.AttemptID)
 	if err != nil {
@@ -854,6 +859,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
 		_, end := startSpan(ctx, "password.Verify")
+		start := time.Now()
 		updated, verifyErr := password.Verify(p.Password, verifier)
 		spanErr := verifyErr
 		if errors.Is(spanErr, crypto.ErrRehashFailed) {
@@ -861,6 +867,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			spanErr = nil
 		}
 		end(&spanErr)
+		metrics.RecordPasswordVerification(ctx, passwordResult(spanErr), time.Since(start))
 		switch {
 		case errors.Is(verifyErr, crypto.ErrRehashFailed):
 			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "the password matched but could not be rehashed",

@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/oidc/v3/pkg/op"
 	"go.opentelemetry.io/otel/attribute"
@@ -186,10 +188,11 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	// and the one Add below. Returning early from either would leave that key
 	// uncached, and the master key arm is the expensive one -- unwrapping under
 	// it is the RSA private-key operation this cache exists to avoid.
+	start := time.Now()
 	var kek crypto.Crypter
-	kind := "project"
+	kind := metrics.KeyKindProject
 	if masterKey := s.masterKeys.GetByKeyID(jweHeader.KeyID); masterKey != nil {
-		kek, kind = masterKey, "master"
+		kek, kind = masterKey, metrics.KeyKindMaster
 	} else {
 		// A database read and a recursion, both of which the cache above spares
 		// every caller after the first.
@@ -203,12 +206,16 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	// kind "master" is the RSA unwrap under a master key, "project" the
 	// unwrap under a project KEK.
 	unwrapCtx, end := startSpan(ctx, "KeyService.unwrapKey")
-	trace.SpanFromContext(unwrapCtx).SetAttributes(attribute.String("key.kind", kind))
+	trace.SpanFromContext(unwrapCtx).SetAttributes(metrics.KeyKindKey.String(string(kind)))
 	crypter, err := key.Crypter(kek)
 	end(&err)
 	if err != nil {
 		return nil, err
 	}
+	// The whole resolution is timed, the uncached KEK read and recursion
+	// included: that is what the cache saves. Only a resolution that produced
+	// a crypter is recorded; a failed one says nothing about that.
+	metrics.RecordKeyChainResolution(ctx, kind, time.Since(start))
 
 	s.crypterCache.Add(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}, crypter)
 	return crypter, nil

@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
 // RequestBufferConfig tunes Path A batching (ADR 048).
@@ -233,10 +234,13 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 			events[i].OccurredAtWait = time.Since(item.startedAt)
 		}
 		insertCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		start := time.Now()
 		lastErr = b.insert.InsertEvents(insertCtx, events)
+		metrics.RecordAuditInsert(insertCtx, metrics.AuditRequest, time.Since(start))
 		cancel()
 		if lastErr == nil {
 			b.flushed.Add(uint64(len(events)))
+			recordEventsWritten(ctx, events)
 			return
 		}
 		if attempt < maxAttempts {
@@ -253,6 +257,18 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		slog.Uint64("dropped_total", b.dropped.Load()),
 		slog.String("error", lastErr.Error()),
 	)
+}
+
+// recordEventsWritten counts a batch that storage accepted, once per event
+// type it held.
+func recordEventsWritten(ctx context.Context, events []*domain.Event) {
+	counts := make(map[domain.EventType]int, 1)
+	for _, ev := range events {
+		counts[ev.EventType]++
+	}
+	for eventType, n := range counts {
+		metrics.RecordAuditEvents(ctx, string(eventType), n)
+	}
 }
 
 // Close drains the buffer and stops the flusher.

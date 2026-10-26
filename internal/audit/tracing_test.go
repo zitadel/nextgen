@@ -20,18 +20,23 @@ import (
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
 var spanExporter = tracetest.NewInMemoryExporter()
 
-// TestMain sets the global provider once: the package tracer delegates to the
-// first provider set in the process.
+// metricsReader collects what the package's inserts record; see TestMain.
+var metricsReader *metricstest.Reader
+
+// TestMain sets the global providers once: the package tracer and the
+// catalogue's instruments delegate to the first provider set in the process.
 func TestMain(m *testing.M) {
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(spanExporter),
 		sdktrace.WithSampler(zotel.NewSampler(1.0)),
 	))
+	metricsReader = metricstest.Install()
 	os.Exit(m.Run())
 }
 
