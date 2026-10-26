@@ -119,14 +119,13 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 | **drift** | Divergence between the repo's `zitadel.json` and server-side state. Resolves silently in favor of repo. |
 | **branding** | The per-project login-appearance resource: layout, asset URLs, and the Liquid template, published as immutable revisions via the Branding API / `zitadel apply`. Flow responses resolve the newest revision. Decisions in [ADR 040](../adrs/040-tenant-login-templates-editable-config.md). Carries widget appearance, widget structure, and project translations — not page chrome. Placement of each kind of change: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
 | **translations** | Project-scoped locale × key copy overlays for login strings ([ADR 045](../adrs/045-copy-overlays-as-branding-revisions.md)). A different setting from branding appearance ([#1038](https://github.com/zitadel/nextgen/issues/1038)). Page-local override is `lang` / `locales` on the element ([ADR 018](../adrs/018-widget-owned-locale-resolution.md)). Placement: [`branding/customization-strategy.md`](branding/customization-strategy.md), [ADR 057](../adrs/057-login-customization-categories.md). |
-| **widget template** | Advanced widget structure: the LiquidJS artifact the login component renders per step (`branding.liquid_template` / `login.liquid`). Strict scope — `<zl-*>` against the step payload, no page chrome — and **shared by embedded and Zitadel-served login** when it ships. Not setup, not the first visual iteration. Security rules in [`flowengine/template-security.md`](flowengine/template-security.md). Distinct from the `renderer` enum value and from a proposed **page template**. |
+| **widget template** | Advanced widget structure: the LiquidJS artifact the login component renders per step (`branding.liquid_template` / `login.liquid`). Strict scope — `<zl-*>` against the step payload, no page chrome. Not setup, not the first visual iteration. Security rules in [`flowengine/template-security.md`](flowengine/template-security.md). Distinct from the `renderer` enum value and from a proposed **page template**. |
 | **template** (branding) | Prefer **widget template** when both Liquid artifacts are in play. Bare "template" still means `login.liquid` in older docs (ADR 040, [`branding/templates.md`](branding/templates.md)). |
 | **design** | A named Liquid starting point for the widget template that `zitadel branding eject --design` scaffolds: `centered` (the default card) or `minimal` (no card chrome). The former `split`, `split-right` and `hero` were page chrome and were retired in [#1039](https://github.com/zitadel/nextgen/issues/1039) ([ADR 057](../adrs/057-login-customization-categories.md)); revisions already published from them keep rendering. |
 | **layout** | The `branding.layout` wire enum (`centered \| split`). It is validated and handed to the template; the bundled default template does not read it. Deliberately small — richer looks ship as designs (templates), not new enum values. |
-| **page chrome** | Everything outside `<zitadel-login>`: split page, modal host, left-pane marketing. Embedders write application code. Zitadel-served page chrome is **unset**. [ADR 057](../adrs/057-login-customization-categories.md). |
-| **page template** | Proposed later Liquid document (`page.liquid`) with a `login_widget` hole for Zitadel-served page chrome. Not a settled requirement; not used by embeds. |
+| **page chrome** | Everything outside `<zitadel-login>`: split page, modal host, left-pane marketing. Application code the customer writes. [ADR 057](../adrs/057-login-customization-categories.md). |
 | **embedded login** | `<zitadel-login>` rendered by the customer's application. The customer owns the document. Orthogonal to whether the Zitadel *server* is cloud or customer-operated. |
-| **Zitadel-served login** | Zitadel presents the login page (today `/ui/login/`). Same widget; branding/content reuse where applicable. Independent of Cloud vs customer-operated server. Alias: **hosted login**. |
+| **Zitadel-served login** | Dropped: Zitadel presents no login page, and the customer's application presents every login ([ADR 057](../adrs/057-login-customization-categories.md), amended 2026-10-24). Alias: **hosted login**. |
 | **custom domain** | The customer-chosen hostname (CNAME + ACME certificate) on which Zitadel serves the hosted login and OIDC endpoints: integration level 3 in [`platform/overview.md`](platform/overview.md), deferred past the MVP. Not an **origin** (§4): an origin is where the customer's app runs and is allowlisted; a custom domain is where Zitadel itself answers. |
 | **fully custom frontend** | Customer-owned authentication UI on Zitadel's supported APIs. A presentation model, not an embed escape hatch. |
 
@@ -134,7 +133,7 @@ From the configuration surface, flow engine, and branding. Long-form in [`platfo
 
 ## 7. URL shape
 
-**LOCKED: no version segment in paths.** All endpoints live directly under the root (`POST /users`, `GET /teams/{id}`). Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) is target design — the shipped API is unversioned; breaking changes ride the alpha release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
+**RECOMMENDED: the resource API lives under `/api/v1/`** (`POST /api/v1/users`, `GET /api/v1/teams/{id}`); the login UI, the console, IdP callbacks, health probes and protocol endpoints stay at the root ([ADR 077](../adrs/077-api-path-prefix.md), Proposed). It replaces the lock on no version segment, which assumed an API host of its own. The shipped API still lives directly under the root. Header-selected versioning (`Zitadel-Version`, pinned per API key and per webhook endpoint) stays target design for opt-in changes within a major; until GA, breaking changes ride the release train. See [`api/conventions.md`](api/conventions.md#direction-not-shipped).
 
 ---
 
@@ -164,7 +163,7 @@ Four independent axes the system moves on.
 | `sk_org_…` | **`sk_team_…`** | One team-scoped service token prefix. |
 | `zp_…` | **`sk_proj_…`** | Pre-claim anonymous secret is `sk_proj_` with `pre_claim: true`. |
 | `zpp_…` | **`sk_proj_…`** (origin-scoped) | Origin-scoped variant for preview deploys. Status now **OPEN**: see `preview_secret` in §3. |
-| path version segment | **no version segment** | Versioning via header only. |
+| no path version segment *(header only)* | **`/api/v1/` prefix** | RECOMMENDED, not locked: [ADR 077](../adrs/077-api-path-prefix.md) is Proposed and the shipped API is still at the root (§7). |
 
 ### "Instance" disambiguation
 

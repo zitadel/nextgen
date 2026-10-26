@@ -45,6 +45,9 @@ through any wrapping.
 - A refusal for an error that means "we could not decide" (the database
   failed, say) tells clients their session is dead, and the SDKs clear their
   cookie on a 401: an outage would sign every user out.
+- A handler a browser lands on, outside the API, answers a failure with
+  `internal/errorpage`, never HTML of its own; an API path answers the
+  envelope even to a browser ([ADR 076](../docs/adrs/076-error-pages-and-unmatched-routes.md)).
 
 ## Format before push
 

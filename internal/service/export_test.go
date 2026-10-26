@@ -31,3 +31,13 @@ func ResolveOrCreateIDP(
 func NewIDPConnectionServiceForTest(v2Pool *DB, schemas BuiltinSchemaProvider) *idpConnectionService {
 	return NewIDPConnectionService(v2Pool, schemas)
 }
+
+func ResolveOrPublishPolicy(
+	s *PolicyService,
+	ctx context.Context,
+	stmts AllStatements,
+	projectID, operation string,
+	raw []byte,
+) (*domain.Policy, error) {
+	return s.resolveOrPublish(ctx, stmts, projectID, operation, raw)
+}

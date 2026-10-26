@@ -1,7 +1,15 @@
 # ADR 040: Tenant Login Templates as Editable Config
 
-> **Status:** Proposed (amended 2026-08-27 by [ADR 057](057-login-customization-categories.md); amended 2026-09-15: `$file` references)
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-07-20; amended 2026-08-27 by [ADR 057](057-login-customization-categories.md); amended 2026-09-15: `$file` references)
 > **Date:** 2026-07-20
+>
+> **Amendment (2026-10-24):** shipped: branding revisions with the save gate
+> (`internal/domain/branding_validator.go`), `zitadel branding eject`, and
+> `$file` references (#1224). The "latest revision" interim in §2 is over: a
+> flow now resolves its branding through the deployed release (#1858, #2044),
+> and since [ADR 068](068-project-is-the-data-boundary.md) a project has no
+> environments, so read "environment's active release" as "the project's
+> deployed release". §5 is replaced by ADR 057.
 > **Context:** How tenant-authored LiquidJS login templates ("branding") are stored, validated, delivered to the login component, and edited through the CLI. Completes the write path for the read-only `Branding` projection already defined in [`flow-api` components](../../api/openapi/components/flows/branding.yaml) and consumed by `@zitadel/components`.
 
 ## Introduction
@@ -235,11 +243,11 @@ authoritative validator and a component-level render test.
 
 [ADR 057](057-login-customization-categories.md) keeps this ADR's storage,
 validation, and eject→apply path for the **widget template** (advanced
-structure inside the widget, shared by embedded and Zitadel-served login,
-strict scope, later). It amends §5's catalog: `split` / `split-right` /
-`hero` are page chrome. Setup must not publish those files as
-`login.liquid`. Zitadel-served page chrome is unset; `page.liquid` is a
-proposal, not a requirement.
+structure inside the widget, strict scope, later). It amends §5's catalog:
+`split` / `split-right` / `hero` are page chrome. Setup must not publish
+those files as `login.liquid`. Page chrome is the customer's application:
+ADR 057's amendment of 2026-10-24 drops Zitadel-served login, so there is
+no page template.
 
 Implemented in [#1039](https://github.com/zitadel/nextgen/issues/1039):
 setup no longer has a `--design` flag or design question and publishes no

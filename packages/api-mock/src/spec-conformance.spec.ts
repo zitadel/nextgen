@@ -1800,3 +1800,541 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 });
+describe("api-mock releases and deployments", () => {
+  async function newProject(name: string): Promise<{ id: string; secret: string }> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, secret: body.project_secret };
+  }
+
+  const addPrimary = (id: string, secret: string, pattern: string) =>
+    fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ pattern, kind: "primary" }),
+    });
+
+  const rel1 = { pointers: [{ kind: "schema", revision_id: "sch_a" }] };
+  const rel2 = { pointers: [{ kind: "schema", revision_id: "sch_b" }] };
+
+  const createRelease = (id: string, secret: string, body: object) =>
+    fetch(`${BASE}/releases?project_id=${id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify(body),
+    });
+
+  const createDeployment = (id: string, secret: string, body: object) =>
+    fetch(`${BASE}/deployments?project_id=${id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify(body),
+    });
+
+  test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
+    const project = await newProject("release-build-idps");
+    const connection = (secret: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: secret,
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const first = await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ A }}")] },
+    });
+
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(expect.objectContaining({ kind: "idp", handle: "google" }));
+
+    // The connection is the project's now, created by the build rather than by
+    // a separate write before it.
+    const listed = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(listed.idps.map((idp) => idp.slug)).toEqual(["google"]);
+
+    // A changed document revises the same connection, so the slug keeps
+    // pointing at it rather than a second one appearing.
+    await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ B }}")] },
+    });
+    const again = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(again.idps).toHaveLength(1);
+  });
+
+  test("refuses a build that would change a connection's fixed field", async () => {
+    const project = await newProject("release-build-idp-immutable");
+    const connection = (issuer: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer,
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://accounts.google.com")],
+      },
+    });
+
+    const res = await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://login.microsoftonline.com")],
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
+    const project = await newProject("release-build-policies");
+    const policy = (min_length: number) => ({
+      operation: "auth.factor.password.set",
+      config: { min_length },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    const listed = async () =>
+      (
+        (await (
+          await fetch(`${BASE}/policies?project_id=${project.id}`, {
+            headers: { authorization: `Bearer ${project.secret}` },
+          })
+        ).json()) as { policies: { id: string; revision_id: string; config: object }[] }
+      ).policies;
+
+    const first = await build({ bundle: { policies: [policy(12)] } });
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(
+      expect.objectContaining({ kind: "policy", handle: "auth.factor.password.set" }),
+    );
+    const [published] = await listed();
+    expect(published?.config).toEqual({ min_length: 12 });
+
+    await build({ bundle: { policies: [policy(14)] } });
+    const [revised] = await listed();
+    expect(revised?.id).toBe(published?.id);
+    expect(revised?.revision_id).not.toBe(published?.revision_id);
+    expect(revised?.config).toEqual({ min_length: 14 });
+
+    // Going back adds a revision, as the service does, so the earlier config
+    // applies again and the build is a new release rather than the first one.
+    const back = await build({ bundle: { policies: [policy(12)] } });
+    expect(back.status).toBe(201);
+    const [again] = await listed();
+    expect(again?.config).toEqual({ min_length: 12 });
+    expect(again?.revision_id).not.toBe(published?.revision_id);
+  });
+
+  test("refuses a bundle whose policy breaks its template's rule, or carries one twice", async () => {
+    const project = await newProject("release-build-policy-invalid");
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const contradicting = await build({
+      bundle: {
+        policies: [
+          { operation: "auth.factor.password.set", config: { min_length: 20, max_length: 10 } },
+        ],
+      },
+    });
+    expect(contradicting.status).toBe(400);
+    const refused = (await contradicting.json()) as {
+      code: string;
+      details: { resources: { kind: string; code: string }[] };
+    };
+    expect(refused.code).toBe("rel.invalid");
+    expect(refused.details.resources).toEqual([
+      expect.objectContaining({ kind: "policy", code: "pol.invalid" }),
+    ]);
+
+    const once = { operation: "auth.factor.password.set", config: {} };
+    const twice = await build({ bundle: { policies: [once, once] } });
+    expect(twice.status).toBe(400);
+    expect(
+      ((await twice.json()) as { details: { resources: unknown[] } }).details.resources,
+    ).toHaveLength(2);
+  });
+
+  test("creates a release and dedupes a resubmission on content", async () => {
+    const project = await newProject("release-create");
+
+    const first = await createRelease(project.id, project.secret, { ...rel1, message: "one" });
+    expect(first.status).toBe(201);
+    const created = (await first.json()) as { id: string; content_hash: string; revoked_at: null };
+    expect(created.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(created.revoked_at).toBeNull();
+
+    const again = await createRelease(project.id, project.secret, { ...rel1, message: "two" });
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { id: string }).id).toBe(created.id);
+  });
+
+  test("filters the release list by content hash", async () => {
+    const project = await newProject("release-filter");
+    const created = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      content_hash: string;
+    };
+
+    const match = await fetch(
+      `${BASE}/releases?project_id=${project.id}&content_hash=${encodeURIComponent(created.content_hash)}`,
+    );
+    expect(((await match.json()) as { releases: unknown[] }).releases).toHaveLength(1);
+
+    const miss = await fetch(
+      `${BASE}/releases?project_id=${project.id}&content_hash=sha256:${"0".repeat(64)}`,
+    );
+    expect(((await miss.json()) as { releases: unknown[] }).releases).toHaveLength(0);
+  });
+
+  test("deploys a release to every primary origin and is idempotent", async () => {
+    const project = await newProject("deploy-primary");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const first = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(first.status).toBe(201);
+    const deployment = (await first.json()) as {
+      targets: { origin: string }[];
+      release_id: string;
+    };
+    expect(deployment.targets).toEqual([{ origin: "https://app.acme.com" }]);
+
+    const again = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(again.status).toBe(200);
+  });
+
+  test("rejects primary with no primary origin, and an unknown origin", async () => {
+    const project = await newProject("deploy-no-primary");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const noPrimary = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(noPrimary.status).toBe(400);
+    expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
+
+    const unknown = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://not-allowed.example.com"],
+    });
+    expect(unknown.status).toBe(403);
+    expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+  });
+
+  test("carries the deployment kind, and turns a replaced one inactive", async () => {
+    const project = await newProject("deploy-kind-status");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+
+    const live = await createDeployment(project.id, project.secret, {
+      release_id: first.id,
+      targets: ["primary"],
+    });
+    expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
+
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const history = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { release_id: string; status: string }[] };
+    expect(history.deployments.find((entry) => entry.release_id === first.id)?.status).toBe(
+      "inactive",
+    );
+  });
+
+  test("refuses a primary origin named one by one", async () => {
+    const project = await newProject("deploy-exact-primary");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const res = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com"],
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "dep.invalid",
+      message: "deployment: deploy primary origins with the primary keyword",
+    });
+  });
+
+  test("refuses a rollback whose expected deployment is no longer the newest", async () => {
+    const project = await newProject("deploy-rollback-guard");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ expected_deployment_id: firstDeploy.id }),
+      },
+    );
+
+    expect(rollback.status).toBe(409);
+    expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
+  });
+
+  test("deploys by digest the release of this project, not another's with the same digest", async () => {
+    const first = await newProject("deploy-digest-a");
+    const second = await newProject("deploy-digest-b");
+    await addPrimary(second.id, second.secret, "https://app.acme.com");
+    await createRelease(first.id, first.secret, rel1);
+    const own = (await (await createRelease(second.id, second.secret, rel1)).json()) as {
+      content_hash: string;
+    };
+
+    const deployed = await createDeployment(second.id, second.secret, {
+      content_hash: own.content_hash,
+      targets: ["primary"],
+    });
+
+    expect(deployed.status).toBe(201);
+  });
+
+  test("writes a new preview deployment for a release the URL already serves", async () => {
+    const project = await newProject("deploy-preview-renewal");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    await createDeployment(project.id, project.secret, body);
+
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+
+    expect(renewed.status).toBe(201);
+  });
+
+  test("gives a preview deployment without a ttl the project's default expiry", async () => {
+    const project = await newProject("deploy-preview-default-ttl");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["https://x-acme.vercel.app"],
+      })
+    ).json()) as { targets: { expires_at: string | null }[] };
+
+    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+  });
+
+  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+    const project = await newProject("deploy-rollback-removed");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://www.acme.com" }),
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${deployment.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ message: "revert" }),
+      },
+    );
+
+    expect(rollback.status).toBe(403);
+    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+  });
+
+  test("rolls back to an earlier deployment, reversing the live release", async () => {
+    const project = await newProject("deploy-rollback");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ message: "revert" }),
+      },
+    );
+    expect(rollback.status).toBe(201);
+    const rolled = (await rollback.json()) as {
+      release_id: string;
+      metadata: { reason: string; rollback_to: string };
+    };
+    expect(rolled.release_id).toBe(first.id);
+    expect(rolled.metadata.reason).toBe("rollback");
+    expect(rolled.metadata.rollback_to).toBe(firstDeploy.id);
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+    ).json()) as { deployments: { release_id: string }[] };
+    expect(live.deployments).toHaveLength(1);
+    expect(live.deployments[0]?.release_id).toBe(first.id);
+  });
+
+  test("refuses to revoke a release an origin still serves, then allows it", async () => {
+    const project = await newProject("release-revoke");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const served = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: served.id,
+      targets: ["primary"],
+    });
+
+    const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+    expect(inUse.status).toBe(409);
+    expect(((await inUse.json()) as { code: string }).code).toBe("rel.in_use");
+
+    const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: next.id,
+      targets: ["primary"],
+    });
+
+    const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { revoked_at: string }).revoked_at).not.toBeNull();
+  });
+});

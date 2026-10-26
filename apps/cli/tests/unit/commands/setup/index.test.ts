@@ -6,7 +6,12 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildSummary } from "../../../../src/commands/setup/index";
+import {
+  buildSummary,
+  readCredentialEnvFiles,
+  restoreCredentialEnvFiles,
+} from "../../../../src/commands/setup/index";
+import { takeReportedWarnings } from "../../../../src/lib/warnings";
 import { LocalServer } from "../../../../src/lib/local-server/server";
 import { aBinaryRecord } from "../../../helpers/runtime-record";
 import {
@@ -213,8 +218,10 @@ describe("setup command pre-flight", () => {
     );
     expect(json.hint).toContain("Run start to restart it");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `setup --framework next --non-interactive --server local --cwd ${cwd}`,
+      ),
     ]);
     expect(json.details).toMatchObject({ server_url: serverUrl, server_version: "0.0.1" });
     // Nothing scaffolded and no project files: only the runtime `start` left.
@@ -269,8 +276,10 @@ describe("setup command pre-flight", () => {
     expect(json.code).toBe("E_LOCAL_SERVER_NOT_RUNNING");
     expect(json.hint).toContain("Start local Zitadel first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
-      expectedPublicCliCommand("setup --framework next --non-interactive --server local"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
+      expectedPublicCliCommand(
+        `setup --framework next --non-interactive --server local --cwd ${cwd}`,
+      ),
     ]);
   });
 
@@ -311,10 +320,8 @@ describe("setup command pre-flight", () => {
   });
 
   // Recovery commands configure the project setup was pointed at, not the
-  // shell's own directory, and they carry no `--cwd` -- a path can hold spaces
-  // and metacharacters, and nothing escapes a suggested command for a shell.
-  // So the guidance names the directory instead.
-  it("names the project directory when it is not the shell's own", async () => {
+  // shell's own directory, so each carries `--cwd`, quoted for a shell.
+  it("points every recovery command at the project directory", async () => {
     const cwd = await makeTempDir();
     await writeFile(join(cwd, "package.json"), JSON.stringify({ dependencies: { next: "^15" } }));
     await writeRuntimeMetadata(cwd, runtimeFor(cwd, "http://localhost:9"));
@@ -330,11 +337,10 @@ describe("setup command pre-flight", () => {
       "--json",
     ]);
 
-    const json = parseJson(res.stdout) as { hint?: string; next_commands?: string[] };
-    expect(json.hint).toContain(cwd);
-    // Named in prose, never as an argument a shell would split.
+    const json = parseJson(res.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.length).toBeGreaterThan(0);
     for (const command of json.next_commands ?? []) {
-      expect(command).not.toContain("--cwd");
+      expect(command).toContain(`--cwd ${cwd}`);
     }
   });
 
@@ -476,9 +482,9 @@ describe("setup command pre-flight", () => {
       "--framework next --dev-port 3000 --non-interactive --server local",
     );
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
       expectedPublicCliCommand(
-        "setup --framework next --dev-port 3000 --non-interactive --server local",
+        `setup --framework next --dev-port 3000 --non-interactive --server local --cwd ${cwd}`,
       ),
     ]);
   });
@@ -517,9 +523,9 @@ describe("setup command pre-flight", () => {
     // sign-in preset, not silently fall back to the default.
     expect(json.hint).toContain("--preset passkey-first");
     expect(json.next_commands).toEqual([
-      expectedPublicCliCommand("start"),
+      expectedPublicCliCommand(`start --cwd ${cwd}`),
       expectedPublicCliCommand(
-        "setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local",
+        `setup --framework next --preset passkey-first --dev-port 3000 --non-interactive --server local --cwd ${cwd}`,
       ),
     ]);
   });
@@ -549,7 +555,7 @@ describe("setup command pre-flight", () => {
     expect(capture.body).toMatchObject({
       name: expect.any(String),
       origins: expect.arrayContaining([
-        expect.objectContaining({ pattern: expect.any(String), kind: "preview" }),
+        expect.objectContaining({ pattern: expect.any(String), kind: "primary" }),
       ]),
       seed_defaults: false,
     });
@@ -769,6 +775,45 @@ describe("setup that fails after it created the project", () => {
   });
 });
 
+describe("the credential env files a failed setup rolls back", () => {
+  it("puts back one that existed and removes one setup created", async () => {
+    const cwd = await makeTempDir();
+    await writeFile(join(cwd, ".env.local"), "KEEP=1\n");
+    const before = await readCredentialEnvFiles(cwd);
+    await writeFile(join(cwd, ".env.local"), "KEEP=1\nZITADEL_PROJECT_ID=abandoned\n");
+    await writeFile(join(cwd, ".env.development.local"), "ZITADEL_PROJECT_ID=abandoned\n");
+
+    await restoreCredentialEnvFiles(cwd, before);
+
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe("KEEP=1\n");
+    expect(existsSync(join(cwd, ".env.development.local"))).toBe(false);
+  });
+
+  it("does not read a file it cannot open as one that is absent", async () => {
+    const cwd = await makeTempDir();
+    // A directory where the file should be reads as EISDIR, not ENOENT: treating
+    // it as absent would let the rollback delete something it should restore.
+    await mkdir(join(cwd, ".env.development.local"));
+
+    await expect(readCredentialEnvFiles(cwd)).rejects.toMatchObject({ code: "EISDIR" });
+  });
+
+  it("reports a file it cannot restore as a warning instead of throwing", async () => {
+    const cwd = await makeTempDir();
+    // Writing a file over a directory fails, as an unrestorable file would.
+    await mkdir(join(cwd, ".env.local"));
+    takeReportedWarnings();
+
+    await expect(
+      restoreCredentialEnvFiles(cwd, new Map([[".env.local", Buffer.from("KEEP=1\n")]])),
+    ).resolves.toBeUndefined();
+
+    expect(takeReportedWarnings()).toEqual([
+      expect.stringContaining("Could not restore .env.local"),
+    ]);
+  });
+});
+
 describe("setup --design removal (#1039)", () => {
   it("--help no longer offers a login design", async () => {
     const res = await runCliForTest(["setup", "--help"]);
@@ -941,11 +986,29 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("points at each customizable folder setup wrote, the password policy included", () => {
+    const customize = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+      writtenRel: [
+        ".zitadel/schemas/default-human-user.json",
+        ".zitadel/flows/default-login.json",
+        ".zitadel/policies/auth.factor.password.set.json",
+      ],
+    }).find((section) => section.title === "Customize");
+
+    expect(customize?.rows.map((row) => row.label)).toEqual([
+      "User schema",
+      "Login flow",
+      "Password policy",
+    ]);
+  });
 });
 
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -1039,6 +1102,20 @@ async function startCreateProjectCaptureServer(
         JSON.stringify({
           id: "flow_test",
           created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/policies") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "pol_test",
+          revision_id: "polrev_test",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: {},
+          created_at: "2026-06-01T00:00:00.000Z",
+          updated_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;

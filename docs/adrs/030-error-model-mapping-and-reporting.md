@@ -11,6 +11,11 @@
 > documents the shipped producer contract. The status moves to Implemented
 > once every decision item below is verified against code.
 >
+> **Amended by [ADR 076](076-error-pages-and-unmatched-routes.md):** the
+> router's answers use the envelope too (`req.not_found`,
+> `req.method_not_allowed`), and a browser navigation to a path no operation
+> matches gets an HTML page instead.
+>
 > **Amendment (2026-10-23):** a failing request now logs two lines at the API
 > boundary: one request line and one error line (Decision 5, "Request line and
 > error line"). The Inventory is frozen as the snapshot from proposal time. The

@@ -42,8 +42,8 @@ For changes to the Go server, APIs, or database layer.
 | ----------------------------------------------------- | ------------------------------------------ |
 | Install dependencies                                  | `corepack pnpm install --frozen-lockfile`  |
 | Verify my toolchain                                   | `moon run workspace:doctor`                |
-| Start the server (builds console + login-ui, then Go) | `moon run workspace:server`                |
-| Start the server (skip UI builds)                     | `go run . server --migrate`                |
+| Start the server (builds the console, then Go)        | `moon run workspace:server`                |
+| Start the server (skip the console build)             | `go run . server --migrate`                |
 | Debug and attach VSCode                               | `moon run workspace:server-debug`          |
 | Regenerate Go/OpenAPI artifacts                       | `moon run server:generate`                 |
 | Verify committed generated output                     | `moon run server:check-generate`           |
@@ -55,17 +55,16 @@ node_modules automatically (`.moon/workspace.yml` sets `installDependencies: fal
 
 ### Starting the server from source
 
-The Go binary embeds production builds of two frontend apps:
-- `apps/console` → `internal/staticui/console/dist/`
-- `apps/login-ui` → `internal/staticui/login/dist/`
+The Go binary embeds a production build of the console: `apps/console` →
+`internal/staticui/console/dist/`.
 
-`moon run workspace:server` builds both apps before starting Go. If you have not
-changed any frontend code, skip the UI builds with `go run . server --migrate`.
+`moon run workspace:server` builds it before starting Go. If you have not
+changed any console code, skip the build with `go run . server --migrate`.
 
-To build the UIs manually (when bypassing the wrapper):
+To build the console manually (when bypassing the wrapper):
 
 ```sh
-moon run console:build login-ui:build
+moon run console:build
 go run . server --migrate
 ```
 
@@ -76,7 +75,7 @@ path or DSN you manage. Schema migrations run when you pass `--migrate`;
 `moon run workspace:server` adds that flag. To apply schema and exit without
 serving, run `go run . migrate`.
 
-Open http://localhost:8080/ui/console/ and http://localhost:8080/ui/login/
+Open http://localhost:8080/ui/console/
 
 ### Debugging with VSCode
 
@@ -139,7 +138,7 @@ that version is published on npm.
 
 The wrapper sets `ZITADEL_TELEMETRY_ENV=development` unless you set it, so local
 builds, which report their unreleased version, stay out of the production
-telemetry project.
+telemetry project and send no copy to Vercel Web Analytics.
 
 Pass `--runtime docker`, `--image <tag>`, or set `ZITADEL_LOCAL_IMAGE=<tag>` when
 intentionally testing the Docker backend.
@@ -155,10 +154,10 @@ last-built `dist/`, so after a fresh checkout or a source change run
 
 ---
 
-## I want to contribute to the front-end embedded apps
+## I want to contribute to the console
 
-For changes to the admin console (`apps/console`) or the login UI (`apps/login-ui`) —
-the two SPAs bundled directly into the server binary.
+For changes to the admin console (`apps/console`), the SPA bundled directly into
+the server binary.
 
 | I want to...                                 | Run                                        |
 | -------------------------------------------- | ------------------------------------------ |
@@ -166,64 +165,17 @@ the two SPAs bundled directly into the server binary.
 | Verify my toolchain                          | `moon run workspace:doctor`                |
 | Open the component workbench (Storybook)     | `moon run storybook:dev` → http://localhost:6006 |
 | Start the console on a seeded real instance  | `moon run console:dev-real` |
-| Start the login-UI dev server                | `moon run login-ui:dev` → http://localhost:5175 |
-| Build both apps and test with the Go server  | `moon run console:build login-ui:build` then `go run . server --migrate` |
+| Test the built console with the Go server    | `moon run console:build` then `go run . server --migrate` |
 | Run lint, type checks, and tests             | `moon ci :lint :typecheck :build :test`    |
 
 Run `corepack pnpm install --frozen-lockfile` first.
 
 `console:dev-real` boots an ephemeral real instance, seeds it, and starts the
 console dev server against it; the console's other loops are in its
-[README](apps/console/README.md#local-development). The login-UI dev server
-renders the real sign-in flow, so it needs a running backend server too.
+[README](apps/console/README.md#local-development).
 
-Dev servers serve at `/`; the embedded production builds are served at
-`/ui/console/` and `/ui/login/`.
-
-### First-run setup for the login-UI dev server
-
-The Go backend does **not** create a project on startup. Create one before the
-login UI can boot a flow. Project creation provisions the default human user
-schema and default login/register flow definition.
-
-**1. Start the API-only backend:**
-
-```sh
-NEXTGEN_SERVER_CONSOLE_ENABLED=false NEXTGEN_SERVER_LOGIN_ENABLED=false go run . server --migrate
-```
-
-This skips the embedded UI dist checks, so it works before you have built
-`apps/console` or `apps/login-ui`.
-
-**2. Create a project:**
-
-```sh
-curl -s -X POST http://localhost:8080/projects \
-  -H "Content-Type: application/json" \
-  -d '{"name": "dev"}'
-```
-
-The response contains an `id` field — that is your project ID. If you have
-`jq` installed, append `| jq .` to pretty-print the response.
-
-**3. Configure the dev server:**
-
-Copy the example env file and fill in your project ID:
-
-```sh
-cp apps/login-ui/.env.example apps/login-ui/.env.development.local
-# edit .env.development.local and uncomment VITE_PROJECT_ID=<id-from-step-2>
-```
-
-These Vite env vars are only for the local dev server. `VITE_PROXY_PATH` tells
-the login UI to prefix all API requests with
-`/__nextgen`, which the Vite dev server proxies to the Go backend on port 8080.
-Set `VITE_BACKEND_URL` in `.env.development.local` to override the target
-(default: `http://localhost:8080`). Production hosted-login builds ignore these
-development env vars and use request/URL-derived context instead.
-
-As a one-off alternative, pass `?project_id=<id>` in the browser URL instead
-of setting `VITE_PROJECT_ID`.
+The dev server serves at `/`; the embedded production build is served at
+`/ui/console/`.
 
 ---
 
@@ -526,8 +478,7 @@ Releases):
 moon run release:snapshot
 ```
 
-The release task builds the embedded UI surfaces (console and login-ui)
-automatically.
+The release task builds the embedded console automatically.
 
 To cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md). Moon builds the artifacts

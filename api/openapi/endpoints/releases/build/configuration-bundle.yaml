@@ -16,9 +16,9 @@ description: |
 
   A handle names one resource of its kind in a bundle. Two schemas with the
   same `objectType`, two flow definitions with the same `name`, two IDP
-  connections with the same `slug`, or a schema without an `objectType`
-  refuse the release with `rel.invalid`, with an
-  entry for each such resource.
+  connections with the same `slug`, two policies for the same `operation`,
+  or a schema without an `objectType` refuse the release with `rel.invalid`,
+  with an entry for each such resource.
 
   Each kind is optional, and the arrays may be empty: a project that never
   ejected its branding omits `branding`. The bundle carries at least one
@@ -69,6 +69,24 @@ properties:
       carries no credentials.
     items:
       $ref: ../../idps/idp-connection.yaml
+  policies:
+    type: array
+    maxItems: 50
+    description: |
+      Operation policies, one per `.zitadel/policies/<operation>.json`, each
+      the body `POST /policies` takes. The handle is `operation`: a project
+      has one policy per operation. An unknown setting or a value outside a
+      setting's bounds is refused while the request is decoded, with
+      `req.invalid` and no `details.resources`; a config the operation's
+      template refuses beyond that, such as settings that contradict each
+      other, gets a `rel.invalid` entry.
+
+      A request served this release reads the policy revision it pins for
+      the operation, as it reads the user schema, branding and identity
+      providers, once the release pins a flow; a release that pins a flow
+      and no policy for an operation means no policy for it.
+    items:
+      $ref: ../../policies/publish-policy-request.yaml
   branding:
     $ref: ../../../components/flows/branding.yaml
     description: |

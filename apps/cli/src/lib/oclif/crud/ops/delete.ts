@@ -1,6 +1,6 @@
 import { Flags } from "@oclif/core";
 
-import { publicCliCommand } from "../../../public-cli";
+import { deletedData, mutatedData } from "../../envelope";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { article, capitalize, dryRunResult, idArg, idValue } from "../shared";
 
@@ -66,15 +66,15 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
       kind: "confirm",
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
-      retry: publicCliCommand(`${topic} ${verb} ${id} --force`, meta.cliVersion),
+      retry: this.suggest(`${topic} ${verb} ${id} --force`),
     });
     if (!confirmed) {
       return { status: "skipped", reason: `${verb}-cancelled` };
     }
-    await spec.call(await this.connect(meta), id);
+    await spec.call(await this.context(), id);
     return {
       status: "ok",
-      data: { id, [past]: true },
+      data: past === "deleted" ? deletedData({ id }) : mutatedData({ id }, past),
       pretty: `${capitalize(past)} ${resource.singular} ${id}`,
     };
   }

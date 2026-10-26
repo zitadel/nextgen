@@ -85,11 +85,12 @@ export function normalizePublicCliCommand(command: string, cliVersion: string): 
   return command;
 }
 
-export function normalizePublicCliCommands(
-  commands: ReadonlyArray<string> | undefined,
+export function normalizePublicCliCommands<T extends string>(
+  commands: ReadonlyArray<T> | undefined,
   cliVersion: string,
-): string[] | undefined {
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
+): T[] | undefined {
+  // Only the `zitadel` prefix changes, so a suggestion stays a suggestion.
+  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion) as T);
 }
 
 /**
@@ -100,7 +101,7 @@ export function normalizePublicCliCommands(
  * command — that is the canonical, readable spelling — but the CLI is not a
  * dependency of the scaffolded app, so the bare command does not exist on
  * the user's PATH (and `npx zitadel` would fetch an unrelated npm package).
- * Covers inline code spans (`` `zitadel plan` ``) and fenced-block lines
+ * Covers inline code spans (`` `zitadel deploy` ``) and fenced-block lines
  * that start with `zitadel `; prose file names like `zitadel.json` and
  * `zitadel.db` don't match because the word must end the span or be
  * followed by a space.
@@ -150,6 +151,30 @@ export function normalizePublicCliJson<T>(value: T, cliVersion: string): T {
   if (typeof value === "object" && value !== null) {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, normalizePublicCliJson(item, cliVersion)]),
+    ) as T;
+  }
+  return value;
+}
+
+/** The version selector of a public `npx @zitadel/cli@<selector>` mention. */
+const PUBLIC_CLI_VERSION = new RegExp(`${CLI_PACKAGE_NAME.replaceAll("/", "\\/")}@[^\\s\`]+`, "g");
+
+/**
+ * Replaces the version in every public CLI mention inside a JSON document
+ * with `*`, so two documents {@link normalizePublicCliJson} wrote for
+ * different CLI versions compare equal when nothing else differs. Returns a
+ * rewritten copy.
+ */
+export function maskPublicCliVersion<T>(value: T): T {
+  if (typeof value === "string") {
+    return value.replace(PUBLIC_CLI_VERSION, `${CLI_PACKAGE_NAME}@*`) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => maskPublicCliVersion(item)) as T;
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, maskPublicCliVersion(item)]),
     ) as T;
   }
   return value;

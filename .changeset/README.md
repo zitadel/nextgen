@@ -21,11 +21,10 @@ server or API change needs one (list `@zitadel/server`) — even from `internal/
 or `api/generated/**` — because it ships new server and SDK versions that belong
 in the release notes.
 
-The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in
-the server container, so a user-visible change there ships too and needs a
-changeset listing `@zitadel/server`. They publish no npm package of their own —
-that is why they sit in the `ignore` list — but a customer still receives the
-change.
+The console (`apps/console/**`) is embedded in the server container, so a
+user-visible change there ships too and needs a changeset listing
+`@zitadel/server`. It publishes no npm package of its own — that is why it sits
+in the `ignore` list — but a customer still receives the change.
 
 Skip a changeset **only** when the change is *exclusively*:
 
@@ -50,7 +49,7 @@ a customer gets something. Full title rule:
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** | PR title type |
 | --- | --- | --- | --- |
 | Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes | `feat` / `fix` — never `docs` or `chore` |
-| Changes what the console or login UI does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(login)` |
+| Changes what the console does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(console)` |
 | Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` | `test` / `docs` / `ci` / `build` / `chore` / `refactor` — never `feat` or `fix` |
 | Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships | Not `feat` or `fix` |
 

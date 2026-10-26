@@ -55,7 +55,7 @@ import { userAttributes, userIdentity, userIdentitySecondary, userMetadata } fro
  * team and access relate).
  */
 export const Route = createFileRoute("/_authed/users/$userId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "user" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const user = await api.getUserByID(params.userId);

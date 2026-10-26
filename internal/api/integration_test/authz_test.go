@@ -405,7 +405,8 @@ func TestManagementAuthz(t *testing.T) {
 // QueryTeams / ListBranding / ListFlowDefinitions return the granted row and
 // omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
 // because schema RSI rows are project-scoped. QueryUsers is 200 [] because
-// user RSI rows have NULL team_id — by-id user reads deny for the same shape.
+// user RSI rows have NULL team_id; a by-id user read is outside the grant's
+// scope for the same reason, so it answers not found (#2112).
 //
 // It deliberately has no t.Parallel(). The Spanner emulator's planner charges
 // for the authz list predicate in proportion to the rows in the tables, and Go
@@ -566,12 +567,13 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 
 	getUser, err := client.GetUserByID(t.Context(), api.GetUserByIDParams{UserID: api.UserID(userIn)})
 	require.NoError(t, err)
-	assertAuthzError(t, getUser, "user.permission_denied")
+	assertAuthzError(t, getUser, "user.not_found")
 }
 
 // TestGetAuthzTeamScopedOnlyAllow pins #833: after RSI, a team-scoped-only
-// project.viewer grant Allows by-id GetTeam for that team and denies create
-// (no RSI object on the Check).
+// project.viewer grant Allows by-id GetTeam for that team, answers another
+// team as not found (outside its scope, #2112) and denies create (no RSI
+// object on the Check).
 func TestGetAuthzTeamScopedOnlyAllow(t *testing.T) {
 	t.Parallel()
 
@@ -618,7 +620,7 @@ func TestGetAuthzTeamScopedOnlyAllow(t *testing.T) {
 
 	denied, err := client.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(other.ID)})
 	require.NoError(t, err)
-	assertAuthzError(t, denied, "team.permission_denied")
+	assertAuthzError(t, denied, "team.team_not_found")
 
 	createResp, err := client.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()}, api.CreateTeamParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)

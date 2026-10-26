@@ -112,7 +112,7 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`healthz` / `readyz` / `livez`) do not.
+Path A `request.api`. Probes (`livez` / `readyz`) do not.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.
@@ -129,6 +129,7 @@ tracked below.
 | `DeleteProjectByID` (when a row was deleted) | `project.deleted` | `entity` | `project` | _(empty)_ |
 | `AddOrigin` | `origin.added` | `entity` | `origin` | `pattern`, `kind` |
 | `RemoveOrigin` | `origin.removed` | `entity` | `origin` | `pattern`, `kind` |
+| `RemovePreview` (when a row was deleted) | `preview.removed` | `entity` | `preview` | _(empty)_ |
 | `CreateUser` | `user.created` | `entity` | `user` | `schema_id`, `attribute_keys[]`, `attributes` (`x-audit` values only) |
 | Unique violation on create | `user.create.failed` | `entity` | `user` | `key_name` |
 | `PatchUser` (attribute patch) | `user.updated` | `entity` | `user` | `attribute_keys[]`, `attributes` (`x-audit` values only) |
@@ -165,6 +166,7 @@ tracked below.
 | Project create seed `CreateAuthzAssignment` (sk_proj) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService create (`CreateAuthzAssignment` for user/team on project.viewer, editor, or admin) | `authz.granted` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | GrantService revoke (`RevokeAuthzAssignment`) | `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
+| Startup reconcile of the platform operators configuration (`CreateAuthzAssignment` / `RevokeAuthzAssignment` on the platform operator relation, [ADR 075](../../adrs/075-platform-operators.md)); actor type `system` | `authz.granted`, `authz.revoked` | `admin` | `authz_assignment` | `principal_type`, `principal_id`, `relation` |
 | Set password (`entity_id` / `factor_id` = password row id) | `auth.factor.password.set` | `auth` | `user_password` | `user_id`, `factor_id` |
 | Create passkey (`entity_id` / `factor_id` = credential id) | `auth.factor.passkey.enrolled` | `auth` | `user_passkey` | `user_id`, `factor_id` |
 
@@ -203,5 +205,6 @@ Types planned but not yet emitted by a live producer. Follow-up issues:
 | `team.membership.updated` | [#879](https://github.com/zitadel/nextgen/issues/879) membership + claim CompleteClaim path — join ids + status |
 | `claim.challenge_created` / `claim.completed` | [#880](https://github.com/zitadel/nextgen/issues/880) claim lifecycle emitters |
 | `session.expired` | [#881](https://github.com/zitadel/nextgen/issues/881) session reaper |
+| `preview.expired` | [#2280](https://github.com/zitadel/nextgen/issues/2280) preview expiry sweep |
 | `schema.deleted` | [#882](https://github.com/zitadel/nextgen/issues/882) schema delete API |
 | `auth.factor.password.removed` / TOTP enroll+remove / passkey remove / recovery enroll+remove | [#884](https://github.com/zitadel/nextgen/issues/884) factor remove + TOTP/recovery APIs — same `AuthFactorPayload` rules |

@@ -23,6 +23,14 @@ var deployedAt = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
 
 func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	return svc, statements
+}
+
+// newStrictDeploymentService leaves InsertEvent for the test to expect.
+func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
+	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	statements := servicemocks.NewMockAllStatements(ctrl)
@@ -35,7 +43,6 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 		}).
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
-	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	return service.NewDeploymentService(service.NewPool(pool)), statements
 }
 
@@ -80,6 +87,8 @@ func expectInsert(statements *servicemocks.MockAllStatements, read []domain.Orig
 			entity.DeployedAt = deployedAt
 			return nil
 		})
+	statements.EXPECT().FreezeDeploymentVariables(gomock.Any(), "proj_1", "dep_new").
+		Return(&domain.VariableSet{ProjectID: "proj_1"}, nil)
 }
 
 func servingDeployment(releaseID string) *domain.Deployment {
@@ -299,8 +308,25 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for primary origins", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for preview URLs", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, previewPattern)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "at most 365 days")
 	})
 
 	t.Run("an exact primary origin", func(t *testing.T) {
@@ -448,6 +474,15 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
+
+	t.Run("a preview ttl above the maximum never reaches storage", func(t *testing.T) {
+		svc, _ := newMockedDeploymentService(t)
+		input := deploymentInput()
+		input.OriginKind = domain.DeploymentOriginKindPreview
+		input.PreviewTTL = domain.MaxPreviewTTL + time.Second
+		_, err := svc.Create(t.Context(), input)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
 }
 
 func assertServiceDomainCode(t *testing.T, err error, code string) domain.Error {
@@ -578,8 +613,12 @@ func expectPreviewServing(statements *servicemocks.MockAllStatements, origins []
 // expectPreviewWrite expects the insert and the renewal of the previews of
 // origins for the default ttl.
 func expectPreviewWrite(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment) {
+	expectPreviewWriteFor(statements, origins, read, 7*24*time.Hour)
+}
+
+func expectPreviewWriteFor(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment, ttl time.Duration) {
 	expectInsert(statements, read)
-	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(7*24*time.Hour), deployedAt).Return(nil)
+	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(ttl), deployedAt).Return(nil)
 }
 
 func previewDeployment(id, origin string, at time.Time) *domain.Deployment {
@@ -607,13 +646,13 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		assert.Equal(t, origins, result.Deployment.Origins())
 	})
 
-	t.Run("a request ttl takes the default", func(t *testing.T) {
+	t.Run("a request ttl sets the expiry", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, previewPattern)
 		expectPreviewServing(statements, []string{gitOrigin}, nil, nil)
-		expectPreviewWrite(statements, []string{gitOrigin}, nil)
+		expectPreviewWriteFor(statements, []string{gitOrigin}, nil, time.Hour)
 
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(time.Hour)})
 		require.NoError(t, err)
 	})
 

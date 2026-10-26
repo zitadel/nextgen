@@ -13,7 +13,7 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * ogen API at the origin root, with no proxy in between. That makes the
  * console's API base a real claim about a real routing table instead of a
  * string nobody checks — the claim that shipped wrong, as `/api/*` against a
- * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
+ * mux that serves `/ui/console`, `/console/runtime.json`, `/`.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
  * in `src-real/`, which runs the same screens through the Vite dev proxy.
@@ -53,8 +53,8 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // `/` has no screen of its own and lands on Users, which acts on a selected
   // project. The seeded user holds no grant, so `GET /users/me/projects` lists
   // nothing and there is no project to select for them
-  // (`resolveDefaultProjectScope`): the guard sends them to Projects instead,
-  // never to the project the console signed into, which they could not manage.
+  // (`resolveDefaultProjectScope`): `/` lands on Projects instead, never on the
+  // project the console signed into, which they could not manage.
   // That read is authenticated by the session cookie alone (#1237), so it
   // answering 200 is what proves the base and the cookie are right.
   expect((await myProjects).status()).toBe(200);
@@ -65,8 +65,6 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   // reached.
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await expect(page.getByText("No projects yet.")).toBeVisible();
-  // Projects is where a project is chosen, so the bar carries no switcher there.
-  await expect(page.getByRole("button", { name: "Switch project" })).toHaveCount(0);
 });
 
 test("manages the project with the session cookie alone", async ({ page, seed, zitadel }) => {
@@ -102,13 +100,13 @@ test("shows each user's team on the Users screen with the session cookie", async
   // #1300 §4: `expand: ["teams"]` needs team_membership.read, which a session
   // never carries; QueryUsers lets a session through once it may list the
   // project. Proven through the console, not only the API: without it the
-  // Users screen falls back to the unexpanded read and drops its Team column,
+  // Users screen falls back to the unexpanded read and drops its Member of column,
   // while every Go test stays green.
   const { projectId, schemaId } = zitadel.handle;
   const team = await withErrorBody(
     zitadel.api.createTeam({ name: uniqueName("Support") }, { project_id: projectId }),
   );
-  // Created straight into the team: the membership the Team column shows.
+  // Created straight into the team: the membership the Member of column shows.
   const member = seed.identity().email;
   await withErrorBody(
     zitadel.api.createUser(
@@ -119,7 +117,7 @@ test("shows each user's team on the Users screen with the session cookie", async
   await signIn(page, zitadel, await seed.user(), EMBEDDED_LOGIN_URL);
 
   await page.goto("/ui/console/users");
-  await expect(page.getByRole("columnheader", { name: "Team" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Member of" })).toBeVisible();
   const row = page.getByRole("row").filter({ hasText: member });
   await expect(row.getByText(team.name, { exact: true })).toBeVisible();
 });

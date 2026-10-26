@@ -1,5 +1,6 @@
 get:
   operationId: getDeploymentVariables
+  x-zitadel-cli: variable resolve
   summary: Get a deployment's variables
   description: |
     Returns the variable values the deployment froze when it was made. Later

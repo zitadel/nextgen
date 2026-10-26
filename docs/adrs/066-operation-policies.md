@@ -88,14 +88,14 @@ Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 - Overrides stay simple. A later audience or hierarchy model resolves
   between instances that exist, not between instances and a hidden default.
 
-Projects still start from a sensible policy. `zitadel setup` scaffolds a
-starter instance for `auth.factor.password.set` with `min_length: 15`, the
-NIST SP 800-63B minimum for a password used as a single factor
-([#1450](https://github.com/zitadel/nextgen/issues/1450)). #898's default
-therefore lives on as the starter's value, not as server behaviour. A project
-that skips the starter, or later removes the file or its `min_length`, has no
+The CLI follows the same rule. `zitadel setup` writes and publishes the
+`auth.factor.password.set` instance with an empty `config`, and puts a
+minimum length into it only when the developer gives one
+([#1450](https://github.com/zitadel/nextgen/issues/1450)). The file makes the
+policy easy to find and to set; a value the CLI chose on the project's behalf
+would be a default one level up. A project without a `min_length` has no
 length policy; the domain guards (non-empty, at most 64 code points) still
-apply. NIST alignment holds for projects that keep the starter.
+apply.
 
 ### Terminology
 
@@ -158,14 +158,14 @@ resource has, and is not answered here.
 #### Instance
 
 Each instance guards one operation and carries its own configuration under `config`.
-The envelope (`kind`, `operation`) is the same for every operation;
+The envelope (`operation`, and the editor's optional `$schema`) is the same for every operation;
 `config` is what the operation's template defines, and `operation` is the
 discriminator that says which template that is.
 
 ```json
 // .zitadel/policies/auth.factor.password.set.json
 {
-  "kind": "policy",
+  "$schema": "../meta/policy.json",
   "operation": "auth.factor.password.set",
   "config": {
     "min_length": 12,
@@ -261,18 +261,24 @@ from the context, so the other paths, which have no history to compare with
 or must not learn it, pass it without a hash being verified. The write checks
 that the password it replaces is still the one the history was compared
 with, and fails with `user.conflict` when another change landed in between.
-Instances are published with `POST /policies` and resolved through
-`service.PolicyResolver`, which `service.PolicyService.ResolvePolicy`
-implements: the newest stored revision of the project's policy for the
-operation, and no policy when the project published none, in which case the
-gate applies only the server's own length cap. A flow step where the user
+Instances are published with `POST /policies`, or by a release build that
+carries them, and resolved through `service.PolicyResolver`, which
+`service.PolicyService.ResolvePolicy` implements. A request whose release pins
+a flow (ADR 035, [#536](https://github.com/zitadel/nextgen/issues/536)) gets
+the policy revision that release pins for the operation, as it gets the user
+schema, branding and identity providers the release pins. There is no
+fallback: a release that pins a flow and no policy for the operation means no
+policy, never the newest stored revision, so deleting a policy file and
+deploying switches the policy off, with the confirmation `deploy` asks for
+every removal. A request that resolves no release, or one that pins no flow,
+gets the newest stored revision, as for every other kind, until it resolves a
+release ([#1616](https://github.com/zitadel/nextgen/issues/1616)); runtime
+resolution then serves only what releases pin
+([#2331](https://github.com/zitadel/nextgen/issues/2331)). Without a policy
+the gate applies only the server's own length cap. A flow step where the user
 chooses a password shows and checks the same length bounds before the gate
-runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)). The newest stored
-revision is a stand-in: ADR 035 says an environment sees only what its active
-release pins, so resolution moves to the release's pinned policy revision once
-release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)). The
-[catalog index](../design/policies/catalog.md) names the functions.
+runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)).
+The [catalog index](../design/policies/catalog.md) names the functions.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -506,11 +512,16 @@ is the one with the greatest `created_at`. It has no URL identity or `$ref`
 handling, which a policy does not need. The API publishes
 (`POST /policies`) and has the ADR 063 reads: the list (`GET /policies`),
 the read by `id`, the revisions of one policy and one revision
-(`GET /policies/revisions/{revision_id}`). Templates are not
-release content: they ship with the server, and a release records the catalog
-version it was validated against. Release validation runs the same check as
-publishing (`policy.Engine.ValidateInstance`: known operation and settings,
-types, bounds, config rules) and rejects two instances for the same
+(`GET /policies/revisions/{revision_id}`). A release build
+(`POST /releases/build`) carries instances under `policies`, each the body
+`POST /policies` takes, and publishes them inside the release's transaction:
+an unchanged config reuses the operation's newest revision, a changed one
+appends a revision, and the release pins it under the `policy` kind with the
+operation as its handle. Building one needs `policy.write`, like publishing.
+Templates are not release content: they ship with the server, and a release
+records the catalog version it was validated against. Release validation runs
+the same check as publishing (`policy.Engine.Bind`: known operation and
+settings, types, bounds, config rules) and rejects two instances for the same
 operation.
 
 ### Applicability
@@ -525,7 +536,7 @@ configuration proposal ([#1264](https://github.com/zitadel/nextgen/pull/1264),
 closed without a decision) gave release content a required `audience` (an
 explicit project default or a set of scope parameters such as `team_ids`),
 release-time validation, and most-specific-wins resolution; whichever model
-is decided, policies take its envelope field next to `kind` and `operation`.
+is decided, policies take its envelope field next to `operation`.
 The model needs no change to take it: the engine evaluates one resolved
 instance, and the resolver is the only piece that grows a request hint. That
 a scoped instance must not weaken the project's policy is decided with it

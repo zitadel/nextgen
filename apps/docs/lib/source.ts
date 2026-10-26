@@ -29,8 +29,13 @@ const docs = defineDocs({
     mdxOptions: (environment) => applyMdxPreset({ rehypeCodeOptions: codeOptions })(environment),
     postprocess: {
       // An API tag's page lists the tag's operations with <Operations />,
-      // which its Markdown renders as the page does (pageText).
-      includeProcessedMarkdown: { mdxAsPlaceholder: ["Operations"] },
+      // which its Markdown renders as the page does (pageText). A live
+      // example, a story's <….WithControl /> (components/examples), works
+      // only on the page: its Markdown leaves it out.
+      includeProcessedMarkdown: {
+        mdxAsPlaceholder: ["Operations"],
+        filterElement: (node) => !("name" in node && node.name?.endsWith(".WithControl")),
+      },
     },
   },
   meta: {
