@@ -3,7 +3,7 @@ import type { Parsed } from "@zitadel/config/idp";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
- * "Dev server port" — defaults to the detected port. The validated answer
+ * "Which port should your app run on?" — defaults to the detected port. The validated answer
  * becomes the issuer URL (`http://localhost:<port>`) via `issuerFromPort`.
  */
 export class DevPortPrompt implements SetupPrompt {
@@ -17,7 +17,7 @@ export class DevPortPrompt implements SetupPrompt {
     const devPort = await ctx.input({
       kind: "text",
       name: "dev server port",
-      message: "Dev server port",
+      message: `Which port should your app run on?\nPress Enter to use ${answers.devPort}, or type a different port and press Enter.`,
       placeholder: String(answers.devPort),
       initialValue: String(answers.devPort),
       parse: (value): Parsed<number> => {

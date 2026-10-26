@@ -82,7 +82,7 @@ export async function askCustomSettings(
 }
 
 /**
- * "Add social sign-in providers?" — the one onboarding question that needs
+ * "Add external sign-in providers? (optional)" — the one onboarding question that needs
  * something from outside the terminal, so it asks last of the configuration
  * questions and takes "not now" as a first-class answer (#1081).
  *
@@ -171,8 +171,9 @@ export class SocialSignInPrompt implements SetupPrompt {
   private async chooseProviders(ask: Asker): Promise<readonly ProviderName[]> {
     return ask({
       kind: "multiselect",
-      name: "social sign-in providers",
-      message: "Add social sign-in providers?",
+      name: "external sign-in providers",
+      message:
+        "Add external sign-in providers? (optional)\nSelect any providers you want to add, or press Enter to skip.",
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
@@ -180,13 +181,11 @@ export class SocialSignInPrompt implements SetupPrompt {
       options: [
         ...IDP_PROVIDERS.map((provider) => ({
           value: provider as ProviderName,
-          label: `Continue with ${idpProvider(provider).displayName}`,
-          hint: "needs an OAuth app you register with the provider",
+          label: `${idpProvider(provider).displayName} — requires a ${idpProvider(provider).displayName} OAuth app`,
         })),
         {
           value: CUSTOM_PROVIDER as ProviderName,
-          label: "Continue with another OpenID Connect provider",
-          hint: "you name it and give its issuer",
+          label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
         },
       ],
     });

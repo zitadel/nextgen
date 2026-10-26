@@ -65,7 +65,7 @@ import {
   nonBlankString,
 } from "../../../lib/oclif";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
-import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
+import { inShell, portableSuggestions, type SuggestedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
 /**
@@ -455,7 +455,20 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // use the top-level nextCommands instead).
         ...this.followUps(!reusing || written.length > 0, scopeArgs, recovery),
       },
-      pretty: `Enabled ${entry.displayName} for ${schema.name}`,
+      pretty: completionText({
+        displayName: entry.displayName,
+        changed: !reusing || written.length > 0,
+        credentialsStored:
+          secret?.published === "stored" &&
+          (clientIdState === undefined || clientIdState === "stored"),
+        commands: portableSuggestions(
+          [
+            ["deploy", "--dry-run", ...scopeArgs],
+            ["deploy", ...scopeArgs],
+          ],
+          this.meta.cliVersion,
+        ),
+      }),
     });
   }
 
@@ -655,4 +668,37 @@ function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
     ...(edits.schema.changed ? [schema.path] : []),
     ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
   ];
+}
+
+/**
+ * What a person reads when the command ends. Configuring a provider is not
+ * the same as offering it: the files are local and the credentials sit on the
+ * Project until a deploy publishes the configuration, so this says what is done,
+ * what is not yet, and how to finish. It claims no more than happened: the
+ * credentials sentence appears only when they reached the Project (a failed or
+ * deferred publish has its own warning), and nothing here says sign-in works.
+ *
+ * @param commands - The preview then the deploy, as runnable commands. Empty
+ *   when an argument is not portable, which leaves them out.
+ */
+export function completionText(input: {
+  displayName: string;
+  /** Whether a file changed, or a connection was created, that a deploy publishes. */
+  changed: boolean;
+  credentialsStored: boolean;
+  commands: readonly string[];
+}): string {
+  const { displayName, changed, credentialsStored, commands } = input;
+  if (!changed) {
+    return `${displayName} sign-in is already configured locally.`;
+  }
+  return [
+    `${displayName} sign-in is configured locally.`,
+    ...(credentialsStored ? ["Provider credentials are stored on your Project."] : []),
+    "",
+    `Next: preview and deploy the configuration to make ${displayName} sign-in available in your app.`,
+    ...(commands.length > 0 ? ["", ...commands.map((command) => `  ${command}`)] : []),
+    "",
+    `After deploying, reload your app and test ${displayName} sign-in.`,
+  ].join("\n");
 }

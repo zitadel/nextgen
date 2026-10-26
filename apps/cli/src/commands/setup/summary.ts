@@ -1,6 +1,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import type { SetupPreset } from "@zitadel/config/defaults";
+import { providerOf } from "@zitadel/config/idp";
 import pc from "picocolors";
 import semver from "semver";
 
@@ -164,4 +166,27 @@ function stripRange(range: string): string | undefined {
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
+}
+
+/**
+ * The sign-in configuration the wizard's answers add up to, said once so the
+ * preset and the providers need not be pieced together. It describes what will
+ * be configured, not that sign-in works: an enabled method is not a credential
+ * a user has registered. Both presets enable password and passkey in the
+ * schema and differ in which the login flow starts with.
+ */
+export function signInSummary(answers: {
+  preset: SetupPreset;
+  sso: ReadonlyArray<{ selection: Parameters<typeof providerOf>[0] }>;
+}): string {
+  const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
+  return [
+    answers.preset === "passkey-first"
+      ? "Sign-in starts with a passkey, with email and password as the fallback."
+      : "Sign-in starts with email and password.",
+    "Password and passkey are enabled in the user schema.",
+    providers.length === 0
+      ? "No external providers selected."
+      : `External providers: ${providers.join(", ")}.`,
+  ].join("\n");
 }

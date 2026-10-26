@@ -81,8 +81,8 @@ npm run dev
 ```
 
 `start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+`admin@zitadel.localhost`. It ends by telling you to run `setup`; the
+management console comes later.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
@@ -91,7 +91,7 @@ reports it as already owned. If that attempt fails, setup prints a warning and
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
-Any time you need the console again, print a fresh link:
+When you want the console, print a sign-in link for it. The link works once:
 
 ```sh
 npx @zitadel/cli@latest console

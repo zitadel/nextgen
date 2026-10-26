@@ -564,6 +564,39 @@ describe("local runtime commands", () => {
     expect(stop.exitCode).toBe(0);
   });
 
+  it("start tells a person to create an app next, without a console link", async () => {
+    const cwd = await tempProject("zitadel-start-human-");
+    const fake = await fakeServerBinary();
+    const port = nextPort();
+
+    const result = await runCliForTest(["start", "--cwd", cwd, "--port", String(port)], {
+      ZITADEL_SERVER_BINARY: fake.binPath,
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      [
+        "Local Zitadel server is ready.",
+        `Server: http://localhost:${String(port)}`,
+        "",
+        "Next: create an app with authentication.",
+        "",
+        "Run this command in the same directory. Setup will guide you",
+        "through choosing a framework and sign-in method, create your",
+        "app, and install its dependencies.",
+        "",
+        `  ${expectedPublicCliCommand("setup --server local")}`,
+        "",
+      ].join("\n"),
+    );
+    expect(result.stderr).not.toContain("console sign-in link");
+    const runtime = await readRuntimeMetadata(cwd);
+    if (runtime?.backend === "binary") {
+      binaryPids.push(runtime.pid);
+    }
+    await runCliForTest(["stop", "--cwd", cwd, "--json"]);
+  });
+
   it("start fails with E_PORT_IN_USE when a foreign listener owns the requested port", async () => {
     const cwd = await tempProject("zitadel-start-port-conflict-");
     const fake = await fakeServerBinary();

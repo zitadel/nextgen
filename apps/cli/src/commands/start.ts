@@ -1,7 +1,5 @@
 import { Flags } from "@oclif/core";
 
-import consola from "consola";
-
 import { ZitadelError, toZitadelError } from "../lib/errors";
 import { serverLogAction } from "../lib/journey-guidance";
 import { ensureLocalAdmin, type LocalAdmin } from "../lib/local-server/admin-credential";
@@ -119,14 +117,18 @@ export default class Start extends BaseCommand {
     // The envelope's `source` named the port guessed before one was chosen; an
     // agent that follows it would target a different server than the one started.
     this.meta = { ...this.meta, source: runtime.server_url };
+    // The sign-in link is for the structured report only. A person is told to
+    // create an app next, and `zitadel console` mints a link whenever they want
+    // the console; minting one they are never shown would only spend it or warn
+    // about it. The local admin is created either way.
+    const consoleLogin = this.jsonEnabled()
+      ? await consoleLoginFor(runtime.server_url, local?.admin)
+      : undefined;
+    const data = readyData(runtime, alreadyRunning, this.meta.cliVersion, consoleLogin);
     return this.emit({
       status: "ok",
-      data: readyData(
-        runtime,
-        alreadyRunning,
-        this.meta.cliVersion,
-        await consoleLoginFor(runtime.server_url, local?.admin),
-      ),
+      pretty: readyText(data.title, runtime.server_url, this.meta.cliVersion),
+      data,
     });
   }
 }
@@ -162,14 +164,31 @@ async function consoleLoginFor(
   }
   try {
     const url = await consoleSignInUrl(serverUrl, admin);
-    consola.log(`Console: signed in as ${admin.email}. Open this link (works once):`);
-    consola.log(url);
     return { signed_in_as: admin.email, sign_in_url: url };
   } catch (error) {
     const reason = toZitadelError(error);
     reportWarning(`Could not create a console sign-in link: ${reason.message}`);
     return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
   }
+}
+
+/**
+ * What a person sees once the server is up: where it is, and that the next
+ * step is creating an app. The command is the one `next_commands` carries.
+ */
+function readyText(title: string, serverUrl: string, cliVersion: string): string {
+  return [
+    title,
+    `Server: ${serverUrl}`,
+    "",
+    "Next: create an app with authentication.",
+    "",
+    "Run this command in the same directory. Setup will guide you",
+    "through choosing a framework and sign-in method, create your",
+    "app, and install its dependencies.",
+    "",
+    `  ${unscopedCommand("setup --server local", cliVersion)}`,
+  ].join("\n");
 }
 
 type ConsoleLogin = {

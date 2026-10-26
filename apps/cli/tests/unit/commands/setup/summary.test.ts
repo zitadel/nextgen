@@ -8,6 +8,7 @@ import {
   detectProjectFacts,
   formatFrameworkLine,
   relativeDisplayPath,
+  signInSummary,
 } from "../../../../src/commands/setup/summary";
 import { stripAnsi } from "../../../helpers/run-cli";
 
@@ -101,5 +102,46 @@ describe("detectProjectFacts", () => {
     // The separator is dimmed wherever picocolors sees colour support (CI is
     // set and NO_COLOR is not, as in ci-turbo), so compare the plain text.
     expect(stripAnsi(formatFrameworkLine({ ...facts, typescript: false }))).toMatch(/^React · /);
+  });
+});
+
+describe("signInSummary", () => {
+  it("says password-first starts with email and password and enables both methods", () => {
+    expect(signInSummary({ preset: "password-first", sso: [] })).toBe(
+      [
+        "Sign-in starts with email and password.",
+        "Password and passkey are enabled in the user schema.",
+        "No external providers selected.",
+      ].join("\n"),
+    );
+  });
+
+  it("says passkey-first starts with a passkey and falls back to email and password", () => {
+    expect(signInSummary({ preset: "passkey-first", sso: [] })).toContain(
+      "Sign-in starts with a passkey, with email and password as the fallback.",
+    );
+  });
+
+  it("names the selected providers", () => {
+    const summary = signInSummary({
+      preset: "password-first",
+      sso: [
+        { selection: { kind: "catalog", id: "google" } },
+        {
+          selection: {
+            kind: "custom",
+            connection: {
+              slug: "acme-sso",
+              displayName: "Acme SSO",
+              issuer: "https://sso.acme.example",
+              scopes: "openid",
+            },
+          },
+        },
+      ] as never,
+    });
+
+    expect(summary).toContain("External providers: Google, Acme SSO.");
+    expect(summary).not.toContain("No external providers");
   });
 });
