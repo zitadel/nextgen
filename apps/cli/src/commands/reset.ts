@@ -12,8 +12,8 @@ import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Reset extends BaseCommand {
   static override description = "Delete the local Zitadel server runtime and data.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 5;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({
       char: "f",

@@ -159,28 +159,31 @@ upgrade, so upgrade the app and rerun rather than retrying.
 
 The CLI ships its own command list and per-command flags, always correct for the
 installed version. **Do not guess a command name.** Before running any command you
-are not certain of, run `zitadel --help` first and use the exact name it prints:
+are not certain of, look it up first and use the exact name the CLI prints:
 command and resource names — including whether a resource is singular or plural
-and the exact verb — are whatever `--help` shows, never what you would assume. A
-wrong guess costs a failed call and a round of recovery; one cheap `--help` up
-front avoids it. `zitadel --help` is a flat list and cheap to read, so reach for
-it first; treat the CLI's own output as authoritative over anything you remember:
+and the exact verb — are whatever the CLI shows, never what you would assume. A
+wrong guess costs a failed call and a round of recovery; one cheap lookup up
+front avoids it. `zitadel --help` lists each family of commands (`users`,
+`release`) as one row, so it stays short; `zitadel commands` is the flat list of
+every command, verbs included, and `zitadel <family> --help` lists one family's
+verbs. Treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
-npx @zitadel/cli@latest --help               # every command, grouped by purpose
+npx @zitadel/cli@latest --help               # every command family, grouped by purpose
 npx @zitadel/cli@latest commands             # flat list of all commands
 npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
 npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
-`--help` groups the surface into project commands (create a project and scaffold
-auth), local-server commands (run a local Zitadel), configuration commands
-(`deploy` plus the config resources), and resource commands (the uniform
-`<resource> <verb>` surface). Read the groups from `--help` rather than from
-memory, since they change as the CLI gains commands.
+`--help` groups the commands by what you are doing: getting started, local
+development, users and teams, authentication, configuration and releases, and
+diagnostics and utilities. A family such as `users` is one row, and
+`zitadel users --help` lists its verbs. Read the groups from `--help` rather than
+from memory, since they change as the CLI gains commands.
 
-Use `zitadel --help` to find *which* command to run. Use `resources --json` when
+Use `zitadel --help` to find *which* family or command to run, and
+`zitadel commands` for the exact verb. Use `resources --json` when
 you need a resource's *fields*: it reports the whole runtime-resource surface at
 once — every resource, its verbs, each verb's `create_fields` / `update_fields`
 (flag name, kind, `required`, any closed value set), its `filter_fields` /

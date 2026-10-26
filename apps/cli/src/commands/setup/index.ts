@@ -59,7 +59,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { brandingGuidanceAction } from "../../lib/journey-guidance";
+import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -199,7 +199,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
 export default class Setup extends BaseCommand {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
-  static override group = CommandGroups.project;
+  static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
@@ -931,8 +931,11 @@ export default class Setup extends BaseCommand {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
-      // Last, below the steps that start the app and test sign-in, and only on
-      // a run that succeeded: a failed or cancelled setup never reaches here,
+      // After the steps that start the app and test sign-in, outside the box so
+      // the command can be copied without its border.
+      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
+      // Then the skills note, once per machine, as the last thing setup prints.
+      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
       // so it does not use up the once-per-machine note.
       await showSkillsHint({
         env: process.env,
