@@ -1,11 +1,12 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { Ellipsis, GitCommitHorizontal, Layers3 } from "lucide-react";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { CARD_HEADING, DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
+import { DetailRows } from "@/components/detail-rows";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
@@ -276,42 +277,27 @@ function ReleaseMetadata({ release }: { release: Release }) {
   const { message, git_sha, git_dirty, created_by } = release.metadata;
   return (
     <DetailSection title="Metadata" titleStyle="heading">
-      <div className="flex flex-col gap-4.5">
-        <MetadataRow label="Message">{message || "—"}</MetadataRow>
-        <Separator />
-        {/* `git_dirty` means the tree had uncommitted changes, so the commit
-            names what the release was built near, not what it was built from. */}
-        <MetadataRow label="Git commit">
-          {git_sha ? (
-            <span title={git_sha}>
-              {shortSha(git_sha)}
-              {git_dirty && <span className="text-muted-foreground"> · uncommitted changes</span>}
-            </span>
-          ) : (
-            "—"
-          )}
-        </MetadataRow>
-        <Separator />
-        {/* The identity id, or nothing: a release built from CI carries none. */}
-        <MetadataRow label="Created by">{created_by || "—"}</MetadataRow>
-      </div>
+      <DetailRows
+        rows={[
+          { key: "message", label: "Message", value: message || "—" },
+          {
+            key: "git-commit",
+            label: "Git commit",
+            // `git_dirty` means the tree had uncommitted changes, so the commit
+            // names what the release was built near, not what it was built from.
+            value: git_sha ? (
+              <span title={git_sha}>
+                {shortSha(git_sha)}
+                {git_dirty && <span className="text-muted-foreground"> · uncommitted changes</span>}
+              </span>
+            ) : (
+              "—"
+            ),
+          },
+          // The identity id, or nothing: a release built from CI carries none.
+          { key: "created-by", label: "Created by", value: created_by || "—" },
+        ]}
+      />
     </DetailSection>
-  );
-}
-
-/**
- * The label in the same 216px column the pointer groups use at `lg`, with the
- * value beside it; on a phone the value sits at the row's end.
- */
-function MetadataRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 py-1 lg:justify-start lg:gap-0">
-      <span className="shrink-0 text-sm leading-5 font-medium text-muted-foreground lg:w-54">
-        {label}
-      </span>
-      <span className="min-w-0 text-right text-sm leading-5 text-foreground wrap-anywhere lg:text-left">
-        {children}
-      </span>
-    </div>
   );
 }
