@@ -3,8 +3,8 @@
    always show in the same proportion. `<zl-avatar>` paints with it, and the
    console imports it as `@zitadel/components/avatar.css`.
 
-   `.zl-avatar` holds still, at the person's own angle (`--zl-avatar-base`).
-   Add `.zl-avatar-moving` and its direction moves, not evenly: a slow turn
+   `.zl-avatar` paints it at the person's own angle (`--zl-avatar-base`).
+   `.zl-avatar-moving` sets its direction moving, not evenly: a slow turn
    plus two sways on different periods, all registered angles so they
    interpolate. The gradient drifts round, speeds up, slows and sometimes
    swings back, rather than turning steadily about its centre. Each person
@@ -12,8 +12,8 @@
    of avatars never moves in step. Every name carries the `zl-` prefix: the
    console loads these rules on its document.
 
-   The moving angles fall back to 0deg, so a still avatar needs none of them
-   registered. That matters in `<zl-avatar>`'s shadow root, which ignores
+   The moving angles fall back to 0deg, so `.zl-avatar` alone needs none of
+   them registered, as in `<zl-avatar>`'s shadow root, which ignores
    `@property`. */
 @property --zl-avatar-turn {
   syntax: "<angle>";

@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 /**
  * A project's mark: the gradient a person's avatar is generated from
  * (`@zitadel/components/avatar`), seeded by the project's id, so a project
- * keeps its colours on every screen. It is still (no `zl-avatar-moving`) and
- * square-cornered, since a project is not a person. It tells projects apart at a glance, where one
+ * keeps its colours on every screen. It is square-cornered, since a project is
+ * not a person. It tells projects apart at a glance, where one
  * glyph for every project could not, until a project carries a logo of its
  * own.
  *

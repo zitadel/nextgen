@@ -20,9 +20,7 @@ import { surfaceStyles } from "../styles/index.js";
  *   surface     two `--zl-gradient-*-start` colours picked from `seed`
  *
  * `seed` is what the visitor typed, never a user id: the login must not
- * confirm that an account exists. It holds still (no
- * `zl-avatar-moving`): the login remounts it on every step and reload, where
- * a moving gradient would restart and jump.
+ * confirm that an account exists.
  *
  * Decorative: the identifier always sits beside it, so it is hidden from
  * assistive technology.

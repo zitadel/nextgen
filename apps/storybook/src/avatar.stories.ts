@@ -9,8 +9,7 @@ interface AvatarArgs {
 
 /**
  * Avatar atom (`<zl-avatar>`): the gradient generated from what a visitor
- * typed, the same one the console shows for that identifier. It holds still;
- * the console's moves.
+ * typed, the same one the console shows for that identifier.
  *
  * One controls-driven story: the seed is the knob.
  */
