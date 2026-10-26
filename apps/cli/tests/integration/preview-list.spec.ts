@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp } from "../helpers/project";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "../../src/lib/oclif";
 
 const platform = usePlatformMock();
 
@@ -52,16 +53,18 @@ describe("preview list", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("fails naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
+      it("fails naming the preview credential when it is not set", async () => {
         const app = await anApp();
         await app.bindEnvironment("preview", {
           ZITADEL_PROJECT_ID: "proj_preview",
-          ZITADEL_PROJECT_SECRET: "sk",
+          ...(PREVIEW_CREDENTIAL === "project"
+            ? { ZITADEL_PREVIEW_TOKEN: "pt" }
+            : { ZITADEL_PROJECT_SECRET: "sk" }),
         });
 
         const result = await app.run(["preview", "list", "--env", "preview", "--json"]);
 
-        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+        expect(result).toSay(CREDENTIALS[PREVIEW_CREDENTIAL]);
       });
 
       it("is empty on a project with no previews", async () => {

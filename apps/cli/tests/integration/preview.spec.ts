@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp } from "../helpers/project";
+import { CREDENTIALS, PREVIEW_CREDENTIAL } from "../../src/lib/oclif";
 
 const platform = usePlatformMock();
 
@@ -24,12 +25,18 @@ async function anAppAdmittingPreviews() {
   return app;
 }
 
-/** Arranges a project whose `preview` environment holds no preview token. */
-async function anAppWithoutAPreviewToken() {
+/**
+ * Arranges a project whose `preview` environment holds no preview credential.
+ * Which variable that is follows the credential the preview commands present
+ * ({@link PREVIEW_CREDENTIAL}), so the environment is bound without it.
+ */
+async function anAppWithoutAPreviewCredential() {
   const app = await anApp();
   await app.bindEnvironment("preview", {
     ZITADEL_PROJECT_ID: "proj_preview",
-    ZITADEL_PROJECT_SECRET: "sk",
+    ...(PREVIEW_CREDENTIAL === "project"
+      ? { ZITADEL_PREVIEW_TOKEN: "pt" }
+      : { ZITADEL_PROJECT_SECRET: "sk" }),
   });
   return app;
 }
@@ -331,8 +338,8 @@ describe("preview", () => {
         expect(app.envelopeOf<Listed>(listed).data.items).toEqual([]);
       });
 
-      it("skips when ZITADEL_PREVIEW_TOKEN is not set", async () => {
-        const app = await anAppWithoutAPreviewToken();
+      it("skips when the preview credential is not set", async () => {
+        const app = await anAppWithoutAPreviewCredential();
 
         const result = await app.run([
           "preview",
@@ -347,7 +354,7 @@ describe("preview", () => {
       });
 
       it("warns naming ZITADEL_PREVIEW_TOKEN when it is not set", async () => {
-        const app = await anAppWithoutAPreviewToken();
+        const app = await anAppWithoutAPreviewCredential();
 
         const result = await app.run([
           "preview",
@@ -358,11 +365,11 @@ describe("preview", () => {
           "--json",
         ]);
 
-        expect(result).toSay("ZITADEL_PREVIEW_TOKEN");
+        expect(result).toSay(CREDENTIALS[PREVIEW_CREDENTIAL]);
       });
 
-      it("fails naming ZITADEL_PREVIEW_TOKEN under --strict when it is not set", async () => {
-        const app = await anAppWithoutAPreviewToken();
+      it("fails naming the preview credential under --strict when it is not set", async () => {
+        const app = await anAppWithoutAPreviewCredential();
 
         const result = await app.run([
           "preview",

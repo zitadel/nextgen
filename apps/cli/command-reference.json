@@ -612,7 +612,7 @@
         },
         {
           "name": "strict",
-          "description": "Fail instead of warning when no preview credential (ZITADEL_PREVIEW_TOKEN) is set.",
+          "description": "Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.",
           "type": "boolean"
         },
         {

@@ -2,7 +2,14 @@ import { Flags } from "@oclif/core";
 import type { ZitadelClient } from "@zitadel/api/client";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 
-import { CommandGroups, type JsonEnvelope, PreviewCommand, previewFlags } from "../../lib/oclif";
+import {
+  CommandGroups,
+  CREDENTIALS,
+  type JsonEnvelope,
+  PREVIEW_CREDENTIAL,
+  PreviewCommand,
+  previewFlags,
+} from "../../lib/oclif";
 import {
   buildBundle,
   createDeployment,
@@ -55,8 +62,7 @@ export default class Preview extends PreviewCommand {
     // Preview-only: `preview list` and `preview rm` share the credential but
     // have no deploy to make strict, so this lives here, not in `previewFlags`.
     strict: Flags.boolean({
-      description:
-        "Fail instead of warning when no preview credential (ZITADEL_PREVIEW_TOKEN) is set.",
+      description: `Fail instead of warning when no preview credential (${CREDENTIALS[PREVIEW_CREDENTIAL]}) is set.`,
     }),
   };
 
@@ -121,25 +127,26 @@ export default class Preview extends PreviewCommand {
       });
     }
 
-    // A fork pull-request build cannot read the preview credential — a secret
-    // is never exposed to a fork — so a missing `ZITADEL_PREVIEW_TOKEN` is not
-    // a build failure: the preview is skipped and the build carries on (#1312).
-    // `--strict` is for a trusted build that expects the token, where a missing
-    // one is a misconfiguration worth failing on. The project secret is never a
-    // stand-in, so its presence does not satisfy this.
-    if (this.environment.values.ZITADEL_PREVIEW_TOKEN === undefined) {
+    // A fork pull-request build cannot read a secret — one is never exposed to
+    // a fork — so a missing credential is not a build failure: the preview is
+    // skipped and the build carries on (#1312). `--strict` is for a trusted
+    // build that expects it, where a missing one is a misconfiguration worth
+    // failing on. The other credential is never a stand-in, so its presence
+    // does not satisfy this.
+    const credential = CREDENTIALS[PREVIEW_CREDENTIAL];
+    if (this.environment.values[credential] === undefined) {
       if (flags.strict) {
-        throw new ZitadelError("E_VALIDATION", "ZITADEL_PREVIEW_TOKEN is not set", {
-          hint: "Set ZITADEL_PREVIEW_TOKEN for this build, or drop --strict to skip the preview when it is absent.",
+        throw new ZitadelError("E_VALIDATION", `${credential} is not set`, {
+          hint: `Set ${credential} for this build, or drop --strict to skip the preview when it is absent.`,
         });
       }
       reportWarning(
-        "No preview credential (ZITADEL_PREVIEW_TOKEN) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.",
+        `No preview credential (${credential}) is set, so the preview is skipped; a fork pull-request build cannot read it. Pass --strict to fail instead.`,
       );
       return this.emit({
         status: "skipped",
         reason: "no-preview-credential",
-        pretty: "no preview credential (ZITADEL_PREVIEW_TOKEN) — preview skipped",
+        pretty: `no preview credential (${credential}) — preview skipped`,
       });
     }
 

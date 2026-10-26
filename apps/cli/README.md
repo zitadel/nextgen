@@ -2234,7 +2234,7 @@ FLAGS
       --origin=<value>...  A preview URL to deploy to, instead of detecting them
                            from the platform build. Repeatable.
       --strict             Fail instead of warning when no preview credential
-                           (ZITADEL_PREVIEW_TOKEN) is set.
+                           (ZITADEL_PROJECT_SECRET) is set.
       --[no-]telemetry     Send anonymous usage analytics. Disable with
                            --no-telemetry.
       --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
