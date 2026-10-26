@@ -93,6 +93,7 @@ export const bindOperation = <Ctx, Spec>(
     static override flags = statics.flags;
     static override args = statics.args;
     static override group = definition.resource.group;
+    static override groupOrder = definition.resource.groupOrder;
   };
   // Beside the class, never on it: oclif copies a command's own statics into
   // `commands --json` and the published manifest, and a registry entry (with a

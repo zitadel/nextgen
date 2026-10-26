@@ -116,6 +116,16 @@ you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
 
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
+
 ### Zitadel Cloud
 
 ```sh

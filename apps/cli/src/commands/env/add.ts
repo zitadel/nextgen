@@ -64,8 +64,7 @@ type DeployedRelease = {
  */
 export default class EnvAdd extends BaseCommand {
   static override description = "Bind an environment to a project, creating the project if needed.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 7;
+  static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",

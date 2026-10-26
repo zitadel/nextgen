@@ -95,6 +95,25 @@ describe("status command", () => {
     );
   });
 
+  it("ends with where to find every command, in the text only", async () => {
+    const cwd = await configuredProject();
+
+    const text = await runCliForTest([
+      "status",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+    ]);
+    const json = await status(cwd);
+
+    expect(text.stdout.trimEnd().split("\n").slice(-2)).toEqual([
+      "Explore all commands:",
+      `  ${expectedPublicCliCommand("")}`,
+    ]);
+    expect(json.stdout).not.toContain("Explore all commands");
+  });
+
   it("reports a project with no owning team as temporary and points at claim", async () => {
     const cwd = await configuredProject();
 
