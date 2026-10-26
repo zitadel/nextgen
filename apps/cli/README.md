@@ -722,7 +722,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin created by `zitadel start`.
+Open the local console, signed in as the local admin.
 
 ```
 USAGE
@@ -744,10 +744,10 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin created by `zitadel start`.
+  Open the local console, signed in as the local admin.
 
-  Run it in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest
-  `.zitadel/local/` on the way up.
+  The local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside
+  it: the local admin is read from the nearest `.zitadel/local/` on the way up.
 
 EXAMPLES
   $ zitadel console
@@ -757,7 +757,7 @@ EXAMPLES
 
 ## `zitadel deploy`
 
-Build a release from .zitadel/ and deploy it to the project.
+Apply your local configuration to Zitadel.
 
 ```
 USAGE
@@ -783,7 +783,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Build a release from .zitadel/ and deploy it to the project.
+  Apply your local configuration to Zitadel.
+
+  Builds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.
 
 EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
@@ -2115,7 +2117,7 @@ EXAMPLES
 
 ## `zitadel pull [TARGET]`
 
-Rebuild .zitadel/ from the revisions a released snapshot pins.
+Rebuild your .zitadel/ files from a release.
 
 ```
 USAGE
@@ -2144,7 +2146,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Rebuild .zitadel/ from the revisions a released snapshot pins.
+  Rebuild your .zitadel/ files from a release.
+
+  Writes .zitadel/ from the revisions a released snapshot pins.
 
 EXAMPLES
   $ zitadel pull
@@ -2340,7 +2344,7 @@ DESCRIPTION
 
 ## `zitadel resources`
 
-List the resources this CLI manages and what can be done to each.
+List the resources this CLI manages.
 
 ```
 USAGE
@@ -2362,7 +2366,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List the resources this CLI manages and what can be done to each.
+  List the resources this CLI manages.
+
+  Shows what can be done to each.
 
 EXAMPLES
   $ zitadel resources
@@ -2636,7 +2642,7 @@ EXAMPLES
 
 ## `zitadel setup`
 
-Create a Zitadel project and scaffold local auth.
+Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.
 
 ```
 USAGE
@@ -2694,7 +2700,8 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create a Zitadel project and scaffold local auth.
+  Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent
+  skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.
 
 EXAMPLES
   $ zitadel setup --framework next

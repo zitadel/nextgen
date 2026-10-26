@@ -83,7 +83,7 @@ import { reportWarning } from "../../../lib/warnings";
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.authentication;
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -436,9 +436,28 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopeArgs,
     );
 
+    // A file changed or a connection was created, which only a deploy publishes.
+    const unpublished = !reusing || written.length > 0;
+    const credentialsStored =
+      secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
+    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
+    const name = entry.displayName;
+
     return this.emit({
       status: "ok",
       data: {
+        // Configured is not live, and stored credentials are only claimed once
+        // they reached the Project (a failed or deferred publish warns instead).
+        title: unpublished
+          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
+          : `${name} sign-in is already configured locally.`,
+        ...(unpublished
+          ? {
+              next_actions: [
+                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+              ],
+            }
+          : {}),
         ...this.payload({
           projectId,
           provider,
@@ -453,9 +472,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
-        ...this.followUps(!reusing || written.length > 0, scopeArgs, recovery),
+        ...this.followUps(unpublished, scopeArgs, recovery),
       },
-      pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
   }
 

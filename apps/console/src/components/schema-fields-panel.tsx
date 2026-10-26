@@ -2,6 +2,7 @@ import { Check, ChevronRight, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import { OVERLINE, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   type SchemaProperty,
   type UserSchema,
   resolveSchemaPath,
+  schemaDesignation,
   schemaProperties,
 } from "@/lib/schema";
 
@@ -29,6 +31,11 @@ const ROOT_LABEL = "Schema";
  * depth is expressed by replacing the table rather than nesting inside it. A
  * row whose type is `Object` opens that object's own properties and pushes a
  * breadcrumb segment; the breadcrumb walks back up.
+ *
+ * The leaf the schema's `x-identifier` names, and each of its `x-display`
+ * parts, carries that keyword as a badge beside its key, so what signs a user
+ * in and what names them reads off the table rather than only off the
+ * document — in the words the users table's hover card uses.
  *
  * D14 also calls for a search field once an attribute list gets long. Nothing
  * here is long yet — the shipped presets define one to four properties — so the
@@ -77,6 +84,7 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
               <PropertyRow
                 key={property.key}
                 property={property}
+                designation={schemaDesignation(schema, [...path, property.key])}
                 onDrillIn={() => setPath([...path, property.key])}
               />
             ))
@@ -93,7 +101,15 @@ const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-rin
 const HEAD_CELL = PANEL_HEAD_CELL;
 const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
 
-function PropertyRow({ property, onDrillIn }: { property: SchemaProperty; onDrillIn: () => void }) {
+function PropertyRow({
+  property,
+  designation,
+  onDrillIn,
+}: {
+  property: SchemaProperty;
+  designation: ReturnType<typeof schemaDesignation>;
+  onDrillIn: () => void;
+}) {
   return (
     <TableRow className={property.isObject ? "relative hover:bg-accent" : "hover:bg-transparent"}>
       <TableCell className={`${BODY_CELL} pl-2 text-foreground`}>
@@ -109,6 +125,15 @@ function PropertyRow({ property, onDrillIn }: { property: SchemaProperty; onDril
             {property.key}
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
           </button>
+        ) : designation ? (
+          // The key gives way to the badge, which never truncates. The space
+          // separates the two in the cell's accessible name.
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{property.key}</span>{" "}
+            <Badge variant="secondary" className="font-mono font-normal">
+              {designation}
+            </Badge>
+          </span>
         ) : (
           property.key
         )}

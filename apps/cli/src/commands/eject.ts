@@ -99,8 +99,8 @@ async function pathExists(path: string): Promise<boolean> {
  */
 export default class Eject extends BaseCommand {
   static override description = "Remove managed files and local Zitadel state.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 4;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {
     force: Flags.boolean({

@@ -236,6 +236,25 @@ describe("DevPortPrompt", () => {
     expect(out.devPort).toBe(4000);
   });
 
+  it("names the app's port and says how to accept the suggested one", async () => {
+    vi.mocked(text).mockResolvedValueOnce("3000" as never);
+
+    await new DevPortPrompt().ask(baseAnswers({ devPort: 3000 }), ctx);
+
+    expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
+      message: "Which port should your app run on? Press Enter to use 3000, or edit it first.",
+      initialValue: "3000",
+    });
+  });
+
+  it("repeats the suggested port that was detected in the hint", async () => {
+    vi.mocked(text).mockResolvedValueOnce("5173" as never);
+
+    await new DevPortPrompt().ask(baseAnswers({ devPort: 5173 }), ctx);
+
+    expect(vi.mocked(text).mock.calls[0]?.[0]?.message).toContain("Press Enter to use 5173,");
+  });
+
   it("skips and keeps the flagged port when --dev-port was passed", async () => {
     const out = await new DevPortPrompt().ask(baseAnswers({ devPort: 5000 }), {
       ...ctx,
@@ -305,6 +324,22 @@ describe("UseCasePrompt", () => {
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({ initialValue: "minimal" });
   });
 
+  it("asks which registration fields to collect, with every field set in its label", async () => {
+    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
+
+    await new UseCasePrompt().ask(baseAnswers({ useCase: "minimal" }), ctx);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      message:
+        "Which fields should your registration form include? You can change these after setup. Only email is required.",
+      options: [
+        { value: "minimal", label: "Email only" },
+        { value: "consumer", label: "Email, first name and last name" },
+        { value: "business", label: "Email, first name, last name and company name" },
+      ],
+    });
+  });
+
   it("skips and keeps the flagged use case when --use-case was passed", async () => {
     const answers = await new UseCasePrompt().ask(baseAnswers({ useCase: "consumer" }), {
       ...ctx,
@@ -337,6 +372,26 @@ describe("SignInPresetPrompt", () => {
     expect(answers.preset).toBe("passkey-first");
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       initialValue: "password-first",
+    });
+  });
+
+  it("says which method is offered first and that password-first also enables passkeys", async () => {
+    vi.mocked(select).mockResolvedValueOnce("password-first" as never);
+
+    await new SignInPresetPrompt().ask(baseAnswers({ preset: "password-first" }), ctx);
+
+    expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
+      message: "Which sign-in method should your app offer first?",
+      options: [
+        {
+          value: "password-first",
+          label: "Password first — password-led sign-in; passkeys also enabled",
+        },
+        {
+          value: "passkey-first",
+          label: "Passkey first — passkey-led sign-in; email and password fallback",
+        },
+      ],
     });
   });
 
@@ -402,6 +457,21 @@ describe("SocialSignInPrompt", () => {
     expect(options.map((option) => option.value)).toEqual([...IDP_PROVIDERS, "custom"]);
   });
 
+  it("says the providers are optional and that Enter skips them", async () => {
+    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+    await new SocialSignInPrompt().ask(baseAnswers(), ctx);
+
+    const question = vi.mocked(multiselect).mock.calls[0]?.[0];
+    expect(question?.message).toBe(
+      "Add external sign-in providers? (optional) Select any providers you want to add, or press Enter to skip.",
+    );
+    expect(question?.options.map((option) => option.label)).toEqual([
+      "Google — requires a Google OAuth app",
+      "Another OpenID Connect (OIDC) provider — requires provider configuration",
+    ]);
+  });
+
   it("captures the credentials and shows the redirect URI to register", async () => {
     vi.mocked(multiselect).mockResolvedValueOnce(["google"] as never);
     vi.mocked(text).mockResolvedValueOnce("  1234-abc.apps.googleusercontent.com  " as never);
@@ -445,7 +515,7 @@ describe("SocialSignInPrompt", () => {
       const options = vi.mocked(multiselect).mock.calls[0]?.[0]?.options ?? [];
       expect(options.at(-1)).toMatchObject({
         value: "custom",
-        label: "Continue with another OpenID Connect provider",
+        label: "Another OpenID Connect (OIDC) provider — requires provider configuration",
       });
     });
 

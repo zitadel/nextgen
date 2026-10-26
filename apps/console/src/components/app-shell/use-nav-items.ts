@@ -49,8 +49,8 @@ export function useNavItems(view: NavView = "portal"): NavItem[] {
 /**
  * The entry a screen was opened from while Projects asks for a project first:
  * the one `?next=` names on Projects (`/teams?status=…` → Teams, and a screen
- * beneath an entry, `/users/usr_1`, → Users). The sidebar marks it and the page
- * names it, as the person asked for that screen rather than for Projects.
+ * beneath an entry, `/users/usr_1`, → Users). The page names it, as the person
+ * asked for that screen rather than for Projects.
  * `undefined` anywhere else, and for a `next` no entry holds.
  */
 export function useRequestedNavItem(items: NavItem[]): NavItem | undefined {

@@ -13352,6 +13352,7 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
 	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -13374,6 +13375,7 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
@@ -13390,6 +13392,11 @@ const (
 	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
+func (s CreateDeploymentErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateDeploymentErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
 func (s CreateDeploymentErrorResponse) IsAuthUnauthorized() bool {
@@ -13464,6 +13471,27 @@ func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
 func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateDeploymentErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateDeploymentErrorResponse to AuthCsrfInvalid.
+func (s *CreateDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateDeploymentErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateDeploymentErrorResponse is AuthCsrfInvalid.
+func (s CreateDeploymentErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateDeploymentErrorResponse(v AuthCsrfInvalid) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateDeploymentErrorResponse to AuthUnauthorized.
@@ -79875,6 +79903,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
 	Type                RevokeReleaseErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
@@ -79892,6 +79921,7 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
+	AuthCsrfInvalidRevokeReleaseErrorResponse     RevokeReleaseErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "evt.invalid"
 	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
@@ -79903,6 +79933,11 @@ const (
 	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
 	UnavailableRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RevokeReleaseErrorResponse is AuthCsrfInvalid.
+func (s RevokeReleaseErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeReleaseErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
 func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
@@ -79952,6 +79987,27 @@ func (s RevokeReleaseErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RevokeReleaseErrorResponse is Unavailable.
 func (s RevokeReleaseErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRevokeReleaseErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RevokeReleaseErrorResponse to AuthCsrfInvalid.
+func (s *RevokeReleaseErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeReleaseErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeReleaseErrorResponse is AuthCsrfInvalid.
+func (s RevokeReleaseErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeReleaseErrorResponse(v AuthCsrfInvalid) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RevokeReleaseErrorResponse to AuthUnauthorized.
@@ -80476,6 +80532,7 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
 	Type                 RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -80498,6 +80555,7 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
@@ -80514,6 +80572,11 @@ const (
 	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
 	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
+func (s RollbackDeploymentErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRollbackDeploymentErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
 func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
@@ -80588,6 +80651,27 @@ func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
 func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRollbackDeploymentErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RollbackDeploymentErrorResponse to AuthCsrfInvalid.
+func (s *RollbackDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRollbackDeploymentErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RollbackDeploymentErrorResponse is AuthCsrfInvalid.
+func (s RollbackDeploymentErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRollbackDeploymentErrorResponse(v AuthCsrfInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RollbackDeploymentErrorResponse to AuthUnauthorized.

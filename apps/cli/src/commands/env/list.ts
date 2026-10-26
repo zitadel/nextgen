@@ -16,8 +16,7 @@ const COLUMNS = ["name", "source", "server", "project_id", "resolved"] as const;
  */
 export default class EnvList extends EnvironmentCommand {
   static override description = "List the environments bound in this directory's .env files.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 6;
+  static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> env list", "<%= config.bin %> env list --plain"];
   static override flags = {
     plain: Flags.boolean({
