@@ -412,7 +412,7 @@ function ProfileCard({
                 <GitCommitHorizontal className="size-4" strokeWidth={1.5} aria-hidden />
                 <Badge
                   variant="ghost"
-                  className="h-auto min-h-5 min-w-0 shrink overflow-visible py-0 font-mono font-normal break-all whitespace-normal"
+                  className="h-auto min-h-5 min-w-0 shrink overflow-visible px-0 py-0 font-mono font-normal break-all whitespace-normal"
                 >
                   {schemaId}
                 </Badge>
