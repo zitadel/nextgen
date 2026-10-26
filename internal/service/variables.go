@@ -19,7 +19,9 @@ type VariableToSet struct {
 }
 
 // VariableService reads and writes the variables one owner entered (ADR 062,
-// ADR 069).
+// ADR 069). It also reads and stores the set a deployment froze. Storing that
+// set uses the statements of the deployment's transaction, so the link sees
+// the deployment row written there.
 //
 // The owner is the project. Storage matches the owner column exactly, so a
 // value another project entered can never reach a caller here. The primary
@@ -45,6 +47,18 @@ type VariableService interface {
 	// GetDeploymentVariables returns the set deploymentID was frozen with.
 	// A deployment that was never frozen returns an error that is not internal.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+	// ReadDeploymentVariableSet is GetDeploymentVariables through stmts. A
+	// caller inside a transaction passes that transaction's statements. A
+	// deployment that was never frozen returns an error that is not internal.
+	ReadDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string) (*domain.VariableSet, error)
+	// NewKindVariableSet is the content-addressed set of the live rows of kind
+	// visible on stmts. It does not scan a release and it does not write.
+	NewKindVariableSet(ctx context.Context, stmts VariableStatements, projectID string, kind domain.DeploymentOriginKind) (*domain.VariableSet, error)
+	// StoreDeploymentVariableSet inserts set when its hash is new and links
+	// deploymentID to that hash. stmts are the deployment transaction's
+	// statements: a second transaction cannot see the deployment row the link
+	// references. The set is the one the caller already resolved.
+	StoreDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string, set *domain.VariableSet) error
 	// SetVariables applies one batch whole or not at all. A nil value removes
 	// the name. With a kind, only that kind's rows are written or removed.
 	// Without one, a plain value is written for both kinds, a secret for
@@ -164,7 +178,11 @@ func (s *variableService) GetDeploymentVariables(ctx context.Context, projectID,
 	ctx, end := startSpan(ctx, "VariableService.GetDeploymentVariables")
 	defer end(&err)
 
-	set, err := s.v2Pool.Statements().GetDeploymentVariables(ctx, projectID, deploymentID)
+	return s.ReadDeploymentVariableSet(ctx, s.v2Pool.Statements(), projectID, deploymentID)
+}
+
+func (s *variableService) ReadDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string) (*domain.VariableSet, error) {
+	set, err := stmts.GetDeploymentVariables(ctx, projectID, deploymentID)
 	if err != nil {
 		if isNoRowFound(err) {
 			return nil, errNoFrozenVariables
@@ -172,6 +190,21 @@ func (s *variableService) GetDeploymentVariables(ctx context.Context, projectID,
 		return nil, domain.ErrInternal(err).WithMessage("failed to read the deployment's variables")
 	}
 	return set, nil
+}
+
+func (s *variableService) NewKindVariableSet(ctx context.Context, stmts VariableStatements, projectID string, kind domain.DeploymentOriginKind) (*domain.VariableSet, error) {
+	variables, err := stmts.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, kind)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read variables")
+	}
+	return domain.NewVariableSet(projectID, variables)
+}
+
+func (s *variableService) StoreDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string, set *domain.VariableSet) error {
+	if err := stmts.EnsureVariableSet(ctx, set); err != nil {
+		return err
+	}
+	return stmts.LinkDeploymentVariableSet(ctx, projectID, deploymentID, set.Hash)
 }
 
 // variableRemoval addresses one row a batch removes.

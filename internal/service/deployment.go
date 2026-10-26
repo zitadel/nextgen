@@ -79,11 +79,12 @@ type ListDeploymentsOutput struct {
 }
 
 type DeploymentService struct {
-	v2Pool *DB
+	v2Pool    *DB
+	variables VariableService
 }
 
-func NewDeploymentService(v2Pool *DB) *DeploymentService {
-	return &DeploymentService{v2Pool: v2Pool}
+func NewDeploymentService(v2Pool *DB, variables VariableService) *DeploymentService {
+	return &DeploymentService{v2Pool: v2Pool, variables: variables}
 }
 
 // maxDeployAttempts bounds how often an unguarded deploy retries after losing
@@ -249,7 +250,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
-		set, err := resolveDeploymentVariableSet(ctx, stmts, entity, release)
+		set, err := resolveDeploymentVariableSet(ctx, s.variables, stmts, entity, release)
 		if err != nil {
 			return err
 		}
@@ -261,7 +262,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		// origins already match. Anything else is a new deployment.
 		var currentHash string
 		if domain.SamePrimaryRelease(entity, current) {
-			currentHash, err = deploymentSetHash(ctx, stmts, current)
+			currentHash, err = deploymentSetHash(ctx, s.variables, stmts, current)
 			if err != nil {
 				return err
 			}
@@ -284,7 +285,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		if err := attachVariableSet(ctx, stmts, &written, set); err != nil {
+		if err := s.variables.StoreDeploymentVariableSet(ctx, stmts, written.ProjectID, written.ID, set); err != nil {
 			return err
 		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {

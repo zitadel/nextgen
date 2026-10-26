@@ -74,7 +74,7 @@ func (f deploymentFixture) deploy(t *testing.T, releaseID api.ReleaseID) api.Cre
 // API does not take preview targets yet.
 func (f deploymentFixture) deployPreview(t *testing.T, releaseID api.ReleaseID) *service.CreateDeploymentOutput {
 	t.Helper()
-	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t)).Create(t.Context(), service.CreateDeploymentInput{
+	out, err := service.NewDeploymentService(harness.EnsureServiceDB(t), harness.EnsureVariableService(t)).Create(t.Context(), service.CreateDeploymentInput{
 		ProjectID:  f.project,
 		ReleaseID:  string(releaseID),
 		OriginKind: domain.DeploymentOriginKindPreview,

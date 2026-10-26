@@ -18,12 +18,12 @@ func (s *DeploymentService) Variables(ctx context.Context, projectID, deployment
 	ctx, end := startSpan(ctx, "DeploymentService.Variables")
 	defer end(&err)
 
-	set, err := s.v2Pool.Statements().GetDeploymentVariables(ctx, projectID, deploymentID)
+	set, err := s.variables.GetDeploymentVariables(ctx, projectID, deploymentID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if errors.Is(err, errNoFrozenVariables) {
 			return nil, domain.ErrDeploymentNotFound()
 		}
-		return nil, domain.ErrInternal(err).WithMessage("failed to get deployment variables")
+		return nil, err
 	}
 	return set, nil
 }
@@ -33,22 +33,18 @@ func (s *DeploymentService) Variables(ctx context.Context, projectID, deployment
 // set already passed the check. Anything else builds the set from the live
 // rows of the deployment's kind, including the empty set, and refuses the
 // deploy when the release names a variable that set does not hold.
-func resolveDeploymentVariableSet(ctx context.Context, stmts AllStatements, entity *domain.Deployment, release *domain.Release) (*domain.VariableSet, error) {
+func resolveDeploymentVariableSet(ctx context.Context, variables VariableService, stmts AllStatements, entity *domain.Deployment, release *domain.Release) (*domain.VariableSet, error) {
 	if entity.Metadata.RollbackTo != nil {
-		set, err := stmts.GetDeploymentVariables(ctx, entity.ProjectID, *entity.Metadata.RollbackTo)
+		set, err := variables.ReadDeploymentVariableSet(ctx, stmts, entity.ProjectID, *entity.Metadata.RollbackTo)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			if errors.Is(err, errNoFrozenVariables) {
 				return nil, domain.ErrDeploymentNotFound()
 			}
-			return nil, domain.ErrInternal(err).WithMessage("failed to read the restored deployment's variables")
+			return nil, err
 		}
 		return set, nil
 	}
-	variables, err := stmts.GetVariables(ctx, domain.VariableOwner{ProjectID: entity.ProjectID}, entity.OriginKind)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read variables")
-	}
-	set, err := domain.NewVariableSet(entity.ProjectID, variables)
+	set, err := variables.NewKindVariableSet(ctx, stmts, entity.ProjectID, entity.OriginKind)
 	if err != nil {
 		return nil, err
 	}
@@ -64,28 +60,18 @@ func resolveDeploymentVariableSet(ctx context.Context, stmts AllStatements, enti
 
 // deploymentSetHash is the set current runs with. No deployment, or one that
 // was never frozen, has no hash, so it cannot match the set being written.
-func deploymentSetHash(ctx context.Context, stmts VariableSetStatements, current *domain.Deployment) (string, error) {
+func deploymentSetHash(ctx context.Context, variables VariableService, stmts VariableSetStatements, current *domain.Deployment) (string, error) {
 	if current == nil {
 		return "", nil
 	}
-	set, err := stmts.GetDeploymentVariables(ctx, current.ProjectID, current.ID)
+	set, err := variables.ReadDeploymentVariableSet(ctx, stmts, current.ProjectID, current.ID)
 	if err != nil {
-		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+		if errors.Is(err, errNoFrozenVariables) {
 			return "", nil
 		}
-		return "", domain.ErrInternal(err).WithMessage("failed to read the deployment's variables")
+		return "", err
 	}
 	return set.Hash, nil
-}
-
-// attachVariableSet stores the set create already resolved and links the
-// deployment to it. The missing-name check and the hash comparison used this
-// same set, so a change to the live rows after that read cannot land here.
-func attachVariableSet(ctx context.Context, stmts VariableSetStatements, written *domain.Deployment, set *domain.VariableSet) error {
-	if err := stmts.EnsureVariableSet(ctx, set); err != nil {
-		return err
-	}
-	return stmts.LinkDeploymentVariableSet(ctx, written.ProjectID, written.ID, set.Hash)
 }
 
 // missingVariableNames is every ${{ NAME }} in the release's pinned documents

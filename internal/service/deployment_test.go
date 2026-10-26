@@ -36,7 +36,7 @@ func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *serv
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewDeploymentService(service.NewPool(pool)), statements
+	return newDeploymentService(ctrl, pool), statements
 }
 
 // newMockedDeploymentServiceQuiet is newMockedDeploymentService for a path
@@ -55,7 +55,13 @@ func newMockedDeploymentServiceQuiet(t *testing.T) (*service.DeploymentService, 
 		}).
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(statements).AnyTimes()
-	return service.NewDeploymentService(service.NewPool(pool)), statements
+	return newDeploymentService(ctrl, pool), statements
+}
+
+func newDeploymentService(ctrl *gomock.Controller, pool *servicemocks.MockPool) *service.DeploymentService {
+	db := service.NewPool(pool)
+	variables := service.NewVariableService(db, servicemocks.NewMockKeyService(ctrl))
+	return service.NewDeploymentService(db, variables)
 }
 
 func deploymentInput() service.CreateDeploymentInput {
