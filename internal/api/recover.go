@@ -12,8 +12,10 @@ import (
 // WithRecover turns a handler panic into the standard internal error
 // response and one API error line with the panic's stack. A panic after the
 // response started aborts the connection instead, so the client does not
-// take a truncated response for a success. http.ErrAbortHandler is
-// re-panicked, as net/http expects.
+// take a truncated response for a success. [http.ErrAbortHandler] is
+// re-panicked untouched: it asks net/http to abort the connection without
+// logging, and handling it here would log it and could finish a truncated
+// response as a success.
 func WithRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tw := &headerTrackingWriter{ResponseWriter: w}
