@@ -907,6 +907,28 @@ describe("setup command", () => {
     expect(res.stdout).toContain("--use-case business");
   });
 
+  it("reproduces --password-min-length in the retry guidance when project creation fails", async () => {
+    const cwd = await makeNextProject();
+    server.use(
+      http.post("*/projects", () =>
+        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await setup(cwd, [
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--password-min-length",
+      "12",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    // Without it, following the suggested retry would publish an empty policy.
+    expect(res.stdout).toContain("--password-min-length 12");
+  });
+
   describe("when the default resources of a new app cannot be uploaded", () => {
     const failingUpload = async () => {
       const cwd = await makeNewAppDirectory();
@@ -975,6 +997,19 @@ describe("a retry after a failure before the wizard", () => {
     });
 
     expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
+  });
+
+  it("carries the minimum password length, and an explicit none as 0", () => {
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "12" }))).toContain(
+      "--password-min-length 12",
+    );
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
+      "--password-min-length 0",
+    );
+    // A refused value would only be refused again.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
+      "--password-min-length",
+    );
   });
 
   it("does not carry a provider this CLI does not offer", () => {

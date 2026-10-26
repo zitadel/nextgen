@@ -88,14 +88,14 @@ Decided on 2026-10-15, revising #898's "defaults to 15 characters".
 - Overrides stay simple. A later audience or hierarchy model resolves
   between instances that exist, not between instances and a hidden default.
 
-Projects still start from a sensible policy. `zitadel setup` scaffolds a
-starter instance for `auth.factor.password.set` with `min_length: 15`, the
-NIST SP 800-63B minimum for a password used as a single factor
-([#1450](https://github.com/zitadel/nextgen/issues/1450)). #898's default
-therefore lives on as the starter's value, not as server behaviour. A project
-that skips the starter, or later deploys it without its `min_length`, has no
+The CLI follows the same rule. `zitadel setup` writes and publishes the
+`auth.factor.password.set` instance with an empty `config`, and puts a
+minimum length into it only when the developer gives one
+([#1450](https://github.com/zitadel/nextgen/issues/1450)). The file makes the
+policy easy to find and to set; a value the CLI chose on the project's behalf
+would be a default one level up. A project without a `min_length` has no
 length policy; the domain guards (non-empty, at most 64 code points) still
-apply. NIST alignment holds for projects that keep the starter.
+apply.
 
 ### Terminology
 

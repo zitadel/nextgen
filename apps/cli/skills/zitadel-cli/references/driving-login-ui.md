@@ -94,7 +94,10 @@ which applies the next time a password is set. A setting left out is off, and
 the deployed release carries, so deploying without the file switches it off
 there; a password set through the API, or before the first deploy, uses the
 newest revision, which only `"config": {}` switches off. `policies list` and
-`policies get <id|operation>` read them back. Managed files carry a marker comment; `eject` removes only
+`policies get <id|operation>` read them back. `setup` writes and publishes
+the password policy with an empty `config`, which enforces nothing; pass
+`--password-min-length <n>` only when the user gives a value, and do not
+choose one for them. Managed files carry a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

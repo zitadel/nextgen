@@ -13,8 +13,14 @@
  *
  * **Dependency rule.** No upward imports (`commands/`, `release/`).
  */
+import {
+  PublishPolicyBody as PublishPolicyBodySchema,
+  publishPolicyBodyOneConfigMinLengthMax,
+} from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { PublishPolicyBody } from "@zitadel/api/generated/model";
 import { policyConfigSchema } from "@zitadel/config/schemas";
+import type { Parsed } from "@zitadel/config/idp";
+import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 /** Project-relative directory the policy files live in. */
 export const POLICIES_DIR = ".zitadel/policies";
@@ -60,4 +66,56 @@ export function policyFileIssues(data: unknown, file: string): string[] {
     return [`${file} holds the ${result.data.operation} policy, so it must be named ${expected}`];
   }
   return [];
+}
+
+/** The operation the password policy guards, and the name of its file. */
+export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set";
+
+/** Where `setup` writes the password policy. */
+export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_POLICY_OPERATION)}`;
+
+/**
+ * A minimum password length as `setup` was given it: a number, or `null` for
+ * an explicit "none" (an empty answer, or 0), which is not the same as not
+ * being asked: a kept policy file loses its `min_length` on "none" and keeps it
+ * when nothing was given.
+ */
+export type PasswordMinLength = number | null;
+
+/**
+ * The password policy file `setup` writes. Without a minimum its `config` is
+ * empty, which enforces nothing: the CLI does not choose a value on the
+ * project's behalf, it only makes the policy easy to find and to set.
+ */
+export function passwordPolicyFile(
+  minLength?: PasswordMinLength,
+): PolicyFile & { $schema: string } {
+  return {
+    $schema: POLICY_FILE_SCHEMA_REF,
+    operation: PASSWORD_POLICY_OPERATION,
+    config: typeof minLength === "number" ? { min_length: minLength } : {},
+  };
+}
+
+/**
+ * Reads a minimum password length the way `setup` takes one, from its flag or
+ * its prompt: empty or 0 means none (`null`), anything else a whole number the
+ * template's bounds accept. The bounds come from the generated publish body,
+ * so the CLI and the server cannot disagree on them.
+ */
+export function parsePasswordMinLength(value: string): Parsed<PasswordMinLength> {
+  const text = value.trim();
+  // A minimum of 0 enforces nothing, so it means none: the file keeps one
+  // form for "off", the setting left out, which its bounds (1 and up) teach.
+  if (text === "" || /^0+$/.test(text)) {
+    return { ok: true, value: null };
+  }
+  const result = PublishPolicyBodySchema.shape.config.shape.min_length.safeParse(Number(text));
+  if (!/^\d+$/.test(text) || !result.success || result.data === undefined) {
+    return {
+      ok: false,
+      problem: `Must be a whole number from 1 to ${publishPolicyBodyOneConfigMinLengthMax}, or 0 for none`,
+    };
+  }
+  return { ok: true, value: result.data };
 }
