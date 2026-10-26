@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { intro, outro } from "@clack/prompts";
+import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
@@ -120,6 +120,7 @@ import {
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  signInSummary,
   url as styleUrl,
   type Row,
   type Section,
@@ -197,7 +198,8 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * empty-directory framework choice, before the main wizard).
  */
 export default class Setup extends BaseCommand {
-  static override description = "Create a Zitadel project and scaffold local auth.";
+  static override description =
+    "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.project;
   static override groupOrder = 1;
   static override examples = [
@@ -266,15 +268,6 @@ export default class Setup extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
-    // First thing `setup` prints, so ahead of `toMeta`, which opens telemetry
-    // (its first-run notice goes to stderr) and can throw on server resolution.
-    await showSkillsHint({
-      env: process.env,
-      interactive:
-        !this.jsonEnabled() &&
-        !flags["non-interactive"] &&
-        Boolean(process.stdout.isTTY && process.stdin.isTTY),
-    });
     // Before toMeta and before anything touches the server or the disk.
     if (flags.design !== undefined) {
       throw setupDesignRemovedError(this.config.version);
@@ -449,6 +442,7 @@ export default class Setup extends BaseCommand {
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
+      note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
     }
 
@@ -925,6 +919,16 @@ export default class Setup extends BaseCommand {
           ].join("\n"),
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+      });
+      // Last, below the steps that start the app and test sign-in, and only on
+      // a run that succeeded: a failed or cancelled setup never reaches here,
+      // so it does not use up the once-per-machine note.
+      await showSkillsHint({
+        env: process.env,
+        interactive:
+          !dryRun &&
+          !flags["non-interactive"] &&
+          Boolean(process.stdout.isTTY && process.stdin.isTTY),
       });
     }
 

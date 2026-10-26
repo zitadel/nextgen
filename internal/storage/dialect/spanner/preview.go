@@ -17,6 +17,7 @@ const (
 	existingPreviewsQuery    = `SELECT origin FROM previews WHERE project_id = @p1 AND origin IN UNNEST(@p2)`
 	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM previews`
 	deletePreviewStmt        = `DELETE FROM previews WHERE project_id = @p1 AND origin = @p2`
+	deleteLivePreviewStmt    = deletePreviewStmt + ` AND expires_at > @p3`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= @p3`
 )
 
@@ -93,9 +94,9 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Preview]{Items: items, NextCursor: nextCursor}, nil
 }
 
-// DeletePreview implements [service.PreviewStatements].
-func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	return ps.delete(ctx, buildStatement(deletePreviewStmt, projectID, origin).statement())
+// DeleteLivePreview implements [service.PreviewStatements].
+func (ps previewStatements) DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
+	return ps.delete(ctx, buildStatement(deleteLivePreviewStmt, projectID, origin, now).statement())
 }
 
 // DeleteExpiredPreview implements [service.PreviewStatements].

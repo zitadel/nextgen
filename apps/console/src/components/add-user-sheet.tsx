@@ -2,7 +2,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { type ReactNode, useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
-import { FormSheet, FormSheetForm } from "@/components/form-sheet";
+import { FormSheet, FormSheetForm, SHEET_SECTION } from "@/components/form-sheet";
 import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,6 @@ import {
   schemaFields,
 } from "@/lib/schema";
 
-const SECTION = "flex flex-col gap-4";
 // The design wraps the label in a row so a marker can sit beside it, rather
 // than appending to the label text itself.
 const LABEL_ROW = "flex w-full items-center gap-2";
@@ -222,7 +221,7 @@ function AddUserForm({
       }}
       onClose={onClose}
     >
-      <div className={SECTION}>
+      <div className={SHEET_SECTION}>
         {team && (
           <Field>
             <div className={LABEL_ROW}>

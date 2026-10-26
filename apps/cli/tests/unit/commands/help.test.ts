@@ -37,6 +37,7 @@ Local server commands
 
 Configuration commands
   deploy:                       Build a release from .zitadel/ and deploy it to the project
+  pull:                         Rebuild .zitadel/ from the revisions a released snapshot pins
   branding eject:               Take ownership of the login template
   auth-method passkey disable:  Disable passkey sign-in for a user schema
   auth-method passkey enable:   Enable passkey sign-in for a user schema

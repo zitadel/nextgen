@@ -105,10 +105,11 @@ export const RESOURCE_STICKY_END =
  * A body cell of a sticky column. It must be opaque, or the scrolled cells
  * show through it, so the row's translucent hover and open-menu fills
  * (`ResourceRow`, `TableRow`) are mixed onto the card colour here rather than
- * layered over it. The row needs the `group` class.
+ * layered over it. The row needs the `group` class. It fades with the row's
+ * own `transition-colors`, or it would snap while the rest of the row fades.
  */
 export const RESOURCE_STICKY_BODY =
-  "bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
+  "transition-colors bg-card group-hover:bg-[color-mix(in_oklab,var(--color-muted)_40%,var(--color-card))] group-has-aria-expanded:bg-[color-mix(in_oklab,var(--color-muted)_50%,var(--color-card))]";
 
 /** One body cell: 56px tall, inset 24px. */
 export const RESOURCE_CELL = "h-14 px-6 py-2";

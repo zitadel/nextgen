@@ -27,13 +27,11 @@ export function describeError(
   withFields = true,
 ): string {
   if (cause instanceof ApiError) {
-    const body = cause.body;
-    if (body && typeof body === "object") {
-      const message = (body as Record<string, unknown>).message;
-      if (typeof message === "string" && message.trim() !== "") {
-        const fields = withFields ? invalidFields(cause) : [];
-        return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
-      }
+    const body = errorBody(cause);
+    const message = body?.message;
+    if (body && typeof message === "string" && message.trim() !== "") {
+      const fields = withFields ? namedFields(body) : [];
+      return fields.length > 0 ? `${message} (${fields.join(", ")})` : message;
     }
     return fallback;
   }
@@ -47,9 +45,19 @@ export function describeError(
  */
 export function invalidFields(cause: unknown): string[] {
   if (!(cause instanceof ApiError)) return [];
+  const body = errorBody(cause);
+  return body ? namedFields(body) : [];
+}
+
+/** The error payload of a failed request, when it carried one. */
+function errorBody(cause: ApiError): Record<string, unknown> | undefined {
   const body = cause.body;
-  if (!body || typeof body !== "object") return [];
-  const details = (body as Record<string, unknown>).details;
+  return body && typeof body === "object" ? (body as Record<string, unknown>) : undefined;
+}
+
+/** The fields an error payload names, from its producer's `details`. */
+function namedFields(body: Record<string, unknown>): string[] {
+  const details = body.details;
   if (!details || typeof details !== "object") return [];
   const producer = (details as Record<string, unknown>).details;
   if (!producer || typeof producer !== "object") return [];
@@ -72,4 +80,14 @@ export async function nullOnForbidden<T>(read: Promise<T>): Promise<T | null> {
     if (cause instanceof ApiError && cause.status === 403) return null;
     throw cause;
   }
+}
+
+/**
+ * The API's error code of a failed request (ADR 030 `code`), or nothing when
+ * the failure carried no payload. For the one case a screen answers
+ * differently by code, such as a refusal with its own dialog.
+ */
+export function errorCode(cause: unknown): string | undefined {
+  const code = cause instanceof ApiError ? errorBody(cause)?.code : undefined;
+  return typeof code === "string" ? code : undefined;
 }

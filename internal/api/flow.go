@@ -317,7 +317,7 @@ func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) err
 	if h.runtime == nil {
 		return nil
 	}
-	project, err := h.projectService.Get(ctx, projectID)
+	project, err := h.projectService.Get(ctx, projectID, service.ProjectQueryOptions{})
 	if err != nil {
 		return domain.ErrInternal(err)
 	}

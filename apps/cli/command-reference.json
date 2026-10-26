@@ -113,7 +113,7 @@
     {
       "id": "setup",
       "group": "Project commands",
-      "description": "Create a Zitadel project and scaffold local auth.",
+      "description": "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.",
       "args": [],
       "flags": [
         {
@@ -595,6 +595,41 @@
         },
         {
           "command": "deploy --dry-run"
+        }
+      ]
+    },
+    {
+      "id": "pull",
+      "group": "Configuration commands",
+      "description": "Rebuild .zitadel/ from the revisions a released snapshot pins.",
+      "args": [
+        {
+          "name": "target",
+          "description": "What to pull: 'latest' (the live release), a release id (rel_…), or a deployment id (dep_…)."
+        }
+      ],
+      "flags": [
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "pull"
+        },
+        {
+          "command": "pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1"
+        },
+        {
+          "command": "pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"
         }
       ]
     },

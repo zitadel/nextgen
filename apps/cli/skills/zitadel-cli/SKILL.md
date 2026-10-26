@@ -85,7 +85,14 @@ upgrade, so upgrade the app and rerun rather than retrying.
   and the files it looked in; there is no cloud default outside `setup`, and
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
-  project.
+  project. The project it creates has never had a release, so the environment
+  serves the server's own defaults until something is deployed to it: run the
+  `deploy` the result's `next_commands` names, against the file it wrote
+  (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
+  deploy there and then; your runs never are, so they never deploy — run that
+  `deploy` yourself. `data.deployment` carries the `release_id`,
+  `content_hash`, `deployment_id` and `origins` when a person accepted, and is
+  null otherwise — a failed deploy is a warning, never a failed `env add`.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -437,7 +444,11 @@ than one:
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
-project. When they refuse, they write and publish nothing, on a dry run too.
+project. A provider added by `sso enable` is configured locally, not live: its
+`data.title` says so, `data.next_actions` says to deploy, and `data.next_commands`
+holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
+application exists. `data.title` claims the credentials are stored on the project
+only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
