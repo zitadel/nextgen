@@ -12,12 +12,12 @@ import {
   type IdpProvider,
   IDP_PROVIDERS,
   parseClientId,
+  parseClientSecret,
   type ProviderName,
   type ProviderSelection,
   providerOf,
   selectionName,
   validated,
-  parseClientSecret,
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../lib/api-client";
