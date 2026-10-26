@@ -1,6 +1,6 @@
 # @zitadel/sdk-next
 
-Next.js middleware and helpers for Nextgen Auth.
+Next.js middleware, helpers and components for Zitadel.
 
 ## Installation
 
@@ -40,7 +40,9 @@ because it accepts the token-bearing `auth()` result — see section 3.
 
 ### 1. Middleware
 
-Create `src/proxy.ts` at the root of your Next.js app:
+Create `proxy.ts` next to your `app` directory (at the project root, or in
+`src/` when you use `src/app`). On Next.js 15, name the file `middleware.ts`
+and the function `middleware`:
 
 ```ts
 import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
@@ -137,8 +139,9 @@ async function AuthProvider({ children }) {
 
 `NextgenProvider` converts the `auth()` result to the client-safe shape
 **before** it crosses the server→client boundary: client components receive
-`userId` / `email` / `name`, and the raw session token never enters the RSC
-flight payload, where any script on the page could read it.
+`userId`, `identifier`, `identifierProperty` and `display`, and the raw session
+token never enters the RSC flight payload, where any script on the page could
+read it.
 
 That strip only protects you while it runs on the server, which is why
 `NextgenProvider` is server-only and **must not be re-exported through a
@@ -206,7 +209,8 @@ A rejected `getSession()` means the state is *unknown* (broken proxy, network,
 5xx) — render a neutral or error state, never the signed-out CTAs.
 
 A `200` with a non-empty `user_id` resolves to
-`{ isAuthenticated: true, session: { userId, email, name } }` (client-safe —
+`{ isAuthenticated: true, session: { userId, identifier, identifierProperty, display } }`
+(client-safe —
 no token); the canonical `401/auth.unauthorized`, `403/sess.project_mismatch`
 (a session of another project on the same host), `404/sess.not_found`, and
 anonymous sessions resolve to signed out. The request

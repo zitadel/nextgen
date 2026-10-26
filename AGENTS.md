@@ -19,7 +19,7 @@ conflict.
 | `apps/` | deployable apps | [apps](apps/AGENTS.md) |
 | `apps/server/`, `apps/server-*/` | the Go `server:*` tasks; the `@zitadel/server` npm binaries | — |
 | `apps/cli/` | the `zitadel` CLI | [cli](apps/cli/AGENTS.md), [tests](apps/cli/tests/AGENTS.md), [local server](apps/cli/src/lib/local-server/AGENTS.md) |
-| `apps/console/`, `apps/login-ui/` | the SPAs the server embeds | [console](apps/console/AGENTS.md) |
+| `apps/console/` | the SPA the server embeds | [console](apps/console/AGENTS.md) |
 | `apps/docs/`, `apps/website/` | the docs site; the hosted cloud's front page | [docs](apps/docs/AGENTS.md), [website](apps/website/AGENTS.md) |
 | `apps/storybook/` | workbench and a11y gate for the login atoms | [storybook](apps/storybook/AGENTS.md) |
 | `apps/demo-*/` | reference apps for the sign-in component | [next](apps/demo-next/README.md), [nuxt](apps/demo-nuxt/README.md) |

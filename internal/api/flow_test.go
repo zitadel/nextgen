@@ -300,6 +300,32 @@ func TestSubmitFlowStep_MalformedCookieHeaderReturns401(t *testing.T) {
 	}
 }
 
+// A key store that cannot answer says nothing about the presented cookie, so
+// opening it keeps the status of the fault instead of refusing the cookie: the
+// browser keeps its flow and retries once the store is back.
+func TestFlowStep_KeyStoreUnavailableKeepsItsStatus(t *testing.T) {
+	ts := newTestServerKeys(t, domain.ErrUnavailable().WithParent(errors.New("retry budget spent")), nil)
+	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", IssuedAt: time.Now()}
+	cookieVal := ts.sealCookie(t, state)
+
+	for _, tc := range []struct {
+		method string
+		path   string
+		body   any
+	}{
+		{http.MethodGet, "/flow/flow_1", nil},
+		{http.MethodPost, "/flow/flow_1/submit", map[string]any{"action": "submit"}},
+	} {
+		resp, body := doRequest(t, tc.method, ts.srv.URL+tc.path, tc.body, cookieVal)
+		if resp.StatusCode != http.StatusServiceUnavailable {
+			t.Errorf("%s %s: status = %d, want 503, body = %s", tc.method, tc.path, resp.StatusCode, body)
+		}
+		if got := resp.Header.Values("Set-Cookie"); len(got) != 0 {
+			t.Errorf("%s %s: expected no Set-Cookie, got %q", tc.method, tc.path, got)
+		}
+	}
+}
+
 func TestSubmitFlowStep_StaleCookieReturns401(t *testing.T) {
 	ts := newTestServer(t)
 
@@ -445,7 +471,6 @@ func TestSubmitFlowStep_SSO_BindsTheBrowserAndResealsTheFlowCookie(t *testing.T)
 		t.Run(tt.name, func(t *testing.T) {
 			ts := newTestServer(t, tt.middleware...)
 			state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
-			ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: tt.origin, Kind: domain.OriginKindPrimary}}}, nil)
 			ts.fake.submitResult = domain.FlowStepResult{
 				State:           state,
 				Step:            &domain.FlowStep{Name: "sso-redirect", RedirectURL: new("https://accounts.example.test/authorize?state=s")},
@@ -524,7 +549,6 @@ func TestSubmitFlowStep_SSO_HandedOffAttemptIsAConflict(t *testing.T) {
 	ts := newTestServer(t)
 	state := &domain.FlowState{ID: "flow_1", ProjectID: "proj_1", SessionID: "sess_1", IssuedAt: time.Now()}
 	ts.fake.submitErr = domain.ErrAuthAttemptAlreadyHandedOff()
-	ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}}, nil)
 
 	resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", map[string]any{
 		"action":          "sso",
@@ -601,8 +625,6 @@ func TestSubmitFlowStep_SSO_RejectsAnUnboundReturn(t *testing.T) {
 			requestOrigin := origin
 			if tt.noOrigin {
 				requestOrigin = ""
-			} else {
-				ts.projects.EXPECT().Get(gomock.Any(), "proj_1").Return(&domain.Project{Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}}}, nil)
 			}
 
 			resp, body := doRequestWithOrigin(t, http.MethodPost, ts.srv.URL+"/flow/flow_1/submit", tt.body, ts.sealCookie(t, state), requestOrigin)

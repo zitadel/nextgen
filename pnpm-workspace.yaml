@@ -8,6 +8,7 @@ packages:
   - "tools/*"
 
 catalog:
+  "@arethetypeswrong/cli": ^0.18.5
   "@angular/platform-server": ^22.2.3
   # Babel 7 for the Nuxt projects: Nuxt's sub-packages have optional peers on
   # Babel 7 plugins, which pnpm auto-installs into every project with Nuxt in
@@ -25,6 +26,7 @@ catalog:
   # The docs build that request again, for an operation's Markdown and the
   # check of its TypeScript sample, so keep it on fumadocs-openapi's range.
   "@fumadocs/json-schema": ^0.3.2
+  "@fumadocs/story": ^1.5.1
   "@modelcontextprotocol/server": ^2.3.1
   "@moonrepo/cli": ^2.6.1
   "@mswjs/http-middleware": ^0.10.3

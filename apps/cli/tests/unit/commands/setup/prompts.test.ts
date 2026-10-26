@@ -49,6 +49,7 @@ import {
   askCustomSettings,
   DevPortPrompt,
   FrameworkConfirmPrompt,
+  PasswordPolicyPrompt,
   PickFrameworkPrompt,
   ServerPrompt,
   SignInPresetPrompt,
@@ -174,7 +175,7 @@ describe("ServerPrompt", () => {
   });
 
   it("offers and preselects the detected local Zitadel server", async () => {
-    // `zitadel start` ran here: runtime metadata + /healthz say localhost:8080.
+    // `zitadel start` ran here: runtime metadata + /readyz say localhost:8080.
     vi.mocked(LocalServer.detectUrl).mockResolvedValueOnce("http://localhost:8080");
     vi.mocked(select).mockResolvedValueOnce("http://localhost:8080" as never);
 
@@ -242,6 +243,35 @@ describe("DevPortPrompt", () => {
     });
 
     expect(out.devPort).toBe(5000);
+    expect(vi.mocked(text)).not.toHaveBeenCalled();
+  });
+});
+
+describe("PasswordPolicyPrompt", () => {
+  it("puts the entered minimum into the answers", async () => {
+    vi.mocked(text).mockResolvedValueOnce("12" as never);
+
+    const out = await new PasswordPolicyPrompt().ask(baseAnswers(), ctx);
+
+    expect(out.passwordMinLength).toBe(12);
+  });
+
+  it("records an empty answer as none, and preselects no value", async () => {
+    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    const out = await new PasswordPolicyPrompt().ask(baseAnswers(), ctx);
+
+    expect(out.passwordMinLength).toBeNull();
+    expect(vi.mocked(text).mock.calls[0]?.[0]?.initialValue).toBeUndefined();
+  });
+
+  it("skips and keeps the flagged minimum when --password-min-length was passed", async () => {
+    const out = await new PasswordPolicyPrompt().ask(baseAnswers({ passwordMinLength: 10 }), {
+      ...ctx,
+      passwordMinLengthFromFlag: true,
+    });
+
+    expect(out.passwordMinLength).toBe(10);
     expect(vi.mocked(text)).not.toHaveBeenCalled();
   });
 });
@@ -343,6 +373,7 @@ describe("SETUP_PROMPTS", () => {
       "DevPortPrompt",
       "UseCasePrompt",
       "SignInPresetPrompt",
+      "PasswordPolicyPrompt",
       "SocialSignInPrompt",
     ]);
   });

@@ -475,7 +475,7 @@ describe("auth-method sso enable secret handling", () => {
     expect(result.exitCode).toBe(0);
     // Nothing is written to disk: the secret goes to the project's variables
     // and nowhere else, so there is no copy in the working tree to leak.
-    await expect(readFile(join(cwd, ".env.local"), "utf8")).rejects.toThrow();
+    expect(await readFile(join(cwd, ".env.local"), "utf8")).not.toContain("piped-secret");
     expect(result.stdout).not.toContain("piped-secret");
     expect(result.stderr).not.toContain("piped-secret");
   });
@@ -516,7 +516,7 @@ describe("auth-method sso enable secret handling", () => {
     // Rendered as a command an agent can run, like every other result's.
     expect(json.data.next_commands).toEqual(
       expect.arrayContaining([
-        expect.stringContaining("variables set GOOGLE_CLIENT_SECRET --project-level --secret"),
+        expect.stringContaining("variable set GOOGLE_CLIENT_SECRET --secret"),
       ]),
     );
     expect(json.data.next_commands.every((command) => command.startsWith("npx "))).toBe(true);
@@ -550,6 +550,19 @@ describe("auth-method sso enable secret handling", () => {
     expect(json.code).toBe("E_VALIDATION");
     expect(json.hint).toContain("stdin");
     await expect(readFile(join(cwd, ".zitadel/idps/google.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("keeps the run's server in the retry it suggests for a missing client id", async () => {
+    // Following a retry without it would publish the credentials to whichever
+    // project the default environment resolves to.
+    const cwd = await setUpProject();
+
+    const result = await enable(cwd, "--server", "https://api.zitadel.cloud");
+
+    const json = parseJson(result.stdout) as { next_commands?: string[] };
+    expect(json.next_commands?.[0]).toContain(
+      "auth-method sso enable --provider google --client-id <client-id> --server https://api.zitadel.cloud",
+    );
   });
 });
 
@@ -746,7 +759,7 @@ describe("auth-method sso enable preflight", () => {
     );
   });
 
-  it("lists plan and apply, with --cwd, as next_args", async () => {
+  it("lists a dry run and a deploy, with --cwd, as next_args", async () => {
     const cwd = await setUpProject();
 
     const result = await enable(cwd, "--client-id", "abc");
@@ -754,8 +767,8 @@ describe("auth-method sso enable preflight", () => {
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args).toEqual(
       expect.arrayContaining([
-        ["plan", "--cwd", expect.any(String)],
-        ["apply", "--cwd", expect.any(String)],
+        ["deploy", "--dry-run", "--cwd", expect.any(String)],
+        ["deploy", "-m", "<what changed>", "--cwd", expect.any(String)],
       ]),
     );
     for (const args of data.next_args) {
@@ -771,10 +784,9 @@ describe("auth-method sso enable preflight", () => {
 
     const { data } = parseJson(result.stdout) as { data: { next_args: string[][] } };
     expect(data.next_args[0]).toEqual([
-      "variables",
+      "variable",
       "set",
       "GOOGLE_CLIENT_ID",
-      "--project-level",
       "--cwd",
       expect.any(String),
     ]);

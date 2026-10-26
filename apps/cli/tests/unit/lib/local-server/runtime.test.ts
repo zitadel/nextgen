@@ -1,4 +1,5 @@
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ZitadelError } from "../../../../src/lib/errors";
 import {
   LOCAL_RUNTIME_FILE,
+  checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
   findUpward,
   ensureContainerIdentity,
@@ -239,6 +241,42 @@ describe("loopbackReach", () => {
     await writeRuntimeMetadata(cwd, binaryRuntime());
     await expect(loopbackReach(cwd, "http://localhost:9999")).resolves.toBe("unknown");
     await expect(loopbackReach(cwd, "https://example.zitadel.cloud")).resolves.toBe("unknown");
+  });
+});
+
+describe("checkLocalServerHealth", () => {
+  const servers: Server[] = [];
+
+  afterEach(async () => {
+    for (const server of servers.splice(0)) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  /** A server whose process answers, and whose database answers as `database` says. */
+  async function aServerWhoseDatabaseIs(database: "up" | "down"): Promise<string> {
+    const server = createServer((req, res) => {
+      if (req.url === "/readyz") {
+        res.writeHead(database === "up" ? 200 : 503).end(database === "up" ? "ok" : "fail");
+        return;
+      }
+      res.writeHead(req.url === "/livez" ? 200 : 404).end("ok");
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, "localhost", () => resolve()));
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("server did not expose a TCP address");
+    }
+    return `http://localhost:${String(address.port)}`;
+  }
+
+  it("is healthy once the server's database answers", async () => {
+    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs("up"))).resolves.toBe(true);
+  });
+
+  it("is not healthy while the database does not answer, though the process does", async () => {
+    await expect(checkLocalServerHealth(await aServerWhoseDatabaseIs("down"))).resolves.toBe(false);
   });
 });
 

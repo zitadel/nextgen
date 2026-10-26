@@ -41,6 +41,10 @@ type Props = {
  * the flow endpoints take the project id alone. The session cookie rides along
  * as on every other console request.
  *
+ * The flow opens from the console's origin, which a project's origins do not
+ * list: the server admits its own origin to open any project's flow, though
+ * not to submit a step (root ADR 036, amendment of 2026-10-23).
+ *
  * Typography is the one thing a visitor sees that this does not: the element
  * mounts as a `widget`, and a widget never injects a font stylesheet into the
  * document that embeds it (the host owns its fonts and its CSP).

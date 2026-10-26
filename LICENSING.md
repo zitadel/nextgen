@@ -21,7 +21,6 @@ This default includes, without limitation:
 cmd/
 internal/
 apps/console/
-apps/login-ui/
 apps/server/
 apps/server-*/
 ```

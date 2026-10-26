@@ -137,6 +137,11 @@ type CreateAuthAttemptInput struct {
 	// Internal marks a server-orchestrated ceremony (see
 	// [domain.AuthAttempt.Internal]). Never settable through the REST surface.
 	Internal bool
+	// DeploymentID and ReleaseID seal the runtime resolution. Empty when
+	// create did not resolve; filled from RuntimeResolutionFromContext when
+	// the caller leaves them empty.
+	DeploymentID string
+	ReleaseID    string
 }
 
 // BeginPasskeyEnrollmentInput starts a management-plane enrollment ceremony
@@ -378,6 +383,16 @@ func (s *authAttemptService) Create(ctx context.Context, input CreateAuthAttempt
 		return nil, err
 	}
 	attempt.Internal = input.Internal
+	attempt.DeploymentID = input.DeploymentID
+	attempt.ReleaseID = input.ReleaseID
+	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
+		if attempt.DeploymentID == "" && resolution.Deployment != nil {
+			attempt.DeploymentID = resolution.Deployment.ID
+		}
+		if attempt.ReleaseID == "" && resolution.Release != nil {
+			attempt.ReleaseID = resolution.Release.ID
+		}
+	}
 
 	if err = s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
 		if err := tx.Statements().CreateAuthAttempt(ctx, attempt); err != nil {

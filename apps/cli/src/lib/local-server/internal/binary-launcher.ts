@@ -7,6 +7,7 @@ import { StringDecoder } from "node:string_decoder";
 import { resolveServerBinary, serverBinaryPath } from "@zitadel/server/binary";
 
 import { ZitadelError, isErrno } from "../../errors";
+import { shellCommand } from "../../suggestion";
 import { EMPTY_ENV, type ResolvedEnv, envSummary } from "../env-vars";
 import type { BinaryRuntimeMetadata } from "../runtime";
 import type { LogSink } from "../server-log";
@@ -235,7 +236,7 @@ export class BinaryLauncher implements Launcher<BinaryRuntimeMetadata> {
     } catch (error) {
       throw new ZitadelError("E_VALIDATION", "Zitadel server npm package is not available", {
         hint: "Reinstall @zitadel/cli so npm can install @zitadel/server and its platform package.",
-        nextCommands: ["npm install @zitadel/cli@latest"],
+        nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
         details: { package: SERVER_NPM_PACKAGE, message: errorMessage(error) },
       });
     }
@@ -493,7 +494,7 @@ async function spawned(child: ReturnType<typeof spawn>, command: string): Promis
   } catch (error) {
     throw new ZitadelError("E_VALIDATION", "The Zitadel server could not be started", {
       hint: "Check that the server binary exists and can be run, or reinstall @zitadel/cli.",
-      nextCommands: ["npm install @zitadel/cli@latest"],
+      nextCommands: [shellCommand("npm install @zitadel/cli@latest")],
       details: { command, message: errorMessage(error) },
     });
   }

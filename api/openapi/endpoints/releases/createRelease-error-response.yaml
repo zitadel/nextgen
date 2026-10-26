@@ -7,6 +7,7 @@ content:
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../components/schemas/errors/rel-invalid.yaml'
         - $ref: '../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../components/schemas/errors/rel-permission_denied.yaml'
@@ -15,12 +16,14 @@ content:
         - $ref: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
         - $ref: '../../components/schemas/errors/rel-unresolved_reference.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
           rel.invalid: '../../components/schemas/errors/rel-invalid.yaml'
           rel.not_found: '../../components/schemas/errors/rel-not_found.yaml'
           rel.permission_denied: '../../components/schemas/errors/rel-permission_denied.yaml'
@@ -29,6 +32,7 @@ content:
           rel.revision_unpinnable: '../../components/schemas/errors/rel-revision_unpinnable.yaml'
           rel.unresolved_reference: '../../components/schemas/errors/rel-unresolved_reference.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.unauthorized:
         summary: auth.unauthorized
@@ -45,6 +49,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       rel.invalid:
         summary: rel.invalid
         value:
@@ -85,3 +94,8 @@ content:
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

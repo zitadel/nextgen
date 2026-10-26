@@ -137,7 +137,7 @@ func TestIDPCallbackHandler(t *testing.T) {
 			wantIn:     service.FlowSSOCallbackInput{ConnectionSlug: "google", State: "proj-1.rand", Code: "the-code"},
 		},
 	}
-	var errorPage string
+	errorPages := map[int]string{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			stored := returnTarget
@@ -160,15 +160,19 @@ func TestIDPCallbackHandler(t *testing.T) {
 			if tt.wantStatus == http.StatusSeeOther {
 				return
 			}
-			// One page for every failure, whatever the cause: the body reflects
+			// One page per status, whatever the cause: the body reflects
 			// nothing from the request or the error.
-			assert.NotContains(t, rec.Body.String(), "unknown")
-			if errorPage == "" {
-				errorPage = rec.Body.String()
-				assert.Contains(t, errorPage, "could not be completed")
+			body := rec.Body.String()
+			assert.Equal(t, "text/html; charset=utf-8", rec.Header().Get("Content-Type"))
+			assert.Contains(t, body, "could not be completed")
+			for _, reflected := range []string{"unknown", "the-code", "proj-1.rand", "google", "evil.example"} {
+				assert.NotContains(t, body, reflected)
+			}
+			if page, ok := errorPages[tt.wantStatus]; ok {
+				assert.Equal(t, page, body)
 				return
 			}
-			assert.Equal(t, errorPage, rec.Body.String())
+			errorPages[tt.wantStatus] = body
 		})
 	}
 }

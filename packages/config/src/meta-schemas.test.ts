@@ -17,6 +17,7 @@ import {
   FLOW_FILE_SCHEMA_REF,
   META_SCHEMA_DIR,
   metaSchemaFiles,
+  POLICY_FILE_SCHEMA_REF,
   PROJECT_FILE_SCHEMA_REF,
 } from "./meta-schemas.js";
 
@@ -47,6 +48,7 @@ describe("meta-schemas", () => {
       "sso-auth-method.json",
       "idp-connection.json",
       "branding.json",
+      "policy.json",
       "project.json",
     ]);
   });
@@ -132,6 +134,36 @@ describe("meta-schemas", () => {
         theme: { [side]: { palette: { primary: "red; } :host { display: none" } } },
       };
       expect(check(hostile), `${side} accepted an injection`).toBe(false);
+    }
+  });
+
+  // A policy file is the publish body plus `$schema`: the operation picks the
+  // branch, the branch's config is closed, and nothing else may sit beside
+  // them, so a typo fails in the editor as it fails `plan`.
+  it("validates a policy file and refuses what the API refuses", () => {
+    expect(join(".zitadel/policies", POLICY_FILE_SCHEMA_REF)).toBe(
+      join(META_SCHEMA_DIR, "policy.json"),
+    );
+    const ajv = new Ajv2020({ strict: false });
+    const policySchema = metaSchemaFiles().find((f) => f.name === "policy.json");
+    const check = ajv.compile(policySchema?.body as object);
+
+    const file = {
+      $schema: POLICY_FILE_SCHEMA_REF,
+      operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    };
+    expect(check(file), JSON.stringify(check.errors)).toBe(true);
+    expect(check({ ...file, config: {} }), "{} switches every rule off").toBe(true);
+
+    for (const [name, bad] of Object.entries({
+      "unknown operation": { ...file, operation: "auth.check" },
+      "unknown setting": { ...file, config: { min_lenght: 15 } },
+      "out of bounds": { ...file, config: { min_length: 65 } },
+      "unknown top-level key": { ...file, kind: "policy" },
+      "missing config": { operation: "auth.factor.password.set" },
+    })) {
+      expect(check(bad), name).toBe(false);
     }
   });
 

@@ -6,8 +6,8 @@ import type {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { publicCliCommand } from "../public-cli";
 import { reportWarning } from "../warnings";
+import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "../suggestion";
 
 /**
  * Publishes one variable to the project.
@@ -38,7 +38,7 @@ export type SecretOutcome = {
    *
    * `deferred` when there was no value to publish or no project to publish to;
    * `failed` when the platform refused the call. Neither is fatal — the
-   * connection is written either way and `variables set` publishes it later.
+   * connection is written either way and `variable set` publishes it later.
    */
   readonly published: PublishState;
 };
@@ -88,7 +88,7 @@ export async function publishClientId(options: {
  * By the time this runs the connection document is already on disk and, in
  * `setup`, the whole project is provisioned. Failing the command there would
  * leave the developer with a half-written Project to clean up over something
- * one later command fixes, so the caller warns and points at `variables set`.
+ * one later command fixes, so the caller warns and points at `variable set`.
  */
 async function publishSecret(
   publish: SecretPublisher | undefined,
@@ -109,19 +109,18 @@ async function publishSecret(
 }
 
 /**
- * The `variables set` arguments that publish one credential to the project.
+ * The `variable set` arguments that publish one credential to the project.
  *
- * `--project-level` is not optional: every `variables` command refuses with
- * "Name the owner" without an owner, so a command missing it would fail
- * before it reached the API and repair nothing. The project level is also the
- * right owner, because the engine resolves a connection's `${{ NAME }}` from
- * the project's own variables.
+ * Without `--preview` the write takes the platform's default: a client id,
+ * which is not secret, is stored for both kinds, and a client secret for the
+ * primary kind only. The engine resolves a connection's `${{ NAME }}` from the
+ * project's own variables.
  */
 function republishArgsFor(
   name: ClientIdVariable | ClientSecretVariable,
   secret: boolean,
 ): string[] {
-  return ["variables", "set", name, "--project-level", ...(secret ? ["--secret"] : [])];
+  return ["variable", "set", name, ...(secret ? ["--secret"] : [])];
 }
 
 /**
@@ -136,8 +135,11 @@ export function republishCommand(
   name: ClientIdVariable | ClientSecretVariable,
   secret: boolean,
   cliVersion: string,
-): string {
-  return publicCliCommand(republishArgsFor(name, secret).join(" "), cliVersion);
+  selector: EnvironmentSelector,
+): SuggestedCommand {
+  // `selector` carries the invocation's --env/--env-file/--server so the retry
+  // targets the same project.
+  return projectCommand(republishArgsFor(name, secret).join(" "), selector, cliVersion);
 }
 
 /** A credential, and whether the project ended up holding it. */
@@ -181,8 +183,11 @@ export function republishArgs(
 export function republishCommands(
   credentials: readonly CredentialRecovery[],
   cliVersion: string,
-): string[] {
-  return republishArgs(credentials).map((args) => publicCliCommand(args.join(" "), cliVersion));
+  selector: EnvironmentSelector,
+): SuggestedCommand[] {
+  return republishArgs(credentials).map((args) =>
+    projectCommand(args.join(" "), selector, cliVersion),
+  );
 }
 
 /**
@@ -222,11 +227,12 @@ export function reportSecretOutcome(
   outcome: SecretOutcome,
   cliVersion: string,
   noValue: boolean,
+  selector: EnvironmentSelector,
 ): void {
   reportPublished(
     outcome.name,
     outcome.published,
-    republishCommand(outcome.name, true, cliVersion),
+    republishCommand(outcome.name, true, cliVersion, selector),
     noValue,
   );
 }
@@ -241,6 +247,7 @@ export function reportClientIdOutcome(
   name: ClientIdVariable,
   state: PublishState,
   cliVersion: string,
+  selector: EnvironmentSelector,
 ): void {
-  reportPublished(name, state, republishCommand(name, false, cliVersion), false);
+  reportPublished(name, state, republishCommand(name, false, cliVersion, selector), false);
 }

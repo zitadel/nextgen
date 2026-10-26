@@ -69,19 +69,19 @@ func ParseInstance(data []byte) (*Instance, error) {
 
 // settingValues checks the instance's config against the template and
 // returns the settings that are valid, in their canonical Go type (int64,
-// bool, string), and one problem per setting that is not.
-func settingValues(t *Template, config map[string]any) (map[string]any, []error) {
+// bool, string), and one violation per setting that is not.
+func settingValues(t *Template, config map[string]any) (map[string]any, []Violation) {
 	out := make(map[string]any, len(config))
-	var problems []error
+	var problems []Violation
 	for _, name := range slices.Sorted(maps.Keys(config)) {
 		setting, ok := t.Config[name]
 		if !ok {
-			problems = append(problems, fmt.Errorf("setting %q is not defined for operation %q", name, t.Operation))
+			problems = append(problems, Violation{Setting: name, Reason: fmt.Sprintf("setting %q is not defined for operation %q", name, t.Operation)})
 			continue
 		}
 		value, err := coerceSetting(name, setting, config[name])
 		if err != nil {
-			problems = append(problems, err)
+			problems = append(problems, Violation{Setting: name, Reason: err.Error()})
 			continue
 		}
 		out[name] = value

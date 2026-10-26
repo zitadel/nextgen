@@ -8,8 +8,10 @@ content:
         - $ref: '../../../components/schemas/errors/grant-not_found.yaml'
         - $ref: '../../../components/schemas/errors/grant-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
+        - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-permission_denied.yaml'
       discriminator:
         propertyName: code
@@ -18,8 +20,10 @@ content:
           grant.not_found: '../../../components/schemas/errors/grant-not_found.yaml'
           grant.permission_denied: '../../../components/schemas/errors/grant-permission_denied.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.permission_denied: '../../../components/schemas/errors/user-permission_denied.yaml'
     examples:
       auth.unauthorized:
@@ -42,6 +46,11 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
       req.invalid:
         summary: req.invalid
         value:
@@ -52,6 +61,11 @@ content:
         value:
           code: team.permission_denied
           message: 'the team management API requires the project secret'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
       user.permission_denied:
         summary: user.permission_denied
         value:

@@ -282,7 +282,7 @@ func ReleasePayloadSnapshot(rel *Release) ReleasePayload {
 	return payload
 }
 
-// DeploymentPayload records what went live where (ADR 061).
+// DeploymentPayload records what went live where (ADR 035, ADR 068).
 type DeploymentPayload struct {
 	ReleaseID  string   `json:"release_id,omitempty"`
 	Targets    []string `json:"targets,omitempty"`

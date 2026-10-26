@@ -205,12 +205,11 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			want: domain.FlowResolvedFields{
 				Fields: []domain.FlowField{
 					{
-						Name:       "x-auth-methods#password",
-						TextKey:    "password.field.password",
-						Type:       domain.FlowFieldTypePassword,
-						Challenge:  domain.FlowFieldChallengePassword,
-						Required:   true,
-						Validation: &domain.FlowFieldValidation{MinLength: 8},
+						Name:      "x-auth-methods#password",
+						TextKey:   "password.field.password",
+						Type:      domain.FlowFieldTypePassword,
+						Challenge: domain.FlowFieldChallengePassword,
+						Required:  true,
 					},
 				},
 				ImplicitOutcomes: map[string][]string{},
@@ -231,12 +230,11 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			want: domain.FlowResolvedFields{
 				Fields: []domain.FlowField{
 					{
-						Name:       "x-auth-methods#password",
-						TextKey:    "step.field.password",
-						Type:       domain.FlowFieldTypePassword,
-						Challenge:  domain.FlowFieldChallengeNone,
-						Required:   true,
-						Validation: &domain.FlowFieldValidation{MinLength: 8},
+						Name:      "x-auth-methods#password",
+						TextKey:   "step.field.password",
+						Type:      domain.FlowFieldTypePassword,
+						Challenge: domain.FlowFieldChallengeNone,
+						Required:  true,
 					},
 				},
 				ImplicitOutcomes: map[string][]string{},
@@ -253,12 +251,11 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 			want: domain.FlowResolvedFields{
 				Fields: []domain.FlowField{
 					{
-						Name:       "x-auth-methods#password",
-						TextKey:    "step.field.password",
-						Type:       domain.FlowFieldTypePassword,
-						Challenge:  domain.FlowFieldChallengeNone,
-						Required:   true,
-						Validation: &domain.FlowFieldValidation{MinLength: 8},
+						Name:      "x-auth-methods#password",
+						TextKey:   "step.field.password",
+						Type:      domain.FlowFieldTypePassword,
+						Challenge: domain.FlowFieldChallengeNone,
+						Required:  true,
 					},
 				},
 				ImplicitOutcomes: map[string][]string{},
@@ -287,12 +284,11 @@ func TestSchemaFieldResolver_Resolve(t *testing.T) {
 						Validation: &domain.FlowFieldValidation{Format: "email"},
 					},
 					{
-						Name:       "x-auth-methods#password",
-						TextKey:    "login.field.password",
-						Type:       domain.FlowFieldTypePassword,
-						Challenge:  domain.FlowFieldChallengePassword,
-						Required:   true,
-						Validation: &domain.FlowFieldValidation{MinLength: 8},
+						Name:      "x-auth-methods#password",
+						TextKey:   "login.field.password",
+						Type:      domain.FlowFieldTypePassword,
+						Challenge: domain.FlowFieldChallengePassword,
+						Required:  true,
 					},
 				},
 				ImplicitOutcomes: map[string][]string{"email": identifierOutcomes},

@@ -70,6 +70,9 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	// GetProject is GetProjectByID reading what opts asks for besides the
+	// project's own row, in the same round trip.
+	GetProject(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns
@@ -137,6 +140,14 @@ type CryptoKeyStatements interface {
 // 	Transactioner[JSONSchemaStatements]
 // }
 
+// ProjectQueryOptions selects what a project read loads besides the project's
+// own row.
+type ProjectQueryOptions struct {
+	// OwningTeam reads the team that owns the project (ADR 054 §2) into
+	// Project.OwningTeamID.
+	OwningTeam bool
+}
+
 // JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
 // column predicates. Column predicates stay in Filter / ListOptions.
 type JSONSchemaQueryOptions struct {
@@ -198,12 +209,22 @@ type PolicyStatements interface {
 	// called inside a transaction. An unknown id returns
 	// *database.NoRowFoundError.
 	LockPolicy(ctx context.Context, projectID, id string) error
-	// GetPolicy returns the policy of operation in the project at its newest
-	// revision, or *database.NoRowFoundError when the project has none.
-	GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error)
+	// GetPolicy returns the one policy filter selects at its newest revision
+	// (policystore.ByOperation, policystore.ByID), or
+	// *database.NoRowFoundError.
+	GetPolicy(ctx context.Context, filter database.Filter[domain.PolicyField]) (*domain.Policy, error)
 	// GetPolicyRevision returns the policy at the given revision, newest or
-	// not, or *database.NoRowFoundError.
+	// not, or *database.NoRowFoundError. It stays apart from GetPolicy, which
+	// only ever reads newest revisions: a pinned revision must reach a
+	// superseded one.
 	GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error)
+	// ListPolicies returns each policy the options select at its newest
+	// revision, first published first unless the options order otherwise.
+	ListPolicies(ctx context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
+	// ListPolicyRevisions pages one policy's revisions, superseded ones
+	// included, newest first unless the page orders otherwise. An unknown
+	// policy lists nothing.
+	ListPolicyRevisions(ctx context.Context, projectID, policyID string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -303,8 +324,9 @@ type PreviewStatements interface {
 	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
 	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
 	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
-	// DeletePreview is idempotent.
-	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteLivePreview deletes only if the preview is still live at now, so
+	// an expired one is left for the sweep. Idempotent.
+	DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 	// DeleteExpiredPreview deletes only if the preview expired by now, so a
 	// racing renewal survives the sweep.
 	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
@@ -728,12 +750,25 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListActiveAuthzAssignmentsByRelation lists the unrevoked assignments on
+	// objectType.relation in the project, whoever holds them, ordered by
+	// creation. Expiry is not consulted. The platform.operators reconcile
+	// reads the operators it granted with it (ADR 075 §4).
+	ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error)
 	// ListManagedGrants lists unrevoked collaboration grants (user/team
 	// viewer|editor|admin) with cursor pagination. Setup and owning-team
 	// rows are excluded in SQL. projectID is required and always ANDed
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// ListProjectAdmins returns a page of the people, by user id, who
+	// administer the project: as active members of the owning team, as active
+	// members of a team with an unexpired admin grant, or as existing users
+	// with an unexpired admin grant. Only people viewerUserID may see are
+	// listed: those with a grant of their own, or members of one of the
+	// project's admin teams that viewerUserID is also an active member of.
+	// Each carries every way they administer the project.
+	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
@@ -761,9 +796,11 @@ type AuthzAssignmentStatements interface {
 	//     the tupleset team, so nothing names the user on the project at all.
 	//
 	// Every route is evaluated on the active system catalog, mirroring
-	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
-	// different OrderBy is rejected.
-	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
+	// CheckAuthz. opts.Filter narrows the set (a name search) and is ANDed
+	// with that predicate in the same statement, so paging walks only the
+	// matches (ADR 053 §6). opts.Pagination.OrderBy carries the sort columns;
+	// a cursor issued for a different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
@@ -824,13 +861,22 @@ type AuthzCatalogStatements interface {
 //     homeProjectID) or a local membership edge in project. Empty homeProjectID
 //     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//     It answers from the protected project's grants only; params.PlatformProjectID is ignored.
+//     With a ResourceID the foothold covers that target only (an assignment scoped
+//     project-wide, to ResourceTeamID or to ResourceID, a membership in the target
+//     team or the target's team, or the user's own record; #2112); without one it
+//     is HasAuthzProjectFoothold.
+//   - CheckPlatformOperator: the deployment-wide operator path (ADR 075 §3), which the
+//     resolver asks when CheckAuthz did not allow.
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
+//     Both include the operator path when params.PlatformOperatorEligible().
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }
 

@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "user schema" },
   loaderDeps: projectScopeDeps,
   // Schema ids are unique per project only (the seeded default carries the same
   // `$id` everywhere), and an ambiguous id resolves in the caller's own project

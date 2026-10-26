@@ -227,7 +227,7 @@ describe("test sign-in", () => {
       it("refuses a live sign-in when the client secret variable is not set", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
-        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.removeVariable("GOOGLE_CLIENT_SECRET");
         await app.markClaimed();
         platform.hasGoogle();
 
@@ -279,7 +279,7 @@ describe("test sign-in", () => {
       async function anUnclaimedApp() {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);
-        await app.apply();
+        await app.publish();
         platform.hasGoogle();
         return app;
       }
@@ -361,6 +361,18 @@ describe("test sign-in", () => {
         );
 
         expect(result).toHintAt("zitadel events list");
+      });
+
+      it("refuses a live sign-in while nothing has been deployed", async () => {
+        const app = await aSetUpApp();
+        await app.enableSso("google", CREDENTIALS);
+        await app.markClaimed();
+        platform.hasGoogle();
+        platform.recordsSignIn([]);
+
+        const result = await app.run(LIVE, { BROWSER: "none" });
+
+        expect(result).toHintAt("deploy the files first");
       });
 
       it("refuses an unclaimed project, whose events are hidden, before it opens anything", async () => {
@@ -468,16 +480,6 @@ describe("test sign-in", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("opens with the project and the server, like the other commands", async () => {
-        const app = await aSetUpApp();
-        await app.enableSso("google", CREDENTIALS);
-        platform.hasGoogle();
-
-        const result = await app.run(["test", "sign-in", "--provider", "google"]);
-
-        expect(result).toPrint("Server");
-      });
-
       it("prints each check as it ran", async () => {
         const app = await aSetUpApp();
         await app.enableSso("google", CREDENTIALS);

@@ -31,7 +31,7 @@ const WRITE_LOGGED_LINES = `process.stderr.write(${JSON.stringify(`${Object.valu
 const PLAIN_SERVER = `const http = require("node:http");
 const port = Number((process.env.NEXTGEN_SERVER_ADDRESS || ":8080").split(":").at(-1));
 const server = http.createServer((req, res) => {
-  res.writeHead(req.url === "/healthz" ? 200 : 404).end("ok");
+  res.writeHead(req.url === "/readyz" ? 200 : 404).end("ok");
 });
 server.listen(port, "localhost");
 process.on("SIGTERM", () => server.close(() => process.exit(0)));

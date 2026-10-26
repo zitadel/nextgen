@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/authz/resolver"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -57,7 +58,8 @@ type resourceAccess struct {
 	// kind is the expected resource_scope_index.resource_kind for path-id ops.
 	// Empty means no kind check (project-scoped create/list only).
 	kind domain.ResourceKind
-	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
+	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold
+	// (for a by-id Check, none that covers the target);
 	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
@@ -119,8 +121,9 @@ var brandingAccess = resourceAccess{
 }
 
 // policyAccess gates operation policies (ADR 066). Publish and the revision
-// read are project-scoped like releases: both carry a project_id and filter by
-// it, so no route resolves a path id through RSI.
+// read are project-scoped like releases: a revision has no index row. A
+// policy's own id resolves through RSI in the named project, like an IdP
+// connection's, so a grant on one policy reaches it and its revisions list.
 var policyAccess = resourceAccess{
 	kind:     domain.ResourceKindPolicy,
 	readMiss: domain.ErrPolicyNotFound,
@@ -332,6 +335,12 @@ func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, 
 		// Wrong kind for this route: same anti-oracle shape as unknown id.
 		return "", res.readMiss()
 	}
+	if projectHint != "" && scope.ProjectID != projectHint {
+		// A project secret looks its own project up whatever the hint says
+		// (lookupResourceScope); a route scoped to the project the caller
+		// named must still not answer from another one.
+		return "", res.readMiss()
+	}
 	if err := requireProjectAccessAfterRSI(ctx, stmts, scope, res, op); err != nil {
 		return "", err
 	}
@@ -340,7 +349,8 @@ func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, 
 
 // requireProjectAccess gates a management operation via resolver.Check when
 // project_id is already known (create, project by-id, or after RSI).
-// Management lists use requireProjectListAccess, not this gate.
+// Management lists use requireProjectListAccess, unless their statement has
+// no resource-scope predicate (previews): those use this gate project-wide.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -358,6 +368,16 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 // RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
 // do not leak existence via mismatched codes. Team-/resource-scoped grants may
 // Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+// requireTargetAccess is requireProjectAccessAfterRSI for an id that has no
+// RSI row (a miss on a by-id read): the Check names it as the target, so the
+// foothold that turns a denial into 403 must cover it, as for a real row.
+func (h *Handler) requireTargetAccess(ctx context.Context, projectID, resourceID string, res resourceAccess, op accessOp) error {
+	if h == nil || h.pool == nil {
+		return domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectAccessAfterRSI(ctx, h.pool.Statements(), domain.NewResourceScope(res.kind, projectID, resourceID), res, op)
+}
+
 func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
 	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, rsi)
 }
@@ -401,6 +421,8 @@ func projectCheckRequest(scope ScopeContext, projectID string, op accessOp, rsi 
 		ObjectType:    "project",
 		Relation:      projectRelation(op),
 		TeamID:        scope.TeamID,
+		// Set only for a session homed in the platform project (ADR 075).
+		PlatformProjectID: scope.PlatformProjectID,
 	}
 	if rsi != nil {
 		req.ResourceID = rsi.ResourceID
@@ -422,11 +444,49 @@ func checkProjectAccess(ctx context.Context, r *resolver.Resolver, stmts service
 	if err := credentialCeiling(scope, projectID); err != nil {
 		return resolver.DecisionUnspecified, err
 	}
-	dec, err := r.Check(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
+	dec, path, err := r.CheckPath(ctx, stmts, projectCheckRequest(scope, projectID, op, rsi))
 	if err != nil {
 		return resolver.DecisionUnspecified, domain.ErrInternal(err).WithMessage("authz permission check failed")
 	}
+	if path == resolver.PathPlatformOperator {
+		markPlatformOperator(ctx, scope)
+	}
 	return dec, nil
+}
+
+// markPlatformOperator records on the request's events that the platform
+// operator relation, not a grant on the project, authorized it (ADR 075 §5).
+func markPlatformOperator(ctx context.Context, scope ScopeContext) {
+	audit.MarkAuthorization(ctx, domain.EventAuthorizationMetadata{
+		Path:               resolver.PathPlatformOperator.String(),
+		ActorHomeProjectID: scope.ProjectID,
+	})
+}
+
+// platformOperator reports whether the credential is a platform operator, who
+// can read every project (ADR 075 §3): the question listMyProjects asks without
+// a target project.
+func (h *Handler) platformOperator(ctx context.Context, scope ScopeContext) (bool, error) {
+	req := resolver.Request{
+		PrincipalType:     scope.PrincipalType,
+		PrincipalID:       scope.PrincipalID,
+		HomeProjectID:     scope.ProjectID,
+		PlatformProjectID: scope.PlatformProjectID,
+		ObjectType:        "project",
+		Relation:          projectRelation(opRead),
+	}
+	// Before the statements are needed: most sessions cannot be operators.
+	if !req.PlatformOperatorEligible() {
+		return false, nil
+	}
+	if h == nil || h.pool == nil {
+		return false, domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	ok, err := resolver.New().PlatformOperator(ctx, h.pool.Statements(), req)
+	if err != nil {
+		return false, domain.ErrInternal(err).WithMessage("authz permission check failed")
+	}
+	return ok, nil
 }
 
 // credentialCeiling is the pre-resolver gate on the credential plane.

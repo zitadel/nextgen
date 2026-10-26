@@ -9,11 +9,7 @@ import {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import {
-  createZitadelClient,
-  escapeControlCharacters,
-  type ZitadelClient,
-} from "../../lib/api-client";
+import { escapeControlCharacters, type ZitadelClient } from "../../lib/api-client";
 import { openInBrowser } from "../../lib/browser";
 import {
   type CheckResult,
@@ -28,20 +24,24 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
 import { wrapForBox } from "../../lib/box";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { reportWarning } from "../../lib/warnings";
-import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
+import {
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
+import { nextCommandsData } from "../../lib/oclif/envelope";
+import { readZitadelSecret } from "../../lib/project";
+import { diffConfigAgainst } from "../../lib/release/git";
+import { listLiveDeployments, servesPrimary } from "../../lib/release";
 import { SIGN_IN_EVENT_TYPES, watchSignInAudit } from "../../lib/sign-in-audit";
-import { buildSyncPlan, enumeratePlanResources, makeSyncers } from "../../lib/sync";
+import { reportWarning } from "../../lib/warnings";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_TIMEOUT_SECONDS = 300;
 const POLL_MS = 1_000;
 /** How many of the newest audit events one poll reads; a sign-in writes a handful. */
 const AUDIT_PAGE = 100;
-/** The resource kinds a sign-in depends on: the connection, the user schema and the login flow. */
-const SIGN_IN_KINDS = ["idp", "schema", "flow"];
 
 /** Resolves after `ms`, or as soon as `signal` aborts. */
 const wait = (ms: number, signal: AbortSignal) =>
@@ -58,7 +58,6 @@ const wait = (ms: number, signal: AbortSignal) =>
   });
 
 const MAX_BODY_BYTES = 1_000_000;
-
 /** One GET, following redirects, bounded in time and in the body it keeps. */
 const send: Send = async (url) => {
   const response = await fetch(url, {
@@ -117,7 +116,7 @@ async function readBounded(response: Response, limit: number): Promise<string> {
  * it finishes. A check that fails makes the command fail; one that could not
  * tell is shown as skipped and never counted as a pass.
  */
-export default class TestSignIn extends BaseCommand {
+export default class TestSignIn extends EnvironmentCommand {
   static override description = "Check that a sign-in provider is set up correctly.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -144,9 +143,7 @@ export default class TestSignIn extends BaseCommand {
     const live = flags.live;
     await this.toMeta(flags);
     const { cwd } = this.meta;
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${this.meta.source}`);
+    const { client, projectId } = await this.connect();
     const connections = await this.connections(cwd, flags.provider);
     if (connections.length > 1 && live) {
       throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
@@ -165,10 +162,11 @@ export default class TestSignIn extends BaseCommand {
         },
       });
     }
-    const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
+    // The callback URI is built from the origin the app serves from.
+    const projectIssuer = this.environment.values.ZITADEL_ISSUER?.value;
     if (projectIssuer === undefined) {
-      throw new ZitadelError("E_VALIDATION", "zitadel.json names no development issuer", {
-        hint: "The callback URI is built from it; run zitadel setup first.",
+      throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+        hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
       });
     }
     const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
@@ -177,6 +175,7 @@ export default class TestSignIn extends BaseCommand {
         await this.checkProvider({
           connection,
           projectIssuer,
+          project: { client, projectId },
           live,
           timeoutSeconds: flags.timeout,
         }),
@@ -217,9 +216,7 @@ export default class TestSignIn extends BaseCommand {
               ? undefined
               : escaped(providers.length > 1 ? `${first.provider}: ${recovery}` : recovery),
           details: data,
-          nextCommands: [
-            publicCliCommand(`test sign-in --provider ${first.provider}`, this.meta.cliVersion),
-          ],
+          nextCommands: [this.suggest(`test sign-in --provider ${first.provider}`)],
         },
       );
     }
@@ -233,10 +230,9 @@ export default class TestSignIn extends BaseCommand {
             ? "The live sign-in completed; a user it created is still in the project."
             : "Sign in once to be sure: these checks cannot prove the whole journey.",
         ],
-        next_commands:
-          only === undefined
-            ? []
-            : [publicCliCommand(`test sign-in --provider ${only.provider}`, this.meta.cliVersion)],
+        ...nextCommandsData(
+          only === undefined ? [] : [this.suggest(`test sign-in --provider ${only.provider}`)],
+        ),
       },
     });
   }
@@ -245,18 +241,18 @@ export default class TestSignIn extends BaseCommand {
   private async checkProvider(options: {
     readonly connection: ConnectionFile;
     readonly projectIssuer: string;
+    readonly project: { readonly client: ZitadelClient; readonly projectId: string };
     readonly live: boolean;
     readonly timeoutSeconds: number;
   }): Promise<ProviderReport> {
-    const { connection, projectIssuer, live } = options;
-    const { cwd } = this.meta;
+    const { connection, projectIssuer, project, live } = options;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
     const callbackUri = callbackUriFor(projectIssuer, slug);
     if (live) {
-      await this.requireClaimed(cwd);
-      await this.requireSecretVariable(cwd, oidc.client_secret);
-      await this.requireApplied(cwd);
+      await this.requireClaimed();
+      await this.requireSecretVariable(project, oidc.client_secret);
+      await this.requireApplied(project);
     }
 
     consola.start(`Checking ${slug}`);
@@ -267,7 +263,7 @@ export default class TestSignIn extends BaseCommand {
     // connection is still Google; the slug stays for the callback URI and the report.
     const kind = typeof connection.body.template === "string" ? connection.body.template : slug;
     const catalogId = IDP_PROVIDERS.find((id) => id === kind);
-    const clientId = await this.clientId(cwd, oidc.client_id).then(
+    const clientId = await this.clientId(project, oidc.client_id).then(
       (value) => ({ value }),
       (error: unknown) => ({ error: toZitadelError(error) }),
     );
@@ -319,21 +315,20 @@ export default class TestSignIn extends BaseCommand {
               live: {
                 loginUrl: `${projectIssuer.replace(/\/$/, "")}/login`,
                 timeoutMs: options.timeoutSeconds * 1000,
-                open: async (url) => {
+                open: async (url: string) => {
                   await openInBrowser(url);
                 },
                 // Under --json consola is silent, so the login URL a person has to open would reach
                 // nobody; stderr keeps stdout clean for the envelope and still shows it.
-                say: (message) =>
+                say: (message: string) =>
                   this.jsonEnabled()
                     ? process.stderr.write(`${escaped(message)}\n`)
                     : consola.info(escaped(message)),
-                watch: async (signal) => {
-                  const { client, projectId } = await this.projectClient(cwd);
-                  return watchSignInAudit(
+                watch: async (signal: AbortSignal) =>
+                  watchSignInAudit(
                     (pageToken) =>
-                      client.listEvents({
-                        project_id: projectId,
+                      project.client.listEvents({
+                        project_id: project.projectId,
                         order: "desc",
                         limit: AUDIT_PAGE,
                         event_type: [...SIGN_IN_EVENT_TYPES],
@@ -343,8 +338,7 @@ export default class TestSignIn extends BaseCommand {
                     wait,
                     POLL_MS,
                     signal,
-                  );
-                },
+                  ),
                 sleep: wait,
               },
             }
@@ -368,89 +362,89 @@ export default class TestSignIn extends BaseCommand {
   /**
    * The audit events are readable only once the project is claimed, so on an
    * unclaimed one a sign-in would complete while the command waited for events
-   * it can never see.
+   * it can never see. The claim is recorded in `.zitadel/secret`; a project that
+   * keeps no such file cannot be told, so it is not refused here.
    */
-  private async requireClaimed(cwd: string): Promise<void> {
-    const secret = await readZitadelSecret(cwd);
-    if (!isAttached(secret)) {
+  private async requireClaimed(): Promise<void> {
+    const secret = await readZitadelSecret(this.meta.cwd).catch(() => undefined);
+    if (secret !== undefined && !isAttached(secret)) {
       throw new ZitadelError(
         "E_VALIDATION",
         "The project is not claimed, so its events are hidden",
         {
           hint: "A live sign-in is followed through the project's audit events, which are readable once the project is claimed. Claim it, then try again.",
-          nextCommands: [publicCliCommand("claim", this.meta.cliVersion)],
+          nextCommands: [this.suggest("claim")],
         },
       );
     }
   }
 
   /** The client secret is write-only, so the most that can be known is that the project holds one. */
-  private async requireSecretVariable(cwd: string, written: unknown): Promise<void> {
+  private async requireSecretVariable(
+    project: { readonly client: ZitadelClient; readonly projectId: string },
+    written: unknown,
+  ): Promise<void> {
     const name = typeof written === "string" ? referencedVariable(written) : undefined;
     if (name === undefined) {
       return;
     }
-    const { client, projectId } = await this.projectClient(cwd);
-    const held = await client.getVariable(name, { project_id: projectId, kind: "primary" }).then(
-      ({ primary }) => primary,
-      (error: unknown) => {
-        const failure = toZitadelError(error);
-        if (failure.code === "E_NOT_FOUND") {
-          return undefined;
-        }
-        throw failure;
-      },
-    );
+    const held = await project.client
+      .getVariable(name, { project_id: project.projectId, kind: "primary" })
+      .then(
+        ({ primary }) => primary,
+        (error: unknown) => {
+          const failure = toZitadelError(error);
+          if (failure.code === "E_NOT_FOUND") {
+            return undefined;
+          }
+          throw failure;
+        },
+      );
     if (held === undefined || held === null || typeof held !== "object") {
       throw new ZitadelError(
         "E_CREDENTIAL_MISSING",
         `The client secret variable ${name} is ${held === undefined ? "not set" : "not a secret"}`,
         {
-          hint: `Publish it with: zitadel variables set ${name} --project-level --secret`,
-          nextCommands: [
-            publicCliCommand(
-              `variables set ${name} --project-level --secret`,
-              this.meta.cliVersion,
-            ),
-          ],
+          hint: `Publish it with: zitadel variable set ${name} --secret`,
+          nextCommands: [this.suggest(`variable set ${name} --secret`)],
         },
       );
     }
   }
 
-  /** What the runtime serves is what gets signed in with, so files it has not received are refused. */
-  private async requireApplied(cwd: string): Promise<void> {
-    const { client, projectId } = await this.projectClient(cwd);
-    const plan = await buildSyncPlan(
-      cwd,
-      makeSyncers({ client, projectId, env: this.meta.env, cwd }),
-      true,
-    );
-    const pending = enumeratePlanResources(plan).filter((change) =>
-      SIGN_IN_KINDS.includes(change.kind),
-    );
-    if (pending.length > 0) {
+  /**
+   * What the project serves is what gets signed in with, so a sign-in is refused
+   * while the files differ from the live release. Where the live release records
+   * no commit to compare with, nothing can be said and the check goes on.
+   */
+  private async requireApplied(project: {
+    readonly client: ZitadelClient;
+    readonly projectId: string;
+  }): Promise<void> {
+    const deployments = await listLiveDeployments(project.client, project.projectId, {
+      withRelease: true,
+    });
+    const live = deployments.find(servesPrimary)?.release?.metadata;
+    if (live === undefined) {
+      throw new ZitadelError("E_VALIDATION", "Nothing is deployed to the project yet", {
+        hint: "The sign-in runs against what the project serves, so deploy the files first.",
+        nextCommands: [this.suggest("deploy -m '<what changed>'")],
+      });
+    }
+    const diff =
+      live.git_sha && !live.git_dirty
+        ? await diffConfigAgainst(this.meta.cwd, live.git_sha, false, [])
+        : null;
+    if (diff !== null && diff.trim() !== "") {
       throw new ZitadelError(
         "E_VALIDATION",
-        `${pending.length} change${pending.length === 1 ? "" : "s"} to the connection, schema or flow ${pending.length === 1 ? "is" : "are"} not applied yet`,
+        "The files have changes the project does not serve yet",
         {
-          hint: `The sign-in would run against the old files: ${pending.map((change) => change.file).join(", ")}`,
-          nextCommands: [publicCliCommand("apply", this.meta.cliVersion)],
-          details: { pending },
+          hint: "The sign-in would run against the deployed files, not the ones on disk.",
+          nextCommands: [this.suggest("deploy -m '<what changed>'")],
         },
       );
     }
-  }
-
-  private async projectClient(cwd: string): Promise<{ client: ZitadelClient; projectId: string }> {
-    const secret = await readZitadelSecret(cwd);
-    return {
-      client: createZitadelClient(
-        { baseUrl: this.meta.source, token: secret.project_secret },
-        { verbatim: true },
-      ),
-      projectId: secret.project_id,
-    };
   }
 
   /** The connection named with --provider, or every connection the project has. */
@@ -485,7 +479,10 @@ export default class TestSignIn extends BaseCommand {
   }
 
   /** The client ID: written in the file, or a project variable the file references. */
-  private async clientId(cwd: string, written: unknown): Promise<string> {
+  private async clientId(
+    project: { readonly client: ZitadelClient; readonly projectId: string },
+    written: unknown,
+  ): Promise<string> {
     if (typeof written !== "string" || written === "") {
       throw new ZitadelError("E_VALIDATION", "The connection has no oidc.client_id");
     }
@@ -493,15 +490,13 @@ export default class TestSignIn extends BaseCommand {
     if (name === undefined) {
       return written;
     }
-    const secret = await readZitadelSecret(cwd);
-    const client = createZitadelClient({ baseUrl: this.meta.source, token: secret.project_secret });
-    const { primary } = await client.getVariable(name, {
-      project_id: secret.project_id,
+    const { primary } = await project.client.getVariable(name, {
+      project_id: project.projectId,
       kind: "primary",
     });
     if (typeof primary !== "string" || primary === "") {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no value`, {
-        hint: `Publish it with: zitadel variables set ${name} --project-level`,
+        hint: `Publish it with: zitadel variable set ${name}`,
       });
     }
     return primary;

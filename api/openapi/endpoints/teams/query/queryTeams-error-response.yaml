@@ -12,6 +12,7 @@ content:
         - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
         - $ref: '../../../components/schemas/errors/team-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/team-project_not_found.yaml'
+        - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
@@ -23,6 +24,7 @@ content:
           team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
           team.permission_denied: '../../../components/schemas/errors/team-permission_denied.yaml'
           team.project_not_found: '../../../components/schemas/errors/team-project_not_found.yaml'
+          unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
       auth.csrf_invalid:
         summary: auth.csrf_invalid
@@ -64,3 +66,8 @@ content:
         value:
           code: team.project_not_found
           message: 'project not found'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'
