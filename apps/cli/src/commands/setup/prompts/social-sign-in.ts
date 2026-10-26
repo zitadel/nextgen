@@ -173,7 +173,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       kind: "multiselect",
       name: "external sign-in providers",
       message:
-        "Add external sign-in providers? (optional)\nSelect any providers you want to add, or press Enter to skip.",
+        "Add external sign-in providers? (optional) Select any providers you want to add, or press Enter to skip.",
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.

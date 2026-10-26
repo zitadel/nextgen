@@ -302,7 +302,7 @@ describe("UseCasePrompt", () => {
 
     expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
       message:
-        "Which fields should your registration form include?\nYou can change these after setup. Only email is required.",
+        "Which fields should your registration form include? You can change these after setup. Only email is required.",
       options: [
         { value: "minimal", label: "Email only" },
         { value: "consumer", label: "Email, first name and last name" },
@@ -434,7 +434,7 @@ describe("SocialSignInPrompt", () => {
 
     const question = vi.mocked(multiselect).mock.calls[0]?.[0];
     expect(question?.message).toBe(
-      "Add external sign-in providers? (optional)\nSelect any providers you want to add, or press Enter to skip.",
+      "Add external sign-in providers? (optional) Select any providers you want to add, or press Enter to skip.",
     );
     expect(question?.options.map((option) => option.label)).toEqual([
       "Google — requires a Google OAuth app",

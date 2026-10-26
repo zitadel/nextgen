@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
-import { providerOf } from "@zitadel/config/idp";
+import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
 import pc from "picocolors";
 import semver from "semver";
 
@@ -177,7 +177,7 @@ export function fileNameOf(p: string): string {
  */
 export function signInSummary(answers: {
   preset: SetupPreset;
-  sso: ReadonlyArray<{ selection: Parameters<typeof providerOf>[0] }>;
+  sso: ReadonlyArray<{ selection: ProviderSelection }>;
 }): string {
   const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
   return [

@@ -30,7 +30,7 @@ export class UseCasePrompt implements SetupPrompt {
       kind: "select",
       name: "use case",
       message:
-        "Which fields should your registration form include?\nYou can change these after setup. Only email is required.",
+        "Which fields should your registration form include? You can change these after setup. Only email is required.",
       initialValue: answers.useCase,
       options: SETUP_USE_CASES.map((useCase) => ({
         value: useCase,

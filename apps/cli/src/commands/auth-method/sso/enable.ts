@@ -440,6 +440,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !reusing || written.length > 0;
     const credentialsStored =
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
+    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
     const name = entry.displayName;
 
     return this.emit({
@@ -448,7 +449,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
-          ? `${name} sign-in is configured locally.${credentialsStored ? " Provider credentials are stored on your Project." : ""}`
+          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
           : `${name} sign-in is already configured locally.`,
         ...(unpublished
           ? {
