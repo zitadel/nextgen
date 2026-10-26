@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Braces } from "lucide-react";
+import { Braces, Info } from "lucide-react";
 
 import { DocumentViewer } from "@/components/document-viewer";
 import {
@@ -83,7 +83,7 @@ export function UserIdentityCell({
         {card ? (
           <HoverCard openDelay={400} closeDelay={100}>
             <HoverCardTrigger asChild>{link}</HoverCardTrigger>
-            <HoverCardContent align="start" className="w-80 p-3">
+            <HoverCardContent align="start" className="w-80 overflow-hidden p-3">
               <UserIdentityCard user={user} context={card} />
             </HoverCardContent>
           </HoverCard>
@@ -193,10 +193,16 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
           </>
         )}
       </dl>
-      <p className="text-muted-foreground border-border border-t pt-2 text-[11px] leading-4">
-        The schema decides what a user signs in with (
-        <code className="whitespace-nowrap">x-identifier</code>) and what the console calls them (
-        <code className="whitespace-nowrap">x-display</code>).
+      {/* Guidance, not data: a band of its own, edge to edge under the card's
+          12px inset, so it does not read as another row of the list. On the
+          page canvas, since `muted` is the popover's own colour in dark mode. */}
+      <p className="text-muted-foreground border-border bg-background -mx-3 -mb-3 flex gap-2 border-t px-3 py-2.5 text-[11px] leading-4">
+        <Info aria-hidden strokeWidth={1.5} className="mt-px size-3.5 shrink-0" />
+        <span>
+          The schema decides what a user signs in with (
+          <code className="whitespace-nowrap">x-identifier</code>) and what the console calls them (
+          <code className="whitespace-nowrap">x-display</code>).
+        </span>
       </p>
     </div>
   );
