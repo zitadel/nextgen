@@ -7,7 +7,7 @@ import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { EYEBROW } from "@/components/typography";
+import { HEADING_MD } from "@/components/typography";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
 import { formatDate } from "@/lib/date";
@@ -108,7 +108,7 @@ function IdpDetail() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
-      <h2 className={EYEBROW}>{title}</h2>
+      <h2 className={HEADING_MD}>{title}</h2>
       {children}
     </section>
   );

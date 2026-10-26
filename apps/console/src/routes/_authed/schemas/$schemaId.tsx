@@ -8,6 +8,7 @@ import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
+import { HEADING_SM } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Separator } from "@/components/ui/separator";
@@ -87,9 +88,7 @@ function SchemaDetail() {
                 heading lines up with the tab label above it rather than with
                 the tab's box. */}
             <section className="flex flex-col gap-2.5 px-2">
-              <h2 className="font-serif text-[15px] leading-[22px] text-foreground">
-                Sign-in methods
-              </h2>
+              <h2 className={HEADING_SM}>Sign-in methods</h2>
               {methods.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   This schema declares no sign-in methods.
