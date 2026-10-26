@@ -128,8 +128,8 @@ function UsersScreen() {
     (page) => {
       setColumns(page.columns);
       // A later page can be served without the expansion the first page carried
-      // — a permission revoked mid-list — and a Team column standing over blank
-      // cells would read as "these users are on no team".
+      // — a permission revoked mid-list — and a Member of column standing over
+      // blank cells would read as "these users are on no team".
       setTeamsExpanded((current) => current && page.teamsExpanded);
     },
   );
@@ -160,13 +160,12 @@ function UsersScreen() {
   // Schema properties are hidden until the viewer pins them (D23); everything
   // else a row holds reads in its one bounded Attributes cell.
   const pinned = useMemo(() => pinnedColumns(pickable, pins), [pickable, pins]);
-  const showAttributes = useMemo(
-    () =>
-      rows.some((row) => {
-        const summary = attributeSummary(row, pinned);
-        return summary.entries.length > 0 || summary.more > 0;
-      }),
+  const summaries = useMemo(
+    () => rows.map((row) => ({ row, summary: attributeSummary(row, pinned) })),
     [rows, pinned],
+  );
+  const showAttributes = summaries.some(
+    ({ summary }) => summary.entries.length > 0 || summary.more > 0,
   );
   const scroll = useScrollEdges();
   // Each row's schema, for the identity card's title and the attributes
@@ -217,10 +216,10 @@ function UsersScreen() {
                 ))}
                 {showAttributes && <ResourceHeadCell>Attributes</ResourceHeadCell>}
                 <ResourceHeadCell>Status</ResourceHeadCell>
-                {/* After `Status`, where the design's column order puts it. */}
-                {/* Memberships, not ownership: the team that owns a user's
-                  lifecycle is a different relation (ADR 024), in the User
-                  cell's hover card (D23). */}
+                {/* After `Status`, where the design's column order puts it.
+                    Memberships, not ownership: the team that owns a user's
+                    lifecycle is a different relation (ADR 024), in the User
+                    cell's hover card (D23). */}
                 {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
                 <ResourceHeadCell>ID</ResourceHeadCell>
                 {/* 52px: the 36px menu button and 8px either side. The cell
@@ -237,7 +236,7 @@ function UsersScreen() {
                   No users yet.
                 </ResourceEmptyRow>
               ) : (
-                rows.map((user) => (
+                summaries.map(({ row: user, summary }) => (
                   <ResourceRow key={user.id} className="group">
                     <UserIdentityCell
                       user={user}
@@ -258,7 +257,7 @@ function UsersScreen() {
                     {showAttributes && (
                       <UserAttributesCell
                         user={user}
-                        summary={attributeSummary(user, pinned)}
+                        summary={summary}
                         schema={schemas.get(user.schemaId)?.schema}
                       />
                     )}

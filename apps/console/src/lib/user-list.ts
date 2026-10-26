@@ -190,7 +190,7 @@ export interface UserRow {
    * leads, since the identifier is `name` itself otherwise.
    */
   secondary?: string;
-  /** The schema property the identifier came from (e.g. "email"), as the line's tooltip. */
+  /** The schema property the identifier came from (e.g. "email"), as its chip. */
   identifierProperty?: string;
   /** The user's whole `attributes` tree, as the Attributes popover shows it. */
   attributes: Record<string, unknown>;
@@ -288,12 +288,6 @@ export function columnsBeyondIdentity(columns: SchemaField[], rows: UserRow[]): 
 /** The pinned properties of each schema, by schema id. */
 export type ColumnPins = Record<string, string[]>;
 
-/** A pinned property, rendered as its own column. */
-export interface PinnedColumn {
-  key: string;
-  label: string;
-}
-
 /**
  * The pinned columns, in the groups' order and each group's field order.
  *
@@ -302,14 +296,12 @@ export interface PinnedColumn {
  * that value there, whichever schema's pin made the column. An em dash under
  * a pinned "Family name" would otherwise read as "has none".
  */
-export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): PinnedColumn[] {
-  const columns = new Map<string, PinnedColumn>();
+export function pinnedColumns(groups: ColumnGroup[], pins: ColumnPins): SchemaField[] {
+  const columns = new Map<string, SchemaField>();
   for (const group of groups) {
     const pinned = new Set(pins[group.schemaId] ?? []);
     for (const entry of group.fields) {
-      if (pinned.has(entry.key) && !columns.has(entry.key)) {
-        columns.set(entry.key, { key: entry.key, label: entry.label });
-      }
+      if (pinned.has(entry.key) && !columns.has(entry.key)) columns.set(entry.key, entry);
     }
   }
   return [...columns.values()];
@@ -330,7 +322,7 @@ export interface AttributeSummary {
  * column shows and that does not repeat the User cell, in the row's attribute
  * order. Objects and arrays are counted, never rendered.
  */
-export function attributeSummary(row: UserRow, columns: PinnedColumn[]): AttributeSummary {
+export function attributeSummary(row: UserRow, columns: SchemaField[]): AttributeSummary {
   const shown = new Set(columns.map((column) => column.key));
   const rest = row.attributeKeys.filter(
     (key) => !(shown.has(key) && row.values[key] !== undefined) && !repeatsIdentity(row, key),

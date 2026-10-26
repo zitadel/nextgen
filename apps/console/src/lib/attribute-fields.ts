@@ -59,25 +59,29 @@ function rowsAt(
           kind: "group",
           path,
           label,
-          rows: rowsAt(value, childSchema(schema, key), path, 1),
+          rows: rowsAt(value, schema && resolveSchemaPath(schema, [key]), path, 1),
         });
       } else {
         rows.push({ kind: "drill", path, label, count: Object.keys(value).length });
       }
-    } else if (Array.isArray(value) && value.length > 0 && value.every(isScalar)) {
-      const items = property && isRecord(property.items) ? property.items : undefined;
-      rows.push({
-        kind: "list",
-        path,
-        label,
-        items: value.map((item) => formatScalar(item, items)),
-      });
     } else if (Array.isArray(value) && value.length > 0) {
-      // Objects in a list have no one-line form; the JSON tab shows them.
-      const count = `${value.length} ${value.length === 1 ? "item" : "items"}`;
-      rows.push({ kind: "value", path, label, value: count, empty: false });
+      if (value.every(isScalar)) {
+        const items = property && isRecord(property.items) ? property.items : undefined;
+        rows.push({
+          kind: "list",
+          path,
+          label,
+          items: value.map((item) => formatScalar(item, items)),
+        });
+      } else {
+        // Objects in a list have no one-line form; the JSON tab shows them.
+        const count = `${value.length} ${value.length === 1 ? "item" : "items"}`;
+        rows.push({ kind: "value", path, label, value: count, empty: false });
+      }
     } else {
-      const empty = value === null || value === undefined || value === "" || isEmptyBag(value);
+      // Left here: a scalar, or an object or list with nothing in it.
+      const empty =
+        value === null || value === undefined || value === "" || typeof value === "object";
       rows.push({
         kind: "value",
         path,
@@ -132,11 +136,6 @@ export function attributesAt(
   return isRecord(node) ? node : undefined;
 }
 
-/** The schema node of a nested object, if the schema describes it. */
-function childSchema(schema: UserSchema | undefined, key: string): UserSchema | undefined {
-  return schema ? resolveSchemaPath(schema, [key]) : undefined;
-}
-
 function orderedKeys(node: Record<string, unknown>, schema: UserSchema | undefined): string[] {
   const keys = Object.keys(node);
   const declared = keys.filter((key) => declaredProperty(schema, key)).sort();
@@ -171,11 +170,4 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isScalar(value: unknown): boolean {
   return value === null || ["string", "number", "boolean"].includes(typeof value);
-}
-
-function isEmptyBag(value: unknown): boolean {
-  return (
-    (isRecord(value) && Object.keys(value).length === 0) ||
-    (Array.isArray(value) && value.length === 0)
-  );
 }

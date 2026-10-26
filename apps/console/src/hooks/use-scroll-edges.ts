@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 /** Which edges of a horizontal scroller have content scrolled under them. */
-export interface ScrollEdges {
+interface ScrollEdges {
   /** Content is scrolled out past the leading edge. */
   start: boolean;
   /** Content runs on past the trailing edge. */

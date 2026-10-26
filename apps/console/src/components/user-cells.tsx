@@ -29,9 +29,19 @@ import { cn } from "@/lib/utils";
 /** The User and schema-driven cells clamp at 280px and truncate. */
 export const USER_CLAMP = "max-w-70";
 
-// The identifier's property beside it: a label, so smaller and quieter than
-// the value it names (`InlineCode` alone is the 12/16 prose size).
-const IDENTIFIER_CHIP = "text-muted-foreground shrink-0 px-1 py-0 text-[10px] leading-3.5";
+/**
+ * The identifier's property (`email`, `username`) beside it: a label, so
+ * smaller and quieter than the value it names (`InlineCode` alone is the
+ * 12/16 prose size).
+ */
+function IdentifierChip({ property }: { property?: string }) {
+  if (!property) return null;
+  return (
+    <InlineCode className="text-muted-foreground shrink-0 px-1 py-0 text-[10px] leading-3.5">
+      {property}
+    </InlineCode>
+  );
+}
 
 /**
  * The User cell of a user table: the server-resolved identity (display →
@@ -57,12 +67,6 @@ export function UserIdentityCell({
   sticky?: boolean;
   card?: IdentityCardContext;
 }) {
-  const chip = user.identifierProperty && (
-    <InlineCode className={IDENTIFIER_CHIP}>{user.identifierProperty}</InlineCode>
-  );
-  // No display name: the identifier is the link text itself.
-  const chipOnName =
-    !user.secondary && user.identifier !== undefined && user.name === user.identifier;
   const link = (
     <Link
       to="/users/$userId"
@@ -92,11 +96,12 @@ export function UserIdentityCell({
         ) : (
           link
         )}
-        {chipOnName && chip}
+        {/* No display name: the identifier is the link text itself. */}
+        {!user.secondary && <IdentifierChip property={user.identifierProperty} />}
       </span>
       {user.secondary && (
         <span className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5 text-xs">
-          {chip}
+          <IdentifierChip property={user.identifierProperty} />
           <span className="truncate">{user.secondary}</span>
         </span>
       )}
@@ -105,7 +110,7 @@ export function UserIdentityCell({
 }
 
 /** What the identity hover card knows about the list besides the row. */
-export interface IdentityCardContext {
+interface IdentityCardContext {
   /** The title of the user's schema, else its id. */
   schemaTitle: string;
   /** False when the list was served without memberships (a 403 on `expand`). */
@@ -151,9 +156,7 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
         <dd className="flex min-w-0 items-center gap-1.5">
           {user.identifier ? (
             <>
-              {user.identifierProperty && (
-                <InlineCode className={IDENTIFIER_CHIP}>{user.identifierProperty}</InlineCode>
-              )}
+              <IdentifierChip property={user.identifierProperty} />
               <span className="truncate">{user.identifier}</span>
             </>
           ) : (
@@ -283,7 +286,7 @@ export function UserAttributesCell({
             }}
             className="max-h-(--radix-popover-content-available-height) w-[min(28rem,calc(100vw-2rem))] overflow-y-auto p-0"
           >
-            {/* 16px inset, the same as the viewer's tab labels and code. */}
+            {/* 16px inset, the same as the viewer's tab labels and Fields list. */}
             <div className="flex items-start justify-between gap-3 px-4 py-3">
               <PopoverHeader className="min-w-0">
                 <PopoverTitle>Attributes</PopoverTitle>

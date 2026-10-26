@@ -47,7 +47,7 @@ export function AttributeFields({
   // the root beats a list of nothing.
   const node = attributesAt(attributes, path);
   const at = node ? path : [];
-  const rows = attributeRows(node ?? attributes, nodeSchema(schema, at));
+  const rows = attributeRows(node ?? attributes, schema && resolveSchemaPath(schema, at));
   const total = countRows(rows);
 
   return (
@@ -150,8 +150,4 @@ function Row({ row, onOpen }: { row: AttributeRow; onOpen: (path: string[]) => v
       </dd>
     </>
   );
-}
-
-function nodeSchema(schema: UserSchema | undefined, path: string[]): UserSchema | undefined {
-  return schema && (path.length === 0 ? schema : resolveSchemaPath(schema, path));
 }
