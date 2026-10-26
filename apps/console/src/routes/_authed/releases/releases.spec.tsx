@@ -406,6 +406,21 @@ describe("release actions", () => {
     await waitFor(() => expect(reads).toBe(2));
   });
 
+  it("offers a first deploy, and no rollback, while the primary origins never served it", async () => {
+    servePointers();
+    server.use(
+      http.get(`${API}/releases/rel_1`, () => HttpResponse.json(release())),
+      http.get(PROJECT_URL, () => HttpResponse.json(ORIGINS_PROJECT)),
+    );
+    await renderAt("/releases/rel_1");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Actions for rel_1" }));
+    expect(await screen.findByRole("menuitem", { name: "Deploy" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Rollback" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: "Deploy" }));
+    expect(await screen.findByRole("dialog", { name: "Deploy release" })).toBeInTheDocument();
+  });
+
   it("rolls back to this release's superseded deployment from the header", async () => {
     servePointers();
     let posted: { deploymentId: string; projectId: string | null; body: unknown } | undefined;

@@ -125,17 +125,12 @@ export function FormSheetForm({
       <Separator />
       {/* On the page background rather than a raised surface, so scrolling body
           content passes under it. */}
+      {/* Both buttons at the default size, as the design's sheet footer draws them. */}
       <SheetFooter className="flex-row items-center justify-end gap-3 bg-background px-6 py-4">
         <Button type="button" variant="secondary" className="gap-1.5 px-2.5" onClick={onClose}>
           Cancel
         </Button>
-        <Button
-          type="submit"
-          size="sm"
-          className="gap-1 px-2.5 text-xs"
-          disabled={!canSubmit}
-          loading={pending}
-        >
+        <Button type="submit" className="gap-1.5 px-2.5" disabled={!canSubmit} loading={pending}>
           {submitLabel}
         </Button>
       </SheetFooter>

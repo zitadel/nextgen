@@ -44,9 +44,8 @@ import {
  * Release detail: the header, the configuration the release pins, where it
  * went, and its metadata.
  *
- * The header's menu redeploys the release, rolls back to it or revokes it; a
- * revoked release has no menu. A fresh deployment starts from the
- * deployments directory.
+ * The header's menu deploys the release, rolls back to it or revokes it; a
+ * revoked release has no menu.
  *
  * The pointers fail soft; the release and deployment reads are what the
  * route's error state reports.
@@ -137,11 +136,13 @@ function ReleaseDetail() {
 
 /**
  * The header's menu: **Redeploy** is the deploy drawer for this release with
- * its own copy; **Rollback** opens the drawer with this release's newest
- * superseded primary deployment chosen, when it has one; **Revoke release**
- * asks first, and refuses at once while an origin serves it.
+ * its own copy, or **Deploy** with the plain copy while the primary origins
+ * have never served it; **Rollback** opens the drawer with this release's
+ * newest superseded primary deployment chosen, and is left out until the
+ * release has a primary deployment to go back to; **Revoke release** asks
+ * first, and refuses at once while an origin serves it.
  *
- * Both open by state, outside the menu, so the menu closes on select.
+ * Each opens by state, outside the menu, so the menu closes on select.
  */
 function ReleaseActions({
   release,
@@ -161,6 +162,7 @@ function ReleaseActions({
   const superseded = deployments.find(
     (deployment) => deployment.kind === "primary" && deployment.status !== "live",
   );
+  const deployedToPrimary = deployments.some((deployment) => deployment.kind === "primary");
 
   return (
     <>
@@ -171,8 +173,12 @@ function ReleaseActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>Redeploy</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setRedeployOpen(true)}>
+            {deployedToPrimary ? "Redeploy" : "Deploy"}
+          </DropdownMenuItem>
+          {deployedToPrimary && (
+            <DropdownMenuItem onSelect={() => setRollbackOpen(true)}>Rollback</DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={() => setRevokeOpen(true)}>
             Revoke release
@@ -181,7 +187,7 @@ function ReleaseActions({
       </DropdownMenu>
       <DeploySheet
         release={release}
-        intent="redeploy"
+        intent={deployedToPrimary ? "redeploy" : "deploy"}
         open={redeployOpen}
         onOpenChange={setRedeployOpen}
         onDeployed={onChanged}
