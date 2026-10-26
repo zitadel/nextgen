@@ -225,6 +225,12 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.CreateDeploymentOperation:   true,
 	api.RollbackDeploymentOperation: true,
 	api.RevokeReleaseOperation:      true,
+	// The Project settings page adds and removes origins and reads variables
+	// (#2320). Variable writes stay with the project secret.
+	api.AddOriginOperation:    true,
+	api.RemoveOriginOperation: true,
+	api.GetVariablesOperation: true,
+	api.GetVariableOperation:  true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

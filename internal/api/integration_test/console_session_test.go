@@ -163,6 +163,61 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.RevokeReleaseConflict{}, revoked, helpers.MustMarshal(t, revoked))
 	})
 
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page adds and removes origins and reads the
+		// variables with the session (#2320). Variables are written with the
+		// secret only. The project is this test's own: origins and variables
+		// are project state, and the platform project is shared.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+
+		origin := api.ProjectOrigin{Pattern: "https://console-session-origin.example.com", Kind: api.ProjectOriginKindPrimary}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		project, err := session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectDetailResponse{}, project, helpers.MustMarshal(t, project))
+		require.Contains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+		project, err = session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.NotContains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		written, err := secret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"SESSION_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("shown")),
+			"SESSION_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value: api.NewStringVariableScalar("never-shown"), Secret: true,
+			}),
+		}, api.UpdateVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+
+		// The session reads every name with its value per kind, the secret held.
+		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		variables := *listed.(*api.VariablesByKind)
+		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("shown")), variables["SESSION_PLAIN"].Primary.Value)
+		assert.Equal(t, held, variables["SESSION_SECRET"].Primary.Value)
+		assert.NotContains(t, helpers.MustMarshal(t, listed), "never-shown")
+
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: ownedID, VariableName: "SESSION_SECRET"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
+		assert.Equal(t, api.VariableByKind{Primary: api.NewOptVariable(held)}, *one.(*api.VariableByKind))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -404,6 +459,26 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: otherID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		assertAuthzError(t, revoked, domain.ErrReleaseProjectNotFound().Code)
+	})
+
+	t.Run("cannot add or remove another project's origins, nor read its variables", func(t *testing.T) {
+		// Every op is project-scoped: the miss is the resource's own not
+		// found, which says nothing about the project.
+		added, err := session.AddOrigin(t.Context(), &api.ProjectOrigin{
+			Pattern: "https://stranger.example.com", Kind: api.ProjectOriginKindPrimary,
+		}, api.AddOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, added, domain.ErrOriginNotFound().Code)
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: "https://stranger.example.com"}, api.RemoveOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, removed, domain.ErrOriginNotFound().Code)
+
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, listed, domain.ErrVariableNotFound().Code)
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: otherID, VariableName: "ANY"})
+		require.NoError(t, err)
+		assertAuthzError(t, one, domain.ErrVariableNotFound().Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
@@ -690,6 +765,30 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: customerProjectID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+	})
+
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		origin := api.ProjectOrigin{Pattern: "https://granted-origin.example.com", Kind: api.ProjectOriginKindPreview}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+
+		written, err := customerSecret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"GRANTED_READ": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("granted")),
+		}, api.UpdateVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, *listed.(*api.VariablesByKind), "GRANTED_READ")
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: customerProjectID, VariableName: "GRANTED_READ"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
 	})
 
 	t.Run("without a grant the resource is not found", func(t *testing.T) {
