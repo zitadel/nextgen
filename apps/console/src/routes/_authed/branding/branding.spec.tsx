@@ -235,17 +235,35 @@ describe("branding screen", () => {
   });
 
   it("names the previewed theme and switches it", async () => {
-    serveRevision();
+    serveRevision({ ...PUBLISHED, theme: { mode: "auto", light: {}, dark: {} } });
     await renderAt("/branding");
 
     expect(await screen.findByTestId("preview")).toHaveAttribute("data-theme", "revision");
     await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
-    // The revision's own mode, which the preview follows until a side is pinned.
-    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent("auto");
-    await userEvent.click(screen.getByRole("menuitemradio", { name: "Dark" }));
+    // Both sides published under `auto`: the operator's operating system picks.
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent(
+      "System",
+    );
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
 
-    expect(screen.getByTestId("preview")).toHaveAttribute("data-theme", "dark");
-    expect(screen.getByRole("button", { name: "Previewed theme: Dark" })).toBeInTheDocument();
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-theme", "light");
+    expect(screen.getByRole("button", { name: "Previewed theme: Light" })).toBeInTheDocument();
+  });
+
+  it("does not offer a side the revision does not publish", async () => {
+    // Dark only: the element paints dark whatever it is asked for.
+    serveRevision();
+    await renderAt("/branding");
+
+    await screen.findByTestId("preview");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent("Dark");
+    const light = screen.getByRole("menuitemradio", { name: /Light/ });
+    expect(light).toHaveAttribute("aria-disabled", "true");
+    expect(light).toHaveTextContent("Not published");
+    expect(screen.getByRole("menuitemradio", { name: "Dark" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
   });
 
   it("switches the previewed state", async () => {

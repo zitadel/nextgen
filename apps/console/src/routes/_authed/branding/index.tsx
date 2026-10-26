@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { publishedSides } from "@zitadel/components";
 import {
   type LucideIcon,
   Monitor,
@@ -121,8 +122,7 @@ const STATE_LABELS: Record<PreviewState, string> = {
 
 /**
  * Which side the preview paints: a fixed side, or `revision` to leave it to
- * the revision's own `theme.mode` — what a visitor gets. A pinned side still
- * cannot reach one the revision does not publish.
+ * the revision's own `theme.mode` — what a visitor gets.
  */
 type PreviewTheme = "light" | "dark" | "revision";
 
@@ -133,6 +133,27 @@ const THEMES: Record<PreviewTheme, { label: string; icon: LucideIcon }> = {
   light: { label: "Light", icon: Sun },
   dark: { label: "Dark", icon: Moon },
 };
+
+/**
+ * The side a revision that publishes only the other one cannot paint. The
+ * element then paints the published side whatever it is asked for
+ * (`publishedSides`); with both or neither published, either side paints.
+ */
+function unpublishedSide(revision: BrandingRevision): PreviewTheme | undefined {
+  const [only, second] = publishedSides(revision);
+  if (!only || second) return undefined;
+  return only === "light" ? "dark" : "light";
+}
+
+/** What "From branding" paints, resolved as the element does it. */
+function revisionSide(revision: BrandingRevision): string {
+  const [only, second] = publishedSides(revision);
+  if (only && !second) return THEMES[only].label;
+  const mode = revision.theme?.mode;
+  // `auto`, and an unset mode, which a widget treats as `auto`, follow the
+  // operator's operating system, not the console's own theme.
+  return mode === "light" || mode === "dark" ? THEMES[mode].label : "System";
+}
 
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
@@ -173,9 +194,11 @@ function BrandingScreen() {
   // Derived like `activeJourney`: a pick this step cannot show previews the
   // default, and comes back when a step that can show it is served.
   const activeState = states && !states.includes(state) ? "default" : state;
-  // Unset, a widget follows the visitor: the panel shows `auto` for it too.
-  const revisionMode = revision.theme?.mode ?? "auto";
-  const activeTheme = THEMES[theme];
+  // Derived like `activeState`: a side this revision does not publish is not
+  // offered, and a pick of it previews the revision's own until one does.
+  const unpublished = unpublishedSide(revision);
+  const activeTheme = theme === unpublished ? "revision" : theme;
+  const ActiveThemeIcon = THEMES[activeTheme].icon;
 
   return (
     <Page fill>
@@ -261,26 +284,26 @@ function BrandingScreen() {
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label={`Previewed theme: ${activeTheme.label}`}
-                  title={`Theme: ${activeTheme.label}`}
+                  aria-label={`Previewed theme: ${THEMES[activeTheme].label}`}
+                  title={`Theme: ${THEMES[activeTheme].label}`}
                 >
-                  <activeTheme.icon />
+                  <ActiveThemeIcon />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Previewed theme</DropdownMenuLabel>
                 <DropdownMenuRadioGroup
-                  value={theme}
+                  value={activeTheme}
                   onValueChange={(value) => setTheme(value as PreviewTheme)}
                 >
                   {Object.entries(THEMES).map(([id, entry]) => (
-                    <DropdownMenuRadioItem key={id} value={id}>
+                    <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
                       <entry.icon aria-hidden />
                       {entry.label}
-                      {/* What a visitor gets: the revision's own mode. */}
-                      {id === "revision" && (
+                      {/* What a visitor gets, and why a side is not offered. */}
+                      {(id === "revision" || id === unpublished) && (
                         <span className="ml-auto pl-4 text-xs text-muted-foreground">
-                          {revisionMode}
+                          {id === "revision" ? revisionSide(revision) : "Not published"}
                         </span>
                       )}
                     </DropdownMenuRadioItem>
@@ -311,7 +334,7 @@ function BrandingScreen() {
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
-                theme={theme}
+                theme={activeTheme}
                 state={activeState}
                 successStep={selected?.successStep}
                 onStates={(next) => setServed({ preview, states: next })}
