@@ -55,7 +55,7 @@
   },
   "devDependencies": {
     "@babel/core": "catalog:",
-    "@mridang/vite-plugin-nuxt-module": "^0.1.0",
+    "@mridang/vite-plugin-nuxt-module": "^0.1.1",
     "@nuxt/kit": "catalog:",
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",

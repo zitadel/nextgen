@@ -1645,8 +1645,8 @@ importers:
         specifier: 'catalog:'
         version: 7.29.7(supports-color@8.1.1)
       '@mridang/vite-plugin-nuxt-module':
-        specifier: ^0.1.0
-        version: 0.1.0(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))
+        specifier: ^0.1.1
+        version: 0.1.1(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))
       '@nuxt/kit':
         specifier: 'catalog:'
         version: 4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3)))
@@ -4343,8 +4343,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@mridang/vite-plugin-nuxt-module@0.1.0':
-    resolution: {integrity: sha512-CVmMGw3RwUeofgpx1C9J9WhalKhMA/Vgv4PjimTnDQNEhUTCvT1U6orBwHCgjdcf0eiRurXG71UXAYmIBZ/afQ==}
+  '@mridang/vite-plugin-nuxt-module@0.1.1':
+    resolution: {integrity: sha512-0PKLV1vNI/E95VvkkG9kpidd59oBddSwe4/6Xncg3y2Asr2yQwicogXlO2PoPl8UJqkYXFi50ImDWQnLKpGN1A==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@nuxt/kit': '>=3'
@@ -18621,7 +18621,7 @@ snapshots:
   '@moonrepo/core-windows-x64-msvc@2.6.1':
     optional: true
 
-  '@mridang/vite-plugin-nuxt-module@0.1.0(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))':
+  '@mridang/vite-plugin-nuxt-module@0.1.1(@nuxt/kit@4.5.2(magic-string@1.4.3)(magicast@0.5.4)(oxc-parser@0.150.0)(rolldown@1.2.12)(unplugin@3.3.0(esbuild@0.28.1)(rolldown@1.2.12)(rollup@4.62.2)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.15.8(@swc/helpers@0.5.23))(cssnano@8.0.5(postcss@8.5.30))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.30)(uglify-js@3.19.3))))(@nuxt/schema@4.5.2)(nuxt@4.5.2(b5c1427c4f232bc3779ada250a730ba3))(oxc-resolver@11.20.0)(sass-embedded@1.104.1)(sass@1.104.1)(typescript@6.0.3)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vue-tsc@3.2.8(typescript@6.0.3))':
     dependencies:
       picomatch: 4.0.7
       rolldown: 1.2.12
