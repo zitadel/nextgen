@@ -41,7 +41,7 @@ tasks:
     deps:
       - "build"
 
-  # The same deps as build: The declaration pass resolves the workspace
+  # The same deps as build: the declaration pass resolves the workspace
   # packages, which need api's generated client and the built dependencies.
   dev:
     command: "corepack pnpm run dev"

@@ -124,9 +124,10 @@ This SDK is not server-only: its `/react` entry wraps the widgets from `@zitadel
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-tanstack-start/README.md` and
-the bundled `.d.ts` types (`dist/server.d.ts`, `dist/client.d.ts`,
-`dist/react.d.ts`) are authoritative and versioned with the installed package —
-read them before wiring anything, and let them override anything remembered.
+the `.d.ts` types under `dist/` (start at `dist/server.d.ts`, `dist/client.d.ts`
+and `dist/react.d.ts` and follow their re-exports) are authoritative and
+versioned with the installed package — read them before wiring anything, and
+let them override anything remembered.
 This skill teaches the pattern, not a full catalog of options, widget props, or
 the shared JWT-verification pipeline (that lives in `@zitadel/sdk-core`). Check
 exact option names, props, and defaults against the installed version rather

@@ -27,7 +27,7 @@ implicitInputs:
   # (and unselected by `moon ci`), running stale config.
   - "/vitest.shared.mjs"
   - "/vitest.shared.d.mts"
-  # The Vite build of the SDKs (`libraryBuild()`); every build task reads it.
+  # The Vite build of the SDKs (`libraryBuild()`), which their build tasks read.
   - "/vite.shared.mjs"
   - "/vite.shared.d.mts"
 

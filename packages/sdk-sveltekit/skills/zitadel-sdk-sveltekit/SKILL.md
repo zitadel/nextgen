@@ -111,9 +111,10 @@ This SDK is server-only. The widgets come from `@zitadel/sdk-svelte`, so read it
 ## Read these, don't guess
 
 The package README at `node_modules/@zitadel/sdk-sveltekit/README.md` and the
-bundled `.d.ts` types (`dist/server.d.ts`, `dist/client.d.ts`) are authoritative
-and versioned with the installed package — read them before wiring anything, and
-let them override anything remembered. This skill teaches the pattern, not a
+`.d.ts` types under `dist/` (start at `dist/server.d.ts` and `dist/client.d.ts`
+and follow their re-exports) are authoritative and versioned with the installed
+package — read them before wiring anything, and let them override anything
+remembered. This skill teaches the pattern, not a
 full catalog of options or the shared JWT-verification pipeline (that lives in
 `@zitadel/sdk-core`). For widget props and callbacks, read
 `node_modules/@zitadel/sdk-svelte/README.md` and its types. Check exact option

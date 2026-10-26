@@ -12,7 +12,7 @@ const leaves = (value) =>
 /**
  * The Vite build every SDK shares, derived from its `package.json`. List it
  * first in a package's own `plugins`, before its framework plugin and
- * `unplugin-dts`, because Qwik's plugin reads the `outDir` this sets:
+ * `unplugin-dts`:
  *
  *   import { libraryBuild } from "../../vite.shared.mjs";
  *   export default defineConfig({
@@ -27,11 +27,13 @@ const leaves = (value) =>
  * runtime target is one, and a `.mjs` file otherwise. Dependencies, peer
  * dependencies and Node built-ins stay external.
  *
- * Any warning fails the build, except the Rolldown codes in `allow`, each of
- * which needs a comment at the call site saying why, `PLUGIN_TIMINGS`, and a
+ * Any warning Rolldown reports fails the build, except the codes in `allow`, each
+ * of which needs a comment at the call site saying why, `PLUGIN_TIMINGS`, and a
  * `MODULE_LEVEL_DIRECTIVE` Rolldown keeps: one on an entry, or on any module of
  * a build that preserves modules. A directive on another module is merged into
- * a chunk and lost, so it still fails.
+ * a chunk and lost, so it still fails. A plugin that prints its own warnings
+ * (the Svelte compiler, Qwik, `unplugin-dts`) never reports them to Rolldown,
+ * so they do not fail it.
  *
  * It throws when a runtime target has no source, when a types-only target has
  * no `.d.ts` source, or when a `./src/` condition (the workspace-source one)

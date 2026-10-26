@@ -23,18 +23,19 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Build an SDK with plain Vite**: `libraryBuild()` (`vite.shared.mjs`), the framework's
-  plugin and `unplugin-dts` (`svelteTypes()` for Svelte; Analog writes Angular's).
+- **Build an SDK with plain Vite**: `libraryBuild()` (`vite.shared.mjs`), the
+  framework plugin and `unplugin-dts` (`svelteTypes()` for Svelte; Analog
+  writes Angular's).
 - **Add an entry point to `exports` and give it a source, never to a config**:
-  `libraryBuild()` derives the entries from `exports` and fails on any warning.
-- **Allow a warning code only with a comment saying why.**
+  `libraryBuild()` derives the entries from `exports`.
+- **Fix a Rolldown warning, or allow its code with a comment saying why**:
+  `libraryBuild()` fails the build on any other.
 - **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
   into shared chunks and strip the directive. Re-test the App Router split.
-- **Build `sdk-nuxt` with `nuxtModule()`** from `@mridang/vite-plugin-nuxt-module`; list
-  the entries beside `src/module.ts` in its `entry`, not in `exports`.
-- **Check `sdk-angular` templates in `typecheck`, not the build**: Analog's plugin
-  does not type-check templates, so `ngc --noEmit` enforces `strictTemplates`.
-- **The non-SDK packages build with `tsdown`.**
+- **Build `sdk-nuxt` with `nuxtModule()`** (`@mridang/vite-plugin-nuxt-module`):
+  list each entry in `nuxtModule({ entry })` as well as in `exports`.
+- **Check `sdk-angular` templates in `typecheck`**: Analog's plugin skips them,
+  so `ngc --noEmit` enforces `strictTemplates`.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs
