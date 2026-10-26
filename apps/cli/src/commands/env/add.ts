@@ -313,8 +313,8 @@ export default class EnvAdd extends BaseCommand {
         // The deployment this run made, so the environment serves the
         // developer's `.zitadel/` rather than whatever the server serves a
         // project with nothing deployed to it. `null` whenever none was made:
-        // a `--project` bind, `--no-deploy`, a run with nobody to ask, a
-        // declined prompt, or a deploy that failed.
+        // a `--project` bind, a run with nobody to ask, a declined prompt, or
+        // a deploy that failed.
         deployment:
           deployment === undefined
             ? null
