@@ -918,6 +918,14 @@ export class ScaffoldedApp {
     await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
   }
 
+  /**
+   * Removes one editor schema setup wrote, as a project set up by a CLI that
+   * did not ship that dialect yet would lack it.
+   */
+  lacksEditorSchema(dialect: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
