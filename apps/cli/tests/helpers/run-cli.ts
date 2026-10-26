@@ -7,7 +7,7 @@ import type { LocalServers, ManagedRuntimeProcess } from "../../src/lib/local-se
 import { publicCliCommand } from "../../src/lib/public-cli";
 import { cliPackageRoot } from "./oclif-build";
 
-const cliVersion = JSON.parse(
+export const cliVersion = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as { version: string };
 
@@ -145,11 +145,6 @@ export function stripAnsi(text: string): string {
 
 export function expectedPublicCliCommand(args: string): string {
   return publicCliCommand(args, cliVersion.version);
-}
-
-/** The version the built CLI reports, which it stamps into the files it writes. */
-export function builtCliVersion(): string {
-  return cliVersion.version;
 }
 
 /**

@@ -15,6 +15,21 @@ interface SvelteTypesOptions {
   readonly tsconfig?: string;
 }
 
+/**
+ * Appends `.js` to extensionless relative specifiers in emitted declarations.
+ *
+ * `svelte2tsx` copies import paths as written (`./types`, `./Foo.svelte`),
+ * which Node's ESM resolution cannot follow in a consumer's `.d.ts` lookup.
+ * `./Foo.svelte.js` resolves to `Foo.svelte.d.ts`.
+ */
+function withExplicitExtensions(source: string): string {
+  return source.replace(
+    /(\bfrom\s+|\bimport\s*\(\s*)(["'])(\.{1,2}\/[^"']*?)\2/g,
+    (match, lead: string, quote: string, specifier: string) =>
+      /\.(?:js|mjs|cjs|json)$/.test(specifier) ? match : `${lead}${quote}${specifier}.js${quote}`,
+  );
+}
+
 /** Recursively collect absolute file paths under `dir`. */
 function walk(dir: string): readonly string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -69,7 +84,11 @@ export function svelteTypes(options: SvelteTypesOptions = {}): Plugin {
         }
         const dest = path.join(outDir, path.relative(tmp, file));
         fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(file, dest);
+        if (file.endsWith(".d.ts")) {
+          fs.writeFileSync(dest, withExplicitExtensions(fs.readFileSync(file, "utf8")));
+        } else {
+          fs.copyFileSync(file, dest);
+        }
       }
 
       fs.rmSync(tmp, { recursive: true, force: true });

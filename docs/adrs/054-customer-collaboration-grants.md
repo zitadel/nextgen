@@ -14,6 +14,9 @@
 > so claim selects an explicitly authorized target team instead of always
 > reusing the claimer's personal team.
 >
+> **Amended by:** [ADR 075](075-platform-operators.md) — §10's time-bounded
+> grant branch does not apply to platform operators, whose access is standing.
+>
 > **Amended 2026-09-21** (§8): deactivating a team that still holds an active
 > owning-team assignment is rejected until ownerless-team recovery exists
 > (zitadel/nextgen#1261).
@@ -437,7 +440,9 @@ composed into the same SQL query, not after fetching an unfiltered page.
 Customer team ownership and customer/agency access-team grants never imply
 deployment-wide operator or staff-support authority. Staff support does not
 require membership in the customer's owning team and must use its own
-time-bounded, audited grant branch.
+time-bounded, audited grant branch. [ADR 075](075-platform-operators.md)
+defines that branch as the `platform.operator` relation and, if accepted,
+makes it standing until a narrower support tier exists.
 
 The Console may render customer management and instance-operator surfaces in
 one application, but it derives each capability independently. It must not use

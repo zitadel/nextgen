@@ -333,7 +333,7 @@ func encodePatchUserByIDRequest(
 }
 
 func encodePublishPolicyRequest(
-	req *PublishPolicyRequest,
+	req PublishPolicyRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

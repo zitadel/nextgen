@@ -12,7 +12,7 @@ import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
 import BrandingEject from "../../../src/commands/branding/eject";
 import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
-import { builtCliVersion, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { cliVersion, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -89,7 +89,7 @@ describe("branding eject", () => {
 
     await eject(cwd);
 
-    const expected = projectMetaSchemas(builtCliVersion()).find(
+    const expected = projectMetaSchemas(cliVersion.version).find(
       (file) => file.path === ".zitadel/meta/branding.json",
     );
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");

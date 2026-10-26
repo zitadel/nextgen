@@ -67,6 +67,22 @@ describe("<zl-sso-providers>", () => {
     expect(icon?.getAttribute("name")).toBe("brand-google");
   });
 
+  it("shows the GitHub mark for the github template, at the same size as Google's", async () => {
+    const atom = await mount([GOOGLE, GITHUB]);
+
+    const icons = [...(atom.shadowRoot?.querySelectorAll("zl-icon") ?? [])];
+    expect(icons.map((icon) => icon.getAttribute("name"))).toEqual([
+      "brand-google",
+      "brand-github",
+    ]);
+    // One size and one slot for every mark keeps the buttons aligned.
+    expect(icons.every((icon) => icon.getAttribute("size") === "16")).toBe(true);
+    expect(icons.every((icon) => icon.hasAttribute("decorative"))).toBe(true);
+    expect(icons.every((icon) => icon.parentElement?.getAttribute("slot") === "leading")).toBe(
+      true,
+    );
+  });
+
   it("still renders a working button for a template with no mark", async () => {
     // A tenant's own OIDC connection will never have artwork here, and a
     // stand-in glyph would be a wrong logo.

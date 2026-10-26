@@ -52,8 +52,8 @@ export function removeGuidanceSection(source: string): string {
 
 /** The agent-facing golden path, written into `AGENTS.md`. */
 export function agentsGuidanceSection(ctx: PatchContext): string {
-  const plan = publicCliCommand("plan", ctx.cliVersion);
-  const apply = publicCliCommand("apply", ctx.cliVersion);
+  const deployDryRun = publicCliCommand("deploy --dry-run", ctx.cliVersion);
+  const deploy = publicCliCommand("deploy", ctx.cliVersion);
   const doctorFix = publicCliCommand("doctor --fix", ctx.cliVersion);
   const movePort = movePortCommand(ctx);
   // WebAuthn ceremonies need an OS-level authenticator, so an agent driving
@@ -75,11 +75,12 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
     ctx.posture === "widget"
       ? 'Presentation, by contrast, is edited in the generated pages: this app pre-dates setup, so they embed the sign-in widgets as `variant="widget"` cards (with `theme="auto"`) inside your existing layout; switch to `variant="page"` for the widget\'s own full-page chrome, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.'
       : 'Presentation, by contrast, is edited in the generated pages: they pin the sign-in widgets to `variant="page"` (full-page chrome); switch to `variant="widget"` to embed a card inside your own layout, and set `theme` (`light` | `dark` | `auto`) to pick the color scheme — `auto` follows the OS `prefers-color-scheme`, not this app\'s own theme, so pin `light` or `dark` when the app fixes its scheme.';
-  // The token bridge is the highest-leverage embedding lever and lives
-  // nowhere an integrator would otherwise look (component source). Keep the
-  // knob list here in sync with the documented public tokens.
+  // The stable tokens and the forwarded parts are the embedding levers, and
+  // they live nowhere an integrator would otherwise look (component source).
+  // The docs list their names, so this points there instead of keeping a
+  // copy that drifts.
   const themingParagraph =
-    "Theming the widgets from your app: `--zl-*` design-token custom properties set on the element in your own stylesheet pierce the widgets' shadow DOM. The bridge covers your fonts (`--zl-font-family-heading`, `--zl-font-family-sans`), radii (`--zl-radius-md`/`-lg`/`-xl`), the primary CTA pair (`--zl-primary` / `--zl-primary-foreground`), and the link color (`--zl-link`). When your page already carries the heading, set the `suppress-header` attribute on `<zitadel-login>` / `<zitadel-session>` (SDK wrappers: `suppressHeader`) to visually hide the widget's own heading block — it stays in the accessibility tree. Page layout around the widget (split screens, hero panes, marketing copy) is your app's code, not a Zitadel template.";
+    "Theming the widgets from your app: two hooks in your own stylesheet reach into their shadow DOM — the stable `--zl-*` design tokens, set on the element, and the parts `<zitadel-login>` forwards from its inner components as `zitadel-login::part(<atom>-<part>)` (the `card` part of `zl-card` is `zitadel-login::part(card-card)`). Both are listed under \"Style the login from your app\" in https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app; any other `--zl-*` variable is internal. When your page already carries the heading, set the `suppress-header` attribute on `<zitadel-login>` / `<zitadel-session>` (SDK wrappers: `suppressHeader`) to visually hide the widget's own heading block — it stays in the accessibility tree. Page layout around the widget (split screens, hero panes, marketing copy) is your app's code, not a Zitadel template.";
   // The app's own chrome (header nav, account menus) needs a session read of
   // its own — the widgets render their surfaces but never tell the host page
   // whether someone is signed in. Name the framework's supported read path;
@@ -92,7 +93,7 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
         : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/sessions/me?project_id=<project id>`, naming the project id the app passes to `configureZitadel()` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id` and that `project_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console\'s on localhost) or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
   return `## Authentication (Zitadel)
 
-This app's login is managed by Zitadel. Local config is the source of truth; never change auth behavior by editing generated route files.
+This app's login is managed by Zitadel. Local config is the source of truth for what the login collects and how sign-in works (step 3 below). The app files setup generated are yours to change, from the pages to the request boundary that protects routes in a server-rendered app: \`doctor\` reports a file you changed as \`edited\`, or as \`adopted\` once you delete its \`zitadel-cli: managed-file\` comment, and \`doctor --fix\` restores only a missing file, never one you changed.
 
 The golden path:
 
@@ -103,9 +104,9 @@ The golden path:
    - \`.zitadel/schemas/*.json\` — what a user is (fields, required, auth methods). See \`.zitadel/schemas/README.md\`.
    - \`.zitadel/flows/*.json\` — which screen collects which field/credential and how steps transition. See \`.zitadel/flows/README.md\`.
 4. Preview, then publish:
-   - \`${plan}\`
-   - \`${apply}\`
-   - Agents: append \`--non-interactive --json\` to both. \`plan\` validates flow invariants with the server's own rules **before** anything uploads — fix what it reports and re-run.
+   - \`${deployDryRun}\`
+   - \`${deploy}\`
+   - Agents: run both with \`--non-interactive\`; the publish also needs \`-m "<why this release changes>"\`, because a non-interactive \`deploy\` requires a message (\`--dry-run\` is exempt). \`deploy --dry-run\` validates flow invariants with the server's own rules and prints the diff **before** anything uploads — fix what it reports and re-run. Leave \`--json\` off the dry run to see that diff: its envelope carries only what would be published.
 
 ${presentationParagraph}${jsxTypesNote}
 
@@ -127,8 +128,8 @@ Never edit \`.zitadel/state.json\` (sync bookkeeping) or \`.zitadel/secret\` (cr
 
 /** The human-facing summary appended to the app `README.md`. */
 export function readmeGuidanceSection(ctx: PatchContext): string {
-  const plan = publicCliCommand("plan", ctx.cliVersion);
-  const apply = publicCliCommand("apply", ctx.cliVersion);
+  const deployDryRun = publicCliCommand("deploy --dry-run", ctx.cliVersion);
+  const deploy = publicCliCommand("deploy", ctx.cliVersion);
   const movePort = movePortCommand(ctx);
   return `## Authentication (Zitadel)
 
@@ -141,8 +142,8 @@ The dev server keeps its terminal busy, so run the commands below from a second 
 To change what the login collects or how sign-in works, edit the files under \`.zitadel/schemas/\` and \`.zitadel/flows/\` (each folder has a README), then:
 
 \`\`\`sh
-${plan}
-${apply}
+${deployDryRun}
+${deploy}
 \`\`\``;
 }
 

@@ -378,6 +378,23 @@ Inline status message for the four Figma severities (`error \| success \|
 warning \| info`). Renders the matching icon automatically; supports an
 optional `heading` and default-slot body.
 
+### `<zl-sso-providers>`
+
+One outline button per identity provider the step offers. A provider's logo
+shows automatically when `<zl-icon>` ships a `brand-<template>` mark for its
+catalog `template` (`SHIPPED_BRAND_ICON_NAMES`); any other provider, including
+a tenant's own OIDC connection, stays text-only rather than getting a stand-in
+logo.
+
+- Multicolour marks (Google) keep the vendor's colours.
+- Monochrome marks (GitHub) carry no fill and follow the button's foreground,
+  so they flip with light and dark mode.
+- Every mark sits in the button's leading slot at 16px.
+
+To add a provider's logo, add its official artwork to `BRAND_GLYPHS` in
+`src/atoms/zl-icon.ts` and its name to `BrandIconName` and
+`SHIPPED_BRAND_ICON_NAMES`; the buttons and the Storybook mock pick it up.
+
 ### `<zl-icon>` / `<zl-pill>` / `<zl-card>` / `<zl-page-shell>`
 
 Pure presentational atoms — icons render from a curated inline-SVG sprite,

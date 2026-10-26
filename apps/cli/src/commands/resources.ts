@@ -38,9 +38,8 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { ApiError } from "@zitadel/api/runtime/fetch";
 import { isVariableReference } from "@zitadel/config/idp";
-import { consola } from "consola";
 
-import { createZitadelClient, type ZitadelClient } from "../lib/api-client";
+import type { ZitadelClient } from "../lib/api-client";
 import { CommandGroups } from "../lib/oclif/groups";
 import { ZitadelError } from "../lib/errors";
 import {
@@ -52,12 +51,11 @@ import {
   type UpdateSpec,
   type WriteShape,
 } from "../lib/oclif/crud";
-import { readZitadelSecret } from "../lib/project";
 
 /**
  * The platform connection every resource verb calls through: the typed
- * client bound to the resolved server, plus the project the credential in
- * `.zitadel/secret` belongs to. Endpoints that scope by `project_id` read it
+ * client bound to the resolved server, plus the project the credential
+ * belongs to. Endpoints that scope by `project_id` read it
  * from here; the flag surface never exposes it.
  */
 export type Platform = Readonly<{ client: ZitadelClient; projectId: string }>;
@@ -97,7 +95,7 @@ const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "sign
 /**
  * The runtime resources the CLI manages imperatively — one entry per topic.
  * Config resources (schemas, flows, branding, releases) are deliberately
- * absent: they reconcile from `.zitadel/**` through `plan` / `apply`
+ * absent: they are published from `.zitadel/**` through `deploy`
  * (ADR 007, ADR 035), and an imperative write path would fork that source of
  * truth. Adding a backend resource is adding an entry here.
  */
@@ -425,13 +423,21 @@ export const RESOURCES = {
     },
   },
 
-  releases: {
+  release: {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
     heading: "id",
-    detail: ["id", "project_id", "metadata.message", "metadata.git_sha", "metadata.git_dirty"],
+    detail: [
+      "id",
+      "project_id",
+      "content_hash",
+      "revoked_at",
+      "metadata.message",
+      "metadata.git_sha",
+      "metadata.git_dirty",
+    ],
     list: {
       items: "releases",
       response: ListReleasesResponse,
@@ -523,10 +529,9 @@ export const RESOURCES = {
 } satisfies ResourceRegistry<Platform>;
 
 /**
- * The `<resource> <verb>` commands, ready for the explicit command table.
- * Connecting mirrors `schemas list` and `apply`: the project secret from
- * `.zitadel/secret` becomes the bearer, so a missing secret fails the same
- * way (`E_VALIDATION` pointing at `zitadel setup`).
+ * The `<resource> <verb>` commands, ready for the explicit command table. They
+ * connect like every command that talks to a project (see
+ * `EnvironmentCommand`), so they take `--env` and `--env-file` too.
  */
 export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   operations: FILTER_OPERATIONS,
@@ -534,21 +539,8 @@ export const RESOURCE_COMMANDS = buildResourceCommands<Platform>(RESOURCES, {
   // credential without revealing it, and is the only form a connection's
   // `client_secret` takes, so it may stand on a command line.
   references: { matches: isVariableReference, example: "'${{ NAME }}'" },
-  connect: async ({ cwd, source }) => {
-    const secret = await readZitadelSecret(cwd);
-    // Which project and server a verb is about is worth stating to a human, and
-    // is the "make boundary-crossing visible" rule from the CLI guidelines. It
-    // shares stdout with the result, though, so a piped run would feed those
-    // lines to whatever consumes the output — a piped `users list` would have
-    // them counted as rows by `wc -l`. On a pipe the result travels alone;
-    // `--json` silences them either way.
-    if (process.stdout.isTTY) {
-      consola.info(`Project   ${secret.project_id}`);
-      consola.info(`Server    ${source}`);
-    }
-    return {
-      client: createZitadelClient({ baseUrl: source, token: secret.project_secret }),
-      projectId: secret.project_id,
-    };
+  connect: async (open) => {
+    const { client, projectId } = await open();
+    return { client, projectId };
   },
 });

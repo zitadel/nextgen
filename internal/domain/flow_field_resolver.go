@@ -145,20 +145,28 @@ const (
 	AutocompleteNewPassword     = "new-password"
 )
 
-// passwordAutocomplete is the token a password field carries under each
-// purpose: signing in asks for the password the user already has, registering
-// and recovering ask them to choose one. It describes what the form asks for,
-// not what the engine does with the value — dispatch decides that on its own
-// terms, so neither tracks the other.
-//
-// Mapped one purpose at a time, deliberately. An unlisted purpose yields no
-// token rather than inheriting a default, so reauth cannot tell a password
-// manager to generate a replacement for the password it is asking the user
-// to confirm. A journey that collects a password adds its entry here.
-var passwordAutocomplete = map[FlowDefinitionPurpose]string{
-	FlowDefinitionPurposeLogin:    AutocompleteCurrentPassword,
-	FlowDefinitionPurposeRegister: AutocompleteNewPassword,
-	FlowDefinitionPurposeRecovery: AutocompleteNewPassword,
+// passwordPurpose is what a password field means under one purpose: the
+// autofill token the form carries, and whether the user chooses the password
+// there or enters one they have. The two are kept apart on purpose. The token
+// describes what the form asks for, for password managers; choosing decides
+// whether the project's password policy bounds the field
+// ([FlowStateMachineRuntime.applyPasswordPolicy]). Neither follows the other,
+// and dispatch decides what the engine does with the value on its own terms.
+type passwordPurpose struct {
+	autocomplete string
+	chooses      bool
+}
+
+// passwordPurposes maps the purposes that collect a password, one at a time,
+// deliberately. An unlisted purpose yields no token and no choosing rather
+// than inheriting a default, so reauth cannot tell a password manager to
+// generate a replacement for the password it is asking the user to confirm,
+// nor hold that password to a policy it may predate. A journey that collects
+// a password adds its entry here.
+var passwordPurposes = map[FlowDefinitionPurpose]passwordPurpose{
+	FlowDefinitionPurposeLogin:    {autocomplete: AutocompleteCurrentPassword},
+	FlowDefinitionPurposeRegister: {autocomplete: AutocompleteNewPassword, chooses: true},
+	FlowDefinitionPurposeRecovery: {autocomplete: AutocompleteNewPassword, chooses: true},
 }
 
 // AutocompleteForField returns the autofill token for a resolved field under
@@ -174,7 +182,7 @@ func AutocompleteForField(f FlowField, purpose FlowDefinitionPurpose) string {
 	case FlowFieldChallengeIdentifier:
 		return AutocompleteUsername
 	case FlowFieldChallengePassword:
-		return passwordAutocomplete[purpose]
+		return passwordPurposes[purpose].autocomplete
 	}
 	return ""
 }

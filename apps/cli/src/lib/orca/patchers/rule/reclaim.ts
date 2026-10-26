@@ -15,18 +15,25 @@ import type { FileOp, ScaffoldPlan } from "./file-writer/types";
  * the transform returning the source unchanged), so replaying one restores a
  * removed managed block without clobbering the user's own edits. Deliberately
  * excludes the unmarked `.zitadel/` resource writes and `zitadel.json` — those
- * are user-editable and synced by `apply`, so `--fix` must not clobber them.
+ * are user-editable and published by `deploy`, so `--fix` must not clobber them.
  *
  * Pure: filters a freshly-allocated list; the input plan is not mutated.
  */
 export function reclaimableOps(plan: ScaffoldPlan): FileOp[] {
-  return plan.ops.filter(
-    (op) =>
-      op.kind === "merge-env" ||
-      op.kind === "append-gitignore" ||
-      op.kind === "add-dep" ||
-      op.kind === "edit" ||
-      (op.kind === "write" && op.contents.includes(MANAGED_MARKER)),
+  return (
+    plan.ops
+      .filter(
+        (op) =>
+          op.kind === "merge-env" ||
+          op.kind === "append-gitignore" ||
+          op.kind === "add-dep" ||
+          op.kind === "edit" ||
+          (op.kind === "write" && op.contents.includes(MANAGED_MARKER)),
+      )
+      // A repair only adds what is missing: setup may replace its own stale
+      // values, but a value the developer changed since (`env add --force`, a
+      // prompt's answer) is theirs, so a replayed merge never overwrites.
+      .map((op) => (op.kind === "merge-env" && op.overwrite ? { ...op, overwrite: false } : op))
   );
 }
 

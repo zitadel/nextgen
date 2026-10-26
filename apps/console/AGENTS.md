@@ -46,9 +46,11 @@ the login surface) and owns the token rules. The atom recipe is in
   loaders, `useRequiredProjectScope` in components.
 - Never scope a management call with `getConsoleProjectId()`: that is the
   project the console signs into, not the one being managed.
-- The sidebar is Projects (the one unscoped entry), then the selected
-  project's screens. Screens outside every project (account, billing,
-  operators) go in the project switcher or Settings, not the sidebar.
+- The sidebar is Projects (the one unscoped entry), then the project's
+  screens, listed with or without a selection: without one, a screen asks
+  for a project first (Projects with `?next=`, D22). Screens outside every
+  project (account, billing, operators) go in the project switcher or
+  Settings, not the sidebar.
 - Never hand-edit `src/routeTree.gen.ts`; the TanStack Router plugin
   regenerates it from `src/routes/`.
 - In specs, assert on `router.state.resolvedLocation`, never

@@ -1,6 +1,6 @@
 get:
   operationId: getVariables
-  x-zitadel-cli: variables list
+  x-zitadel-cli: variable list
   summary: Get variables
   description: |
     Returns the project's variables, keyed by name, each with its value per
@@ -28,7 +28,7 @@ get:
 
 patch:
   operationId: updateVariables
-  x-zitadel-cli: variables set
+  x-zitadel-cli: variable set
   summary: Update variables
   description: |
     Enters, replaces and removes the project's variables for the requested

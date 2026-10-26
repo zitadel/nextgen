@@ -71,8 +71,8 @@ The fixtures find the instance through `ZITADEL_TESTING_HANDSHAKE`, which
 `withZitadel()` points at its handshake file.
 
 `app` is optional. Omit it when the instance itself serves the app — the
-Zitadel binary embeds the console and hosted sign-in at `/ui/console/` and
-`/ui/login/`, so a suite testing those surfaces has no second server to boot.
+Zitadel binary embeds the console at `/ui/console/`, so a suite testing it
+has no second server to boot.
 Only the instance entry is generated, and `appOrigin` must then be the
 instance's own local origin:
 
@@ -333,11 +333,10 @@ platform packages; the in-repo workspace carries no such binary, so the repo's
 own suites run `moon run server:build` and point the kit at the result via
 `ZITADEL_SERVER_BINARY` (the `withZitadel` option `zitadel.serverBinary` /
 `serverBinaryHint` exists for this). Most in-repo moon tasks set
-`NEXTGEN_SERVER_LOGIN_ENABLED=false` / `NEXTGEN_SERVER_CONSOLE_ENABLED=false`
-because they drive the app-embedded login, not the server-hosted `/ui/*`; the
-exception is `e2e:console-embedded`, which keeps both surfaces on and
-omits `app` — the binary-served `/ui/*` pages are its subject. Customer
-installs need none of this.
+`NEXTGEN_SERVER_CONSOLE_ENABLED=false` because they drive the app-embedded
+login, not the server-hosted console; the exception is `e2e:console-embedded`,
+which keeps the console on and omits `app` — the binary-served console is its
+subject. Customer installs need none of this.
 
 ## Known limitations
 

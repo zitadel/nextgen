@@ -18,9 +18,9 @@ type MetaSchemaDrift = { missing: ProjectMetaSchema[]; outdated: ProjectMetaSche
  * `$schema` points at nothing, or editors and agents read outdated rules.
  *
  * They are CLI-owned generated output (`projectMetaSchemas`), never read by
- * `plan`, `apply` or the server, so a stale file only misleads the editor:
- * that is a warning, not a failure, and `--fix` rewrites them. A file there
- * the CLI does not ship is left alone.
+ * `deploy` or the server, so a stale file only misleads the editor: that is
+ * a warning, not a failure, and `--fix` rewrites them. A file there the CLI
+ * does not ship is left alone.
  *
  * Compared as parsed JSON, so a reformatted file, or the key order `branding
  * eject` used to write, still matches.
@@ -56,7 +56,6 @@ export class MetaSchemasCheck implements SanityCheck {
       details: {
         missing: missing.map((file) => file.path),
         outdated: outdated.map((file) => file.path),
-        remedy_command: remedy,
       },
     };
   }

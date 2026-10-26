@@ -5,7 +5,7 @@
  *
  * They are CLI-owned generated output: pure functions of `@zitadel/config`'s
  * `metaSchemaFiles()` and the CLI version, read only by editors and agents,
- * never by `plan`, `apply` or the server. The `zitadel …` mentions in their
+ * never by `deploy` or the server. The `zitadel …` mentions in their
  * descriptions become the runnable public command on the way out
  * ({@link normalizePublicCliJson}), so they differ between CLI versions.
  */
