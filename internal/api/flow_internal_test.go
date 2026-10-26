@@ -1,12 +1,17 @@
 package api
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	apigen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
 func TestToFlowField_OmitsValidationWhenAbsent(t *testing.T) {
@@ -187,80 +192,6 @@ func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
 	require.False(t, got.Identifier.Set)
 }
 
-func TestValidateOriginAgainstProject(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		origin      string
-		allowed     []domain.Origin
-		wantErr     bool
-		wantInError []string
-	}{
-		{
-			name:    "empty allowlist allows any origin",
-			origin:  "http://127.0.0.1:3000",
-			allowed: nil,
-		},
-		{
-			name:    "exact primary match allows",
-			origin:  "https://app.example.com",
-			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
-		},
-		{
-			name:   "loopback is admitted when allowlist is non-empty",
-			origin: "http://127.0.0.1:3000",
-			allowed: []domain.Origin{
-				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
-			},
-		},
-		{
-			name:    "ipv6 loopback is admitted when allowlist is non-empty",
-			origin:  "http://[::1]:3000",
-			allowed: []domain.Origin{{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary}},
-		},
-		{
-			name:    "preview exact pattern does not admit",
-			origin:  "https://preview.example.com",
-			allowed: []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
-			wantErr: true,
-			wantInError: []string{
-				`"https://preview.example.com"`,
-			},
-		},
-		{
-			name:   "non-loopback without primary match is rejected",
-			origin: "https://other.example.com",
-			allowed: []domain.Origin{
-				{Pattern: "https://app.example.com", Kind: domain.OriginKindPrimary},
-				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
-			},
-			wantErr: true,
-			wantInError: []string{
-				`"https://other.example.com"`,
-				"https://app.example.com",
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := validateOriginAgainstProject(tc.origin, &domain.Project{Origins: tc.allowed})
-
-			if !tc.wantErr {
-				require.NoError(t, err)
-				return
-			}
-			require.Error(t, err)
-			for _, want := range tc.wantInError {
-				require.Contains(t, err.Error(), want, "message must name the offending origin and the allowlist")
-			}
-		})
-	}
-}
-
 // Explicit JSON `null` for a transition's action/purpose must map to "not
 // set" — IsSet() alone is also true for ogen's explicit-null state, and
 // reading .Value would silently yield the zero enum (switch / login).
@@ -302,4 +233,84 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 	purposed := svcReq.Steps[0].Transitions["purposed"]
 	require.NotNil(t, purposed.Purpose)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
+}
+
+func TestWithSealedRelease_PropagatesDeploymentLookupError(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	releases := servicemocks.NewMockReleaseService(ctrl)
+	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ProjectID: "proj_1",
+		ID:        "rel_1",
+	}, nil)
+
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	lookupErr := errors.New("deployment lookup failed")
+	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(nil, lookupErr)
+
+	h := Handler{
+		releaseService: releases,
+		pool:           service.NewPool(pool),
+	}
+	_, err := h.withSealedRelease(t.Context(), &domain.FlowState{
+		ProjectID:    "proj_1",
+		DeploymentID: "dep_1",
+		ReleaseID:    "rel_1",
+	})
+	require.ErrorIs(t, err, lookupErr)
+}
+
+func TestWithSealedRelease_AttachesDeployment(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	releases := servicemocks.NewMockReleaseService(ctrl)
+	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ProjectID: "proj_1",
+		ID:        "rel_1",
+	}, nil)
+
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	dep := &domain.Deployment{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_1"}
+	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(dep, nil)
+
+	h := Handler{
+		releaseService: releases,
+		pool:           service.NewPool(pool),
+	}
+	ctx, err := h.withSealedRelease(t.Context(), &domain.FlowState{
+		ProjectID:    "proj_1",
+		DeploymentID: "dep_1",
+		ReleaseID:    "rel_1",
+	})
+	require.NoError(t, err)
+	resolution := service.RuntimeResolutionFromContext(ctx)
+	require.NotNil(t, resolution)
+	require.Equal(t, dep, resolution.Deployment)
+}
+
+func TestWithSealedRelease_Revoked(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	releases := servicemocks.NewMockReleaseService(ctrl)
+	now := time.Now().UTC()
+	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ProjectID: "proj_1",
+		ID:        "rel_1",
+		RevokedAt: &now,
+	}, nil)
+
+	h := Handler{releaseService: releases}
+	_, err := h.withSealedRelease(t.Context(), &domain.FlowState{
+		ProjectID:    "proj_1",
+		DeploymentID: "dep_1",
+		ReleaseID:    "rel_1",
+	})
+	require.ErrorIs(t, err, domain.ErrReleaseRevoked())
 }

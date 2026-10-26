@@ -32014,6 +32014,8 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -32056,6 +32058,8 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "unavailable"
@@ -32191,6 +32195,16 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundGetFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedGetFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether GetFlowStepErrorResponse is ReqInvalid.
@@ -32765,6 +32779,48 @@ func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool
 func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetRelNotFound sets GetFlowStepErrorResponse to RelNotFound.
+func (s *GetFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundGetFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundGetFlowStepErrorResponse(v RelNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets GetFlowStepErrorResponse to RelRevoked.
+func (s *GetFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedGetFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedGetFlowStepErrorResponse(v RelRevoked) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -83183,6 +83239,10 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -83225,6 +83285,10 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
@@ -83360,6 +83424,26 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSubmitFlowStepErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSubmitFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
@@ -83934,6 +84018,90 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SubmitFlowStepErrorResponse to ProjOriginNotAllowed.
+func (s *SubmitFlowStepErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSubmitFlowStepErrorResponse(v ProjOriginNotAllowed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SubmitFlowStepErrorResponse to ProjPreviewNotLive.
+func (s *SubmitFlowStepErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotFound sets SubmitFlowStepErrorResponse to RelNotFound.
+func (s *SubmitFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSubmitFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundSubmitFlowStepErrorResponse(v RelNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SubmitFlowStepErrorResponse to RelRevoked.
+func (s *SubmitFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSubmitFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedSubmitFlowStepErrorResponse(v RelRevoked) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
