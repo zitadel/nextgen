@@ -61,9 +61,7 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
         [
           "",
           "Using an AI coding agent?",
-          "",
-          "Install Zitadel skills to help your agent work with",
-          "Zitadel’s CLI and authentication integrations:",
+          "Install Zitadel skills to help your agent work with Zitadel’s CLI and authentication integrations:",
           "",
           `  ${command(INSTALL_COMMAND)}`,
           "",

@@ -17,7 +17,7 @@ export class DevPortPrompt implements SetupPrompt {
     const devPort = await ctx.input({
       kind: "text",
       name: "dev server port",
-      message: `Which port should your app run on?\nPress Enter to use ${answers.devPort}, or type a different port and press Enter.`,
+      message: `Which port should your app run on? Press Enter to use ${answers.devPort}, or type a different port.`,
       placeholder: String(answers.devPort),
       initialValue: String(answers.devPort),
       parse: (value): Parsed<number> => {

@@ -242,7 +242,7 @@ describe("DevPortPrompt", () => {
 
     expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
       message:
-        "Which port should your app run on?\nPress Enter to use 3000, or type a different port and press Enter.",
+        "Which port should your app run on? Press Enter to use 3000, or type a different port.",
       initialValue: "3000",
     });
   });

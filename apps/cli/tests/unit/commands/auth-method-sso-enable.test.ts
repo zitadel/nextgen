@@ -189,18 +189,12 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.stdout).toContain(
-      [
-        "Google sign-in is configured locally.",
-        "Provider credentials are stored on your Project.",
-        "",
-        "Next: preview and deploy the configuration to make Google sign-in available in your app.",
-        "",
-        `  ${expectedPublicCliCommand(`deploy --dry-run --cwd ${cwd}`)}`,
-        `  ${expectedPublicCliCommand(`deploy --cwd ${cwd}`)}`,
-        "",
-        "After deploying, reload your app and test Google sign-in.",
-      ].join("\n"),
+      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
     );
+    expect(result.stdout).toContain(
+      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+    );
+    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
   });
 
   it("does not say the credentials are stored when publishing them failed", async () => {
@@ -238,7 +232,7 @@ describe("auth-method sso enable", () => {
     );
 
     expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
-    expect(result.stdout).toContain("After deploying, reload your app and test Acme SSO sign-in.");
+    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
   });
 
   it("does not offer a deploy when rerunning changed nothing", async () => {
@@ -248,7 +242,7 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd);
 
     expect(result.stdout).toContain("Google sign-in is already configured locally.");
-    expect(result.stdout).not.toContain("Next: preview and deploy");
+    expect(result.stdout).not.toContain("Deploy the configuration");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {

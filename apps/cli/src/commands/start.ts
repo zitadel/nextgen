@@ -124,11 +124,9 @@ export default class Start extends BaseCommand {
     const consoleLogin = this.jsonEnabled()
       ? await consoleLoginFor(runtime.server_url, local?.admin)
       : undefined;
-    const data = readyData(runtime, alreadyRunning, this.meta.cliVersion, consoleLogin);
     return this.emit({
       status: "ok",
-      pretty: readyText(data.title, runtime.server_url, this.meta.cliVersion),
-      data,
+      data: readyData(runtime, alreadyRunning, this.meta.cliVersion, consoleLogin),
     });
   }
 }
@@ -170,25 +168,6 @@ async function consoleLoginFor(
     reportWarning(`Could not create a console sign-in link: ${reason.message}`);
     return { signed_in_as: admin.email, error: reason.message, hint: reason.hint };
   }
-}
-
-/**
- * What a person sees once the server is up: where it is, and that the next
- * step is creating an app. The command is the one `next_commands` carries.
- */
-function readyText(title: string, serverUrl: string, cliVersion: string): string {
-  return [
-    title,
-    `Server: ${serverUrl}`,
-    "",
-    "Next: create an app with authentication.",
-    "",
-    "Run this command in the same directory. Setup will guide you",
-    "through choosing a framework and sign-in method, create your",
-    "app, and install its dependencies.",
-    "",
-    `  ${unscopedCommand("setup --server local", cliVersion)}`,
-  ].join("\n");
 }
 
 type ConsoleLogin = {
@@ -235,8 +214,8 @@ function readyData(
       ...(console?.sign_in_url
         ? [`Console: you are ${console.signed_in_as}. Open ${console.sign_in_url} (works once).`]
         : []),
-      "Run setup in this directory or one inside it, so it finds this server's local admin; the CLI will detect the framework or ask when needed.",
-      "Setup installs dependencies when needed; then start your app dev server.",
+      "Create an app with authentication. Run setup in this directory or one inside it, so it finds this server's local admin.",
+      "Setup asks for a framework and sign-in method, creates your app, and installs its dependencies.",
       serverLogAction(cliVersion),
     ],
     ...nextCommandsData([

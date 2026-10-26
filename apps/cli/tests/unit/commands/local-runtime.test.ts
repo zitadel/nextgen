@@ -574,21 +574,13 @@ describe("local runtime commands", () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toBe(
-      [
-        "Local Zitadel server is ready.",
-        `Server: http://localhost:${String(port)}`,
-        "",
-        "Next: create an app with authentication.",
-        "",
-        "Run this command in the same directory. Setup will guide you",
-        "through choosing a framework and sign-in method, create your",
-        "app, and install its dependencies.",
-        "",
-        `  ${expectedPublicCliCommand("setup --server local")}`,
-        "",
-      ].join("\n"),
+    expect(result.stdout).toContain("Local Zitadel server is ready.");
+    expect(result.stdout).toContain(
+      "  Create an app with authentication. Run setup in this directory",
     );
+    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("setup --server local")}`);
+    expect(result.stdout).not.toContain("handoff");
+    expect(result.stdout).not.toContain(expectedPublicCliCommand("console"));
     expect(result.stderr).not.toContain("console sign-in link");
     const runtime = await readRuntimeMetadata(cwd);
     if (runtime?.backend === "binary") {
@@ -704,7 +696,7 @@ describe("local runtime commands", () => {
     expect(envelope.data.next_actions.join("\n")).toContain(
       "Run setup in this directory or one inside it",
     );
-    expect(envelope.data.next_actions.join("\n")).toContain("Setup installs dependencies");
+    expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
     // As in the binary case: no platform project on the fake server, so no
     // link and no `console` suggestion.
     expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
