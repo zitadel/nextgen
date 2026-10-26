@@ -61,12 +61,12 @@ export default class ZitadelHelp extends Help {
     this.log(sections.join("\n\n"));
   }
 
-  protected override async showCommandHelp(command: Command.Loadable): Promise<void> {
+  override async showCommandHelp(command: Command.Loadable): Promise<void> {
     await super.showCommandHelp(command);
     this.log(exploreAllCommands(this.config.version));
   }
 
-  protected override async showTopicHelp(topic: Interfaces.Topic): Promise<void> {
+  override async showTopicHelp(topic: Interfaces.Topic): Promise<void> {
     await super.showTopicHelp(topic);
     this.log(exploreAllCommands(this.config.version));
   }
