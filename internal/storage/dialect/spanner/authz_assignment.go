@@ -356,13 +356,13 @@ var _ service.AuthzAssignmentStatements = (*authzAssignmentStatements)(nil)
 
 // ListProjectAdmins implements [service.AuthzAssignmentStatements].
 func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
-	cursor, err := authz.ProjectAdminsCursorFrom(page)
+	afterUserID, err := authz.ProjectAdminsCursorUserID(page)
 	if err != nil {
 		return nil, err
 	}
 	admins, next, err := pagination.Page(page, authz.ProjectAdminSchema, func(limit uint32) ([]*domain.ProjectAdminRecord, error) {
 		var c statementCompiler
-		authz.WriteProjectAdminSources(&c, spannerAuthzEnv(), projectID, viewerUserID, cursor, page.OrderBy.Direction == database.OrderDesc, limit)
+		authz.WriteProjectAdminSources(&c, spannerAuthzEnv(), projectID, viewerUserID, afterUserID, page.OrderBy.Direction == database.OrderDesc, limit)
 		var sources []authz.ProjectAdminSourceRow
 		err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
 			var qErr error

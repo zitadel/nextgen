@@ -81,14 +81,8 @@ func TestGrantService_ListProjectAdmins(t *testing.T) {
 		assert.Empty(t, got.NextPageToken)
 
 		assert.Equal(t, "owner@example.com", byUser["user_owner"].User.Identifier)
-		assert.Equal(t, []service.ProjectAdminSource{
-			{Type: service.ProjectAdminSourceOwningTeam, Team: &service.TeamRef{TeamID: "team_owner", Name: "Acme"}},
-			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_a"},
-		}, byUser["user_owner"].Sources, "one entry, both sources")
-		assert.Equal(t, []service.ProjectAdminSource{
-			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_b", Team: &service.TeamRef{TeamID: "team_ops"}},
-			{Type: service.ProjectAdminSourceGrant, GrantID: "asgn_c"},
-		}, byUser["user_direct"].Sources)
+		assert.Equal(t, []domain.ProjectAdminSourceRecord{owningTeam, {GrantID: "asgn_a"}}, byUser["user_owner"].Sources, "one entry, both sources")
+		assert.Equal(t, []domain.ProjectAdminSourceRecord{opsGrant, {GrantID: "asgn_c"}}, byUser["user_direct"].Sources)
 		assert.Equal(t, "direct@example.com", byUser["user_direct"].User.Identifier)
 		assert.ElementsMatch(t, []string{"user_direct", "user_owner"}, ref.gotUserIDs, "every person listed is looked up")
 	})

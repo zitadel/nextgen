@@ -7,22 +7,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-type ProjectAdminSourceType string
-
-const (
-	ProjectAdminSourceOwningTeam ProjectAdminSourceType = "owning_team"
-	ProjectAdminSourceGrant      ProjectAdminSourceType = "grant"
-)
-
-type ProjectAdminSource struct {
-	Type    ProjectAdminSourceType
-	GrantID string
-	Team    *TeamRef
-}
-
 type ProjectAdmin struct {
 	User    domain.UserRef
-	Sources []ProjectAdminSource
+	Sources []domain.ProjectAdminSourceRecord
 }
 
 type ListProjectAdminsInput struct {
@@ -61,40 +48,20 @@ func (s *GrantService) ListProjectAdmins(ctx context.Context, input ListProjectA
 	}
 	out := &ProjectAdmins{NextPageToken: string(listed.NextCursor)}
 
-	homes := map[string]string{}
+	byHome := map[string][]*ProjectAdmin{}
 	for _, record := range listed.Items {
-		out.Admins = append(out.Admins, projectAdminFromRecord(record))
-		homes[record.UserID] = record.HomeProjectID
+		admin := &ProjectAdmin{User: domain.UserRef{UserID: record.UserID}, Sources: record.Sources}
+		out.Admins = append(out.Admins, admin)
+		byHome[record.HomeProjectID] = append(byHome[record.HomeProjectID], admin)
 	}
 
-	if err := s.resolveAdminRefs(ctx, out.Admins, homes); err != nil {
+	if err := s.resolveAdminRefs(ctx, byHome); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func projectAdminFromRecord(record *domain.ProjectAdminRecord) *ProjectAdmin {
-	admin := &ProjectAdmin{User: domain.UserRef{UserID: record.UserID}}
-	for _, source := range record.Sources {
-		mapped := ProjectAdminSource{Type: ProjectAdminSourceGrant, GrantID: source.GrantID}
-		if source.OwningTeam {
-			mapped.Type = ProjectAdminSourceOwningTeam
-		}
-		if source.TeamID != "" {
-			mapped.Team = &TeamRef{TeamID: source.TeamID, Name: source.TeamName}
-		}
-		admin.Sources = append(admin.Sources, mapped)
-	}
-	return admin
-}
-
-func (s *GrantService) resolveAdminRefs(ctx context.Context, admins []*ProjectAdmin, homes map[string]string) error {
-	byHome := map[string][]*ProjectAdmin{}
-	for _, admin := range admins {
-		home := homes[admin.User.UserID]
-		byHome[home] = append(byHome[home], admin)
-	}
-
+func (s *GrantService) resolveAdminRefs(ctx context.Context, byHome map[string][]*ProjectAdmin) error {
 	for home, homeAdmins := range byHome {
 		userIDs := make([]string, 0, len(homeAdmins))
 		for _, admin := range homeAdmins {

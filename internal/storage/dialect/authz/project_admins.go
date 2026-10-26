@@ -19,47 +19,43 @@ var ProjectAdminSchema = database.NewSchema(map[domain.ProjectAdminField]databas
 	},
 })
 
-// ProjectAdminsCursor is where a project admins page resumes: after (or, in
-// descending order, before) the user id of the previous page's last person.
-type ProjectAdminsCursor struct {
-	UserID string
-	Set    bool
-}
-
-// ProjectAdminsCursorFrom decodes and checks the page's cursor the way the
+// ProjectAdminsCursorUserID returns the user id a project admins page resumes
+// after (or, in descending order, before), the previous page's last person, or
+// "" on the first page. It decodes and checks the page's cursor the way the
 // dialects' keyset filters do: it must match the page's order, and its value
 // must be a user id. A NUL byte is refused too: Postgres rejects it in a text
 // parameter, which would otherwise surface as an internal error.
-func ProjectAdminsCursorFrom(page database.Page[domain.ProjectAdminField]) (ProjectAdminsCursor, error) {
+func ProjectAdminsCursorUserID(page database.Page[domain.ProjectAdminField]) (string, error) {
 	if err := ProjectAdminSchema.EnsureOrderable(page.OrderBy); err != nil {
-		return ProjectAdminsCursor{}, err
+		return "", err
 	}
 	if len(page.Cursor) == 0 {
-		return ProjectAdminsCursor{}, nil
+		return "", nil
 	}
 	cursor, err := pagination.CursorFromToken[domain.ProjectAdminField](page.Cursor)
 	if err != nil {
-		return ProjectAdminsCursor{}, database.ErrInvalidCursor()
+		return "", database.ErrInvalidCursor()
 	}
 	if !cursor.MatchesOrderBy(page.OrderBy) {
-		return ProjectAdminsCursor{}, database.ErrCursorOrderMismatch()
+		return "", database.ErrCursorOrderMismatch()
 	}
 	values, err := ProjectAdminSchema.CoerceCursorValues(cursor.Columns, cursor.Values)
 	if err != nil {
-		return ProjectAdminsCursor{}, database.ErrInvalidCursor().WithParent(err)
+		return "", database.ErrInvalidCursor().WithParent(err)
 	}
 	userID, _ := values[0].(string)
 	if userID == "" || strings.ContainsRune(userID, 0) {
-		return ProjectAdminsCursor{}, database.ErrInvalidCursor()
+		return "", database.ErrInvalidCursor()
 	}
-	return ProjectAdminsCursor{UserID: userID, Set: true}, nil
+	return userID, nil
 }
 
 // WriteProjectAdminSources emits the query behind ListProjectAdmins: every
 // way the first limit people (0 for no limit) administer a project, among
-// those viewerUserID may see, in user id order (descending when desc) from the
-// cursor. It selects user_id, home_project_id, source_rank (0 owning team, 1
-// team grant, 2 user grant), grant_id, team_id and team_name.
+// those viewerUserID may see, in user id order (descending when desc) after
+// afterUserID in that order ("" for the first page). It selects user_id,
+// home_project_id, source_rank (0 owning team, 1 team grant, 2 user grant),
+// grant_id, team_id and team_name.
 //
 // The viewer sees a person who holds an admin grant of their own, or who is a
 // member of one of the project's admin teams that the viewer is also an
@@ -76,15 +72,15 @@ func ProjectAdminsCursorFrom(page database.Page[domain.ProjectAdminField]) (Proj
 // granted directly, and sources are then read only for the page's people.
 // How much of a large team is read for the candidates is up to the dialect's
 // planner.
-func WriteProjectAdminSources(w ArgWriter, env Env, projectID, viewerUserID string, cursor ProjectAdminsCursor, desc bool, limit uint32) {
+func WriteProjectAdminSources(w ArgWriter, env Env, projectID, viewerUserID, afterUserID string, desc bool, limit uint32) {
 	compare, direction := " > ", " ASC"
 	if desc {
 		compare, direction = " < ", " DESC"
 	}
 	writeAfter := func(column string) {
-		if cursor.Set {
+		if afterUserID != "" {
 			w.WriteString(` AND ` + column + compare)
-			w.WriteArg(cursor.UserID)
+			w.WriteArg(afterUserID)
 		}
 	}
 	writeLimit := func() {

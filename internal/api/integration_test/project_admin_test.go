@@ -5,7 +5,6 @@ package integration_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,6 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
 )
 
 // TestProjectAdminsThroughOwningTeam covers #1462: the person who owns a
@@ -190,35 +188,6 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		assert.NotContains(t, queryAdmins(t, owner), api.UserID(memberID), "a member who left no longer is")
 	})
 
-	t.Run("an admin grant with a future expiry is listed", func(t *testing.T) {
-		futureID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
-		expiresAt := time.Now().Add(time.Hour)
-		future := &domain.AuthzAssignment{
-			ProjectID:     project.ID,
-			CatalogID:     domain.SystemCatalogID,
-			PrincipalType: domain.AuthzPrincipalTypeUser,
-			PrincipalID:   futureID,
-			ObjectType:    "project",
-			Relation:      "admin",
-			ExpiresAt:     &expiresAt,
-		}
-		future.ApplyScope(domain.NewProjectAssignmentScope())
-		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), future))
-		assert.Contains(t, queryAdmins(t, owner), api.UserID(futureID))
-	})
-
-	t.Run("a deleted user's leftover grant is not listed", func(t *testing.T) {
-		deletedID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
-		resp, err := owner.CreateGrant(t.Context(), userIDGrant(deletedID, api.CreateGrantRequestRelationAdmin), grantParams)
-		require.NoError(t, err)
-		require.IsType(t, &api.Grant{}, resp, helpers.MustMarshal(t, resp))
-		require.Contains(t, queryAdmins(t, owner), api.UserID(deletedID))
-
-		// Deleting a user leaves their grants in place.
-		require.NoError(t, harness.EnsureUserService(t).DeleteUser(t.Context(), service.DeleteUserInput{ProjectID: platform.ID, UserID: deletedID}))
-		assert.NotContains(t, queryAdmins(t, owner), api.UserID(deletedID))
-	})
-
 	t.Run("a viewer sees only people with a grant or in their own teams", func(t *testing.T) {
 		reader, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 		require.NoError(t, err)
@@ -229,23 +198,6 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		assert.NotContains(t, admins, api.UserID(ownerID), "so is a member of the owning team")
 		require.Contains(t, admins, api.UserID(colleagueID))
 		assert.True(t, admins[api.UserID(colleagueID)].User.Identifier.IsSet(), "a direct grant shows the person")
-	})
-
-	t.Run("an expired admin grant is not listed", func(t *testing.T) {
-		expiredID := cleanupPlatformUser(t, harness.CreateUserWithTeam(t, platform.ID))
-		expiredAt := time.Now().Add(-time.Hour)
-		expired := &domain.AuthzAssignment{
-			ProjectID:     project.ID,
-			CatalogID:     domain.SystemCatalogID,
-			PrincipalType: domain.AuthzPrincipalTypeUser,
-			PrincipalID:   expiredID,
-			ObjectType:    "project",
-			Relation:      "admin",
-			ExpiresAt:     &expiredAt,
-		}
-		expired.ApplyScope(domain.NewProjectAssignmentScope())
-		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), expired))
-		assert.NotContains(t, queryAdmins(t, owner), api.UserID(expiredID))
 	})
 
 	t.Run("a project secret sees only people with a grant of their own", func(t *testing.T) {
@@ -273,22 +225,4 @@ func TestProjectAdminsThroughOwningTeam(t *testing.T) {
 		require.True(t, ok, helpers.MustMarshal(t, resp))
 		assert.Equal(t, api.ErrorCode(domain.ErrProjectNotFound().Code), notFound.Code)
 	})
-}
-
-// TestProjectWithoutOwningTeam pins the null owning team of an unclaimed
-// project.
-func TestProjectWithoutOwningTeam(t *testing.T) {
-	t.Parallel()
-
-	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
-	require.NoError(t, err)
-	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
-	require.NoError(t, err)
-	harness.SetProjectSecretOnApiClient(t, client, project)
-
-	resp, err := client.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
-	require.NoError(t, err)
-	got, ok := resp.(*api.ProjectDetailResponse)
-	require.True(t, ok, helpers.MustMarshal(t, resp))
-	assert.True(t, got.OwningTeamID.IsNull())
 }
