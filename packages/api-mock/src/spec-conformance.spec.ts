@@ -2125,10 +2125,10 @@ describe("api-mock releases and deployments", () => {
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
       id: string;
     };
-    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "PT1H" };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
     await createDeployment(project.id, project.secret, body);
 
-    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "P30D" });
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
 
     expect(renewed.status).toBe(201);
   });
@@ -2267,7 +2267,7 @@ describe("api-mock releases and deployments", () => {
     const mixed = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: ["https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"],
-      ttl: "PT168H",
+      ttl: "168h",
     });
     expect(mixed.status).toBe(400);
     expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2285,7 +2285,7 @@ describe("api-mock releases and deployments", () => {
     const withTtl = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: ["primary"],
-      ttl: "PT168H",
+      ttl: "168h",
     });
     expect(withTtl.status).toBe(400);
     expect(((await withTtl.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2301,7 +2301,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "PT168H",
+      ttl: "168h",
     });
 
     const removePreview = () =>
@@ -2331,7 +2331,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "PT168H",
+      ttl: "168h",
     });
     await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
@@ -2358,7 +2358,7 @@ describe("api-mock releases and deployments", () => {
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "PT60M",
+      ttl: "60m",
     });
     expect(first.status).toBe(201);
     const expiresFirst = (
@@ -2372,7 +2372,7 @@ describe("api-mock releases and deployments", () => {
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "PT168H",
+      ttl: "168h",
     });
     expect(again.status).toBe(201);
     const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
@@ -2400,7 +2400,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: urls,
-      ttl: "PT168H",
+      ttl: "168h",
     });
 
     const first = (await (
@@ -2436,7 +2436,7 @@ describe("api-mock releases and deployments", () => {
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
         targets: [url],
-        ttl: "PT168H",
+        ttl: "168h",
       })
     ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
     const historyBefore = (await (

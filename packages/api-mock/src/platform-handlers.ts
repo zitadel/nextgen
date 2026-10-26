@@ -1094,37 +1094,17 @@ function pointerHandle(kind: string, revisionId: string): string {
  * for every project, matching the spec's "omitted, the project's default
  * applies" (create-deployment-request.yaml).
  */
-const DEFAULT_PREVIEW_TTL = "P7D";
+const DEFAULT_PREVIEW_TTL = "7d";
 
-/** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
-function isoDurationMs(ttl: string): number | undefined {
-  // The same shapes the server's parser takes (internal/api/ogenx): whole days
-  // and a time part in hours, minutes or fractional seconds. Weeks, months and
-  // years are not among them, so the mock refuses what the server would.
-  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
-  if (!match) {
-    return undefined;
-  }
-  const [, days, hours, minutes, seconds] = match;
-  // A bare `P` or `PT` carries no components and is not a duration.
-  if ([days, hours, minutes, seconds].every((part) => part === undefined)) {
-    return undefined;
-  }
-  return (
-    Number(days ?? 0) * 86_400_000 +
-    Number(hours ?? 0) * 3_600_000 +
-    Number(minutes ?? 0) * 60_000 +
-    Number(seconds ?? 0) * 1_000
-  );
-}
-
-/** Turn a `ttl` (`PT30M`, `PT168H`, `P7D`) into an ISO expiry counted from now. */
+/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
 function ttlToExpiry(ttl: string): string {
-  const ms = isoDurationMs(ttl);
-  if (ms === undefined) {
+  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+  if (!match) {
     return new Date().toISOString();
   }
-  return new Date(Date.now() + ms).toISOString();
+  const amount = Number(match[1]);
+  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
+  return new Date(Date.now() + amount * unitMs).toISOString();
 }
 
 /** The project's primary origins, as exact URLs, sorted. */

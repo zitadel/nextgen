@@ -5,11 +5,8 @@ const MINUTE = 60;
 const HOUR = 60 * 60;
 const DAY = 24 * 60 * 60;
 
-/**
- * A TTL parsed into its canonical single-unit string, the ISO-8601 duration the
- * wire carries, and its duration in milliseconds.
- */
-export type Ttl = Readonly<{ canonical: string; iso: string; ms: number }>;
+/** A TTL parsed into its canonical single-unit string and its duration in milliseconds. */
+export type Ttl = Readonly<{ canonical: string; ms: number }>;
 
 /**
  * Parse a TTL like `7d`, `12h`, `90m` or `3600s` — a positive whole number
@@ -28,26 +25,7 @@ export function parseTtl(input: string): Ttl {
   }
   const unit = match[2] === "s" ? 1 : match[2] === "m" ? MINUTE : match[2] === "h" ? HOUR : DAY;
   const seconds = Number(match[1]) * unit;
-  return { canonical: formatTtl(seconds), iso: isoDuration(seconds), ms: seconds * 1000 };
-}
-
-/**
- * The ISO-8601 duration for a whole number of seconds, the form the API takes
- * (`P7D`, `PT1H`, `PT90M`). The flag keeps the shorter `7d`/`12h` spelling
- * because that is what a person writes; only the wire sees this one. A whole
- * number of days is a date-part duration (`P7D`); anything else is a time-part
- * one carrying the coarsest exact unit. It rounds a sub-minute remainder up to
- * the next whole minute exactly as {@link formatTtl} does, so what the caller
- * is shown and what the wire carries are the same duration.
- */
-export function isoDuration(seconds: number): string {
-  if (seconds % DAY === 0) {
-    return `P${seconds / DAY}D`;
-  }
-  if (seconds % HOUR === 0) {
-    return `PT${seconds / HOUR}H`;
-  }
-  return `PT${Math.ceil(seconds / MINUTE)}M`;
+  return { canonical: formatTtl(seconds), ms: seconds * 1000 };
 }
 
 /**

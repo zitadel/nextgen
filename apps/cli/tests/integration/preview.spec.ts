@@ -91,7 +91,7 @@ describe("preview", () => {
         );
       });
 
-      it.each(["30s", "366d"])("refuses a ttl of %s, outside the 60s..365d range", async (ttl) => {
+      it.each(["30s", "31d"])("refuses a ttl of %s, outside the 60s..30d range", async (ttl) => {
         const app = await anAppAdmittingPreviews();
 
         const result = await app.run(["preview", "--origin", PREVIEW_URL, "--ttl", ttl, "--json"]);
@@ -286,7 +286,7 @@ describe("preview", () => {
       it("refuses a ttl outside the range even where it would skip", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.run(["preview", "--env", "production", "--ttl", "400d", "--json"]);
+        const result = await app.run(["preview", "--env", "production", "--ttl", "45d", "--json"]);
 
         expect(result).toFailWith("E_VALIDATION");
       });

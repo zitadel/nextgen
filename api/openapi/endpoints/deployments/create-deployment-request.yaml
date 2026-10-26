@@ -19,7 +19,7 @@ properties:
     $ref: deployment-targets-request.yaml
   ttl:
     description: |
-      Preview URLs only. Each preview stays live for 7 days (`P7D`) from this
+      Preview URLs only. Each preview stays live for 7 days (`7d`) from this
       deployment; a sent value is accepted but not applied.
     $ref: ../../components/schemas/preview-ttl.yaml
   reason:
