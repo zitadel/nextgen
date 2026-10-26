@@ -89,7 +89,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import type { Asker } from "../../lib/input";
+import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -330,7 +330,8 @@ export default class Setup extends Promptable(BaseCommand) {
     // here `--force` permits overwriting files, so it must never answer a
     // question. Interactive only when a person is there, which is also the only
     // time the wizard runs.
-    const wizardInput = this.inputUnforced;
+    const wizardInput: Asker = (question) =>
+      input(question, { interactive: !nonInteractive, force: false });
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,

@@ -107,7 +107,7 @@ export type PromptContext = {
    *
    * Deliberately not the command's `this.input`. That one answers a `confirm`
    * when the command's `--force` is given, and setup's `--force` means "overwrite
-   * files", so with it a prompt such as "Detected next. Proceed?" would be
+   * files", so with it a prompt such as "We detected next. Would you like to set up Zitadel for it?" would be
    * answered yes without asking. This one never is.
    */
   readonly input: Asker;

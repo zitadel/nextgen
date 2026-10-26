@@ -3,7 +3,7 @@ import { intro } from "@clack/prompts";
 import type { Asker } from "../../../lib/input";
 
 /**
- * "Choose a framework to scaffold" — the only prompt outside the main wizard.
+ * "Which framework would you like to scaffold?" — the only prompt outside the main wizard.
  * Runs at the empty-directory branch (before any other detection), so it owns
  * its own `intro` heading. Returns the chosen framework id; choices come from
  * `Orca.availableFrameworks`.
