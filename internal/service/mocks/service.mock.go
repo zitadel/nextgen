@@ -2312,45 +2312,6 @@ func (c *MockAllStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(c
 	return c
 }
 
-// FreezeDeploymentVariables mocks base method.
-func (m *MockAllStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FreezeDeploymentVariables", ctx, projectID, deploymentID)
-	ret0, _ := ret[0].(*domain.VariableSet)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FreezeDeploymentVariables indicates an expected call of FreezeDeploymentVariables.
-func (mr *MockAllStatementsMockRecorder) FreezeDeploymentVariables(ctx, projectID, deploymentID any) *MockAllStatementsFreezeDeploymentVariablesCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FreezeDeploymentVariables", reflect.TypeOf((*MockAllStatements)(nil).FreezeDeploymentVariables), ctx, projectID, deploymentID)
-	return &MockAllStatementsFreezeDeploymentVariablesCall{Call: call}
-}
-
-// MockAllStatementsFreezeDeploymentVariablesCall wrap *gomock.Call
-type MockAllStatementsFreezeDeploymentVariablesCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockAllStatementsFreezeDeploymentVariablesCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) Do(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
 // GetActiveOwningTeamGrant mocks base method.
 func (m *MockAllStatements) GetActiveOwningTeamGrant(ctx context.Context, projectID string) (*domain.AuthzAssignment, error) {
 	m.ctrl.T.Helper()

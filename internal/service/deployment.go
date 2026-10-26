@@ -249,20 +249,9 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
-		set, err := resolveDeploymentVariableSet(ctx, stmts, entity)
+		set, err := resolveDeploymentVariableSet(ctx, stmts, entity, release)
 		if err != nil {
 			return err
-		}
-		// A rollback restores a release and a set that already passed this
-		// check, and neither can change.
-		if entity.Metadata.RollbackTo == nil {
-			missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
-			if err != nil {
-				return err
-			}
-			if len(missing) > 0 {
-				return domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
-			}
 		}
 		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {

@@ -29,9 +29,11 @@ func (s *DeploymentService) Variables(ctx context.Context, projectID, deployment
 }
 
 // resolveDeploymentVariableSet is the set create would attach. A rollback
-// reuses the restored deployment's set. Anything else freezes the live rows
-// of the deployment's kind, including the empty set.
-func resolveDeploymentVariableSet(ctx context.Context, stmts AllStatements, entity *domain.Deployment) (*domain.VariableSet, error) {
+// reuses the restored deployment's set and does not scan: that release and
+// set already passed the check. Anything else builds the set from the live
+// rows of the deployment's kind, including the empty set, and refuses the
+// deploy when the release names a variable that set does not hold.
+func resolveDeploymentVariableSet(ctx context.Context, stmts AllStatements, entity *domain.Deployment, release *domain.Release) (*domain.VariableSet, error) {
 	if entity.Metadata.RollbackTo != nil {
 		set, err := stmts.GetDeploymentVariables(ctx, entity.ProjectID, *entity.Metadata.RollbackTo)
 		if err != nil {
@@ -46,7 +48,18 @@ func resolveDeploymentVariableSet(ctx context.Context, stmts AllStatements, enti
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to read variables")
 	}
-	return domain.NewVariableSet(entity.ProjectID, variables)
+	set, err := domain.NewVariableSet(entity.ProjectID, variables)
+	if err != nil {
+		return nil, err
+	}
+	missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
+	if err != nil {
+		return nil, err
+	}
+	if len(missing) > 0 {
+		return nil, domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+	}
+	return set, nil
 }
 
 // deploymentSetHash is the set current runs with. No deployment, or one that
