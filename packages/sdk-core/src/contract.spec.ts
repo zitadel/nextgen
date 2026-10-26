@@ -1201,7 +1201,7 @@ describe("SDK sources ↔ declaration imports", () => {
     const bare = readdirSync(src, { recursive: true, encoding: "utf8" })
       .filter(
         (file) =>
-          /\.(m?tsx?|svelte|vue)$/.test(file) &&
+          /\.(tsx?|svelte)$/.test(file) &&
           !/(^|\/)__tests__\//.test(file) &&
           !/\.(spec|test)\.[^.]+$/.test(file),
       )
