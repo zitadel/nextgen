@@ -8,7 +8,7 @@ import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
-import { HEADING_SM } from "@/components/typography";
+import { HEADING_MD, HEADING_SM } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Separator } from "@/components/ui/separator";
@@ -76,7 +76,8 @@ function SchemaDetail() {
                 trigger is `px-2`, so the effect is that `SCHEMA` lines up with
                 the tab *label* and the tab's box sits just outside it. */}
             <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch lg:pl-2">
-              <div className="lg:w-[468px] lg:shrink-0">
+              <div className="flex flex-col gap-6 lg:w-[468px] lg:shrink-0">
+                <h2 className={HEADING_MD}>Schema steps</h2>
                 <SchemaFieldsPanel schema={schema} />
               </div>
               <DocumentViewer document={schema} noun="schema" />
