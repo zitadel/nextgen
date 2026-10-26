@@ -7,7 +7,9 @@ import {
   SquareTerminal,
   Users,
 } from "lucide-react";
+import type { ReactNode } from "react";
 
+import { CLI } from "@/components/cli-hint";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import { avatarVars } from "@/components/user-avatar";
@@ -28,7 +30,7 @@ interface Stage {
  * The stages a project goes through, as the CLI drives them
  * (`apps/cli/skills/zitadel-cli/SKILL.md`, "Golden path"). Each environment is
  * a project of its own (`env add` creates one), which is why one app shows up
- * here more than once.
+ * in the Projects list more than once.
  */
 const STAGES: Stage[] = [
   {
@@ -90,12 +92,7 @@ export function ProjectLifecycle({ className }: { className?: string }) {
 
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-0">
         {STAGES.map((stage, index) => (
-          <StageItem
-            key={stage.title}
-            stage={stage}
-            step={index + 1}
-            last={index === STAGES.length - 1}
-          />
+          <StageItem key={stage.title} stage={stage} step={index + 1} />
         ))}
       </ol>
 
@@ -111,57 +108,90 @@ export function ProjectLifecycle({ className }: { className?: string }) {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Every command runs with <InlineCode>npx @zitadel/cli@latest</InlineCode>, no install needed.
+        Every command runs with <InlineCode>{CLI}</InlineCode>, no install needed.
       </p>
     </section>
   );
 }
+
+/** A stage's card, inside its edge. */
+const CARD = "flex flex-1 flex-col gap-2 bg-card p-4";
+
+/** The console's own card: lavender from its top edge, fading into the card. */
+const HERE_CARD =
+  "rounded-[7px] bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--zl-gradient-lavender-start)_20%,transparent),transparent_75%)]";
+
+/**
+ * Its badge, saturated out of the wash, which a grey fill vanishes into: deep
+ * purple on lavender in light, lavender on deep purple in dark.
+ */
+const HERE_BADGE =
+  "bg-[color:color-mix(in_oklch,var(--zl-gradient-lavender-start)_60%,transparent)] text-[color:var(--zl-gradient-purple-start)] dark:bg-[color:var(--zl-gradient-purple-start)] dark:text-[color:var(--zl-gradient-lavender-start)]";
 
 /**
  * One stage: its node on the track, then its card. At `lg` the stages sit on
  * one row and the node carries a rule to the next one, so the row reads as a
  * track; stacked, the rule goes and each card stands alone.
  */
-function StageItem({ stage, step, last }: { stage: Stage; step: number; last: boolean }) {
-  const { icon: Icon } = stage;
+function StageItem({ stage, step }: { stage: Stage; step: number }) {
+  const icon = <stage.icon strokeWidth={1.5} className="size-4 text-foreground" />;
+  const body = (
+    <>
+      <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
+        {stage.title}
+        {stage.here && (
+          <Badge variant="secondary" className={HERE_BADGE}>
+            You are here
+          </Badge>
+        )}
+      </h3>
+      <p className="text-xs leading-5 text-muted-foreground">{stage.body}</p>
+      {stage.command && <InlineCode className="mt-auto self-start">{stage.command}</InlineCode>}
+    </>
+  );
 
   return (
-    <li className="flex flex-col gap-3 lg:pr-3 lg:last:pr-0">
+    <li className="group flex flex-col gap-3 lg:pr-3 lg:last:pr-0">
       <div className="flex items-center gap-3" aria-hidden>
         {stage.here ? (
-          // The console's own stage takes the generated gradient as its frame.
-          <span
-            className="zl-avatar zl-avatar-moving size-9 shrink-0 rounded-md! p-px"
-            style={avatarVars("zitadel-console")}
-          >
+          <GradientFrame className="size-9 shrink-0">
             <span className="flex size-full items-center justify-center rounded-[7px] bg-background">
-              <Icon strokeWidth={1.5} className="size-4 text-foreground" />
+              {icon}
             </span>
-          </span>
+          </GradientFrame>
         ) : (
           <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-card">
-            <Icon strokeWidth={1.5} className="size-4 text-foreground" />
+            {icon}
           </span>
         )}
         <span className={EYEBROW}>{String(step).padStart(2, "0")}</span>
-        {!last && (
-          <span className="hidden h-px flex-1 bg-gradient-to-r from-border to-transparent lg:block" />
-        )}
+        <span className="hidden h-px flex-1 bg-gradient-to-r from-border to-transparent group-last:hidden! lg:block" />
       </div>
-      <div
-        className={cn(
-          "flex flex-1 flex-col gap-2 rounded-md border bg-card p-4",
-          stage.here ? "border-foreground/20" : "border-border",
-        )}
-      >
-        <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
-          {stage.title}
-          {stage.here && <Badge variant="secondary">You are here</Badge>}
-        </h3>
-        <p className="text-xs leading-5 text-muted-foreground">{stage.body}</p>
-        {stage.command && <InlineCode className="mt-auto self-start">{stage.command}</InlineCode>}
-      </div>
+      {stage.here ? (
+        <GradientFrame className="flex flex-1">
+          <div className={`${CARD} ${HERE_CARD}`}>{body}</div>
+        </GradientFrame>
+      ) : (
+        <div className={`${CARD} rounded-md border border-border`}>{body}</div>
+      )}
     </li>
+  );
+}
+
+/**
+ * The console's own stage frames its icon and its card in one generated
+ * gradient, seeded alike, so the stage the reader is at stands out of the row.
+ * The gradient sits behind a 1px inset, so it shows as the edge; the content
+ * inside rounds at 7px, which keeps the outer corner at 8px (D18).
+ */
+function GradientFrame({ className, children }: { className: string; children: ReactNode }) {
+  return (
+    <div
+      className={`zl-avatar zl-avatar-moving rounded-md! p-px ${className}`}
+      style={avatarVars("zitadel-console")}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -172,7 +202,7 @@ function Ownership({
 }: {
   icon: LucideIcon;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="flex gap-3 rounded-md border border-dashed border-border p-4">

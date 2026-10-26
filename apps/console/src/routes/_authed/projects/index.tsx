@@ -30,7 +30,6 @@ import { useSearchDraft } from "@/hooks/use-search-draft";
 import { formatDate } from "@/lib/date";
 import { byName, primaryHost, useProjectScope, useSelectProjectTarget } from "@/lib/project-scope";
 import { HomeColumn, Page } from "@/components/layout";
-import { PAGE_TITLE_ROW } from "@/components/typography";
 
 /**
  * Projects overview — every project the person can act on.
@@ -93,9 +92,6 @@ export const Route = createFileRoute("/_authed/projects/")({
 
 type ProjectsSearch = { next?: string; q?: string };
 
-/** One project as the list reads it. */
-type ProjectRow = Awaited<ReturnType<typeof api.listMyProjects>>["projects"][number];
-
 /**
  * One page of projects. `GET /users/me/projects` is cursor-paginated, so this is a
  * page size rather than a cap on what the operator can reach — `Load more` walks
@@ -153,11 +149,9 @@ function ProjectsScreen() {
     <Page>
       <HomeColumn>
         <header className="flex flex-col gap-2 pt-2 lg:pt-6">
-          <div className={PAGE_TITLE_ROW}>
-            <h1 className="font-serif text-3xl leading-9 tracking-tight text-foreground">
-              {requested ? `Continue to ${requested.nav.label}` : "Projects"}
-            </h1>
-          </div>
+          <h1 className="font-serif text-3xl leading-9 tracking-tight text-foreground">
+            {requested ? `Continue to ${requested.nav.label}` : "Projects"}
+          </h1>
           {/* Until a project is selected the project's screens ask for one
               first, so the page says what choosing one is for, or, on the way
               to one of them, that choosing goes on there. */}
@@ -173,13 +167,82 @@ function ProjectsScreen() {
         <div className="mt-6 grid items-start gap-6 lg:mt-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="flex min-w-0 flex-col gap-4">
             {searchable && <ProjectSearch query={search.q ?? ""} onSearch={onSearch} />}
-            <ProjectTable
-              projects={projects}
-              q={loaded.q}
-              selected={selected}
-              onOpen={(projectId) => void navigate(selectTarget(projectId))}
-              link={selectTarget}
-            />
+            {/* As the Users table: the Name cell clamps, the ID takes the
+                slack and truncates first, and the date and row menu keep their
+                own width. */}
+            <div className={RESOURCE_TABLE_WRAP}>
+              <Table className="text-xs">
+                <TableHeader>
+                  <ResourceHeaderRow>
+                    <ResourceHeadCell>Name</ResourceHeadCell>
+                    <ResourceHeadCell>ID</ResourceHeadCell>
+                    <ResourceHeadCell>Created</ResourceHeadCell>
+                    <ResourceMenuHead className="w-15" />
+                  </ResourceHeaderRow>
+                </TableHeader>
+                <TableBody>
+                  {projects.length === 0 ? (
+                    <ResourceEmptyRow colSpan={4}>
+                      {loaded.q ? `No projects match “${loaded.q}”.` : "No projects yet."}
+                    </ResourceEmptyRow>
+                  ) : (
+                    projects.map((project) => {
+                      const host = primaryHost(project.origins);
+                      return (
+                        // The whole row opens the project: selects it and lands on its
+                        // first screen, or on the screen `?next=` names — the same
+                        // target as the switcher's row. The name is a real link so the
+                        // row is reachable by keyboard and the target shows in the
+                        // status bar; the row handler is the pointer affordance on top
+                        // of it, and `opensRow` keeps it out of the link's way.
+                        <ResourceRow
+                          key={project.id}
+                          className="group"
+                          aria-current={project.id === selected ? "true" : undefined}
+                          onOpen={() => void navigate(selectTarget(project.id))}
+                        >
+                          {/* The mark and the host are the project switcher's: what
+                                tells two projects of one name apart (D20's pattern of
+                                a second line under the name). */}
+                          <TableCell className={`${RESOURCE_CELL} ${NAME_CLAMP} text-sm`}>
+                            <span className="flex min-w-0 items-center gap-2.5">
+                              <ProjectMark projectId={project.id} className="size-6" />
+                              <span className="min-w-0">
+                                {/* The bar has no project pill here, so the list
+                                      says which project the other screens open (D21). */}
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  <Link
+                                    {...selectTarget(project.id)}
+                                    className="text-foreground min-w-0 truncate font-medium underline-offset-2 hover:underline"
+                                  >
+                                    {project.name}
+                                  </Link>
+                                  {project.id === selected && (
+                                    <Badge variant="secondary">Current</Badge>
+                                  )}
+                                </span>
+                                {host && (
+                                  <span className="text-muted-foreground block truncate text-xs">
+                                    {host}
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                          </TableCell>
+                          <ResourceIdCell id={project.id} name={project.name} />
+                          <TableCell className={RESOURCE_CELL_MUTED}>
+                            {formatDate(project.created_at)}
+                          </TableCell>
+                          <TableCell className={`${RESOURCE_CELL} text-right`}>
+                            <RowActions projectId={project.id} name={project.name} />
+                          </TableCell>
+                        </ResourceRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
             <LoadMore paging={paging} />
           </div>
           <aside className="lg:sticky lg:top-20">
@@ -190,98 +253,6 @@ function ProjectsScreen() {
         {!requested && <ProjectLifecycle className="mt-14 border-t border-border pt-10 lg:mt-20" />}
       </HomeColumn>
     </Page>
-  );
-}
-
-/**
- * The list itself, as the Users table: the Name cell clamps, the ID takes the
- * slack and truncates first, and the date and row menu keep their own width.
- */
-function ProjectTable({
-  projects,
-  q,
-  selected,
-  onOpen,
-  link,
-}: {
-  projects: ProjectRow[];
-  q: string | undefined;
-  selected: string | undefined;
-  onOpen: (projectId: string) => void;
-  link: ReturnType<typeof useSelectProjectTarget>;
-}) {
-  return (
-    <div className={RESOURCE_TABLE_WRAP}>
-      <Table className="text-xs">
-        <TableHeader>
-          <ResourceHeaderRow>
-            <ResourceHeadCell>Name</ResourceHeadCell>
-            <ResourceHeadCell>ID</ResourceHeadCell>
-            <ResourceHeadCell>Created</ResourceHeadCell>
-            <ResourceMenuHead className="w-15" />
-          </ResourceHeaderRow>
-        </TableHeader>
-        <TableBody>
-          {projects.length === 0 ? (
-            <ResourceEmptyRow colSpan={4}>
-              {q ? `No projects match “${q}”.` : "No projects yet."}
-            </ResourceEmptyRow>
-          ) : (
-            projects.map((project) => {
-              const host = primaryHost(project.origins);
-              return (
-                // The whole row opens the project: selects it and lands on its
-                // first screen, or on the screen `?next=` names — the same
-                // target as the switcher's row. The name is a real link so the
-                // row is reachable by keyboard and the target shows in the
-                // status bar; the row handler is the pointer affordance on top
-                // of it, and `opensRow` keeps it out of the link's way.
-                <ResourceRow
-                  key={project.id}
-                  className="group"
-                  aria-current={project.id === selected ? "true" : undefined}
-                  onOpen={() => onOpen(project.id)}
-                >
-                  {/* The mark and the host are the project switcher's: what
-                        tells two projects of one name apart (D20's pattern of
-                        a second line under the name). */}
-                  <TableCell className={`${RESOURCE_CELL} ${NAME_CLAMP} text-sm`}>
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <ProjectMark projectId={project.id} className="size-6" />
-                      <span className="min-w-0">
-                        {/* The bar has no project pill here, so the list
-                              says which project the other screens open (D21). */}
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <Link
-                            {...link(project.id)}
-                            className="text-foreground min-w-0 truncate font-medium underline-offset-2 hover:underline"
-                          >
-                            {project.name}
-                          </Link>
-                          {project.id === selected && <Badge variant="secondary">Current</Badge>}
-                        </span>
-                        {host && (
-                          <span className="text-muted-foreground block truncate text-xs">
-                            {host}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </TableCell>
-                  <ResourceIdCell id={project.id} name={project.name} />
-                  <TableCell className={RESOURCE_CELL_MUTED}>
-                    {formatDate(project.created_at)}
-                  </TableCell>
-                  <TableCell className={`${RESOURCE_CELL} text-right`}>
-                    <RowActions projectId={project.id} name={project.name} />
-                  </TableCell>
-                </ResourceRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
-    </div>
   );
 }
 

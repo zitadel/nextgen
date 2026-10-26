@@ -6,7 +6,7 @@ import { avatarVars } from "@/components/user-avatar";
 import { serverOrigin } from "@/lib/server-origin";
 
 /**
- * How to create a project, beside the Projects list (decisions log D21).
+ * How to create a project, beside the Projects list (decisions log D24).
  *
  * A project is created from the app it signs people in to: the CLI's `setup`
  * creates it and connects the app in one step, and the console holds nothing

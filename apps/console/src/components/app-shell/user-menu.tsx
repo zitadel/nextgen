@@ -91,7 +91,7 @@ function ThemeRow() {
 }
 
 /** The person as the account menu names them, in ADR 058's order. */
-function useAccountName(user?: ShellUser) {
+function accountName(user?: ShellUser) {
   // The name leads once set, with the email beneath it; until then the email
   // stands alone. A blank name counts as none.
   const display = user?.display?.trim() || undefined;
@@ -103,30 +103,42 @@ function useAccountName(user?: ShellUser) {
 }
 
 /**
- * Footer account entry: the signed-in person, opening the account dropdown to
- * the right of the sidebar (Console ADR 0003).
- *
- * The person is named in ADR 058's order (display → identifier → user id):
- * once a name is set it leads, with the email beneath it; until then the
- * email stands alone. Accounts are not shown while the cloud does not use
- * them (Console ADR 0005 §3).
+ * The avatar an account trigger carries, and the trigger's props: the avatar's
+ * colours sweep across the trigger on hover (`.avatar-host`, `styles.css`), and
+ * its gradient moves faster while the trigger is hovered or its menu is open.
  */
-export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const { name, second } = useAccountName(user);
+function useAvatarHost(user?: ShellUser) {
   const seed = avatarSeed(user);
-  // The avatar's gradient moves faster while the row is hovered or its menu is open.
   const [hovered, setHovered] = useState(false);
   const [open, setOpen] = useState(false);
+  return {
+    image: <UserAvatar seed={seed} fast={hovered || open} />,
+    host: {
+      style: avatarVars(seed),
+      onPointerEnter: () => setHovered(true),
+      onPointerLeave: () => setHovered(false),
+    },
+    onOpenChange: setOpen,
+  };
+}
+
+/**
+ * Footer account entry: the signed-in person, opening the account dropdown to
+ * the right of the sidebar (Console ADR 0003). Accounts are not shown while
+ * the cloud does not use them (Console ADR 0005 §3).
+ */
+export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
+  const { name, second } = accountName(user);
+  const avatar = useAvatarHost(user);
 
   return (
     <SidebarMenuItem>
-      <DropdownMenu onOpenChange={setOpen}>
+      <DropdownMenu onOpenChange={avatar.onOpenChange}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             size="lg"
             tooltip={name}
             aria-label={`Account: ${name}`}
-            // The avatar's colours sweep across the row on hover (`styles.css`).
             // The avatar holds still while the sidebar collapses: it stays at
             // the row's 4px left inset in both states (in the rail's 32px
             // square that centres it), so the label going first moves nothing.
@@ -134,12 +146,10 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
             // to the rail's 32px; the 8px lift animates with it (`margin`), so
             // the avatar keeps its height throughout.
             className="avatar-host h-12 py-1.5 pl-1 transition-[width,height,padding,margin] group-data-[collapsible=icon]:mb-2 group-data-[collapsible=icon]:p-1!"
-            style={avatarVars(seed)}
-            onPointerEnter={() => setHovered(true)}
-            onPointerLeave={() => setHovered(false)}
+            {...avatar.host}
           >
             {/* 24px in the footer row, generated from the identifier. */}
-            <UserAvatar seed={seed} fast={hovered || open} />
+            {avatar.image}
             {/* Hidden on the rail, so the avatar alone is what centres. */}
             <span className="flex min-w-0 flex-1 flex-col gap-1 group-data-[collapsible=icon]:hidden">
               <span className="truncate text-sm leading-none font-semibold">{name}</span>
@@ -163,24 +173,20 @@ export function UserMenuItem({ user, onSignOut }: { user?: ShellUser; onSignOut?
  * beneath it.
  */
 export function UserMenuButton({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
-  const { name } = useAccountName(user);
-  const seed = avatarSeed(user);
-  const [hovered, setHovered] = useState(false);
-  const [open, setOpen] = useState(false);
+  const { name } = accountName(user);
+  const avatar = useAvatarHost(user);
 
   return (
-    <DropdownMenu onOpenChange={setOpen}>
+    <DropdownMenu onOpenChange={avatar.onOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           aria-label={`Account: ${name}`}
           title={name}
-          className="avatar-host flex size-8 shrink-0 items-center justify-center rounded-md outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
-          style={avatarVars(seed)}
-          onPointerEnter={() => setHovered(true)}
-          onPointerLeave={() => setHovered(false)}
+          className="avatar-host flex size-8 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          {...avatar.host}
         >
-          <UserAvatar seed={seed} fast={hovered || open} />
+          {avatar.image}
         </button>
       </DropdownMenuTrigger>
       <AccountMenuContent user={user} onSignOut={onSignOut} side="bottom" />
@@ -207,7 +213,7 @@ function AccountMenuContent({
   /** Beside the sidebar's footer row, or beneath the top bar's avatar. */
   side: "right" | "bottom";
 }) {
-  const { name, second } = useAccountName(user);
+  const { name, second } = accountName(user);
 
   return (
     <DropdownMenuContent

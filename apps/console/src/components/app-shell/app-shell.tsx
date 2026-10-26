@@ -55,10 +55,12 @@ export function AppShell({
   // view too, which draws no bar.
   const [searchOpen, setSearchOpen] = useSearchShortcut();
 
+  const searchDialog = <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />;
+
   if (atHome) {
     return (
       <HomeShell user={user} onSignOut={onSignOut} onSearch={() => setSearchOpen(true)}>
-        <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+        {searchDialog}
         {children}
       </HomeShell>
     );
@@ -66,7 +68,7 @@ export function AppShell({
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
-      <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      {searchDialog}
       <AppSidebar user={user} onSignOut={onSignOut} />
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
@@ -106,19 +108,24 @@ function HomeShell({
 }) {
   return (
     <div className="flex min-h-svh w-full flex-col bg-background">
-      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background/85 px-4 backdrop-blur-sm">
-        <Link to="/projects" aria-label="Home" className="inline-flex items-center text-foreground">
-          <ZitadelLogo className="h-[21px] w-auto" />
-        </Link>
+      <header className={`${TOP_BAR} px-4`}>
+        <HomeLink className="text-foreground" />
         <div className="flex min-w-0 items-center gap-3">
-          <div className="hidden w-75 justify-end sm:flex">
-            <SearchTrigger onOpen={onSearch} />
-          </div>
+          <BarSearch onSearch={onSearch} />
           <UserMenuButton user={user} onSignOut={onSignOut} />
         </div>
       </header>
       <main className="min-w-0 flex-1">{children}</main>
     </div>
+  );
+}
+
+/** Home is Projects, the list of every project, from any screen. */
+function HomeLink({ className }: { className: string }) {
+  return (
+    <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
+      <ZitadelLogo className="h-[21px] w-auto" />
+    </Link>
   );
 }
 
@@ -189,14 +196,7 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
 function BrandHeader() {
   return (
     <SidebarHeader className={BRAND_HEADER}>
-      {/* Home is Projects, the list of every project, from any screen. */}
-      <Link
-        to="/projects"
-        aria-label="Home"
-        className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
-      >
-        <ZitadelLogo className="h-[21px] w-auto" />
-      </Link>
+      <HomeLink className="text-sidebar-foreground group-data-[collapsible=icon]:hidden" />
       <SidebarTrigger className={HEADER_BUTTON} />
     </SidebarHeader>
   );
@@ -290,14 +290,26 @@ function NavList({ view, label }: { view: NavView; label: string }) {
  */
 function ContextBar({ onSearch, userId }: { onSearch: () => void; userId?: string }) {
   return (
-    <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-2 md:px-4">
+    <div className={`${TOP_BAR} px-2 md:px-4`}>
       {/* The signed-in person, whose recent projects the switcher keeps. */}
       <ContextSwitcher userId={userId} />
-      {/* Hidden on phones, as in the proposal: ⌘K still opens it, and the bar
-          needs the width for the switchers. */}
-      <div className="hidden w-75 justify-end sm:flex">
-        <SearchTrigger onOpen={onSearch} />
-      </div>
+      <BarSearch onSearch={onSearch} />
+    </div>
+  );
+}
+
+/** The top bar both shells draw: 56px, ruled underneath, level with the sidebar's brand header. */
+const TOP_BAR =
+  "sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background";
+
+/**
+ * The bar's search. Hidden on phones, as in the proposal: ⌘K still opens it,
+ * and the bar needs the width for the switchers.
+ */
+function BarSearch({ onSearch }: { onSearch: () => void }) {
+  return (
+    <div className="hidden w-75 justify-end sm:flex">
+      <SearchTrigger onOpen={onSearch} />
     </div>
   );
 }
