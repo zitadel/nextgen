@@ -338,7 +338,7 @@ func TestManagementAuthz(t *testing.T) {
 
 			okResp, err := ownClient.GetProject(t.Context(), api.GetProjectParams{ProjectID: victimID})
 			require.NoError(t, err)
-			assert.IsType(t, &api.ProjectResponse{}, okResp, helpers.MustMarshal(t, okResp))
+			assert.IsType(t, &api.ProjectDetailResponse{}, okResp, helpers.MustMarshal(t, okResp))
 		})
 
 		t.Run("preview secret rejected", func(t *testing.T) {

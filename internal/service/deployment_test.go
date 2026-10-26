@@ -23,25 +23,13 @@ var deployedAt = time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC)
 
 func newMockedDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
-	ctrl := gomock.NewController(t)
-	pool := servicemocks.NewMockPool(ctrl)
-	statements := servicemocks.NewMockAllStatements(ctrl)
-	statementer := servicemocks.NewMockStatementer[service.AllStatements](ctrl)
-	pool.EXPECT().Statements().Return(statements).AnyTimes()
-	pool.EXPECT().
-		Transaction(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, fn func(context.Context, service.Statementer[service.AllStatements]) error) error {
-			return fn(ctx, statementer)
-		}).
-		AnyTimes()
-	statementer.EXPECT().Statements().Return(statements).AnyTimes()
+	svc, statements := newStrictDeploymentService(t)
 	statements.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return newDeploymentService(ctrl, pool), statements
+	return svc, statements
 }
 
-// newMockedDeploymentServiceQuiet is newMockedDeploymentService for a path
-// that must not emit. An InsertEvent call fails the test.
-func newMockedDeploymentServiceQuiet(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
+// newStrictDeploymentService leaves InsertEvent for the test to expect.
+func newStrictDeploymentService(t *testing.T) (*service.DeploymentService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
@@ -284,7 +272,7 @@ func TestDeploymentServiceCreateChangedSetWrites(t *testing.T) {
 
 // A release that names a variable this kind does not hold writes nothing.
 func TestDeploymentServiceCreateMissingVariableWritesNothing(t *testing.T) {
-	svc, statements := newMockedDeploymentServiceQuiet(t)
+	svc, statements := newStrictDeploymentService(t)
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
 		ID: "rel_1",
 		Pointers: []domain.ReleasePointer{{
@@ -410,8 +398,25 @@ func TestDeploymentServiceDeployRejects(t *testing.T) {
 	t.Run("a ttl for primary origins", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, appPrimary)
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(time.Hour)})
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for primary origins", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, appPrimary)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "ttl is only valid for preview URLs")
+	})
+
+	t.Run("a ttl above the maximum for preview URLs", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		expectProjectOrigins(statements, previewPattern)
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(domain.MaxPreviewTTL + time.Second)})
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+		assert.ErrorContains(t, err, "at most 365 days")
 	})
 
 	t.Run("an exact primary origin", func(t *testing.T) {
@@ -642,6 +647,15 @@ func TestDeploymentServiceCreateErrorMapping(t *testing.T) {
 		_, err := svc.Create(t.Context(), input)
 		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
 	})
+
+	t.Run("a preview ttl above the maximum never reaches storage", func(t *testing.T) {
+		svc, _ := newMockedDeploymentService(t)
+		input := deploymentInput()
+		input.OriginKind = domain.DeploymentOriginKindPreview
+		input.PreviewTTL = domain.MaxPreviewTTL + time.Second
+		_, err := svc.Create(t.Context(), input)
+		assertServiceDomainCode(t, err, domain.ErrDeploymentInvalid().Code)
+	})
 }
 
 func assertServiceDomainCode(t *testing.T, err error, code string) domain.Error {
@@ -773,8 +787,12 @@ func expectPreviewServing(statements *servicemocks.MockAllStatements, origins []
 // expectPreviewWrite expects the insert and the renewal of the previews of
 // origins for the default ttl.
 func expectPreviewWrite(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment) {
+	expectPreviewWriteFor(statements, origins, read, 7*24*time.Hour)
+}
+
+func expectPreviewWriteFor(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment, ttl time.Duration) {
 	expectInsert(statements, read, emptyVariableSet())
-	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(7*24*time.Hour), deployedAt).Return(nil)
+	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(ttl), deployedAt).Return(nil)
 }
 
 func previewDeployment(id, origin string, at time.Time) *domain.Deployment {
@@ -802,13 +820,13 @@ func TestDeploymentServiceDeployPreview(t *testing.T) {
 		assert.Equal(t, origins, result.Deployment.Origins())
 	})
 
-	t.Run("a request ttl takes the default", func(t *testing.T) {
+	t.Run("a request ttl sets the expiry", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		expectProjectOrigins(statements, previewPattern)
 		expectPreviewServing(statements, []string{gitOrigin}, nil, nil)
-		expectPreviewWrite(statements, []string{gitOrigin}, nil)
+		expectPreviewWriteFor(statements, []string{gitOrigin}, nil, time.Hour)
 
-		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, HasTTL: true})
+		_, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{gitOrigin}, TTL: new(time.Hour)})
 		require.NoError(t, err)
 	})
 

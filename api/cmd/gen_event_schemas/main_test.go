@@ -23,7 +23,7 @@ func TestPayloadMapCoversDomainEventTypes(t *testing.T) {
 
 	eventTypes, err := extractEventTypes(domainEventPath)
 	require.NoError(t, err)
-	require.Len(t, eventTypes, 43, "domain EventType constant count changed; update payloadByEventType")
+	require.Len(t, eventTypes, 44, "domain EventType constant count changed; update payloadByEventType")
 	require.NoError(t, validateMappings(eventTypes, payloadsDir))
 }
 

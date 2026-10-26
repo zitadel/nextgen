@@ -48,7 +48,9 @@
         "$TURBO_ROOT$/packages/sdk-*/skills/**/SKILL.md",
         "$TURBO_ROOT$/apps/demo-*/package.json",
         "$TURBO_ROOT$/apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}",
-        "!$TURBO_ROOT$/apps/demo-*/**/node_modules/**"
+        "!$TURBO_ROOT$/apps/demo-*/**/node_modules/**",
+        "$TURBO_ROOT$/packages/*/package.json",
+        "$TURBO_ROOT$/packages/*/tsconfig.lib.json"
       ]
     }
   }

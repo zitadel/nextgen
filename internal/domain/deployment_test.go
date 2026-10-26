@@ -209,3 +209,21 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		}
 	})
 }
+
+func TestResolvePreviewTTL(t *testing.T) {
+	got, err := ResolvePreviewTTL(nil)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPreviewTTL, got)
+
+	for _, ttl := range []time.Duration{time.Second, 7 * 24 * time.Hour, MaxPreviewTTL} {
+		got, err := ResolvePreviewTTL(&ttl)
+		require.NoError(t, err)
+		assert.Equal(t, ttl, got)
+	}
+	for _, ttl := range []time.Duration{0, -time.Hour, MaxPreviewTTL + time.Second} {
+		_, err := ResolvePreviewTTL(&ttl)
+		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	}
+	_, err = ResolvePreviewTTL(new(MaxPreviewTTL + time.Second))
+	assert.ErrorContains(t, err, "at most 365 days")
+}

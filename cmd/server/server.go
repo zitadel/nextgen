@@ -319,14 +319,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	releaseService := service.NewReleaseService(
-		serviceDBPool,
-		schemaService,
-		flowDefinitionSvc,
-		brandingService,
-		idpConnectionService,
-		builtinBases,
-	)
 	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -340,6 +332,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
 	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err

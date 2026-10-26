@@ -90,7 +90,8 @@ export default class Deploy extends EnvironmentCommand {
       }
     }
 
-    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
+      await buildBundle(cwd);
     this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
@@ -104,6 +105,7 @@ export default class Deploy extends EnvironmentCommand {
       bundle,
       brandingSources,
       idpFiles,
+      policyFiles,
       suggest: (args) => this.suggest(args),
     };
 
