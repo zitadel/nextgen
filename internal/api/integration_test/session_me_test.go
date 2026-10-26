@@ -90,7 +90,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
 	require.NoError(t, err)
 	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+		harness.APIBaseURL(t)+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
 	require.NoError(t, err)
 	exchangeReq.Header.Set("Content-Type", "application/json")
 
@@ -112,7 +112,7 @@ func TestGetMySession_Identity(t *testing.T) {
 	}
 	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
 
-	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/sessions/me", nil)
+	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.APIBaseURL(t)+"/sessions/me", nil)
 	require.NoError(t, err)
 	meReq.AddCookie(sessionCookie)
 
@@ -173,7 +173,7 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	})
 	require.NoError(t, err)
 	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+		harness.APIBaseURL(t)+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
 	require.NoError(t, err)
 	exchangeReq.Header.Set("Content-Type", "application/json")
 	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
@@ -194,7 +194,7 @@ func TestGetMySession_ExpiredSessionIsSignedOut(t *testing.T) {
 	}
 	require.NotNil(t, sessionCookie, "exchange must set the __nextgen_session cookie")
 
-	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, testServer.URL+"/sessions/me", nil)
+	meReq, err := http.NewRequestWithContext(t.Context(), http.MethodGet, harness.APIBaseURL(t)+"/sessions/me", nil)
 	require.NoError(t, err)
 	meReq.AddCookie(sessionCookie)
 
@@ -246,7 +246,7 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 	exchangeBody, err := json.Marshal(map[string]string{"handoff_token": plainToken})
 	require.NoError(t, err)
 	exchangeReq, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
-		testServer.URL+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
+		harness.APIBaseURL(t)+"/sessions/exchange?project_id="+project.ID, bytes.NewReader(exchangeBody))
 	require.NoError(t, err)
 	exchangeReq.Header.Set("Content-Type", "application/json")
 	exchangeReq.Header.Set("Authorization", "Bearer "+projectSecret)
@@ -269,7 +269,7 @@ func TestMySession_HoldsTheSessionToTheNamedProject(t *testing.T) {
 
 	call := func(method, path, projectID string) *http.Response {
 		t.Helper()
-		target := testServer.URL + path
+		target := harness.APIBaseURL(t) + path
 		if projectID != "" {
 			target += "?project_id=" + projectID
 		}
