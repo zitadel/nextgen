@@ -528,8 +528,10 @@ function ProfileField({
   return (
     <Field orientation="responsive">
       {/* As in the add-user sheet: the marker is a sibling of the label, not
-          part of it, so the accessible name stays the field name. */}
-      <div className={`flex items-center gap-2 ${LABEL_COLUMN}`}>
+          part of it, so the accessible name stays the field name. On a wide
+          row the column is the control's 36px, so a one-line label centres
+          on it while an error under the control leaves it in place. */}
+      <div className={`flex items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`}>
         <FieldLabel htmlFor={id} className={FIELD_LABEL}>
           {entry.label}
         </FieldLabel>
@@ -537,7 +539,7 @@ function ProfileField({
       </div>
       <FieldContent>
         {entry.inputType === "boolean" ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 @md/field-group:min-h-9">
             {/* A switch cannot be read-only, so a locked value disables it. */}
             <Switch
               id={id}
