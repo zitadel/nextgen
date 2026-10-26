@@ -42,7 +42,7 @@ function SchemaDetail() {
           <PanelTitle icon={Braces} title={name} />
           {/* The same header card as Login flows. The design draws a third
               value, `EXPIRES AT`; nothing on the schema resource backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Schema ID" value={schemaId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />

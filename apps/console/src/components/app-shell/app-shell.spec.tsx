@@ -28,14 +28,15 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * theme toggle writing `data-theme` and persisting the preference.
  */
 // The design's single-level sidebar ("01 / Nav Level 1"), less the screens
-// that are not built (Deployments, Sessions). Projects is not a row: it is
-// the home, behind the logo and the switcher's `All projects`.
+// that are not built (Sessions). Projects is not a row: it is the home,
+// behind the logo and the switcher's `All projects`.
 const NAV_ORDER = [
   "Teams",
   "Users",
   "User schemas",
   "Login flows",
   "Branding",
+  "Deployments",
   "Authentication",
   "Project settings",
 ];

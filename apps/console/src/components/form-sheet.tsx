@@ -14,6 +14,27 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+/** A section of a drawer form: its fields 16px apart. */
+export const SHEET_SECTION = "flex flex-col gap-4";
+// The design wraps the label in a row so a marker can sit beside it, rather
+// than appending to the label text itself.
+export const SHEET_LABEL_ROW = "flex w-full items-center gap-2";
+/**
+ * The field label's face, on a legend. The legend keeps
+ * its own 12px under it: a `legend` sits outside the fieldset's flex gap.
+ */
+export const SHEET_LEGEND = "font-serif text-sm leading-5 font-normal";
+/**
+ * A choice card: the label's own card
+ * styling, at the design's 12px inset. `p-3!`: the label's `[&>*]:data-[slot=field]:p-4` is a variant
+ * and out-specifies a plain `p-3`. The chosen card keeps the input border; the
+ * label's own `border-primary` is a solid highlight the design does not draw.
+ * The card's text is the sans face: the label it sits in is the display face,
+ * which its children would inherit.
+ */
+export const SHEET_CHOICE_CARD =
+  "font-sans has-data-[state=checked]:border-input [&>*]:data-[slot=field]:p-3!";
+
 /**
  * The right-side drawer a resource is added from (decisions log D15).
  *
@@ -104,17 +125,12 @@ export function FormSheetForm({
       <Separator />
       {/* On the page background rather than a raised surface, so scrolling body
           content passes under it. */}
+      {/* Both buttons at the default size, as the design's sheet footer draws them. */}
       <SheetFooter className="flex-row items-center justify-end gap-3 bg-background px-6 py-4">
         <Button type="button" variant="secondary" className="gap-1.5 px-2.5" onClick={onClose}>
           Cancel
         </Button>
-        <Button
-          type="submit"
-          size="sm"
-          className="gap-1 px-2.5 text-xs"
-          disabled={!canSubmit}
-          loading={pending}
-        >
+        <Button type="submit" className="gap-1.5 px-2.5" disabled={!canSubmit} loading={pending}>
           {submitLabel}
         </Button>
       </SheetFooter>
