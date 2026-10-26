@@ -60,6 +60,11 @@ skill, and the per-framework SDK and component skills. Without it, only the
 top-level router skill is installed. The CLI skill also ships inside the
 `@zitadel/cli` package.
 
+After a successful interactive `setup`, the CLI suggests this command once if it
+finds a coding agent on your machine. "Once" is per machine, not per project: the
+CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
+see it.
+
 ## Customer quick start
 
 ```sh
