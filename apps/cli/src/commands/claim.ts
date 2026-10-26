@@ -13,6 +13,7 @@ import { ZitadelError } from "../lib/errors";
 import { isObject } from "../lib/json";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import { hasZitadelSecret, readZitadelSecret, writeZitadelSecret } from "../lib/project";
+import { isLoopbackUrl } from "../lib/server";
 import { reportWarning } from "../lib/warnings";
 import type { SuggestedCommand } from "../lib/suggestion";
 
@@ -395,17 +396,4 @@ function claimWindowExpiredError(): ZitadelError {
       hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },
   );
-}
-
-/**
- * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
- * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
- */
-function isLoopbackUrl(value: string): boolean {
-  try {
-    const hostname = new URL(value).hostname;
-    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
-  } catch {
-    return false;
-  }
 }
