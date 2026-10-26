@@ -59,7 +59,12 @@ func (c Config) Connect(ctx context.Context) (database.Pool, error) {
 	if filePath != "" {
 		tightenDBFilePerms(filePath)
 	}
-	return newPool(sqlDB), nil
+	pool, err := newPool(sqlDB)
+	if err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
+	return pool, nil
 }
 
 func (c Config) dsn() (dsn string, filePath string, err error) {

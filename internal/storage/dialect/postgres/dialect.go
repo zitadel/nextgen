@@ -28,7 +28,12 @@ func (p Config) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPool(pool), nil
+	pooled, err := newPool(pool)
+	if err != nil {
+		pool.Close()
+		return nil, err
+	}
+	return pooled, nil
 }
 
 // Name implements [database.Dialect].
@@ -42,7 +47,7 @@ type PoolConfig struct {
 
 // Connect implements [database.Dialect].
 func (p *PoolConfig) Connect(ctx context.Context) (database.Pool, error) {
-	return newPool(p.Pool), nil
+	return newPool(p.Pool)
 }
 
 // Name implements [database.Dialect].
