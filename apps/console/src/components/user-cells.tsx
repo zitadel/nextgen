@@ -196,9 +196,10 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
         )}
       </dl>
       {/* Guidance, not data: a band of its own, edge to edge under the card's
-          12px inset, so it does not read as another row of the list. On the
-          page canvas, since `muted` is the popover's own colour in dark mode. */}
-      <p className="text-muted-foreground border-border bg-background -mx-3 -mb-3 flex gap-2 border-t px-3 py-2.5 text-[11px] leading-4">
+          12px inset, so it does not read as another row of the list. A shade
+          below the popover: `muted` is the popover's own colour in dark mode,
+          and the full canvas too deep against it. */}
+      <p className="text-muted-foreground border-border bg-background dark:bg-background/40 -mx-3 -mb-3 flex gap-2 border-t px-3 py-2.5 text-[11px] leading-4">
         <Info aria-hidden strokeWidth={1.5} className="mt-px size-3.5 shrink-0" />
         <span>
           The schema decides what a user signs in with (

@@ -123,10 +123,13 @@ export function DocumentViewer({
         hidden={view === "fields"}
         className={cn(
           "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
-          // Compact, the source sits in a bordered code block of its own, on
-          // the page canvas, as the schema screen frames it: it reads as text
-          // to copy, apart from the Fields list on the popover's surface.
-          compact ? "m-3 max-h-72 rounded-md border border-border bg-background" : "max-h-[32rem]",
+          // Compact, the source sits in a bordered code block of its own, a
+          // shade below the popover, as the schema screen frames it: it reads
+          // as text to copy, apart from the Fields list on the popover's
+          // surface. Dark, the full canvas is too deep against `popover`.
+          compact
+            ? "m-3 max-h-72 rounded-md border border-border bg-background dark:bg-background/40"
+            : "max-h-[32rem]",
         )}
       >
         {/* Plain until the grammars compile — same face, size and leading, so
