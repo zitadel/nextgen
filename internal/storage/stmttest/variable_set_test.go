@@ -403,3 +403,26 @@ func TestVariableSetStatements_LinkReusesAnExistingSet(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.ForeignKeyError), "the set has to exist already")
 	})
 }
+
+// Ensure stores the set it is given. Changing the live variable afterwards
+// leaves a deployment linked to that hash on the ensured values.
+func TestVariableSetStatements_EnsureKeepsTheSetItWasGiven(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableSetFixture(t, d)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v1.example.test", false)
+		variable, err := domain.NewVariable("api_url", f.owner(), "https://v1.example.test")
+		require.NoError(t, err)
+		set, err := domain.NewVariableSet(f.projectID, []*domain.Variable{variable})
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.EnsureVariableSet(t.Context(), set))
+		require.NoError(t, d.stmts.EnsureVariableSet(t.Context(), set), "a hash that already exists is success")
+
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://v2.example.test", false)
+		deploymentID := f.deploy(t, domain.DeploymentOriginKindPrimary)
+		require.NoError(t, d.stmts.LinkDeploymentVariableSet(t.Context(), f.projectID, deploymentID, set.Hash))
+
+		got := f.get(t, deploymentID)
+		assert.Equal(t, set.Hash, got.Hash)
+		assert.Equal(t, map[string]any{"api_url": "https://v1.example.test"}, entryValues(got))
+	})
+}

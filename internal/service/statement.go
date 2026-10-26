@@ -674,12 +674,15 @@ type VariableSetStatements interface {
 	// Secrets are copied as the ciphertext stored, never decrypted. The set
 	// returned is what a later GetDeploymentVariables reads back.
 	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+	// EnsureVariableSet inserts set when its hash is new to the project. A
+	// hash that already exists is success: that row holds the same entries.
+	// It does not link a deployment and it does not read the live variables.
+	// The caller passes the set it already resolved.
+	EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error
 	// LinkDeploymentVariableSet points deploymentID at the set setHash already
-	// names. Rollback uses it so the new deployment serves the values the
-	// restored deployment froze, rather than the values the project holds now.
-	// The set row must already exist: this inserts the link only. A second
-	// link of the same deployment is a UniqueError. A deployment or a set the
-	// project does not hold is a ForeignKeyError.
+	// names. The set row must already exist: this inserts the link only. A
+	// second link of the same deployment is a UniqueError. A deployment or a
+	// set the project does not hold is a ForeignKeyError.
 	LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error
 	// GetDeploymentVariables returns the set deploymentID was frozen with,
 	// as it was then, whatever the project's variables have become since. A

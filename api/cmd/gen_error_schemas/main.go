@@ -118,13 +118,12 @@ func extractDomainErrors(domainPath string) []errorInfo {
 										continue
 									}
 
-									// Extract message (second arg). A fmt.Sprintf
-									// format is the stable text; the call fills
-									// it in when the error is returned.
-									description := extractMessage(callExpr.Args[1])
-									if description == "" {
+									// Extract message (second arg)
+									msgLit, ok := callExpr.Args[1].(*ast.BasicLit)
+									if !ok {
 										continue
 									}
+									description := strings.Trim(msgLit.Value, `"`)
 									description = capitalizeFirst(description)
 
 									errors = append(errors, errorInfo{
@@ -221,28 +220,6 @@ func extractCodeArgument(arg ast.Expr, prefixes map[string]string) string {
 	}
 
 	return ""
-}
-
-// extractMessage is the text newError records. A string literal is itself. A
-// fmt.Sprintf call contributes its format string, which is what stays stable
-// across calls.
-func extractMessage(arg ast.Expr) string {
-	if lit, ok := arg.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-		return strings.Trim(lit.Value, `"`)
-	}
-	call, ok := arg.(*ast.CallExpr)
-	if !ok || len(call.Args) == 0 {
-		return ""
-	}
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok || sel.Sel.Name != "Sprintf" {
-		return ""
-	}
-	lit, ok := call.Args[0].(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
-		return ""
-	}
-	return strings.Trim(lit.Value, `"`)
 }
 
 func capitalizeFirst(s string) string {

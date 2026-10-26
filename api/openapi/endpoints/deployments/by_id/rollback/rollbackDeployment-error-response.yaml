@@ -71,7 +71,7 @@ content:
         summary: dep.variables_missing
         value:
           code: dep.variables_missing
-          message: 'deployment: variables have no %s value: %s'
+          message: 'deployment: the release references variables its kind has no value for'
       env.project_not_found:
         summary: env.project_not_found
         value:

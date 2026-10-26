@@ -93,6 +93,20 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 	return set, nil
 }
 
+// EnsureVariableSet implements [service.VariableSetStatements].
+func (s variableSetStatements) EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error {
+	raw, err := variableset.MarshalEntries(set.Entries)
+	if err != nil {
+		return err
+	}
+	entries, err := encodeNullJSON(raw)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Update(ctx, buildStatement(insertVariableSetStmt, set.ProjectID, set.Hash, entries).statement())
+	return err
+}
+
 // LinkDeploymentVariableSet implements [service.VariableSetStatements].
 func (s variableSetStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
 	_, err := s.db.Update(ctx, buildStatement(linkDeploymentVariableSetStmt, projectID, deploymentID, setHash).statement())

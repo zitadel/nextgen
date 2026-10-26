@@ -91,6 +91,16 @@ func (s variableSetStatements) FreezeDeploymentVariables(ctx context.Context, pr
 	return set, nil
 }
 
+// EnsureVariableSet implements [service.VariableSetStatements].
+func (s variableSetStatements) EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error {
+	entries, err := variableset.MarshalEntries(set.Entries)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Exec(ctx, insertVariableSetStmt, set.ProjectID, set.Hash, string(entries), nowUnixNano())
+	return wrapError(err)
+}
+
 // LinkDeploymentVariableSet implements [service.VariableSetStatements].
 func (s variableSetStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
 	_, err := s.client.Exec(ctx, linkDeploymentVariableSetStmt, projectID, deploymentID, setHash)

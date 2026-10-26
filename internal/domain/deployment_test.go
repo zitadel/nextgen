@@ -117,7 +117,7 @@ func TestDeploymentsEqual(t *testing.T) {
 func TestErrDeploymentVariablesMissingSortsNames(t *testing.T) {
 	err := ErrDeploymentVariablesMissing(DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
 	assert.Equal(t, "dep.variables_missing", err.Code)
-	assert.Equal(t, "deployment: variables have no preview value: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET", err.Message)
+	assert.Equal(t, "deployment: the release references variables its kind has no value for", err.Message)
 	assert.Equal(t, DeploymentVariablesMissingDetails{
 		Kind:  "preview",
 		Names: []string{"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"},

@@ -77,7 +77,7 @@ func ErrDeploymentVariablesMissing(kind DeploymentOriginKind, names []string) Er
 	slices.Sort(sorted)
 	return newError(
 		PrefixDeployment.ErrorCodePrefix("variables_missing"),
-		fmt.Sprintf("deployment: variables have no %s value: %s", kind, strings.Join(sorted, ", ")),
+		"deployment: the release references variables its kind has no value for",
 		DeploymentVariablesMissingDetails{Kind: kind.String(), Names: sorted},
 		nil,
 	)
@@ -146,15 +146,20 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 	return newest
 }
 
+// SamePrimaryRelease reports whether candidate and current are both primary
+// deployments of one release to the same origins. Only then can they be equal.
+func SamePrimaryRelease(candidate, current *Deployment) bool {
+	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
+		current.OriginKind == DeploymentOriginKindPrimary &&
+		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
+}
+
 // DeploymentsEqual reports whether candidate repeats current, the project's
 // newest primary deployment: the same release, the same origins, and the same
 // frozen variable set, so writing it would change nothing. A deployment to
 // preview URLs never equals one, since writing it renews its previews.
 func DeploymentsEqual(candidate, current *Deployment, candidateSetHash, currentSetHash string) bool {
-	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
-		current.OriginKind == DeploymentOriginKindPrimary &&
-		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins()) &&
-		candidateSetHash == currentSetHash
+	return SamePrimaryRelease(candidate, current) && candidateSetHash == currentSetHash
 }
 
 // CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is

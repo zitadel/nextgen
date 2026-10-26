@@ -2196,6 +2196,44 @@ func (c *MockAllStatementsEnsureEventSinkCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// EnsureVariableSet mocks base method.
+func (m *MockAllStatements) EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureVariableSet", ctx, set)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureVariableSet indicates an expected call of EnsureVariableSet.
+func (mr *MockAllStatementsMockRecorder) EnsureVariableSet(ctx, set any) *MockAllStatementsEnsureVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureVariableSet", reflect.TypeOf((*MockAllStatements)(nil).EnsureVariableSet), ctx, set)
+	return &MockAllStatementsEnsureVariableSetCall{Call: call}
+}
+
+// MockAllStatementsEnsureVariableSetCall wrap *gomock.Call
+type MockAllStatementsEnsureVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsEnsureVariableSetCall) Return(arg0 error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsEnsureVariableSetCall) Do(f func(context.Context, *domain.VariableSet) error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsEnsureVariableSetCall) DoAndReturn(f func(context.Context, *domain.VariableSet) error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ExchangeSession mocks base method.
 func (m *MockAllStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
 	m.ctrl.T.Helper()

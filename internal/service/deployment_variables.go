@@ -65,15 +65,14 @@ func deploymentSetHash(ctx context.Context, stmts VariableSetStatements, current
 	return set.Hash, nil
 }
 
-// attachVariableSet links a rollback to the set it resolved, and freezes the
-// live rows for every other deploy. Freeze re-reads those rows in this
-// transaction, which is what inserts the set when its hash is new.
+// attachVariableSet stores the set create already resolved and links the
+// deployment to it. The missing-name check and the hash comparison used this
+// same set, so a change to the live rows after that read cannot land here.
 func attachVariableSet(ctx context.Context, stmts VariableSetStatements, written *domain.Deployment, set *domain.VariableSet) error {
-	if written.Metadata.RollbackTo != nil {
-		return stmts.LinkDeploymentVariableSet(ctx, written.ProjectID, written.ID, set.Hash)
+	if err := stmts.EnsureVariableSet(ctx, set); err != nil {
+		return err
 	}
-	_, err := stmts.FreezeDeploymentVariables(ctx, written.ProjectID, written.ID)
-	return err
+	return stmts.LinkDeploymentVariableSet(ctx, written.ProjectID, written.ID, set.Hash)
 }
 
 // missingVariableNames is every ${{ NAME }} in the release's pinned documents
@@ -87,11 +86,19 @@ func missingVariableNames(ctx context.Context, stmts AllStatements, projectID st
 	seen := make(map[string]struct{})
 	var missing []string
 	for _, pointer := range release.Pointers {
-		doc, err := releasePointerDocument(ctx, stmts, projectID, pointer)
+		raw, err := releasePointerDocument(ctx, stmts, projectID, pointer)
 		if err != nil {
 			return nil, err
 		}
-		if doc == nil {
+		if len(raw) == 0 {
+			continue
+		}
+		var value any
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
+		}
+		doc, ok := value.(map[string]any)
+		if !ok {
 			continue
 		}
 		placeholders, err := domain.ScanDocumentForVariables(doc)
@@ -111,14 +118,14 @@ func missingVariableNames(ctx context.Context, stmts AllStatements, projectID st
 	return missing, nil
 }
 
-func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID string, pointer domain.ReleasePointer) (map[string]any, error) {
+func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID string, pointer domain.ReleasePointer) ([]byte, error) {
 	switch pointer.Kind {
 	case domain.ReleasePointerKindSchema:
 		schema, err := stmts.GetJSONSchemaByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
 			return nil, revisionReadError(err)
 		}
-		return jsonObject(schema.Schema)
+		return schema.Schema, nil
 	case domain.ReleasePointerKindFlowDefinition:
 		definition, err := stmts.GetFlowDefinitionByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
@@ -128,13 +135,13 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read a flow definition")
 		}
-		return jsonObject(raw)
+		return raw, nil
 	case domain.ReleasePointerKindIDP:
 		connection, err := stmts.GetIDPConnectionRevision(ctx, projectID, pointer.RevisionID)
 		if err != nil {
 			return nil, revisionReadError(err)
 		}
-		return jsonObject(connection.Document)
+		return connection.Document, nil
 	case domain.ReleasePointerKindBranding:
 		branding, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
@@ -144,7 +151,7 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 		if err != nil {
 			return nil, domain.ErrInternal(err).WithMessage("failed to read a branding revision")
 		}
-		return jsonObject(raw)
+		return raw, nil
 	default:
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("unknown release pointer kind %d", pointer.Kind))
 	}
@@ -155,21 +162,4 @@ func revisionReadError(err error) error {
 		return domain.ErrInternal(err).WithMessage("pinned revision is missing")
 	}
 	return domain.ErrInternal(err).WithMessage("failed to read a pinned revision")
-}
-
-// jsonObject is a JSON object, the only shape ScanDocumentForVariables walks.
-// A value that is not an object has no placeholders. Invalid JSON is ours.
-func jsonObject(raw []byte) (map[string]any, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(raw, &doc); err == nil {
-		return doc, nil
-	}
-	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read a release document")
-	}
-	return nil, nil
 }

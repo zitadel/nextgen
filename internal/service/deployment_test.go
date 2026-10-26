@@ -85,23 +85,24 @@ func expectDeploymentSet(statements *servicemocks.MockAllStatements, id string, 
 
 // expectServing sets up the reads of one primary attempt: the release, the
 // live primary variables, what appOrigin last received (nothing when serving
-// is nil), and the project's newest primary deployment and its set. It
-// returns what was read for the lock.
+// is nil), and the project's newest primary deployment. It returns what was
+// read for the lock. The current set is read separately, and only when the
+// release and origins match.
 func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	expectLiveVariables(statements, domain.DeploymentOriginKindPrimary)
-	return expectServedPrimary(statements, serving, emptyVariableSet())
+	return expectServedPrimary(statements, serving)
 }
 
 // expectRollbackServing is expectServing for a rollback: the set comes from
 // the restored deployment, not from the live rows.
-func expectRollbackServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment, previousID string, previous, current *domain.VariableSet) []domain.OriginDeployment {
+func expectRollbackServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment, previousID string, previous *domain.VariableSet) []domain.OriginDeployment {
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	expectDeploymentSet(statements, previousID, previous)
-	return expectServedPrimary(statements, serving, current)
+	return expectServedPrimary(statements, serving)
 }
 
-func expectServedPrimary(statements *servicemocks.MockAllStatements, serving *domain.Deployment, current *domain.VariableSet) []domain.OriginDeployment {
+func expectServedPrimary(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
 	var read []domain.OriginDeployment
 	if serving != nil {
 		read = []domain.OriginDeployment{{
@@ -113,7 +114,6 @@ func expectServedPrimary(statements *servicemocks.MockAllStatements, serving *do
 	newest := &database.ListResult[*domain.Deployment]{}
 	if serving != nil && serving.OriginKind == domain.DeploymentOriginKindPrimary {
 		newest.Items = []*domain.Deployment{serving}
-		expectDeploymentSet(statements, serving.ID, current)
 	}
 	statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).Return(newest, nil)
 	return read
@@ -123,14 +123,15 @@ func expectServedPrimary(statements *servicemocks.MockAllStatements, serving *do
 // list, so it must not carry the caller's authz list filter.
 var unrestricted = gomock.Cond(func(ctx context.Context) bool { return service.AuthzListUnrestricted(ctx) })
 
-func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment) {
+func expectInsert(statements *servicemocks.MockAllStatements, read []domain.OriginDeployment, set *domain.VariableSet) {
 	statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
 		DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
 			entity.ID = "dep_new"
 			entity.DeployedAt = deployedAt
 			return nil
 		})
-	statements.EXPECT().FreezeDeploymentVariables(gomock.Any(), "proj_1", "dep_new").Return(emptyVariableSet(), nil)
+	statements.EXPECT().EnsureVariableSet(gomock.Any(), set).Return(nil)
+	statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", set.Hash).Return(nil)
 }
 
 func servingDeployment(releaseID string) *domain.Deployment {
@@ -144,7 +145,7 @@ func servingDeployment(releaseID string) *domain.Deployment {
 
 func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	expectInsert(statements, expectServing(statements, nil))
+	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
 	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{
 		ActorID:   new("user_1"),
@@ -160,7 +161,7 @@ func TestDeploymentServiceCreateRecordsActor(t *testing.T) {
 
 func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
-	expectInsert(statements, expectServing(statements, nil))
+	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -172,7 +173,7 @@ func TestDeploymentServiceCreateWithoutActor(t *testing.T) {
 func TestDeploymentServiceCreateInsertsAgainstWhatItRead(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	read := expectServing(statements, servingDeployment("rel_0"))
-	expectInsert(statements, read)
+	expectInsert(statements, read, emptyVariableSet())
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -187,7 +188,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		expectServing(statements, nil)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), gomock.Any()).Return(new(database.UniqueError))
 		read := expectServing(statements, servingDeployment("rel_0"))
-		expectInsert(statements, read)
+		expectInsert(statements, read, emptyVariableSet())
 
 		result, err := svc.Create(t.Context(), deploymentInput())
 		require.NoError(t, err)
@@ -248,6 +249,7 @@ func TestDeploymentServiceCreateUnchangedPrimaryWritesNothing(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
 	expectServing(statements, serving)
+	expectDeploymentSet(statements, serving.ID, emptyVariableSet())
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -264,7 +266,9 @@ func TestDeploymentServiceCreateChangedSetWrites(t *testing.T) {
 	variable := live.Variables()["GOOGLE_CLIENT_ID"]
 	statements.EXPECT().GetVariables(gomock.Any(), domain.VariableOwner{ProjectID: "proj_1"}, domain.DeploymentOriginKindPrimary).
 		Return([]*domain.Variable{variable}, nil)
-	expectInsert(statements, expectServedPrimary(statements, serving, emptyVariableSet()))
+	read := expectServedPrimary(statements, serving)
+	expectDeploymentSet(statements, serving.ID, emptyVariableSet())
+	expectInsert(statements, read, live)
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -299,7 +303,7 @@ func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	serving := servingDeployment("rel_1")
 	serving.OriginKind = domain.DeploymentOriginKindPreview
-	expectInsert(statements, expectServing(statements, serving))
+	expectInsert(statements, expectServing(statements, serving), emptyVariableSet())
 
 	result, err := svc.Create(t.Context(), deploymentInput())
 	require.NoError(t, err)
@@ -319,8 +323,7 @@ func TestDeploymentServiceCreatePreviewAlwaysRenews(t *testing.T) {
 	}}
 	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
 	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
-	expectDeploymentSet(statements, serving.ID, emptyVariableSet())
-	expectInsert(statements, read)
+	expectInsert(statements, read, emptyVariableSet())
 	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", []string{appOrigin}, deployedAt.Add(168*time.Hour), deployedAt).Return(nil)
 
 	input := deploymentInput()
@@ -335,7 +338,7 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	t.Run("matching", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		serving := servingDeployment("rel_0")
-		expectInsert(statements, expectServing(statements, serving))
+		expectInsert(statements, expectServing(statements, serving), emptyVariableSet())
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new(serving.ID)
@@ -358,7 +361,9 @@ func TestDeploymentServiceCreateGuard(t *testing.T) {
 	// A stale guard is refused even when the deploy would change nothing.
 	t.Run("checked before the no-op", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
-		expectServing(statements, servingDeployment("rel_1"))
+		serving := servingDeployment("rel_1")
+		expectServing(statements, serving)
+		expectDeploymentSet(statements, serving.ID, emptyVariableSet())
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new("dep_stale")
@@ -387,7 +392,7 @@ var appPrimary = domain.Origin{Pattern: appOrigin, Kind: domain.OriginKindPrimar
 func TestDeploymentServiceDeployExpandsPrimary(t *testing.T) {
 	svc, statements := newMockedDeploymentService(t)
 	expectProjectOrigins(statements, appPrimary)
-	expectInsert(statements, expectServing(statements, nil))
+	expectInsert(statements, expectServing(statements, nil), emptyVariableSet())
 
 	result, err := svc.Deploy(t.Context(), service.DeployInput{ProjectID: "proj_1", ReleaseID: "rel_1", Targets: []string{"primary"}})
 	require.NoError(t, err)
@@ -441,13 +446,14 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		expectProjectOrigins(statements, appPrimary)
 		serving := servingDeployment("rel_0")
 		previousSet := emptyVariableSet()
-		read := expectRollbackServing(statements, serving, "dep_previous", previousSet, previousSet)
+		read := expectRollbackServing(statements, serving, "dep_previous", previousSet)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
 			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
 				entity.ID = "dep_new"
 				entity.DeployedAt = deployedAt
 				return nil
 			})
+		statements.EXPECT().EnsureVariableSet(gomock.Any(), previousSet).Return(nil)
 		statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", previousSet.Hash).Return(nil)
 
 		result, err := svc.Rollback(t.Context(), rollback(new(serving.ID)))
@@ -464,7 +470,9 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		expectProjectOrigins(statements, appPrimary)
 		serving := servingDeployment("rel_1")
-		expectRollbackServing(statements, serving, "dep_previous", emptyVariableSet(), emptyVariableSet())
+		set := emptyVariableSet()
+		expectRollbackServing(statements, serving, "dep_previous", set)
+		expectDeploymentSet(statements, serving.ID, set)
 
 		result, err := svc.Rollback(t.Context(), rollback(nil))
 		require.NoError(t, err)
@@ -473,7 +481,7 @@ func TestDeploymentServiceRollback(t *testing.T) {
 	})
 
 	// The release and origins already match. The write happens because the
-	// restored set is not the one live now, and it is linked, not re-frozen.
+	// restored set is not the one the newest deployment holds.
 	t.Run("links the restored set and does not freeze", func(t *testing.T) {
 		svc, statements := newMockedDeploymentService(t)
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
@@ -481,13 +489,15 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		serving := servingDeployment("rel_1")
 		previous := variableSet(t, "GOOGLE_CLIENT_ID", "old")
 		current := variableSet(t, "GOOGLE_CLIENT_ID", "new")
-		read := expectRollbackServing(statements, serving, "dep_previous", previous, current)
+		read := expectRollbackServing(statements, serving, "dep_previous", previous)
+		expectDeploymentSet(statements, serving.ID, current)
 		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
 			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
 				entity.ID = "dep_new"
 				entity.DeployedAt = deployedAt
 				return nil
 			})
+		statements.EXPECT().EnsureVariableSet(gomock.Any(), previous).Return(nil)
 		statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", previous.Hash).Return(nil)
 
 		result, err := svc.Rollback(t.Context(), rollback(nil))
@@ -502,7 +512,8 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		expectProjectOrigins(statements, appPrimary)
 		serving := servingDeployment("rel_1")
 		set := variableSet(t, "GOOGLE_CLIENT_ID", "old")
-		expectRollbackServing(statements, serving, "dep_previous", set, set)
+		expectRollbackServing(statements, serving, "dep_previous", set)
+		expectDeploymentSet(statements, serving.ID, set)
 
 		result, err := svc.Rollback(t.Context(), rollback(nil))
 		require.NoError(t, err)
@@ -534,11 +545,42 @@ func TestDeploymentServiceRollback(t *testing.T) {
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
 		expectProjectOrigins(statements, appPrimary)
 		serving := servingDeployment("rel_0")
-		expectRollbackServing(statements, serving, "dep_previous", emptyVariableSet(), emptyVariableSet())
+		expectRollbackServing(statements, serving, "dep_previous", emptyVariableSet())
 
 		_, err := svc.Rollback(t.Context(), rollback(new("dep_stale")))
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
 		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: serving}, de.Details)
+	})
+
+	// The restored release and set already passed the name check, and a
+	// pinned revision does not change, so the rollback does not read it.
+	t.Run("a pinned document is not scanned", func(t *testing.T) {
+		svc, statements := newMockedDeploymentService(t)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_previous").Return(previousDeployment(), nil)
+		expectProjectOrigins(statements, appPrimary)
+		serving := servingDeployment("rel_0")
+		previousSet := emptyVariableSet()
+		statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+			ID: "rel_1",
+			Pointers: []domain.ReleasePointer{{
+				Kind: domain.ReleasePointerKindIDP, Handle: "google", RevisionID: "idprev_1",
+			}},
+		}, nil)
+		expectDeploymentSet(statements, "dep_previous", previousSet)
+		read := expectServedPrimary(statements, serving)
+		statements.EXPECT().CreateDeployment(gomock.Any(), gomock.Any(), read).
+			DoAndReturn(func(_ context.Context, entity *domain.Deployment, _ []domain.OriginDeployment) error {
+				entity.ID = "dep_new"
+				entity.DeployedAt = deployedAt
+				return nil
+			})
+		statements.EXPECT().EnsureVariableSet(gomock.Any(), previousSet).Return(nil)
+		statements.EXPECT().LinkDeploymentVariableSet(gomock.Any(), "proj_1", "dep_new", previousSet.Hash).Return(nil)
+
+		result, err := svc.Rollback(t.Context(), rollback(nil))
+		require.NoError(t, err)
+		assert.True(t, result.Created)
+		assert.Equal(t, new("dep_previous"), result.Deployment.Metadata.RollbackTo)
 	})
 
 	t.Run("an unknown deployment", func(t *testing.T) {
@@ -719,14 +761,13 @@ func expectPreviewServing(statements *servicemocks.MockAllStatements, origins []
 	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", origins).Return(read, nil)
 	if newest != nil {
 		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", newest.ID).Return(newest, nil)
-		expectDeploymentSet(statements, newest.ID, emptyVariableSet())
 	}
 }
 
 // expectPreviewWrite expects the insert and the renewal of the previews of
 // origins for the default ttl.
 func expectPreviewWrite(statements *servicemocks.MockAllStatements, origins []string, read []domain.OriginDeployment) {
-	expectInsert(statements, read)
+	expectInsert(statements, read, emptyVariableSet())
 	statements.EXPECT().UpsertPreviews(gomock.Any(), "proj_1", origins, deployedAt.Add(7*24*time.Hour), deployedAt).Return(nil)
 }
 

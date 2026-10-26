@@ -904,7 +904,7 @@ func TestDeploymentRefusesAMissingVariable(t *testing.T) {
 	missing, ok := refused.(*api.CreateDeploymentBadRequest).GetDeploymentVariablesMissing()
 	require.True(t, ok, helpers.MustMarshal(t, refused))
 	assert.Equal(t, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code, missing.Code)
-	assert.Equal(t, "deployment: variables have no primary value: GONE, ZEBRA", missing.Message)
+	assert.Equal(t, "deployment: the release references variables its kind has no value for", missing.Message)
 	assert.Equal(t, api.DeploymentVariablesMissingDetails{
 		Kind:  api.DeploymentKindPrimary,
 		Names: []string{"GONE", "ZEBRA"},

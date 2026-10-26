@@ -253,20 +253,29 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if err != nil {
 			return err
 		}
-		missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
-		if err != nil {
-			return err
-		}
-		if len(missing) > 0 {
-			return domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+		// A rollback restores a release and a set that already passed this
+		// check, and neither can change.
+		if entity.Metadata.RollbackTo == nil {
+			missing, err := missingVariableNames(ctx, stmts, entity.ProjectID, release, set)
+			if err != nil {
+				return err
+			}
+			if len(missing) > 0 {
+				return domain.ErrDeploymentVariablesMissing(entity.OriginKind, missing)
+			}
 		}
 		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {
 			return err
 		}
-		currentHash, err := deploymentSetHash(ctx, stmts, current)
-		if err != nil {
-			return err
+		// The hash can change the answer only when the kind, release, and
+		// origins already match. Anything else is a new deployment.
+		var currentHash string
+		if domain.SamePrimaryRelease(entity, current) {
+			currentHash, err = deploymentSetHash(ctx, stmts, current)
+			if err != nil {
+				return err
+			}
 		}
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
