@@ -196,7 +196,6 @@ export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchem
   return node;
 }
 
-/** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
 /**
  * One property a schema node declares, or `undefined` where it declares none
  * by that key (an attribute the schema does not describe).
@@ -218,6 +217,7 @@ export function schemaPropertyLabel(key: string, property?: Record<string, unkno
   return property ? propertyLabel(key, property) : key;
 }
 
+/** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
 export interface SchemaAuthMethod {
   /** Annotation key — `password`, `passkey`, `magic_link`, `sso`, `otp`. */
   key: string;

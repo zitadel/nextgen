@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -615,6 +615,75 @@ describe("users screen", () => {
     const menu = await openColumns();
     expect(menu.getByText("Columns")).toBeInTheDocument();
     expect(menu.getByRole("menuitemcheckbox", { name: "Company name" })).toBeInTheDocument();
+  });
+
+  it("leaves a touch long press on a link to the browser", async () => {
+    // On touch the menu opens from the trigger's own long-press timer, not
+    // from `contextmenu`; a press on a user link must not start it, while one
+    // anywhere else in the table still does.
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              metadata: { status: "active" },
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+    const longPress = async (target: Element) => {
+      fireEvent.pointerDown(target, { pointerType: "touch", button: 0 });
+      // Past the trigger's 700ms long-press timer.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 800)));
+      fireEvent.pointerUp(target, { pointerType: "touch", button: 0 });
+    };
+
+    await longPress(await screen.findByRole("link", { name: "maya@acme.com" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    await longPress(screen.getByText("active"));
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+  });
+
+  it("keeps a project's pins to that project", async () => {
+    // Schema ids are unique per project only, so another project's pins never
+    // carry over.
+    const storage = memoryStorage();
+    storage.setItem(
+      "zl-console-users-columns:proj_test",
+      JSON.stringify({ sch_business: ["companyName"] }),
+    );
+    vi.stubGlobal("localStorage", storage);
+    server.use(
+      http.get("*/api/projects/proj_other", () =>
+        HttpResponse.json({ id: "proj_other", name: "Other project" }),
+      ),
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers(scopedPath("/users", "proj_other"));
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.queryByRole("columnheader", { name: "Company name" })).not.toBeInTheDocument();
+    expect(table.getByText("companyName: Acme")).toBeInTheDocument();
   });
 
   it("shows the default columns, and still pins, when storage is unavailable", async () => {

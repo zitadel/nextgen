@@ -3,6 +3,7 @@ import { Box, MoreVertical, Plus, User } from "lucide-react";
 import {
   Fragment,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   useCallback,
   useEffect,
@@ -207,7 +208,7 @@ function UsersScreen() {
           data-scroll-end={scroll.edges.end || undefined}
           className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
         >
-          <Table className="text-xs" onContextMenu={keepLinkMenu}>
+          <Table className="text-xs" onContextMenu={keepLinkMenu} onPointerDown={keepLinkPress}>
             <TableHeader>
               <ResourceHeaderRow>
                 <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
@@ -305,25 +306,28 @@ function UsersScreen() {
 function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: string) => void] {
   const [state, setState] = useState(() => ({ projectId, pins: readColumnPins(projectId) }));
   // Switching project swaps in that project's pins rather than carrying over
-  // another project's: schema ids are unique per project only.
-  const pins = state.projectId === projectId ? state.pins : readColumnPins(projectId);
+  // another project's: schema ids are unique per project only. Read once, as
+  // the render that sees the new project adjusts the state.
+  if (state.projectId !== projectId) {
+    setState({ projectId, pins: readColumnPins(projectId) });
+  }
 
   const toggle = useCallback(
     (schemaId: string, key: string) => {
-      const current = pins[schemaId] ?? [];
-      const next = {
-        ...pins,
+      const current = state.pins[schemaId] ?? [];
+      const pins = {
+        ...state.pins,
         [schemaId]: current.includes(key)
           ? current.filter((pinned) => pinned !== key)
           : [...current, key],
       };
-      writeColumnPins(projectId, next);
-      setState({ projectId, pins: next });
+      writeColumnPins(state.projectId, pins);
+      setState({ projectId: state.projectId, pins });
     },
-    [pins, projectId],
+    [state],
   );
 
-  return [pins, toggle];
+  return [state.pins, toggle];
 }
 
 /**
@@ -386,6 +390,15 @@ function ColumnsContextMenu({
  */
 function keepLinkMenu(event: MouseEvent) {
   if (event.target instanceof Element && event.target.closest("a")) event.stopPropagation();
+}
+
+/**
+ * The same for a long press on touch or pen, which the trigger opens from its
+ * own timer on `pointerdown` rather than from `contextmenu`: a press on a
+ * link never starts it, so only the browser's link menu opens.
+ */
+function keepLinkPress(event: PointerEvent) {
+  if (event.pointerType !== "mouse") keepLinkMenu(event);
 }
 
 /**
