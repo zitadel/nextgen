@@ -3,6 +3,7 @@ package middleware_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,8 @@ import (
 	"github.com/stretchr/testify/require"
 	slogctx "github.com/veqryn/slog-context"
 	slogotel "github.com/veqryn/slog-context/otel"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog/extractors"
@@ -178,6 +181,56 @@ func TestWithLogging_logsTheOperationID(t *testing.T) {
 
 	operationID, _ := attrString(t, record, "operation_id")
 	assert.Equal(t, "getHealth", operationID)
+}
+
+// The server span ended before the line is written, so the line reads the span
+// context the tracer left in the holder. Only a sampled span gives IDs, and
+// they sit at the root of the line, not in the request group, as on every
+// other line.
+func TestWithLogging_logsTheTraceOfTheServerSpan(t *testing.T) {
+	sampled := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    trace.TraceID{1},
+		SpanID:     trace.SpanID{2},
+		TraceFlags: trace.FlagsSampled,
+	})
+	unsampled := trace.NewSpanContext(trace.SpanContextConfig{TraceID: trace.TraceID{3}, SpanID: trace.SpanID{4}})
+	for _, tt := range []struct {
+		name    string
+		set     *trace.SpanContext
+		wantIDs bool
+	}{
+		{name: "sampled", set: &sampled, wantIDs: true},
+		{name: "unsampled", set: &unsampled},
+		{name: "no server span"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			logger := slog.New(slogctx.NewHandler(slog.NewJSONHandler(&logs, nil), &slogctx.HandlerOptions{
+				Prependers: []slogctx.AttrExtractor{slogctx.ExtractPrepended},
+			}))
+			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(zlog.WithLoggingContext(context.Background(), logger))
+			middleware.WithLogging(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				if tt.set != nil {
+					middleware.SetServerSpanContext(r.Context(), *tt.set)
+				}
+			})).ServeHTTP(httptest.NewRecorder(), req)
+
+			var line map[string]any
+			require.NoError(t, json.Unmarshal(logs.Bytes(), &line))
+			require.Equal(t, "request served", line["msg"])
+			request, ok := line["request"].(map[string]any)
+			require.True(t, ok, "the request group")
+			assert.NotContains(t, request, slogotel.DefaultKeyTraceID)
+			assert.NotContains(t, request, slogotel.DefaultKeySpanID)
+			if !tt.wantIDs {
+				assert.NotContains(t, line, slogotel.DefaultKeyTraceID)
+				assert.NotContains(t, line, slogotel.DefaultKeySpanID)
+				return
+			}
+			assert.Equal(t, sampled.TraceID().String(), line[slogotel.DefaultKeyTraceID])
+			assert.Equal(t, sampled.SpanID().String(), line[slogotel.DefaultKeySpanID])
+		})
+	}
 }
 
 // A panic after the response started keeps propagating, and the request still
