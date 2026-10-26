@@ -25,6 +25,7 @@ import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
 import OriginRm from "./commands/origin/rm";
+import Pull from "./commands/pull";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
@@ -58,6 +59,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   eject: Eject,
   env: Env,
   logs: Logs,
+  pull: Pull,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,

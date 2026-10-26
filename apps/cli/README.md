@@ -106,8 +106,10 @@ and agent UIs may display stderr package-manager progress together with stdout.
 - `zitadel doctor`: verify the local runtime and generated project files
   (including scaffold drift and dependency-version alignment)
 - `zitadel status`: summarise the local runtime and project
-- `zitadel plan`: validate config and preview sync changes without mutation
-- `zitadel apply`: validate and upload repo config to Zitadel
+- `zitadel deploy`: build a release from `.zitadel/` and deploy it to the
+  project's primary origins (`--dry-run` validates and previews only)
+- `zitadel pull`: rebuild `.zitadel/` from the revisions a released snapshot
+  pins — the inverse of deploy — for `latest`, a release id, or a deployment id
 - `zitadel branding eject`: scaffold an editable login template from a design
 - `zitadel schemas list`: list the project's user schemas
 - `zitadel variable set|get|list|rm`: manage the project's variables and secrets
@@ -169,9 +171,12 @@ which ships in this package.
 * [`zitadel origin add PATTERN`](#zitadel-origin-add-pattern)
 * [`zitadel origin list`](#zitadel-origin-list)
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
+* [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
+* [`zitadel policies list`](#zitadel-policies-list)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
+* [`zitadel pull [TARGET]`](#zitadel-pull-target)
 * [`zitadel release create`](#zitadel-release-create)
 * [`zitadel release get ID`](#zitadel-release-get-id)
 * [`zitadel release list`](#zitadel-release-list)
@@ -1395,7 +1400,7 @@ EXAMPLES
 
 ## `zitadel flow-definitions get FLOW`
 
-Get one flow definition by id.
+Get one flow definition by flow name (newest revision) or revision id.
 
 ```
 USAGE
@@ -1430,12 +1435,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one flow definition by id.
+  Get one flow definition by flow name (newest revision) or revision id.
 
 EXAMPLES
-  $ zitadel flow-definitions get <id>
+  $ zitadel flow-definitions get <flow>
 
-  $ zitadel flow-definitions get <id> --json
+  $ zitadel flow-definitions get <flow> --json
 ```
 
 ## `zitadel flow-definitions list`
@@ -2034,8 +2039,8 @@ Show local Zitadel server logs.
 ```
 USAGE
   $ zitadel logs [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--tail
-    <value>]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--follow] [--level
+    debug|info|warn|error] [--tail <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -2047,8 +2052,11 @@ FLAGS
                          NO_COLOR and FORCE_COLOR are honored too.
       --debug            Debug logging.
       --dry-run          Preview without mutating files or the platform.
-      --follow           Follow logs.
-      --tail=<value>     [default: 200] Number of lines to show.
+      --follow           Keep printing lines as the server writes them.
+      --level=<option>   Show only lines at this level or above.
+                         <options: debug|info|warn|error>
+      --tail=<value>     [default: 200] Number of lines to show, counting only
+                         those --level shows.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
@@ -2057,6 +2065,15 @@ GLOBAL FLAGS
 
 DESCRIPTION
   Show local Zitadel server logs.
+
+  On a terminal, warnings are yellow and errors red. Run it in the directory
+  `zitadel start` ran in, or one inside it: the server is found from the nearest
+  `.zitadel/local/` on the way up.
+
+EXAMPLES
+  $ zitadel logs --follow
+
+  $ zitadel logs --level warn
 ```
 
 ## `zitadel origin add PATTERN`
@@ -2189,6 +2206,105 @@ EXAMPLES
   $ zitadel origin rm https://app.acme.com
 
   $ zitadel origin rm https://app.acme.com --force
+```
+
+## `zitadel policies get POLICY`
+
+Get one policy by policy id or operation.
+
+```
+USAGE
+  $ zitadel policies get POLICY [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--fields <value>]
+
+ARGUMENTS
+  POLICY  policy id or operation
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to
+                          the resource's own; `--json` is unaffected.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Get one policy by policy id or operation.
+
+EXAMPLES
+  $ zitadel policies get <policy>
+
+  $ zitadel policies get <policy> --json
+```
+
+## `zitadel policies list`
+
+List policies.
+
+```
+USAGE
+  $ zitadel policies list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--fields <value>]
+    [--plain] [--filter <value>...]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --fields=<value>      Columns to show, comma-separated dot-paths (e.g.
+                            id,attributes.email). Defaults to the resource's own
+                            columns; `--json` is unaffected.
+      --filter=<value>...   Filter as field=operation:value (operation defaults
+                            to equals). Fields: operation (equals).
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List policies.
+
+EXAMPLES
+  $ zitadel policies list --json
+
+  $ zitadel policies list --all --json
+
+  $ zitadel policies list --filter operation=equals:<value>
 ```
 
 ## `zitadel projects get ID`
@@ -2369,6 +2485,52 @@ EXAMPLES
   $ zitadel projects update <id> --data '{...}' --json
 
   $ zitadel projects update <id> --file ./project.json
+```
+
+## `zitadel pull [TARGET]`
+
+Rebuild .zitadel/ from the revisions a released snapshot pins.
+
+```
+USAGE
+  $ zitadel pull [TARGET] [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>]
+
+ARGUMENTS
+  [TARGET]  [default: latest] What to pull: 'latest' (the live release), a
+            release id (rel_…), or a deployment id (dep_…).
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Rebuild .zitadel/ from the revisions a released snapshot pins.
+
+EXAMPLES
+  $ zitadel pull
+
+  $ zitadel pull rel_01KX3RG8A7F0N9WD3P2E4YM5C1
+
+  $ zitadel pull dep_01KX5N7C9D2E7F0N9WD3P2E4YM6
 ```
 
 ## `zitadel release create`
@@ -2623,7 +2785,7 @@ EXAMPLES
 
 ## `zitadel schemas get SCHEMA`
 
-Get one schema by id.
+Get one schema by object type (current revision) or revision id.
 
 ```
 USAGE
@@ -2658,12 +2820,12 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Get one schema by id.
+  Get one schema by object type (current revision) or revision id.
 
 EXAMPLES
-  $ zitadel schemas get <id>
+  $ zitadel schemas get <schema>
 
-  $ zitadel schemas get <id> --json
+  $ zitadel schemas get <schema> --json
 ```
 
 ## `zitadel schemas list`
@@ -2927,9 +3089,9 @@ USAGE
     next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|svelte|qwik-r
     outer|qwik|angular] [--renderer react] [--dev-port <value>] [--skip-install]
     [--preset password-first|passkey-first] [--use-case
-    minimal|consumer|business] [--sso google|custom] [--sso-client-id <value>]
-    [--sso-slug <value>] [--sso-display-name <value>] [--sso-issuer <value>]
-    [--sso-scopes <value>]
+    minimal|consumer|business] [--password-min-length <value>] [--sso
+    google|custom] [--sso-client-id <value>] [--sso-slug <value>]
+    [--sso-display-name <value>] [--sso-issuer <value>] [--sso-scopes <value>]
 
 FLAGS
   -c, --cwd=<value>
@@ -2968,6 +3130,11 @@ FLAGS
       Framework to target.
       <options: next|nuxt|tanstack-start|react|vue|solid-start|solid|sveltekit|sve
       lte|qwik-router|qwik|angular>
+
+  --password-min-length=<value>
+      Minimum password length for the project's password policy, for example 15; 0
+      sets none. Without it, setup writes the policy with no rules; change it in
+      .zitadel/policies/ later.
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:

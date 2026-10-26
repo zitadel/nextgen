@@ -266,8 +266,9 @@ func ReleaseFromContext(ctx context.Context) *domain.Release {
 type PinnedRevisions map[string]string
 
 // ReleasePinsFlow reports whether the request's release pins at least one
-// flow definition. Schema, branding and identity providers follow that
-// switch: they read the pinned revisions only then, and the newest otherwise.
+// flow definition. Schema, branding, identity providers and policies follow
+// that switch: they read the pinned revisions only then, and the newest
+// otherwise.
 func ReleasePinsFlow(ctx context.Context) bool {
 	return len(PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)) > 0
 }

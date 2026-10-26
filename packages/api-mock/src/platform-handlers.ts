@@ -74,6 +74,12 @@ import {
   GetIdpByIdParams,
   GetIdpByIdQueryParams,
   GetIdpByIdResponse,
+  GetPolicyParams,
+  GetPolicyQueryParams,
+  GetPolicyResponse,
+  GetPolicyRevisionParams,
+  GetPolicyRevisionQueryParams,
+  GetPolicyRevisionResponse,
   GetProjectParams,
   GetProjectResponse,
   GetReleaseByIdParams,
@@ -90,7 +96,14 @@ import {
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
   ListReleasesQueryParams,
+  ListPoliciesQueryParams,
+  ListPoliciesResponse,
+  ListPolicyRevisionsParams,
+  ListPolicyRevisionsQueryParams,
+  ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
+  PublishPolicyQueryParams,
+  PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
@@ -109,6 +122,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -198,10 +212,47 @@ function queryRecord(request: Request): Record<string, string> {
 }
 
 /**
- * Server-side record for a project. Strict superset of the spec response
- * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets and `updatedAt`. Handlers project from this record to the right
- * wire shape at the boundary.
+ * A `GET` list's query record with `limit` as a number: URLs carry strings and
+ * the generated zod does not coerce, so an out-of-range limit is refused by the
+ * schema rather than silently normalised.
+ */
+function listQueryRecord(request: Request): Record<string, unknown> {
+  const { limit, ...rest } = queryRecord(request);
+  return { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+}
+
+/**
+ * One page of a `GET` list. The real cursor is opaque; the mock's is the next
+ * start index, and a token it never minted is refused with `req.invalid`, like
+ * the real server.
+ */
+function pageOf<T>(
+  records: readonly T[],
+  limit: number,
+  pageToken: string | undefined,
+):
+  | { ok: true; page: T[]; next: string | undefined }
+  | { ok: false; response: HttpResponse<ErrorBody> } {
+  const start = pageToken === undefined ? 0 : Number(pageToken);
+  if (!Number.isInteger(start) || start < 0) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 }),
+    };
+  }
+  const page = records.slice(start, start + limit);
+  return {
+    ok: true,
+    page,
+    next: start + limit < records.length ? String(start + limit) : undefined,
+  };
+}
+
+/**
+ * Server-side record for a project: the server-only secrets and `updatedAt`
+ * on top of the spec's project fields. It does not hold `owning_team_id`,
+ * which `GetProject200` requires: the handlers derive that from the claims at
+ * the boundary, where they project this record to the right wire shape.
  */
 type ProjectRecord = {
   id: string;
@@ -286,6 +337,23 @@ type IdpConnectionRecord = {
 };
 
 /**
+ * One operation policy (ADR 066), as the CLI's policy syncer publishes it.
+ *
+ * Keyed by `id`; `operation` is what dedupes a write. A project has one policy
+ * per operation, and every publish appends a revision beneath its id, so a
+ * second `POST /policies` for the same operation revises it — which is what
+ * keeps the CLI's `plan`/`apply` idempotent. Revisions are oldest first.
+ */
+type PolicyRecord = {
+  id: string;
+  projectId: string;
+  operation: string;
+  createdAt: string;
+  seq: number;
+  revisions: Array<{ revisionId: string; config: Record<string, unknown>; createdAt: string }>;
+};
+
+/**
  * One variable at the project level, which is the only owner the API addresses
  * today. `secret` decides what a read may say: a secret reports that a value is
  * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
@@ -348,6 +416,7 @@ type Store = {
   idps: Map<string, IdpConnectionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
+  policies: Map<string, PolicyRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -372,6 +441,7 @@ function makeStore(): Store {
     idps: new Map(),
     releases: new Map(),
     deployments: new Map(),
+    policies: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -566,6 +636,89 @@ function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
   };
 }
 
+/** One policy revision, in the wire shape every policy endpoint answers with. */
+function policyResponse(
+  record: PolicyRecord,
+  revision: PolicyRecord["revisions"][number],
+): Record<string, unknown> {
+  return {
+    id: record.id,
+    revision_id: revision.revisionId,
+    project_id: record.projectId,
+    operation: record.operation,
+    config: revision.config,
+    created_at: record.createdAt,
+    updated_at: revision.createdAt,
+  };
+}
+
+/** The newest revision of a policy; a stored policy always has one. */
+/**
+ * The violation the template's config rule `min_length_not_above_max_length`
+ * (internal/policy/templates/auth.factor.password.set.json) reports.
+ */
+const MIN_ABOVE_MAX_VIOLATION = {
+  config_rule: "min_length_not_above_max_length",
+  settings: ["max_length", "min_length"],
+};
+
+/**
+ * Whether a config breaks the template's config rule, which the server checks
+ * on publish and on a release build. A rule the template gains must be added
+ * here.
+ */
+function policyRuleViolated(config: Record<string, unknown>): boolean {
+  const { min_length: min, max_length: max } = config;
+  return typeof min === "number" && typeof max === "number" && min > max;
+}
+
+/**
+ * Publish config as the operation's newest revision, creating the policy on
+ * the first publish. With `reuseUnchanged`, a config equal to the newest
+ * revision's reuses it, as a release build does.
+ */
+function publishPolicyRevision(
+  projectId: string,
+  operation: string,
+  config: Record<string, unknown>,
+  { reuseUnchanged = false }: { reuseUnchanged?: boolean } = {},
+): { record: PolicyRecord; revision: PolicyRecord["revisions"][number] } {
+  const existing = [...store.policies.values()].find(
+    (record) => record.projectId === projectId && record.operation === operation,
+  );
+  if (reuseUnchanged && existing) {
+    const newest = newestRevision(existing);
+    if (JSON.stringify(sortedKeys(newest.config)) === JSON.stringify(sortedKeys(config))) {
+      return { record: existing, revision: newest };
+    }
+  }
+  const now = nowIso();
+  const revision = { revisionId: `polrev_${shortId()}`, config, createdAt: now };
+  const record: PolicyRecord = existing
+    ? { ...existing, revisions: [...existing.revisions, revision] }
+    : {
+        id: `pol_${shortId()}`,
+        projectId,
+        operation,
+        createdAt: now,
+        seq: ++store.lastSeq,
+        revisions: [revision],
+      };
+  store.policies.set(record.id, record);
+  return { record, revision };
+}
+
+/** A shallow copy with its keys in order, so two configs compare by value. */
+function sortedKeys(config: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(config).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function newestRevision(record: PolicyRecord): PolicyRecord["revisions"][number] {
+  return record.revisions[record.revisions.length - 1] as PolicyRecord["revisions"][number];
+}
+
+const POLICY_NOT_FOUND = errorBody("pol.not_found", "policy: not found");
+
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
   b: { createdAt: string; seq: number },
@@ -646,6 +799,7 @@ export type PlatformStoreSnapshot = {
   schemas: number;
   flowDefinitions: number;
   idps: number;
+  policies: number;
   claimChallenges: number;
   claims: number;
   projectIds: string[];
@@ -680,6 +834,7 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
     idps: store.idps.size,
+    policies: store.policies.size,
     claimChallenges: store.claimChallenges.size,
     claims: store.claims.size,
     projectIds: [...store.projects.keys()],
@@ -877,6 +1032,9 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   if (kind === "idp") {
     return typeof resource.slug === "string" ? resource.slug : "idp";
   }
+  if (kind === "policy") {
+    return typeof resource.operation === "string" ? resource.operation : "policy";
+  }
   return "default";
 }
 
@@ -888,8 +1046,12 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
  * flow observable through `schemas list` / `flow-definitions list`. Branding has
  * no store here, so it keeps a synthesised revision id.
  */
-function materializeBundle(projectId: string, bundle: Record<string, unknown>): ReleasePointer[] {
-  const pointers: ReleasePointer[] = [];
+function materializeBundle(
+  projectId: string,
+  bundle: Record<string, unknown>,
+  policyPointers: ReleasePointer[],
+): ReleasePointer[] {
+  const pointers: ReleasePointer[] = [...policyPointers];
   for (const item of asArray(bundle.schemas)) {
     const resource = isObject(item) ? item : {};
     const handle = bundleResourceHandle("schema", resource);
@@ -1004,6 +1166,65 @@ function bundleIdpClash(
     }
   }
   return undefined;
+}
+
+/**
+ * Publish a bundle's policies the way the service does inside a build, before
+ * the release is looked up: an unchanged config reuses the operation's newest
+ * revision, any other adds one. They run first because the revision a policy
+ * gets decides the release's content, as it does on the server: going back to
+ * an earlier config adds a revision and so builds a new release.
+ */
+function publishBundlePolicies(
+  projectId: string,
+  bundle: Record<string, unknown>,
+): ReleasePointer[] {
+  return asArray(bundle.policies).map((item) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const config = isObject(resource.config) ? resource.config : {};
+    const { revision } = publishPolicyRevision(projectId, handle, config, { reuseUnchanged: true });
+    return { kind: "policy", handle, revision_id: revision.revisionId };
+  });
+}
+
+/**
+ * The `details.resources` entries a bundle's policies earn: a config the
+ * template's rule refuses (`pol.invalid`), and both of two policies for one
+ * operation (`rel.invalid`).
+ */
+function bundlePolicyFailures(bundle: Record<string, unknown>): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  const seen = new Map<string, number>();
+  asArray(bundle.policies).forEach((item, index) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const earlier = seen.get(handle);
+    if (earlier !== undefined) {
+      for (const at of [earlier, index]) {
+        failures.push({
+          kind: "policy",
+          index: at,
+          handle,
+          code: "rel.invalid",
+          message: `policy "${handle}" appears twice`,
+        });
+      }
+      return;
+    }
+    seen.set(handle, index);
+    if (policyRuleViolated(isObject(resource.config) ? resource.config : {})) {
+      failures.push({
+        kind: "policy",
+        index,
+        handle,
+        code: "pol.invalid",
+        message: "policy: invalid",
+        details: { details: { violations: [MIN_ABOVE_MAX_VIOLATION] } },
+      });
+    }
+  });
+  return failures;
 }
 
 /** The array at a bundle field, or an empty one when the field is absent. */
@@ -1301,6 +1522,9 @@ export function setupPlatformHandlers() {
         origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
+        // The claim's team owns the project, as the server's owning-team
+        // assignment does; null until the project is claimed.
+        owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
@@ -1438,19 +1662,38 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
+      // The service validates each policy against its template and refuses two
+      // for one operation, reporting every refused resource under
+      // `rel.invalid`.
+      const refused = bundlePolicyFailures(bundle);
+      if (refused.length > 0) {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: the bundle has invalid resources", {
+            resources: refused,
+          }),
+          { status: 400 },
+        );
+      }
       const entries = bundleDigestEntries(bundle);
-      if (entries.length === 0 || entries.length > 50) {
+      const total = entries.length + asArray(bundle.policies).length;
+      if (total === 0 || total > 50) {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
           { status: 400 },
         );
       }
-      // `makePointers` is deferred so a bundle only materialises revisions when
-      // the release is new, not on a deduped resubmission.
+      // Policies are published before the lookup, and the digest takes their
+      // revision ids: see publishBundlePolicies.
+      const policyPointers = publishBundlePolicies(project.id, bundle);
+      for (const pointer of policyPointers) {
+        entries.push({ kind: "policy", handle: pointer.handle, content: pointer.revision_id });
+      }
+      // `makePointers` is deferred so a bundle only materialises the other
+      // revisions when the release is new, not on a deduped resubmission.
       return upsertRelease(
         project.id,
         contentDigest(entries),
-        () => materializeBundle(project.id, bundle),
+        () => materializeBundle(project.id, bundle, policyPointers),
         data,
       );
     }),
@@ -2217,16 +2460,11 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
-      // and the generated zod does not coerce, so out-of-range limits are
-      // rejected by the schema (1-100) rather than silently normalised.
-      const { limit, ...rest } = queryRecord(request);
       // `expand` repeats (`expand=in_use&expand=…`) and is an array in the
       // spec; queryRecord keeps only its last value.
       const expand = new URL(request.url).searchParams.getAll("expand");
       const raw = {
-        ...rest,
-        ...(limit === undefined ? {} : { limit: Number(limit) }),
+        ...listQueryRecord(request),
         ...(expand.length === 0 ? {} : { expand }),
       };
       const query = parse(ListSchemasQueryParams, raw, "invalid_query");
@@ -2247,17 +2485,13 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.kind || schemaKind(r.body) === query.data.kind,
       );
-      // The real cursor is opaque; the mock's is the next start index. A token
-      // it never minted is rejected with req.invalid, like the real server.
-      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
-      if (!Number.isInteger(start) || start < 0) {
-        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
       }
-      const page = records.slice(start, start + query.data.limit);
+      const { page, next } = paged;
       // The mock keeps no users, so no revision is ever in use.
       const inUse = query.data.expand?.includes("in_use") ? { in_use: false } : {};
-      const next =
-        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
@@ -2537,6 +2771,155 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // --- operation policies ---------------------------------------------------
+    // `setup` publishes the password policy here, a release build publishes
+    // `.zitadel/policies/*.json` through the same revision helper, and
+    // `policies list|get` read them back. They mirror the server's answers: an
+    // unknown setting is malformed (`req.invalid` there), and a minimum above
+    // the maximum fails the template's config rule (`pol.invalid`).
+
+    http.post("*/policies", async ({ request }) => {
+      const query = parse(PublishPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      // Like the server's decoder: unknown settings are refused, while an
+      // extra top-level key (the file's `$schema`) is ignored.
+      const body = parse(policyConfigSchema.loose(), raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      const { operation, config } = body.data;
+      if (policyRuleViolated(config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const { record, revision } = publishPolicyRevision(query.data.project_id, operation, config);
+
+      const out = parse(
+        PublishPolicyResponse,
+        policyResponse(record, revision),
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/policies", ({ request }) => {
+      const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      // First published first; `seq` stands in for created_at.
+      const records = [...store.policies.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => !query.data.operation || record.operation === query.data.operation)
+        .sort((a, b) => a.seq - b.seq);
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        policies: paged.page.map((record) => policyResponse(record, newestRevision(record))),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPoliciesResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
+    // as a policy id.
+    http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetPolicyRevisionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      for (const record of store.policies.values()) {
+        if (record.projectId !== query.data.project_id) continue;
+        const revision = record.revisions.find((r) => r.revisionId === path.data.revision_id);
+        if (revision) {
+          const out = parse(
+            GetPolicyRevisionResponse,
+            policyResponse(record, revision),
+            "mock_response_invalid",
+          );
+          return out.ok ? HttpResponse.json(out.data) : out.response;
+        }
+      }
+      return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+    }),
+
+    http.get("*/policies/:policy_id", ({ params, request }) => {
+      const path = parse(GetPolicyParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const out = parse(
+        GetPolicyResponse,
+        policyResponse(record, newestRevision(record)),
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/policies/:policy_id/revisions", ({ params, request }) => {
+      const path = parse(ListPolicyRevisionsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(
+        ListPolicyRevisionsQueryParams,
+        listQueryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const paged = pageOf(
+        [...record.revisions].reverse(),
+        query.data.limit,
+        query.data.page_token,
+      );
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        revisions: paged.page.map((revision) => policyResponse(record, revision)),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPolicyRevisionsResponse, responseBody, "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     // --- variables ---------------------------------------------------------

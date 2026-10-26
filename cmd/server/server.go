@@ -319,14 +319,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	releaseService := service.NewReleaseService(
-		serviceDBPool,
-		schemaService,
-		flowDefinitionSvc,
-		brandingService,
-		idpConnectionService,
-		builtinBases,
-	)
 	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
@@ -340,6 +332,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
 	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
@@ -714,8 +716,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	})
 	v.SetDefault("instrumentation.log.format", instrumentation.LogFormatText)
 	v.SetDefault("instrumentation.log.add_source", true)
+	// The location is cheap and stays on. A stack is one debug.Stack() per
+	// error, so it is opt-in. See ADR 030.
 	v.SetDefault("instrumentation.log.errors.report_location", true)
-	v.SetDefault("instrumentation.log.errors.stack_trace", true)
+	v.SetDefault("instrumentation.log.errors.stack_trace", false)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
 	// Off: an incoming traceparent is not used. See ADR 080.
 	v.SetDefault("instrumentation.trace.trust_remote_spans", false)

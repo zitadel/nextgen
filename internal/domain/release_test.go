@@ -82,6 +82,26 @@ func TestNewReleaseRejects(t *testing.T) {
 	}
 }
 
+func TestNewReleasePinsPolicyByOperation(t *testing.T) {
+	t.Parallel()
+
+	withPolicy := content()
+	withPolicy.Policies = []*domain.Policy{{ID: "pol_1", RevisionID: "polrev_1", Operation: "auth.factor.password.set"}}
+
+	release, err := domain.NewRelease("proj_1", withPolicy, domain.ReleaseMetadata{})
+	require.NoError(t, err)
+	assert.Contains(t, release.Pointers, domain.ReleasePointer{
+		Kind:       domain.ReleasePointerKindPolicy,
+		Handle:     "auth.factor.password.set",
+		RevisionID: "polrev_1",
+	})
+
+	// One policy per operation: two revisions of it cannot be pinned together.
+	withPolicy.Policies = append(withPolicy.Policies, &domain.Policy{ID: "pol_1", RevisionID: "polrev_2", Operation: "auth.factor.password.set"})
+	_, err = domain.NewRelease("proj_1", withPolicy, domain.ReleaseMetadata{})
+	assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
+}
+
 func TestNewReleaseRejectsSchemaWithoutObjectType(t *testing.T) {
 	t.Parallel()
 

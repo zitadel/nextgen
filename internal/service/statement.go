@@ -70,6 +70,9 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	// GetProject is GetProjectByID reading what opts asks for besides the
+	// project's own row, in the same round trip.
+	GetProject(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns
@@ -136,6 +139,14 @@ type CryptoKeyStatements interface {
 // 	Statementer[JSONSchemaStatements]
 // 	Transactioner[JSONSchemaStatements]
 // }
+
+// ProjectQueryOptions selects what a project read loads besides the project's
+// own row.
+type ProjectQueryOptions struct {
+	// OwningTeam reads the team that owns the project (ADR 054 §2) into
+	// Project.OwningTeamID.
+	OwningTeam bool
+}
 
 // JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
 // column predicates. Column predicates stay in Filter / ListOptions.
@@ -314,8 +325,9 @@ type PreviewStatements interface {
 	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
 	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
 	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
-	// DeletePreview is idempotent.
-	DeletePreview(ctx context.Context, projectID, origin string) (deleted bool, err error)
+	// DeleteLivePreview deletes only if the preview is still live at now, so
+	// an expired one is left for the sweep. Idempotent.
+	DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 	// DeleteExpiredPreview deletes only if the preview expired by now, so a
 	// racing renewal survives the sweep.
 	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
@@ -750,6 +762,14 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// ListProjectAdmins returns a page of the people, by user id, who
+	// administer the project: as active members of the owning team, as active
+	// members of a team with an unexpired admin grant, or as existing users
+	// with an unexpired admin grant. Only people viewerUserID may see are
+	// listed: those with a grant of their own, or members of one of the
+	// project's admin teams that viewerUserID is also an active member of.
+	// Each carries every way they administer the project.
+	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
