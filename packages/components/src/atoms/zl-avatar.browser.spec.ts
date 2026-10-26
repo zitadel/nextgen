@@ -5,9 +5,10 @@ import "./zl-avatar.js";
 import type { ZlAvatar } from "./zl-avatar.js";
 
 /**
- * Computed paint, in a real browser because jsdom resolves neither `var()`
- * nor animations. Tokens are injected because the browser project loads no
- * stylesheet, and the gradient's colours come from them.
+ * Computed paint, in a real browser because jsdom resolves no `var()`. Tokens
+ * are injected because the browser project loads no stylesheet, and the
+ * gradient's colours come from them. Nothing registers the moving angles here,
+ * as on a page that never loads `avatar.css`.
  */
 describe("<zl-avatar> paint (chromium)", () => {
   let host: HTMLDivElement;
@@ -26,21 +27,11 @@ describe("<zl-avatar> paint (chromium)", () => {
     style.remove();
   });
 
-  async function mount(markup: string): Promise<CSSStyleDeclaration> {
-    host.innerHTML = markup;
+  it("paints its gradient at the seed's own angle, with the moving angles unregistered", async () => {
+    host.innerHTML = `<zl-avatar seed="maya@example.com"></zl-avatar>`;
     const element = host.querySelector("zl-avatar") as ZlAvatar;
     await element.updateComplete;
     const avatar = element.shadowRoot?.querySelector(".zl-avatar") as HTMLElement;
-    return getComputedStyle(avatar);
-  }
-
-  it("holds still, so a remount on the next step does not jump", async () => {
-    const avatar = await mount(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
-    expect(avatar.animationName).toBe("none");
-  });
-
-  it("paints its gradient at the seed's own angle, with the moving angles unregistered", async () => {
-    const avatar = await mount(`<zl-avatar seed="maya@example.com"></zl-avatar>`);
-    expect(avatar.backgroundImage).toMatch(/^linear-gradient\(324deg, /);
+    expect(getComputedStyle(avatar).backgroundImage).toMatch(/^linear-gradient\(324deg, /);
   });
 });

@@ -8,8 +8,7 @@
    those standard names so shadcn/ui components drop in unchanged. */
 @import "@zitadel/design-tokens/css/shadcn.css";
 
-/* The generated avatar's gradient (`.zl-avatar`) and opt-in motion
-   (`.zl-avatar-moving`), shared with the login's `<zl-avatar>` so the two never
+/* The generated avatar, shared with the login's `<zl-avatar>` so the two never
    drift (`components/user-avatar.tsx`). */
 @import "@zitadel/components/avatar.css";
 

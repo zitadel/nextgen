@@ -31,9 +31,8 @@ function setRate(element: HTMLElement | null, rate: number) {
  * rules, so it is the one the login shows. A picture can replace it once
  * users can upload one.
  *
- * It moves: `zl-avatar-moving` opts into the shared drift
- * (`@zitadel/components/avatar.css`), a slow turn plus two sways of the
- * gradient's direction, unless the person asked for reduced motion.
+ * It moves: `zl-avatar-moving` opts into the shared drift of the gradient's
+ * direction (`@zitadel/components/avatar.css`).
  *
  * With `fast` it moves `FAST` times quicker: the playback rate
  * changes, not the duration, so the motion speeds up from where it is instead
