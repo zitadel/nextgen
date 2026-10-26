@@ -21,6 +21,7 @@ import {
   providerOf,
   selectionName,
   type ConnectionSlug,
+  parseClientSecret,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 import semver from "semver";
@@ -136,7 +137,6 @@ import {
 } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { Promptable } from "../../lib/oclif/promptable";
-import { clientSecretQuestion } from "../../lib/questions";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -1346,7 +1346,10 @@ export async function ssoFromFlags(
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
   const secret = await ask({
-    ...clientSecretQuestion({ provider: providerOf(selection).displayName }),
+    kind: "secret",
+    name: "client secret",
+    message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
+    parse: parseClientSecret,
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
