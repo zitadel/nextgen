@@ -1,9 +1,22 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ProjectMark } from "./project-mark";
 import { UserAvatar } from "./user-avatar";
 
 describe("UserAvatar", () => {
+  it("opts into the shared motion, which a project's mark leaves off", () => {
+    const { container } = render(
+      <>
+        <UserAvatar seed="user_1" />
+        <ProjectMark projectId="proj_1" />
+      </>,
+    );
+    const [person, project] = container.querySelectorAll(".zl-avatar");
+    expect(person?.classList.contains("zl-avatar-moving")).toBe(true);
+    expect(project?.classList.contains("zl-avatar-moving")).toBe(false);
+  });
+
   it("eases up to speed on hover, and coasts back to rest", () => {
     vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance"] });
     // jsdom runs no CSS animations, so stand in for the gradient's.

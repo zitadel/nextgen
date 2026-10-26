@@ -197,7 +197,12 @@ export default class Doctor extends BaseCommand {
       : bareResolves
         ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
         : undefined;
-    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion, claimSelector);
+    const warningAdvice = advisoryForWarnings(
+      warnings,
+      this.meta.cliVersion,
+      claimSelector,
+      selector,
+    );
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =
@@ -384,7 +389,8 @@ export function failureAdvice(
 
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review and a dependency remedy.
+ * nudge, the managed-runtime review, a dependency remedy and the meta-schema
+ * refresh.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -394,6 +400,8 @@ export function advisoryForWarnings(
    * reads, or nothing when no selector reaches it.
    */
   local: EnvironmentSelector | undefined,
+  /** This run's selection, which a suggested rerun of doctor carries. */
+  selector: EnvironmentSelector,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -443,6 +451,13 @@ export function advisoryForWarnings(
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
     );
     nextCommands.push(dependencyRemedy);
+  }
+
+  if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
+    nextActions.push(
+      "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
+    );
+    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (nextActions.length === 0 && nextCommands.length === 0) {
@@ -752,6 +767,25 @@ function claimWindowClosed(check: CheckOutcome): boolean {
     typeof details === "object" &&
     details !== null &&
     (details as { claimable?: unknown }).claimable === false
+  );
+}
+
+/**
+ * Whether the meta-schemas warning lists a missing or outdated file that this
+ * CLI's `--fix` writes: not when the project pins a newer `@zitadel/*`
+ * version, whose own doctor writes them. A file behind a symlink, or one the
+ * CLI cannot read, only gets the warning's reason.
+ */
+function hasRepairableMetaSchemas(check: CheckOutcome | undefined): boolean {
+  if (check?.status !== "warn") {
+    return false;
+  }
+  const details = check.details as
+    | { missing?: unknown[]; outdated?: unknown[]; newer_pin?: unknown }
+    | undefined;
+  return (
+    details?.newer_pin === undefined &&
+    (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0
   );
 }
 

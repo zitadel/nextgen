@@ -80,6 +80,8 @@ func expectInsert(statements *servicemocks.MockAllStatements, read []domain.Orig
 			entity.DeployedAt = deployedAt
 			return nil
 		})
+	statements.EXPECT().FreezeDeploymentVariables(gomock.Any(), "proj_1", "dep_new").
+		Return(&domain.VariableSet{ProjectID: "proj_1"}, nil)
 }
 
 func servingDeployment(releaseID string) *domain.Deployment {
