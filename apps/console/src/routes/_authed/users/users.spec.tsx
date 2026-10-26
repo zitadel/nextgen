@@ -42,9 +42,9 @@ function recordQueries(response: (body: Record<string, unknown>) => Response) {
   return bodies;
 }
 
-/** Opens the toolbar's Columns menu and returns it. */
+/** Opens the Columns menu by right-clicking the table, and returns it. */
 async function openColumns() {
-  await userEvent.click(await screen.findByRole("button", { name: "Columns" }));
+  await userEvent.pointer({ keys: "[MouseRight]", target: await screen.findByRole("table") });
   return within(await screen.findByRole("menu"));
 }
 
@@ -506,6 +506,36 @@ describe("users screen", () => {
     const reloaded = within(await screen.findByRole("table"));
     expect(await reloaded.findByRole("columnheader", { name: "Company name" })).toBeInTheDocument();
     expect(reloaded.getByText("Acme")).toBeInTheDocument();
+  });
+
+  it("opens the Columns menu from the table, not from a link in it", async () => {
+    // The menu replaces a toolbar button. A right-click on a link still gets
+    // the browser's own menu (open in a new tab, copy the link).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: { email: "maya@acme.com", companyName: "Acme" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const link = await screen.findByRole("link", { name: "maya@acme.com" });
+    expect(screen.queryByRole("button", { name: "Columns" })).not.toBeInTheDocument();
+    await userEvent.pointer({ keys: "[MouseRight]", target: link });
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+
+    const menu = await openColumns();
+    expect(menu.getByText("Columns")).toBeInTheDocument();
+    expect(menu.getByRole("menuitemcheckbox", { name: "Company name" })).toBeInTheDocument();
   });
 
   it("shows the default columns, and still pins, when storage is unavailable", async () => {

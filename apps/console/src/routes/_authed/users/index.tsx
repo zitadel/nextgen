@@ -1,6 +1,14 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Box, Columns3, MoreVertical, Plus, User } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Box, MoreVertical, Plus, User } from "lucide-react";
+import {
+  Fragment,
+  type MouseEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { AddUserSheet } from "@/components/add-user-sheet";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
@@ -32,14 +40,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
@@ -185,93 +193,99 @@ function UsersScreen() {
         Users
       </ResourceTitle>
 
-      {pickable.length > 0 && (
-        <div className={`${RESOURCE_TABLE_TOP} flex justify-end`}>
-          <ColumnsMenu groups={pickable} pins={pins} onToggle={togglePin} />
-        </div>
-      )}
       {/* The pinned columns give the table no fixed width. The ID gives way
           first; more pinned columns than fit scroll the table horizontally
           rather than compressing cells. The row menu (and from 640px the User
           column) stays pinned to the card's edge while the rest scrolls under
-          it, so the menu is reachable at any width. */}
-      <div
-        ref={scroll.ref}
-        data-scroll-start={scroll.edges.start || undefined}
-        data-scroll-end={scroll.edges.end || undefined}
-        className={`${RESOURCE_TABLE_WRAP} ${pickable.length > 0 ? "mt-3" : RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
-      >
-        <Table className="text-xs">
-          <TableHeader>
-            <ResourceHeaderRow>
-              <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
-              {pinned.map((column) => (
-                <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
-              ))}
-              {showAttributes && <ResourceHeadCell>Attributes</ResourceHeadCell>}
-              <ResourceHeadCell>Status</ResourceHeadCell>
-              {/* After `Status`, where the design's column order puts it. */}
-              {/* Memberships, not ownership: the team that owns a user's
+          it, so the menu is reachable at any width. Right-clicking the table
+          opens the Columns menu. */}
+      <ColumnsContextMenu groups={pickable} pins={pins} onToggle={togglePin}>
+        <div
+          ref={scroll.ref}
+          data-scroll-start={scroll.edges.start || undefined}
+          data-scroll-end={scroll.edges.end || undefined}
+          className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP} ${RESOURCE_TABLE_SCROLL}`}
+        >
+          <Table className="text-xs" onContextMenu={keepLinkMenu}>
+            <TableHeader>
+              <ResourceHeaderRow>
+                <ResourceHeadCell className={RESOURCE_STICKY_START}>User</ResourceHeadCell>
+                {pinned.map((column) => (
+                  <ResourceHeadCell key={column.key}>{column.label}</ResourceHeadCell>
+                ))}
+                {showAttributes && <ResourceHeadCell>Attributes</ResourceHeadCell>}
+                <ResourceHeadCell>Status</ResourceHeadCell>
+                {/* After `Status`, where the design's column order puts it. */}
+                {/* Memberships, not ownership: the team that owns a user's
                   lifecycle is a different relation (ADR 024), in the User
                   cell's hover card (D23). */}
-              {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
-              <ResourceHeadCell>ID</ResourceHeadCell>
-              {/* 52px: the 36px menu button and 8px either side. The cell
+                {teamsExpanded && <ResourceHeadCell>Member of</ResourceHeadCell>}
+                <ResourceHeadCell>ID</ResourceHeadCell>
+                {/* 52px: the 36px menu button and 8px either side. The cell
                   inset the other columns take would make this pinned column
                   84px wide for one icon. */}
-              <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
-            </ResourceHeaderRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <ResourceEmptyRow
-                colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 5 : 4)}
-              >
-                No users yet.
-              </ResourceEmptyRow>
-            ) : (
-              rows.map((user) => (
-                <ResourceRow key={user.id} className="group">
-                  <UserIdentityCell
-                    user={user}
-                    sticky
-                    card={{
-                      schemaTitle: schemaTitles.get(user.schemaId) ?? user.schemaId,
-                      teamsKnown: teamsExpanded,
-                    }}
-                  />
-                  {pinned.map((column) => (
-                    <TableCell key={column.key} className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
-                      {user.values[column.key] ?? "—"}
-                    </TableCell>
-                  ))}
-                  {showAttributes && (
-                    <UserAttributesCell user={user} summary={attributeSummary(user, pinned)} />
-                  )}
-                  <TableCell className={RESOURCE_CELL}>
-                    <StatusBadge status={user.status} />
-                  </TableCell>
-                  {teamsExpanded && (
-                    <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
-                      <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
-                    </TableCell>
-                  )}
-                  <UserIdCell user={user} />
-                  <TableCell
-                    className={cn(RESOURCE_CELL, "px-2", RESOURCE_STICKY_END, RESOURCE_STICKY_BODY)}
-                  >
-                    <RowActions
-                      userId={user.id}
-                      name={user.name}
-                      onDeleted={() => router.invalidate()}
+                <ResourceMenuHead className={`w-13 px-2 ${RESOURCE_STICKY_END}`} />
+              </ResourceHeaderRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <ResourceEmptyRow
+                  colSpan={pinned.length + (showAttributes ? 1 : 0) + (teamsExpanded ? 5 : 4)}
+                >
+                  No users yet.
+                </ResourceEmptyRow>
+              ) : (
+                rows.map((user) => (
+                  <ResourceRow key={user.id} className="group">
+                    <UserIdentityCell
+                      user={user}
+                      sticky
+                      card={{
+                        schemaTitle: schemaTitles.get(user.schemaId) ?? user.schemaId,
+                        teamsKnown: teamsExpanded,
+                      }}
                     />
-                  </TableCell>
-                </ResourceRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                    {pinned.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}
+                      >
+                        {user.values[column.key] ?? "—"}
+                      </TableCell>
+                    ))}
+                    {showAttributes && (
+                      <UserAttributesCell user={user} summary={attributeSummary(user, pinned)} />
+                    )}
+                    <TableCell className={RESOURCE_CELL}>
+                      <StatusBadge status={user.status} />
+                    </TableCell>
+                    {teamsExpanded && (
+                      <TableCell className={`${RESOURCE_CELL_MUTED} ${USER_CLAMP}`}>
+                        <TeamCell teams={user.teams} truncated={user.teamsTruncated} />
+                      </TableCell>
+                    )}
+                    <UserIdCell user={user} />
+                    <TableCell
+                      className={cn(
+                        RESOURCE_CELL,
+                        "px-2",
+                        RESOURCE_STICKY_END,
+                        RESOURCE_STICKY_BODY,
+                      )}
+                    >
+                      <RowActions
+                        userId={user.id}
+                        name={user.name}
+                        onDeleted={() => router.invalidate()}
+                      />
+                    </TableCell>
+                  </ResourceRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </ColumnsContextMenu>
       {/* Full width and `secondary`, 24px under the table, not a centred pill. */}
       <LoadMore paging={paging} />
     </Page>
@@ -308,57 +322,65 @@ function useColumnPins(projectId: string): [ColumnPins, (schemaId: string, key: 
 }
 
 /**
- * The toolbar's Columns menu: a checkbox per schema property, pinning it as its
- * own column. Grouped under each schema's title when the loaded users mix
- * schemas, since a pin belongs to one schema's property.
+ * The Columns menu, opened by right-clicking the table (a long press on touch,
+ * the context-menu key or Shift+F10 on a focused control in it): a checkbox
+ * per schema property, pinning it as its own column. Grouped under each
+ * schema's title when the loaded users mix schemas, since a pin belongs to one
+ * schema's property.
  *
  * Selecting an item keeps the menu open, so several can be pinned in one go.
+ * With nothing to offer, the table keeps the browser's own menu.
  */
-function ColumnsMenu({
+function ColumnsContextMenu({
   groups,
   pins,
   onToggle,
+  children,
 }: {
   groups: ColumnGroup[];
   pins: ColumnPins;
   onToggle: (schemaId: string, key: string) => void;
+  children: ReactNode;
 }) {
+  if (groups.length === 0) return children;
   const grouped = groups.length > 1;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Columns3 aria-hidden strokeWidth={1.5} />
-          Columns
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-56"
-      >
-        {groups.map((group, index) => (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="max-h-[min(24rem,var(--radix-context-menu-content-available-height))] w-56">
+        <ContextMenuLabel>Columns</ContextMenuLabel>
+        {groups.map((group) => (
           <Fragment key={group.schemaId}>
-            {index > 0 && <DropdownMenuSeparator />}
+            <ContextMenuSeparator />
             {grouped && (
-              <DropdownMenuLabel className="text-muted-foreground truncate text-xs">
+              <ContextMenuLabel className="text-muted-foreground truncate text-xs font-normal">
                 {group.title}
-              </DropdownMenuLabel>
+              </ContextMenuLabel>
             )}
             {group.fields.map((entry) => (
-              <DropdownMenuCheckboxItem
+              <ContextMenuCheckboxItem
                 key={entry.key}
                 checked={pins[group.schemaId]?.includes(entry.key) ?? false}
                 onCheckedChange={() => onToggle(group.schemaId, entry.key)}
                 onSelect={(event) => event.preventDefault()}
               >
                 <span className="truncate">{entry.label}</span>
-              </DropdownMenuCheckboxItem>
+              </ContextMenuCheckboxItem>
             ))}
           </Fragment>
         ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </ContextMenuContent>
+    </ContextMenu>
   );
+}
+
+/**
+ * A right-click on a link keeps the browser's own menu (open in a new tab,
+ * copy the link) rather than the Columns menu: stopping the event here, under
+ * the trigger, never prevents its default.
+ */
+function keepLinkMenu(event: MouseEvent) {
+  if (event.target instanceof Element && event.target.closest("a")) event.stopPropagation();
 }
 
 /**
