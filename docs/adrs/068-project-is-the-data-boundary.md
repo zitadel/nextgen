@@ -1,7 +1,11 @@
 # ADR 068: The Project Is the Data Boundary
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-10-08)
 > **Date:** 2026-10-08
+>
+> **Amendment (2026-10-24):** the environment entity is gone (#1643,
+> migration `000028_drop_environments.sql`), and #1569 amended the ADRs that
+> assumed it.
 > **Context:** [#966](https://github.com/zitadel/nextgen/issues/966) (data
 > isolation) and [#528](https://github.com/zitadel/nextgen/issues/528)
 > (environments), answered by the spike

@@ -21,7 +21,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
-import { CLI_APPLY, CliCommand, CliHint } from "@/components/cli-hint";
+import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
@@ -111,8 +111,8 @@ function LoginFlowsScreen() {
           </TableBody>
         </Table>
         <CliHint>
-          Edit the definitions locally, then apply your changes with{" "}
-          <CliCommand>{CLI_APPLY}</CliCommand>.
+          Edit the definitions locally, then deploy your changes with{" "}
+          <CliCommand>{CLI_DEPLOY}</CliCommand>.
         </CliHint>
       </div>
     </Page>

@@ -21,7 +21,8 @@ import { LocalServer } from "../lib/local-server/server";
 import { consoleSignInUrl } from "../lib/local-server/sign-in";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
+import { nextCommandsData } from "../lib/oclif/envelope";
+import { unscopedCommand } from "../lib/suggestion";
 import { reportWarning } from "../lib/warnings";
 
 export default class Start extends BaseCommand {
@@ -83,9 +84,8 @@ export default class Start extends BaseCommand {
           urls: {
             api: serverUrl,
             console: `${serverUrl}/ui/console/`,
-            login: `${serverUrl}/ui/login/`,
           },
-          next_commands: [publicCliCommand("start", this.meta.cliVersion)],
+          ...nextCommandsData([unscopedCommand("start", this.meta.cliVersion)]),
         },
       });
     }
@@ -210,7 +210,6 @@ function readyData(
     urls: {
       api: metadata.server_url,
       console: `${metadata.server_url}/ui/console/`,
-      login: `${metadata.server_url}/ui/login/`,
     },
     ...(console ? { console } : {}),
     next_actions: [
@@ -221,13 +220,13 @@ function readyData(
       "Setup installs dependencies when needed; then start your app dev server.",
       serverLogAction(cliVersion),
     ],
-    next_commands: [
-      publicCliCommand("setup --server local", cliVersion),
+    ...nextCommandsData([
+      unscopedCommand("setup --server local", cliVersion),
       // Only when a link could actually be minted: `zitadel console` mints
       // the same way, so suggesting it after a failure sends the caller at a
       // command that fails again.
-      ...(console?.sign_in_url ? [publicCliCommand("console", cliVersion)] : []),
-    ],
+      ...(console?.sign_in_url ? [unscopedCommand("console", cliVersion)] : []),
+    ]),
   };
 }
 

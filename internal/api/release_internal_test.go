@@ -192,6 +192,21 @@ func TestRequireBuildKindScopes(t *testing.T) {
 		assert.Contains(t, err.Error(), "idp.write")
 	})
 
+	t.Run("missing policy.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		err := requireBuildKindScopes(ctx, api.ConfigurationBundle{
+			Policies: []api.PublishPolicyRequest{api.NewPasswordSetPolicyInputPublishPolicyRequest(api.PasswordSetPolicyInput{
+				Operation: api.PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+			})},
+		})
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "policy.write")
+	})
+
 	t.Run("empty kinds need no extra scope", func(t *testing.T) {
 		ctx := WithScopeContext(context.Background(), ScopeContext{
 			ProjectID: "proj_a",

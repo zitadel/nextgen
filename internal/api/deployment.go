@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -28,7 +29,9 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ProjectID: string(params.ProjectID),
 		ReleaseID: string(req.ReleaseID.Value),
 		Targets:   req.Targets,
-		HasTTL:    req.TTL.Set,
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))
@@ -51,7 +54,7 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if err != nil {
 		return nil, err
 	}
-	// Created or not, the deployment is the project's newest primary one.
+	// Created or not, the deployment is the newest to its targets.
 	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
 	if result.Created {
 		created := api.CreateDeploymentCreated(resp)

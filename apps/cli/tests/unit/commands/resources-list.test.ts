@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { RESOURCES } from "../../../src/commands/resources";
+import { onATerminal } from "../../helpers/project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 type Json = Record<string, unknown>;
@@ -13,19 +14,18 @@ describe("zitadel resources", () => {
       status: string;
       data: {
         count: number;
-        resources: Array<{ topic: string; verbs: string[]; filter_fields?: string[] }>;
+        items: Array<{ topic: string; verbs: string[]; filter_fields?: string[] }>;
       };
     };
     expect(json.status).toBe("ok");
     expect(json.data.count).toBe(Object.keys(RESOURCES).length);
-    expect(json.data.resources.map((resource) => resource.topic)).toEqual(Object.keys(RESOURCES));
+    expect(json.data.items.map((resource) => resource.topic)).toEqual(Object.keys(RESOURCES));
   });
 
   it("reports the verbs each resource actually exposes", async () => {
     const res = await runCliForTest(["resources", "--json", "--non-interactive", "--no-telemetry"]);
-    const resources = (
-      parseJson(res.stdout) as { data: { resources: Array<Record<string, unknown>> } }
-    ).data.resources;
+    const resources = (parseJson(res.stdout) as { data: { items: Array<Record<string, unknown>> } })
+      .data.items;
     const byTopic = Object.fromEntries(resources.map((resource) => [resource.topic, resource]));
     expect(byTopic.users?.verbs).toEqual(["list", "get", "create", "update", "delete"]);
     expect(byTopic.sessions?.verbs).toEqual(["list", "get", "revoke"]);
@@ -38,14 +38,14 @@ describe("zitadel resources", () => {
     const resources = (
       parseJson(res.stdout) as {
         data: {
-          resources: Array<{
+          items: Array<{
             topic: string;
             create_fields?: Array<{ name: string; flag: string | null; required: boolean }>;
             update_fields?: Array<{ name: string; flag: string | null; required: boolean }>;
           }>;
         };
       }
-    ).data.resources;
+    ).data.items;
 
     const grants = resources.find((resource) => resource.topic === "grants");
     expect(grants?.create_fields?.[0]).toMatchObject({
@@ -79,10 +79,10 @@ describe("zitadel resources", () => {
     const idps = (
       parseJson(res.stdout) as {
         data: {
-          resources: Array<{ topic: string; document_root?: string; create_fields?: Json[] }>;
+          items: Array<{ topic: string; document_root?: string; create_fields?: Json[] }>;
         };
       }
-    ).data.resources.find((resource) => resource.topic === "idps");
+    ).data.items.find((resource) => resource.topic === "idps");
     const field = (name: string) => idps?.create_fields?.find((entry) => entry.name === name);
 
     // The fields are the connection's own, as `.zitadel/idps/<slug>.json` spells them.
@@ -104,7 +104,7 @@ describe("zitadel resources", () => {
     const resources = (
       parseJson(res.stdout) as {
         data: {
-          resources: Array<{
+          items: Array<{
             topic: string;
             paged?: boolean;
             drains?: boolean;
@@ -118,7 +118,7 @@ describe("zitadel resources", () => {
           }>;
         };
       }
-    ).data.resources;
+    ).data.items;
     const find = (topic: string, field: string) =>
       resources.find((r) => r.topic === topic)?.filters?.find((f) => f.field === field);
 
@@ -146,9 +146,9 @@ describe("zitadel resources", () => {
     const byTopic = Object.fromEntries(
       (
         parseJson(res.stdout) as {
-          data: { resources: Array<{ topic: string; delete_outcome?: string }> };
+          data: { items: Array<{ topic: string; delete_outcome?: string }> };
         }
-      ).data.resources.map((resource) => [resource.topic, resource.delete_outcome]),
+      ).data.items.map((resource) => [resource.topic, resource.delete_outcome]),
     );
     expect(byTopic.users).toBe("deleted");
     expect(byTopic.teams).toBe("deactivated");
@@ -157,9 +157,11 @@ describe("zitadel resources", () => {
   });
 
   it("renders a table for humans", async () => {
-    const res = await runCliForTest(["resources", "--non-interactive", "--no-telemetry"]);
+    const res = await onATerminal(() =>
+      runCliForTest(["resources", "--non-interactive", "--no-telemetry"]),
+    );
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("resource");
+    expect(res.stdout).toContain("topic");
     expect(res.stdout).toContain("users");
     expect(res.stdout).toContain("list, get, create, update, delete");
     expect(res.stdout).toContain(`${Object.keys(RESOURCES).length} resources`);

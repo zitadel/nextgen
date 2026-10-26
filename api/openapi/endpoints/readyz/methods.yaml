@@ -3,17 +3,27 @@ get:
   tags:
     - System
   summary: Check server readiness
-  description: Check whether the server is ready to accept requests
+  description: |
+    Answers whether the server can serve requests, which takes its database answering within a second.
+
+    Point a readiness probe here, so that a server whose database does not
+    answer gets no requests until it does. The check is one round trip to the
+    database.
   security: []
   responses:
     '200':
-      description: The server is ready to accept requests
+      description: The server and its database answer.
       content:
         text/plain:
           examples:
             ok:
               summary: Server is ready
               value: ok
+    '503':
+      description: The database did not answer within a second.
+      content:
+        text/plain:
+          examples:
             fail:
               summary: Server is not ready
               value: fail

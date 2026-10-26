@@ -11,6 +11,7 @@ get:
   security:
     - oauth2:
         - policy.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/policy-revision-id.yaml

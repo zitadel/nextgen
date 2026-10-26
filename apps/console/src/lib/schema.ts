@@ -202,31 +202,6 @@ function bounds(min: unknown, max: unknown, unit?: string): string | undefined {
 }
 
 /**
- * The columns the users table shows, unioned across every schema the loaded
- * users actually reference.
- *
- * The design has no fixed column set: its `Filled` variant lists
- * Given name / Family name / Company name / Email while `Minimal` lists only
- * Email, because the user model is `additionalProperties: true` keyed on
- * `schema`. The design decisions log (D4) settles what to show — every
- * available field rather than a curated default — so this unions rather than
- * intersects: a project with both a `business` and a `minimal` schema shows the
- * business columns, and minimal users render blank in them.
- *
- * Order follows {@link schemaFields} within a schema, and first-seen order
- * across them, so adding a schema appends columns instead of reshuffling.
- */
-export function schemaColumns(schemas: UserSchema[]): SchemaField[] {
-  const columns = new Map<string, SchemaField>();
-  for (const schema of schemas) {
-    for (const entry of schemaFields(schema)) {
-      if (!columns.has(entry.key)) columns.set(entry.key, entry);
-    }
-  }
-  return [...columns.values()];
-}
-
-/**
  * Every property a schema declares, including the nested objects
  * {@link schemaFields} drops.
  *
@@ -276,6 +251,27 @@ export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchem
     node = next;
   }
   return node;
+}
+
+/**
+ * One property a schema node declares, or `undefined` where it declares none
+ * by that key (an attribute the schema does not describe).
+ */
+export function declaredProperty(
+  node: UserSchema | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!node) return undefined;
+  const properties = readProperties(node);
+  return Object.hasOwn(properties, key) ? properties[key] : undefined;
+}
+
+/**
+ * A property's label as the forms and columns show it: its `title`, else the
+ * key humanised. A key the schema does not declare keeps its own spelling.
+ */
+export function schemaPropertyLabel(key: string, property?: Record<string, unknown>): string {
+  return property ? propertyLabel(key, property) : key;
 }
 
 /** A sign-in method as the schema's `x-auth-methods` annotation declares it. */

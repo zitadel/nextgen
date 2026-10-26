@@ -48,6 +48,25 @@ export function FormSheet({
   );
 }
 
+/**
+ * The drawer's title and close, ruled off from the body beneath. 56px with the
+ * rule inside it, as the top bar is, so the two rules meet in one line across
+ * the drawer's edge.
+ */
+export function FormSheetHeader({ title }: { title: string }) {
+  return (
+    <SheetHeader className="h-14 shrink-0 flex-row items-center justify-between gap-0 border-b border-border px-6 py-0">
+      <SheetTitle className="font-serif text-xl leading-none font-normal">{title}</SheetTitle>
+      <SheetClose
+        className="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        aria-label="Close"
+      >
+        <X className="size-5" aria-hidden />
+      </SheetClose>
+    </SheetHeader>
+  );
+}
+
 /** The drawer's form: title and close, the scrolling body, then Cancel and submit. */
 export function FormSheetForm({
   title,
@@ -75,16 +94,7 @@ export function FormSheetForm({
 
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <SheetHeader className="flex-row items-center justify-between gap-0 px-6 py-5">
-        <SheetTitle className="font-serif text-xl leading-none font-normal">{title}</SheetTitle>
-        <SheetClose
-          className="cursor-pointer opacity-70 transition-opacity hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-          aria-label="Close"
-        >
-          <X className="size-5" aria-hidden />
-        </SheetClose>
-      </SheetHeader>
-      <Separator />
+      <FormSheetHeader title={title} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6">
         {children}

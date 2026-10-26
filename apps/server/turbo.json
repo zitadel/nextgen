@@ -5,7 +5,8 @@
   // package, so every task lists its inputs: the `serverInputs` file group of
   // apps/server/moon.yml, repeated per task because turbo has no file groups.
   // Also compiled in through //go:embed or read by tests: the config defaults
-  // (incl. presets), the integration-test fixtures and the events catalog.
+  // (incl. presets), the integration-test fixtures, the events catalog and
+  // the product analytics catalog.
   // GOFLAGS and the target platform change what Go produces, so they are
   // hashed; the cache locations pass through globally (root turbo.json).
   "tasks": {
@@ -22,6 +23,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -43,6 +45,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -67,6 +70,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -77,6 +81,9 @@
         "$TURBO_ROOT$/api/generated/**",
         "$TURBO_ROOT$/api/openapi/components/schemas/errors/**",
         "$TURBO_ROOT$/api/openapi/endpoints/**/*-error-response.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/event.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/types/*.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/webhooks/*.yaml",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/internal/**/*_enumer.go",
         "$TURBO_ROOT$/internal/**/*.mock.go"
@@ -102,6 +109,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -128,6 +136,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -137,10 +146,10 @@
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
       ]
     },
-    // go vet compiles //go:embed all:dist, so the UI builds go first (a
+    // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -153,6 +162,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -161,7 +171,7 @@
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
     "lint": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -174,6 +184,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -181,11 +192,11 @@
         "$TURBO_ROOT$/biome.json"
       ]
     },
-    // The test binary embeds both UI dists. Listed directly and not only
+    // The test binary embeds the console's dist. Listed directly and not only
     // through vet: turbo hashes every dependency's result, but the direct edge
     // keeps the intent visible, as in moon.yml.
     "test": {
-      "dependsOn": ["openapi", "format", "vet", "lint", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["openapi", "format", "vet", "lint", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -198,6 +209,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
@@ -215,7 +227,7 @@
     // type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"],
       "inputs": [
@@ -229,6 +241,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -236,7 +249,7 @@
     },
     "test-spanner": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
       "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"],
       "inputs": [
@@ -250,6 +263,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
@@ -257,7 +271,7 @@
     },
     "test-sqlite": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "passThroughEnv": ["ZITADEL_TEST_*"],
       "inputs": [
@@ -271,16 +285,17 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
       ]
     },
-    // The binary embeds both UI dists; the dist bytes are inputs of the build
-    // alone, so a UI-only change re-links the binary without re-running the
-    // Go checks and tests.
+    // The binary embeds the console's dist; the dist bytes are inputs of the
+    // build alone, so a console-only change re-links the binary without
+    // re-running the Go checks and tests.
     "build": {
-      "dependsOn": ["check-generate", "@zitadel/console#build", "@zitadel/login-ui#build"],
+      "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -293,6 +308,7 @@
         "$TURBO_ROOT$/packages/config/defaults/**",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
+        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",

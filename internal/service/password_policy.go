@@ -79,6 +79,68 @@ func NewPasswordPolicy(engine *policy.Engine, resolver PolicyResolver, verifier 
 
 var _ PasswordGate = (*PasswordPolicy)(nil)
 
+var _ domain.FlowPasswordPolicy = (*PasswordPolicy)(nil)
+
+// PasswordLengthBounds implements [domain.FlowPasswordPolicy]: the length
+// bounds of the project's policy, which a flow step that asks for a new
+// password shows and checks before the gate does. Without a policy, or for a
+// bound it leaves unset, the minimum is 0 and the maximum is the domain cap.
+// Like the gate, it fails closed when the policy cannot be read.
+func (p *PasswordPolicy) PasswordLengthBounds(ctx context.Context, projectID string) (minLength, maxLength int, err error) {
+	bound, err := p.bind(ctx, projectID)
+	if err != nil {
+		return 0, 0, err
+	}
+	constraints, err := bound.Constraints()
+	if err != nil {
+		return 0, 0, domain.ErrInternal(err).WithMessage("failed to read the password policy")
+	}
+	maxLength = domain.MaxPasswordLength
+	if v, set, err := intSetting(constraints.Rules, "min_length"); err != nil {
+		return 0, 0, err
+	} else if set {
+		minLength = int(v)
+	}
+	if v, set, err := intSetting(constraints.Rules, "max_length"); err != nil {
+		return 0, 0, err
+	} else if set && int(v) < maxLength {
+		maxLength = int(v)
+	}
+	return minLength, maxLength, nil
+}
+
+// bind resolves the project's password policy and binds it to the template.
+// A policy that cannot be read, or a stored instance the current template
+// rejects, fails closed: the compatibility test is meant to prevent the
+// latter, and refusing is the only safe answer when it happens anyway.
+func (p *PasswordPolicy) bind(ctx context.Context, projectID string) (*policy.Bound, error) {
+	inst, err := p.resolver.ResolvePolicy(ctx, projectID, OperationPasswordSet)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to resolve the password policy")
+	}
+	bound, err := p.engine.Bind(ctx, OperationPasswordSet, inst)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to bind the password policy")
+	}
+	return bound, nil
+}
+
+// intSetting reads an integer setting from the policy's constraints. A
+// missing key is an unset rule; a present value that is not an int64 fails
+// closed, because reading it as unset would drop the rule and let a password
+// through.
+func intSetting(rules map[string]any, name string) (value int64, set bool, err error) {
+	raw, ok := rules[name]
+	if !ok {
+		return 0, false, nil
+	}
+	v, ok := raw.(int64)
+	if !ok {
+		return 0, false, domain.ErrInternal(fmt.Errorf("%s is %v", name, raw)).WithMessage("failed to read the password policy")
+	}
+	return v, true, nil
+}
+
 // CheckPassword evaluates the candidate. A denied candidate returns
 // [domain.ErrUserPasswordPolicyViolation] naming every failed rule; a
 // candidate over the server's cap is reported the same way, as max_length,
@@ -93,16 +155,9 @@ func (p *PasswordPolicy) CheckPassword(ctx context.Context, in SetPasswordInput)
 	}
 	length := utf8.RuneCountInString(normalized)
 
-	inst, err := p.resolver.ResolvePolicy(ctx, in.ProjectID, OperationPasswordSet)
+	bound, err := p.bind(ctx, in.ProjectID)
 	if err != nil {
-		return PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to resolve the password policy")
-	}
-	bound, err := p.engine.Bind(ctx, OperationPasswordSet, inst)
-	if err != nil {
-		// A stored instance the current template rejects; the compatibility
-		// test is meant to prevent it, and failing closed is the only safe
-		// answer when it happens anyway.
-		return PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to bind the password policy")
+		return PasswordCheck{}, err
 	}
 
 	// A candidate over the cap is refused whatever the history says, so it is
@@ -155,8 +210,11 @@ func (p *PasswordPolicy) historyMatches(ctx context.Context, bound *policy.Bound
 	if err != nil {
 		return nil, PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to read the password policy")
 	}
-	depth, ok := constraints.Rules["history_depth"].(int64)
-	if !ok || depth < 1 {
+	depth, set, err := intSetting(constraints.Rules, "history_depth")
+	if err != nil {
+		return nil, PasswordCheck{}, err
+	}
+	if !set || depth < 1 {
 		// Reading no depth would verify nothing and let any password through.
 		return nil, PasswordCheck{}, domain.ErrInternal(fmt.Errorf("history_depth is %v", constraints.Rules["history_depth"])).WithMessage("failed to read the password policy")
 	}

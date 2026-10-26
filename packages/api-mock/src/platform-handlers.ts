@@ -20,7 +20,7 @@
  *   afterAll(() => server.close());
  *   afterEach(() => { server.resetHandlers(); resetPlatformStore(); });
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { serverCanonicalFlow } from "./server-canonical-flow.js";
 
@@ -50,7 +50,13 @@ import {
   CreateIdpBody,
   CreateIdpQueryParams,
   CreateIdpResponse,
+  BuildReleaseBody,
+  BuildReleaseQueryParams,
+  CreateDeploymentBody,
+  CreateDeploymentQueryParams,
   CreateProjectBody,
+  CreateReleaseBody,
+  CreateReleaseQueryParams,
   CreateSchemaBody,
   CreateSchemaQueryParams,
   DeleteVariableParams,
@@ -61,13 +67,23 @@ import {
   GetClaimWindowParams,
   GetClaimWindowQueryParams,
   GetClaimWindowResponse,
+  GetDeploymentByIdParams,
+  GetDeploymentByIdQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
   GetIdpByIdQueryParams,
   GetIdpByIdResponse,
+  GetPolicyParams,
+  GetPolicyQueryParams,
+  GetPolicyResponse,
+  GetPolicyRevisionParams,
+  GetPolicyRevisionQueryParams,
+  GetPolicyRevisionResponse,
   GetProjectParams,
   GetProjectResponse,
+  GetReleaseByIdParams,
+  GetReleaseByIdQueryParams,
   GetSchemaByIdParams,
   GetSchemaByIdQueryParams,
   GetVariableParams,
@@ -76,15 +92,29 @@ import {
   GetVariablesQueryParams,
   GetVariablesResponse,
   InitClaimParams,
+  ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListReleasesQueryParams,
+  ListPoliciesQueryParams,
+  ListPoliciesResponse,
+  ListPolicyRevisionsParams,
+  ListPolicyRevisionsQueryParams,
+  ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
+  PublishPolicyQueryParams,
+  PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
   RemoveOriginBody,
   RemoveOriginParams,
+  RevokeReleaseParams,
+  RevokeReleaseQueryParams,
+  RollbackDeploymentBody,
+  RollbackDeploymentParams,
+  RollbackDeploymentQueryParams,
   UpdateVariablesBody,
   UpdateVariablesQueryParams,
   UpdateVariablesResponse,
@@ -92,6 +122,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -178,6 +209,43 @@ function parse<S extends z.ZodTypeAny>(
 /** Build a query-string record msw can hand to the generated `QueryParams` zod. */
 function queryRecord(request: Request): Record<string, string> {
   return Object.fromEntries(new URL(request.url).searchParams);
+}
+
+/**
+ * A `GET` list's query record with `limit` as a number: URLs carry strings and
+ * the generated zod does not coerce, so an out-of-range limit is refused by the
+ * schema rather than silently normalised.
+ */
+function listQueryRecord(request: Request): Record<string, unknown> {
+  const { limit, ...rest } = queryRecord(request);
+  return { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+}
+
+/**
+ * One page of a `GET` list. The real cursor is opaque; the mock's is the next
+ * start index, and a token it never minted is refused with `req.invalid`, like
+ * the real server.
+ */
+function pageOf<T>(
+  records: readonly T[],
+  limit: number,
+  pageToken: string | undefined,
+):
+  | { ok: true; page: T[]; next: string | undefined }
+  | { ok: false; response: HttpResponse<ErrorBody> } {
+  const start = pageToken === undefined ? 0 : Number(pageToken);
+  if (!Number.isInteger(start) || start < 0) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 }),
+    };
+  }
+  const page = records.slice(start, start + limit);
+  return {
+    ok: true,
+    page,
+    next: start + limit < records.length ? String(start + limit) : undefined,
+  };
 }
 
 /**
@@ -269,6 +337,23 @@ type IdpConnectionRecord = {
 };
 
 /**
+ * One operation policy (ADR 066), as the CLI's policy syncer publishes it.
+ *
+ * Keyed by `id`; `operation` is what dedupes a write. A project has one policy
+ * per operation, and every publish appends a revision beneath its id, so a
+ * second `POST /policies` for the same operation revises it — which is what
+ * keeps the CLI's `plan`/`apply` idempotent. Revisions are oldest first.
+ */
+type PolicyRecord = {
+  id: string;
+  projectId: string;
+  operation: string;
+  createdAt: string;
+  seq: number;
+  revisions: Array<{ revisionId: string; config: Record<string, unknown>; createdAt: string }>;
+};
+
+/**
  * One variable at the project level, which is the only owner the API addresses
  * today. `secret` decides what a read may say: a secret reports that a value is
  * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
@@ -276,11 +361,62 @@ type IdpConnectionRecord = {
  */
 type VariableRecord = { value: string | number | boolean; secret: boolean };
 
+/**
+ * One pinned resource of a release: which resource (`kind` + `handle`) and
+ * which revision of it. A bundle synthesises the revision id; `pointers` pins
+ * one that already exists.
+ */
+type ReleasePointer = { kind: string; handle: string; revision_id: string };
+
+/**
+ * A release in the store. `contentHash` is the bare 64-hex digest without the
+ * `sha256:` prefix — the prefix is added at the wire boundary, as the Go
+ * converter does — and is what dedupes a re-submitted bundle or pointer set.
+ * `revokedAt` is null until the release is revoked, after which it can never be
+ * served again.
+ */
+type ReleaseRecord = {
+  id: string;
+  projectId: string;
+  contentHash: string;
+  pointers: ReleasePointer[];
+  message: string | null;
+  gitSha: string | null;
+  gitDirty: boolean;
+  createdAt: string;
+  revokedAt: string | null;
+  seq: number;
+};
+
+/** One origin a deployment made its release live on, with a preview's expiry. */
+type DeploymentTargetRow = { origin: string; expiresAt: string | null };
+
+/**
+ * A deployment in the store: the release, the resolved targets, and why it
+ * happened. Append-only — a later deployment to an origin supersedes this one
+ * there without rewriting it. `rollbackTo` names the deployment a rollback
+ * re-applied, null otherwise.
+ */
+type DeploymentRecord = {
+  id: string;
+  projectId: string;
+  releaseId: string;
+  targets: DeploymentTargetRow[];
+  reason: "deploy" | "rollback";
+  message: string | null;
+  rollbackTo: string | null;
+  deployedAt: string;
+  seq: number;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
   flowDefinitions: Map<string, FlowDefinitionRecord>;
   idps: Map<string, IdpConnectionRecord>;
+  releases: Map<string, ReleaseRecord>;
+  deployments: Map<string, DeploymentRecord>;
+  policies: Map<string, PolicyRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -303,6 +439,9 @@ function makeStore(): Store {
     schemas: new Map(),
     flowDefinitions: new Map(),
     idps: new Map(),
+    releases: new Map(),
+    deployments: new Map(),
+    policies: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -497,6 +636,89 @@ function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
   };
 }
 
+/** One policy revision, in the wire shape every policy endpoint answers with. */
+function policyResponse(
+  record: PolicyRecord,
+  revision: PolicyRecord["revisions"][number],
+): Record<string, unknown> {
+  return {
+    id: record.id,
+    revision_id: revision.revisionId,
+    project_id: record.projectId,
+    operation: record.operation,
+    config: revision.config,
+    created_at: record.createdAt,
+    updated_at: revision.createdAt,
+  };
+}
+
+/** The newest revision of a policy; a stored policy always has one. */
+/**
+ * The violation the template's config rule `min_length_not_above_max_length`
+ * (internal/policy/templates/auth.factor.password.set.json) reports.
+ */
+const MIN_ABOVE_MAX_VIOLATION = {
+  config_rule: "min_length_not_above_max_length",
+  settings: ["max_length", "min_length"],
+};
+
+/**
+ * Whether a config breaks the template's config rule, which the server checks
+ * on publish and on a release build. A rule the template gains must be added
+ * here.
+ */
+function policyRuleViolated(config: Record<string, unknown>): boolean {
+  const { min_length: min, max_length: max } = config;
+  return typeof min === "number" && typeof max === "number" && min > max;
+}
+
+/**
+ * Publish config as the operation's newest revision, creating the policy on
+ * the first publish. With `reuseUnchanged`, a config equal to the newest
+ * revision's reuses it, as a release build does.
+ */
+function publishPolicyRevision(
+  projectId: string,
+  operation: string,
+  config: Record<string, unknown>,
+  { reuseUnchanged = false }: { reuseUnchanged?: boolean } = {},
+): { record: PolicyRecord; revision: PolicyRecord["revisions"][number] } {
+  const existing = [...store.policies.values()].find(
+    (record) => record.projectId === projectId && record.operation === operation,
+  );
+  if (reuseUnchanged && existing) {
+    const newest = newestRevision(existing);
+    if (JSON.stringify(sortedKeys(newest.config)) === JSON.stringify(sortedKeys(config))) {
+      return { record: existing, revision: newest };
+    }
+  }
+  const now = nowIso();
+  const revision = { revisionId: `polrev_${shortId()}`, config, createdAt: now };
+  const record: PolicyRecord = existing
+    ? { ...existing, revisions: [...existing.revisions, revision] }
+    : {
+        id: `pol_${shortId()}`,
+        projectId,
+        operation,
+        createdAt: now,
+        seq: ++store.lastSeq,
+        revisions: [revision],
+      };
+  store.policies.set(record.id, record);
+  return { record, revision };
+}
+
+/** A shallow copy with its keys in order, so two configs compare by value. */
+function sortedKeys(config: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(config).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function newestRevision(record: PolicyRecord): PolicyRecord["revisions"][number] {
+  return record.revisions[record.revisions.length - 1] as PolicyRecord["revisions"][number];
+}
+
+const POLICY_NOT_FOUND = errorBody("pol.not_found", "policy: not found");
+
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
   b: { createdAt: string; seq: number },
@@ -577,6 +799,7 @@ export type PlatformStoreSnapshot = {
   schemas: number;
   flowDefinitions: number;
   idps: number;
+  policies: number;
   claimChallenges: number;
   claims: number;
   projectIds: string[];
@@ -584,6 +807,12 @@ export type PlatformStoreSnapshot = {
   flowDefinitionIds: string[];
   /** Connection slugs, which is what schemas and flows reference. */
   idpSlugs: string[];
+  /** Release ids, newest first, for a caller that drove the HTTP API. */
+  releaseIds: string[];
+  /** Release content digests (full `sha256:` form), insertion order. */
+  releaseContentHashes: string[];
+  /** Deployment ids, newest first. */
+  deploymentIds: string[];
   /**
    * Variable names entered at the project, secrets included. Names only: a
    * secret's value is not readable over the API, and a snapshot that returned
@@ -605,12 +834,22 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
     idps: store.idps.size,
+    policies: store.policies.size,
     claimChallenges: store.claimChallenges.size,
     claims: store.claims.size,
     projectIds: [...store.projects.keys()],
     schemaIds: [...store.schemas.keys()],
     flowDefinitionIds: [...store.flowDefinitions.keys()],
     idpSlugs: [...store.idps.values()].map((record) => record.slug),
+    releaseIds: [...store.releases.values()]
+      .sort((a, b) => b.seq - a.seq)
+      .map((release) => release.id),
+    releaseContentHashes: [...store.releases.values()].map(
+      (release) => `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+    ),
+    deploymentIds: [...store.deployments.values()]
+      .sort((a, b) => b.seq - a.seq)
+      .map((deployment) => deployment.id),
     variableNames: [...store.variables.values()].flatMap((owned) => [...owned.keys()]),
     claimChallengeIds: [...store.claimChallenges.keys()],
   };
@@ -760,6 +999,475 @@ function resolveUserSchema(projectId: string, ref: unknown): SchemaRecord | unde
     .sort(compareNewestFirst)[0];
 }
 
+// --- releases and deployments ------------------------------------------
+// Releases and deployments are stored in their own block so the two features
+// do not collide with the rest of the store. The Go handlers are unimplemented
+// stubs; the behaviour the CLI drives against lives here.
+
+/** The wire prefix for a release digest. The store keeps the bare hex. */
+const RELEASE_CONTENT_HASH_PREFIX = "sha256:";
+
+/**
+ * A stable digest over the content a release pins. Faithful enough for the
+ * mock: it is a sha256 over a canonical JSON of the sorted entries, so the
+ * same content always digests the same way and a re-submission dedupes. It
+ * does not reproduce the server's RFC 8785 canonicalisation.
+ */
+function contentDigest(entries: { kind: string; handle: string; content: unknown }[]): string {
+  const sorted = [...entries].sort((a, b) =>
+    a.kind === b.kind ? a.handle.localeCompare(b.handle) : a.kind.localeCompare(b.kind),
+  );
+  const canonical = JSON.stringify({ version: 1, resources: sorted });
+  return createHash("sha256").update(canonical).digest("hex");
+}
+
+/** The handle a schema, flow definition or branding declares. */
+function bundleResourceHandle(kind: string, resource: Record<string, unknown>): string {
+  if (kind === "schema") {
+    return typeof resource.objectType === "string" ? resource.objectType : "schema";
+  }
+  if (kind === "flow_definition") {
+    return typeof resource.name === "string" ? resource.name : "flow";
+  }
+  if (kind === "idp") {
+    return typeof resource.slug === "string" ? resource.slug : "idp";
+  }
+  if (kind === "policy") {
+    return typeof resource.operation === "string" ? resource.operation : "policy";
+  }
+  return "default";
+}
+
+/**
+ * Turn a bundle into pinned revisions, materialising each resource into the
+ * store the way the server allocates revisions from a bundle: a schema or flow
+ * whose content matches the project's newest revision of the same handle reuses
+ * it, anything else allocates a new one. This is what makes a deployed schema or
+ * flow observable through `schemas list` / `flow-definitions list`. Branding has
+ * no store here, so it keeps a synthesised revision id.
+ */
+function materializeBundle(
+  projectId: string,
+  bundle: Record<string, unknown>,
+  policyPointers: ReleasePointer[],
+): ReleasePointer[] {
+  const pointers: ReleasePointer[] = [...policyPointers];
+  for (const item of asArray(bundle.schemas)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("schema", resource);
+    const existing = [...store.schemas.values()].find(
+      (record) =>
+        record.projectId === projectId &&
+        record.objectType === handle &&
+        JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const id = existing?.id ?? `sch_${shortId()}`;
+    if (!existing) {
+      store.schemas.set(id, {
+        id,
+        projectId,
+        objectType: handle,
+        createdAt: nowIso(),
+        seq: ++store.lastSeq,
+        body: resource as unknown as GetSchemaById200Schema,
+      });
+    }
+    pointers.push({ kind: "schema", handle, revision_id: id });
+  }
+  for (const item of asArray(bundle.flow_definitions)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("flow_definition", resource);
+    const existing = [...store.flowDefinitions.values()].find(
+      (record) =>
+        record.projectId === projectId &&
+        record.body.name === handle &&
+        JSON.stringify(record.body) === JSON.stringify(resource),
+    );
+    const id = existing?.id ?? `flowdef_${shortId()}`;
+    if (!existing) {
+      const createdAt = nowIso();
+      store.flowDefinitions.set(id, {
+        id,
+        projectId,
+        status: typeof resource.status === "string" ? resource.status : "active",
+        createdAt,
+        updatedAt: createdAt,
+        seq: ++store.lastSeq,
+        body: resource,
+      });
+    }
+    pointers.push({ kind: "flow_definition", handle, revision_id: id });
+  }
+  // A connection is resolved by its slug, as the service does: an unchanged
+  // document reuses the revision it already has, a changed one revises the same
+  // connection so everything referencing the slug keeps pointing at it.
+  for (const item of asArray(bundle.idps)) {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("idp", resource);
+    const existing = [...store.idps.values()].find(
+      (record) => record.projectId === projectId && record.slug === handle,
+    );
+    const unchanged =
+      existing !== undefined && JSON.stringify(existing.body) === JSON.stringify(resource);
+    const now = nowIso();
+    const record: IdpConnectionRecord = unchanged
+      ? (existing as IdpConnectionRecord)
+      : existing
+        ? {
+            ...existing,
+            revisionId: `idprev_${shortId()}`,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: resource,
+          }
+        : {
+            id: `idp_${shortId()}`,
+            revisionId: `idprev_${shortId()}`,
+            projectId,
+            slug: handle,
+            createdAt: now,
+            updatedAt: now,
+            seq: ++store.lastSeq,
+            body: resource,
+          };
+    if (!unchanged) {
+      store.idps.set(record.id, record);
+    }
+    pointers.push({ kind: "idp", handle, revision_id: record.revisionId });
+  }
+  for (const item of isObject(bundle.branding) ? [bundle.branding] : []) {
+    const resource = item;
+    pointers.push({
+      kind: "branding",
+      handle: bundleResourceHandle("branding", resource),
+      revision_id: `branding_${shortId()}`,
+    });
+  }
+  return pointers;
+}
+
+/**
+ * The first connection in the bundle that would change a field fixed for the
+ * life of the connection, with the field it changes.
+ */
+function bundleIdpClash(
+  projectId: string,
+  bundle: Record<string, unknown>,
+): { slug: string; field: string } | undefined {
+  for (const item of asArray(bundle.idps)) {
+    const resource = isObject(item) ? item : {};
+    const slug = bundleResourceHandle("idp", resource);
+    const existing = [...store.idps.values()].find(
+      (record) => record.projectId === projectId && record.slug === slug,
+    );
+    const field = existing === undefined ? undefined : immutableFieldClash(existing.body, resource);
+    if (field !== undefined) {
+      return { slug, field };
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Publish a bundle's policies the way the service does inside a build, before
+ * the release is looked up: an unchanged config reuses the operation's newest
+ * revision, any other adds one. They run first because the revision a policy
+ * gets decides the release's content, as it does on the server: going back to
+ * an earlier config adds a revision and so builds a new release.
+ */
+function publishBundlePolicies(
+  projectId: string,
+  bundle: Record<string, unknown>,
+): ReleasePointer[] {
+  return asArray(bundle.policies).map((item) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const config = isObject(resource.config) ? resource.config : {};
+    const { revision } = publishPolicyRevision(projectId, handle, config, { reuseUnchanged: true });
+    return { kind: "policy", handle, revision_id: revision.revisionId };
+  });
+}
+
+/**
+ * The `details.resources` entries a bundle's policies earn: a config the
+ * template's rule refuses (`pol.invalid`), and both of two policies for one
+ * operation (`rel.invalid`).
+ */
+function bundlePolicyFailures(bundle: Record<string, unknown>): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  const seen = new Map<string, number>();
+  asArray(bundle.policies).forEach((item, index) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const earlier = seen.get(handle);
+    if (earlier !== undefined) {
+      for (const at of [earlier, index]) {
+        failures.push({
+          kind: "policy",
+          index: at,
+          handle,
+          code: "rel.invalid",
+          message: `policy "${handle}" appears twice`,
+        });
+      }
+      return;
+    }
+    seen.set(handle, index);
+    if (policyRuleViolated(isObject(resource.config) ? resource.config : {})) {
+      failures.push({
+        kind: "policy",
+        index,
+        handle,
+        code: "pol.invalid",
+        message: "policy: invalid",
+        details: { details: { violations: [MIN_ABOVE_MAX_VIOLATION] } },
+      });
+    }
+  });
+  return failures;
+}
+
+/** The array at a bundle field, or an empty one when the field is absent. */
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/** Everything a bundle carries, flattened for the digest, in input order. */
+function bundleDigestEntries(
+  bundle: Record<string, unknown>,
+): { kind: string; handle: string; content: unknown }[] {
+  const entries: { kind: string; handle: string; content: unknown }[] = [];
+  const groups: [string, string][] = [
+    ["schemas", "schema"],
+    ["flow_definitions", "flow_definition"],
+    ["idps", "idp"],
+  ];
+  for (const [field, kind] of groups) {
+    const items = bundle[field];
+    if (!Array.isArray(items)) {
+      continue;
+    }
+    for (const item of items) {
+      const resource = isObject(item) ? item : {};
+      entries.push({ kind, handle: bundleResourceHandle(kind, resource), content: resource });
+    }
+  }
+  if (isObject(bundle.branding)) {
+    entries.push({
+      kind: "branding",
+      handle: bundleResourceHandle("branding", bundle.branding),
+      content: bundle.branding,
+    });
+  }
+  return entries;
+}
+
+/**
+ * The handle a pinned revision declares. Resolved from the store so a release
+ * records the identity of the revision it pins, as the server does; `default`
+ * for branding, and the revision id itself when nothing in the store answers.
+ */
+function pointerHandle(kind: string, revisionId: string): string {
+  if (kind === "schema") {
+    const record = store.schemas.get(revisionId);
+    if (record?.objectType) {
+      return record.objectType;
+    }
+  }
+  if (kind === "flow_definition") {
+    const record = store.flowDefinitions.get(revisionId);
+    const name = record?.body.name;
+    if (typeof name === "string") {
+      return name;
+    }
+  }
+  if (kind === "branding") {
+    return "default";
+  }
+  return revisionId;
+}
+
+/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
+function ttlToExpiry(ttl: string): string {
+  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+  if (!match) {
+    return new Date().toISOString();
+  }
+  const amount = Number(match[1]);
+  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
+  return new Date(Date.now() + amount * unitMs).toISOString();
+}
+
+/** The project's primary origins, as exact URLs, sorted. */
+function primaryOrigins(project: ProjectRecord): string[] {
+  return project.origins
+    .filter((origin) => origin.kind === "primary")
+    .map((origin) => origin.pattern)
+    .sort();
+}
+
+/**
+ * Whether a concrete origin matches one of the project's preview patterns. A
+ * `*` in a pattern matches one or more characters that are not a dot, as the
+ * origin rule (#1582) defines it.
+ */
+function matchesPreviewPattern(project: ProjectRecord, origin: string): boolean {
+  for (const entry of project.origins) {
+    if (entry.kind !== "preview") {
+      continue;
+    }
+    const pattern = entry.pattern
+      .replace(/[.*+?^${}()|[\]\\]/g, (ch) => (ch === "*" ? "\u0000" : `\\${ch}`))
+      .replaceAll("\u0000", "[^.]+");
+    if (new RegExp(`^${pattern}$`).test(origin)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The newest deployment to an origin, treating an expired preview as gone. */
+function newestDeploymentForOrigin(
+  projectId: string,
+  origin: string,
+): DeploymentRecord | undefined {
+  const now = Date.now();
+  return [...store.deployments.values()]
+    .filter((deployment) => deployment.projectId === projectId)
+    .filter((deployment) =>
+      deployment.targets.some(
+        (target) =>
+          target.origin === origin &&
+          (target.expiresAt === null || new Date(target.expiresAt).getTime() > now),
+      ),
+    )
+    .sort((a, b) => b.seq - a.seq)[0];
+}
+
+/** The release metadata block, nulls written explicitly as the server does. */
+function releaseMetadata(release: ReleaseRecord): Record<string, unknown> {
+  return {
+    message: release.message,
+    git_sha: release.gitSha,
+    git_dirty: release.gitDirty,
+    created_at: release.createdAt,
+    created_by: null,
+    created_by_type: "service",
+  };
+}
+
+/** The wire shape of a release, with its pointers. */
+function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
+  return {
+    id: release.id,
+    project_id: release.projectId,
+    content_hash: `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+    metadata: releaseMetadata(release),
+    revoked_at: release.revokedAt,
+    pointers: release.pointers,
+  };
+}
+
+/**
+ * Which origins a deployment went to: a preview target carries an expiry, a
+ * primary one never does, and the two cannot be mixed in one deployment.
+ */
+function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
+  return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
+}
+
+/**
+ * Whether the deployment still serves its release: `live` while at least one
+ * of its targets is served by it, `inactive` once a later deployment replaced
+ * every one, or its previews expired or were removed.
+ */
+function deploymentStatus(deployment: DeploymentRecord): "live" | "inactive" {
+  return deployment.targets.some(
+    (target) =>
+      newestDeploymentForOrigin(deployment.projectId, target.origin)?.id === deployment.id,
+  )
+    ? "live"
+    : "inactive";
+}
+
+/** The wire shape of a deployment, optionally over a restricted target set. */
+function deploymentResponse(
+  deployment: DeploymentRecord,
+  targets: DeploymentTargetRow[] = deployment.targets,
+  expand?: { release: boolean },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    id: deployment.id,
+    project_id: deployment.projectId,
+    release_id: deployment.releaseId,
+    targets: targets.map((target) =>
+      target.expiresAt === null
+        ? { origin: target.origin }
+        : { origin: target.origin, expires_at: target.expiresAt },
+    ),
+    kind: deploymentKind(deployment),
+    status: deploymentStatus(deployment),
+    deployed_at: deployment.deployedAt,
+    metadata: {
+      reason: deployment.reason,
+      message: deployment.message,
+      rollback_to: deployment.rollbackTo,
+      deployed_by: null,
+      deployed_by_type: "service",
+    },
+  };
+  if (expand?.release) {
+    const release = store.releases.get(deployment.releaseId);
+    if (release) {
+      body.release = releaseResponse(release);
+    }
+  }
+  return body;
+}
+
+/**
+ * Create-or-dedup a release: an existing release with the same content answers
+ * 200 and allocates nothing; otherwise a new record is written and answers 201.
+ * `makePointers` is deferred so a bundle only materialises revisions when the
+ * release is new, not on a deduped resubmission.
+ */
+function upsertRelease(
+  projectId: string,
+  digest: string,
+  makePointers: () => ReleasePointer[],
+  data: Record<string, unknown>,
+) {
+  const existing = [...store.releases.values()].find(
+    (release) => release.projectId === projectId && release.contentHash === digest,
+  );
+  if (existing) {
+    return HttpResponse.json(releaseResponse(existing), { status: 200 });
+  }
+  const id = `rel_${shortId()}`;
+  const record: ReleaseRecord = {
+    id,
+    projectId,
+    contentHash: digest,
+    pointers: makePointers(),
+    message: typeof data.message === "string" ? data.message : null,
+    gitSha: typeof data.git_sha === "string" ? data.git_sha : null,
+    gitDirty: data.git_dirty === true,
+    createdAt: nowIso(),
+    revokedAt: null,
+    seq: ++store.lastSeq,
+  };
+  store.releases.set(id, record);
+  return HttpResponse.json(releaseResponse(record), { status: 201 });
+}
+
+/**
+ * The project's default preview lifetime, applied when a preview deployment
+ * omits `ttl`. A real project configures this; the mock stands in one value
+ * for every project, matching the spec's "omitted, the project's default
+ * applies" (create-deployment-request.yaml).
+ */
+const DEFAULT_PREVIEW_TTL = "7d";
+
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -903,6 +1611,604 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    // --- releases --------------------------------------------------------
+    // A release is assembled from a bundle (the CLI's form) or from pointers.
+    // The content digest dedupes a re-submission; revoke blocks it from ever
+    // being served again. The Go handlers are unimplemented stubs.
+
+    // `POST /releases/build` — the CLI's path: build a release from the
+    // `.zitadel/` bundle, reusing matching revisions and allocating the rest.
+    http.post("*/releases/build", async ({ request }) => {
+      const query = parse(BuildReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(BuildReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("rel.project_not_found", "release: project not found"), {
+          status: 404,
+        });
+      }
+      const data = body.data as Record<string, unknown>;
+      if (!isObject(data.bundle)) {
+        return HttpResponse.json(errorBody("rel.invalid", "release: a build carries a bundle"), {
+          status: 400,
+        });
+      }
+      const bundle = data.bundle;
+      // A connection's fixed fields are checked before anything is written, as
+      // the service checks them inside the build's transaction: a bundle that
+      // would change one is refused whole rather than revising it.
+      const clash = bundleIdpClash(project.id, bundle);
+      if (clash) {
+        return HttpResponse.json(
+          errorBody(
+            "idp.field_immutable",
+            `release: ${clash.slug}: the field ${clash.field} is fixed for the life of the connection`,
+          ),
+          { status: 400 },
+        );
+      }
+      // The service validates each policy against its template and refuses two
+      // for one operation, reporting every refused resource under
+      // `rel.invalid`.
+      const refused = bundlePolicyFailures(bundle);
+      if (refused.length > 0) {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: the bundle has invalid resources", {
+            resources: refused,
+          }),
+          { status: 400 },
+        );
+      }
+      const entries = bundleDigestEntries(bundle);
+      const total = entries.length + asArray(bundle.policies).length;
+      if (total === 0 || total > 50) {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
+          { status: 400 },
+        );
+      }
+      // Policies are published before the lookup, and the digest takes their
+      // revision ids: see publishBundlePolicies.
+      const policyPointers = publishBundlePolicies(project.id, bundle);
+      for (const pointer of policyPointers) {
+        entries.push({ kind: "policy", handle: pointer.handle, content: pointer.revision_id });
+      }
+      // `makePointers` is deferred so a bundle only materialises the other
+      // revisions when the release is new, not on a deduped resubmission.
+      return upsertRelease(
+        project.id,
+        contentDigest(entries),
+        () => materializeBundle(project.id, bundle, policyPointers),
+        data,
+      );
+    }),
+
+    // `POST /releases` — pin pre-existing revision ids. Not a CLI flow, kept for
+    // contract completeness.
+    http.post("*/releases", async ({ request }) => {
+      const query = parse(CreateReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateReleaseBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("rel.project_not_found", "release: project not found"), {
+          status: 404,
+        });
+      }
+      const data = body.data as Record<string, unknown>;
+      if (!Array.isArray(data.pointers)) {
+        return HttpResponse.json(errorBody("rel.invalid", "release: a create pins pointers"), {
+          status: 400,
+        });
+      }
+      const pointers = data.pointers.map((item) => {
+        const pointer = item as { kind: string; revision_id: string };
+        return {
+          kind: pointer.kind,
+          handle: pointerHandle(pointer.kind, pointer.revision_id),
+          revision_id: pointer.revision_id,
+        };
+      });
+      const digest = contentDigest(
+        pointers.map((pointer) => ({
+          kind: pointer.kind,
+          handle: pointer.handle,
+          content: pointer.revision_id,
+        })),
+      );
+      return upsertRelease(project.id, digest, () => pointers, data);
+    }),
+
+    http.get("*/releases", ({ request }) => {
+      const query = parse(ListReleasesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const contentHash = queryRecord(request).content_hash;
+      const releases = [...store.releases.values()]
+        .filter((release) => release.projectId === query.data.project_id)
+        .filter((release) =>
+          contentHash === undefined
+            ? true
+            : `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}` === contentHash,
+        )
+        .sort((a, b) => b.seq - a.seq)
+        .map((release) => ({
+          id: release.id,
+          project_id: release.projectId,
+          content_hash: `${RELEASE_CONTENT_HASH_PREFIX}${release.contentHash}`,
+          metadata: releaseMetadata(release),
+          revoked_at: release.revokedAt,
+        }));
+      return HttpResponse.json({ releases });
+    }),
+
+    http.get("*/releases/:release_id", ({ params, request }) => {
+      const path = parse(GetReleaseByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetReleaseByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      return HttpResponse.json(releaseResponse(release));
+    }),
+
+    http.post("*/releases/:release_id/revoke", ({ params, request }) => {
+      const path = parse(RevokeReleaseParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(RevokeReleaseQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const release = store.releases.get(path.data.release_id);
+      if (!release || release.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      if (release.revokedAt !== null) {
+        return HttpResponse.json(releaseResponse(release), { status: 200 });
+      }
+
+      // A release an origin still serves cannot be revoked: the live deployment
+      // to any origin must not pin it.
+      const servedBy: { origin: string; deployment_id: string }[] = [];
+      const origins = new Set(
+        [...store.deployments.values()]
+          .filter((deployment) => deployment.projectId === release.projectId)
+          .flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+      );
+      for (const origin of origins) {
+        const newest = newestDeploymentForOrigin(release.projectId, origin);
+        if (newest?.releaseId === release.id) {
+          servedBy.push({ origin, deployment_id: newest.id });
+        }
+      }
+      if (servedBy.length > 0) {
+        return HttpResponse.json(
+          errorBody("rel.in_use", "release: still served by an origin", {
+            origins: servedBy.sort((a, b) => a.origin.localeCompare(b.origin)),
+          }),
+          { status: 409 },
+        );
+      }
+
+      release.revokedAt = nowIso();
+      return HttpResponse.json(releaseResponse(release), { status: 200 });
+    }),
+
+    // --- deployments -----------------------------------------------------
+    // A deployment makes a release live on a set of targets, expanding
+    // `primary` to the project's primary origins. It is idempotent on what is
+    // served and append-only; rollback re-applies an earlier one. Variable
+    // freezing arrives with the variables work. The Go handlers are stubs.
+
+    http.post("*/deployments", async ({ request }) => {
+      const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(CreateDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+
+      const data = body.data as Record<string, unknown>;
+      const hasReleaseId = typeof data.release_id === "string";
+      const hasContentHash = typeof data.content_hash === "string";
+      if (hasReleaseId === hasContentHash) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: name the release by exactly one of id or digest"),
+          { status: 400 },
+        );
+      }
+      const release = hasReleaseId
+        ? store.releases.get(data.release_id as string)
+        : [...store.releases.values()].find(
+            // In this project: another project built from the same scaffold
+            // holds a release with the very same digest.
+            (candidate) =>
+              candidate.projectId === project.id &&
+              `${RELEASE_CONTENT_HASH_PREFIX}${candidate.contentHash}` === data.content_hash,
+          );
+      if (!release || release.projectId !== project.id) {
+        return HttpResponse.json(errorBody("rel.not_found", "release: not found"), { status: 404 });
+      }
+      if (release.revokedAt !== null) {
+        return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
+      }
+
+      const requested = data.targets as string[];
+      const primaries = primaryOrigins(project);
+      const resolved = new Set<string>();
+      let sawPreview = false;
+      let sawPrimary = false;
+      for (const target of requested) {
+        if (target === "primary") {
+          if (primaries.length === 0) {
+            return HttpResponse.json(
+              errorBody("dep.invalid", "deployment: the project has no primary origin"),
+              { status: 400 },
+            );
+          }
+          for (const origin of primaries) {
+            resolved.add(origin);
+          }
+          sawPrimary = true;
+          continue;
+        }
+        if (primaries.includes(target)) {
+          return HttpResponse.json(
+            errorBody("dep.invalid", "deployment: deploy primary origins with the primary keyword"),
+            { status: 400 },
+          );
+        }
+        if (matchesPreviewPattern(project, target)) {
+          resolved.add(target);
+          sawPreview = true;
+          continue;
+        }
+        return HttpResponse.json(
+          errorBody(
+            "proj.origin_not_allowed",
+            `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
+          ),
+          { status: 403 },
+        );
+      }
+      if (sawPreview && sawPrimary) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: primary origins and preview URLs cannot be mixed"),
+          { status: 400 },
+        );
+      }
+      const ttl = typeof data.ttl === "string" ? data.ttl : undefined;
+      if (ttl !== undefined && !sawPreview) {
+        return HttpResponse.json(
+          errorBody("dep.invalid", "deployment: ttl is only valid for preview URLs"),
+          { status: 400 },
+        );
+      }
+
+      const targets = [...resolved].sort();
+      const expectedId =
+        typeof data.expected_deployment_id === "string" ? data.expected_deployment_id : undefined;
+      // The contract's guard: the newest deployment to any of the targets.
+      if (expectedId !== undefined) {
+        const newest = targets
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest && newest.id !== expectedId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newest) },
+            ),
+            { status: 409 },
+          );
+        }
+      }
+
+      // Idempotent on what is served: when every target already runs this
+      // release, the newest deployment to the targets is returned unchanged.
+      // Never for preview URLs: the contract has a preview deploy always write
+      // a new deployment (201), which is how its expiry is renewed.
+      const alreadyServed = targets.every(
+        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === release.id,
+      );
+      if (targets.length > 0 && alreadyServed && !sawPreview) {
+        const newest = [...store.deployments.values()]
+          .filter(
+            (deployment) =>
+              deployment.projectId === project.id &&
+              deployment.releaseId === release.id &&
+              deployment.targets.some((target) => targets.includes(target.origin)),
+          )
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest) {
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+        }
+      }
+
+      const expiresAt = sawPreview ? ttlToExpiry(ttl ?? DEFAULT_PREVIEW_TTL) : null;
+      const id = `dep_${shortId()}`;
+      const record: DeploymentRecord = {
+        id,
+        projectId: project.id,
+        releaseId: release.id,
+        targets: targets.map((origin) => ({ origin, expiresAt: sawPreview ? expiresAt : null })),
+        reason: data.reason === "rollback" ? "rollback" : "deploy",
+        message: typeof data.message === "string" ? data.message : null,
+        rollbackTo: null,
+        deployedAt: nowIso(),
+        seq: ++store.lastSeq,
+      };
+      store.deployments.set(id, record);
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
+    }),
+
+    http.get("*/deployments", ({ request }) => {
+      // URLs carry strings and the generated zod does not coerce: `live` is a
+      // boolean, `limit` an int and `expand` an array, so build those before
+      // validating, the way the schemas list handler coerces `limit`.
+      const record = queryRecord(request);
+      const expandRelease = (request.url.match(/[?&]expand=release\b/) ?? []).length > 0;
+      const { live: liveRaw, limit, expand: _expand, ...rest } = record;
+      const query = parse(
+        ListDeploymentsQueryParams,
+        {
+          ...rest,
+          ...(liveRaw === undefined ? {} : { live: liveRaw === "true" }),
+          ...(limit === undefined ? {} : { limit: Number(limit) }),
+          ...(expandRelease ? { expand: ["release"] } : {}),
+        },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const origin = record.origin;
+      const live = liveRaw === "true";
+
+      let deployments = [...store.deployments.values()]
+        .filter((deployment) => deployment.projectId === query.data.project_id)
+        .sort((a, b) => b.seq - a.seq);
+      if (origin !== undefined) {
+        deployments = deployments.filter((deployment) =>
+          deployment.targets.some((target) => target.origin === origin),
+        );
+      }
+
+      let items: Record<string, unknown>[];
+      if (live) {
+        // What each target serves now: the newest deployment per origin, each
+        // carrying only the targets it still serves.
+        const serving = new Map<string, DeploymentTargetRow[]>();
+        const now = Date.now();
+        const liveOrigins = new Set(
+          deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
+        );
+        for (const target of liveOrigins) {
+          if (origin !== undefined && target !== origin) {
+            continue;
+          }
+          const newest = newestDeploymentForOrigin(query.data.project_id, target);
+          if (!newest) {
+            continue;
+          }
+          const row = newest.targets.find(
+            (candidate) =>
+              candidate.origin === target &&
+              (candidate.expiresAt === null || new Date(candidate.expiresAt).getTime() > now),
+          );
+          if (!row) {
+            continue;
+          }
+          const rows = serving.get(newest.id) ?? [];
+          rows.push(row);
+          serving.set(newest.id, rows);
+        }
+        items = [...serving.entries()]
+          .map(([id, rows]) => {
+            const deployment = store.deployments.get(id);
+            return deployment ? { deployment, rows } : undefined;
+          })
+          .filter(
+            (entry): entry is { deployment: DeploymentRecord; rows: DeploymentTargetRow[] } =>
+              entry !== undefined,
+          )
+          .sort((a, b) => b.deployment.seq - a.deployment.seq)
+          .map((entry) =>
+            deploymentResponse(entry.deployment, entry.rows, { release: expandRelease }),
+          );
+      } else {
+        items = deployments.map((deployment) =>
+          deploymentResponse(deployment, deployment.targets, { release: expandRelease }),
+        );
+      }
+      // The real cursor is opaque; the mock's is the next start index, like the
+      // schemas list. A target beyond the first page is only reachable by
+      // following the cursor, so a caller that needs the whole history pages
+      // through it rather than reading the first page alone.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const page = items.slice(start, start + query.data.limit);
+      const next =
+        start + query.data.limit < items.length ? String(start + query.data.limit) : undefined;
+      return HttpResponse.json({ deployments: page, next_page_token: next });
+    }),
+
+    http.get("*/deployments/:deployment_id", ({ params, request }) => {
+      const path = parse(GetDeploymentByIdParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentByIdQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      return HttpResponse.json(deploymentResponse(deployment));
+    }),
+
+    http.post("*/deployments/:deployment_id/rollback", async ({ params, request }) => {
+      const path = parse(RollbackDeploymentParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(RollbackDeploymentQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = (await readJson(request)) ?? {};
+      const body = parse(RollbackDeploymentBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+      const target = store.deployments.get(path.data.deployment_id);
+      if (!target || target.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      const project = store.projects.get(query.data.project_id);
+      if (!project) {
+        return HttpResponse.json(errorBody("env.project_not_found", "project not found"), {
+          status: 404,
+        });
+      }
+
+      // Only a deployment to primary origins can be rolled back, and every
+      // target must still be a primary origin of the project.
+      if (target.targets.some((row) => row.expiresAt !== null)) {
+        return HttpResponse.json(
+          errorBody(
+            "dep.invalid",
+            "deployment: a deployment to preview URLs cannot be rolled back",
+          ),
+          { status: 400 },
+        );
+      }
+      const primaries = primaryOrigins(project);
+      const removed = target.targets.find((row) => !primaries.includes(row.origin));
+      if (removed) {
+        return HttpResponse.json(
+          errorBody(
+            "proj.origin_not_allowed",
+            `project: ${removed.origin} is not a primary origin`,
+          ),
+          { status: 403 },
+        );
+      }
+      const release = store.releases.get(target.releaseId);
+      if (release?.revokedAt) {
+        return HttpResponse.json(errorBody("rel.revoked", "release: revoked"), { status: 409 });
+      }
+
+      const origins = target.targets.map((row) => row.origin);
+      // The optimistic guard: the deployment the caller believes is the newest
+      // one to any of the targets. A mismatch is a deploy that raced in.
+      const rollbackData = body.data as Record<string, unknown>;
+      const expectedRollbackId =
+        typeof rollbackData.expected_deployment_id === "string"
+          ? rollbackData.expected_deployment_id
+          : undefined;
+      if (expectedRollbackId !== undefined) {
+        const newestToTargets = origins
+          .map((origin) => newestDeploymentForOrigin(project.id, origin))
+          .filter((deployment): deployment is DeploymentRecord => deployment !== undefined)
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newestToTargets && newestToTargets.id !== expectedRollbackId) {
+          return HttpResponse.json(
+            errorBody(
+              "dep.conflict",
+              "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              { deployment: deploymentResponse(newestToTargets) },
+            ),
+            { status: 409 },
+          );
+        }
+      }
+      const alreadyServed = origins.every(
+        (origin) => newestDeploymentForOrigin(project.id, origin)?.releaseId === target.releaseId,
+      );
+      if (alreadyServed) {
+        const newest = [...store.deployments.values()]
+          .filter(
+            (deployment) =>
+              deployment.projectId === project.id &&
+              deployment.releaseId === target.releaseId &&
+              deployment.targets.some((row) => origins.includes(row.origin)),
+          )
+          .sort((a, b) => b.seq - a.seq)[0];
+        if (newest) {
+          return HttpResponse.json(deploymentResponse(newest), { status: 200 });
+        }
+      }
+
+      const id = `dep_${shortId()}`;
+      const record: DeploymentRecord = {
+        id,
+        projectId: project.id,
+        releaseId: target.releaseId,
+        targets: origins.sort().map((origin) => ({ origin, expiresAt: null })),
+        reason: "rollback",
+        message:
+          typeof (body.data as Record<string, unknown>).message === "string"
+            ? ((body.data as Record<string, unknown>).message as string)
+            : null,
+        rollbackTo: target.id,
+        deployedAt: nowIso(),
+        seq: ++store.lastSeq,
+      };
+      store.deployments.set(id, record);
+      return HttpResponse.json(deploymentResponse(record), { status: 201 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -1151,12 +2457,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
-      // and the generated zod does not coerce, so out-of-range limits are
-      // rejected by the schema (1-100) rather than silently normalised.
-      const { limit, ...rest } = queryRecord(request);
-      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
-      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      const query = parse(ListSchemasQueryParams, listQueryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -1174,15 +2475,11 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.kind || schemaKind(r.body) === query.data.kind,
       );
-      // The real cursor is opaque; the mock's is the next start index. A token
-      // it never minted is rejected with req.invalid, like the real server.
-      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
-      if (!Number.isInteger(start) || start < 0) {
-        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
       }
-      const page = records.slice(start, start + query.data.limit);
-      const next =
-        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
+      const { page, next } = paged;
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
@@ -1462,6 +2759,155 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // --- operation policies ---------------------------------------------------
+    // `setup` publishes the password policy here, a release build publishes
+    // `.zitadel/policies/*.json` through the same revision helper, and
+    // `policies list|get` read them back. They mirror the server's answers: an
+    // unknown setting is malformed (`req.invalid` there), and a minimum above
+    // the maximum fails the template's config rule (`pol.invalid`).
+
+    http.post("*/policies", async ({ request }) => {
+      const query = parse(PublishPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      // Like the server's decoder: unknown settings are refused, while an
+      // extra top-level key (the file's `$schema`) is ignored.
+      const body = parse(policyConfigSchema.loose(), raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      const { operation, config } = body.data;
+      if (policyRuleViolated(config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const { record, revision } = publishPolicyRevision(query.data.project_id, operation, config);
+
+      const out = parse(
+        PublishPolicyResponse,
+        policyResponse(record, revision),
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/policies", ({ request }) => {
+      const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      // First published first; `seq` stands in for created_at.
+      const records = [...store.policies.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => !query.data.operation || record.operation === query.data.operation)
+        .sort((a, b) => a.seq - b.seq);
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        policies: paged.page.map((record) => policyResponse(record, newestRevision(record))),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPoliciesResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
+    // as a policy id.
+    http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetPolicyRevisionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      for (const record of store.policies.values()) {
+        if (record.projectId !== query.data.project_id) continue;
+        const revision = record.revisions.find((r) => r.revisionId === path.data.revision_id);
+        if (revision) {
+          const out = parse(
+            GetPolicyRevisionResponse,
+            policyResponse(record, revision),
+            "mock_response_invalid",
+          );
+          return out.ok ? HttpResponse.json(out.data) : out.response;
+        }
+      }
+      return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+    }),
+
+    http.get("*/policies/:policy_id", ({ params, request }) => {
+      const path = parse(GetPolicyParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const out = parse(
+        GetPolicyResponse,
+        policyResponse(record, newestRevision(record)),
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/policies/:policy_id/revisions", ({ params, request }) => {
+      const path = parse(ListPolicyRevisionsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(
+        ListPolicyRevisionsQueryParams,
+        listQueryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const paged = pageOf(
+        [...record.revisions].reverse(),
+        query.data.limit,
+        query.data.page_token,
+      );
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        revisions: paged.page.map((revision) => policyResponse(record, revision)),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPolicyRevisionsResponse, responseBody, "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     // --- variables ---------------------------------------------------------

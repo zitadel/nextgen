@@ -33,7 +33,7 @@ import { fetchTeamUsers } from "@/lib/team-users";
  * become tabs of their own.
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "team" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);

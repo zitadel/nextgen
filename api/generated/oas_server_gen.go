@@ -37,7 +37,9 @@ type Handler interface {
 	// allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 	// project's newest revision of the same handle: unchanged content reuses
 	// that revision, changed content allocates a new one, and the request
-	// answers `201` with the new release. Metadata is excluded from the
+	// answers `201` with the new release. A policy whose config matches only an
+	// older revision allocates a new one too, so a request that resolves no
+	// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 	// comparison, so the same content under a different `message` is the same
 	// release.
 	// A structurally malformed request is refused while decoding with
@@ -49,8 +51,9 @@ type Handler interface {
 	// `rel.unresolved_reference`, naming the pointer and the handle.
 	// Building writes revisions, so besides `release.write` it needs the write
 	// scope of every kind the bundle carries a resource of: `schema.write`,
-	// `flow_definition.write`, `branding.write` and `idp.write`, as the
-	// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+	// `flow_definition.write`, `branding.write`, `idp.write` and
+	// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+	// permission_denied`,
 	// naming the kind. An empty kind needs no scope.
 	// Building a release does not deploy it. A release is not tied to an
 	// origin, and the same release can later be deployed to any number of
@@ -75,10 +78,10 @@ type Handler interface {
 	// Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 	// also include session_id and that session's session_token to add factors to an existing session.
 	// The project comes from the project secret. A body `project_id` that disagrees
-	// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
-	// same way as other runtime operations and seals it; with no browser `Origin`
-	// and nothing deployed to the resolved target the response is `409` with
-	// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
+	// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
+	// filled only when create runs with a runtime resolution already on the
+	// context (the flow create path); this HTTP entry point does not resolve
+	// Origin or refuse a revoked release itself.
 	//
 	// POST /auth_attempts
 	CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (CreateAuthAttemptRes, error)
@@ -112,11 +115,11 @@ type Handler interface {
 	// - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 	// a primary origin named exactly; `primary` mixed with preview URLs;
 	// `primary` on a project with no primary origin; `ttl` with `primary`;
-	// `ttl` above the project's maximum.
+	// `ttl` above 365 days (`P365D`).
 	// - `400 dep.variables_missing`: a referenced variable has no value for
 	// the kind; `details` names the kind and every missing variable.
 	// - `403 proj.origin_not_allowed`: a preview URL matches no preview
-	// pattern.
+	// pattern, or is a loopback URL.
 	// - `404 rel.not_found`: the release id or digest names no release here.
 	// - `409 dep.conflict`: `expected_deployment_id` is not the deployment
 	// this write replaces; `details.deployment` is that deployment.
@@ -140,7 +143,10 @@ type Handler interface {
 	// pattern with no live preview answers `403` with `proj.preview_not_live`;
 	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
 	// revoked release answers `409` with `rel.revoked`. A request with no
-	// `Origin` passes the gate and still needs a deployment target.
+	// `Origin` passes the gate and still needs a deployment target. A loopback
+	// origin passes it too, and so does the server's own origin, from which its
+	// console previews a project's login; a step submitted from the server's
+	// own origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -197,8 +203,7 @@ type Handler interface {
 	// - Single-use (atomic exchange, no retry)
 	// - Audience-bound (requires matching project key for exchange)
 	// - Idempotency-safe within a 5-minute window (see conventions)
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
+	// Revoke refusal for a sealed release happens at handoff exchange, not here.
 	//
 	// POST /auth_attempts/{attempt_id}/handoff
 	CreateHandoff(ctx context.Context, params CreateHandoffParams) (CreateHandoffRes, error)
@@ -403,8 +408,6 @@ type Handler interface {
 	// challenges issued so far, and any errors preventing progress.
 	// Use this for polling during long-running factor verifications (e.g., waiting for
 	// a federated IdP callback or a device flow).
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// GET /auth_attempts/{attempt_id}
 	GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (GetAuthAttemptRes, error)
@@ -501,12 +504,6 @@ type Handler interface {
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
-	// GetHealth implements getHealth operation.
-	//
-	// Check whether the server is healthy.
-	//
-	// GET /healthz
-	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById implements getIdpById operation.
 	//
 	// Reads a connection by its id, at its newest revision.
@@ -525,7 +522,10 @@ type Handler interface {
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive implements getLive operation.
 	//
-	// Check whether the server is started.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	// Point a liveness probe here. It never checks the database, so an outage
+	// of the database does not restart every instance; `GET /readyz` takes an
+	// instance out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -582,6 +582,15 @@ type Handler interface {
 	//
 	// GET /users/me/schema
 	GetMyUserSchema(ctx context.Context, params GetMyUserSchemaParams) (GetMyUserSchemaRes, error)
+	// GetPolicy implements getPolicy operation.
+	//
+	// Reads a policy as its newest revision, the one that applies the next time
+	// its operation runs.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}
+	GetPolicy(ctx context.Context, params GetPolicyParams) (GetPolicyRes, error)
 	// GetPolicyRevision implements getPolicyRevision operation.
 	//
 	// Reads one revision of a policy, newest or not.
@@ -598,7 +607,10 @@ type Handler interface {
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
-	// Check whether the server is ready to accept requests.
+	// Answers whether the server can serve requests, which takes its database answering within a second.
+	// Point a readiness probe here, so that a server whose database does not
+	// answer gets no requests until it does. The check is one round trip to the
+	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
@@ -697,8 +709,6 @@ type Handler interface {
 	// (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 	// including method, metadata, and any UI hints. The client then verifies the proof
 	// by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
@@ -780,12 +790,17 @@ type Handler interface {
 	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects implements listMyProjects operation.
 	//
-	// The projects the signed-in user holds an active grant on, either directly or
-	// through a team they are a member of. Ordered by project id and paged with an
-	// opaque cursor.
+	// The projects the signed-in user can act on: those they hold an active grant
+	// on, either directly or through a team they are a member of. For a platform
+	// operator (ADR 075) that is every project of the deployment. Ordered by
+	// project id and paged with an opaque cursor.
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `name_contains`, only the projects whose name contains that text are
+	// listed. The search runs on the server together with the grants, so it
+	// reaches every project the user can act on, however many there are, and
+	// pages like the full list.
 	// With `project_id`, the projects are listed only when the session belongs to
 	// that project. It names the project the session was signed in to, not one to
 	// list.
@@ -800,6 +815,25 @@ type Handler interface {
 	//
 	// GET /users/me/teams
 	ListMyTeams(ctx context.Context, params ListMyTeamsParams) (ListMyTeamsRes, error)
+	// ListPolicies implements listPolicies operation.
+	//
+	// Lists the project's policies, one per operation, each as its newest
+	// revision, ordered by `created_at` (first publish) and then `id`. Filter
+	// by `operation` to read the policy of one operation; a project that never
+	// published one gets an empty list.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /policies
+	ListPolicies(ctx context.Context, params ListPoliciesParams) (ListPoliciesRes, error)
+	// ListPolicyRevisions implements listPolicyRevisions operation.
+	//
+	// Returns every revision of one policy, newest first, paginated with a
+	// cursor. The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`: a policy of another
+	// project answers not found exactly as an unknown id does.
+	//
+	// GET /policies/{policy_id}/revisions
+	ListPolicyRevisions(ctx context.Context, params ListPolicyRevisionsParams) (ListPolicyRevisionsRes, error)
 	// ListPreviews implements listPreviews operation.
 	//
 	// Lists the project's live previews, newest first by `created_at`. An
@@ -888,14 +922,20 @@ type Handler interface {
 	// applies to the next time the operation runs; nothing already stored is
 	// re-evaluated, so a stricter password policy applies the next time a
 	// password is set.
-	// `config` is checked against the operation's template: an unknown
-	// operation or setting, a value of the wrong type or outside its bounds, or
-	// settings that contradict each other (a `min_length` above `max_length`)
-	// answer `pol.invalid`. A setting left out is off, and `{}` switches every
+	// The request is typed by `operation`: an unknown operation or setting, or
+	// a value of the wrong type or outside its bounds, answers `req.invalid`
+	// like any malformed request. The operation's template then checks the
+	// config again, together with the rules that relate settings to each other
+	// (a `min_length` above `max_length`), and answers `pol.invalid`. Its
+	// `details.details.violations` lists everything that failed, settings
+	// first, then rules: `{"setting": "min_length"}` for one setting, or
+	// `{"config_rule": "min_length_not_above_max_length", "settings":
+	// ["min_length", "max_length"]}` for a rule across settings, with the
+	// settings it reads. A setting left out is off, and `{}` switches every
 	// rule off; there are no defaults.
 	//
 	// POST /policies
-	PublishPolicy(ctx context.Context, req *PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
+	PublishPolicy(ctx context.Context, req PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.
@@ -1134,8 +1174,6 @@ type Handler interface {
 	// - `recovery_code` method: { recovery_code: "…" }
 	// On successful verification, the factor is written to the auth attempt.
 	// The attempt moves to the next pending challenge or completes if all required factors are verified.
-	// Reuses the deployment sealed when the attempt was created. If that release
-	// was revoked since, the response is `409` with `rel.revoked`.
 	//
 	// POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 	VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (VerifyChallengeProofRes, error)

@@ -108,8 +108,8 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	if len(pinned) > 0 {
 		return s.resolvePinned(ctx, req, pinned)
 	}
-	// TODO: drop this newest-revision fallback once releases work end to end;
-	// every public request should resolve through a pinned release.
+	// TODO(#1616): a request with no release still reads the newest revisions.
+	// A release that pins no flow definition keeps this path.
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
@@ -342,8 +342,6 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain
 		return domain.FlowStepResult{}, err
 	}
 	result.State.ID = flowID
-	// What the request resolved to rides in the sealed state, so a deploy
-	// landing mid-attempt does not change the configuration under it.
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if resolution.Deployment != nil {
 			result.State.DeploymentID = resolution.Deployment.ID

@@ -478,7 +478,7 @@ describe("user schema detail", () => {
     await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
-    expect(screen.getByText(/Applying creates a new revision/)).toBeInTheDocument();
-    expect(screen.getByText("npx @zitadel/cli@latest apply")).toBeInTheDocument();
+    expect(screen.getByText(/Deploying creates a new revision/)).toBeInTheDocument();
+    expect(screen.getByText("npx @zitadel/cli@latest deploy")).toBeInTheDocument();
   });
 });

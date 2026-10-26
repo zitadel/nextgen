@@ -77,3 +77,23 @@ func TestEmit_CopiesRequestIDFromMiddleware(t *testing.T) {
 	require.Equal(t, "req_api", *cap.last.RequestID)
 	require.Equal(t, json.RawMessage("{}"), cap.last.Metadata)
 }
+
+// TestEmit_LandsInTheChangedProject pins ADR 053 §8: a session acting on
+// another project records the change in that project, not in its own.
+func TestEmit_LandsInTheChangedProject(t *testing.T) {
+	t.Parallel()
+	cap := &insertEventCapture{}
+	actor := "user_op"
+	ctx := audit.WithActorContext(t.Context(), audit.ActorContext{ProjectID: "proj_platform", ActorID: &actor})
+	require.NoError(t, audit.Emit(ctx, cap, audit.EmitSpec{
+		Type:       domain.EventTypeProjectUpdated,
+		Category:   domain.EventCategoryEntity,
+		ProjectID:  "proj_customer",
+		EntityType: "project",
+		EntityID:   "proj_customer",
+		Payload:    domain.ProjectUpdatedPayload{},
+	}))
+	require.Equal(t, 1, cap.called)
+	require.Equal(t, "proj_customer", cap.last.ProjectID)
+	require.Equal(t, &actor, cap.last.ActorID)
+}

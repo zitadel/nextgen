@@ -6,7 +6,7 @@ import { FormSheet, FormSheetForm } from "@/components/form-sheet";
 import { type SchemaOption, SchemaPicker } from "@/components/schema-picker";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { useSubmit } from "@/hooks/use-submit";
@@ -327,7 +327,7 @@ function SchemaInput({
         <FieldLabel htmlFor={id}>{field.label}</FieldLabel>
         {/* A sibling of the label, not part of it, so the accessible name stays
             the field name; requiredness itself reaches AT via `required`. */}
-        {!field.required && <MetaItem>Optional</MetaItem>}
+        {!field.required && <FieldOptionalIndicator />}
       </div>
       {field.inputType === "boolean" ? (
         // A switch, as the user profile edits a boolean: a text box would take

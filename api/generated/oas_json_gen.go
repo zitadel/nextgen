@@ -15409,6 +15409,38 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case PolInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.invalid")
+		{
+			s := s.PolInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolRevisionConflictBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.revision_conflict")
+		{
+			s := s.PolRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelInvalidBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.invalid")
@@ -15618,6 +15650,12 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedBuildReleaseErrorResponse
 					found = true
+				case "pol.invalid":
+					s.Type = PolInvalidBuildReleaseErrorResponse
+					found = true
+				case "pol.revision_conflict":
+					s.Type = PolRevisionConflictBuildReleaseErrorResponse
+					found = true
 				case "rel.invalid":
 					s.Type = RelInvalidBuildReleaseErrorResponse
 					found = true
@@ -15709,6 +15747,14 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedBuildReleaseErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolInvalidBuildReleaseErrorResponse:
+		if err := s.PolInvalid.Decode(d); err != nil {
+			return err
+		}
+	case PolRevisionConflictBuildReleaseErrorResponse:
+		if err := s.PolRevisionConflict.Decode(d); err != nil {
 			return err
 		}
 	case RelInvalidBuildReleaseErrorResponse:
@@ -19210,6 +19256,16 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Policies != nil {
+			e.FieldStart("policies")
+			e.ArrStart()
+			for _, elem := range s.Policies {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Branding.Set {
 			e.FieldStart("branding")
 			s.Branding.Encode(e)
@@ -19217,11 +19273,12 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfConfigurationBundle = [4]string{
+var jsonFieldsNameOfConfigurationBundle = [5]string{
 	0: "schemas",
 	1: "flow_definitions",
 	2: "idps",
-	3: "branding",
+	3: "policies",
+	4: "branding",
 }
 
 // Decode decodes ConfigurationBundle from json.
@@ -19282,6 +19339,23 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"idps\"")
+			}
+		case "policies":
+			if err := func() error {
+				s.Policies = make([]PublishPolicyRequest, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem PublishPolicyRequest
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Policies = append(s.Policies, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"policies\"")
 			}
 		case "branding":
 			if err := func() error {
@@ -19460,44 +19534,6 @@ func (s *ConfigurationBundleSchemasItem) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes CreateAuthAttemptConflict as json.
-func (s *CreateAuthAttemptConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateAuthAttemptConflict from json.
-func (s *CreateAuthAttemptConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateAuthAttemptConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateAuthAttemptConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateAuthAttemptConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateAuthAttemptConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes CreateAuthAttemptErrorResponse as json.
 func (s CreateAuthAttemptErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -19603,6 +19639,22 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19695,6 +19747,9 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedCreateAuthAttemptErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
 					found = true
@@ -19742,6 +19797,10 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
+	case ProjMismatchCreateAuthAttemptErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
+			return err
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		if err := s.ReqInvalid.Decode(d); err != nil {
 			return err
@@ -19769,44 +19828,6 @@ func (s CreateAuthAttemptErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *CreateAuthAttemptErrorResponse) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes CreateAuthAttemptForbidden as json.
-func (s *CreateAuthAttemptForbidden) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes CreateAuthAttemptForbidden from json.
-func (s *CreateAuthAttemptForbidden) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode CreateAuthAttemptForbidden to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = CreateAuthAttemptForbidden(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *CreateAuthAttemptForbidden) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *CreateAuthAttemptForbidden) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -20596,6 +20617,22 @@ func (s CreateDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjOriginNotAllowedCreateDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundCreateDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -20716,6 +20753,9 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.not_found":
 					s.Type = ProjNotFoundCreateDeploymentErrorResponse
 					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedCreateDeploymentErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundCreateDeploymentErrorResponse
 					found = true
@@ -20780,6 +20820,10 @@ func (s *CreateDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjNotFoundCreateDeploymentErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedCreateDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundCreateDeploymentErrorResponse:
@@ -39388,6 +39432,12 @@ func (s *EventMetadata) Encode(e *jx.Encoder) {
 // encodeFields encodes fields.
 func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 	{
+		if s.Authorization.Set {
+			e.FieldStart("authorization")
+			s.Authorization.Encode(e)
+		}
+	}
+	{
 		if s.Client.Set {
 			e.FieldStart("client")
 			s.Client.Encode(e)
@@ -39402,8 +39452,9 @@ func (s *EventMetadata) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfEventMetadata = [1]string{
-	0: "client",
+var jsonFieldsNameOfEventMetadata = [2]string{
+	0: "authorization",
+	1: "client",
 }
 
 // Decode decodes EventMetadata from json.
@@ -39415,6 +39466,16 @@ func (s *EventMetadata) Decode(d *jx.Decoder) error {
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
+		case "authorization":
+			if err := func() error {
+				s.Authorization.Reset()
+				if err := s.Authorization.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"authorization\"")
+			}
 		case "client":
 			if err := func() error {
 				s.Client.Reset()
@@ -39514,6 +39575,155 @@ func (s EventMetadataAdditional) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *EventMetadataAdditional) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *EventMetadataAuthorization) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *EventMetadataAuthorization) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("path")
+		s.Path.Encode(e)
+	}
+	{
+		if s.ActorHomeProjectID.Set {
+			e.FieldStart("actor_home_project_id")
+			s.ActorHomeProjectID.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfEventMetadataAuthorization = [2]string{
+	0: "path",
+	1: "actor_home_project_id",
+}
+
+// Decode decodes EventMetadataAuthorization from json.
+func (s *EventMetadataAuthorization) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode EventMetadataAuthorization to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "path":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Path.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"path\"")
+			}
+		case "actor_home_project_id":
+			if err := func() error {
+				s.ActorHomeProjectID.Reset()
+				if err := s.ActorHomeProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"actor_home_project_id\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode EventMetadataAuthorization")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfEventMetadataAuthorization) {
+					name = jsonFieldsNameOfEventMetadataAuthorization[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *EventMetadataAuthorization) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *EventMetadataAuthorization) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes EventMetadataAuthorizationPath as json.
+func (s EventMetadataAuthorizationPath) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes EventMetadataAuthorizationPath from json.
+func (s *EventMetadataAuthorizationPath) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode EventMetadataAuthorizationPath to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch EventMetadataAuthorizationPath(v) {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		*s = EventMetadataAuthorizationPathPlatformOperator
+	default:
+		*s = EventMetadataAuthorizationPath(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s EventMetadataAuthorizationPath) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *EventMetadataAuthorizationPath) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -40408,6 +40618,38 @@ func (s ExchangeHandoffErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjMismatchExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+		{
+			s := s.ProjMismatch
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedExchangeHandoffErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidExchangeHandoffErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -40589,6 +40831,12 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedExchangeHandoffErrorResponse
 					found = true
+				case "proj.mismatch":
+					s.Type = ProjMismatchExchangeHandoffErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedExchangeHandoffErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidExchangeHandoffErrorResponse
 					found = true
@@ -40661,6 +40909,14 @@ func (s *ExchangeHandoffErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedExchangeHandoffErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjMismatchExchangeHandoffErrorResponse:
+		if err := s.ProjMismatch.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedExchangeHandoffErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidExchangeHandoffErrorResponse:
@@ -53835,6 +54091,38 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotFoundGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -54096,6 +54384,12 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedGetFlowStepErrorResponse
 					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundGetFlowStepErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedGetFlowStepErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidGetFlowStepErrorResponse
 					found = true
@@ -54238,6 +54532,14 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedGetFlowStepErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundGetFlowStepErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedGetFlowStepErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidGetFlowStepErrorResponse:
@@ -54760,120 +55062,6 @@ func (s *GetGrantUnauthorized) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetGrantUnauthorized) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode encodes GetHealthErrorResponse as json.
-func (s GetHealthErrorResponse) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-func (s GetHealthErrorResponse) encodeFields(e *jx.Encoder) {
-	switch s.Type {
-	case InternalGetHealthErrorResponse:
-		e.FieldStart("code")
-		e.Str("internal")
-		{
-			s := s.Internal
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	case ReqInvalidGetHealthErrorResponse:
-		e.FieldStart("code")
-		e.Str("req.invalid")
-		{
-			s := s.ReqInvalid
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
-	}
-}
-
-// Decode decodes GetHealthErrorResponse from json.
-func (s *GetHealthErrorResponse) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode GetHealthErrorResponse to nil")
-	}
-	// Sum type discriminator.
-	if typ := d.Next(); typ != jx.Object {
-		return errors.Errorf("unexpected json type %q", typ)
-	}
-
-	var found bool
-	if err := d.Capture(func(d *jx.Decoder) error {
-		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
-			if found {
-				return d.Skip()
-			}
-			switch string(key) {
-			case "code":
-				typ, err := d.Str()
-				if err != nil {
-					return err
-				}
-				switch typ {
-				case "internal":
-					s.Type = InternalGetHealthErrorResponse
-					found = true
-				case "req.invalid":
-					s.Type = ReqInvalidGetHealthErrorResponse
-					found = true
-				default:
-					return errors.Errorf("unknown type %s", typ)
-				}
-				return nil
-			}
-			return d.Skip()
-		})
-	}); err != nil {
-		return errors.Wrap(err, "capture")
-	}
-	if !found {
-		return errors.New("unable to detect sum type variant")
-	}
-	switch s.Type {
-	case InternalGetHealthErrorResponse:
-		if err := s.Internal.Decode(d); err != nil {
-			return err
-		}
-	case ReqInvalidGetHealthErrorResponse:
-		if err := s.ReqInvalid.Decode(d); err != nil {
-			return err
-		}
-	default:
-		return errors.Errorf("inferred invalid type: %s", s.Type)
-	}
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s GetHealthErrorResponse) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *GetHealthErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -56819,6 +57007,235 @@ func (s GetMyUserSchemaErrorResponse) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *GetMyUserSchemaErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes GetPolicyErrorResponse as json.
+func (s GetPolicyErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s GetPolicyErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolNotFoundGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableGetPolicyErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes GetPolicyErrorResponse from json.
+func (s *GetPolicyErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode GetPolicyErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedGetPolicyErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalGetPolicyErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedGetPolicyErrorResponse
+					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundGetPolicyErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedGetPolicyErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidGetPolicyErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableGetPolicyErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedGetPolicyErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalGetPolicyErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedGetPolicyErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundGetPolicyErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedGetPolicyErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidGetPolicyErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableGetPolicyErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s GetPolicyErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *GetPolicyErrorResponse) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -70840,6 +71257,710 @@ func (s *ListMyTeamsErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes ListPoliciesErrorResponse as json.
+func (s ListPoliciesErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListPoliciesErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolNotFoundListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListPoliciesErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListPoliciesErrorResponse from json.
+func (s *ListPoliciesErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListPoliciesErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListPoliciesErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListPoliciesErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListPoliciesErrorResponse
+					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundListPoliciesErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedListPoliciesErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListPoliciesErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListPoliciesErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListPoliciesErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListPoliciesErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListPoliciesErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundListPoliciesErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedListPoliciesErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListPoliciesErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListPoliciesErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListPoliciesErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListPoliciesErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListPoliciesResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListPoliciesResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("policies")
+		e.ArrStart()
+		for _, elem := range s.Policies {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfListPoliciesResponse = [2]string{
+	0: "policies",
+	1: "next_page_token",
+}
+
+// Decode decodes ListPoliciesResponse from json.
+func (s *ListPoliciesResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListPoliciesResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "policies":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Policies = make([]Policy, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem Policy
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Policies = append(s.Policies, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"policies\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListPoliciesResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListPoliciesResponse) {
+					name = jsonFieldsNameOfListPoliciesResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListPoliciesResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListPoliciesResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ListPolicyRevisionsErrorResponse as json.
+func (s ListPolicyRevisionsErrorResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+func (s ListPolicyRevisionsErrorResponse) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case AuthUnauthorizedListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.unauthorized")
+		{
+			s := s.AuthUnauthorized
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case InternalListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("internal")
+		{
+			s := s.Internal
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case NotImplementedListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("not_implemented")
+		{
+			s := s.NotImplemented
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolNotFoundListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.not_found")
+		{
+			s := s.PolNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolPermissionDeniedListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.permission_denied")
+		{
+			s := s.PolPermissionDenied
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ReqInvalidListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("req.invalid")
+		{
+			s := s.ReqInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case UnavailableListPolicyRevisionsErrorResponse:
+		e.FieldStart("code")
+		e.Str("unavailable")
+		{
+			s := s.Unavailable
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	}
+}
+
+// Decode decodes ListPolicyRevisionsErrorResponse from json.
+func (s *ListPolicyRevisionsErrorResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListPolicyRevisionsErrorResponse to nil")
+	}
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
+
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "code":
+				typ, err := d.Str()
+				if err != nil {
+					return err
+				}
+				switch typ {
+				case "auth.unauthorized":
+					s.Type = AuthUnauthorizedListPolicyRevisionsErrorResponse
+					found = true
+				case "internal":
+					s.Type = InternalListPolicyRevisionsErrorResponse
+					found = true
+				case "not_implemented":
+					s.Type = NotImplementedListPolicyRevisionsErrorResponse
+					found = true
+				case "pol.not_found":
+					s.Type = PolNotFoundListPolicyRevisionsErrorResponse
+					found = true
+				case "pol.permission_denied":
+					s.Type = PolPermissionDeniedListPolicyRevisionsErrorResponse
+					found = true
+				case "req.invalid":
+					s.Type = ReqInvalidListPolicyRevisionsErrorResponse
+					found = true
+				case "unavailable":
+					s.Type = UnavailableListPolicyRevisionsErrorResponse
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
+				}
+				return nil
+			}
+			return d.Skip()
+		})
+	}); err != nil {
+		return errors.Wrap(err, "capture")
+	}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case AuthUnauthorizedListPolicyRevisionsErrorResponse:
+		if err := s.AuthUnauthorized.Decode(d); err != nil {
+			return err
+		}
+	case InternalListPolicyRevisionsErrorResponse:
+		if err := s.Internal.Decode(d); err != nil {
+			return err
+		}
+	case NotImplementedListPolicyRevisionsErrorResponse:
+		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolNotFoundListPolicyRevisionsErrorResponse:
+		if err := s.PolNotFound.Decode(d); err != nil {
+			return err
+		}
+	case PolPermissionDeniedListPolicyRevisionsErrorResponse:
+		if err := s.PolPermissionDenied.Decode(d); err != nil {
+			return err
+		}
+	case ReqInvalidListPolicyRevisionsErrorResponse:
+		if err := s.ReqInvalid.Decode(d); err != nil {
+			return err
+		}
+	case UnavailableListPolicyRevisionsErrorResponse:
+		if err := s.Unavailable.Decode(d); err != nil {
+			return err
+		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ListPolicyRevisionsErrorResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListPolicyRevisionsErrorResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ListPolicyRevisionsResponse) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ListPolicyRevisionsResponse) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("revisions")
+		e.ArrStart()
+		for _, elem := range s.Revisions {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+	{
+		if s.NextPageToken.Set {
+			e.FieldStart("next_page_token")
+			s.NextPageToken.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfListPolicyRevisionsResponse = [2]string{
+	0: "revisions",
+	1: "next_page_token",
+}
+
+// Decode decodes ListPolicyRevisionsResponse from json.
+func (s *ListPolicyRevisionsResponse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ListPolicyRevisionsResponse to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "revisions":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Revisions = make([]Policy, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem Policy
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Revisions = append(s.Revisions, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"revisions\"")
+			}
+		case "next_page_token":
+			if err := func() error {
+				s.NextPageToken.Reset()
+				if err := s.NextPageToken.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"next_page_token\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ListPolicyRevisionsResponse")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfListPolicyRevisionsResponse) {
+					name = jsonFieldsNameOfListPolicyRevisionsResponse[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ListPolicyRevisionsResponse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ListPolicyRevisionsResponse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes ListPreviewsErrorResponse as json.
 func (s ListPreviewsErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -76172,6 +77293,39 @@ func (s OptEventMetadata) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptEventMetadata) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes EventMetadataAuthorization as json.
+func (o OptEventMetadataAuthorization) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes EventMetadataAuthorization from json.
+func (o *OptEventMetadataAuthorization) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptEventMetadataAuthorization to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptEventMetadataAuthorization) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptEventMetadataAuthorization) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -82365,6 +83519,40 @@ func (s OptProjClaimWindowExpiredDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes ProjMismatchDetails as json.
+func (o OptProjMismatchDetails) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes ProjMismatchDetails from json.
+func (o *OptProjMismatchDetails) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptProjMismatchDetails to nil")
+	}
+	o.Set = true
+	o.Value = make(ProjMismatchDetails)
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptProjMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptProjMismatchDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -89910,6 +91098,476 @@ func (s *PasswordProof) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode implements json.Marshaler.
+func (s *PasswordSetConfig) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PasswordSetConfig) encodeFields(e *jx.Encoder) {
+	{
+		if s.MinLength.Set {
+			e.FieldStart("min_length")
+			s.MinLength.Encode(e)
+		}
+	}
+	{
+		if s.MaxLength.Set {
+			e.FieldStart("max_length")
+			s.MaxLength.Encode(e)
+		}
+	}
+	{
+		if s.HistoryDepth.Set {
+			e.FieldStart("history_depth")
+			s.HistoryDepth.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfPasswordSetConfig = [3]string{
+	0: "min_length",
+	1: "max_length",
+	2: "history_depth",
+}
+
+// Decode decodes PasswordSetConfig from json.
+func (s *PasswordSetConfig) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasswordSetConfig to nil")
+	}
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "min_length":
+			if err := func() error {
+				s.MinLength.Reset()
+				if err := s.MinLength.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"min_length\"")
+			}
+		case "max_length":
+			if err := func() error {
+				s.MaxLength.Reset()
+				if err := s.MaxLength.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"max_length\"")
+			}
+		case "history_depth":
+			if err := func() error {
+				s.HistoryDepth.Reset()
+				if err := s.HistoryDepth.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"history_depth\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PasswordSetConfig")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PasswordSetConfig) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasswordSetConfig) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *PasswordSetPolicy) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PasswordSetPolicy) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("id")
+		s.ID.Encode(e)
+	}
+	{
+		e.FieldStart("revision_id")
+		s.RevisionID.Encode(e)
+	}
+	{
+		e.FieldStart("project_id")
+		s.ProjectID.Encode(e)
+	}
+	{
+		e.FieldStart("operation")
+		s.Operation.Encode(e)
+	}
+	{
+		e.FieldStart("config")
+		s.Config.Encode(e)
+	}
+	{
+		e.FieldStart("created_at")
+		json.EncodeDateTime(e, s.CreatedAt)
+	}
+	{
+		e.FieldStart("updated_at")
+		json.EncodeDateTime(e, s.UpdatedAt)
+	}
+}
+
+var jsonFieldsNameOfPasswordSetPolicy = [7]string{
+	0: "id",
+	1: "revision_id",
+	2: "project_id",
+	3: "operation",
+	4: "config",
+	5: "created_at",
+	6: "updated_at",
+}
+
+// Decode decodes PasswordSetPolicy from json.
+func (s *PasswordSetPolicy) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasswordSetPolicy to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "id":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.ID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id\"")
+			}
+		case "revision_id":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.RevisionID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"revision_id\"")
+			}
+		case "project_id":
+			requiredBitSet[0] |= 1 << 2
+			if err := func() error {
+				if err := s.ProjectID.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"project_id\"")
+			}
+		case "operation":
+			requiredBitSet[0] |= 1 << 3
+			if err := func() error {
+				if err := s.Operation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"operation\"")
+			}
+		case "config":
+			requiredBitSet[0] |= 1 << 4
+			if err := func() error {
+				if err := s.Config.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"config\"")
+			}
+		case "created_at":
+			requiredBitSet[0] |= 1 << 5
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.CreatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "updated_at":
+			requiredBitSet[0] |= 1 << 6
+			if err := func() error {
+				v, err := json.DecodeDateTime(d)
+				s.UpdatedAt = v
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"updated_at\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PasswordSetPolicy")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b01111111,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfPasswordSetPolicy) {
+					name = jsonFieldsNameOfPasswordSetPolicy[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PasswordSetPolicy) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasswordSetPolicy) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *PasswordSetPolicyInput) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *PasswordSetPolicyInput) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("operation")
+		s.Operation.Encode(e)
+	}
+	{
+		e.FieldStart("config")
+		s.Config.Encode(e)
+	}
+}
+
+var jsonFieldsNameOfPasswordSetPolicyInput = [2]string{
+	0: "operation",
+	1: "config",
+}
+
+// Decode decodes PasswordSetPolicyInput from json.
+func (s *PasswordSetPolicyInput) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasswordSetPolicyInput to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "operation":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Operation.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"operation\"")
+			}
+		case "config":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				if err := s.Config.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"config\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode PasswordSetPolicyInput")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfPasswordSetPolicyInput) {
+					name = jsonFieldsNameOfPasswordSetPolicyInput[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *PasswordSetPolicyInput) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasswordSetPolicyInput) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PasswordSetPolicyInputOperation as json.
+func (s PasswordSetPolicyInputOperation) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes PasswordSetPolicyInputOperation from json.
+func (s *PasswordSetPolicyInputOperation) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasswordSetPolicyInputOperation to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch PasswordSetPolicyInputOperation(v) {
+	case PasswordSetPolicyInputOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyInputOperationAuthFactorPasswordSet
+	default:
+		*s = PasswordSetPolicyInputOperation(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PasswordSetPolicyInputOperation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasswordSetPolicyInputOperation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes PasswordSetPolicyOperation as json.
+func (s PasswordSetPolicyOperation) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes PasswordSetPolicyOperation from json.
+func (s *PasswordSetPolicyOperation) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode PasswordSetPolicyOperation to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch PasswordSetPolicyOperation(v) {
+	case PasswordSetPolicyOperationAuthFactorPasswordSet:
+		*s = PasswordSetPolicyOperationAuthFactorPasswordSet
+	default:
+		*s = PasswordSetPolicyOperation(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s PasswordSetPolicyOperation) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *PasswordSetPolicyOperation) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes PatchMyUserBadRequest as json.
 func (s *PatchMyUserBadRequest) Encode(e *jx.Encoder) {
 	unwrapped := (*ErrorDetails)(s)
@@ -92553,53 +94211,46 @@ func (s *PolRevisionConflictDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *Policy) Encode(e *jx.Encoder) {
+// Encode encodes Policy as json.
+func (s Policy) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *Policy) encodeFields(e *jx.Encoder) {
-	{
-		e.FieldStart("id")
-		s.ID.Encode(e)
-	}
-	{
-		e.FieldStart("revision_id")
-		s.RevisionID.Encode(e)
-	}
-	{
-		e.FieldStart("project_id")
-		s.ProjectID.Encode(e)
-	}
-	{
+func (s Policy) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case PasswordSetPolicyPolicy:
 		e.FieldStart("operation")
-		e.Str(s.Operation)
+		e.Str("auth.factor.password.set")
+		{
+			s := s.PasswordSetPolicy
+			{
+				e.FieldStart("id")
+				s.ID.Encode(e)
+			}
+			{
+				e.FieldStart("revision_id")
+				s.RevisionID.Encode(e)
+			}
+			{
+				e.FieldStart("project_id")
+				s.ProjectID.Encode(e)
+			}
+			{
+				e.FieldStart("config")
+				s.Config.Encode(e)
+			}
+			{
+				e.FieldStart("created_at")
+				json.EncodeDateTime(e, s.CreatedAt)
+			}
+			{
+				e.FieldStart("updated_at")
+				json.EncodeDateTime(e, s.UpdatedAt)
+			}
+		}
 	}
-	{
-		e.FieldStart("config")
-		s.Config.Encode(e)
-	}
-	{
-		e.FieldStart("created_at")
-		json.EncodeDateTime(e, s.CreatedAt)
-	}
-	{
-		e.FieldStart("updated_at")
-		json.EncodeDateTime(e, s.UpdatedAt)
-	}
-}
-
-var jsonFieldsNameOfPolicy = [7]string{
-	0: "id",
-	1: "revision_id",
-	2: "project_id",
-	3: "operation",
-	4: "config",
-	5: "created_at",
-	6: "updated_at",
 }
 
 // Decode decodes Policy from json.
@@ -92607,131 +94258,53 @@ func (s *Policy) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode Policy to nil")
 	}
-	var requiredBitSet [1]uint8
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
 
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "id":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				if err := s.ID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"id\"")
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
 			}
-		case "revision_id":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.RevisionID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"revision_id\"")
-			}
-		case "project_id":
-			requiredBitSet[0] |= 1 << 2
-			if err := func() error {
-				if err := s.ProjectID.Decode(d); err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"project_id\"")
-			}
-		case "operation":
-			requiredBitSet[0] |= 1 << 3
-			if err := func() error {
-				v, err := d.Str()
-				s.Operation = string(v)
+			switch string(key) {
+			case "operation":
+				typ, err := d.Str()
 				if err != nil {
 					return err
 				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"operation\"")
-			}
-		case "config":
-			requiredBitSet[0] |= 1 << 4
-			if err := func() error {
-				if err := s.Config.Decode(d); err != nil {
-					return err
+				switch typ {
+				case "auth.factor.password.set":
+					s.Type = PasswordSetPolicyPolicy
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
 				}
 				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"config\"")
 			}
-		case "created_at":
-			requiredBitSet[0] |= 1 << 5
-			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.CreatedAt = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"created_at\"")
-			}
-		case "updated_at":
-			requiredBitSet[0] |= 1 << 6
-			if err := func() error {
-				v, err := json.DecodeDateTime(d)
-				s.UpdatedAt = v
-				if err != nil {
-					return err
-				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"updated_at\"")
-			}
-		default:
 			return d.Skip()
-		}
-		return nil
+		})
 	}); err != nil {
-		return errors.Wrap(err, "decode Policy")
+		return errors.Wrap(err, "capture")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b01111111,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfPolicy) {
-					name = jsonFieldsNameOfPolicy[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case PasswordSetPolicyPolicy:
+		if err := s.PasswordSetPolicy.Decode(d); err != nil {
+			return err
 		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *Policy) MarshalJSON() ([]byte, error) {
+func (s Policy) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -92739,64 +94312,6 @@ func (s *Policy) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *Policy) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s PolicyConfig) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s PolicyConfig) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes PolicyConfig from json.
-func (s *PolicyConfig) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PolicyConfig to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode PolicyConfig")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PolicyConfig) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PolicyConfig) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -94367,9 +95882,9 @@ func (s *Preview) UnmarshalJSON(data []byte) error {
 
 // Encode encodes PreviewTTL as json.
 func (s PreviewTTL) Encode(e *jx.Encoder) {
-	unwrapped := string(s)
+	unwrapped := ogenx.ISODuration(s)
 
-	e.Str(unwrapped)
+	json.EncodeNative(e, unwrapped)
 }
 
 // Decode decodes PreviewTTL from json.
@@ -94377,10 +95892,10 @@ func (s *PreviewTTL) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PreviewTTL to nil")
 	}
-	var unwrapped string
+	var unwrapped ogenx.ISODuration
 	if err := func() error {
-		v, err := d.Str()
-		unwrapped = string(v)
+		v, err := json.DecodeNative[ogenx.ISODuration](d)
+		unwrapped = v
 		if err != nil {
 			return err
 		}
@@ -94965,6 +96480,194 @@ func (s ProjClaimWindowExpiredDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *ProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *ProjMismatch) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *ProjMismatch) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("code")
+		e.Str("proj.mismatch")
+	}
+	{
+		e.FieldStart("message")
+		e.Str(s.Message)
+	}
+	{
+		if s.Details.Set {
+			e.FieldStart("details")
+			s.Details.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfProjMismatch = [3]string{
+	0: "code",
+	1: "message",
+	2: "details",
+}
+
+// Decode decodes ProjMismatch from json.
+func (s *ProjMismatch) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjMismatch to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "code":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				v, err := d.Str()
+				s.Code = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"code\"")
+			}
+		case "message":
+			requiredBitSet[0] |= 1 << 1
+			if err := func() error {
+				v, err := d.Str()
+				s.Message = string(v)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"message\"")
+			}
+		case "details":
+			if err := func() error {
+				s.Details.Reset()
+				if err := s.Details.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"details\"")
+			}
+		default:
+			return d.Skip()
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjMismatch")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000011,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfProjMismatch) {
+					name = jsonFieldsNameOfProjMismatch[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *ProjMismatch) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjMismatch) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s ProjMismatchDetails) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields implements json.Marshaler.
+func (s ProjMismatchDetails) encodeFields(e *jx.Encoder) {
+	for k, elem := range s {
+		e.FieldStart(k)
+
+		if len(elem) != 0 {
+			e.Raw(elem)
+		}
+	}
+}
+
+// Decode decodes ProjMismatchDetails from json.
+func (s *ProjMismatchDetails) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode ProjMismatchDetails to nil")
+	}
+	m := s.init()
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		var elem jx.Raw
+		if err := func() error {
+			v, err := d.RawAppend(nil)
+			elem = jx.Raw(v)
+			if err != nil {
+				return err
+			}
+			return nil
+		}(); err != nil {
+			return errors.Wrapf(err, "decode field %q", k)
+		}
+		m[string(k)] = elem
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode ProjMismatchDetails")
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s ProjMismatchDetails) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *ProjMismatchDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -98828,28 +100531,26 @@ func (s *PublishPolicyErrorResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode implements json.Marshaler.
-func (s *PublishPolicyRequest) Encode(e *jx.Encoder) {
+// Encode encodes PublishPolicyRequest as json.
+func (s PublishPolicyRequest) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
-// encodeFields encodes fields.
-func (s *PublishPolicyRequest) encodeFields(e *jx.Encoder) {
-	{
+func (s PublishPolicyRequest) encodeFields(e *jx.Encoder) {
+	switch s.Type {
+	case PasswordSetPolicyInputPublishPolicyRequest:
 		e.FieldStart("operation")
-		e.Str(s.Operation)
+		e.Str("auth.factor.password.set")
+		{
+			s := s.PasswordSetPolicyInput
+			{
+				e.FieldStart("config")
+				s.Config.Encode(e)
+			}
+		}
 	}
-	{
-		e.FieldStart("config")
-		s.Config.Encode(e)
-	}
-}
-
-var jsonFieldsNameOfPublishPolicyRequest = [2]string{
-	0: "operation",
-	1: "config",
 }
 
 // Decode decodes PublishPolicyRequest from json.
@@ -98857,77 +100558,53 @@ func (s *PublishPolicyRequest) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PublishPolicyRequest to nil")
 	}
-	var requiredBitSet [1]uint8
+	// Sum type discriminator.
+	if typ := d.Next(); typ != jx.Object {
+		return errors.Errorf("unexpected json type %q", typ)
+	}
 
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		switch string(k) {
-		case "operation":
-			requiredBitSet[0] |= 1 << 0
-			if err := func() error {
-				v, err := d.Str()
-				s.Operation = string(v)
+	var found bool
+	if err := d.Capture(func(d *jx.Decoder) error {
+		return d.ObjBytes(func(d *jx.Decoder, key []byte) error {
+			if found {
+				return d.Skip()
+			}
+			switch string(key) {
+			case "operation":
+				typ, err := d.Str()
 				if err != nil {
 					return err
 				}
-				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"operation\"")
-			}
-		case "config":
-			requiredBitSet[0] |= 1 << 1
-			if err := func() error {
-				if err := s.Config.Decode(d); err != nil {
-					return err
+				switch typ {
+				case "auth.factor.password.set":
+					s.Type = PasswordSetPolicyInputPublishPolicyRequest
+					found = true
+				default:
+					return errors.Errorf("unknown type %s", typ)
 				}
 				return nil
-			}(); err != nil {
-				return errors.Wrap(err, "decode field \"config\"")
 			}
-		default:
 			return d.Skip()
-		}
-		return nil
+		})
 	}); err != nil {
-		return errors.Wrap(err, "decode PublishPolicyRequest")
+		return errors.Wrap(err, "capture")
 	}
-	// Validate required fields.
-	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
-		0b00000011,
-	} {
-		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
-			// Mask only required fields and check equality to mask using XOR.
-			//
-			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
-			// Bits of fields which would be set are actually bits of missed fields.
-			missed := bits.OnesCount8(result)
-			for bitN := 0; bitN < missed; bitN++ {
-				bitIdx := bits.TrailingZeros8(result)
-				fieldIdx := i*8 + bitIdx
-				var name string
-				if fieldIdx < len(jsonFieldsNameOfPublishPolicyRequest) {
-					name = jsonFieldsNameOfPublishPolicyRequest[fieldIdx]
-				} else {
-					name = strconv.Itoa(fieldIdx)
-				}
-				failures = append(failures, validate.FieldError{
-					Name:  name,
-					Error: validate.ErrFieldRequired,
-				})
-				// Reset bit.
-				result &^= 1 << bitIdx
-			}
+	if !found {
+		return errors.New("unable to detect sum type variant")
+	}
+	switch s.Type {
+	case PasswordSetPolicyInputPublishPolicyRequest:
+		if err := s.PasswordSetPolicyInput.Decode(d); err != nil {
+			return err
 		}
+	default:
+		return errors.Errorf("inferred invalid type: %s", s.Type)
 	}
-	if len(failures) > 0 {
-		return &validate.Error{Fields: failures}
-	}
-
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *PublishPolicyRequest) MarshalJSON() ([]byte, error) {
+func (s PublishPolicyRequest) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
@@ -98935,64 +100612,6 @@ func (s *PublishPolicyRequest) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *PublishPolicyRequest) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
-// Encode implements json.Marshaler.
-func (s PublishPolicyRequestConfig) Encode(e *jx.Encoder) {
-	e.ObjStart()
-	s.encodeFields(e)
-	e.ObjEnd()
-}
-
-// encodeFields implements json.Marshaler.
-func (s PublishPolicyRequestConfig) encodeFields(e *jx.Encoder) {
-	for k, elem := range s {
-		e.FieldStart(k)
-
-		if len(elem) != 0 {
-			e.Raw(elem)
-		}
-	}
-}
-
-// Decode decodes PublishPolicyRequestConfig from json.
-func (s *PublishPolicyRequestConfig) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode PublishPolicyRequestConfig to nil")
-	}
-	m := s.init()
-	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
-		var elem jx.Raw
-		if err := func() error {
-			v, err := d.RawAppend(nil)
-			elem = jx.Raw(v)
-			if err != nil {
-				return err
-			}
-			return nil
-		}(); err != nil {
-			return errors.Wrapf(err, "decode field %q", k)
-		}
-		m[string(k)] = elem
-		return nil
-	}); err != nil {
-		return errors.Wrap(err, "decode PublishPolicyRequestConfig")
-	}
-
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s PublishPolicyRequestConfig) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *PublishPolicyRequestConfig) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -107740,6 +109359,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindBranding
 	case ReleasePointerKindIdp:
 		*s = ReleasePointerKindIdp
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 	default:
 		*s = ReleasePointerKind(v)
 	}
@@ -111880,6 +113501,22 @@ func (s RollbackDeploymentErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -112000,6 +113637,9 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.not_found":
 					s.Type = ProjNotFoundRollbackDeploymentErrorResponse
 					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedRollbackDeploymentErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundRollbackDeploymentErrorResponse
 					found = true
@@ -112064,6 +113704,10 @@ func (s *RollbackDeploymentErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjNotFoundRollbackDeploymentErrorResponse:
 		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedRollbackDeploymentErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundRollbackDeploymentErrorResponse:
@@ -120452,6 +122096,70 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -120713,6 +122421,18 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedSubmitFlowStepErrorResponse
 					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundSubmitFlowStepErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedSubmitFlowStepErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSubmitFlowStepErrorResponse
 					found = true
@@ -120855,6 +122575,22 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedSubmitFlowStepErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundSubmitFlowStepErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedSubmitFlowStepErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidSubmitFlowStepErrorResponse:

@@ -58,6 +58,16 @@ func ensureProject(t *testing.T, stmts service.AllStatements) string {
 	return project.ID
 }
 
+// ensureNamedProject is ensureProject with a name a search has to find.
+func ensureNamedProject(t *testing.T, stmts service.AllStatements, name string) string {
+	t.Helper()
+	project := newTestProject(uniqueProjectID(t))
+	project.Name = name
+	require.NoError(t, stmts.CreateProject(t.Context(), project))
+	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), project.ID) })
+	return project.ID
+}
+
 func newMissingHandoffAttempt(projectID string) *domain.AuthAttempt {
 	sum := sha256.Sum256([]byte("missing-handoff-" + time.Now().Format(time.RFC3339Nano)))
 	return &domain.AuthAttempt{

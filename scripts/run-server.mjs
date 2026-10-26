@@ -9,7 +9,7 @@ const args = withServerMigrateArgs(forwardedArgs());
 
 try {
   if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
-    const build = runnerCommand(["console:build", "login-ui:build"]);
+    const build = runnerCommand(["console:build"]);
     await run(build.command, build.args, { cwd: repoRoot });
   }
   await run("go", ["run", ".", ...args], { cwd: repoRoot });

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -168,8 +169,49 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		}
 	})
 
-	t.Run("any other origin is not served yet", func(t *testing.T) {
-		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://acme-git-sso-acmeinc.vercel.app"})
-		assert.ErrorIs(t, err, ErrNotImplemented())
+	t.Run("preview URLs matching a preview pattern", func(t *testing.T) {
+		targets := []string{"https://acme-git-sso-acmeinc.vercel.app", "https://acme-k3x9v2-acmeinc.vercel.app"}
+		kind, origins, err := ResolveDeploymentTargets(projectOrigins, targets)
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentOriginKindPreview, kind)
+		assert.Equal(t, targets, origins)
 	})
+
+	t.Run("a URL no preview pattern matches", func(t *testing.T) {
+		for _, target := range []string{"https://acme.example", "https://a.b-acmeinc.vercel.app"} {
+			_, _, err := ResolveDeploymentTargets(projectOrigins, []string{"https://acme-git-sso-acmeinc.vercel.app", target})
+			require.ErrorIs(t, err, ErrProjectOriginNotAllowed(nil), target)
+			assert.Equal(t, map[string]string{"origin": target}, err.(Error).Details)
+		}
+	})
+
+	t.Run("a loopback URL is never a preview", func(t *testing.T) {
+		origins := append(slices.Clone(projectOrigins),
+			Origin{Pattern: "http://localhost:3000", Kind: OriginKindPreview},
+			Origin{Pattern: "http://127.0.0.1:3000", Kind: OriginKindPreview},
+			Origin{Pattern: "http://*.localhost:3000", Kind: OriginKindPreview},
+		)
+		for _, target := range []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://app.localhost:3000"} {
+			_, _, err := ResolveDeploymentTargets(origins, []string{target})
+			assert.ErrorIs(t, err, ErrProjectOriginNotAllowed(nil), target)
+		}
+	})
+}
+
+func TestResolvePreviewTTL(t *testing.T) {
+	got, err := ResolvePreviewTTL(nil)
+	require.NoError(t, err)
+	assert.Equal(t, DefaultPreviewTTL, got)
+
+	for _, ttl := range []time.Duration{time.Second, 7 * 24 * time.Hour, MaxPreviewTTL} {
+		got, err := ResolvePreviewTTL(&ttl)
+		require.NoError(t, err)
+		assert.Equal(t, ttl, got)
+	}
+	for _, ttl := range []time.Duration{0, -time.Hour, MaxPreviewTTL + time.Second} {
+		_, err := ResolvePreviewTTL(&ttl)
+		assert.ErrorIs(t, err, ErrDeploymentInvalid(), ttl)
+	}
+	_, err = ResolvePreviewTTL(new(MaxPreviewTTL + time.Second))
+	assert.ErrorContains(t, err, "at most 365 days")
 }

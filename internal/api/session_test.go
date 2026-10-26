@@ -448,7 +448,8 @@ func exchangedSession(userID *string) *domain.Session {
 
 func callExchange(t *testing.T, h Handler) error {
 	t.Helper()
-	_, err := h.ExchangeHandoff(t.Context(),
+	ctx := WithScopeContext(t.Context(), ScopeContext{ProjectID: "proj_platform"})
+	_, err := h.ExchangeHandoff(ctx,
 		&api.ExchangeRequest{HandoffToken: "handoff"},
 		api.ExchangeHandoffParams{ProjectID: "proj_platform"})
 	return err
