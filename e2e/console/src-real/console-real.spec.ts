@@ -181,6 +181,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${zitadel.handle.projectId}`);
+    await page.getByRole("tab", { name: "Admins" }).click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
@@ -242,6 +243,7 @@ test("answers the same way for an address that belongs to nobody", async ({
   await signIn(page, zitadel, operator);
 
   await page.goto(`/projects/${zitadel.handle.projectId}`);
+  await page.getByRole("tab", { name: "Admins" }).click();
   await page.getByRole("button", { name: "Add admin", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Add admin" });
   await dialog.getByRole("textbox", { name: "Email address" }).fill(unknown);

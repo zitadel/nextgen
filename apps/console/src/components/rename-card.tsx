@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { DetailSection } from "@/components/detail-page";
+import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
+import { cn } from "@/lib/utils";
 import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -8,13 +9,18 @@ import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/hooks/use-submit";
 
 /**
- * The `Details` card of a resource whose one editable field is its name.
+ * The details card of a resource whose one editable field is its name.
  *
  * The field follows `value`: a save re-runs the loader, and the draft resets
- * when the saved name changes.
+ * when the saved name changes. `layout="inline"` puts the label on a 202px
+ * rail beside the input, as the project's card draws it; the default stacks
+ * them.
  */
 export function RenameCard({
   id,
+  title = "Details",
+  titleStyle,
+  layout = "stacked",
   label,
   value,
   onSave,
@@ -23,6 +29,9 @@ export function RenameCard({
 }: {
   /** The input's id and name. */
   id: string;
+  title?: string;
+  titleStyle?: "eyebrow" | "heading";
+  layout?: "stacked" | "inline";
   label: string;
   value: string;
   /** Saves the trimmed name and reloads the record. */
@@ -42,16 +51,19 @@ export function RenameCard({
   }, [value, clearError]);
 
   return (
-    <DetailSection title="Details" className={className}>
+    <DetailSection title={title} titleStyle={titleStyle} className={className}>
       <div className="flex flex-col gap-4.5">
-        <Field>
-          <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <Field orientation={layout === "inline" ? "horizontal" : "vertical"}>
+          <FieldLabel htmlFor={id} className={cn(layout === "inline" && "w-[202px] flex-none!")}>
+            {label}
+          </FieldLabel>
           <Input
             id={id}
             name={id}
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={200}
+            className={cn(layout === "inline" && "min-w-0 flex-1")}
           />
         </Field>
         <FormError message={save.error} />
@@ -62,7 +74,7 @@ export function RenameCard({
           <Button
             variant="secondary"
             size="sm"
-            className="gap-1 px-2.5 text-xs"
+            className={CARD_ACTION_BUTTON}
             onClick={() => void save.run()}
             disabled={!dirty || trimmed === ""}
             loading={save.pending}

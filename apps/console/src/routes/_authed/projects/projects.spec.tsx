@@ -271,7 +271,7 @@ describe("projects screen", () => {
     await renderProjects();
 
     await userEvent.click(await screen.findByRole("button", { name: "Actions for River" }));
-    const item = await screen.findByRole("menuitem", { name: "Project settings" });
+    const item = await screen.findByRole("menuitem", { name: "View project" });
     expect(item).toHaveAttribute("href", "/project?project=proj_1");
   });
 
