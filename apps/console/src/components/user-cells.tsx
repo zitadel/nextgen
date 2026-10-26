@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Braces } from "lucide-react";
 
 import { DocumentViewer } from "@/components/document-viewer";
 import {
@@ -126,7 +127,22 @@ function UserIdentityCard({ user, context }: { user: UserRow; context: IdentityC
     <div className="text-xs">
       <div className="border-border border-b pb-2.5">
         <p className="text-foreground truncate text-sm font-medium">{user.name}</p>
-        <p className="text-muted-foreground truncate">{context.schemaTitle} schema</p>
+        {/* The schema's glyph, as its sidebar entry draws it, and its name
+            opening it: the schema is what decides everything below. */}
+        <p className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1.5">
+          <Braces aria-hidden strokeWidth={1.5} className="size-3.5 shrink-0" />
+          {user.schemaId ? (
+            <Link
+              to="/schemas/$schemaId"
+              params={{ schemaId: user.schemaId }}
+              className="hover:text-foreground truncate underline-offset-2 hover:underline"
+            >
+              {context.schemaTitle}
+            </Link>
+          ) : (
+            <span className="truncate">No schema</span>
+          )}
+        </p>
       </div>
       <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-2.5 leading-4.5">
         <dt className="text-muted-foreground">Signs in with</dt>

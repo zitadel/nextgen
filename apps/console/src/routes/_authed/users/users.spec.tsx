@@ -343,7 +343,11 @@ describe("users screen", () => {
         '[data-slot="hover-card-content"]',
       ) as HTMLElement,
     );
-    expect(card.getByText("Employees schema")).toBeInTheDocument();
+    // The schema opens from the card, since it decides everything in it.
+    expect(card.getByRole("link", { name: "Employees" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_staff"),
+    );
     expect(card.getByText("username")).toBeInTheDocument();
     expect(card.getByText("None")).toBeInTheDocument();
     expect(card.getByText("Field Ops, Platform (pending)")).toBeInTheDocument();
