@@ -78,9 +78,6 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "vitest.config.ts",
   "vitest.shared.mjs",
   "vitest.shared.d.mts",
-  "vite.shared.mjs",
-  "vite.shared.d.mts",
-  "vite.shared.test.mjs",
 ]);
 
 export function parseSemanticConfig(source) {
