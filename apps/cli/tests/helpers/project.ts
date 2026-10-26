@@ -253,6 +253,11 @@ export class ScaffoldedApp {
     });
   }
 
+  /** `setup` without `--json`, for a spec asserting what the developer reads. */
+  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
+  }
+
   /**
    * `setup --framework next` in a directory without an app, so setup creates
    * one: with stand-ins for the generator on PATH, nothing is downloaded.

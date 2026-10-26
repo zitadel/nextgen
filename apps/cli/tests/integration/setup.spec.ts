@@ -577,6 +577,14 @@ describe("setup", () => {
     });
 
     describe("rendered for a terminal", () => {
+      it("shows no diff for its own deploy, nothing having been deployed before", async () => {
+        const app = await anApp();
+
+        const result = await app.setupRendered();
+
+        expect(result).not.toPrint("No diff available");
+      });
+
       it("leaves the next deploy a commit to diff against", async () => {
         const app = await anApp();
         await app.setup();

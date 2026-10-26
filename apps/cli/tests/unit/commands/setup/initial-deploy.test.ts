@@ -108,6 +108,15 @@ describe("runInitialDeploy", () => {
       );
     });
 
+    it("looks for no baseline to diff against, nothing having been deployed", async () => {
+      const cwd = await aConfiguredProject();
+      const client = aWorkingPlatform();
+
+      await deployIn(cwd, client);
+
+      expect(client.listDeployments).not.toHaveBeenCalled();
+    });
+
     it("deploys to every primary origin, never a named one", async () => {
       const cwd = await aConfiguredProject();
       const client = aWorkingPlatform();

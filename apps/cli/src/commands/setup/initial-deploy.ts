@@ -5,7 +5,6 @@ import {
   buildBundle,
   createDeployment,
   createReleaseFromBundle,
-  diffStep,
   headSha,
   runSteps,
   type StepContext,
@@ -69,7 +68,13 @@ export async function runInitialDeploy(opts: {
       idpFiles,
       suggest: opts.suggest,
     };
-    await runSteps([validateStep, diffStep], ctx);
+    // Validate only. `deploy` also runs the diff step, which shows what
+    // changed since the live release; here nothing has ever been deployed, so
+    // there is no baseline and by definition no diff. Running it anyway would
+    // print "No diff available: nothing is deployed yet" in the middle of
+    // setup — the very sentence this deploy exists to stop the developer
+    // seeing, and about a diff they never asked for.
+    await runSteps([validateStep], ctx);
 
     const gitDirty = await worktreeIsDirty(opts.cwd);
     const release = await createReleaseFromBundle(opts.client, opts.projectId, bundle, {
