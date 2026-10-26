@@ -25,14 +25,6 @@ export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase)
   abstract class PromptableCommand extends Base {
     protected readonly input: Asker = (question) =>
       askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
-
-    /**
-     * For a command whose `--force` means something other than "yes to every
-     * confirm" (`setup` overwrites files with it): the same asker, which never
-     * answers a confirm on its own.
-     */
-    protected readonly inputUnforced: Asker = (question) =>
-      askInput(question, { interactive: !this.meta.nonInteractive, force: false });
   }
   return PromptableCommand;
 }

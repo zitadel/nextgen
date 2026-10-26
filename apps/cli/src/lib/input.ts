@@ -159,7 +159,7 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  * const clientId = await this.input({
  *   kind: "text",
  *   name: "client id",
- *   message: "Client ID",
+ *   message: "What is the client ID of your Google OAuth app?",
  *   flag: "--client-id",
  *   parse: parseClientId,
  *   given: flags["client-id"],

@@ -8,6 +8,7 @@ import { createZitadelClient } from "../../lib/api-client";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
+import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
 import {
   buildBundle,
@@ -277,12 +278,15 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      const confirmed = await this.inputUnforced({
-        kind: "confirm",
-        name: "deploy .zitadel/ to the new environment",
-        message: "Would you like to deploy .zitadel/ to it now?",
-        initialValue: true,
-      });
+      const confirmed = await input(
+        {
+          kind: "confirm",
+          name: "deploy .zitadel/ to the new environment",
+          message: "Would you like to deploy .zitadel/ to it now?",
+          initialValue: true,
+        },
+        { interactive: !nonInteractive, force: false },
+      );
       if (confirmed) {
         deployment = await this.deployInitialRelease({
           cwd,
