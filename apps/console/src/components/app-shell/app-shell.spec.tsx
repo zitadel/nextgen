@@ -28,9 +28,9 @@ vi.mock("@/auth/session", async (importOriginal) => {
  * theme toggle writing `data-theme` and persisting the preference.
  */
 // The design's single-level sidebar ("01 / Nav Level 1"), less the screens
-// that are not built (Deployments, Sessions).
+// that are not built (Deployments, Sessions). Projects is not a row: it is
+// the home, behind the logo and the switcher's `All projects`.
 const NAV_ORDER = [
-  "Projects",
   "Teams",
   "Users",
   "User schemas",
@@ -95,7 +95,7 @@ describe("app shell navigation", () => {
     expect(linkedRows).toHaveLength(NAV_ORDER.length);
   });
 
-  it("lists every screen before a project is selected", async () => {
+  it("draws the home, Projects, without the sidebar", async () => {
     // Several to choose from, so `/` lands on Projects with nothing selected.
     server.use(
       http.get(MY_PROJECTS, () =>
@@ -112,15 +112,38 @@ describe("app shell navigation", () => {
     // Projects itself, not on the way to Users: nothing asked for a screen.
     expect(router.state.resolvedLocation?.search).not.toHaveProperty("next");
     expect(await screen.findByRole("heading", { name: "Projects" })).toBeInTheDocument();
-    // Projects is the list the switcher would offer, with its own search, so
-    // the bar carries no pill there (D21).
-    await screen.findByRole("navigation", { name: "Context" });
+
+    // The sidebar is one project's screens; the home is above every project.
+    // Its bar keeps the logo, search and the account, and no project pill:
+    // the page is that list at full size (D21).
+    expect(screen.queryByRole("navigation", { name: "Primary" })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-slot="sidebar"]')).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Switch project" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/projects");
+    expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Account:/ }));
+    expect(await screen.findByRole("menuitem", { name: "Log out" })).toBeInTheDocument();
+  });
+
+  it("lists every screen before a project is selected", async () => {
+    server.use(
+      http.get(MY_PROJECTS, () =>
+        HttpResponse.json({
+          projects: [
+            { id: "proj_1", name: "River" },
+            { id: "proj_2", name: "Delta" },
+          ],
+        }),
+      ),
+      http.get(READY, () => HttpResponse.text("ok")),
+    );
+    // System needs no project, so it opens with none selected.
+    renderShell("/system");
 
     // The project's screens are listed before one is chosen (D22).
-    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    const nav = within(await screen.findByRole("navigation", { name: "Primary" }));
     expect(nav.queryAllByRole("link").map((link) => link.textContent?.trim())).toEqual(NAV_ORDER);
-    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "true");
   });
 
   it("asks for a project on the way to a screen, then goes on there", async () => {
@@ -133,25 +156,36 @@ describe("app shell navigation", () => {
           ],
         }),
       ),
+      http.get(READY, () => HttpResponse.text("ok")),
     );
-    const router = renderShell();
-    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    const router = renderShell("/system");
 
-    const nav = within(screen.getByRole("navigation", { name: "Primary" }));
+    const nav = within(await screen.findByRole("navigation", { name: "Primary" }));
     await userEvent.click(nav.getByRole("link", { name: "Teams" }));
 
     // Teams needs a project, so the guard sends it to Projects, which names
-    // the screen it is the way to; the sidebar marks Teams, as Vercel does.
-    // Teams' own default filter rides along (`?status=active`).
+    // the screen it is the way to. Teams' own default filter rides along
+    // (`?status=active`).
     await waitFor(() => expect(router.state.resolvedLocation?.search.next).toMatch(/^\/teams\b/));
     expect(await screen.findByRole("heading", { name: "Continue to Teams" })).toBeInTheDocument();
     expect(screen.getByText("Choose a project to continue.")).toBeInTheDocument();
-    expect(nav.getByRole("link", { name: "Teams" })).toHaveAttribute("data-active", "true");
-    expect(nav.getByRole("link", { name: "Projects" })).toHaveAttribute("data-active", "false");
 
     await userEvent.click(await screen.findByRole("link", { name: "Delta" }));
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/teams"));
     expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_2" });
+    // Inside a project, the sidebar is back.
+    expect(await screen.findByRole("navigation", { name: "Primary" })).toBeInTheDocument();
+  });
+
+  it("goes home to Projects from the logo", async () => {
+    const router = renderShell();
+    await screen.findByRole("link", { name: /^Users/ });
+
+    await userEvent.click(screen.getByRole("link", { name: "Home" }));
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+    // The selection rides along, so the list marks the open project.
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_1" });
+    expect(await screen.findByText("Current")).toBeInTheDocument();
   });
 
   it("does not advertise screens that have no endpoint behind them", async () => {
