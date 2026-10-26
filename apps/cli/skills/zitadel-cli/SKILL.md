@@ -85,7 +85,15 @@ upgrade, so upgrade the app and rerun rather than retrying.
   and the files it looked in; there is no cloud default outside `setup`, and
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
-  project.
+  project. The project it creates has never had a release, so the environment
+  serves the server's own defaults until something is deployed to it: run the
+  `deploy` the result's `next_commands` names, against the file it wrote
+  (`--env-file .env.<name>.local`). Interactively it offers to run that deploy;
+  no run of it ever prompts under `--json`, `--non-interactive` or in CI, and
+  `--no-deploy` stops it asking at all. `data.deployment` carries the
+  `release_id`, `content_hash`, `deployment_id` and `origins` when it did
+  deploy, and is null otherwise — a failed deploy is a warning, never a failed
+  `env add`.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where

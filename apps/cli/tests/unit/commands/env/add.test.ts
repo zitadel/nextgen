@@ -154,6 +154,58 @@ describe("env add", () => {
       expect(out).toContain("origin add '<your-app-url>' --kind primary");
     });
 
+    it("offers the deploy that makes the new environment serve .zitadel/", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
+    });
+
+    it("reports no deployment when it made none", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect((envelope.data as unknown as { deployment: unknown }).deployment).toBeNull();
+    });
+
+    it("offers no deploy for a project it only bound", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await addBound(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+    });
+
+    it("still names the deploy under --no-deploy, which only stops it asking", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd, "--no-deploy");
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
+    });
+
+    it("says what the environment serves until something is deployed to it", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out).toContain(
+        "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
+      );
+    });
+
+    it("names the deploy a person should run, against the new environment", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out).toContain(
+        "Deploy to it: zitadel deploy -m '<what changed>' --env-file .env.production.local",
+      );
+    });
+
     it("offers no origin add without an app URL to add", async () => {
       const cwd = await makeProject("next");
 

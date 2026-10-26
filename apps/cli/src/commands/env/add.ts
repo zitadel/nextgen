@@ -8,7 +8,10 @@ import { createZitadelClient } from "../../lib/api-client";
 import { ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
+import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
+import { DEPLOY_ARGS, type InitialDeployOutcome, runInitialDeploy } from "../../lib/release";
+import { reportWarning } from "../../lib/warnings";
 import {
   BaseCommand,
   CommandGroups,
@@ -22,7 +25,7 @@ import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
 import { shellArg, shellOption } from "../../lib/shell";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
-import { projectCommand } from "../../lib/suggestion";
+import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -59,6 +62,12 @@ export default class EnvAdd extends BaseCommand {
         "The URL this environment's app is served from. It becomes ZITADEL_ISSUER and is registered with a new project.",
     }),
     force: Flags.boolean({ description: "Overwrite an existing .env.<name>.local." }),
+    deploy: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Offer to deploy .zitadel/ to the project this creates, so the environment serves it rather than the server's defaults. Use --no-deploy to never ask.",
+    }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -230,7 +239,18 @@ export default class EnvAdd extends BaseCommand {
     // A created project already holds its app URL as a primary origin, which
     // closes it; only a bound one (`--project`) still needs the pattern added.
     const needsOrigin = flags.project !== undefined;
+    const createdProject = !needsOrigin;
     const { cliVersion } = this.meta;
+    const deployment = await this.deployNewEnvironment({
+      cwd,
+      server,
+      projectId,
+      projectSecret,
+      created: createdProject,
+      enabled: flags.deploy !== false,
+      nonInteractive,
+      selector: newEnvironment,
+    });
     const render = (variables: PlatformVariable[]): string[] =>
       variables.map((variable) =>
         variable.secret
@@ -250,6 +270,20 @@ export default class EnvAdd extends BaseCommand {
         project_id: projectId,
         keys: Object.keys(values),
         platform,
+        // The deployment this run made, so the environment serves the
+        // developer's `.zitadel/` rather than whatever the server serves a
+        // project with nothing deployed to it. `null` whenever none was made:
+        // a `--project` bind, `--no-deploy`, a run with nobody to ask, a
+        // declined prompt, or a deploy that failed.
+        deployment:
+          deployment?.kind === "deployed"
+            ? {
+                release_id: deployment.releaseId,
+                content_hash: deployment.contentHash,
+                deployment_id: deployment.deploymentId,
+                origins: [...deployment.origins],
+              }
+            : null,
         // A bound project admits every origin until the first pattern closes
         // it, so the first step is to add one — `origin add` — before anything
         // ships. `next_commands` is machine-readable, so the entry is included
@@ -270,6 +304,14 @@ export default class EnvAdd extends BaseCommand {
                 ),
               ]
             : []),
+          // Only a created project is offered a deploy: it is this run's own,
+          // it has never had a release, and the file just written holds the
+          // secret the deploy authenticates with. A `--project` bind is a
+          // project someone else owns and may already serve a release of
+          // their own, so this run does not propose replacing it.
+          ...(createdProject && deployment?.kind !== "deployed"
+            ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
+            : []),
           projectCommand("env", newEnvironment, cliVersion),
         ]),
       },
@@ -283,6 +325,16 @@ export default class EnvAdd extends BaseCommand {
               writtenKeys.has("ZITADEL_PROJECT_SECRET")
                 ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`
                 : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
+            ]
+          : []),
+        // Said even when nobody could be asked, because it is the one thing
+        // standing between this environment and a working app: until a
+        // release is deployed the project serves the server's own defaults,
+        // not the `.zitadel/` files in this directory.
+        ...(createdProject && deployment?.kind !== "deployed"
+          ? [
+              `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
+              `Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
             ]
           : []),
         `Check what resolves: zitadel env${newEnvironment}`,
@@ -299,5 +351,78 @@ export default class EnvAdd extends BaseCommand {
         ...render(platform.pipeline),
       ].join("\n"),
     });
+  }
+
+  /**
+   * Offer to publish `.zitadel/` to the project this run just created, and do
+   * it when the answer is yes.
+   *
+   * A new project has never had a release, so the environment serves the
+   * server's own defaults until something is deployed to it: the developer's
+   * files sit in their repository doing nothing. Asking here is the only
+   * moment the project, its secret and its origin are all at hand (#1651).
+   *
+   * Nothing is asked when nobody can be asked, which covers `--json`, CI and
+   * every agent: those runs get the suggestion in the envelope instead. The
+   * question is asked directly rather than through `this.input`, because this
+   * command's `--force` means "overwrite the env file" and must not answer it.
+   * A failure is reported rather than thrown — the project exists, the file is
+   * written, and the deploy is one command away.
+   */
+  private async deployNewEnvironment(opts: {
+    cwd: string;
+    server: string;
+    projectId: string;
+    projectSecret: string | undefined;
+    created: boolean;
+    enabled: boolean;
+    nonInteractive: boolean;
+    selector: EnvironmentSelector;
+  }): Promise<InitialDeployOutcome | undefined> {
+    // A bound project is someone else's and may already serve a release of
+    // their own; without the secret there is nothing to authenticate with.
+    if (!opts.created || !opts.enabled || opts.nonInteractive) {
+      return undefined;
+    }
+    if (opts.projectSecret === undefined) {
+      return undefined;
+    }
+    consola.info(
+      "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
+    );
+    const confirmed = await input(
+      {
+        kind: "confirm",
+        name: "deploy .zitadel/ to the new environment",
+        message: "Deploy .zitadel/ to it now?",
+        initialValue: true,
+      },
+      { interactive: true, force: false },
+    );
+    if (!confirmed) {
+      return undefined;
+    }
+    consola.start("Deploying .zitadel/ to the new environment");
+    const json = this.jsonEnabled();
+    const outcome = await runInitialDeploy({
+      cwd: opts.cwd,
+      client: createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret }),
+      projectId: opts.projectId,
+      env: this.meta.env,
+      json,
+      color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+      message: "Initial deployment from zitadel env add",
+      suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+    });
+    if (outcome.kind === "deployed") {
+      consola.success(
+        `Deployed ${outcome.contentHash} to ${outcome.origins.length} origin${outcome.origins.length === 1 ? "" : "s"}`,
+      );
+    } else {
+      reportWarning(
+        `The environment was bound but the first deploy failed: ${outcome.message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish it.`,
+      );
+    }
+    return outcome;
   }
 }

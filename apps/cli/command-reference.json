@@ -413,6 +413,13 @@
           "name": "force",
           "description": "Overwrite an existing .env.<name>.local.",
           "type": "boolean"
+        },
+        {
+          "name": "deploy",
+          "description": "Offer to deploy .zitadel/ to the project this creates, so the environment serves it rather than the server's defaults. Use --no-deploy to never ask.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
         }
       ],
       "examples": [
