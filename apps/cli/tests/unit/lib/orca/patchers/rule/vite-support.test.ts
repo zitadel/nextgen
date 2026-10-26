@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { SESSION_COOKIE_MARKER } from "../../../../../../src/lib/orca/patchers/rule/session-cookie";
 import {
+  viteApiPrefixEdit,
+  viteApiPrefixVerdict,
   viteProxyEdit,
   viteSessionCookieEdit,
   viteSessionCookieVerdict,
@@ -14,6 +16,11 @@ import { aViteApp, type DevApp } from "../../../../../helpers/vite";
 
 const edit = viteProxyEdit(5173, "http://127.0.0.1:8099");
 const sessionCookieEdit = viteSessionCookieEdit();
+const apiPrefixEdit = viteApiPrefixEdit();
+
+/** The path check of the bearer hook setup writes: the exchange with and without the API prefix. */
+const BOTH_EXCHANGE_PATHS =
+  '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")';
 
 const BARE_CONFIG = 'import { defineConfig } from "vite";\n\nexport default defineConfig({});\n';
 
@@ -58,6 +65,32 @@ export default defineConfig({
 });
 `;
 
+/** What setup wrote before it held the bearer to the exchange: the secret went with every request. */
+const UNCONDITIONAL_BEARER_CONFIG = `import { defineConfig, loadEnv } from "vite";
+export default defineConfig({
+  server: {
+    proxy: {
+      "/__nextgen": {
+        target: "http://old.example",
+        changeOrigin: false,
+        secure: false,
+        rewrite: (path) => path.slice("/__nextgen".length),
+        configure: (proxy) => {
+          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
+          if (!secret) {
+            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")
+          }
+          const bearer = \`Bearer \${secret}\`;
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("authorization", bearer);
+          });
+        },
+      },
+    },
+  },
+});
+// preserved user note`;
+
 describe("viteProxyEdit", () => {
   it("adds the /__nextgen proxy with an exchange-only project-secret bearer", () => {
     const out = edit('import { defineConfig } from "vite";\nexport default defineConfig({});');
@@ -66,9 +99,9 @@ describe("viteProxyEdit", () => {
     expect(out).toContain("ZITADEL_PROJECT_SECRET");
     expect(out).toContain("Bearer ${secret}");
     expect(out).toContain('proxyReq.method === "POST"');
-    expect(out).toContain('pathname === "/sessions/exchange"');
+    expect(out).toContain(BOTH_EXCHANGE_PATHS);
     expect(out).toContain('!proxyReq.getHeader("authorization")');
-    expect(out).toContain("zitadel:proxy:v2");
+    expect(out).toContain("zitadel:proxy:v3");
     expect(out).toContain("http://127.0.0.1:8099");
     expect(out).toContain("5173");
     // Bind the exact issuer port or fail — never drift to a port not in preview_origins.
@@ -131,35 +164,12 @@ describe("viteProxyEdit", () => {
   });
 
   it("migrates the legacy generated proxy that stamped the secret on every request", () => {
-    const legacy = `import { defineConfig, loadEnv } from "vite";
-export default defineConfig({
-  server: {
-    proxy: {
-      "/__nextgen": {
-        target: "http://old.example",
-        changeOrigin: false,
-        secure: false,
-        rewrite: (path) => path.slice("/__nextgen".length),
-        configure: (proxy) => {
-          const secret = loadEnv("development", process.cwd(), "ZITADEL_").ZITADEL_PROJECT_SECRET;
-          if (!secret) {
-            throw new Error("ZITADEL_PROJECT_SECRET is not set; add it to .env.local (zitadel setup writes it).")
-          }
-          const bearer = \`Bearer \${secret}\`;
-          proxy.on("proxyReq", (proxyReq) => {
-            proxyReq.setHeader("authorization", bearer);
-          });
-        },
-      },
-    },
-  },
-});
-// preserved user note`;
+    const legacy = UNCONDITIONAL_BEARER_CONFIG;
 
     const out = edit(legacy);
 
-    expect(out).toContain("zitadel:proxy:v2");
-    expect(out).toContain('pathname === "/sessions/exchange"');
+    expect(out).toContain("zitadel:proxy:v3");
+    expect(out).toContain(BOTH_EXCHANGE_PATHS);
     expect(out).toContain("http://old.example");
     expect(out).toContain("changeOrigin: true,\n        xfwd: true,");
     expect(out).toContain("secure: false");
@@ -170,8 +180,9 @@ export default defineConfig({
   it("moves the entry it wrote before onto the origin-forwarding shape", () => {
     const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
 
-    // As setup applies them: the entry's edit, then its session-cookie hooks.
-    expect(sessionCookieEdit(edit(PREVIOUS_CONFIG))).toBe(current);
+    // As setup applies them: the entry's edit, its session-cookie hooks, then
+    // the exchange under the API prefix.
+    expect(apiPrefixEdit(sessionCookieEdit(edit(PREVIOUS_CONFIG)))).toBe(current);
   });
 
   it("leaves a hand-written entry that keeps the browser's Host alone", () => {
@@ -235,6 +246,37 @@ export default defineConfig({
     );
   });
 
+  it("flags a guard that an `||` widens beyond the exchange", () => {
+    const widened = edit(BARE_CONFIG).replace(
+      BOTH_EXCHANGE_PATHS,
+      'pathname === "/sessions/exchange" || true',
+    );
+
+    expect(() => edit(widened)).toThrowError(
+      /may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
+    );
+  });
+
+  it("accepts a guard that names the two exchange paths in either order", () => {
+    const swapped = edit(BARE_CONFIG).replace(
+      BOTH_EXCHANGE_PATHS,
+      '(pathname === "/api/v1/sessions/exchange" || pathname === "/sessions/exchange")',
+    );
+
+    expect(edit(swapped)).toBe(swapped);
+  });
+
+  it("flags a guard that names another path beside the exchange", () => {
+    const other = edit(BARE_CONFIG).replace(
+      BOTH_EXCHANGE_PATHS,
+      '(pathname === "/sessions/exchange" || pathname === "/users/me")',
+    );
+
+    expect(() => edit(other)).toThrowError(
+      /may forward ZITADEL_PROJECT_SECRET outside POST \/sessions\/exchange/,
+    );
+  });
+
   it("preserves a custom existing /__nextgen proxy", () => {
     const custom = `export default defineConfig({
   server: { proxy: { "/__nextgen": { target: "https://custom.example" } } },
@@ -243,7 +285,7 @@ export default defineConfig({
     const out = edit(custom);
 
     expect(out).toContain("https://custom.example");
-    expect(out).not.toContain("zitadel:proxy:v2");
+    expect(out).not.toContain("zitadel:proxy:");
     expect(out).not.toContain("ZITADEL_PROJECT_SECRET");
   });
 
@@ -259,7 +301,7 @@ describe("viteSessionCookieEdit", () => {
   it("gives the entry it wrote before the session-cookie hooks", () => {
     const current = viteProxyEdit(5173, "https://zitadel.example.com")(BARE_CONFIG);
 
-    expect(sessionCookieEdit(bearerOnly)).toBe(current);
+    expect(apiPrefixEdit(sessionCookieEdit(bearerOnly))).toBe(current);
   });
 
   it("finds the entry it wrote whatever a formatter did to its layout", () => {
@@ -413,6 +455,116 @@ describe("viteSessionCookieVerdict", () => {
   });
 });
 
+describe("viteApiPrefixEdit", () => {
+  /** The entry setup wrote with the session-cookie hooks, before it knew the API prefix. */
+  const v2 = sessionCookieEdit(edit(PREVIOUS_CONFIG));
+
+  it("moves the v2 entry it wrote to the exchange with and without the API prefix", () => {
+    const out = apiPrefixEdit(v2);
+
+    expect(out).toContain(BOTH_EXCHANGE_PATHS);
+    expect(out).toContain("/* zitadel:proxy:v3 */");
+    expect(out).not.toContain("zitadel:proxy:v2");
+    expect(out.replace(BOTH_EXCHANGE_PATHS, 'pathname === "/sessions/exchange"')).toBe(
+      v2.replace("zitadel:proxy:v2", "zitadel:proxy:v3"),
+    );
+  });
+
+  it("finds the v2 entry whatever a formatter did to its layout", () => {
+    const reformatted = v2
+      .replace(/"/g, "'")
+      .replace(/;$/gm, "")
+      .replace(/^(?: {2})+/gm, (spaces) => "\t".repeat(spaces.length / 2));
+
+    const out = apiPrefixEdit(reformatted);
+
+    expect(out).toContain(BOTH_EXCHANGE_PATHS);
+    expect(out).toContain("zitadel:proxy:v3");
+    expect(apiPrefixEdit(out)).toBe(out);
+  });
+
+  it("moves the hook a v2 setup migrated from the unconditional bearer as well", () => {
+    const current = edit(UNCONDITIONAL_BEARER_CONFIG);
+    // What a v2 setup made of it: its marker sits on the hook, inside the entry.
+    const byV2 = current
+      .replace("zitadel:proxy:v3", "zitadel:proxy:v2")
+      .replace(BOTH_EXCHANGE_PATHS, 'pathname === "/sessions/exchange"');
+
+    expect(apiPrefixEdit(byV2)).toBe(current);
+  });
+
+  it("leaves an entry whose bearer hook was changed alone", () => {
+    const changed = v2.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
+    );
+
+    expect(apiPrefixEdit(changed)).toBe(changed);
+  });
+
+  it("leaves a hand-written entry alone", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "https://custom.example" } } },
+});`;
+
+    expect(apiPrefixEdit(custom)).toBe(custom);
+  });
+
+  it("is idempotent — the entry setup writes now is left as it is", () => {
+    const current = sessionCookieEdit(edit(BARE_CONFIG));
+
+    expect(apiPrefixEdit(current)).toBe(current);
+  });
+
+  it("moves a CRLF config with CRLF line ends", () => {
+    const out = apiPrefixEdit(v2.replace(/\n/g, "\r\n"));
+
+    expect(out).toBe(apiPrefixEdit(v2).replace(/\n/g, "\r\n"));
+  });
+
+  it("throws E_VALIDATION when the config is missing", () => {
+    expect(() => apiPrefixEdit(undefined)).toThrowError(/not found/);
+  });
+});
+
+describe("viteApiPrefixVerdict", () => {
+  const v2 = sessionCookieEdit(edit(PREVIOUS_CONFIG));
+
+  it("reads the entry setup writes now as applied", () => {
+    expect(viteApiPrefixVerdict(sessionCookieEdit(edit(BARE_CONFIG)))).toBe("applied");
+  });
+
+  it("reads the v2 entry it wrote as detached", () => {
+    expect(viteApiPrefixVerdict(v2)).toBe("detached");
+    expect(viteApiPrefixVerdict(v2.replace(/\n/g, "\r\n"))).toBe("detached");
+  });
+
+  it("reads an entry whose bearer hook was changed as unknown, not applied", () => {
+    const changed = v2.replace(
+      'proxyReq.setHeader("authorization", bearer);',
+      'proxyReq.setHeader("authorization", bearer);\n              console.debug("exchange");',
+    );
+
+    expect(viteApiPrefixVerdict(changed)).toEqual({
+      unknown: expect.stringContaining("must accept /api/v1/sessions/exchange by hand"),
+    });
+  });
+
+  it("reads a hand-written proxy that attaches the secret to the bare exchange only as unknown", () => {
+    const custom = `export default defineConfig({
+  server: { proxy: { "/__nextgen": { target: "https://custom.example", headers: { authorization: process.env.ZITADEL_PROJECT_SECRET } } } },
+});`;
+
+    expect(viteApiPrefixVerdict(custom)).toEqual({
+      unknown: expect.stringContaining("not the one zitadel setup writes"),
+    });
+  });
+
+  it("reads a config without a proxy that attaches the secret as applied", () => {
+    expect(viteApiPrefixVerdict(BARE_CONFIG)).toBe("applied");
+  });
+});
+
 /** The CLI package: a config checked from here resolves `vite` and `@types/node` as an app does. */
 const CLI_ROOT = fileURLToPath(new URL("../../../../../../", import.meta.url));
 
@@ -529,6 +681,18 @@ describe("the generated proxy, run by Vite against a remote https server", () =>
     await fetch(`${origin}/__nextgen/sessions/me`);
 
     const [exchange, me] = remote.requests.slice(-2);
+    expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
+    expect(me?.headers.authorization).toBeUndefined();
+  });
+
+  it("attaches the project secret to the session exchange under the API prefix too", async () => {
+    const { origin } = await serve(viteProxyEdit(5173, remote.url)(BARE_CONFIG));
+
+    await fetch(`${origin}/__nextgen/api/v1/sessions/exchange`, { method: "POST" });
+    await fetch(`${origin}/__nextgen/api/v1/sessions/me`);
+
+    const [exchange, me] = remote.requests.slice(-2);
+    expect(exchange?.path).toBe("/api/v1/sessions/exchange");
     expect(exchange?.headers.authorization).toBe("Bearer sk_proj_test");
     expect(me?.headers.authorization).toBeUndefined();
   });

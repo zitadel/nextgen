@@ -7,6 +7,7 @@
 
 import type { JwtPayload } from "./jwt.js";
 
+import { API_PREFIX } from "@zitadel/api/runtime/base-url";
 import { joinURL } from "ufo";
 
 import { isJwtShaped, verifyJwt } from "./jwt.js";
@@ -128,6 +129,19 @@ export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): U
 // ─── Proxy credentials ───────────────────────────────────────────────────────
 
 /**
+ * The operation a proxied path names: the path without the API prefix
+ * (ADR 077), so `/api/v1/sessions/me` and `/sessions/me` name the same one.
+ * Until 1.0.0 the server answers both spellings, and so every check here that
+ * decides by path accepts both.
+ */
+function operationPath(path: string): string {
+  if (path === API_PREFIX) {
+    return "/";
+  }
+  return path.startsWith(`${API_PREFIX}/`) ? path.slice(API_PREFIX.length) : path;
+}
+
+/**
  * Whether a proxied call may carry the confidential project secret.
  *
  * ADR 036: the browser flow needs the secret only for the handoff exchange
@@ -136,11 +150,12 @@ export function loginRedirectUrl(loginPath: string, requestUrl: string | URL): U
  * project-level authority for any anonymous caller.
  *
  * @param method   - The proxied request's HTTP method.
- * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`.
+ * @param pathname - The path after the proxy prefix, e.g. `/sessions/exchange`
+ *   or `/api/v1/sessions/exchange`.
  * @returns `true` only for the handoff exchange.
  */
 export function requiresProjectSecret(method: string, pathname: string): boolean {
-  return method.toUpperCase() === "POST" && pathname === "/sessions/exchange";
+  return method.toUpperCase() === "POST" && operationPath(pathname) === "/sessions/exchange";
 }
 
 // ─── Response header filtering ───────────────────────────────────────────────
@@ -397,7 +412,7 @@ function setCookieName(setCookie: string): string {
  */
 export interface ProxiedRequest extends BrowserRequest {
   readonly method: string;
-  /** The path after the proxy prefix, e.g. `/sessions/me`. */
+  /** The path after the proxy prefix, e.g. `/sessions/me` or `/api/v1/sessions/me`. */
   readonly path: string;
   /** The query string, with its leading `?`, or `""`. */
   readonly search: string;
@@ -452,6 +467,8 @@ export interface ProxiedSessionCookies {
  *   gone: the server is asked about it in this project, and a session of this
  *   project is cleared (and on sign-out also ended), a dead one cleared, and
  *   one of another project, the Console's on `localhost`, left alone.
+ * - Each of these calls is known by its path with or without the API prefix
+ *   (`/api/v1`), which the server answers both ways until 1.0.0.
  * - Without a project the cookies pass as they are: nothing says which session
  *   is the app's.
  *
@@ -481,12 +498,13 @@ export function proxySessionCookies(
   // A session kept under the server's name, which goes up to the probe only.
   const shared = cookieValue(pieces, SERVER_SESSION_COOKIE);
   const method = request.method.toUpperCase();
+  const operation = operationPath(request.path);
   const isProbe =
     method === "GET" &&
-    request.path === "/sessions/me" &&
+    operation === "/sessions/me" &&
     new URLSearchParams(request.search).get("project_id") === projectId;
-  const signsIn = method === "POST" && request.path === "/sessions/exchange";
-  const signsOut = method === "DELETE" && request.path === "/sessions/me";
+  const signsIn = method === "POST" && operation === "/sessions/exchange";
+  const signsOut = method === "DELETE" && operation === "/sessions/me";
   const probed = own === null && isProbe ? shared : null;
   const secure = secureFor(request);
 
