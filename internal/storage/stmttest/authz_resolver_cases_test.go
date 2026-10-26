@@ -279,6 +279,74 @@ func TestAuthzResolverStatements_Cases(t *testing.T) {
 			assert.False(t, allowed)
 		})
 
+		// #2112 / ADR 053 §7: a Check that names a target has a foothold only
+		// when something could cover that target; without a target (creates,
+		// lists) the foothold stays project-wide.
+		t.Run("check foothold follows the target", func(t *testing.T) {
+			foothold := func(t *testing.T, principal string, mutate func(*domain.AuthzCheckParams)) bool {
+				t.Helper()
+				params := base(domain.AuthzPrincipalTypeUser, principal, "project", "editor")
+				mutate(&params)
+				allowed, foothold := check(t, params)
+				require.False(t, allowed, "every case here is a denial")
+				return foothold
+			}
+			untargeted := func(*domain.AuthzCheckParams) {}
+			teamRow := func(team string) func(*domain.AuthzCheckParams) {
+				return func(p *domain.AuthzCheckParams) { p.ResourceID, p.ResourceTeamID = team, team }
+			}
+			userRow := func(id string) func(*domain.AuthzCheckParams) {
+				return func(p *domain.AuthzCheckParams) { p.ResourceID = id }
+			}
+			otherUser := "usr_other_" + uniqueSuffix(t)
+
+			t.Run("team-scoped grant", func(t *testing.T) {
+				u := "user_tgt_team_" + uniqueSuffix(t)
+				require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+					newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewTeamAssignmentScope(teamT))))
+				assert.True(t, foothold(t, u, teamRow(teamT)), "its own team")
+				assert.False(t, foothold(t, u, teamRow(teamU)), "another team")
+				assert.False(t, foothold(t, u, userRow(otherUser)), "a user, which has no team in RSI")
+				assert.True(t, foothold(t, u, untargeted), "no target keeps the project-wide foothold")
+			})
+
+			t.Run("resource-scoped grant", func(t *testing.T) {
+				u := "user_tgt_res_" + uniqueSuffix(t)
+				res := "usr_tgt_res_" + uniqueSuffix(t)
+				require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+					newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewResourceAssignmentScope(res))))
+				assert.True(t, foothold(t, u, userRow(res)), "the granted resource")
+				assert.False(t, foothold(t, u, userRow(otherUser)), "another resource")
+				assert.True(t, foothold(t, u, untargeted))
+			})
+
+			t.Run("project-scoped grant", func(t *testing.T) {
+				u := "user_tgt_proj_" + uniqueSuffix(t)
+				require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+					newTestAssignment(projectID, "", domain.AuthzPrincipalTypeUser, u, "project", "viewer", domain.NewProjectAssignmentScope())))
+				assert.True(t, foothold(t, u, teamRow(teamU)))
+				assert.True(t, foothold(t, u, userRow(otherUser)))
+			})
+
+			t.Run("membership only", func(t *testing.T) {
+				// A team of its own: other cases grant teamT, which a member
+				// would inherit.
+				u := "user_tgt_member_" + uniqueSuffix(t)
+				own := "team_tgt_member_" + uniqueSuffix(t)
+				require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, own)))
+				require.NoError(t, d.stmts.UpsertAuthzMembershipEdge(t.Context(), domain.NewUserTeamMembershipEdge(projectID, own, u)))
+				assert.True(t, foothold(t, u, teamRow(own)), "a member's own team")
+				assert.False(t, foothold(t, u, teamRow(teamU)), "another team")
+				assert.False(t, foothold(t, u, userRow(otherUser)))
+				assert.True(t, foothold(t, u, untargeted))
+			})
+
+			t.Run("own user record", func(t *testing.T) {
+				u := "user_tgt_self_" + uniqueSuffix(t)
+				assert.True(t, foothold(t, u, userRow(u)))
+			})
+		})
+
 		t.Run("check wrong catalog deny", func(t *testing.T) {
 			u := "user_bad_cat_" + uniqueSuffix(t)
 			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),

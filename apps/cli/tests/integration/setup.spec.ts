@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aNewAppDirectory, anApp, type ScaffoldedApp } from "../helpers/project";
+import { aNewAppDirectory, anApp, type ScaffoldedApp, PASSWORD_POLICY } from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -110,6 +110,44 @@ describe("setup", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
+
+      it("publishes a password policy that enforces nothing", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+        ]);
+      });
+
+      it("puts a given minimum password length into the policy", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "12"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("reads a minimum password length of 0 as none", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "0"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+        ]);
+      });
+
+      it("refuses a minimum password length outside the bounds before creating anything", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--password-min-length", "65"]);
+
+        expect(result).toFailWith("E_VALIDATION");
       });
 
       it("creates a new app in the directory start ran in", async () => {
