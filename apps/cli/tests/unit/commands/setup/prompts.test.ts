@@ -464,7 +464,7 @@ describe("SocialSignInPrompt", () => {
 
     const question = vi.mocked(multiselect).mock.calls[0]?.[0];
     expect(question?.message).toBe(
-      "Add external sign-in providers? (optional) Select any providers you want to add, or press Enter to skip.",
+      "Would you like to add external sign-in providers? This is optional: select any you want, or press Enter to skip.",
     );
     expect(question?.options.map((option) => option.label)).toEqual([
       "Google — requires a Google OAuth app",
@@ -808,10 +808,10 @@ describe("askCustomSettings", () => {
     scopes: "openid",
   };
   const QUESTIONS = {
-    slug: "Name for this connection",
-    displayName: "Name shown on the sign-in button",
-    issuer: "Issuer URL of the provider",
-    scopes: "Scopes to request",
+    slug: "What would you like to call this connection?",
+    displayName: "What name should the sign-in button show?",
+    issuer: "What is the issuer URL of the provider?",
+    scopes: "Which scopes should we request?",
   };
 
   it.each([

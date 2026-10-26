@@ -17,7 +17,7 @@ export class PasswordPolicyPrompt implements SetupPrompt {
       kind: "text",
       name: "minimum password length",
       message:
-        "Set a minimum password length? Leave empty or enter 0 for none; you can change it in .zitadel/policies/ later.",
+        "Would you like to set a minimum password length? Leave it empty or enter 0 for none; you can change it in .zitadel/policies/ later.",
       placeholder: "e.g. 15",
       parse: parsePasswordMinLength,
     });

@@ -17,7 +17,6 @@ import {
   CUSTOM_PROVIDER,
   IDP_PROVIDERS,
   parseClientId,
-  parseClientSecret,
   type ProviderSelection,
   providerOf,
   selectionName,
@@ -88,7 +87,7 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { type Asker, input } from "../../lib/input";
+import type { Asker } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -136,6 +135,8 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { Promptable } from "../../lib/oclif/promptable";
+import { clientSecretQuestion } from "../../lib/questions";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -197,7 +198,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends BaseCommand {
+export default class Setup extends Promptable(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
@@ -329,8 +330,7 @@ export default class Setup extends BaseCommand {
     // here `--force` permits overwriting files, so it must never answer a
     // question. Interactive only when a person is there, which is also the only
     // time the wizard runs.
-    const wizardInput: Asker = (question) =>
-      input(question, { interactive: !nonInteractive, force: false });
+    const wizardInput = this.inputUnforced;
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
@@ -1346,10 +1346,7 @@ export async function ssoFromFlags(
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
   const secret = await ask({
-    kind: "secret",
-    name: "client secret",
-    message: "Client secret",
-    parse: parseClientSecret,
+    ...clientSecretQuestion({ provider: providerOf(selection).displayName }),
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.

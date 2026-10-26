@@ -17,7 +17,7 @@ export class PickFrameworkPrompt {
     return ask({
       kind: "select",
       name: "framework",
-      message: "Choose a framework to scaffold",
+      message: "Which framework would you like to scaffold?",
       options: choices.map((choice) => ({ value: choice.id, label: choice.displayName })),
     });
   }

@@ -1,3 +1,4 @@
+import { clientIdQuestion, clientSecretQuestion } from "../../../lib/questions";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -12,7 +13,6 @@ import {
   type IdpProvider,
   IDP_PROVIDERS,
   parseClientId,
-  parseClientSecret,
   type ProviderName,
   type ProviderSelection,
   providerOf,
@@ -286,10 +286,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
       const piped = await this.input({
-        kind: "secret",
-        name: "client secret",
-        message: "Client secret",
-        parse: parseClientSecret,
+        ...clientSecretQuestion({ provider: entry.displayName }),
         stdin: true,
         optional: true,
       });
@@ -327,11 +324,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
             })
           : undefined;
       const clientId = await this.input({
-        kind: "text",
-        name: `client id for ${entry.displayName}`,
-        message: "Client ID",
+        ...clientIdQuestion(entry.displayName),
         flag: "--client-id",
-        parse: parseClientId,
         given: flags["client-id"],
         retry: retryFor("<client-id>"),
       });
@@ -341,10 +335,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
       const secretValue = await this.input({
-        kind: "secret",
-        name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
-        parse: parseClientSecret,
+        ...clientSecretQuestion({
+          provider: entry.displayName,
+          variable: scaffolded.clientSecret,
+        }),
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
       });
