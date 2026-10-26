@@ -342,8 +342,6 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain
 		return domain.FlowStepResult{}, err
 	}
 	result.State.ID = flowID
-	// What the request resolved to rides in the sealed state, so a deploy
-	// landing mid-attempt does not change the configuration under it.
 	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
 		if resolution.Deployment != nil {
 			result.State.DeploymentID = resolution.Deployment.ID

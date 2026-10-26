@@ -96,6 +96,11 @@ type AuthAttempt struct {
 	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
 	// it must never be handed off, exchanged, or read through the attempt API.
 	Internal bool
+
+	// DeploymentID and ReleaseID seal the runtime resolution for later
+	// attempt ops; empty when create did not resolve a deployment.
+	DeploymentID string
+	ReleaseID    string
 }
 
 const AuthAttemptTTL = 15 * time.Minute

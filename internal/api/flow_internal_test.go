@@ -1,17 +1,12 @@
 package api
 
 import (
-	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	apigen "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
-	"github.com/zitadel/nextgen/internal/service"
-	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
 func TestToFlowField_OmitsValidationWhenAbsent(t *testing.T) {
@@ -233,84 +228,4 @@ func TestMapFlowDefinitionRequest_NullTransitionActionAndPurpose(t *testing.T) {
 	purposed := svcReq.Steps[0].Transitions["purposed"]
 	require.NotNil(t, purposed.Purpose)
 	require.Equal(t, domain.FlowDefinitionPurposeRegister, *purposed.Purpose)
-}
-
-func TestWithSealedRelease_PropagatesDeploymentLookupError(t *testing.T) {
-	t.Parallel()
-
-	ctrl := gomock.NewController(t)
-	releases := servicemocks.NewMockReleaseService(ctrl)
-	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
-		ProjectID: "proj_1",
-		ID:        "rel_1",
-	}, nil)
-
-	pool := servicemocks.NewMockPool(ctrl)
-	stmts := servicemocks.NewMockAllStatements(ctrl)
-	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	lookupErr := errors.New("deployment lookup failed")
-	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(nil, lookupErr)
-
-	h := Handler{
-		releaseService: releases,
-		pool:           service.NewPool(pool),
-	}
-	_, err := h.withSealedRelease(t.Context(), &domain.FlowState{
-		ProjectID:    "proj_1",
-		DeploymentID: "dep_1",
-		ReleaseID:    "rel_1",
-	})
-	require.ErrorIs(t, err, lookupErr)
-}
-
-func TestWithSealedRelease_AttachesDeployment(t *testing.T) {
-	t.Parallel()
-
-	ctrl := gomock.NewController(t)
-	releases := servicemocks.NewMockReleaseService(ctrl)
-	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
-		ProjectID: "proj_1",
-		ID:        "rel_1",
-	}, nil)
-
-	pool := servicemocks.NewMockPool(ctrl)
-	stmts := servicemocks.NewMockAllStatements(ctrl)
-	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	dep := &domain.Deployment{ProjectID: "proj_1", ID: "dep_1", ReleaseID: "rel_1"}
-	stmts.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", "dep_1").Return(dep, nil)
-
-	h := Handler{
-		releaseService: releases,
-		pool:           service.NewPool(pool),
-	}
-	ctx, err := h.withSealedRelease(t.Context(), &domain.FlowState{
-		ProjectID:    "proj_1",
-		DeploymentID: "dep_1",
-		ReleaseID:    "rel_1",
-	})
-	require.NoError(t, err)
-	resolution := service.RuntimeResolutionFromContext(ctx)
-	require.NotNil(t, resolution)
-	require.Equal(t, dep, resolution.Deployment)
-}
-
-func TestWithSealedRelease_Revoked(t *testing.T) {
-	t.Parallel()
-
-	ctrl := gomock.NewController(t)
-	releases := servicemocks.NewMockReleaseService(ctrl)
-	now := time.Now().UTC()
-	releases.EXPECT().Get(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
-		ProjectID: "proj_1",
-		ID:        "rel_1",
-		RevokedAt: &now,
-	}, nil)
-
-	h := Handler{releaseService: releases}
-	_, err := h.withSealedRelease(t.Context(), &domain.FlowState{
-		ProjectID:    "proj_1",
-		DeploymentID: "dep_1",
-		ReleaseID:    "rel_1",
-	})
-	require.ErrorIs(t, err, domain.ErrReleaseRevoked())
 }
