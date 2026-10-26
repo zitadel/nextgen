@@ -55,24 +55,35 @@ a file not named after its operation fails `deploy`, and the server's config
 rules (a minimum above the maximum) fail the release build with `rel.invalid`.
 There are no warnings: a value within the bounds is the project's choice.
 
-## Testing (not built yet)
+## Testing
 
-CEL has no `opa test`. Two things replace it:
+CEL has no `opa test`, and the CLI never evaluates CEL itself: it is
+TypeScript, there is no official CEL implementation for JavaScript, and a
+second evaluator would drift. The server evaluates instead.
 
-- A test file next to the instance.
-  `.zitadel/policies/auth.factor.password.set.test.json` holds a table of
-  `(config, context, expected decision)`. `zitadel policies test` runs it.
-  The shape is the one every policy-as-code CLI converges on (`gator verify`,
-  `kyverno test`, `sentinel test`, `fga model test`).
-- A server-side dry run. `POST /policies/{operation}/evaluate` takes an
-  explicit context and an optional instance, returns the decision, and has no
-  side effects. The CLI test command calls it. Once scoped instances land the same endpoint
-  answers "which instance wins for this request and why", which a
-  most-specific-wins resolution model needs (Okta ships a policy simulator for
-  exactly this reason).
-
-The CLI never evaluates CEL itself: it is TypeScript, there is no official CEL
-implementation for JavaScript, and a second evaluator would drift.
+- `POST /policies/evaluate` is a dry run, a pure function of its body: it
+  reads and writes nothing of the project. It takes `operation`, `config`
+  (required, checked exactly as a publish checks it), `input` and `facts`,
+  and answers `allowed`, plus on a refusal the live operation's error `code`
+  and `violations`. A test written against it therefore holds for the real
+  operation.
+- `input` is what the operation's request carries, in the operation's terms:
+  the password, not its length. The server runs the live operation's own
+  check on it (NFC, code points, the empty and 64-character guards), so the
+  derivation is tested too, and the template's context stays internal.
+- `facts` is what the live operation looks up and a dry run cannot:
+  `self_service` and `history_matches` for a password set. It is a working
+  name; `context` is the template's whole CEL input and stays free for a
+  template-test mode once users can write templates.
+- Which policy applies is not the endpoint's question. A caller that wants
+  to test what a release enforces reads the revision it pins and passes that
+  config; a release that pins none enforces nothing.
+- `.zitadel/policies/<operation>.test.json` holds the cases (input, facts,
+  expected decision), against `.zitadel/meta/policy-test.json`.
+  `zitadel policies test` runs them against the sibling policy file or,
+  with `--release`, against a built release
+  ([#1445](https://github.com/zitadel/nextgen/issues/1445)). `deploy` does
+  not carry test files.
 
 Zitadel's own templates are covered by Go tests in the server: for every
 template, a table of contexts with the expected violations.

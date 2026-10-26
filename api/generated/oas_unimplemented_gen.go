@@ -436,6 +436,29 @@ func (UnimplementedHandler) DeleteVariable(ctx context.Context, params DeleteVar
 	return r, ht.ErrNotImplemented
 }
 
+// EvaluatePolicy implements evaluatePolicy operation.
+//
+// Evaluates a policy config against one request, without side effects, and
+// answers the decision the operation would reach. Nothing is read from or
+// written to the project: the config is the one in the body, checked
+// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+// with the same violations.
+// `input` is what the operation's request carries, in the operation's own
+// terms (a password, not its length): the server derives what the policy
+// checks with the code the live operation runs, guards included. `facts`
+// states what the operation would look up at runtime, such as whether the
+// candidate matches one of the user's kept passwords. A refusal answers the
+// error code and violations the live operation would, so a test written
+// against this endpoint holds for the real operation.
+// Which policy a project or release applies is not decided here: read it
+// and pass its config.
+// The caller needs read access to the project in `project_id`.
+//
+// POST /policies/evaluate
+func (UnimplementedHandler) EvaluatePolicy(ctx context.Context, req EvaluatePolicyRequest, params EvaluatePolicyParams) (r EvaluatePolicyRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // ExchangeHandoff implements exchangeHandoff operation.
 //
 // Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`

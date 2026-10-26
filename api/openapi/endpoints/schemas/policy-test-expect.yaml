@@ -1,0 +1,27 @@
+title: PolicyTestExpect
+type: object
+additionalProperties: false
+description: |
+  The decision a case expects. `code` and `violations` are checked only when
+  given.
+required:
+  - allowed
+properties:
+  allowed:
+    type: boolean
+    description: Whether the operation should go ahead.
+  code:
+    type: string
+    minLength: 1
+    description: |
+      The error code the operation should refuse with, as the live operation
+      answers it, for example `user.password_empty`.
+  violations:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+    description: |
+      The names of exactly the rules that should fail, for example
+      `["min_length"]`.

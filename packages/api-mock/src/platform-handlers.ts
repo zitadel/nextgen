@@ -106,6 +106,9 @@ import {
   ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
   PublishPolicyQueryParams,
+  EvaluatePolicyBody,
+  EvaluatePolicyQueryParams,
+  EvaluatePolicyResponse,
   PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
@@ -728,6 +731,52 @@ function publishPolicyRevision(
       };
   store.policies.set(record.id, record);
   return { record, revision };
+}
+
+/** The server's length cap on a password (`domain.MaxPasswordLength`). */
+const MAX_PASSWORD_LENGTH = 64;
+
+/**
+ * What `POST /policies/evaluate` answers for a password set: the server's
+ * `CheckPassword` (internal/service/password_policy.go) on the given config.
+ * The empty guard comes first, then the template's rules on the length in
+ * code points after NFC, the history only for a user's own set within the
+ * cap, and the cap as `max_length`. A rule the template gains must be added
+ * here.
+ */
+function evaluatePasswordSet(
+  config: Record<string, unknown>,
+  password: string,
+  facts: { self_service: boolean; history_matches: boolean[] },
+): { allowed: boolean; code?: string; violations?: Record<string, unknown> } {
+  const normalized = password.normalize("NFC");
+  if (normalized === "") {
+    return { allowed: false, code: "user.password_empty" };
+  }
+  const length = [...normalized].length;
+  const { min_length: min, max_length: max, history_depth: depth } = config;
+  const violations: Record<string, unknown> = {};
+  if (typeof min === "number" && length < min) {
+    violations.min_length = min;
+  }
+  if (typeof max === "number" && length > max) {
+    violations.max_length = max;
+  }
+  if (
+    typeof depth === "number" &&
+    facts.self_service &&
+    length <= MAX_PASSWORD_LENGTH &&
+    facts.history_matches.slice(0, depth).some(Boolean)
+  ) {
+    violations.history_depth = depth;
+  }
+  if (!("max_length" in violations) && length > MAX_PASSWORD_LENGTH) {
+    violations.max_length = MAX_PASSWORD_LENGTH;
+  }
+  if (Object.keys(violations).length === 0) {
+    return { allowed: true };
+  }
+  return { allowed: false, code: "user.password_policy_violation", violations };
 }
 
 /** A shallow copy with its keys in order, so two configs compare by value. */
@@ -2995,6 +3044,46 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    // A dry run: nothing is read or stored. The config is checked as a
+    // publish checks it, then evaluated as the server's password set would.
+    http.post("*/policies/evaluate", async ({ request }) => {
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(EvaluatePolicyBody, raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      // Unknown settings are malformed, as on publish; the generated body
+      // schema would strip them, so the raw config is checked.
+      const config = parse(policyConfigSchema.shape.config, raw.config, "req.invalid");
+      if (!config.ok) {
+        return config.response;
+      }
+      if (policyRuleViolated(config.data)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const decision = evaluatePasswordSet(config.data, body.data.input.password, {
+        self_service: body.data.facts?.self_service ?? true,
+        history_matches: body.data.facts?.history_matches ?? [],
+      });
+      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.get("*/policies", ({ request }) => {

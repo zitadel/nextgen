@@ -1,0 +1,24 @@
+title: EvaluatePolicyResponse
+type: object
+description: |
+  The decision the operation would reach for the request. A refusal carries
+  the error code and violations the live operation would answer with.
+required:
+  - allowed
+properties:
+  allowed:
+    type: boolean
+    description: Whether the operation would go ahead.
+  code:
+    type: string
+    description: |
+      The error code the live operation would answer with, set only when it
+      would refuse, for example `user.password_empty` or
+      `user.password_policy_violation`.
+  violations:
+    type: object
+    additionalProperties: true
+    description: |
+      Every failed rule keyed by name with the value of the setting it is
+      named after, e.g. `{"min_length": 12}`, as the live error's
+      `details.violations`. Set only with `user.password_policy_violation`.

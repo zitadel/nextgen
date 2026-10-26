@@ -1938,6 +1938,76 @@ describe("api-mock releases and deployments", () => {
     expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
   });
 
+  test("evaluates a password policy as a password set would, storing nothing", async () => {
+    const project = await newProject("policy-evaluate");
+    const evaluate = (body: object) =>
+      fetch(`${BASE}/policies/evaluate?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ operation: "auth.factor.password.set", ...body }),
+      });
+    const decision = async (body: object) => {
+      const res = await evaluate(body);
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+
+    expect(
+      await decision({ config: { min_length: 12 }, input: { password: "a-long-enough-one" } }),
+    ).toEqual({
+      allowed: true,
+    });
+    expect(await decision({ config: { min_length: 12 }, input: { password: "short1" } })).toEqual({
+      allowed: false,
+      code: "user.password_policy_violation",
+      violations: { min_length: 12 },
+    });
+    // 13 code points, 14 bytes.
+    expect(
+      await decision({ config: { min_length: 14 }, input: { password: "Passwört12345" } }),
+    ).toMatchObject({
+      violations: { min_length: 14 },
+    });
+    expect(await decision({ config: {}, input: { password: "" } })).toEqual({
+      allowed: false,
+      code: "user.password_empty",
+    });
+    expect(await decision({ config: {}, input: { password: "a".repeat(65) } })).toMatchObject({
+      violations: { max_length: 64 },
+    });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { history_matches: [false, true] },
+      }),
+    ).toMatchObject({ violations: { history_depth: 2 } });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { self_service: false, history_matches: [true] },
+      }),
+    ).toEqual({ allowed: true });
+
+    const contradicting = await evaluate({
+      config: { min_length: 20, max_length: 10 },
+      input: { password: "x" },
+    });
+    expect(contradicting.status).toBe(400);
+    expect(((await contradicting.json()) as { code: string }).code).toBe("pol.invalid");
+    const unknown = await evaluate({ config: { min_lenght: 12 }, input: { password: "x" } });
+    expect(unknown.status).toBe(400);
+    expect(((await unknown.json()) as { code: string }).code).toBe("req.invalid");
+
+    const listed = (await (
+      await fetch(`${BASE}/policies?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { policies: unknown[] };
+    expect(listed.policies).toEqual([]);
+  });
+
   test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
     const project = await newProject("release-build-policies");
     const policy = (min_length: number) => ({

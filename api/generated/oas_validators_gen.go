@@ -5173,6 +5173,18 @@ func (s *DeploymentVariablesMissingDetails) Validate() error {
 	return nil
 }
 
+func (s EvaluatePolicyRequest) Validate() error {
+	switch s.Type {
+	case PasswordSetEvaluateRequestEvaluatePolicyRequest:
+		if err := s.PasswordSetEvaluateRequest.Validate(); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return errors.Errorf("invalid type %q", s.Type)
+	}
+}
+
 func (s Event) Validate() error {
 	switch s.Type {
 	case AuthAttemptCreatedEventEvent:
@@ -9949,6 +9961,49 @@ func (s *PasswordSetConfig) Validate() error {
 		return &validate.Error{Fields: failures}
 	}
 	return nil
+}
+
+func (s *PasswordSetEvaluateRequest) Validate() error {
+	if s == nil {
+		return validate.ErrNilPointer
+	}
+
+	var failures []validate.FieldError
+	if err := func() error {
+		if err := s.Operation.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "operation",
+			Error: err,
+		})
+	}
+	if err := func() error {
+		if err := s.Config.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		failures = append(failures, validate.FieldError{
+			Name:  "config",
+			Error: err,
+		})
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+	return nil
+}
+
+func (s PasswordSetEvaluateRequestOperation) Validate() error {
+	switch s {
+	case "auth.factor.password.set":
+		return nil
+	default:
+		return errors.Errorf("invalid value: %v", s)
+	}
 }
 
 func (s *PasswordSetPolicy) Validate() error {
