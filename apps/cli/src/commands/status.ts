@@ -5,7 +5,11 @@ import {
   claimWindowClosedAction,
   type ClaimState,
 } from "../lib/claim-state";
-import { customizeAndPublishActions, verifyLoginAction } from "../lib/journey-guidance";
+import {
+  customizeAndPublishActions,
+  exploreAllCommands,
+  verifyLoginAction,
+} from "../lib/journey-guidance";
 import {
   DEFAULT_LOCAL_SERVER_URL,
   readRuntimeMetadata,
@@ -45,7 +49,7 @@ import { DEPLOY_ARGS } from "../lib/release";
  */
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
-  static override group = CommandGroups.localServer;
+  static override group = CommandGroups.gettingStarted;
   static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {
@@ -112,6 +116,7 @@ export default class Status extends EnvironmentCommand {
         next_actions: nextActions,
         ...nextCommandsData(nextCommands),
       },
+      footer: exploreAllCommands(this.meta.cliVersion),
     });
   }
 }

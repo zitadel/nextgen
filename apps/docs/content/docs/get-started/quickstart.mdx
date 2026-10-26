@@ -93,6 +93,16 @@ npx @zitadel/cli@latest console
 
 [Run Zitadel locally](/docs/guides/local-runtime#open-the-console) explains what that link does and how long it lasts.
 
+## Explore every command
+
+Run the CLI with no subcommand to see every command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. Each row is a command or a family of commands: `zitadel users --help` lists what you can do with users, and `zitadel <command> --help` lists a command's options. `zitadel commands` prints every command in one flat list.
+
 ## Customize the login
 
 Setup scaffolded editable copies of your user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/` — each folder has a README explaining what you can change. Edit the files, then preview and publish:

@@ -107,6 +107,8 @@ export type CommandResult =
       readonly data: unknown;
       readonly warnings?: ReadonlyArray<string>;
       readonly pretty?: string;
+      /** Printed in human mode after everything else, and never part of the envelope. */
+      readonly footer?: string;
     }
   | {
       readonly status: "skipped";

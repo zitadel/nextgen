@@ -60,7 +60,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { brandingGuidanceAction } from "../../lib/journey-guidance";
+import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -198,7 +198,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  */
 export default class Setup extends BaseCommand {
   static override description = "Create a Zitadel project and scaffold local auth.";
-  static override group = CommandGroups.project;
+  static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
@@ -926,6 +926,9 @@ export default class Setup extends BaseCommand {
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
       });
+      // After the steps that start the app and test sign-in, outside the box so
+      // the command can be copied without its border.
+      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
     }
 
     return this.emit({

@@ -29,7 +29,7 @@ import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -302,6 +302,26 @@ describe("setup command", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("Redirect URI");
     expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
+  });
+
+  it("ends its summary with where to find every command", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--non-interactive",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
   });
 
   describe("a custom provider", () => {

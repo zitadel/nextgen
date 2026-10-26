@@ -377,6 +377,9 @@ export abstract class BaseCommand extends Command {
     if (rendered !== "") {
       this.log(rendered);
     }
+    if (normalized.status === "ok" && normalized.footer !== undefined) {
+      this.log(`\n${normalized.footer}`);
+    }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
