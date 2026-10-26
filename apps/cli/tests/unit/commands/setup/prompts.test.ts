@@ -242,7 +242,8 @@ describe("DevPortPrompt", () => {
     await new DevPortPrompt().ask(baseAnswers({ devPort: 3000 }), ctx);
 
     expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
-      message: "Which port should your app run on? Press Enter to use 3000, or edit it first.",
+      message:
+        "Which port should your app's local dev server run on? Press Enter to use 3000, or edit it first.",
       initialValue: "3000",
     });
   });
