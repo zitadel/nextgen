@@ -96,6 +96,21 @@ describe("branding eject", () => {
     expect(meta).toBe(expected?.contents);
   });
 
+  it("replaces an outdated dialect meta-schema with this version's", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/meta/branding.json"), '{"title": "an older dialect"}\n');
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    const expected = projectMetaSchemas(cliVersion.version).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
+  });
+
   it("--design minimal writes the card-less template on the centered layout", async () => {
     const cwd = await makeProject();
 

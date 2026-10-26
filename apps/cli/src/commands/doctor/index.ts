@@ -453,7 +453,7 @@ export function advisoryForWarnings(
     nextCommands.push(dependencyRemedy);
   }
 
-  if (warnings.some((check) => check.name === "meta-schemas")) {
+  if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
     nextActions.push(
       "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
     );
@@ -768,6 +768,18 @@ function claimWindowClosed(check: CheckOutcome): boolean {
     details !== null &&
     (details as { claimable?: unknown }).claimable === false
   );
+}
+
+/**
+ * Whether the meta-schemas warning lists a missing or outdated file, which
+ * `--fix` writes. One the CLI cannot read only gets the warning's reason.
+ */
+function hasRepairableMetaSchemas(check: CheckOutcome | undefined): boolean {
+  if (check?.status !== "warn") {
+    return false;
+  }
+  const details = check.details as { missing?: unknown[]; outdated?: unknown[] } | undefined;
+  return (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0;
 }
 
 function hasManagedRuntimeProcesses(check: CheckOutcome | undefined): boolean {

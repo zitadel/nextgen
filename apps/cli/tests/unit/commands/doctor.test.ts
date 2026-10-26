@@ -872,7 +872,12 @@ describe("advisoryForWarnings", () => {
   });
 
   it("suggests doctor --fix for outdated editor schemas in the directory doctor checked", () => {
-    const metaWarning = { name: "meta-schemas", status: "warn" as const, message: "outdated" };
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "outdated",
+      details: { missing: [], outdated: [".zitadel/meta/branding.json"] },
+    };
 
     const advice = advisoryForWarnings(
       [metaWarning],
@@ -882,6 +887,28 @@ describe("advisoryForWarnings", () => {
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+  });
+
+  it("does not suggest doctor --fix for an editor schema it cannot read", () => {
+    const metaWarning = {
+      name: "meta-schemas",
+      status: "warn" as const,
+      message: "unreadable",
+      details: {
+        missing: [],
+        outdated: [],
+        unreadable: [{ path: ".zitadel/meta/branding.json", reason: "EACCES" }],
+      },
+    };
+
+    const advice = advisoryForWarnings(
+      [metaWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({}),
+    );
+
+    expect(advice).toBeUndefined();
   });
 });
 

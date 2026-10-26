@@ -1,6 +1,6 @@
 # ADR 042: Scaffolded File Ownership and Drift Detection
 
-> **Status:** Accepted
+> **Status:** Accepted (amended 2026-10-26: `--fix` keeps the CLI-owned editor schemas in `.zitadel/meta/` current, see [Amendment](#amendment-2026-10-26-cli-owned-editor-schemas))
 > **Date:** 2026-08-01
 > **Context:** The `zitadel` CLI's scaffolded app files (orca patchers), the `doctor` command's verification contract, and the `scaffold` manifest in `.zitadel/state.json`.
 > **Relates to:** [ADR 004](004-agent-contract-and-agents-md.md)
@@ -135,3 +135,26 @@ warnings.
   `--fix` never destroys user work.
 - Guidance merge-blocks in `README.md`/`AGENTS.md` are not covered by the
   check (they are sections, not files); a future revision may add them.
+
+## Amendment (2026-10-26): CLI-owned editor schemas
+
+The files in `.zitadel/meta/` are a third kind of scaffolded file, beside the
+two classes above: CLI-owned generated output. Each is a pure function of the
+CLI version (`projectMetaSchemas` in `apps/cli/src/lib/meta-schemas.ts`), a
+dialect spec that editors read through a `$schema` pointer and agents read
+before an edit. No command and not the server reads them: `deploy` validates
+with the CLI's own Zod and the server with its embedded copy. They are JSON,
+so they cannot carry the managed marker, and by the rule above they would
+read as the user's.
+
+`--fix` overwrites them. The `meta-schemas` check compares each file with what
+this CLI writes, as parsed JSON and with the CLI version in its command
+mentions masked, and warns on a missing or outdated file; the fix writes the
+current version and leaves files the CLI does not ship alone. This is the one
+exception to restore-missing-only. It destroys no user work: a hand-edited
+copy only makes the editor disagree with what `deploy` enforces, which is the
+drift the check exists to remove. Only `setup` writes the folder, so without
+the exception a project set up by an older CLI would keep a dangling
+`$schema` for every dialect added since, and outdated rules for every one that
+changed. The guidance and `SKILL.md` say the folder is generated and not to be
+edited.

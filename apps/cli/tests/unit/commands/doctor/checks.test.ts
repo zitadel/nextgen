@@ -371,7 +371,38 @@ describe("MetaSchemasCheck", () => {
 
     expect(outcome.status).toBe("warn");
     expect(outcome.details).toEqual({ missing: [metaFile("branding.json")], outdated: [] });
-    expect(outcome.message).toMatch(/`npx @zitadel\/cli@\S+ doctor --fix`/);
+    expect(outcome.message).toContain("doctor --fix writes this version's");
+  });
+
+  it("passes schemas another CLI version wrote when only the version differs", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd, "0.2.0");
+    const held = await readFile(join(cwd, metaFile("branding.json")), "utf8");
+    const current = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    expect(held).not.toBe(current?.contents);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("reports a schema it cannot read, and fix leaves it alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await mkdir(join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      unreadable: [{ path: metaFile("branding.json"), reason: "EISDIR" }],
+    });
+    expect(outcome.message).not.toContain("doctor --fix");
   });
 
   it("warns on a schema that differs from this CLI's", async () => {

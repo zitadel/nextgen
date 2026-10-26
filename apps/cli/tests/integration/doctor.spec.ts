@@ -152,15 +152,14 @@ describe("doctor", () => {
         expect((await before.changes()).added).toContain("app/login/page.tsx");
       });
 
-      it("restores an editor schema the project lacks", async () => {
+      it("points a project that lacks an editor schema at --fix", async () => {
         const app = await aSetUpApp();
-        await app.deleteProjectFile(".zitadel/meta/branding.json");
-        const before = await app.snapshot();
+        await app.lacksEditorSchema("branding");
 
-        const result = await app.doctor(["--fix"]);
+        const result = await app.doctor();
 
         expect(result).toSucceed();
-        expect((await before.changes()).added).toContain(".zitadel/meta/branding.json");
+        expect(result).toSuggest("doctor --fix");
       });
 
       it("removes nothing while repairing", async () => {
