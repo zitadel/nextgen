@@ -145,6 +145,7 @@ export default class EnvAdd extends BaseCommand {
                 ? []
                 : [shellOption("--app-url", flags["app-url"])]),
               ...(flags.force ? ["--force"] : []),
+              ...(flags.deploy === false ? ["--no-deploy"] : []),
             ].join(" "),
           ),
         });
