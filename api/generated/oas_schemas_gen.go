@@ -22411,9 +22411,8 @@ func (s *ErrorDetailsStatusCode) SetResponse(val ErrorDetails) {
 	s.Response = val
 }
 
-func (*ErrorDetailsStatusCode) getHealthRes() {}
-func (*ErrorDetailsStatusCode) getLiveRes()   {}
-func (*ErrorDetailsStatusCode) getReadyRes()  {}
+func (*ErrorDetailsStatusCode) getLiveRes()  {}
+func (*ErrorDetailsStatusCode) getReadyRes() {}
 
 // Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
 // member via event_type; each member carries a typed payload.
@@ -23563,9 +23562,17 @@ func (*Event) getEventRes() {}
 // live risk-evaluator input.
 // Ref: #
 type EventMetadata struct {
+	// What authorized the request, when it was not a grant on the event's
+	// project (ADR 053 §8). Every event of such a request carries it.
+	Authorization OptEventMetadataAuthorization `json:"authorization"`
 	// Observed HTTP requestor context on Path A request.api only.
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
+}
+
+// GetAuthorization returns the value of Authorization.
+func (s *EventMetadata) GetAuthorization() OptEventMetadataAuthorization {
+	return s.Authorization
 }
 
 // GetClient returns the value of Client.
@@ -23576,6 +23583,11 @@ func (s *EventMetadata) GetClient() OptEventMetadataClient {
 // GetAdditionalProps returns the value of AdditionalProps.
 func (s *EventMetadata) GetAdditionalProps() EventMetadataAdditional {
 	return s.AdditionalProps
+}
+
+// SetAuthorization sets the value of Authorization.
+func (s *EventMetadata) SetAuthorization(val OptEventMetadataAuthorization) {
+	s.Authorization = val
 }
 
 // SetClient sets the value of Client.
@@ -23597,6 +23609,72 @@ func (s *EventMetadataAdditional) init() EventMetadataAdditional {
 		*s = m
 	}
 	return m
+}
+
+// What authorized the request, when it was not a grant on the event's
+// project (ADR 053 §8). Every event of such a request carries it.
+type EventMetadataAuthorization struct {
+	// `platform_operator`: the deployment's platform operator relation
+	// (ADR 075), which administers every project.
+	Path EventMetadataAuthorizationPath `json:"path"`
+	// The project the actor's user belongs to.
+	ActorHomeProjectID OptString `json:"actor_home_project_id"`
+}
+
+// GetPath returns the value of Path.
+func (s *EventMetadataAuthorization) GetPath() EventMetadataAuthorizationPath {
+	return s.Path
+}
+
+// GetActorHomeProjectID returns the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) GetActorHomeProjectID() OptString {
+	return s.ActorHomeProjectID
+}
+
+// SetPath sets the value of Path.
+func (s *EventMetadataAuthorization) SetPath(val EventMetadataAuthorizationPath) {
+	s.Path = val
+}
+
+// SetActorHomeProjectID sets the value of ActorHomeProjectID.
+func (s *EventMetadataAuthorization) SetActorHomeProjectID(val OptString) {
+	s.ActorHomeProjectID = val
+}
+
+// `platform_operator`: the deployment's platform operator relation
+// (ADR 075), which administers every project.
+type EventMetadataAuthorizationPath string
+
+const (
+	EventMetadataAuthorizationPathPlatformOperator EventMetadataAuthorizationPath = "platform_operator"
+)
+
+// AllValues returns all EventMetadataAuthorizationPath values.
+func (EventMetadataAuthorizationPath) AllValues() []EventMetadataAuthorizationPath {
+	return []EventMetadataAuthorizationPath{
+		EventMetadataAuthorizationPathPlatformOperator,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s EventMetadataAuthorizationPath) MarshalText() ([]byte, error) {
+	switch s {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
+	switch EventMetadataAuthorizationPath(data) {
+	case EventMetadataAuthorizationPathPlatformOperator:
+		*s = EventMetadataAuthorizationPathPlatformOperator
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Observed HTTP requestor context on Path A request.api only.
@@ -33345,116 +33423,6 @@ type GetGrantUnauthorized ErrorDetails
 
 func (*GetGrantUnauthorized) getGrantRes() {}
 
-// GetHealthErrorResponse represents sum type.
-type GetHealthErrorResponse struct {
-	Type       GetHealthErrorResponseType // switch on this field
-	Internal   Internal
-	ReqInvalid ReqInvalid
-}
-
-// GetHealthErrorResponseType is oneOf type of GetHealthErrorResponse.
-type GetHealthErrorResponseType string
-
-// Possible values for GetHealthErrorResponseType.
-const (
-	InternalGetHealthErrorResponse   GetHealthErrorResponseType = "internal"
-	ReqInvalidGetHealthErrorResponse GetHealthErrorResponseType = "req.invalid"
-)
-
-// IsInternal reports whether GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) IsInternal() bool { return s.Type == InternalGetHealthErrorResponse }
-
-// IsReqInvalid reports whether GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) IsReqInvalid() bool {
-	return s.Type == ReqInvalidGetHealthErrorResponse
-}
-
-// SetInternal sets GetHealthErrorResponse to Internal.
-func (s *GetHealthErrorResponse) SetInternal(v Internal) {
-	s.Type = InternalGetHealthErrorResponse
-	s.Internal = v
-}
-
-// GetInternal returns Internal and true boolean if GetHealthErrorResponse is Internal.
-func (s GetHealthErrorResponse) GetInternal() (v Internal, ok bool) {
-	if !s.IsInternal() {
-		return v, false
-	}
-	return s.Internal, true
-}
-
-// NewInternalGetHealthErrorResponse returns new GetHealthErrorResponse from Internal.
-func NewInternalGetHealthErrorResponse(v Internal) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetInternal(v)
-	return s
-}
-
-// SetReqInvalid sets GetHealthErrorResponse to ReqInvalid.
-func (s *GetHealthErrorResponse) SetReqInvalid(v ReqInvalid) {
-	s.Type = ReqInvalidGetHealthErrorResponse
-	s.ReqInvalid = v
-}
-
-// GetReqInvalid returns ReqInvalid and true boolean if GetHealthErrorResponse is ReqInvalid.
-func (s GetHealthErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
-	if !s.IsReqInvalid() {
-		return v, false
-	}
-	return s.ReqInvalid, true
-}
-
-// NewReqInvalidGetHealthErrorResponse returns new GetHealthErrorResponse from ReqInvalid.
-func NewReqInvalidGetHealthErrorResponse(v ReqInvalid) GetHealthErrorResponse {
-	var s GetHealthErrorResponse
-	s.SetReqInvalid(v)
-	return s
-}
-
-// GetHealthErrorResponseStatusCode wraps GetHealthErrorResponse with StatusCode.
-type GetHealthErrorResponseStatusCode struct {
-	StatusCode int
-	Response   GetHealthErrorResponse
-}
-
-// GetStatusCode returns the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) GetStatusCode() int {
-	return s.StatusCode
-}
-
-// GetResponse returns the value of Response.
-func (s *GetHealthErrorResponseStatusCode) GetResponse() GetHealthErrorResponse {
-	return s.Response
-}
-
-// SetStatusCode sets the value of StatusCode.
-func (s *GetHealthErrorResponseStatusCode) SetStatusCode(val int) {
-	s.StatusCode = val
-}
-
-// SetResponse sets the value of Response.
-func (s *GetHealthErrorResponseStatusCode) SetResponse(val GetHealthErrorResponse) {
-	s.Response = val
-}
-
-func (*GetHealthErrorResponseStatusCode) getHealthRes() {}
-
-type GetHealthOK struct {
-	Data io.Reader
-}
-
-// Read reads data from the Data reader.
-//
-// Kept to satisfy the io.Reader interface.
-func (s GetHealthOK) Read(p []byte) (n int, err error) {
-	if s.Data == nil {
-		return 0, io.EOF
-	}
-	return s.Data.Read(p)
-}
-
-func (*GetHealthOK) getHealthRes() {}
-
 // GetIdpByIdErrorResponse represents sum type.
 type GetIdpByIdErrorResponse struct {
 	Type                GetIdpByIdErrorResponseType // switch on this field
@@ -36054,6 +36022,22 @@ func (s GetReadyOK) Read(p []byte) (n int, err error) {
 }
 
 func (*GetReadyOK) getReadyRes() {}
+
+type GetReadyServiceUnavailable struct {
+	Data io.Reader
+}
+
+// Read reads data from the Data reader.
+//
+// Kept to satisfy the io.Reader interface.
+func (s GetReadyServiceUnavailable) Read(p []byte) (n int, err error) {
+	if s.Data == nil {
+		return 0, io.EOF
+	}
+	return s.Data.Read(p)
+}
+
+func (*GetReadyServiceUnavailable) getReadyRes() {}
 
 // GetReleaseByIdErrorResponse represents sum type.
 type GetReleaseByIdErrorResponse struct {
@@ -50764,6 +50748,52 @@ func (o OptEventMetadata) Get() (v EventMetadata, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptEventMetadata) Or(d EventMetadata) EventMetadata {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptEventMetadataAuthorization returns new OptEventMetadataAuthorization with value set to v.
+func NewOptEventMetadataAuthorization(v EventMetadataAuthorization) OptEventMetadataAuthorization {
+	return OptEventMetadataAuthorization{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptEventMetadataAuthorization is optional EventMetadataAuthorization.
+type OptEventMetadataAuthorization struct {
+	Value EventMetadataAuthorization
+	Set   bool
+}
+
+// IsSet returns true if OptEventMetadataAuthorization was set.
+func (o OptEventMetadataAuthorization) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptEventMetadataAuthorization) Reset() {
+	var v EventMetadataAuthorization
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptEventMetadataAuthorization) SetTo(v EventMetadataAuthorization) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptEventMetadataAuthorization) Get() (v EventMetadataAuthorization, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptEventMetadataAuthorization) Or(d EventMetadataAuthorization) EventMetadataAuthorization {
 	if v, ok := o.Get(); ok {
 		return v
 	}

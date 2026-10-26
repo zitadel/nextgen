@@ -27,6 +27,7 @@ test("the routes that are not pages answer an agent that asks for text", async (
     ["/docs/llms.txt", "text/plain"],
     ["/docs/llms-full.txt", "text/plain"],
     ["/docs/openapi.json", "application/json"],
+    ["/docs/mock-service-worker.js", "text/javascript"],
   ];
   for (const accept of ["text/plain", "text/markdown"]) {
     for (const [route, type] of routes) {

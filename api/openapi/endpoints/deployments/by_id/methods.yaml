@@ -1,5 +1,6 @@
 get:
   operationId: getDeploymentById
+  x-zitadel-cli: deployment get
   summary: Get a deployment by id
   description: |
     Reads one deployment record.

@@ -7,6 +7,14 @@
 > **Amended by:** [ADR 052](052-user-envelope-and-attributes.md) — the user
 > schema describes the response's `attributes` object, not the whole response
 > body.
+>
+> **Note (2026-10-24):** the field half shipped (#400, #411), with the reserved
+> token spelled `x-auth-methods#<kind>` (for example `x-auth-methods#password`),
+> not `x-auth-methods-<kind>` as written below. The action half did not:
+> [ADR 026](026-flow-action-kind.md) gives each action a `kind` (`passkey`,
+> `passkey_register`, …) instead of an `auth_method` property. The open
+> credential-policy question is taken up by operation policies
+> ([ADR 066](066-operation-policies.md)).
 
 ## Context
 

@@ -259,20 +259,29 @@ func TestGetSchema(t *testing.T) {
 		t.Run("a schema read naming another project", func(t *testing.T) {
 			t.Parallel()
 
+			// A project of its own: "ok/simple" creates the same object type in
+			// the shared one, and two revisions created in the same microsecond
+			// conflict (idx_json_schemas_object_type_revision).
+			owner, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+			ownerClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownerClient, owner)
+
 			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 			var schemaObj map[string]any
 			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
 			delete(schemaObj, "$id")
-			schemaJSON, err := json.Marshal(schemaObj)
+			schemaJSON, err = json.Marshal(schemaObj)
 			require.NoError(t, err)
-			schemaID := harness.CreateUserSchema(t, project, string(schemaJSON))
+			schemaID := harness.CreateUserSchema(t, owner, string(schemaJSON))
 
 			other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 			require.NoError(t, err)
 
 			// The project's own secret may read the schema, but not as part of
 			// another project.
-			resp, err := client.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+			resp, err := ownerClient.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
 				ID:        schemaID,
 				ProjectID: api.NewOptProjectID(api.ProjectID(other.ID)),
 			})

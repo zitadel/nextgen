@@ -51,7 +51,7 @@ describe("api ls", () => {
 
         const result = await app.apiOperationsRendered("--tag", "System");
 
-        expect(result).toPrint("getHealth\tGET\t/healthz");
+        expect(result).toPrint("getLive\tGET\t/livez");
       });
     });
   });

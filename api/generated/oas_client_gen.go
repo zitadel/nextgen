@@ -160,7 +160,10 @@ type Invoker interface {
 	// pattern with no live preview answers `403` with `proj.preview_not_live`;
 	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
 	// revoked release answers `409` with `rel.revoked`. A request with no
-	// `Origin` passes the gate and still needs a deployment target.
+	// `Origin` passes the gate and still needs a deployment target. A loopback
+	// origin passes it too, and so does the server's own origin, from which its
+	// console previews a project's login; a step submitted from the server's
+	// own origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -521,12 +524,6 @@ type Invoker interface {
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
-	// GetHealth invokes getHealth operation.
-	//
-	// Check whether the server is healthy.
-	//
-	// GET /healthz
-	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById invokes getIdpById operation.
 	//
 	// Reads a connection by its id, at its newest revision.
@@ -545,7 +542,10 @@ type Invoker interface {
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive invokes getLive operation.
 	//
-	// Check whether the server is started.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	// Point a liveness probe here. It never checks the database, so an outage
+	// of the database does not restart every instance; `GET /readyz` takes an
+	// instance out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -627,7 +627,10 @@ type Invoker interface {
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady invokes getReady operation.
 	//
-	// Check whether the server is ready to accept requests.
+	// Answers whether the server can serve requests, which takes its database answering within a second.
+	// Point a readiness probe here, so that a server whose database does not
+	// answer gets no requests until it does. The check is one round trip to the
+	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)
@@ -809,12 +812,17 @@ type Invoker interface {
 	ListMyPasskeys(ctx context.Context, params ListMyPasskeysParams) (ListMyPasskeysRes, error)
 	// ListMyProjects invokes listMyProjects operation.
 	//
-	// The projects the signed-in user holds an active grant on, either directly or
-	// through a team they are a member of. Ordered by project id and paged with an
-	// opaque cursor.
+	// The projects the signed-in user can act on: those they hold an active grant
+	// on, either directly or through a team they are a member of. For a platform
+	// operator (ADR 075) that is every project of the deployment. Ordered by
+	// project id and paged with an opaque cursor.
 	// This is not the same question as `queryProjects`, which answers with the one
 	// project the calling credential is bound to. Here the session is the caller
 	// and the grants are the answer, so the list spans projects.
+	// With `name_contains`, only the projects whose name contains that text are
+	// listed. The search runs on the server together with the grants, so it
+	// reaches every project the user can act on, however many there are, and
+	// pages like the full list.
 	// With `project_id`, the projects are listed only when the session belongs to
 	// that project. It names the project the session was signed in to, not one to
 	// list.
@@ -2288,7 +2296,10 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 // pattern with no live preview answers `403` with `proj.preview_not_live`;
 // nothing deployed to the target answers `409` with `rel.not_deployed`; a
 // revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate and still needs a deployment target.
+// `Origin` passes the gate and still needs a deployment target. A loopback
+// origin passes it too, and so does the server's own origin, from which its
+// console previews a project's login; a step submitted from the server's
+// own origin is still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -6272,80 +6283,6 @@ func (c *Client) sendGetGrant(ctx context.Context, params GetGrantParams) (res G
 	return result, nil
 }
 
-// GetHealth invokes getHealth operation.
-//
-// Check whether the server is healthy.
-//
-// GET /healthz
-func (c *Client) GetHealth(ctx context.Context) (GetHealthRes, error) {
-	res, err := c.sendGetHealth(ctx)
-	return res, err
-}
-
-func (c *Client) sendGetHealth(ctx context.Context) (res GetHealthRes, err error) {
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getHealth"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.URLTemplateKey.String("/healthz"),
-	}
-	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		elapsedDuration := time.Since(startTime)
-		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
-	}()
-
-	// Increment request counter.
-	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-
-	// Start a span for this request.
-	ctx, span := c.cfg.Tracer.Start(ctx, GetHealthOperation,
-		trace.WithAttributes(otelAttrs...),
-		clientSpanKind,
-	)
-	// Track stage for error reporting.
-	var stage string
-	defer func() {
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, stage)
-			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
-		}
-		span.End()
-	}()
-
-	stage = "BuildURL"
-	u := uri.Clone(c.requestURL(ctx))
-	var pathParts [1]string
-	pathParts[0] = "/healthz"
-	uri.AddPathParts(u, pathParts[:]...)
-
-	stage = "EncodeRequest"
-	r, err := ht.NewRequest(ctx, "GET", u)
-	if err != nil {
-		return res, errors.Wrap(err, "create request")
-	}
-
-	stage = "SendRequest"
-	resp, err := c.cfg.Client.Do(r)
-	if err != nil {
-		return res, errors.Wrap(err, "do request")
-	}
-	body := resp.Body
-	defer body.Close()
-
-	stage = "DecodeResponse"
-	result, err := decodeGetHealthResponse(resp)
-	if err != nil {
-		return res, errors.Wrap(err, "decode response")
-	}
-
-	return result, nil
-}
-
 // GetIdpById invokes getIdpById operation.
 //
 // Reads a connection by its id, at its newest revision.
@@ -6668,7 +6605,10 @@ func (c *Client) sendGetIdpRevisionById(ctx context.Context, params GetIdpRevisi
 
 // GetLive invokes getLive operation.
 //
-// Check whether the server is started.
+// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+// Point a liveness probe here. It never checks the database, so an outage
+// of the database does not restart every instance; `GET /readyz` takes an
+// instance out of rotation instead.
 //
 // GET /livez
 func (c *Client) GetLive(ctx context.Context) (GetLiveRes, error) {
@@ -7887,7 +7827,10 @@ func (c *Client) sendGetProject(ctx context.Context, params GetProjectParams) (r
 
 // GetReady invokes getReady operation.
 //
-// Check whether the server is ready to accept requests.
+// Answers whether the server can serve requests, which takes its database answering within a second.
+// Point a readiness probe here, so that a server whose database does not
+// answer gets no requests until it does. The check is one round trip to the
+// database.
 //
 // GET /readyz
 func (c *Client) GetReady(ctx context.Context) (GetReadyRes, error) {
@@ -11100,12 +11043,17 @@ func (c *Client) sendListMyPasskeys(ctx context.Context, params ListMyPasskeysPa
 
 // ListMyProjects invokes listMyProjects operation.
 //
-// The projects the signed-in user holds an active grant on, either directly or
-// through a team they are a member of. Ordered by project id and paged with an
-// opaque cursor.
+// The projects the signed-in user can act on: those they hold an active grant
+// on, either directly or through a team they are a member of. For a platform
+// operator (ADR 075) that is every project of the deployment. Ordered by
+// project id and paged with an opaque cursor.
 // This is not the same question as `queryProjects`, which answers with the one
 // project the calling credential is bound to. Here the session is the caller
 // and the grants are the answer, so the list spans projects.
+// With `name_contains`, only the projects whose name contains that text are
+// listed. The search runs on the server together with the grants, so it
+// reaches every project the user can act on, however many there are, and
+// pages like the full list.
 // With `project_id`, the projects are listed only when the session belongs to
 // that project. It names the project the session was signed in to, not one to
 // list.
@@ -11193,6 +11141,23 @@ func (c *Client) sendListMyProjects(ctx context.Context, params ListMyProjectsPa
 					return e.EncodeValue(conv.StringToString(unwrapped))
 				}
 				return nil
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "name_contains" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "name_contains",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if val, ok := params.NameContains.Get(); ok {
+				return e.EncodeValue(conv.StringToString(val))
 			}
 			return nil
 		}); err != nil {

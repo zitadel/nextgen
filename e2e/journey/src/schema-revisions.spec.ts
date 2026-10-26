@@ -31,6 +31,14 @@ import {
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
 
+/**
+ * A primary origin for the deploys below to land on. Setup registers the app's
+ * own dev URL as a preview pattern, and a deploy goes to the project's primary
+ * origins, so one is added here. Which URL it is does not matter to this
+ * suite: what it asserts is the schema revision each deploy publishes.
+ */
+const DEPLOY_ORIGIN = "https://schema-revisions.example.com";
+
 const mockUrl = process.env.JOURNEY_OIDC_MOCK_URL ?? "";
 // The fixed accounts in tools/oidc-mock/users.json.
 const mockPassword = "journey-pass";
@@ -48,6 +56,20 @@ let revision2: string;
 type UserRecord = Awaited<ReturnType<ZitadelClient["getUserByID"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
+
+/** Publishes `.zitadel/` as `apply` once did: a release built from the files, deployed. */
+async function deploy(message: string): Promise<void> {
+  await runCli(metadata, [
+    "origin",
+    "add",
+    DEPLOY_ORIGIN,
+    "--kind",
+    "primary",
+    "--non-interactive",
+    "--json",
+  ]);
+  await runCli(metadata, ["deploy", "-m", message, "--non-interactive", "--json"]);
+}
 
 test.beforeAll(async () => {
   metadata = await journeyMetadataOrSkip();
@@ -82,7 +104,7 @@ test("enables the mock provider", async () => {
     ],
     OIDC_MOCK_CLIENT_SECRET,
   );
-  await runCli(metadata, ["apply", "--non-interactive", "--json"]);
+  await deploy("enable the mock provider");
 
   objectType = (await readSchemaFile()).objectType as string;
   revision1 = await latestRevision();
@@ -97,7 +119,7 @@ test("publishes revision 2", async () => {
   const properties = schema.properties as Record<string, unknown>;
   properties.company = { type: "string" };
   await writeFile(schemaFile(), `${JSON.stringify(schema, null, 2)}\n`);
-  await runCli(metadata, ["apply", "--non-interactive", "--json"]);
+  await deploy("add company to the user schema");
 
   revision2 = await latestRevision();
   expect(revision2).not.toBe(revision1);
