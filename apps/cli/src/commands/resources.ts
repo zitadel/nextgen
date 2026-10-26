@@ -536,8 +536,9 @@ export const RESOURCES = {
     },
   },
 
-  // Operation policies (ADR 066). Configuration: written from
-  // .zitadel/policies/ by `apply`, so only read here. A project has one
+  // Operation policies (ADR 066). Configuration: carried from
+  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
+  // hand-written command). A project has one
   // policy per operation, and the list shows each at its newest revision.
   // The revision routes are not modelled, for the reason `idps` gives.
   policies: {

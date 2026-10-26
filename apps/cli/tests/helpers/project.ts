@@ -1029,6 +1029,20 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes the password policy's test file with `cases`, as the developer owning it would. */
+  async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+      `${JSON.stringify({ $schema: "../meta/policy-test.json", operation: PASSWORD_POLICY, cases }, null, 2)}\n`,
+    );
+  }
+
+  /** Runs `zitadel policies test` with `args`. */
+  testPolicies(args: string[] = []): Promise<CliResult> {
+    return this.run(["policies", "test", "--non-interactive", ...args]);
+  }
+
   /** Removes the committed password policy file, as the developer owning it would. */
   removePasswordPolicy(): Promise<void> {
     return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));

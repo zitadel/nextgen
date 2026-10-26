@@ -94,7 +94,20 @@ which applies the next time a password is set. A setting left out is off, and
 the deployed release carries, so deploying without the file switches it off
 there; a password set through the API, or before the first deploy, uses the
 newest revision, which only `"config": {}` switches off. `policies list` and
-`policies get <id|operation>` read them back. `setup` writes and publishes
+`policies get <id|operation>` read them back. A policy's cases live beside it
+in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
+`input` in the operation's terms (`{"password": "…"}`), optional `facts` the
+operation would look up (`self_service`, `history_matches`), and the expected
+decision (`allowed`, optionally `code` and exactly the `violations`).
+`policies test [operation]` evaluates every case on the server against the
+sibling policy file, or with `--release <id>` against the revision that
+release pins; a missing policy is tested as none. It fails with `E_VALIDATION`
+(exit 3) when a case does not hold, `data`/`details` carrying `source`,
+`operations[].cases[]` (`name`, `passed`, `expected`, `actual`), `passed` and
+`failed`; with no test files it is `skipped` (`no-policy-tests`). `deploy`
+never carries test files. Until #2331, a release that pins no flow is tested
+with a warning: its sign-ins use the newest revisions instead. Write cases from
+what the user wants enforced; never invent expectations for them. `setup` writes and publishes
 the password policy with a `min_length` of 15; pass `--password-min-length <n>`
 only when the user asks for another value (`0` sets none). Managed files carry
 a marker comment; `eject` removes only
