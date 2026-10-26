@@ -179,6 +179,11 @@
           ]
         },
         {
+          "name": "password-min-length",
+          "description": "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+          "type": "option"
+        },
+        {
           "name": "sso",
           "description": "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
           "type": "option",
@@ -1067,7 +1072,7 @@
     {
       "id": "flow-definitions get",
       "group": "Configuration commands",
-      "description": "Get one flow definition by id.",
+      "description": "Get one flow definition by flow name (newest revision) or revision id.",
       "args": [
         {
           "name": "flow",
@@ -1095,10 +1100,10 @@
       ],
       "examples": [
         {
-          "command": "flow-definitions get <id>"
+          "command": "flow-definitions get <flow>"
         },
         {
-          "command": "flow-definitions get <id> --json"
+          "command": "flow-definitions get <flow> --json"
         }
       ]
     },
@@ -1284,6 +1289,111 @@
       ]
     },
     {
+      "id": "policies get",
+      "group": "Configuration commands",
+      "description": "Get one policy by policy id or operation.",
+      "args": [
+        {
+          "name": "policy",
+          "description": "policy id or operation",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "policies get <policy>"
+        },
+        {
+          "command": "policies get <policy> --json"
+        }
+      ]
+    },
+    {
+      "id": "policies list",
+      "group": "Configuration commands",
+      "description": "List policies.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "policies list --json"
+        },
+        {
+          "command": "policies list --all --json"
+        },
+        {
+          "command": "policies list --filter operation=equals:<value>"
+        }
+      ]
+    },
+    {
       "id": "release create",
       "group": "Configuration commands",
       "description": "Build a release from .zitadel/ without deploying it.",
@@ -1454,7 +1564,7 @@
     {
       "id": "schemas get",
       "group": "Configuration commands",
-      "description": "Get one schema by id.",
+      "description": "Get one schema by object type (current revision) or revision id.",
       "args": [
         {
           "name": "schema",
@@ -1482,10 +1592,10 @@
       ],
       "examples": [
         {
-          "command": "schemas get <id>"
+          "command": "schemas get <schema>"
         },
         {
-          "command": "schemas get <id> --json"
+          "command": "schemas get <schema> --json"
         }
       ]
     },

@@ -341,6 +341,10 @@ terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
+`setup` also writes and publishes the password policy
+(`.zitadel/policies/auth.factor.password.set.json`) with no rules; pass
+`--password-min-length <n>` only when the user gives a value, never one you
+chose for them.
 When setup fails after scaffolding a new app, before its default schema and
 flow are uploaded, it removes the app again and puts back what the directory
 held, so rerunning the same `setup` starts over.
@@ -467,4 +471,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding).
+  workflow (schemas, flows, branding, policies).

@@ -50,16 +50,18 @@ Configuration commands
   deployment get:               Read one deployment by id
   deployment list:              List the project's deployments, newest first
   deployment rollback:          Roll back to an earlier deployment
-  flow-definitions get:         Get one flow definition by id
+  flow-definitions get:         Get one flow definition by flow name (newest revision) or revision id
   flow-definitions list:        List flow-definitions
   origin add:                   Add an origin pattern to the project
   origin list:                  List the origin patterns on the project
   origin rm:                    Remove an origin pattern from the project
+  policies get:                 Get one policy by policy id or operation
+  policies list:                List policies
   release create:               Build a release from .zitadel/ without deploying it
   release get:                  Get one release by id
   release list:                 List release
   release revoke:               Revoke a release so its content is never served again
-  schemas get:                  Get one schema by id
+  schemas get:                  Get one schema by object type (current revision) or revision id
   schemas list:                 List schemas
   variable get:                 Get one variable from the project
   variable list:                List the variables entered on the project

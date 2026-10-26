@@ -65,6 +65,7 @@ type releaseService struct {
 	flows    *flowDefinitionService
 	branding *BrandingService
 	idps     *idpConnectionService
+	policies *PolicyService
 	// builtinBases resolves a schema given as a built-in schema's `$id` under
 	// whichever base the project stores it; the release pins the row found.
 	builtinBases domain.BuiltinSchemaBases
@@ -78,6 +79,7 @@ func NewReleaseService(
 	flows *flowDefinitionService,
 	branding *BrandingService,
 	idps *idpConnectionService,
+	policies *PolicyService,
 	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
 	return &releaseService{
@@ -86,6 +88,7 @@ func NewReleaseService(
 		flows:        flows,
 		branding:     branding,
 		idps:         idps,
+		policies:     policies,
 		builtinBases: builtinBases,
 	}
 }
@@ -365,6 +368,13 @@ func (s *releaseService) loadContent(ctx context.Context, projectID string, requ
 				return content, mapRevisionLookupError(err, pointer)
 			}
 			content.IDPConnections = append(content.IDPConnections, connection)
+
+		case domain.ReleasePointerKindPolicy:
+			revision, err := stmts.GetPolicyRevision(ctx, projectID, pointer.RevisionID)
+			if err != nil {
+				return content, mapRevisionLookupError(err, pointer)
+			}
+			content.Policies = append(content.Policies, revision)
 
 		case domain.ReleasePointerKindBranding:
 			branding, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID)

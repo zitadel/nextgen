@@ -18,7 +18,7 @@ import (
 func newMockedReleaseServiceWithBranding(t *testing.T) (service.ReleaseService, *servicemocks.MockAllStatements) {
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
-	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, nil, nil, service.NewBrandingService(pool), nil, nil, testBuiltinBases), statements
 }
 
 // newMockedReleaseServiceWithSchemas builds with the schema writer. Its
@@ -27,7 +27,7 @@ func newMockedReleaseServiceWithSchemas(t *testing.T) (service.ReleaseService, *
 	t.Helper()
 	pool, statements := mockedBuildPool(t)
 	schemas := service.NewSchemaService(pool, nil, nil, testBuiltinBases)
-	return service.NewReleaseService(pool, schemas, nil, nil, nil, testBuiltinBases), statements
+	return service.NewReleaseService(pool, schemas, nil, nil, nil, nil, testBuiltinBases), statements
 }
 
 // mockedBuildPool runs every transaction inline on statements and accepts
@@ -300,4 +300,21 @@ func TestBuildRelease_NeverFetchesTheBuiltinNamespace(t *testing.T) {
 	require.Len(t, bundleErr.Resources, 1)
 	assert.Equal(t, domain.ReleasePointerKindSchema, bundleErr.Resources[0].Kind)
 	assert.Equal(t, domain.ErrJSONSchemaNotFound().Code, bundleErr.Resources[0].Err.Code)
+}
+
+// A policy write that trips the project's foreign key answers like every
+// other bundled kind's: the project is gone, not the policy invalid.
+func TestBuildRelease_PolicyForAMissingProjectIsProjectNotFound(t *testing.T) {
+	t.Parallel()
+	pool, statements := mockedBuildPool(t)
+	svc := service.NewReleaseService(pool, nil, nil, nil, nil, service.NewPolicyService(pool, mustPolicyEngine(t)), testBuiltinBases)
+
+	statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, new(database.NoRowFoundError))
+	statements.EXPECT().CreatePolicy(gomock.Any(), gomock.Any()).Return(new(database.ForeignKeyError))
+
+	_, err := svc.Build(t.Context(), service.BuildReleaseInput{
+		ProjectID: "proj_gone",
+		Policies:  []service.BuildPolicy{{Operation: service.OperationPasswordSet, Config: map[string]any{}}},
+	})
+	assert.ErrorIs(t, err, domain.ErrReleaseProjectNotFound())
 }

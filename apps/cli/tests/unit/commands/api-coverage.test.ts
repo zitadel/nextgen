@@ -51,11 +51,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
-  // Operation policies are configuration, written from .zitadel/policies/ by
-  // the declarative path; their syncer and `policies list|get` are the CLI
-  // follow-up (ADR 066, #1444).
-  policies:
-    "configuration written from .zitadel/ by the declarative path; CLI support is a follow-up (#1444)",
 };
 
 /**
@@ -119,6 +114,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
+  // Policies are written from .zitadel/policies/ by `apply` (ADR 066).
+  publishPolicy: "configuration: `apply` publishes .zitadel/policies/ through the policy syncer",
+  listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
+  getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
@@ -171,7 +170,7 @@ const clientOperations = (): ClientOperations => {
  * Placeholder arguments covering the shapes a positional can take: a plain
  * name, a prefixed resource id, and a URI id.
  */
-const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as const;
+const REFS = ["ID", "sch_1", "flowdef_1", "pol_1", "https://example.com/schema.json"] as const;
 
 /**
  * Collections served by hand-written commands rather than the registry, with

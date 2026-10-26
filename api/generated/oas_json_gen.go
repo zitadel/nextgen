@@ -15409,6 +15409,38 @@ func (s BuildReleaseErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case PolInvalidBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.invalid")
+		{
+			s := s.PolInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case PolRevisionConflictBuildReleaseErrorResponse:
+		e.FieldStart("code")
+		e.Str("pol.revision_conflict")
+		{
+			s := s.PolRevisionConflict
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelInvalidBuildReleaseErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.invalid")
@@ -15618,6 +15650,12 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedBuildReleaseErrorResponse
 					found = true
+				case "pol.invalid":
+					s.Type = PolInvalidBuildReleaseErrorResponse
+					found = true
+				case "pol.revision_conflict":
+					s.Type = PolRevisionConflictBuildReleaseErrorResponse
+					found = true
 				case "rel.invalid":
 					s.Type = RelInvalidBuildReleaseErrorResponse
 					found = true
@@ -15709,6 +15747,14 @@ func (s *BuildReleaseErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedBuildReleaseErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case PolInvalidBuildReleaseErrorResponse:
+		if err := s.PolInvalid.Decode(d); err != nil {
+			return err
+		}
+	case PolRevisionConflictBuildReleaseErrorResponse:
+		if err := s.PolRevisionConflict.Decode(d); err != nil {
 			return err
 		}
 	case RelInvalidBuildReleaseErrorResponse:
@@ -19210,6 +19256,16 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Policies != nil {
+			e.FieldStart("policies")
+			e.ArrStart()
+			for _, elem := range s.Policies {
+				elem.Encode(e)
+			}
+			e.ArrEnd()
+		}
+	}
+	{
 		if s.Branding.Set {
 			e.FieldStart("branding")
 			s.Branding.Encode(e)
@@ -19217,11 +19273,12 @@ func (s *ConfigurationBundle) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfConfigurationBundle = [4]string{
+var jsonFieldsNameOfConfigurationBundle = [5]string{
 	0: "schemas",
 	1: "flow_definitions",
 	2: "idps",
-	3: "branding",
+	3: "policies",
+	4: "branding",
 }
 
 // Decode decodes ConfigurationBundle from json.
@@ -19282,6 +19339,23 @@ func (s *ConfigurationBundle) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"idps\"")
+			}
+		case "policies":
+			if err := func() error {
+				s.Policies = make([]PublishPolicyRequest, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem PublishPolicyRequest
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Policies = append(s.Policies, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"policies\"")
 			}
 		case "branding":
 			if err := func() error {
@@ -96412,9 +96486,9 @@ func (s *Preview) UnmarshalJSON(data []byte) error {
 
 // Encode encodes PreviewTTL as json.
 func (s PreviewTTL) Encode(e *jx.Encoder) {
-	unwrapped := string(s)
+	unwrapped := ogenx.ISODuration(s)
 
-	e.Str(unwrapped)
+	json.EncodeNative(e, unwrapped)
 }
 
 // Decode decodes PreviewTTL from json.
@@ -96422,10 +96496,10 @@ func (s *PreviewTTL) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode PreviewTTL to nil")
 	}
-	var unwrapped string
+	var unwrapped ogenx.ISODuration
 	if err := func() error {
-		v, err := d.Str()
-		unwrapped = string(v)
+		v, err := json.DecodeNative[ogenx.ISODuration](d)
+		unwrapped = v
 		if err != nil {
 			return err
 		}
@@ -110637,6 +110711,8 @@ func (s *ReleasePointerKind) Decode(d *jx.Decoder) error {
 		*s = ReleasePointerKindBranding
 	case ReleasePointerKindIdp:
 		*s = ReleasePointerKindIdp
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 	default:
 		*s = ReleasePointerKind(v)
 	}
