@@ -17,6 +17,8 @@ content:
         - $ref: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
         - $ref: '../../../components/schemas/errors/sch-not_found.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/pol-invalid.yaml'
+        - $ref: '../../../components/schemas/errors/pol-revision_conflict.yaml'
         - $ref: '../../../components/schemas/errors/rel-invalid.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-permission_denied.yaml'
@@ -42,6 +44,8 @@ content:
           sch.fetch_too_many_redirects: '../../../components/schemas/errors/sch-fetch_too_many_redirects.yaml'
           sch.not_found: '../../../components/schemas/errors/sch-not_found.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          pol.invalid: '../../../components/schemas/errors/pol-invalid.yaml'
+          pol.revision_conflict: '../../../components/schemas/errors/pol-revision_conflict.yaml'
           rel.invalid: '../../../components/schemas/errors/rel-invalid.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.permission_denied: '../../../components/schemas/errors/rel-permission_denied.yaml'
@@ -117,6 +121,16 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      pol.invalid:
+        summary: pol.invalid
+        value:
+          code: pol.invalid
+          message: 'policy: invalid'
+      pol.revision_conflict:
+        summary: pol.revision_conflict
+        value:
+          code: pol.revision_conflict
+          message: 'policy: another revision of the same policy was published at the same instant; retry'
       rel.invalid:
         summary: rel.invalid
         value:
