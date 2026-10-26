@@ -85,11 +85,12 @@ export function normalizePublicCliCommand(command: string, cliVersion: string): 
   return command;
 }
 
-export function normalizePublicCliCommands(
-  commands: ReadonlyArray<string> | undefined,
+export function normalizePublicCliCommands<T extends string>(
+  commands: ReadonlyArray<T> | undefined,
   cliVersion: string,
-): string[] | undefined {
-  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion));
+): T[] | undefined {
+  // Only the `zitadel` prefix changes, so a suggestion stays a suggestion.
+  return commands?.map((command) => normalizePublicCliCommand(command, cliVersion) as T);
 }
 
 /**
@@ -100,7 +101,7 @@ export function normalizePublicCliCommands(
  * command — that is the canonical, readable spelling — but the CLI is not a
  * dependency of the scaffolded app, so the bare command does not exist on
  * the user's PATH (and `npx zitadel` would fetch an unrelated npm package).
- * Covers inline code spans (`` `zitadel plan` ``) and fenced-block lines
+ * Covers inline code spans (`` `zitadel deploy` ``) and fenced-block lines
  * that start with `zitadel `; prose file names like `zitadel.json` and
  * `zitadel.db` don't match because the word must end the span or be
  * followed by a space.

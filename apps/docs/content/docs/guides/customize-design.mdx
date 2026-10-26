@@ -3,6 +3,8 @@ title: Customize the login design
 description: Style the login from your app's stylesheet, or eject a starter design, add your branding, and publish it as a revision.
 ---
 
+import { story as StyledLoginStory } from "@/components/examples/styled-login.story";
+
 The login component ships with a built-in template that follows your project without any files in your repo. Its look comes from your app: style it from your own stylesheet with [`--zl-*` tokens and CSS parts](#style-the-login-from-your-app), and put any page layout — a split screen, a brand pane, marketing copy — around it in your own code. When you need to change the widget's *structure*, you take ownership of its template: the CLI copies a starter design into `.zitadel/branding/`, and once you apply it, the login renders your files.
 
 ## Style the login from your app
@@ -71,6 +73,10 @@ zitadel-login::part(button-root) {
 
 The login draws its own card, so give that card your frame through `card-card` rather than wrapping the element in a second box.
 
+The example applies the same stylesheet to a live login, which runs against a mock of the flow API in your browser. Change a value, and the stylesheet under the login shows what your app would write:
+
+<StyledLoginStory.WithControl />
+
 `<zitadel-session>` and `<zitadel-logout>` take the same tokens but expose no parts: frame them from your own markup.
 
 ## Starter designs
@@ -90,7 +96,7 @@ Both render every step of your login flow — sign-in, registration, passkey cer
 npx @zitadel/cli@latest branding eject
 ```
 
-`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you apply:
+`branding eject` offers the two starter designs above, then scaffolds `.zitadel/branding/` locally — nothing is uploaded until you deploy:
 
 - `branding.json` — the descriptor: layout, brand asset URLs, and the template reference.
 - `login.liquid` — the LiquidJS template the login renders for every step.
@@ -98,7 +104,7 @@ npx @zitadel/cli@latest branding eject
 
 ## Add your branding
 
-Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs at plan time, and the server rejects anything else:
+Brand assets live in `branding.json` and must be hosted `https://` URLs. While you develop, images may also use `http://` on `localhost`, a `127.x.x.x` address, or `[::1]`; the login shows them only when its own page runs on one of those hosts. The CLI validates the URLs before it deploys, and the server rejects anything else:
 
 ```json
 {
@@ -113,7 +119,7 @@ Brand assets live in `branding.json` and must be hosted `https://` URLs. While y
 }
 ```
 
-Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `plan` still checks it.
+Each design decides which images it shows: `centered` shows the logo, `minimal` shows none, and neither shows `hero_url`. A URL the design doesn't use is stored but not shown, and `deploy` still checks it.
 
 `typography.font_family` sets the typeface for body and headings; include a generic family as a fallback. `typography.font_url` is a stylesheet that loads the face. It needs a `font_family`, must be `https://`, and is loaded only when the login runs as `variant="page"`. Setup generates page-variant sign-in pages only when it creates the Next.js or Nuxt app itself, in an empty directory. In a Next.js or Nuxt app that already exists, even a new one, and in every SPA template, the login runs as a widget, so load the font from your own page there.
 
@@ -124,11 +130,11 @@ Without `font_url` the login loads no font of its own: it renders in Arimo where
 Branding follows the same loop as schemas and flows:
 
 ```sh
-npx @zitadel/cli@latest plan
-npx @zitadel/cli@latest apply
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
-`plan` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the pending change; `apply` publishes it. Every publish creates an immutable revision — there is no in-place update, and rolling back means re-applying an earlier template. The live login picks up the newest revision on its next step response.
+`deploy --dry-run` validates the descriptor and the template (LiquidJS parse, banned patterns, required tags) and shows the diff; `deploy` publishes it as part of the release. Every publish creates an immutable revision — there is no in-place update, and rolling back means deploying an earlier release. The live login picks up the newest revision on its next step response.
 
 The scaffolded `README.md` in `.zitadel/branding/` documents the template rules (compose `zl-*` components, no `<script>` or `<style>` tags or inline event handlers, copy through translation keys).
 

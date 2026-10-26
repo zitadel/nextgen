@@ -81,6 +81,9 @@
         "$TURBO_ROOT$/api/generated/**",
         "$TURBO_ROOT$/api/openapi/components/schemas/errors/**",
         "$TURBO_ROOT$/api/openapi/endpoints/**/*-error-response.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/event.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/types/*.yaml",
+        "$TURBO_ROOT$/api/openapi/endpoints/events/webhooks/*.yaml",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
         "$TURBO_ROOT$/internal/**/*_enumer.go",
         "$TURBO_ROOT$/internal/**/*.mock.go"

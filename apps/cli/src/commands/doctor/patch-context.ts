@@ -1,7 +1,7 @@
+import { resolveEnvironment } from "../../lib/environment";
 import { issuerFromPort, type FrameworkFacts, type Orca } from "../../lib/orca";
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import {
-  readDevelopmentIssuer,
   readPreset,
   readRendererId,
   readUseCase,
@@ -33,7 +33,7 @@ export async function loadPatchContext(
   return {
     framework,
     rendererId: readRendererId(config),
-    issuer: await resolveIssuer(cwd, config, framework),
+    issuer: await resolveIssuer(cwd, framework),
     server: typeof config.server === "string" ? config.server : "",
     cliVersion,
     scaffoldedFramework: scaffold?.scaffolded_framework,
@@ -62,14 +62,19 @@ export async function loadPatchContext(
   };
 }
 
-async function resolveIssuer(
-  cwd: string,
-  config: Record<string, unknown>,
-  facts: FrameworkFacts,
-): Promise<string> {
-  const fromConfig = readDevelopmentIssuer(config);
-  if (fromConfig && fromConfig.length > 0) {
-    return fromConfig;
+async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
+  // The issuer setup recorded for the development project, from its files
+  // alone: the repair writes it into `.env.local` and `.env.development.local`,
+  // so a production issuer exported in the shell, or a `ZITADEL_ENV` naming
+  // another environment, must never stand in for it. A file the resolver
+  // cannot read leaves the issuer to the fallbacks below rather than failing
+  // the repair.
+  const issuer = await resolveEnvironment({ cwd, env: {} }).then(
+    ({ values }) => values.ZITADEL_ISSUER?.value,
+    () => undefined,
+  );
+  if (issuer !== undefined) {
+    return issuer;
   }
   const scaffold = await readScaffoldManifest(cwd);
   if (typeof scaffold?.dev_port === "number") {

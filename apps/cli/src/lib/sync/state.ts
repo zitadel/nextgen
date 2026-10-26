@@ -44,34 +44,3 @@ export async function updateScaffold(cwd: string, scaffold: ScaffoldManifest): P
   const updated: ZitadelState = { ...current, scaffold };
   await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
 }
-
-/**
- * Remove an entry from the state file. No-op if the key is absent.
- */
-export async function removeFromState(cwd: string, key: string): Promise<void> {
-  const current = await readState(cwd);
-  const { [key]: _removed, ...rest } = current.resources;
-  const updated: ZitadelState = { ...current, resources: rest };
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
-}
-
-/**
- * Track a resource under a new path and stop tracking the old one, in one
- * write: a process that stops between two writes would leave either both paths
- * or neither, and a leftover old path comes back as a kept removal that, if
- * restored, leaves two tracked files for one resource.
- */
-export async function moveInState(
-  cwd: string,
-  from: string,
-  to: string,
-  entry: ResourceEntry,
-): Promise<void> {
-  const current = await readState(cwd);
-  const { [from]: _old, ...rest } = current.resources;
-  const updated: ZitadelState = {
-    ...current,
-    resources: { ...rest, [to]: { ...current.resources[to], ...entry } },
-  };
-  await writeFile(join(cwd, ".zitadel/state.json"), JSON.stringify(updated, null, 2));
-}

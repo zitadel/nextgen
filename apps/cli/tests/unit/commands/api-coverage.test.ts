@@ -66,7 +66,7 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
 const NOT_CALLED: Readonly<Record<string, string>> = {
   // Bootstrap and the claim flow belong to their own commands.
   createProject:
-    "unauthenticated bootstrap minting secrets into .zitadel/secret; `zitadel setup` owns it",
+    "unauthenticated bootstrap minting secrets; `zitadel setup` and `zitadel env add` own it",
   initClaim: "the browser claim flow; `zitadel claim` calls it",
   getClaimStatus: "the browser claim flow; `zitadel claim` calls it",
   // These two are reached by nothing in the CLI at all — not the registry, not
@@ -79,18 +79,18 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listPreviews: "previews are listed by `zitadel preview` (#1312)",
   removePreview: "previews are removed by `zitadel preview` (#1312)",
 
-  // Configuration is written declaratively (ADR 035), never imperatively here.
-  createSchema: "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createBranding:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
-  createRelease: "a release is constructed by `zitadel deploy` (ADR 035)",
-  buildRelease: "a release is built from .zitadel/ by `zitadel deploy` (ADR 035)",
-  revokeRelease: "an operator's hard stop; `zitadel release revoke` owns it (#539)",
-  createDeployment: "a release goes live through `zitadel deploy` orchestration (ADR 035, #529)",
-  getDeploymentById: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
-  listDeployments: "deployment history reads arrive with the `zitadel deploy` surface (#529)",
+  // Individual resource writes are not made here: `deploy` sends the whole
+  // `.zitadel/` as one release bundle (ADR 035), so the per-kind create
+  // endpoints are never called by the CLI.
+  createSchema: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  createBranding: "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
+  // `deploy` builds a release from the `.zitadel/` bundle via `buildRelease`
+  // (`POST /releases/build`); pinning pre-existing revision ids with
+  // `createRelease` is not a CLI flow.
+  createRelease:
+    "the CLI builds from a bundle via buildRelease, not by pinning revision ids (ADR 035)",
   createFlowDefinition:
-    "configuration is written from .zitadel/ by the declarative path (deploy, ADR 035)",
+    "configuration is written from .zitadel/ as a release bundle (deploy, ADR 035)",
 
   // End-user self-service, authenticated as that user. The CLI holds an
   // operator credential (ADR 036), so these are not its to call.
@@ -180,33 +180,69 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  * is a map keyed by name rather than rows, and the write is one RFC 7386 merge
  * where `null` removes — an upsert, which is why the commands use `set` rather
  * than create and update, as `gh variable set` does (ADR 062, ADR 064).
+ * `variable resolve` reads a deployment's frozen map, which is a deployment
+ * operation served by a variable command.
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
-  variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+  variables: ["variable/set", "variable/get", "variable/list", "variable/rm", "variable/resolve"],
+  // Origins are nested under a project rather than a root collection, so they
+  // have no `/origins/query` grammar; the hand-written commands add, list (off
+  // the project) and remove one pattern at a time.
+  origin: ["origin/add", "origin/list", "origin/rm"],
+  // A release is built from `.zitadel/` and posted as one bundle (`deploy`,
+  // `release create`), looked up and revoked by id. The registry serves
+  // `release list`/`get`; the acts of building and revoking are these.
+  releases: ["deploy", "release/create", "release/revoke"],
+  // A deployment is an act, not a file: `deploy` and `deployment create` make a
+  // release live, `deployment list`/`get` read the history, `deployment
+  // rollback` re-applies one. The operations live in the `lib/release` wrappers
+  // these commands call, which {@link standaloneOperations} scans too.
+  deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
 };
+
+/**
+ * The publish-pipeline modules the deploy/release/deployment commands call into.
+ * Their `client.<operation>(` call sites are the evidence those commands reach
+ * the release and deployment operations, the same way a command's own call site
+ * is for the registry.
+ */
+const PIPELINE_SOURCES: readonly string[] = [
+  "lib/release/release.ts",
+  "lib/release/deployment.ts",
+  "lib/release/steps/diff.ts",
+  "lib/release/steps/idp-checks.ts",
+];
 
 /**
  * The client operations each standalone command calls, read from its source
  * and keyed by its command (`variables set`). The registry's evidence is which
  * client properties its verbs touch; a `client.<operation>(` call site is the
  * same evidence, so a command that stops calling an operation leaves that
- * operation unaccounted and this test fails.
+ * operation unaccounted and this test fails. The release and deployment
+ * commands reach their operations through the pipeline modules above.
  */
-const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> =>
-  new Map(
+const standaloneCommandOperations = async (): Promise<ReadonlyMap<string, ReadonlySet<string>>> => {
+  const callsIn = async (path: string): Promise<string[]> =>
+    [...(await readFile(path, "utf8")).matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
+  const pipeline = (
     await Promise.all(
-      Object.values(STANDALONE)
-        .flat()
-        .map(async (command): Promise<[string, ReadonlySet<string>]> => {
-          const source = await readFile(
+      PIPELINE_SOURCES.map((file) => callsIn(join(import.meta.dirname, "../../../src", file))),
+    )
+  ).flat();
+  return new Map(
+    await Promise.all(
+      Object.entries(STANDALONE).flatMap(([group, commands]) =>
+        commands.map(async (command): Promise<[string, ReadonlySet<string>]> => {
+          const own = await callsIn(
             join(import.meta.dirname, "../../../src/commands", `${command}.ts`),
-            "utf8",
           );
-          const called = [...source.matchAll(/\bclient\.(\w+)\(/g)].map((m) => m[1] as string);
-          return [command.replaceAll("/", " "), new Set(called)];
+          const viaPipeline = group === "releases" || group === "deployments" ? pipeline : [];
+          return [command.replaceAll("/", " "), new Set([...own, ...viaPipeline])];
         }),
+      ),
     ),
   );
+};
 
 /** The client operations the standalone commands call. */
 const standaloneOperations = async (): Promise<ReadonlySet<string>> =>
@@ -378,6 +414,23 @@ describe("the CLI covers the API client", () => {
   });
 });
 
+/**
+ * Commands that call no operation of their own, with the command the reference
+ * shows for the operation they share. An operation carries one
+ * `x-zitadel-cli` line, so where two commands drive the same endpoint the line
+ * names the one a developer reaches for first, and the other is listed here
+ * with the reason. Checked below against what the commands really call, so an
+ * entry cannot outlive the sharing that justifies it.
+ */
+const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Builds a release from `.zitadel/` exactly as `deploy` does, without
+  // deploying it, so `POST /releases/build` names `deploy`.
+  "release create": "deploy",
+  // Reads the project to report its origin patterns; `projects get` is the
+  // command the reference shows for `GET /projects/{id}`.
+  "origin list": "projects get",
+};
+
 describe("the spec names the command behind each operation", () => {
   it("names one operation of every command with that command", async () => {
     const named = await specCommands();
@@ -386,6 +439,7 @@ describe("the spec names the command behind each operation", () => {
       ...(await standaloneCommandOperations()),
     ]);
     const unnamed = [...commands]
+      .filter(([command]) => !(command in SHARES_OPERATION))
       .filter(
         ([command, called]) => [...called].filter((op) => named.get(op) === command).length !== 1,
       )
@@ -397,6 +451,28 @@ describe("the spec names the command behind each operation", () => {
         "In api/openapi/endpoints, give exactly one operation each command calls an " +
         "`x-zitadel-cli: <command>` line right after its operationId.",
     ).toEqual([]);
+  });
+
+  it("keeps every shared-operation reason pointed at something real", async () => {
+    const named = await specCommands();
+    const commands = new Map([
+      ...(await verbOperations()),
+      ...(await standaloneCommandOperations()),
+    ]);
+
+    for (const [command, shownAs] of Object.entries(SHARES_OPERATION)) {
+      const called = commands.get(command);
+      expect(called, `SHARES_OPERATION lists "${command}", which is not a command`).toBeDefined();
+      const shared = [...(called ?? [])].filter((operation) => named.get(operation) === shownAs);
+      expect(
+        shared,
+        `SHARES_OPERATION says "${command}" shows as "${shownAs}", but they share no operation`,
+      ).not.toEqual([]);
+      expect(
+        [...(called ?? [])].filter((operation) => named.get(operation) === command),
+        `"${command}" now has an operation of its own — delete its SHARES_OPERATION entry`,
+      ).toEqual([]);
+    }
   });
 
   it("names only a command that calls the operation", async () => {

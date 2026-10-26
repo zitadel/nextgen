@@ -17,8 +17,8 @@ export type ProjectFiles = {
   readonly schemas?: Record<string, unknown>;
   readonly flows?: Record<string, unknown>;
   /**
-   * Whether the Project is linked the way `zitadel setup` leaves it: a
-   * development issuer in `zitadel.json` and a `.zitadel/secret`. Only a
+   * Whether the Project is linked the way `zitadel setup` leaves it: the server
+   * and development issuer in `.env.local` and a `.zitadel/secret`. Only a
    * command that publishes to the project reads them.
    */
   readonly linked?: boolean;
@@ -33,11 +33,12 @@ export async function makeProject({
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-project-"));
   await mkdir(join(cwd, ".zitadel/schemas"), { recursive: true });
   await mkdir(join(cwd, ".zitadel/flows"), { recursive: true });
-  await writeJson(cwd, "zitadel.json", {
-    version: "0.0.1",
-    ...(linked ? { environments: { development: { issuer: "http://localhost:3000" } } } : {}),
-  });
+  await writeJson(cwd, "zitadel.json", { version: "0.0.1" });
   if (linked) {
+    await writeFile(
+      join(cwd, ".env.local"),
+      "ZITADEL_URL=https://api.zitadel.cloud\nZITADEL_ISSUER=http://localhost:3000\n",
+    );
     await writeJson(cwd, ".zitadel/secret", {
       project_id: "proj_01TEST",
       project_secret: "s",
