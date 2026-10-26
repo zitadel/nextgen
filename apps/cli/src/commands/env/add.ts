@@ -426,7 +426,7 @@ export default class EnvAdd extends BaseCommand {
     const client = createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret });
     consola.start("Deploying .zitadel/ to the new environment");
     try {
-      const { bundle, brandingSources, idpFiles } = await buildBundle(opts.cwd);
+      const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(opts.cwd);
       const ctx: StepContext = {
         cwd: opts.cwd,
         client,
@@ -439,6 +439,7 @@ export default class EnvAdd extends BaseCommand {
         bundle,
         brandingSources,
         idpFiles,
+        policyFiles,
         suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
       };
       await runSteps([validateStep], ctx);
