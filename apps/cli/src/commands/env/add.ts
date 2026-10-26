@@ -255,6 +255,12 @@ export default class EnvAdd extends BaseCommand {
     // closes it; only a bound one (`--project`) still needs the pattern added.
     const needsOrigin = flags.project !== undefined;
     const createdProject = !needsOrigin;
+    // A deploy lands on the project's primary origins, and a created project
+    // holds one only when an app URL was given. Without it there is nowhere
+    // to land, so the deploy is refused by the server however it is reached:
+    // offering it would ask for something that cannot work, and naming it
+    // would send the reader to a command that fails the same way.
+    const hasSomewhereToLand = createdProject && issuer !== undefined;
     const { cliVersion } = this.meta;
     // A project this run created has never had a release, so the environment
     // serves the server's own defaults until something is deployed to it
@@ -268,7 +274,7 @@ export default class EnvAdd extends BaseCommand {
     // is given, and here `--force` permits overwriting the env file, so it
     // must never answer it.
     let deployment: DeployedRelease | undefined;
-    if (createdProject && !nonInteractive && projectSecret !== undefined) {
+    if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
@@ -349,7 +355,7 @@ export default class EnvAdd extends BaseCommand {
           // secret the deploy authenticates with. A `--project` bind is a
           // project someone else owns and may already serve a release of
           // their own, so this run does not propose replacing it.
-          ...(createdProject && deployment === undefined
+          ...(hasSomewhereToLand && deployment === undefined
             ? [projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)]
             : []),
           projectCommand("env", newEnvironment, cliVersion),
@@ -374,7 +380,12 @@ export default class EnvAdd extends BaseCommand {
         ...(createdProject && deployment === undefined
           ? [
               `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
-              `Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
+              ...(hasSomewhereToLand
+                ? [`Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`]
+                : [
+                    `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
+                    `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
+                  ]),
             ]
           : []),
         `Check what resolves: zitadel env${newEnvironment}`,

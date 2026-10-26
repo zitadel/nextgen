@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
-import { confirm } from "@clack/prompts";
+import { confirm, text } from "@clack/prompts";
 
 import EnvAdd from "../../../../src/commands/env/add";
 import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
@@ -164,9 +164,27 @@ describe("env add", () => {
     it("offers the deploy that makes the new environment serve .zitadel/", async () => {
       const cwd = await makeProject("next");
 
-      const { envelope } = await add(cwd);
+      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
 
       expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
+    });
+
+    it("offers no deploy when the project has no origin for one to land on", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+    });
+
+    it("tells a person to give the environment an origin before deploying to it", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out).toContain(
+        "Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file .env.production.local",
+      );
     });
 
     it("reports no deployment when it made none", async () => {
@@ -198,7 +216,7 @@ describe("env add", () => {
     it("names the deploy a person should run, against the new environment", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
       expect(out).toContain(
         "Deploy to it: zitadel deploy -m '<what changed>' --env-file .env.production.local",
@@ -744,6 +762,15 @@ describe("env add asked on a terminal", () => {
     const cwd = await makeDeployableProject();
 
     await adding(cwd, "--project", "proj_existing");
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("never asks when the environment has no origin for a deploy to land on", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
 
     expect(confirm).not.toHaveBeenCalled();
   });
