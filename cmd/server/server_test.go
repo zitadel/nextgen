@@ -139,6 +139,21 @@ func TestLoadConfigSessionDefaults(t *testing.T) {
 	assert.Equal(t, 168*time.Hour, cfg.Session.DefaultTTL)
 }
 
+// TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
+// Decision 5: the report location is on and the stack trace is off.
+func TestLoadConfigErrorDefaults(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION", "")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.True(t, cfg.Instrumentation.Log.Errors.ReportLocation)
+	assert.False(t, cfg.Instrumentation.Log.Errors.StackTrace)
+}
+
 // TestLoadConfigDefaultsToArgon2id locks in the ADR 029 default: with no
 // password_hasher overrides, the built hasher produces argon2id hashes while
 // still verifying (and rehashing) pre-existing bcrypt hashes.

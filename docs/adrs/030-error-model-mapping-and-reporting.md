@@ -21,7 +21,7 @@
 > error line"). The Inventory is frozen as the snapshot from proposal time. The
 > follow-up table marks what shipped in #521, #522, #583, #799, #2252 and #2254, and
 > the leak list in Decision 6 keeps only the sites that are still open. The
-> default for stack capture is left to #1485.
+> server default for stack capture is off, as Decision 5 says (#1485 item 5).
 
 ## Context
 
@@ -274,7 +274,7 @@ A request served through ogen produces at most two log lines at the API boundary
 - **Request line.** `middleware.WithLogging` writes one `Info` line per request, with the message `request served`. It is written when the request ends, from a defer, so a request that panics still gets it. Fields: `method`, `path` (without the query string, for any route), `operation_id` (empty on routes outside ogen), `status`, `response_size` (bytes) and `duration`. `request_id` is on the request logger that `WithLogging` puts on the context, so every line logged through the request context carries it once. The line has no trace or span id yet; the follow-up table tracks this.
 - **Error line.** `OgenErrorHandler` is the API error sink. It is the single point where ogen hands errors to the server, and it logs once every error a handler returns as a Go error, with the message `api error`. Fields: `status`, `operation_id` and the error under the error attribute key. Level: `Error` when the status is 500 or higher, otherwise `Info`. A 5xx is logged at `Warn` instead when the request context is already done and the error is not a server write deadline. The brief or full shape follows the level (Structured logging above), so a stack is only logged at `Error`. Typed error responses that handlers build themselves (for example the flow 404, 409 and 410 responses), the server's own answers for unmatched paths and methods (ADR 076), and routes outside ogen (the IdP callback) do not pass through the sink and get no error line.
 - **Panics.** A handler panic answers 500 with the standard `internal` body and logs an `Error` line with the panic stack, whatever the stack toggle says. A panic after the response has started closes the connection instead.
-- **Expected client errors.** Expected storage signals (for example `NoRowFoundError` → `*.not_found`) answer 4xx and therefore never log a stack. Capturing the stack for them still costs a `debug.Stack()` while the stack toggle is on; the default is an open question (follow-up table).
+- **Expected client errors.** Expected storage signals (for example `NoRowFoundError` → `*.not_found`) answer 4xx and therefore never log a stack. Capturing the stack for them still costs a `debug.Stack()` while the stack toggle is on; the default is off (follow-up table).
 - **Never logged on these lines as fields:** the query string, the request or response body, and `Details`. A decode error logs the kind of decode failure and the rejected field paths as the cause, never ogen's reason text, because that text can quote the rejected value.
 
 ### 6. Redaction and PII policy
@@ -399,7 +399,8 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 | Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | [#585](https://github.com/zitadel/nextgen/issues/585) |
 | Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | [#585](https://github.com/zitadel/nextgen/issues/585) |
 | `errors.Is(err, domain.ErrX())` builds a sentinel per comparison and captures its location and stack (36 sites outside tests) | Domain | [#2344](https://github.com/zitadel/nextgen/issues/2344) |
-| Request line trace id; decide the stack-trace default (ADR says off, server defaults on) | Instrumentation | #1485 |
+| Request line trace id | Instrumentation | #1485 |
+| Stack capture off by default, matching Decision 5 | Instrumentation | Done, #1485 item 5 |
 
 ## References
 
