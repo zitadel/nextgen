@@ -2,6 +2,7 @@ import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
+import { LocalServer } from "../local-server/server";
 import { resolveCwd } from "../paths";
 import { BaseCommand } from "./base";
 import { CREDENTIALS, type CredentialKind } from "./credentials";
@@ -162,6 +163,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
       interactive: !this.meta.nonInteractive && !this.meta.dryRun && options.prompt !== false,
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
+    // Before anything is asked for or sent: a local server another CLI
+    // release started serves that release's API.
+    await LocalServer.assertCurrent(this.meta.cwd, server, {
+      cliVersion: this.meta.cliVersion,
+      env: this.meta.env,
+    });
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     if (process.stdout.isTTY && !options.quiet) {

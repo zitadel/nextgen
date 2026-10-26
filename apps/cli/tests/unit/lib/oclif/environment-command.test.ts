@@ -6,9 +6,11 @@ import { text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
 import { CREDENTIALS } from "../../../../src/lib/oclif/credentials";
 import { EnvironmentCommand } from "../../../../src/lib/oclif/environment-command";
 import { cliPackageRoot } from "../../../helpers/oclif-build";
+import { aBinaryRecord } from "../../../helpers/runtime-record";
 import { asTerminal } from "../../../helpers/terminal";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
@@ -54,6 +56,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -160,6 +163,28 @@ describe("EnvironmentCommand.connect", () => {
     const { telemetry } = await new ProjectProbe(["--cwd", dir], config).run();
 
     expect(telemetry).toEqual({ credential: "project", has_env_file: false });
+  });
+
+  it("refuses a local server another CLI release started, before it asks for the project", async () => {
+    const record = aBinaryRecord({
+      pid: process.pid,
+      command: process.execPath,
+      server_version: "0.0.1",
+      data_dir: join(dir, LOCAL_DATA_DIR),
+    });
+    await writeRuntimeMetadata(dir, record);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("ok", { status: 200 })),
+    );
+    const file = await envFile(`ZITADEL_URL=${record.server_url}\n`);
+
+    await expect(
+      new ProjectProbe(["--cwd", dir, "--env-file", file], config).run(),
+    ).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: expect.stringContaining("The local Zitadel server runs 0.0.1"),
+    });
   });
 });
 

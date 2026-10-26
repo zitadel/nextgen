@@ -12,6 +12,7 @@ import {
 } from "../../lib/api/operations";
 import { buildRequest, pathValuesOf, readInput, urlOf } from "../../lib/api/request";
 import { ZitadelError } from "../../lib/errors";
+import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readZitadelSecret } from "../../lib/project";
 
@@ -133,6 +134,10 @@ export default class Api extends BaseCommand {
       });
     }
 
+    await LocalServer.assertCurrent(meta.cwd, meta.source, {
+      cliVersion: meta.cliVersion,
+      env: meta.env,
+    });
     // As the resource commands do: say which server is called, on a terminal
     // only, so a pipe receives the response alone.
     if (process.stdout.isTTY) {

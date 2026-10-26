@@ -347,9 +347,15 @@ held, so rerunning the same `setup` starts over.
 
 `start` reuses a server already running in the directory only when it is the
 release this CLI ships; one an earlier release started is restarted, and its
-data stays. `setup --server local` refuses a binary-runtime server another
-release started with `E_CONFLICT` before it creates anything: that server's API
-is its own release's. Its `next_commands` run `start`, then `setup` again.
+data stays. Every other command that sends requests to a local server
+(`setup`, `console`, `api`, `env add`, and the project commands whose
+`ZITADEL_URL` is that server) refuses a running one another release started,
+process or container, with `E_CONFLICT` before it sends anything: that
+server's API is its own release's. Its `next_commands` run `start --cwd` in
+the directory that holds the server, then the command again where it can name
+it. `doctor` warns about such a server (`runtime-version`) and suggests the
+same `start`. A server started from `ZITADEL_SERVER_BINARY`, or a container on
+an image that is not a published release, is never refused.
 
 In an existing app, `--framework` has to name the framework setup detects
 there; another one stops setup with `E_CONFLICT` instead of offering

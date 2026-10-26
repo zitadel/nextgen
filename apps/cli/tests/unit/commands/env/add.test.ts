@@ -6,7 +6,9 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../../src/lib/local-server/runtime";
 import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import { aBinaryRecord } from "../../../helpers/runtime-record";
 
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
@@ -369,6 +371,33 @@ describe("env add", () => {
   });
 
   describe("the project it creates", () => {
+    it("is not created on a local server another CLI release started", async () => {
+      const cwd = await makeProject();
+      const record = aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        server_version: "0.0.1",
+        data_dir: join(cwd, LOCAL_DATA_DIR),
+      });
+      await writeRuntimeMetadata(cwd, record);
+      server.use(http.get(`${record.server_url}/readyz`, () => new HttpResponse("ok")));
+
+      const result = await runCliForTest([
+        "env",
+        "add",
+        "production",
+        "--cwd",
+        cwd,
+        "--server",
+        record.server_url,
+        "--non-interactive",
+        "--json",
+      ]);
+
+      expect(parseJson(result.stdout)).toMatchObject({ code: "E_CONFLICT" });
+      expect(created).toEqual([]);
+    });
+
     it("is named after the directory and the environment, without seeded defaults", async () => {
       const cwd = await makeProject();
 

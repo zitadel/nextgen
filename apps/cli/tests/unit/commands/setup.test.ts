@@ -26,10 +26,11 @@ import {
 } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
-import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -1106,6 +1107,31 @@ describe("setup asked on a terminal", () => {
     await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
   });
 
+  it("refuses the local server picked in the wizard when another CLI release started it", async () => {
+    const cwd = await makeNextProject();
+    const record = aBinaryRecord({
+      pid: process.pid,
+      command: process.execPath,
+      server_version: "0.0.1",
+      data_dir: join(cwd, LOCAL_DATA_DIR),
+    });
+    await writeRuntimeMetadata(cwd, record);
+    server.use(http.get(`${record.server_url}/readyz`, () => new HttpResponse("ok")));
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    vi.mocked(select)
+      .mockResolvedValueOnce(record.server_url as never)
+      .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
+      .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
+    vi.mocked(text).mockResolvedValueOnce("3000" as never);
+    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+    await expect(asTerminal(() => Setup.run(["--cwd", cwd]))).rejects.toMatchObject({
+      oclif: { exit: 5 },
+    });
+
+    await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
+  });
+
   describe("in a directory without an app", () => {
     beforeEach(async () => {
       vi.stubEnv("PATH", await aFakeAppGeneratorPath());
@@ -1238,6 +1264,29 @@ describe("setup --dev-port on an app already set up", () => {
     expect(res.exitCode).not.toBe(0);
     expect(await readFile(join(cwd, "package.json"), "utf8")).toBe(before);
     expect(await readFile(join(cwd, ".env.local"), "utf8")).toBe(env);
+  });
+
+  it("changes nothing on a local server another CLI release started", async () => {
+    const cwd = await aSetUpNextApp();
+    const record = aBinaryRecord({
+      pid: process.pid,
+      command: process.execPath,
+      server_version: "0.0.1",
+      data_dir: join(cwd, LOCAL_DATA_DIR),
+    });
+    await writeRuntimeMetadata(cwd, record);
+    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as object;
+    await writeFile(
+      join(cwd, "zitadel.json"),
+      JSON.stringify({ ...config, server: record.server_url }),
+    );
+    server.use(http.get(`${record.server_url}/readyz`, () => new HttpResponse("ok")));
+    const before = await readFile(join(cwd, "package.json"), "utf8");
+
+    const res = await moveTo(cwd, 3101);
+
+    expect(parseJson(res.stdout)).toMatchObject({ code: "E_CONFLICT" });
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toBe(before);
   });
 
   it("reports nothing moved for the port the app is already on", async () => {

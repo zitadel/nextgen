@@ -9,6 +9,7 @@ import { ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
 import { isObject } from "../../lib/json";
+import { LocalServer } from "../../lib/local-server/server";
 import {
   BaseCommand,
   CommandGroups,
@@ -153,6 +154,7 @@ export default class EnvAdd extends BaseCommand {
     let projectSecret = env.ZITADEL_PROJECT_SECRET;
     let previewToken = env.ZITADEL_PREVIEW_TOKEN;
     if (projectId === undefined) {
+      await LocalServer.assertCurrent(cwd, server, { cliVersion: this.meta.cliVersion, env });
       const created = await createZitadelClient({ baseUrl: server }).createProject({
         name: `${basename(cwd)}-${name}`,
         ...(issuer === undefined

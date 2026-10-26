@@ -7,11 +7,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { failureAdvice } from "../../../src/commands/doctor";
 import type { LocalServers } from "../../../src/lib/local-server/processes";
+import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { publicCliCommand } from "../../../src/lib/public-cli";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 import { advisoryForWarnings } from "../../../src/commands/doctor/index";
 import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
 import { nextPort } from "../../helpers/ports";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 import {
   aMachineRunning,
   cliVersion,
@@ -834,6 +836,33 @@ describe("doctor's managed runtime process check", () => {
   });
 });
 
+describe("doctor's check of the local server's release", () => {
+  it("warns about a running server another CLI release started", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-doctor-release-"));
+    tempDirs.push(cwd);
+    const serverUrl = await startHealthServer();
+    await writeRuntimeMetadata(
+      cwd,
+      aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        server_version: "0.0.1",
+        port: Number(new URL(serverUrl).port),
+        server_url: serverUrl,
+        data_dir: join(cwd, LOCAL_DATA_DIR),
+      }),
+    );
+
+    const res = await runCliForTest(["doctor", "--cwd", cwd, "--json"]);
+
+    const checks = (parseJson(res.stdout) as { data: { checks: Check[] } }).data.checks;
+    expect(checks.find((check) => check.name === "runtime-version")).toMatchObject({
+      status: "warn",
+      message: expect.stringContaining("runs 0.0.1"),
+    });
+  });
+});
+
 describe("advisoryForWarnings", () => {
   const claimWarning = {
     name: "claim",
@@ -862,6 +891,23 @@ describe("advisoryForWarnings", () => {
     );
 
     expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("claim")]);
+  });
+
+  it("restarts a server of another CLI release where it was started", () => {
+    const advice = advisoryForWarnings(
+      [
+        {
+          name: "runtime-version",
+          status: "warn",
+          message: "runs 0.0.1",
+          details: { runtime_dir: "/home/dev/work" },
+        },
+      ],
+      cliVersion.version,
+      undefined,
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("start --cwd /home/dev/work")]);
   });
 });
 

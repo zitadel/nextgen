@@ -2,12 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
+import { join } from "node:path";
+
 import { select, text } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
 import Api from "../../../src/commands/api/index";
+import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { makeProject } from "../../helpers/local-project";
 import { cliPackageRoot } from "../../helpers/oclif-build";
+import { aBinaryRecord } from "../../helpers/runtime-record";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -38,6 +42,7 @@ afterEach(() => {
   vi.mocked(select).mockReset();
   vi.mocked(text).mockReset();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 /** Run `zitadel api` from source with its output kept out of the test log. */
@@ -92,5 +97,32 @@ describe("zitadel api for an operation that needs no credential", () => {
       status: "ok",
       data: { url: "http://localhost:8080/livez" },
     });
+  });
+});
+
+describe("zitadel api against a local server another CLI release started", () => {
+  it("sends it nothing", async () => {
+    const cwd = await makeProject();
+    await writeRuntimeMetadata(
+      cwd,
+      aBinaryRecord({
+        pid: process.pid,
+        command: process.execPath,
+        server_version: "0.0.1",
+        port: 8080,
+        data_dir: join(cwd, LOCAL_DATA_DIR),
+      }),
+    );
+    const fetch = vi.fn(async (_url: string | URL) => new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const config = await Config.load({ root: cliPackageRoot });
+
+    await expect(
+      new Api(
+        ["--cwd", cwd, "--no-telemetry", "--server", "http://localhost:8080", "getLive"],
+        config,
+      ).run(),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(fetch.mock.calls.map(([url]) => new URL(String(url)).pathname)).not.toContain("/livez");
   });
 });

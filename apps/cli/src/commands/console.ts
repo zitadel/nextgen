@@ -68,6 +68,11 @@ export default class Console extends BaseCommand {
     }
 
     const serverUrl = await LocalServer.resolveUrl(localDir);
+    await LocalServer.assertCurrent(localDir, serverUrl, {
+      cliVersion: this.meta.cliVersion,
+      env: this.meta.env,
+      rerun: this.suggestUnscoped("console"),
+    });
     const signInUrl = await consoleSignInUrl(serverUrl, admin);
 
     consola.log(`Signed in to the local console as ${admin.email}:`);

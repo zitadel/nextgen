@@ -22,6 +22,7 @@ import {
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
 import Claim from "../../../src/commands/claim";
+import { LocalServer } from "../../../src/lib/local-server/server";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
@@ -572,12 +573,16 @@ async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"
   return `http://localhost:${String(address.port)}`;
 }
 
-/** A runtime record of a server that is running: this process, answering at `serverUrl`. */
+/**
+ * A runtime record of a server that is running: this process, answering at
+ * `serverUrl`, on the version the CLI ships.
+ */
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
   return aBinaryRecord({
     pid: process.pid,
     command: process.execPath,
     log_path: localRuntimePaths(cwd).logFile,
+    server_version: String(LocalServer.bundledVersion()),
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,

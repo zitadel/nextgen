@@ -119,6 +119,7 @@ export default class Doctor extends BaseCommand {
       image,
       port,
       this.localServers(),
+      { cliVersion: this.meta.cliVersion, env: this.meta.env },
     );
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
@@ -435,6 +436,19 @@ export function advisoryForWarnings(
     nextCommands.push(unscopedCommand("stop --all", cliVersion));
   }
 
+  const outdatedRuntime = warnings.find((check) => check.name === "runtime-version");
+  if (outdatedRuntime) {
+    // `start` acts on its working directory, which may not hold the server;
+    // a directory that needs shell quoting leaves the command out.
+    const dir = runtimeDirOf(outdatedRuntime);
+    nextActions.push(
+      `Restart the local server${dir === undefined ? "" : ` in ${dir}`} on this CLI's release with start; its data stays. Until then, the commands that send it requests refuse it.`,
+    );
+    if (dir !== undefined) {
+      nextCommands.push(...portableSuggestions([["start", "--cwd", dir]], cliVersion));
+    }
+  }
+
   const dependencyRemedy = remedyCommandOf(
     warnings.find((check) => check.name === "dependency-version"),
   );
@@ -528,8 +542,10 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  release: { cliVersion: string; env: NodeJS.ProcessEnv },
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
+  const releaseCheck = await checkRuntimeRelease(runtimeDir, runtime, release);
   if (runtimeBackend === "binary") {
     return [
       await check("server-binary", "Server npm package is available", async () => {
@@ -551,6 +567,7 @@ async function runLocalRuntimeChecks(
         checkPortAvailability(runtime, port),
       ),
       await checkRuntime(runtime, runtimeBackend),
+      releaseCheck,
       managedRuntimeCheck,
     ];
   }
@@ -614,8 +631,42 @@ async function runLocalRuntimeChecks(
       checkPortAvailability(runtime, port),
     ),
     await checkRuntime(runtime, runtimeBackend),
+    releaseCheck,
     managedRuntimeCheck,
   ];
+}
+
+/**
+ * Whether the directory's server runs another CLI release, and with it that
+ * release's API. The commands that send it requests refuse such a server
+ * (`LocalServer.assertCurrent`), so doctor warns and advises `start`.
+ */
+async function checkRuntimeRelease(
+  runtimeDir: string,
+  runtime: RuntimeMetadata | undefined,
+  release: { cliVersion: string; env: NodeJS.ProcessEnv },
+): Promise<CheckOutcome> {
+  const outdated = runtime
+    ? await LocalServer.outdated(runtimeDir, runtime.server_url, release)
+    : undefined;
+  if (!outdated) {
+    return {
+      name: "runtime-version",
+      status: "pass",
+      message: "No local server of another CLI release is running",
+    };
+  }
+  return {
+    name: "runtime-version",
+    status: "warn",
+    message: `${outdated.runtime.server_url} runs ${outdated.running}, but this CLI ships ${outdated.expected}: run start to restart it on ${outdated.expected}.`,
+    details: {
+      server_url: outdated.runtime.server_url,
+      server_version: outdated.running,
+      cli_server_version: outdated.expected,
+      runtime_dir: outdated.dir,
+    },
+  };
 }
 
 async function checkPortAvailability(
@@ -737,6 +788,16 @@ function remedyCommandOf(check: CheckOutcome | undefined): SuggestedCommand | un
   }
   const remedy = (details as { remedy_command?: unknown }).remedy_command;
   return typeof remedy === "string" && remedy.length > 0 ? shellCommand(remedy) : undefined;
+}
+
+/** The directory holding the server the runtime-version warning is about. */
+function runtimeDirOf(check: CheckOutcome): string | undefined {
+  const details = check.details;
+  if (typeof details !== "object" || details === null) {
+    return undefined;
+  }
+  const dir = (details as { runtime_dir?: unknown }).runtime_dir;
+  return typeof dir === "string" ? dir : undefined;
 }
 
 /**

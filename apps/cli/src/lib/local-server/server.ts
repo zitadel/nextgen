@@ -1,9 +1,11 @@
 import { join } from "node:path";
 
 import consola from "consola";
+import semver from "semver";
 
 import { ZitadelError } from "../errors";
-import { unscopedCommand } from "../suggestion";
+import { shellOption } from "../shell";
+import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -19,9 +21,11 @@ import { withStartLock } from "./internal/start-lock";
 import { RuntimeFileStore } from "./internal/store";
 import type { LocalServers, ManagedRuntimeProcess } from "./processes";
 import {
+  LOCAL_SERVER_IMAGE_NAME,
   type RuntimeBackend,
   type RuntimeMetadata,
   checkLocalServerHealth,
+  defaultLocalServerImageForCliVersion,
   ensureContainerIdentity,
   localContainerName,
   localRuntimePaths,
@@ -30,6 +34,7 @@ import {
   readRuntimeMetadata,
   removeLocalData,
   removeRuntimeMetadata,
+  sameLocalServer,
 } from "./runtime";
 import {
   type LogLevel,
@@ -78,6 +83,20 @@ export type ServerStatus = Readonly<{
     container_exists: boolean;
     container_running: boolean;
   };
+}>;
+
+/**
+ * A running local server that another CLI release started, as
+ * {@link LocalServer.outdated} finds it.
+ */
+export type OutdatedServer = Readonly<{
+  /** The directory whose record names it, where `start` restarts it. */
+  dir: string;
+  runtime: RuntimeMetadata;
+  /** The release it runs: its server version, or its image's tag. */
+  running: string;
+  /** The release this CLI runs instead. */
+  expected: string;
 }>;
 
 export type StopReport = Readonly<{
@@ -141,8 +160,8 @@ export class LocalServer {
 
   /**
    * The server version this CLI ships. A server another CLI release started
-   * serves that release's API, so `start` and `setup` compare it with a running
-   * server's before reusing it. `undefined` when it cannot be read.
+   * serves that release's API, so `start` restarts one and the other commands
+   * refuse it (see {@link outdated}). `undefined` when it cannot be read.
    */
   static bundledVersion(): string | undefined {
     return BinaryLauncher.bundledVersion();
@@ -201,6 +220,76 @@ export class LocalServer {
       return await LocalServer.resolveUrl(cwd);
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * The server at `serverUrl` when another CLI release started it: the nearest
+   * record names that server, the record's own process or container is the
+   * one running, and it runs another release than this CLI. Such a server
+   * serves its own release's API, so this CLI's requests can fail against it:
+   * halfway through `setup`, after the project exists, or on the first request
+   * once the API has moved under `/api/v1` (ADR 077). `start` restarts it on
+   * this release; a command that only sends it requests refuses it
+   * ({@link assertCurrent}).
+   *
+   * Only releases are compared. A process started from `ZITADEL_SERVER_BINARY`
+   * records `override` or the version it was told, and a container may run any
+   * image (`--image`, `ZITADEL_LOCAL_IMAGE`, a moving tag such as `latest`):
+   * what is not a release says nothing about the API, so it is never refused.
+   * Neither is a record that cannot be read, which is doctor's to report, or
+   * one whose server is gone, which says nothing about what answers there now.
+   */
+  static async outdated(
+    cwd: string,
+    serverUrl: string,
+    options: { cliVersion: string; env?: NodeJS.ProcessEnv },
+  ): Promise<OutdatedServer | undefined> {
+    const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
+    if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
+      return undefined;
+    }
+    const { runtime } = nearest;
+    const env = options.env ?? process.env;
+    // A container runs whatever image `start` was given. A reader has no
+    // `--image`, so it compares the image a bare `start` would restart it on.
+    const [running, expected] =
+      runtime.backend === "binary"
+        ? [runtime.server_version, BinaryLauncher.bundledVersion(env)]
+        : [
+            imageRelease(runtime.image),
+            imageRelease(
+              env.ZITADEL_LOCAL_IMAGE ?? defaultLocalServerImageForCliVersion(options.cliVersion),
+            ),
+          ];
+    if (
+      running === undefined ||
+      expected === undefined ||
+      !semver.valid(running) ||
+      !semver.valid(expected) ||
+      running === expected ||
+      !(await LocalServer.isServing(runtime))
+    ) {
+      return undefined;
+    }
+    return { dir: nearest.dir, runtime, running, expected };
+  }
+
+  /**
+   * Refuses the server at `serverUrl` when another CLI release started it (see
+   * {@link outdated}). Every command that sends a local server requests calls
+   * this before the first one, except `start`, which restarts such a server
+   * instead. The error suggests `start` where the server was started, then
+   * `rerun`, the command to run again, when the caller can say what it is.
+   */
+  static async assertCurrent(
+    cwd: string,
+    serverUrl: string,
+    options: { cliVersion: string; env?: NodeJS.ProcessEnv; rerun?: SuggestedCommand },
+  ): Promise<void> {
+    const outdated = await LocalServer.outdated(cwd, serverUrl, options);
+    if (outdated) {
+      throw outdatedServer(outdated, cwd, options);
     }
   }
 
@@ -533,6 +622,55 @@ export class LocalServer {
     ).start();
     return { runtime: record, alreadyRunning };
   }
+}
+
+/**
+ * The release a published server image names by its tag
+ * (`ghcr.io/zitadel/nextgen:0.4.0`), or `undefined` for any other image, a
+ * moving tag such as `latest` included.
+ */
+function imageRelease(image: string): string | undefined {
+  const prefix = `${LOCAL_SERVER_IMAGE_NAME}:`;
+  if (!image.startsWith(prefix)) {
+    return undefined;
+  }
+  const tag = image.slice(prefix.length).split("@")[0] ?? "";
+  return semver.valid(tag) ? tag : undefined;
+}
+
+/**
+ * The error for a server another CLI release started. `start` is suggested
+ * with the directory that holds the server, because `start` acts on its
+ * working directory and the server may have been started in a parent.
+ */
+function outdatedServer(
+  outdated: OutdatedServer,
+  cwd: string,
+  options: { cliVersion: string; rerun?: SuggestedCommand },
+): ZitadelError {
+  const { dir, runtime, running, expected } = outdated;
+  return new ZitadelError(
+    "E_CONFLICT",
+    `The local Zitadel server runs ${running}, but this CLI ships ${expected}`,
+    {
+      hint:
+        "A server another CLI release started serves that release's API, so this CLI's requests " +
+        `can fail against it. Run start to restart it on ${expected}; its data stays. ` +
+        (dir === cwd ? "" : `Run start in ${dir}, where the server was started. `) +
+        "Then run this command again.",
+      nextCommands: [
+        unscopedCommand(`start ${shellOption("--cwd", dir)}`, options.cliVersion),
+        ...(options.rerun === undefined ? [] : [options.rerun]),
+      ],
+      details: {
+        server_url: runtime.server_url,
+        backend: runtime.backend,
+        server_version: running,
+        cli_server_version: expected,
+        ...(runtime.backend === "docker" ? { image: runtime.image } : {}),
+      },
+    },
+  );
 }
 
 function lifecycleOf(input: {

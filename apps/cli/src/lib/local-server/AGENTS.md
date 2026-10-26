@@ -23,6 +23,9 @@ admin credential, and the CLI talks only to the server a
   `server.ts` (`LocalServer`).
 - A command that needs more from a running server gets it from a new
   `LocalServer` method (and a launcher method), not code of its own.
+- A command that sends a local server requests calls
+  `LocalServer.assertCurrent` before the first one; only `start` restarts a
+  server another CLI release started.
 - `internal/lifecycle.ts` decides against interfaces (reuse, restart, port,
   failure), so its tests need no processes, sockets or real time.
 

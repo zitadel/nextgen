@@ -24,7 +24,6 @@ import {
   type ConnectionSlug,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
-import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
@@ -67,7 +66,7 @@ import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
 import { LocalServer } from "../../lib/local-server/server";
-import { readNearestRuntimeMetadata, readPlatformRuntime } from "../../lib/local-server/runtime";
+import { readPlatformRuntime } from "../../lib/local-server/runtime";
 import {
   readProjectServer,
   readZitadelConfig,
@@ -317,6 +316,7 @@ export default class Setup extends BaseCommand {
       this.meta.source,
       retryOptionsFromFlags(flags),
       this.config.version,
+      this.meta.env,
     );
 
     // Resolved before anything is detected, created or written: an
@@ -435,6 +435,17 @@ export default class Setup extends BaseCommand {
         answers = await prompt.ask(answers, promptCtx);
       }
       outro("Configuration captured");
+      // The wizard may have picked the local server it detected, which the
+      // check above, made against the flag's server, did not cover.
+      if (answers.server !== this.meta.source) {
+        await assertLocalServerVersion(
+          cwd,
+          answers.server,
+          retryOptionsFromFlags(flags),
+          this.config.version,
+          this.meta.env,
+        );
+      }
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -1007,6 +1018,11 @@ export default class Setup extends BaseCommand {
   ): Promise<JsonEnvelope> {
     const config = await readZitadelConfig(cwd);
     const server = readProjectServer(config);
+    await LocalServer.assertCurrent(cwd, server, {
+      cliVersion: this.meta.cliVersion,
+      env: this.meta.env,
+      rerun: this.suggestUnscoped(`setup --dev-port ${String(devPort)}`),
+    });
     consola.start(`Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`);
     const move = await moveDevPort({
       cwd,
@@ -1639,61 +1655,24 @@ function defaultProjectName(cwd: string, framework: string): string {
 }
 
 /**
- * Refuses a local server that another CLI release started. `start` restarts
- * such a server, but one left running stays that release's until `start` runs
- * again, and its API is that release's: setup would create the project, then
- * fail uploading the default schema and flow, and `--force` would not help.
- *
- * Only a binary runtime records the version it runs, and only release versions
- * are compared: an override records `override`, which says nothing about its
- * API. An unreadable `runtime.json` is doctor's to report, not setup's.
+ * Refuses a local server that another CLI release started
+ * (`LocalServer.assertCurrent`). `start` restarts such a server, but one left
+ * running stays that release's until `start` runs again, and its API is that
+ * release's: setup would create the project, then fail uploading the default
+ * schema and flow, and `--force` would not help.
  */
 async function assertLocalServerVersion(
   cwd: string,
   server: string,
   retry: SetupRetryOptions,
   cliVersion: string,
+  env: NodeJS.ProcessEnv,
 ): Promise<void> {
-  let nearest: Awaited<ReturnType<typeof readNearestRuntimeMetadata>>;
-  try {
-    nearest = await readNearestRuntimeMetadata(cwd);
-  } catch {
-    return;
-  }
-  const runtime = nearest?.runtime;
-  if (!nearest || runtime?.backend !== "binary" || runtime.server_url !== server) {
-    return;
-  }
-  const expected = LocalServer.bundledVersion();
-  if (
-    expected === undefined ||
-    !semver.valid(expected) ||
-    !semver.valid(runtime.server_version) ||
-    runtime.server_version === expected
-  ) {
-    return;
-  }
-  const where =
-    nearest.dir === cwd ? "" : `Run start in ${nearest.dir}, where the server was started. `;
-  throw new ZitadelError(
-    "E_CONFLICT",
-    `The local Zitadel server runs ${runtime.server_version}, but this CLI ships ${expected}`,
-    {
-      hint:
-        "A server another CLI release started serves that release's API, so setup would stop " +
-        `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
-        "Then rerun setup.",
-      nextCommands: [
-        unscopedCommand(`start ${shellOption("--cwd", nearest.dir)}`, cliVersion),
-        unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
-      ],
-      details: {
-        server_url: runtime.server_url,
-        server_version: runtime.server_version,
-        cli_server_version: expected,
-      },
-    },
-  );
+  await LocalServer.assertCurrent(cwd, server, {
+    cliVersion,
+    env,
+    rerun: unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+  });
 }
 
 function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: string): unknown {
