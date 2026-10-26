@@ -176,13 +176,14 @@ npx @zitadel/cli@latest resources --json     # the resource surface in one call 
 npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
-`--help` groups the surface into project commands (create a project and scaffold
-auth), local-server commands (run a local Zitadel), configuration commands
-(`deploy` plus the config resources), and resource commands (the uniform
-`<resource> <verb>` surface). Read the groups from `--help` rather than from
-memory, since they change as the CLI gains commands.
+`--help` groups the commands by what you are doing: getting started, local
+development, users and teams, authentication, configuration and releases, and
+diagnostics and utilities. A family such as `users` is one row, and
+`zitadel users --help` lists its verbs. Read the groups from `--help` rather than
+from memory, since they change as the CLI gains commands.
 
-Use `zitadel --help` to find *which* command to run. Use `resources --json` when
+Use `zitadel --help` to find *which* family or command to run, and
+`zitadel commands` for the exact verb. Use `resources --json` when
 you need a resource's *fields*: it reports the whole runtime-resource surface at
 once — every resource, its verbs, each verb's `create_fields` / `update_fields`
 (flag name, kind, `required`, any closed value set), its `filter_fields` /

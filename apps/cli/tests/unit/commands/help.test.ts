@@ -153,6 +153,33 @@ describe("root help", () => {
     ]);
   });
 
+  it("keeps each family of commands in one group, and describes it with a topic", async () => {
+    const { stdout } = await runCliForTest(["commands", "--json"]);
+    const commands = (
+      parseJson(stdout) as Array<{
+        id: string;
+        aliases: string[];
+        pluginName?: string;
+        group?: string;
+      }>
+    )
+      .filter((command) => command.pluginName === "@zitadel/cli")
+      .filter((command) => !command.aliases.includes(command.id));
+    const groupsOf = new Map<string, Set<string | undefined>>();
+    for (const command of commands.filter((candidate) => candidate.id.includes(":"))) {
+      const [family = command.id] = command.id.split(":");
+      groupsOf.set(family, (groupsOf.get(family) ?? new Set()).add(command.group));
+    }
+    const { oclif } = JSON.parse(await readFile(join(cliPackageRoot, "package.json"), "utf8")) as {
+      oclif: { topics: Record<string, { description?: string }> };
+    };
+
+    expect([...groupsOf].filter(([, groups]) => groups.size > 1).map(([family]) => family)).toEqual(
+      [],
+    );
+    expect([...groupsOf.keys()].filter((family) => !oclif.topics[family]?.description)).toEqual([]);
+  });
+
   it("requires every product command to declare a group", async () => {
     const { exitCode, stdout } = await runCliForTest(["commands", "--json"]);
     expect(exitCode).toBe(0);
