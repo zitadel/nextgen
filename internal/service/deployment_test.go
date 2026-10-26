@@ -291,6 +291,29 @@ func TestDeploymentServiceCreateMissingVariableWritesNothing(t *testing.T) {
 	}, de.Details)
 }
 
+// A policy pointer is part of the release. Its config is scanned like any
+// other pinned document, so a name it references and the kind does not hold
+// refuses the deploy.
+func TestDeploymentServiceCreateScansPolicyConfig(t *testing.T) {
+	svc, statements := newStrictDeploymentService(t)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{
+		ID: "rel_1",
+		Pointers: []domain.ReleasePointer{{
+			Kind: domain.ReleasePointerKindPolicy, Handle: service.OperationPasswordSet, RevisionID: "polrev_1",
+		}},
+	}, nil)
+	expectLiveVariables(statements, domain.DeploymentOriginKindPrimary)
+	statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").
+		Return(&domain.Policy{Config: []byte(`{"note":"${{ MISSING }}"}`)}, nil)
+
+	_, err := svc.Create(t.Context(), deploymentInput())
+	de := assertServiceDomainCode(t, err, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code)
+	assert.Equal(t, domain.DeploymentVariablesMissingDetails{
+		Kind:  "primary",
+		Names: []string{"MISSING"},
+	}, de.Details)
+}
+
 // An origin last served by a preview of the same release still gets the
 // primary deploy written, or it would expire with the preview.
 func TestDeploymentServiceCreatePrimaryOverPreviewWrites(t *testing.T) {

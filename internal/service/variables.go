@@ -181,7 +181,10 @@ func (s *variableService) GetDeploymentVariables(ctx context.Context, projectID,
 	return s.ReadDeploymentVariableSet(ctx, s.v2Pool.Statements(), projectID, deploymentID)
 }
 
-func (s *variableService) ReadDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string) (*domain.VariableSet, error) {
+func (s *variableService) ReadDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string) (_ *domain.VariableSet, err error) {
+	ctx, end := startSpan(ctx, "VariableService.ReadDeploymentVariableSet")
+	defer end(&err)
+
 	set, err := stmts.GetDeploymentVariables(ctx, projectID, deploymentID)
 	if err != nil {
 		if isNoRowFound(err) {
@@ -192,7 +195,10 @@ func (s *variableService) ReadDeploymentVariableSet(ctx context.Context, stmts V
 	return set, nil
 }
 
-func (s *variableService) NewKindVariableSet(ctx context.Context, stmts VariableStatements, projectID string, kind domain.DeploymentOriginKind) (*domain.VariableSet, error) {
+func (s *variableService) NewKindVariableSet(ctx context.Context, stmts VariableStatements, projectID string, kind domain.DeploymentOriginKind) (_ *domain.VariableSet, err error) {
+	ctx, end := startSpan(ctx, "VariableService.NewKindVariableSet")
+	defer end(&err)
+
 	variables, err := stmts.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, kind)
 	if err != nil {
 		return nil, domain.ErrInternal(err).WithMessage("failed to read variables")
@@ -200,8 +206,11 @@ func (s *variableService) NewKindVariableSet(ctx context.Context, stmts Variable
 	return domain.NewVariableSet(projectID, variables)
 }
 
-func (s *variableService) StoreDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string, set *domain.VariableSet) error {
-	if err := stmts.EnsureVariableSet(ctx, set); err != nil {
+func (s *variableService) StoreDeploymentVariableSet(ctx context.Context, stmts VariableSetStatements, projectID, deploymentID string, set *domain.VariableSet) (err error) {
+	ctx, end := startSpan(ctx, "VariableService.StoreDeploymentVariableSet")
+	defer end(&err)
+
+	if err = stmts.EnsureVariableSet(ctx, set); err != nil {
 		return err
 	}
 	return stmts.LinkDeploymentVariableSet(ctx, projectID, deploymentID, set.Hash)

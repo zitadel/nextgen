@@ -141,6 +141,12 @@ func releasePointerDocument(ctx context.Context, stmts AllStatements, projectID 
 			return nil, revisionReadError(err)
 		}
 		return connection.Document, nil
+	case domain.ReleasePointerKindPolicy:
+		revision, err := stmts.GetPolicyRevision(ctx, projectID, pointer.RevisionID)
+		if err != nil {
+			return nil, revisionReadError(err)
+		}
+		return revision.Config, nil
 	case domain.ReleasePointerKindBranding:
 		branding, err := stmts.GetBrandingByID(ctx, projectID, pointer.RevisionID)
 		if err != nil {
