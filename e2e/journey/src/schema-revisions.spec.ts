@@ -21,29 +21,25 @@ import {
 
 /**
  * Users created on two revisions of one user schema sign in under the same
- * flow (#1672). A flow names its schema by objectType and runs on the newest
- * revision; a user keeps the revision it was created on. So a user created
- * before a schema publish and one created after it must both sign in, with a
- * password and through the SSO provider, and neither record may change.
+ * flow (#1672). A flow names its schema by objectType, and a registration
+ * lands on the revision the release serving the app's origin pins under it
+ * (#1673); a user keeps the revision it was created on. So a user created
+ * before a schema deploy and one created after it must both sign in, with a
+ * password and through the SSO provider, and neither record may change. A
+ * revision that is released but not deployed must not take new users.
  * Its own Playwright project runs it after the other specs, because it leaves
- * the app with SSO enabled, an IdP connection and schema revision 2.
+ * the app with SSO enabled, an IdP connection and schema revision 3 released
+ * but revision 2 deployed.
  */
 test.describe.configure({ mode: "serial" });
 test.setTimeout(180_000);
-
-/**
- * A primary origin for the deploys below to land on. Setup registers the app's
- * own dev URL as a preview pattern, and a deploy goes to the project's primary
- * origins, so one is added here. Which URL it is does not matter to this
- * suite: what it asserts is the schema revision each deploy publishes.
- */
-const DEPLOY_ORIGIN = "https://schema-revisions.example.com";
 
 const mockUrl = process.env.JOURNEY_OIDC_MOCK_URL ?? "";
 // The fixed accounts in tools/oidc-mock/users.json.
 const mockPassword = "journey-pass";
 const userA = { username: "rev1-user", email: "rev1-user@example.com" };
 const userB = { username: "rev2-user", email: "rev2-user@example.com" };
+const userC = { username: "pinned-user", email: "pinned-user@example.com" };
 // The app password both users get through the API.
 const { password } = identity();
 
@@ -53,21 +49,18 @@ let projectId: string;
 let objectType: string;
 let revision1: string;
 let revision2: string;
+let revision3: string;
 type UserRecord = Awaited<ReturnType<ZitadelClient["getUserByID"]>>;
 let recordA: UserRecord;
 let recordB: UserRecord;
+let recordC: UserRecord;
 
-/** Publishes `.zitadel/` as `apply` once did: a release built from the files, deployed. */
+/**
+ * Builds a release from `.zitadel/` and deploys it to the project's primary
+ * origins. Setup registered the app's own dev URL as one, so the release is
+ * what the browser's sign-in is served.
+ */
 async function deploy(message: string): Promise<void> {
-  await runCli(metadata, [
-    "origin",
-    "add",
-    DEPLOY_ORIGIN,
-    "--kind",
-    "primary",
-    "--non-interactive",
-    "--json",
-  ]);
   await runCli(metadata, ["deploy", "-m", message, "--non-interactive", "--json"]);
 }
 
@@ -114,17 +107,15 @@ test("registers user A through the provider on revision 1", async ({ page }) => 
   recordA = await registerThroughProvider(page, userA, revision1);
 });
 
-test("publishes revision 2", async () => {
-  const schema = await readSchemaFile();
-  const properties = schema.properties as Record<string, unknown>;
-  properties.company = { type: "string" };
-  await writeFile(schemaFile(), `${JSON.stringify(schema, null, 2)}\n`);
+test("deploys revision 2", async () => {
+  await addSchemaProperty("company");
   await deploy("add company to the user schema");
 
   revision2 = await latestRevision();
   expect(revision2).not.toBe(revision1);
 
-  // The flow names the schema by objectType, so it runs on revision 2 from now on.
+  // The flow names the schema by objectType, so the deployed release decides
+  // which revision it runs on: revision 2 from now on.
   const flows = await client.listFlowDefinitions({ project_id: projectId, revisions: "latest" });
   expect(flows.flow_definitions.length).toBeGreaterThan(0);
   for (const flow of flows.flow_definitions) {
@@ -136,8 +127,27 @@ test("registers user B through the provider on revision 2", async ({ page }) => 
   recordB = await registerThroughProvider(page, userB, revision2);
 });
 
-test("both sign in with the password", async ({ page }) => {
-  for (const user of [userA, userB]) {
+test("releases revision 3 without deploying it", async () => {
+  await addSchemaProperty("department");
+  await runCli(metadata, [
+    "release",
+    "create",
+    "-m",
+    "add department to the user schema",
+    "--non-interactive",
+    "--json",
+  ]);
+
+  revision3 = await latestRevision();
+  expect(revision3).not.toBe(revision2);
+});
+
+test("registers user C through the provider on the deployed revision 2", async ({ page }) => {
+  recordC = await registerThroughProvider(page, userC, revision2);
+});
+
+test("all sign in with the password", async ({ page }) => {
+  for (const user of [userA, userB, userC]) {
     await gotoLogin(page);
     await loginWithPassword(page, { email: user.email, password });
     await expectSignedIn(page);
@@ -145,8 +155,8 @@ test("both sign in with the password", async ({ page }) => {
   }
 });
 
-test("both sign in through the provider", async ({ page }) => {
-  for (const user of [userA, userB]) {
+test("all sign in through the provider", async ({ page }) => {
+  for (const user of [userA, userB, userC]) {
     // A linked user goes straight to done: no collection step.
     await signInAtProvider(page, user.username);
     await expectSignedIn(page);
@@ -158,6 +168,7 @@ test("user records are unchanged", async () => {
   for (const [record, revision] of [
     [recordA, revision1],
     [recordB, revision2],
+    [recordC, revision2],
   ] as const) {
     const now = await client.getUserByID(record.id);
     expect(now.schema).toBe(revision);
@@ -172,6 +183,14 @@ function schemaFile(): string {
 
 async function readSchemaFile(): Promise<Record<string, unknown>> {
   return JSON.parse(await readFile(schemaFile(), "utf8")) as Record<string, unknown>;
+}
+
+/** Adds an optional string attribute to the schema file, for the next build to publish. */
+async function addSchemaProperty(name: string): Promise<void> {
+  const schema = await readSchemaFile();
+  const properties = schema.properties as Record<string, unknown>;
+  properties[name] = { type: "string" };
+  await writeFile(schemaFile(), `${JSON.stringify(schema, null, 2)}\n`);
 }
 
 async function latestRevision(): Promise<string> {

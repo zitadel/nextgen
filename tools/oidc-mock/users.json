@@ -18,5 +18,15 @@
     "Email": "rev2-user@example.com",
     "EmailVerified": true,
     "PreferredLanguage": "en"
+  },
+  "pinned-user": {
+    "ID": "pinned-user",
+    "Username": "pinned-user",
+    "Password": "journey-pass",
+    "FirstName": "Pinned",
+    "LastName": "User",
+    "Email": "pinned-user@example.com",
+    "EmailVerified": true,
+    "PreferredLanguage": "en"
   }
 }
