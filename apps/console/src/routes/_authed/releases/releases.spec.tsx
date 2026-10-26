@@ -159,6 +159,7 @@ describe("release detail", () => {
 
   it("summarises a pinned policy's settings above its document", async () => {
     serveDeployments();
+    let requestedProject: string | null = null;
     server.use(
       http.get(`${RELEASES_URL}/rel_1`, () =>
         HttpResponse.json(
@@ -170,7 +171,7 @@ describe("release detail", () => {
         ),
       ),
       http.get(`${API}/policies/revisions/polrev_1`, ({ request }) => {
-        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
+        requestedProject = new URL(request.url).searchParams.get("project_id");
         return HttpResponse.json({
           id: "pol_1",
           revision_id: "polrev_1",
@@ -185,6 +186,7 @@ describe("release detail", () => {
     await renderAt("/releases/rel_1");
 
     expect(await screen.findByRole("heading", { name: "Policies" })).toBeInTheDocument();
+    expect(requestedProject).toBe("proj_test");
     const trigger = screen.getByRole("button", { name: /^Password policy polrev_1$/ });
     await userEvent.click(trigger);
 
@@ -193,12 +195,38 @@ describe("release detail", () => {
       "At least 15 characters",
     );
     expect(within(region).getByText("History").nextElementSibling?.textContent).toBe("Enabled");
-    // The document is the file the CLI publishes, not the revision's envelope.
+    // The document is the publish body, not the revision's envelope.
     const source = region.querySelector("pre")?.textContent ?? "";
     expect(source).toContain('"operation": "auth.factor.password.set"');
     expect(source).toContain('"min_length": 15');
     expect(source).not.toContain("polrev_1");
     expect(within(region).getByText(/Edit the policy locally/)).toBeInTheDocument();
+  });
+
+  it("names a policy from its handle when its revision cannot be read", async () => {
+    serveDeployments();
+    server.use(
+      http.get(`${RELEASES_URL}/rel_1`, () =>
+        HttpResponse.json(
+          release({
+            pointers: [
+              { kind: "policy", handle: "auth.factor.password.set", revision_id: "polrev_gone" },
+            ],
+          }),
+        ),
+      ),
+      http.get(`${API}/policies/revisions/polrev_gone`, () =>
+        HttpResponse.json(
+          { code: "pol.not_found", message: "Policy revision not found" },
+          { status: 404 },
+        ),
+      ),
+    );
+    await renderAt("/releases/rel_1");
+
+    expect(
+      await screen.findByRole("button", { name: /^Password policy polrev_gone$/ }),
+    ).toBeInTheDocument();
   });
 
   it("keeps the screen when a pinned revision cannot be read", async () => {

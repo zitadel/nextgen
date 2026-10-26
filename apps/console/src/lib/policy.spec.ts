@@ -1,10 +1,32 @@
 import { describe, expect, it } from "vitest";
 
-import { passwordPolicySettings, policyDisplayName, policyDocument } from "./policy";
+import {
+  passwordPolicySettings,
+  policyDisplayName,
+  policyDocument,
+  policySettings,
+} from "./policy";
+
+const revision = {
+  id: "pol_1",
+  revision_id: "polrev_1",
+  project_id: "proj_1",
+  operation: "auth.factor.password.set" as const,
+  config: { min_length: 15, history_depth: 4 },
+  created_at: "2026-10-20T09:00:00Z",
+  updated_at: "2026-10-20T10:30:00Z",
+};
 
 describe("policy display", () => {
   it("names the password policy by its operation", () => {
     expect(policyDisplayName("auth.factor.password.set")).toBe("Password policy");
+  });
+
+  it("names an operation it does not know from the operation, with no rows", () => {
+    expect(policyDisplayName("auth.factor.passkey.set")).toBe("Auth.factor.passkey.set");
+    expect(policySettings({ ...revision, operation: "auth.factor.passkey.set" as never })).toEqual(
+      [],
+    );
   });
 
   it("summarises the length rule from whichever bounds are set", () => {
@@ -23,18 +45,8 @@ describe("policy display", () => {
     expect(history({ min_length: 15 })).toBe("Off");
   });
 
-  it("shows the file the CLI publishes, without the revision's ids", () => {
-    expect(
-      policyDocument({
-        id: "pol_1",
-        revision_id: "polrev_1",
-        project_id: "proj_1",
-        operation: "auth.factor.password.set",
-        config: { min_length: 15, history_depth: 4 },
-        created_at: "2026-10-20T09:00:00Z",
-        updated_at: "2026-10-20T10:30:00Z",
-      }),
-    ).toEqual({
+  it("shows the publish body, without the revision's ids", () => {
+    expect(policyDocument(revision)).toEqual({
       operation: "auth.factor.password.set",
       config: { min_length: 15, history_depth: 4 },
     });

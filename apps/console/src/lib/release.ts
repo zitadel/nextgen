@@ -107,7 +107,7 @@ export async function resolvePointer(
         });
         return {
           ...base,
-          name: policyDisplayName(revision.operation),
+          name: policyDisplayName(pointer.handle),
           document: policyDocument(revision),
           settings: policySettings(revision),
         };
@@ -116,7 +116,16 @@ export async function resolvePointer(
   } catch {
     // Fall through to the unresolved shape.
   }
-  return { ...base, name: humanise(pointer.handle), document: undefined };
+  return { ...base, name: unresolvedName(pointer), document: undefined };
+}
+
+/**
+ * The name a pointer has without its revision. A policy's handle is its
+ * operation, so the row reads the same whether or not the read succeeded;
+ * every other kind falls back to its handle.
+ */
+function unresolvedName(pointer: ReleasePointer): string {
+  return pointer.kind === "policy" ? policyDisplayName(pointer.handle) : humanise(pointer.handle);
 }
 
 /** A group of the detail's pointer list: one per kind that the release pins. */
