@@ -13,7 +13,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const USERS_URL = "http://localhost/api/users";
+const USERS_URL = "http://localhost/api/v1/users";
 const USERS_QUERY_URL = `${USERS_URL}/query`;
 const USER = {
   id: "user_1",
@@ -30,7 +30,7 @@ const USER = {
 // keeps these tests about the dialog.
 beforeEach(() =>
   server.use(
-    http.get("http://localhost/api/schemas/:id", () =>
+    http.get("http://localhost/api/v1/schemas/:id", () =>
       HttpResponse.json({ schema: { type: "object", properties: {} } }),
     ),
   ),

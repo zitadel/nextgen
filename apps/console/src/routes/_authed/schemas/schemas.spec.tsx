@@ -14,7 +14,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
   return { ...actual, fetchSession: vi.fn(async () => makeTestSession()) };
 });
 
-const SCHEMAS_URL = "http://localhost/api/schemas";
+const SCHEMAS_URL = "http://localhost/api/v1/schemas";
 
 /**
  * Shaped like the shipped presets: `x-auth-methods` with passkey on and
@@ -354,7 +354,7 @@ describe("user schema detail", () => {
     // same `$id` everywhere), so the id alone could resolve in the caller's own.
     const projects: (string | null)[] = [];
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.get(`${SCHEMAS_URL}/sch_business`, ({ request }) => {

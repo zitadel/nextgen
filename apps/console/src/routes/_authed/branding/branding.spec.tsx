@@ -41,9 +41,9 @@ vi.mock("@/components/branding/login-preview", () => ({
   ),
 }));
 
-const LIST_URL = "http://localhost/api/branding";
-const FLOWS_URL = "http://localhost/api/flow_definitions";
-const REVISION_URL = "http://localhost/api/branding/brnd_1";
+const LIST_URL = "http://localhost/api/v1/branding";
+const FLOWS_URL = "http://localhost/api/v1/flow_definitions";
+const REVISION_URL = "http://localhost/api/v1/branding/brnd_1";
 
 const PUBLISHED = {
   typography: { font_family: "Arimo, sans-serif", font_url: "https://cdn.example.com/font.css" },
@@ -211,7 +211,7 @@ describe("branding screen", () => {
     const acme = { ...FLOW, flow_definition: { ...FLOW.flow_definition, name: "acme-login" } };
     serveRevision();
     server.use(
-      http.get("*/api/projects/proj_other", () =>
+      http.get("*/api/v1/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
       http.get(FLOWS_URL, ({ request }) =>

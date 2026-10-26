@@ -123,13 +123,13 @@ describe("the runtime config in the edge runtime", () => {
     });
     setRuntimeConfig({ nextgen: { projectSecret: "s3cret" } });
     await serve(
-      new Request("http://localhost:3000/__nextgen/sessions/exchange", {
+      new Request("http://localhost:3000/__nextgen/api/v1/sessions/exchange", {
         method: "POST",
         body: "{}",
       }),
       { url: "http://localhost:4000" },
     );
-    expect(forwarded[0]?.url).toBe("http://localhost:4000/sessions/exchange");
+    expect(forwarded[0]?.url).toBe("http://localhost:4000/api/v1/sessions/exchange");
     expect(forwarded[0]?.headers.get("authorization")).toBe("Bearer s3cret");
   });
 });

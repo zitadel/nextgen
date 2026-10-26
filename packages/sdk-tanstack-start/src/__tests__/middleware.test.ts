@@ -533,7 +533,7 @@ describe("server middleware", () => {
     const calls = captureFetch();
 
     await serve(
-      `${ORIGIN}/__nextgen/sessions/me`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/me`,
       { headers: { cookie: `${SHARED}=tok; theme=dark` } },
       { ...PROXY, ...configureProject(undefined, undefined) },
     );
@@ -547,7 +547,7 @@ describe("server middleware", () => {
     captureFetch(() => new Response("{}", { status: 200, headers: upstream }));
 
     const served = await serve(
-      `${ORIGIN}/__nextgen/sessions/exchange`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/exchange`,
       { method: "POST" },
       APP_PROXY,
     );
@@ -573,7 +573,7 @@ describe("server middleware", () => {
     const calls = captureFetch();
 
     await serve(
-      `${ORIGIN}/__nextgen/sessions/me`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/me`,
       {
         method: "DELETE",
         headers: {
@@ -592,15 +592,19 @@ describe("server middleware", () => {
     const calls = captureFetch();
     const headers = { cookie: `${SHARED}=old` };
 
-    await serve(`${ORIGIN}/__nextgen/sessions/me?project_id=${PROJECT}`, { headers }, APP_PROXY);
-    await serve(`${ORIGIN}/__nextgen/sessions/me`, { method: "DELETE", headers }, APP_PROXY);
+    await serve(
+      `${ORIGIN}/__nextgen/api/v1/sessions/me?project_id=${PROJECT}`,
+      { headers },
+      APP_PROXY,
+    );
+    await serve(`${ORIGIN}/__nextgen/api/v1/sessions/me`, { method: "DELETE", headers }, APP_PROXY);
 
     // The sign-out goes up without it; the proxy then asks this project's
     // probe about it, to retire it.
-    const probe = `${PROXY.url}/sessions/me?project_id=${PROJECT}`;
+    const probe = `${PROXY.url}/api/v1/sessions/me?project_id=${PROJECT}`;
     expect(calls.map((call) => [call.url, call.headers.get("cookie")])).toEqual([
       [probe, `${SHARED}=old`],
-      [`${PROXY.url}/sessions/me`, null],
+      [`${PROXY.url}/api/v1/sessions/me`, null],
       [probe, `${SHARED}=old`],
     ]);
   });
@@ -614,7 +618,7 @@ describe("server middleware", () => {
     captureFetch(() => Response.json(answer));
 
     const served = await serve(
-      `${ORIGIN}/__nextgen/sessions/me?project_id=${PROJECT}`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/me?project_id=${PROJECT}`,
       { headers: { cookie: `${SHARED}=old` } },
       APP_PROXY,
     );
@@ -629,7 +633,7 @@ describe("server middleware", () => {
     const calls = signOutBackend(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
 
     const served = await serve(
-      `${ORIGIN}/__nextgen/sessions/me`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/me`,
       { method: "DELETE", headers: { cookie: `${SESSION}=current; ${SHARED}=earlier` } },
       APP_PROXY,
     );
@@ -649,7 +653,7 @@ describe("server middleware", () => {
     );
 
     const served = await serve(
-      `${ORIGIN}/__nextgen/sessions/me`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/me`,
       { method: "DELETE", headers: { cookie: `${SESSION}=current; ${SHARED}=console` } },
       APP_PROXY,
     );
@@ -680,7 +684,7 @@ describe("server middleware", () => {
     const calls = captureFetch();
 
     await serve(
-      `${ORIGIN}/__nextgen/sessions/exchange`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/exchange`,
       { method: "POST", headers: { authorization: "Bearer pk-caller" } },
       { ...PROXY, ...configureSecret("sk-1") },
     );
@@ -1258,12 +1262,12 @@ describe("server middleware", () => {
   });
 
   it.each([
-    ["GET", "/__nextgen/sessions/me"],
-    ["DELETE", "/__nextgen/sessions/me"],
+    ["GET", "/__nextgen/api/v1/sessions/me"],
+    ["DELETE", "/__nextgen/api/v1/sessions/me"],
     ["POST", "/__nextgen/flow"],
     ["GET", "/__nextgen/projects"],
-    ["GET", "/__nextgen/sessions/exchange"],
-    ["POST", "/__nextgen/sessions/exchange/extra"],
+    ["GET", "/__nextgen/api/v1/sessions/exchange"],
+    ["POST", "/__nextgen/api/v1/sessions/exchange/extra"],
   ])("does not attach the project secret to %s %s", async (method, pathname) => {
     const calls = captureFetch();
 
@@ -1280,7 +1284,7 @@ describe("server middleware", () => {
     const calls = captureFetch();
 
     await serve(
-      `${ORIGIN}/__nextgen/sessions/exchange?source=browser`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/exchange?source=browser`,
       { method: "POST" },
       { ...PROXY, ...configureSecret("project-secret") },
     );
@@ -1293,7 +1297,7 @@ describe("server middleware", () => {
       () => new Response("{}", { status: 200, headers: { "cache-control": "private, no-store" } }),
     );
 
-    const served = await serve(`${ORIGIN}/__nextgen/sessions/me`, {}, PROXY);
+    const served = await serve(`${ORIGIN}/__nextgen/api/v1/sessions/me`, {}, PROXY);
 
     expect(served.headers.get("cache-control")).toBe("private, no-store");
   });
@@ -1386,7 +1390,7 @@ describe("server middleware", () => {
     const calls = captureFetch(() => Response.json({ session_id: "s1" }));
 
     await serve(
-      `${ORIGIN}/__nextgen/sessions/exchange`,
+      `${ORIGIN}/__nextgen/api/v1/sessions/exchange`,
       { method: "POST" },
       { ...PROXY, ...configureSecret(configured, environment) },
     );
@@ -1444,7 +1448,7 @@ describe("server middleware", () => {
     );
 
     expect(served.auth?.isAuthenticated).toBe(true);
-    expect(calls[0]?.url).toBe(`http://localhost:4000/sessions/me?project_id=${PROJECT}`);
+    expect(calls[0]?.url).toBe(`http://localhost:4000/api/v1/sessions/me?project_id=${PROJECT}`);
   });
   // backend-url:end
 });

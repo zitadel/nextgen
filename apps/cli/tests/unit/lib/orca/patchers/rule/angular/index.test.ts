@@ -331,7 +331,7 @@ describe("AngularPatcher.plan", () => {
     expect(ops.map((op) => (op.kind === "edit" ? op.wiring : undefined))).toEqual([
       "infrastructure",
       "convenience",
-      "convenience",
+      "infrastructure",
     ]);
   });
 
@@ -420,7 +420,7 @@ describe("AngularPatcher.plan", () => {
     expect(sessionCookieEdit()(proxyConfApiPrefixEdit()(v2))).toBe(proxyConfigEdit()(undefined));
   });
 
-  it("only warns in the doctor while the v2 bearer hook is there", () => {
+  it("fails the doctor while the v2 bearer hook is there", () => {
     const current = proxyConfigEdit()(undefined);
     const v2 = current.replace(BEARER, V2_BEARER);
 
@@ -433,7 +433,7 @@ describe("AngularPatcher.plan", () => {
           (op) =>
             op.kind === "edit" &&
             op.path === "proxy.conf.cjs" &&
-            op.wiring === "convenience" &&
+            op.wiring === "infrastructure" &&
             op.verify === proxyConfApiPrefixVerdict,
         ),
     ).toBe(true);

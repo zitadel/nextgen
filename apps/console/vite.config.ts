@@ -11,7 +11,6 @@ import { baseTest } from "../../vitest.shared.mjs";
 
 const defaultConsoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
-const defaultApiBase = "/api";
 const defaultBackendUrl = "http://localhost:8080";
 
 export default defineConfig(({ command, mode, isPreview }) => ({
@@ -93,7 +92,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     // 0004 §3). A spec that needs another value stubs it with `vi.stubEnv`, and
     // `unstubEnvs` restores these before the next test.
     env: {
-      VITE_CONSOLE_API_BASE: "http://localhost/api",
+      VITE_CONSOLE_API_BASE: "http://localhost",
       VITE_CONSOLE_RUNTIME_FALLBACK: "",
     },
     unstubEnvs: true,
@@ -121,12 +120,12 @@ function devBackendUrl(mode: string): string {
 }
 
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
-  // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
-  // targets. `/api` is this proxy's own path and applies to the dev server
-  // only — the built console targets the origin root, where the Go binary
-  // serves the API (`src/api/zitadel.ts`, Console ADR 0002 §4).
+  // Public, browser-safe var (VITE_ prefixed): what the SDK client puts in
+  // front of the API's `/api/v1` (`src/api/zitadel.ts`, Console ADR 0002 §4).
+  // Unset, the client calls `/api/v1` on the page's origin, as the built
+  // console does on the server's, and the proxy forwards that path unchanged.
   const env = loadEnv(mode, import.meta.dirname, "VITE_");
-  const apiBase = env.VITE_CONSOLE_API_BASE || defaultApiBase;
+  const apiBase = env.VITE_CONSOLE_API_BASE || "";
   // Removed in #1345: the console takes the project it signs into from the
   // server's `/console/runtime.json`. Said out loud, because a `.env.local`
   // that still sets it would otherwise be ignored without a word.
@@ -139,8 +138,10 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
   const backendUrl = devBackendUrl(mode);
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
-  // `/api2/...`) is not accidentally proxied and rewritten.
-  const escaped = apiBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // `/api/v12/...`) is not accidentally proxied and rewritten. A base of its
+  // own is stripped, and what follows it, `/api/v1/...`, goes to the server.
+  const proxied = apiBase || "/api/v1";
+  const escaped = proxied.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
   return {
     // Console ADR 0004 §3: the pre-session runtime-metadata document lives
@@ -154,6 +155,9 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       target: backendUrl,
       changeOrigin: true,
       rewrite: (path: string) => {
+        if (!apiBase) {
+          return path;
+        }
         const stripped = path.startsWith(apiBase) ? path.slice(apiBase.length) : path;
         return stripped.startsWith("/") ? stripped : `/${stripped}`;
       },

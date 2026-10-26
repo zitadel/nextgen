@@ -11,8 +11,8 @@ one, update the ADR in the same change.
 - [0002 API access](docs/adrs/0002-console-api-access.md): the console holds
   no script-readable credential. Call the API same-origin through
   `configureZitadel()` / `getApi()`, never a bespoke client. The base is
-  `/api` only under the dev server; never reintroduce an `/api` shim on the
-  server.
+  empty everywhere: the client calls `/api/v1` (root ADR 077), and the dev
+  proxy forwards it unchanged.
 - [0003 Authentication](docs/adrs/0003-console-authentication.md): `/login`
   embeds the login widget, and the pathless `_authed` layout owns the session
   guard and the shell. The session cookie is the operator's credential for the

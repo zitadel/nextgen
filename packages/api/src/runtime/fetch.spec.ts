@@ -100,6 +100,37 @@ describe("customFetch", () => {
     expect(error).toMatchObject({ status: 503, requestId: undefined });
   });
 
+  it("says a server without the operation may predate the API prefix", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "req.not_found", message: "not found" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/api/v1/users/me`, { method: "GET" }).catch(
+      (e: unknown) => e,
+    );
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as Error).message).toBe(
+      `GET ${base}/api/v1/users/me returned 404 (req.not_found): the server has no such operation; a server older than this client does not serve the API under /api/v1`,
+    );
+  });
+
+  it("keeps the plain message for a resource that is not there", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end(JSON.stringify({ code: "usr.not_found", message: "not found" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/api/v1/users/usr_1`, { method: "GET" }).catch(
+      (e: unknown) => e,
+    );
+
+    expect((error as Error).message).toBe(`GET ${base}/api/v1/users/usr_1 returned 404`);
+  });
+
   it("keeps the server's request ID on the ApiError", async () => {
     const http = createHttpServer((_req, res) => {
       res.writeHead(400, { "content-type": "application/json", "x-request-id": "req_01TEST" });

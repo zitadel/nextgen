@@ -67,7 +67,7 @@ describe("zitadel api without an operation, at a terminal", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
+      data: { operation: "revokeSession", url: "http://localhost:8080/api/v1/sessions/sess_1" },
     });
   });
 
@@ -90,7 +90,7 @@ describe("zitadel api for an operation that needs no credential", () => {
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/livez" },
+      data: { url: "http://localhost:8080/api/v1/livez" },
     });
   });
 });

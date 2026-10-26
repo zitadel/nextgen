@@ -12,7 +12,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 });
 
 // Readiness, not liveness: `/readyz` answers once the server's database does.
-const READY_URL = "http://localhost/api/readyz";
+const READY_URL = "http://localhost/api/v1/readyz";
 
 async function renderSystem() {
   const [{ RouterProvider, createMemoryHistory }, { createAppRouter }] = await Promise.all([
