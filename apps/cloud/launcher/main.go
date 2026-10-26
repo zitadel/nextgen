@@ -38,6 +38,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -48,6 +49,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/nextgen/internal/bootstrap/users"
 )
 
 const (
@@ -72,23 +74,82 @@ var servingParams = []struct{ key, value string }{
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 func main() {
-	var args []string
-	var err error
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		args, err = prepareMigration(os.Args[2:])
-	} else {
-		args, err = prepareServer(os.Args[1:])
+		if err := runMigrate(os.Args[2:]); err != nil {
+			fmt.Fprintln(os.Stderr, "launcher:", err)
+			if errors.Is(err, errPrepareFailed) {
+				os.Exit(64)
+			}
+			os.Exit(1)
+		}
+		return
 	}
+	args, err := prepareServer(os.Args[1:])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(64)
 	}
-	cmd := server.NewCommand()
-	cmd.SetArgs(args)
-	if err := cmd.Execute(); err != nil {
+	if err := executeServer(args); err != nil {
 		fmt.Fprintln(os.Stderr, "launcher:", err)
 		os.Exit(1)
 	}
+}
+
+// errPrepareFailed marks a prepareMigration/prepareServer failure (exit 64)
+// rather than a migrate/server execution failure (exit 1).
+var errPrepareFailed = errors.New("prepare failed")
+
+// executeServer runs the nextgen server command with args. Tests replace it.
+var executeServer = func(args []string) error {
+	cmd := server.NewCommand()
+	cmd.SetArgs(args)
+	return cmd.Execute()
+}
+
+// runMigrate prepares and runs deploy-time migrations. On a preview, when the
+// sticky branch database cannot remigrate after a version renumber (goose
+// out-of-order, or ADD COLUMN colliding with columns left under the old
+// version number), drop the preview database once, recreate it, and remigrate
+// from empty. Production is never dropped.
+func runMigrate(extra []string) error {
+	args, err := prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	if err := executeServer(args); err == nil {
+		return nil
+	} else if os.Getenv("VERCEL_ENV") != "preview" || !shouldRecreatePreviewOnMigrateError(err) {
+		return err
+	}
+
+	ref := gitRef()
+	name, nameErr := previewDatabaseName(ref)
+	if nameErr != nil {
+		return err
+	}
+	baseDSN := os.Getenv(migratorDatabaseURLVar)
+	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit a poisoned sticky schema; recreating %s\n", name)
+	if dropErr := dropDatabase(context.Background(), baseDSN, name); dropErr != nil {
+		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
+	}
+	args, err = prepareMigration(extra)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errPrepareFailed, err)
+	}
+	return executeServer(args)
+}
+
+// shouldRecreatePreviewOnMigrateError reports migrate failures that a fresh
+// empty preview database would clear after a migration renumber on the branch:
+// goose out-of-order versions, or Postgres duplicate_column (42701) when the
+// sticky DB still has columns from the migration under its previous number.
+func shouldRecreatePreviewOnMigrateError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "missing (out-of-order) migration") ||
+		strings.Contains(msg, "SQLSTATE 42701")
 }
 
 // productionBranch is the branch production deploys from: main, unless
@@ -183,6 +244,9 @@ type serving struct {
 	database string
 	// admin is the bootstrap admin document, nil when none is configured.
 	admin []byte
+	// adminID is the user id admin names, the deployment's platform operator
+	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
+	adminID string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -246,7 +310,17 @@ func parseServing(env string) (*serving, error) {
 		if !strings.Contains(string(doc), `"header"`) || !strings.Contains(string(doc), `"authenticators"`) {
 			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document")
 		}
+		var admin users.Document
+		if err := json.Unmarshal(doc, &admin); err != nil {
+			return nil, fmt.Errorf("BOOTSTRAP_ADMIN_USER_JSON_B64 does not decode to a bootstrap user document: %w", err)
+		}
+		// The server's import refuses a document without one too; refusing it
+		// here keeps the cloud from starting without its platform operator.
+		if admin.Header.ID == "" {
+			return nil, errors.New("BOOTSTRAP_ADMIN_USER_JSON_B64 names no user id (header.id)")
+		}
 		s.admin = doc
+		s.adminID = admin.Header.ID
 	}
 	return s, nil
 }
@@ -313,14 +387,14 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 	// Set, not defaulted: these follow from how Vercel runs the function and
 	// how vercel.json routes, so a leftover variable must not move them. The
-	// login UI stays on because the console service reads
-	// /console/runtime.json, which the server only mounts while one of its
-	// UIs is enabled.
+	// request ID is Vercel's, the one its dashboard shows for the request:
+	// Vercel sets x-vercel-id on every request and replaces the ID a client
+	// sends.
 	for key, value := range map[string]string{
-		"NEXTGEN_SERVER_ADDRESS":         ":" + port,
-		"NEXTGEN_SERVER_CONSOLE_ENABLED": "false",
-		"NEXTGEN_SERVER_CONSOLE_PATH":    consolePath,
-		"NEXTGEN_SERVER_LOGIN_ENABLED":   "true",
+		"NEXTGEN_SERVER_ADDRESS":           ":" + port,
+		"NEXTGEN_SERVER_CONSOLE_ENABLED":   "false",
+		"NEXTGEN_SERVER_CONSOLE_PATH":      consolePath,
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER": "x-vercel-id",
 	} {
 		if err := os.Setenv(key, value); err != nil {
 			return nil, err
@@ -333,6 +407,9 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT": "true",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT": "json",
 		"NEXTGEN_SERVER_PUBLIC_BASE":         publicBase(env),
+		// The bootstrap admin administers every project (ADR 075), unless
+		// the deployment names its platform operators itself.
+		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
 	} {
 		if err := setDefault(key, value); err != nil {
 			return nil, err

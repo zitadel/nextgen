@@ -43,6 +43,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
       "types": "./dist/branding-url.d.mts",
@@ -89,7 +94,7 @@
   "scripts": {
     "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
     "prebuild": "node --run sync-schemas",
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "pretypecheck": "node --run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "node --run sync-schemas",

@@ -133,12 +133,12 @@ describe("buildRequest", () => {
   });
 
   it("sends no body for an operation that takes none", () => {
-    expect(requestFor("getHealth")).not.toHaveProperty("body");
+    expect(requestFor("getLive")).not.toHaveProperty("body");
   });
 
   it("refuses --input for an operation that takes no body", () => {
-    expect(() => requestFor("getHealth", [], { input: {} })).toThrow(
-      "getHealth takes no body, but --input gave one",
+    expect(() => requestFor("getLive", [], { input: {} })).toThrow(
+      "getLive takes no body, but --input gave one",
     );
   });
 

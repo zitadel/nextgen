@@ -90,8 +90,8 @@ The most common workflow looks like this:
 1.  Update your schema.
 2.  If you've added, removed or renamed fields, update the corresponding
     login flow in `.zitadel/flows/`.
-3.  Run `zitadel plan` to preview the changes.
-4.  Run `zitadel apply` to publish them.
+3.  Run `zitadel deploy --dry-run` to preview the changes.
+4.  Run `zitadel deploy` to publish them.
 
 ## Why do I need to update the login flow?
 

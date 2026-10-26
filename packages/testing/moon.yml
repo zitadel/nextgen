@@ -56,10 +56,8 @@ tasks:
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # server:build embeds the console/login UIs via its task deps; keep the
-      # server-hosted surfaces off anyway — these tests drive the API and
-      # app-embedded login, not /ui/*.
-      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      # server:build embeds the console via its task deps; keep it off anyway —
+      # these tests drive the API and app-embedded login, not /ui/console.
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:
       cache: false

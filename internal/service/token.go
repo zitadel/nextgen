@@ -172,6 +172,11 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *do
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrTokenRevoked()
 		}
+		// A classified failure keeps its code, so a token store that is
+		// unavailable answers 503, not 500, and clients retry.
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to read token record")
 	}
 	if !record.Active(time.Now()) {

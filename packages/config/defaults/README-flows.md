@@ -30,10 +30,10 @@ The common workflow:
 
 1. Edit the flow definition (and, if it needs new data, the schema in
    `.zitadel/schemas/` first).
-2. Run `zitadel plan` to preview the change.
-3. Run `zitadel apply` to publish it.
+2. Run `zitadel deploy --dry-run` to preview the change.
+3. Run `zitadel deploy` to publish it.
 
-Every apply of an edited flow definition publishes a new immutable
+Every deploy of an edited flow definition publishes a new immutable
 revision. Earlier revisions stay readable by id, and stay active. A login
 that pins the flow definition's name serves its newest active revision. A
 login without a pin serves the project default: the project's newest
@@ -74,7 +74,7 @@ Typical edits:
 
 ## Multiple flow definitions
 
-All files in this folder sync on `apply`, but each sign-in in the widget
+All files in this folder are published on `deploy`, but each sign-in in the widget
 follows exactly one flow definition. Which one:
 
 - **By name** — give the flow definition a distinct `name` and pass it as
@@ -97,12 +97,11 @@ unscoped one serves the purpose.
 
 The flip side: a **new active flow definition without an `audience`, or a
 new revision of one, becomes the newest unscoped definition, i.e. the
-project default for the purposes it serves**, the moment it applies.
-`plan` calls this out with a `# warning:` line on that create or revision
-so an experiment can't silently take over `/login`. If that isn't the
-intent, give the flow definition an `audience` before its first `apply`
-and select it by `flowName`, or pin `flow-name` on the pages that should
-keep the current project default.
+project default for the purposes it serves**, the moment it deploys.
+So an experiment can't silently take over `/login`, give the flow
+definition an `audience` before its first `deploy` and select it by
+`flowName`, or pin `flow-name` on the pages that should keep the current
+project default.
 
 ## Presets
 
@@ -116,5 +115,6 @@ anything here afterwards.
 
 Editing a schema publishes a new immutable revision, and every flow
 definition naming its `objectType` uses it from then on, with no change
-to the files. Update `steps[].fields[]` yourself when the edit added or
-removed properties a step should collect.
+to the files, so `deploy` never rewrites anything locally. Update
+`steps[].fields[]` yourself when the edit added or removed properties a
+step should collect.

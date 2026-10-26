@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
 const testPolicyOperation = "auth.factor.password.set"
@@ -23,6 +24,35 @@ func createPolicy(t *testing.T, stmts service.AllStatements, projectID, operatio
 	entity := &domain.Policy{ProjectID: projectID, Operation: operation, Config: []byte(config)}
 	require.NoError(t, stmts.CreatePolicy(t.Context(), entity))
 	return entity
+}
+
+// revisePolicy publishes config on top of entity the way the service does,
+// under the policy's lock, and leaves entity at the new revision.
+func revisePolicy(t *testing.T, d dialect, entity *domain.Policy, config string) {
+	t.Helper()
+	entity.Config = []byte(config)
+	require.NoError(t, d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+		if err := tx.Statements().LockPolicy(ctx, entity.ProjectID, entity.ID); err != nil {
+			return err
+		}
+		return tx.Statements().RevisePolicy(ctx, entity)
+	}))
+}
+
+func policyIDs(result *database.ListResult[*domain.Policy]) []string {
+	ids := make([]string, 0, len(result.Items))
+	for _, item := range result.Items {
+		ids = append(ids, item.ID)
+	}
+	return ids
+}
+
+func policyRevisionIDs(result *database.ListResult[*domain.Policy]) []string {
+	ids := make([]string, 0, len(result.Items))
+	for _, item := range result.Items {
+		ids = append(ids, item.RevisionID)
+	}
+	return ids
 }
 
 func TestPolicyStatements_CreateAndGet(t *testing.T) {
@@ -42,7 +72,7 @@ func TestPolicyStatements_CreateAndGet(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, projectID, scope.ProjectID)
 
-		got, err := d.stmts.GetPolicy(t.Context(), projectID, testPolicyOperation)
+		got, err := d.stmts.GetPolicy(t.Context(), policystore.ByOperation(projectID, testPolicyOperation))
 		require.NoError(t, err)
 		assert.Equal(t, entity.ID, got.ID)
 		assert.Equal(t, entity.RevisionID, got.RevisionID)
@@ -93,7 +123,7 @@ func TestPolicyStatements_ReviseAppendsRevision(t *testing.T) {
 		assert.True(t, domain.PrefixPolicyRevision.Matches(entity.RevisionID))
 		assert.False(t, entity.UpdatedAt.Before(entity.CreatedAt))
 
-		newest, err := d.stmts.GetPolicy(t.Context(), projectID, testPolicyOperation)
+		newest, err := d.stmts.GetPolicy(t.Context(), policystore.ByOperation(projectID, testPolicyOperation))
 		require.NoError(t, err)
 		assert.Equal(t, entity.RevisionID, newest.RevisionID)
 		assert.JSONEq(t, `{"min_length":15}`, string(newest.Config))
@@ -109,7 +139,7 @@ func TestPolicyStatements_NotFound(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		projectID := ensureProject(t, d.stmts)
 
-		_, err := d.stmts.GetPolicy(t.Context(), projectID, testPolicyOperation)
+		_, err := d.stmts.GetPolicy(t.Context(), policystore.ByOperation(projectID, testPolicyOperation))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 
 		_, err = d.stmts.GetPolicyRevision(t.Context(), projectID, "polrev_unknown")
@@ -144,7 +174,7 @@ func TestPolicyStatements_FailedCreateLeavesNothing(t *testing.T) {
 		require.NotEmpty(t, entity.ID)
 		require.NotEmpty(t, entity.RevisionID)
 
-		_, err := d.stmts.GetPolicy(t.Context(), projectID, testPolicyOperation)
+		_, err := d.stmts.GetPolicy(t.Context(), policystore.ByOperation(projectID, testPolicyOperation))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 		_, err = d.stmts.GetPolicyRevision(t.Context(), projectID, entity.RevisionID)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
@@ -216,8 +246,105 @@ func TestPolicyStatements_LateReviseInEarlyTransactionStampsLast(t *testing.T) {
 
 		assert.True(t, late.UpdatedAt.After(early.UpdatedAt),
 			"the late revise stamped %s, not after the revision it followed (%s)", late.UpdatedAt, early.UpdatedAt)
-		newest, err := d.stmts.GetPolicy(t.Context(), projectID, testPolicyOperation)
+		newest, err := d.stmts.GetPolicy(t.Context(), policystore.ByOperation(projectID, testPolicyOperation))
 		require.NoError(t, err)
 		assert.Equal(t, late.RevisionID, newest.RevisionID, "the late revise must be the newest revision")
+	})
+}
+
+// GetPolicy by id serves the newest revision, as it does by operation.
+func TestPolicyStatements_GetPolicyByID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		entity := createPolicy(t, d.stmts, projectID, testPolicyOperation, `{"min_length":8}`)
+		revisePolicy(t, d, entity, `{"min_length":15}`)
+
+		got, err := d.stmts.GetPolicy(t.Context(), policystore.ByID(projectID, entity.ID))
+		require.NoError(t, err)
+		assert.Equal(t, entity.RevisionID, got.RevisionID)
+		assert.Equal(t, testPolicyOperation, got.Operation)
+		assert.JSONEq(t, `{"min_length":15}`, string(got.Config))
+		assert.True(t, got.CreatedAt.Equal(entity.CreatedAt), "CreatedAt stays the first publish")
+		assert.True(t, got.UpdatedAt.Equal(entity.UpdatedAt))
+
+		_, err = d.stmts.GetPolicy(t.Context(), policystore.ByID(projectID, "pol_unknown"))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		// Another project's policy is not found from this one.
+		_, err = d.stmts.GetPolicy(t.Context(), policystore.ByID(ensureProject(t, d.stmts), entity.ID))
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+// ListPolicies lists each policy of the project once, at its newest revision,
+// first published first. Storage does not check operations against the
+// templates, so the test makes up its own to hold several policies.
+func TestPolicyStatements_ListPolicies(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		first := createPolicy(t, d.stmts, projectID, "test.first", `{"n":1}`)
+		second := createPolicy(t, d.stmts, projectID, "test.second", `{"n":2}`)
+		revisePolicy(t, d, first, `{"n":3}`)
+		createPolicy(t, d.stmts, ensureProject(t, d.stmts), "test.first", `{}`)
+
+		got, err := d.stmts.ListPolicies(unfilteredListCtx(t), policystore.ListOptions(projectID, "", 10))
+		require.NoError(t, err)
+		assert.Equal(t, []string{first.ID, second.ID}, policyIDs(got), "first published first, without other projects' policies")
+		assert.Equal(t, first.RevisionID, got.Items[0].RevisionID, "a policy lists at its newest revision")
+		assert.JSONEq(t, `{"n":3}`, string(got.Items[0].Config))
+		assert.Empty(t, got.NextCursor)
+
+		// Options that name no order still page first published first.
+		got, err = d.stmts.ListPolicies(unfilteredListCtx(t), &database.ListOptions[domain.PolicyField]{
+			Filter:     database.Equal(database.Col(domain.PolicyFieldProjectID), projectID),
+			Pagination: database.Page[domain.PolicyField]{Limit: 1},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{first.ID}, policyIDs(got))
+		assert.NotEmpty(t, got.NextCursor, "a full page without an explicit order still carries a cursor")
+
+		_, err = d.stmts.ListPolicies(unfilteredListCtx(t), nil)
+		assert.Error(t, err, "a list without options would read every project")
+
+		got, err = d.stmts.ListPolicies(unfilteredListCtx(t), policystore.ListOptions(projectID, "test.second", 10))
+		require.NoError(t, err)
+		assert.Equal(t, []string{second.ID}, policyIDs(got))
+
+		got, err = d.stmts.ListPolicies(unfilteredListCtx(t), policystore.ListOptions(ensureProject(t, d.stmts), "", 10))
+		require.NoError(t, err)
+		assert.Empty(t, got.Items, "a project that never published lists nothing")
+	})
+}
+
+// ListPolicyRevisions lists one policy's history newest first, superseded
+// revisions included.
+func TestPolicyStatements_ListPolicyRevisions(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureProject(t, d.stmts)
+		entity := createPolicy(t, d.stmts, projectID, "test.first", `{"n":1}`)
+		want := []string{entity.RevisionID}
+		for _, config := range []string{`{"n":2}`, `{"n":3}`} {
+			revisePolicy(t, d, entity, config)
+			want = append([]string{entity.RevisionID}, want...)
+		}
+		sibling := createPolicy(t, d.stmts, projectID, "test.second", `{}`)
+		revisePolicy(t, d, sibling, `{"n":4}`)
+
+		got, err := d.stmts.ListPolicyRevisions(unfilteredListCtx(t), projectID, entity.ID, database.Page[domain.PolicyField]{Limit: 10})
+		require.NoError(t, err)
+		assert.Equal(t, want, policyRevisionIDs(got), "newest first, without the sibling policy's revisions")
+		assert.JSONEq(t, `{"n":1}`, string(got.Items[2].Config), "the first revision stays listed as published")
+		for _, item := range got.Items {
+			assert.Equal(t, entity.ID, item.ID)
+			assert.True(t, item.CreatedAt.Equal(entity.CreatedAt), "every revision carries the policy's first publish")
+		}
+
+		got, err = d.stmts.ListPolicyRevisions(unfilteredListCtx(t), ensureProject(t, d.stmts), entity.ID, database.Page[domain.PolicyField]{Limit: 10})
+		require.NoError(t, err)
+		assert.Empty(t, got.Items, "another project lists none of the policy's revisions")
+
+		got, err = d.stmts.ListPolicyRevisions(unfilteredListCtx(t), projectID, "pol_unknown", database.Page[domain.PolicyField]{Limit: 10})
+		require.NoError(t, err)
+		assert.Empty(t, got.Items, "an unknown policy lists nothing; the service reports it")
 	})
 }

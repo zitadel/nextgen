@@ -462,6 +462,42 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.IsType(t, &api.ListUserIdentityLinksResponse{}, links, helpers.MustMarshal(t, links))
 	})
 
+	t.Run("policies", func(t *testing.T) {
+		t.Parallel()
+		// The console shows a project's policies read-only (#898); the
+		// project's own credentials publish them.
+		published := passwordSetPolicy(t, publishPolicy(t, customerSecret, customer.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		list, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, list, helpers.MustMarshal(t, list))
+		require.Len(t, list.(*api.ListPoliciesResponse).Policies, 1)
+
+		got, err := session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID)
+
+		revisions, err := session.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+		assert.Len(t, revisions.(*api.ListPolicyRevisionsResponse).Revisions, 1)
+
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: customerProjectID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, revision).RevisionID)
+
+		// Publishing stays with the project's credentials: a policy is
+		// authored as a file and applied, so publish does not take the
+		// session, even with the CSRF token the console would send.
+		status, body := consoleCall(t, platformSessionCookie(t, operatorID), http.MethodPost,
+			"/policies?project_id="+customer.ID,
+			`{"operation": "auth.factor.password.set", "config": {"min_length": 1}}`)
+		assert.Equal(t, http.StatusUnauthorized, status, body)
+		got, err = session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: customerProjectID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID, "the session published nothing")
+	})
+
 	t.Run("team read and update", func(t *testing.T) {
 		t.Parallel()
 		resp, err := session.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(customerTeamID)})
@@ -662,12 +698,14 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 			assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.QueryUsersForbidden).Code)
 		})
 	}
-	// The roster reads the same memberships by its own route.
+	// A user's RSI row names no team, so the user is outside a team-scoped
+	// grant and its roster answers not found before any membership gate
+	// (#2112); TestConsoleSessionByIDTeamFilterNeedsProjectRead pins the gate.
 	t.Run("list user teams", func(t *testing.T) {
 		resp, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.ListUserTeamsForbidden{}, resp, helpers.MustMarshal(t, resp))
-		assert.Equal(t, api.ErrorCode("user.permission_denied"), resp.(*api.ListUserTeamsForbidden).Code)
+		require.IsType(t, &api.ListUserTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
+		assert.Equal(t, api.ErrorCode("user.not_found"), resp.(*api.ListUserTeamsNotFound).Code)
 	})
 }
 
@@ -773,6 +811,12 @@ func TestConsoleSessionByIDTeamFilterNeedsProjectRead(t *testing.T) {
 	refused := byTeam.(*api.GetUserByIDErrorResponseStatusCode)
 	assert.Equal(t, http.StatusForbidden, refused.StatusCode)
 	assert.True(t, refused.Response.IsUserPermissionDenied(), helpers.MustMarshal(t, byTeam))
+
+	// The roster reads the same memberships by its own route.
+	roster, err := session.ListUserTeams(t.Context(), api.ListUserTeamsParams{UserID: api.UserID(memberID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListUserTeamsForbidden{}, roster, helpers.MustMarshal(t, roster))
+	assert.Equal(t, api.ErrorCode("user.permission_denied"), roster.(*api.ListUserTeamsForbidden).Code)
 }
 
 // TestConsoleSessionProjectViewerReadsMemberships is the allowed side of the
@@ -982,6 +1026,7 @@ func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
 	}
 	cookie, teamID := signUp(t)
 	otherUserID := harness.CreateUserWithTeam(t, platform.ID)
+	_, otherTeamID := signUp(t)
 
 	t.Run("renames their team", func(t *testing.T) {
 		status, body := consoleCall(t, cookie, http.MethodPatch, "/teams/"+teamID, `{"name":"Acme Platform"}`)
@@ -989,22 +1034,21 @@ func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
 		assert.Equal(t, "Acme Platform", helpers.MustUnmarshal[api.TeamResponse](t, []byte(body)).Name)
 	})
 
-	t.Run("cannot rename another user's team", func(t *testing.T) {
-		_, otherTeamID := signUp(t)
-		status, body := consoleCall(t, cookie, http.MethodPatch, "/teams/"+otherTeamID, `{"name":"Not mine"}`)
-		assert.Equal(t, http.StatusForbidden, status, body)
-		assert.Equal(t, api.ErrorCode("team.permission_denied"), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
-	})
-
-	// The grant reaches nothing else in the platform project. It is a foothold
-	// there, so these answer 403 rather than 404 until #2112.
-	for name, tc := range map[string]struct{ path, code string }{
-		"cannot read the platform project":  {"/projects/" + platform.ID, "proj.permission_denied"},
-		"cannot read another platform user": {"/users/" + otherUserID, "user.permission_denied"},
+	// The grant reaches nothing else in the platform project. Another
+	// customer's team or user answers like an id that names nothing (#2112);
+	// the platform project itself is no secret and keeps its 403.
+	for name, tc := range map[string]struct {
+		method, path, body string
+		status             int
+		code               string
+	}{
+		"cannot rename another user's team": {http.MethodPatch, "/teams/" + otherTeamID, `{"name":"Not mine"}`, http.StatusNotFound, "team.team_not_found"},
+		"cannot read another platform user": {http.MethodGet, "/users/" + otherUserID, "", http.StatusNotFound, "user.not_found"},
+		"cannot read the platform project":  {http.MethodGet, "/projects/" + platform.ID, "", http.StatusForbidden, "proj.permission_denied"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			status, body := consoleCall(t, cookie, http.MethodGet, tc.path, "")
-			assert.Equal(t, http.StatusForbidden, status, body)
+			status, body := consoleCall(t, cookie, tc.method, tc.path, tc.body)
+			assert.Equal(t, tc.status, status, body)
 			assert.Equal(t, api.ErrorCode(tc.code), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
 		})
 	}

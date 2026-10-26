@@ -3,7 +3,7 @@ title: Add social sign-in
 description: Let users sign in with Google or any OpenID Connect provider, set up with the zitadel CLI.
 ---
 
-A social sign-in provider, such as "Sign in with Google", is one more sign-in method on a user schema. `auth-method sso enable` writes the connection, turns it on in the schema and login flow, and stores the provider's credentials on the project. `plan` and `apply` then publish it.
+A social sign-in provider, such as "Sign in with Google", is one more sign-in method on a user schema. `auth-method sso enable` writes the connection, turns it on in the schema and login flow, and stores the provider's credentials on the project. `deploy` then publishes it.
 
 ## Register the app with the provider
 
@@ -40,15 +40,15 @@ Pass `--schema <name>` when the project has more than one user schema. The JSON 
   "changed": [".zitadel/schemas/default-human-user.json", ".zitadel/flows/default-login.json"],
   "client_id": { "variable": "GOOGLE_CLIENT_ID", "published": "stored" },
   "secret": { "variable": "GOOGLE_CLIENT_SECRET", "published": "stored" },
-  "next_commands": ["npx @zitadel/cli@latest plan", "npx @zitadel/cli@latest apply"]
+  "next_commands": ["npx @zitadel/cli@latest deploy --dry-run", "npx @zitadel/cli@latest deploy"]
 }
 ```
 
 Then publish the change:
 
 ```sh
-npx @zitadel/cli@latest plan
-npx @zitadel/cli@latest apply
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
 Reload the app: the sign-in, registration and password steps show a "Continue with Google" button.
@@ -91,7 +91,7 @@ For a custom provider, use `--sso custom` with `--sso-slug`, `--sso-display-name
 - **The login flow**, `.zitadel/flows/<flow>.json`: the slug is added to `sso_providers` on the steps that offer sign-in, and two steps are added. `register-sso` creates the user on a first sign-in with the provider. `sso-conflict` handles a provider account whose email already belongs to a user (see [Limits](#limits)).
 - **Two project variables**, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the secret encrypted). They live on the project, not in `.env.local`: the server exchanges the code with the provider, so the app never needs the secret.
 
-The variables are the one thing `sso enable` publishes before `apply`. When a credential did not reach the project, for example because the secret was not piped in or the server refused it, `published` is `deferred` or `failed` and `next_commands` starts with the `variables set` command that stores it:
+The variables are the one thing `sso enable` publishes before `deploy`. When a credential did not reach the project, for example because the secret was not piped in or the server refused it, `published` is `deferred` or `failed` and `next_commands` starts with the `variables set` command that stores it:
 
 ```sh
 npx @zitadel/cli@latest variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
@@ -108,7 +108,7 @@ Once a connection has been applied, these fields identify it and the users who s
 - `oidc.issuer`
 - `subject_claim`
 
-`plan` refuses an edit to one of them:
+`deploy` refuses an edit to one of them:
 
 ```text
 Error E_VALIDATION: .zitadel/idps/google.json: subject_claim of the connection "google" cannot be edited

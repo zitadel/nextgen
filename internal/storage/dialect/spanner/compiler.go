@@ -40,13 +40,9 @@ func compileRead[F ~uint8, T any](c *statementCompiler, stmt string, opt *databa
 func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stmt string, opt *database.ListOptions[F], schema database.Schema[F, T], tableName, resourceIDCol string, conjuncts ...string) error {
 	c.WriteString(stmt)
 
-	filter := opt.Filter
-	keyset, err := cursorFilter(opt.Pagination, schema)
+	filter, err := pageFilter(opt, schema)
 	if err != nil {
 		return err
-	}
-	if keyset != nil {
-		filter = database.And(filter, keyset)
 	}
 	hasWhere := false
 	if filter != nil {
@@ -70,9 +66,42 @@ func compileList[F ~uint8, T any](ctx context.Context, c *statementCompiler, stm
 	return nil
 }
 
+// compileWhereRest finishes a list statement whose WHERE the caller opened
+// with a predicate of its own: one that binds arguments, which compileList's
+// string conjuncts cannot carry (authz.WriteAuthorizedProjectIDs). It ANDs the
+// list filter and the page cursor onto that predicate, then orders and limits,
+// as compileList does after its own WHERE.
+func compileWhereRest[F ~uint8, T any](c *statementCompiler, opt *database.ListOptions[F], schema database.Schema[F, T]) error {
+	filter, err := pageFilter(opt, schema)
+	if err != nil {
+		return err
+	}
+	if filter != nil {
+		c.WriteString(" AND ")
+		compileFilter(c, filter, schema)
+	}
+	compileOrderBy(c, opt.Pagination.OrderBy, schema)
+	compileLimit(c, opt.Pagination.Limit)
+	return nil
+}
+
+// pageFilter is a list's filter with the page cursor's keyset ANDed after it,
+// or nil when there is neither: the one merge compileList and compileWhereRest
+// share.
+func pageFilter[F ~uint8, T any](opt *database.ListOptions[F], schema database.Schema[F, T]) (database.Filter[F], error) {
+	keyset, err := cursorFilter(opt.Pagination, schema)
+	if err != nil {
+		return nil, err
+	}
+	if keyset == nil {
+		return opt.Filter, nil
+	}
+	return database.And(opt.Filter, keyset), nil
+}
+
 // cursorFilter decodes the page cursor into the keyset comparison that resumes
-// the page, or nil when the page starts from the beginning. Statements that
-// assemble their own WHERE call it directly; compileList calls it for the rest.
+// the page, or nil when the page starts from the beginning. pageFilter ANDs it
+// onto the list's filter.
 func cursorFilter[F ~uint8, T any](page database.Page[F], schema database.Schema[F, T]) (database.Filter[F], error) {
 	// Before cursor decode, so the first page and cursor pages fail alike (#850).
 	if err := schema.EnsureOrderable(page.OrderBy); err != nil {

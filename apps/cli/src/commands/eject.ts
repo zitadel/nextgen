@@ -3,25 +3,27 @@ import { readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
-import { publicCliCommand } from "../lib/public-cli";
 import { createOrca } from "../lib/orca";
 import { AGENTS_HEADER, removeGuidanceSection } from "../lib/orca/patchers/rule/guidance";
 import type { EjectActions } from "../lib/orca/patchers/types";
 import { MANAGED_MARKER } from "../lib/paths";
 import { readRendererId, readZitadelConfig } from "../lib/project";
+import { shellArg } from "../lib/shell";
+import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
- * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`) when the
- * framework or its patcher cannot be resolved, so an orphaned/partial project
- * can still be cleaned up.
+ * framework-agnostic set (`zitadel.json`, `.zitadel/`, `.env.local`,
+ * `.env.development.local`) when the framework or its patcher cannot be
+ * resolved, so an orphaned/partial project can still be cleaned up.
  */
 async function resolveEjectActions(cwd: string): Promise<EjectActions> {
   const fallback: EjectActions = {
     markedFiles: [],
     rootConfigFiles: ["zitadel.json"],
     directories: [".zitadel"],
-    envBackups: [".env.local"],
+    envBackups: [".env.local", ".env.development.local"],
     dependencies: [],
     configEdits: [],
     guidanceFiles: ["AGENTS.md", "README.md"],
@@ -44,21 +46,30 @@ async function resolveEjectActions(cwd: string): Promise<EjectActions> {
 
 /**
  * Builds the `next_commands` envelope field — manual follow-ups `eject` can't
- * safely run itself: deleting the `.env.local.ejected-*` backups it created
- * (only when some were made), and uninstalling the SDK packages the patcher
- * added (the CLI never modifies the user's `package.json` + lockfile +
+ * safely run itself: deleting the `.env*.ejected-*` backups it created (only
+ * when some were made), and uninstalling the SDK packages the patcher added
+ * (the CLI never modifies the user's `package.json` + lockfile +
  * `node_modules` directly; it just suggests the command).
  */
 function assembleNextCommands(
-  backedUp: ReadonlyArray<unknown>,
+  backedUp: ReadonlyArray<string>,
   dependencies: ReadonlyArray<string>,
-): ReadonlyArray<string> {
-  const commands: string[] = [];
+  // `--cwd` as typed: the backups and the package.json are in that directory,
+  // so a command run from the shell's would miss them or touch another project.
+  dir: string | undefined,
+): ReadonlyArray<SuggestedCommand> {
+  const inDir = (command: string) =>
+    shellCommand(dir === undefined ? command : `cd ${shellArg(dir)} && ${command}`);
+  const commands: SuggestedCommand[] = [];
   if (backedUp.length > 0) {
-    commands.push("rm -f .env.local.ejected-*");
+    // Name only the backups eject actually created (each `backedUp` entry is
+    // `<rel> -> <backup>`), so this destructive glob can't also sweep up
+    // unrelated `.env*.ejected-*` files a user happens to keep.
+    const patterns = backedUp.map((entry) => `${entry.split(" -> ")[0]}.ejected-*`);
+    commands.push(inDir(`rm -f ${patterns.join(" ")}`));
   }
   for (const dep of dependencies) {
-    commands.push(`npm uninstall ${dep}`);
+    commands.push(inDir(`npm uninstall ${dep}`));
   }
   return commands;
 }
@@ -100,7 +111,7 @@ export default class Eject extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Eject);
-    await this.toMeta(flags);
+    await this.toMeta(flags, { resolveServer: false });
     const { cwd, dryRun } = this.meta;
 
     // A dry run removes nothing, so it has nothing to confirm (as in `reset`).
@@ -110,7 +121,7 @@ export default class Eject extends BaseCommand {
         kind: "confirm",
         name: "remove the managed files and local state",
         message: "Remove the managed files and local Zitadel state?",
-        retry: publicCliCommand("eject --force", this.meta.cliVersion),
+        retry: this.suggestUnscoped("eject --force"),
       }));
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "eject-cancelled" });
@@ -221,7 +232,11 @@ export default class Eject extends BaseCommand {
       return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
     }
 
-    const nextCommands = assembleNextCommands(backedUp, actions.dependencies);
+    const nextCommands = assembleNextCommands(
+      backedUp,
+      actions.dependencies,
+      typeof flags.cwd === "string" ? flags.cwd : undefined,
+    );
 
     return this.emit({
       status: "ok",
@@ -230,7 +245,7 @@ export default class Eject extends BaseCommand {
         files_removed: removed,
         files_preserved: preserved,
         backed_up: backedUp,
-        next_commands: nextCommands,
+        ...nextCommandsData(nextCommands),
         manual_steps: manualSteps,
       },
     });

@@ -2,13 +2,19 @@ get:
   operationId: listMyProjects
   summary: List the projects I can act on
   description: |
-    The projects the signed-in user holds an active grant on, either directly or
-    through a team they are a member of. Ordered by project id and paged with an
-    opaque cursor.
+    The projects the signed-in user can act on: those they hold an active grant
+    on, either directly or through a team they are a member of. For a platform
+    operator (ADR 075) that is every project of the deployment. Ordered by
+    project id and paged with an opaque cursor.
 
     This is not the same question as `queryProjects`, which answers with the one
     project the calling credential is bound to. Here the session is the caller
     and the grants are the answer, so the list spans projects.
+
+    With `name_contains`, only the projects whose name contains that text are
+    listed. The search runs on the server together with the grants, so it
+    reaches every project the user can act on, however many there are, and
+    pages like the full list.
 
     With `project_id`, the projects are listed only when the session belongs to
     that project. It names the project the session was signed in to, not one to
@@ -20,6 +26,21 @@ get:
   parameters:
     - $ref: ../../../../components/parameters/limit.yaml
     - $ref: ../../../../components/parameters/page-token.yaml
+    # Declared here rather than shared: no other list is searched by name in
+    # the query string. It is the `name` field with the query endpoints'
+    # `contains` operation, and named after both.
+    - name: name_contains
+      in: query
+      required: false
+      description: |
+        Narrows the list to the projects whose name contains this text,
+        ignoring case, as `contains` matches text in a query endpoint's
+        filter. Send the same value with every `page_token` the search
+        returns: a token continues the list it came from. An empty value
+        lists every project, as leaving it out does.
+      schema:
+        type: string
+      example: acme
     - $ref: ../../../../components/parameters/session-project-id.yaml
   responses:
     '200':

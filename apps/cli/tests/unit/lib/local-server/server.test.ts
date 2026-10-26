@@ -255,7 +255,7 @@ describe("LocalServer", () => {
         "fetch",
         vi.fn(async (input: string | URL) => {
           const target = new URL(String(input));
-          if (target.pathname === "/healthz" && origins.includes(target.origin)) {
+          if (target.pathname === "/readyz" && origins.includes(target.origin)) {
             return new Response("ok", { status: 200 });
           }
           throw new TypeError("fetch failed (stub: connection refused)");

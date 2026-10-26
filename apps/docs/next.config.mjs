@@ -1,8 +1,12 @@
+import { createNextStory } from "@fumadocs/story/next";
 import { createMDX } from "fumadocs-mdx/next";
 
 import moved from "./lib/moved.json" with { type: "json" };
 
 const withMDX = createMDX();
+// The live examples (components/examples): the plugin reads each
+// *.story.tsx's component props and generates the example's controls.
+const withStory = createNextStory();
 
 // The share of page loads that send Speed Insights (app/layout.tsx), from 0
 // (none) to 1 (every one, the default when unset); set per environment on
@@ -25,6 +29,10 @@ const config = {
   // too: on the cloud's host every other path belongs to another service
   // (repo-root vercel.json), /_next/ to the website.
   assetPrefix: "/docs",
+  // Loaded by Node rather than bundled, so `apiMockPublicDir` finds the
+  // service worker the package ships beside itself
+  // (app/docs/mock-service-worker.js).
+  serverExternalPackages: ["@zitadel/api-mock"],
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.
@@ -41,4 +49,4 @@ const config = {
   },
 };
 
-export default withMDX(config);
+export default withStory(withMDX(config));

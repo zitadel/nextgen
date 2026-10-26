@@ -9,6 +9,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
@@ -121,14 +122,54 @@ func (s policyStatements) LockPolicy(ctx context.Context, projectID, id string) 
 }
 
 // GetPolicy implements [service.PolicyStatements].
-func (s policyStatements) GetPolicy(ctx context.Context, projectID, operation string) (*domain.Policy, error) {
-	return s.getOne(ctx, policystore.ByOperation(projectID, operation), newestPolicyRevision)
+func (s policyStatements) GetPolicy(ctx context.Context, filter database.Filter[domain.PolicyField]) (*domain.Policy, error) {
+	return s.getOne(ctx, filter, newestPolicyRevision)
 }
 
 // GetPolicyRevision implements [service.PolicyStatements].
 func (s policyStatements) GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error) {
 	// No newest-revision conjunct: a pinned read must reach a superseded row.
 	return s.getOne(ctx, policystore.ByRevision(projectID, revisionID))
+}
+
+// ListPolicies implements [service.PolicyStatements].
+func (s policyStatements) ListPolicies(ctx context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+	opts, err := policystore.WithDefaultOrder(opts)
+	if err != nil {
+		return nil, err
+	}
+	return s.list(ctx, opts, newestPolicyRevision)
+}
+
+// ListPolicyRevisions implements [service.PolicyStatements].
+func (s policyStatements) ListPolicyRevisions(ctx context.Context, projectID, policyID string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error) {
+	// No newest-revision conjunct: the history includes superseded rows.
+	return s.list(ctx, policystore.RevisionListOptions(projectID, policyID, page))
+}
+
+// list runs the management-list path: the authz predicate filters on the
+// policy row, so a revision is visible exactly when its policy is.
+func (s policyStatements) list(ctx context.Context, opts *database.ListOptions[domain.PolicyField], conjuncts ...string) (*database.ListResult[*domain.Policy], error) {
+	items, nextCursor, err := pagination.Page(opts.Pagination, policystore.Schema, func(limit uint32) ([]*domain.Policy, error) {
+		opts := opts.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileList(ctx, &compiler, policyQuery, opts, policystore.Schema, "p", "id", conjuncts...); err != nil {
+			return nil, err
+		}
+		var items []*domain.Policy
+		if err := s.db.Query(ctx, compiler.statement(), func(iter *spanner.RowIterator) error {
+			var err error
+			items, err = collectRows(iter, scanPolicy)
+			return err
+		}); err != nil {
+			return nil, err
+		}
+		return items, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &database.ListResult[*domain.Policy]{Items: items, NextCursor: nextCursor}, nil
 }
 
 func (s policyStatements) getOne(ctx context.Context, filter database.Filter[domain.PolicyField], conjuncts ...string) (*domain.Policy, error) {
