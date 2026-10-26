@@ -1189,7 +1189,11 @@ describe("setup asked on a terminal", () => {
 
       await expect(settingUp(cwd)).rejects.toThrow();
 
-      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(text).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("Which port should your app run on?"),
+        }),
+      );
       expect(await readdir(cwd)).toEqual([]);
     });
 

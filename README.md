@@ -60,6 +60,11 @@ skill, and the per-framework SDK and component skills. Without it, only the
 top-level router skill is installed. The CLI skill also ships inside the
 `@zitadel/cli` package.
 
+After a successful interactive `setup`, the CLI suggests this command once if it
+finds a coding agent on your machine. "Once" is per machine, not per project: the
+CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
+see it.
+
 ## Customer quick start
 
 ```sh
@@ -81,8 +86,9 @@ npm run dev
 ```
 
 `start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+`admin@zitadel.localhost`. It ends by telling you to run `setup`. Once `setup`
+has created your project it offers `zitadel console`; before that the console has
+nothing to show.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
@@ -91,7 +97,7 @@ reports it as already owned. If that attempt fails, setup prints a warning and
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
-Any time you need the console again, print a fresh link:
+Once your project exists, print a sign-in link for the console. The link works once:
 
 ```sh
 npx @zitadel/cli@latest console

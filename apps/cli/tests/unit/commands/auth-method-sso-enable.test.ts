@@ -8,7 +8,7 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { defaultSchema, loginFlow, setUpProject, withStdin } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 
 /**
  * The platform the credentials are published to. No test names a server, so
@@ -181,6 +181,68 @@ describe("auth-method sso enable", () => {
     ) as { steps: Array<{ name: string; actions?: Array<{ name: string }> }> };
     const conflict = flow.steps.find((step) => step.name === "sso-conflict");
     expect(conflict?.actions?.map((action) => action.name)).toContain("passkey");
+  });
+
+  it("says the provider is configured locally and how to deploy it", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain(
+      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+    );
+    expect(result.stdout).toContain(
+      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+    );
+    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
+  });
+
+  it("does not say the credentials are stored when publishing them failed", async () => {
+    const cwd = await setUpProject();
+    refusePublishes();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain("Google sign-in is configured locally.");
+    expect(result.stdout).not.toContain("stored on your Project");
+  });
+
+  it("names a custom provider by its display name", async () => {
+    const cwd = await setUpProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
+    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
+  });
+
+  it("does not offer a deploy when rerunning changed nothing", async () => {
+    const cwd = await setUpProject();
+    await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    const result = await enableRendered(cwd);
+
+    expect(result.stdout).toContain("Google sign-in is already configured locally.");
+    expect(result.stdout).not.toContain("Deploy the configuration");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {
