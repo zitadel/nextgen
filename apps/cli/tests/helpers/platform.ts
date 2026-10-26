@@ -74,6 +74,12 @@ export interface PlatformMock {
   /** Makes a stored connection unreadable while everything else answers. */
   cannotReadConnections(): void;
 
+  /**
+   * Answers the next deployment create with `409 dep.conflict`, as when another
+   * deploy lands between a deploy's inspection and its write.
+   */
+  racesTheNextDeploy(): void;
+
   /** Drops any arranged failure, so the platform answers normally again. */
   recovers(): void;
 
@@ -104,6 +110,9 @@ export interface PlatformMock {
 
   /** Records every published branding revision, which the mock does not keep. */
   capturesBrandingPublishes(): Captured<Record<string, unknown>>;
+
+  /** Records every rollback request's body, then lets the platform answer it. */
+  capturesRollbacks(): Captured<Record<string, unknown>>;
 }
 
 /** Starts the mock platform for a spec file and resets it between tests. */
@@ -157,6 +166,24 @@ export function usePlatformMock(): PlatformMock {
           }),
         );
       });
+    },
+
+    racesTheNextDeploy() {
+      server.use(
+        http.post(
+          "*/deployments",
+          () =>
+            HttpResponse.json(
+              {
+                code: "dep.conflict",
+                message:
+                  "deployment: the newest deployment to the targets does not match expected_deployment_id",
+              },
+              { status: 409 },
+            ),
+          { once: true },
+        ),
+      );
     },
 
     cannotListVariables() {
@@ -276,6 +303,28 @@ export function usePlatformMock(): PlatformMock {
         },
         get last() {
           return published.at(-1);
+        },
+      };
+    },
+
+    capturesRollbacks() {
+      const requests: Array<Record<string, unknown>> = [];
+      server.use(
+        http.post("*/deployments/:id/rollback", async ({ request }) => {
+          const text = await request.clone().text();
+          requests.push(text === "" ? {} : (JSON.parse(text) as Record<string, unknown>));
+          return undefined;
+        }),
+      );
+      return {
+        get all() {
+          return requests;
+        },
+        get count() {
+          return requests.length;
+        },
+        get last() {
+          return requests.at(-1);
         },
       };
     },

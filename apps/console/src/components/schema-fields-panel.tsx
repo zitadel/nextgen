@@ -49,7 +49,7 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Breadcrumb path={path} onNavigate={setPath} />
+      <PathBreadcrumb path={path} onNavigate={setPath} />
 
       {/* `table-fixed` so the declared column widths are exact rather than a
           hint the auto layout can widen. The design pads the row by 8px and
@@ -140,16 +140,23 @@ function PropertyRow({ property, onDrillIn }: { property: SchemaProperty; onDril
  *
  * Deep paths elide the middle (`Schema › … › datum › reference`) so the trail
  * stays on one line; the ellipsis is inert because it stands for more than one
- * level and picking which to jump to would be a guess.
+ * level and picking which to jump to would be a guess. The Users list's
+ * attribute Fields view walks a user's attributes with it too.
  */
-function Breadcrumb({
+export function PathBreadcrumb({
   path,
   onNavigate,
+  rootLabel = ROOT_LABEL,
+  label = "Schema path",
 }: {
   path: string[];
   onNavigate: (next: string[]) => void;
+  /** The first segment, standing for the document root. */
+  rootLabel?: string;
+  /** The navigation landmark's accessible name. */
+  label?: string;
 }) {
-  const segments = [ROOT_LABEL, ...path];
+  const segments = [rootLabel, ...path];
   const last = segments.length - 1;
   const at = (depth: number) => ({ label: segments[depth] ?? "", depth });
   const visible =
@@ -158,7 +165,7 @@ function Breadcrumb({
       : segments.map((label, depth) => ({ label, depth }));
 
   return (
-    <nav aria-label="Schema path" className="flex flex-wrap items-center gap-1.5">
+    <nav aria-label={label} className="flex flex-wrap items-center gap-1.5">
       {visible.map((segment, index) => {
         const current = segment.depth === last;
         return (

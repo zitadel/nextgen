@@ -9,6 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { type Platform, RESOURCES } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
+  definitionOf,
   describeBody,
   parseFilter,
   parseSort,
@@ -67,6 +68,13 @@ describe("resource registry", () => {
     for (const [topic, resource] of entries()) {
       expect(COMMANDS[`${topic}:list`], `${topic}:list`).toBeDefined();
       expect(COMMANDS[`${topic}:get`], `${topic}:get`).toBeDefined();
+      // `release` is the one topic that mixes generated reads (list/get) with
+      // hand-written verbs (create/revoke) under one singular topic, so the
+      // "a write command exists iff the registry declares it" invariant does
+      // not hold for it — the hand-written release create lives in src/index.ts.
+      if (topic === "release") {
+        continue;
+      }
       expect(Boolean(COMMANDS[`${topic}:create`])).toBe(Boolean(resource.create));
       expect(Boolean(COMMANDS[`${topic}:update`])).toBe(Boolean(resource.update));
       const deleteVerb = resource.delete?.verb ?? "delete";
@@ -74,23 +82,49 @@ describe("resource registry", () => {
     }
   });
 
-  it("gives no generated command an --environment flag, since none addresses one", () => {
-    const generated = Object.entries(COMMANDS).filter(([id]) => id!.split(":")[0]! in RESOURCES);
+  it("gives every generated command --env and --env-file, and no --environment flag", () => {
+    const generated = Object.entries(COMMANDS).filter(
+      ([, command]) => definitionOf(command) !== undefined,
+    );
     expect(generated.length).toBeGreaterThan(0);
     for (const [id, command] of generated) {
       const flags = { ...command.baseFlags, ...command.flags };
+      expect(Object.keys(flags), id).toEqual(expect.arrayContaining(["env", "env-file"]));
       expect(Object.keys(flags), id).not.toContain("environment");
       expect(
-        Object.values(flags).map((flag) => flag.char),
+        Object.entries(flags)
+          .filter(([, flag]) => flag.char === "e")
+          .map(([name]) => name),
         id,
-      ).not.toContain("e");
+      ).toEqual(["env"]);
     }
+  });
+
+  it("reads the project and credential of --env-file", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-resources-env-"));
+    const file = join(cwd, "staging.env");
+    await writeFile(file, "ZITADEL_PROJECT_ID=proj_staging\nZITADEL_PROJECT_SECRET=sk_staging\n");
+    let seen: { project?: string | null; authorization?: string | null } = {};
+    server.use(
+      http.post(`${SERVER}/teams/query`, ({ request }) => {
+        seen = {
+          project: new URL(request.url).searchParams.get("project_id"),
+          authorization: request.headers.get("authorization"),
+        };
+        return HttpResponse.json({ teams: [] });
+      }),
+    );
+
+    const res = await run(cwd, ["teams", "list", "--env-file", file]);
+
+    expect(res.exitCode).toBe(0);
+    expect(seen).toEqual({ project: "proj_staging", authorization: "Bearer sk_staging" });
   });
 
   // A read and a write verb, since the flag reached both through the generated
   // command's own flags and the base flags it inherits.
   it.each([
-    ["a read verb", ["users", "list", "-e", "prod"]],
+    ["a read verb", ["users", "list", "--environment", "prod"]],
     ["a write verb", ["teams", "create", "--name", "t", "--environment", "production"]],
   ])("refuses the environment flag on %s before any request", async (_case, argv) => {
     const cwd = await makeProject();
@@ -401,6 +435,161 @@ describe("get rendering", () => {
 
     expect(res.stdout).toMatch(/email\s+user_1@example\.com/);
     expect(res.stdout).not.toContain("status");
+  });
+
+  it("shows a policy's config, the setting a reader looks it up for", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, () =>
+        HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: { min_length: 12 },
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "policies",
+        "get",
+        "pol_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toMatch(/config\s+\{"min_length":12\}/);
+  });
+
+  it("shows an empty config, which says the policy enforces nothing", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, () =>
+        HttpResponse.json({
+          id: "pol_1",
+          revision_id: "polrev_1",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: {},
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z",
+        }),
+      ),
+    );
+
+    const res = await asTerminal(() =>
+      runCliForTest([
+        "policies",
+        "get",
+        "pol_1",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--non-interactive",
+      ]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toMatch(/config\s+\{\}/);
+  });
+});
+
+describe("policies", () => {
+  const policy = {
+    id: "pol_1",
+    revision_id: "polrev_1",
+    project_id: "proj_test",
+    operation: "auth.factor.password.set",
+    config: { min_length: 15 },
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("gets a policy by id", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies/pol_1`, ({ request }) => {
+        expect(new URL(request.url).searchParams.get("project_id")).toBe("proj_test");
+        return HttpResponse.json(policy);
+      }),
+    );
+
+    const res = await run(cwd, ["policies", "get", "pol_1"]);
+
+    expect(res.exitCode).toBe(0);
+    expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
+  });
+
+  it("gets a policy by its operation through the list's filter", async () => {
+    const cwd = await makeProject();
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${SERVER}/policies`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json({ policies: [policy], next_page_token: null });
+      }),
+    );
+
+    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+
+    expect(res.exitCode).toBe(0);
+    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect((parseJson(res.stdout) as { data: { id: string } }).data.id).toBe("pol_1");
+  });
+
+  it("answers E_NOT_FOUND for an operation the project has no policy for", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/policies`, () =>
+        HttpResponse.json({ policies: [], next_page_token: null }),
+      ),
+    );
+
+    const res = await run(cwd, ["policies", "get", "auth.factor.password.set"]);
+
+    expect(res.exitCode).toBe(4);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
+
+  it("answers E_NOT_FOUND for a name that is neither an id nor an operation, without a request", async () => {
+    const cwd = await makeProject();
+
+    const res = await run(cwd, ["policies", "get", "password"]);
+
+    expect(res.exitCode).toBe(4);
+    expect((parseJson(res.stdout) as { code: string }).code).toBe("E_NOT_FOUND");
+  });
+
+  it("lists policies narrowed to one operation", async () => {
+    const cwd = await makeProject();
+    let query: URLSearchParams | undefined;
+    server.use(
+      http.get(`${SERVER}/policies`, ({ request }) => {
+        query = new URL(request.url).searchParams;
+        return HttpResponse.json({ policies: [policy], next_page_token: null });
+      }),
+    );
+
+    const res = await run(cwd, [
+      "policies",
+      "list",
+      "--filter",
+      "operation=auth.factor.password.set",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(query?.get("operation")).toBe("auth.factor.password.set");
+    expect((parseJson(res.stdout) as { data: { count: number } }).data.count).toBe(1);
   });
 });
 
@@ -1394,7 +1583,7 @@ describe("other resources", () => {
 
 describe("configuration resources are read-only", () => {
   it("exposes only list and get for every configuration topic", () => {
-    for (const topic of ["schemas", "releases", "flow-definitions", "branding"]) {
+    for (const topic of ["schemas", "release", "flow-definitions", "branding"]) {
       const resource = RESOURCES[topic as keyof typeof RESOURCES];
       expect(resource, topic).toBeDefined();
       expect(Object.keys(resource!), topic).toEqual(
@@ -1700,5 +1889,17 @@ describe("flow definitions list the current flows", () => {
     await run(cwd, ["flow-definitions", "list", "--filter", "revisions=all"]);
 
     expect(url?.searchParams.get("revisions")).toBe("all");
+  });
+});
+
+describe("the release resource", () => {
+  it("lists whether each release is revoked", () => {
+    expect(RESOURCES.release.columns).toContain("revoked_at");
+  });
+
+  it("shows a release's content hash and revocation", () => {
+    expect(RESOURCES.release.detail).toEqual(
+      expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
   });
 });

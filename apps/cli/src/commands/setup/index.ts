@@ -62,6 +62,7 @@ import {
 } from "../../lib/idp";
 import { brandingGuidanceAction } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -89,7 +90,11 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
-import { publicCliCommand } from "../../lib/public-cli";
+import {
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+  parsePasswordMinLength,
+} from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -119,8 +124,17 @@ import {
   type Row,
   type Section,
 } from "./summary";
+import { shellOption } from "../../lib/shell";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
+import {
+  type EnvironmentSelector,
+  inShell,
+  projectCommand,
+  type SuggestedCommand,
+  unscopedCommand,
+} from "../../lib/suggestion";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -145,6 +159,29 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
+/**
+ * The selector appended to setup's credential-recovery commands. `variable set`
+ * is an `EnvironmentCommand` that resolves the project and server from the
+ * environment, where the process environment outranks the `.env` files — so a
+ * bare retry in a shell holding production values would publish to the wrong
+ * project. Pinning `--env-file .env.development.local` (the file setup wrote)
+ * forces the local project the recovery is for, because `--env-file` outranks
+ * the process environment (unlike `--env`); same reasoning as the SSO recovery.
+ */
+function recoverySelector(cwd: string | undefined): EnvironmentSelector {
+  // `--cwd` too, as typed: `--env-file` resolves against it, so a recovery
+  // run from where setup was launched reads the file setup wrote.
+  return environmentSelectorSuffix({ envFile: ".env.development.local", cwd });
+}
+
+/**
+ * {@link recoverySelector} plus `--server local`, for the recovery after a
+ * local-server failure (see `ssoRecovery`).
+ */
+function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
+  return environmentSelectorSuffix({ envFile: ".env.development.local", server: "local", cwd });
+}
 
 /** `zitadel setup` — create a project and scaffold local auth.
  *
@@ -199,6 +236,10 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
+    "password-min-length": nonBlankString({
+      description:
+        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+    }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
@@ -351,7 +392,6 @@ export default class Setup extends BaseCommand {
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
-
     this.recordTelemetry({
       framework: app.framework,
       renderer: flags.renderer ?? "react",
@@ -361,8 +401,13 @@ export default class Setup extends BaseCommand {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
+      // Read from the raw flag: it is parsed below, so a bad value fails after
+      // this step is recorded, like the other flags'. 0 sets none.
+      password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
+    // Read once: a bad value is refused here, before anything is created.
+    const passwordMinLengthFlag = passwordMinLengthFromFlag(flags["password-min-length"]);
 
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
@@ -380,6 +425,7 @@ export default class Setup extends BaseCommand {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
+      passwordMinLength: passwordMinLengthFlag,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -397,6 +443,7 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         ssoFromFlag: flags.sso !== undefined,
+        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
       for (const prompt of SETUP_PROMPTS) {
@@ -423,6 +470,8 @@ export default class Setup extends BaseCommand {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
+      // Whether a minimum went into the password policy, never the value.
+      password_policy: typeof answers.passwordMinLength === "number" ? "set" : "empty",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -523,6 +572,7 @@ export default class Setup extends BaseCommand {
               useCase: answers.useCase,
               devPort: answers.devPort,
               sso: answers.sso.map((answer) => answer.selection),
+              passwordMinLength: answers.passwordMinLength,
             },
           );
       consola.success(`Created project ${project.id}`);
@@ -530,7 +580,7 @@ export default class Setup extends BaseCommand {
 
       // `.env.local` as it is before the patch merges this project's id and
       // secret into it, so a failure below can put it back.
-      const envLocalBefore = await readEnvLocal(cwd);
+      const envFilesBefore = await readCredentialEnvFiles(cwd);
       if (framework === undefined) {
         // What the patch writes depends on the files the scaffold creates.
         consola.info("Would patch the new project (dry run): its files come from the scaffold");
@@ -546,7 +596,7 @@ export default class Setup extends BaseCommand {
           // rerun starts over.
           if (!dryRun) {
             await removeSetupMarkers(cwd);
-            await restoreEnvLocal(cwd, envLocalBefore);
+            await restoreCredentialEnvFiles(cwd, envFilesBefore);
           }
           throw error;
         }
@@ -573,6 +623,7 @@ export default class Setup extends BaseCommand {
               preset: answers.preset,
               useCase: answers.useCase,
               sso: answers.sso,
+              passwordMinLength: answers.passwordMinLength,
               cliVersion: this.meta.cliVersion,
             });
       } catch (error) {
@@ -587,7 +638,7 @@ export default class Setup extends BaseCommand {
         // setup neither writes over nor removes one -- unless it is part of a
         // new app, which goes as a whole.
         await removeSetupMarkers(cwd);
-        await restoreEnvLocal(cwd, envLocalBefore);
+        await restoreCredentialEnvFiles(cwd, envFilesBefore);
         const cause = toZitadelError(error);
         throw new ZitadelError(cause.code, `Default resource setup failed: ${cause.message}`, {
           // The cause knows its own remedy when it has one -- a file setup
@@ -596,15 +647,18 @@ export default class Setup extends BaseCommand {
           hint:
             cause.hint ??
             (newApp === undefined
-              ? "The project was created but its default schema/flow upload did not finish. " +
-                "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
-                "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+              ? "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default schema/flow upload did not finish, " +
-                "so setup removed the new app again. Re-run setup as before to start over."),
+              : "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload, so setup removed the new app again. " +
+                "Re-run setup as before to start over."),
           nextCommands:
-            cause.nextCommands ?? (newApp === undefined ? ["zitadel setup --force"] : []),
+            cause.nextCommands ??
+            (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
           details: cause.details,
         });
       }
@@ -645,7 +699,7 @@ export default class Setup extends BaseCommand {
     // where the engine resolves the connection's `${{ NAME }}` from, against
     // Zitadel Cloud as much as against a local server. A refusal is reported
     // rather than failing setup: everything else is already provisioned, and
-    // `variables set` publishes it later.
+    // `variable set` publishes it later.
     // One outcome per provider, keyed by slug: the summary reports each
     // separately, because one provider's publish can land while another's does
     // not, and telling the developer "the secret did not reach the project"
@@ -680,10 +734,15 @@ export default class Setup extends BaseCommand {
               `${answer.endpoints.issuer}, not the provider`,
           );
         }
-        reportClientIdOutcome(idVariable, clientId, this.meta.cliVersion);
+        reportClientIdOutcome(
+          idVariable,
+          clientId,
+          this.meta.cliVersion,
+          recoverySelector(flags.cwd),
+        );
         // The wizard refuses an empty secret, so a deferred publish here only
         // ever means there was no project to publish to.
-        reportSecretOutcome(secret, this.meta.cliVersion, false);
+        reportSecretOutcome(secret, this.meta.cliVersion, false, recoverySelector(flags.cwd));
       }
     }
 
@@ -715,6 +774,7 @@ export default class Setup extends BaseCommand {
       env: this.meta.env,
       issuer,
       json: this.jsonEnabled(),
+      selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags["skip-install"]),
     });
@@ -806,14 +866,14 @@ export default class Setup extends BaseCommand {
         (isLocal && (dryRun || hostsPlatform)));
     const claimNudge = nudgeClaim
       ? {
-          actions: [claimAction(this.meta.cliVersion, deadline)],
-          boxActions: [claimBoxAction(this.meta.cliVersion, deadline)],
-          commands: [claimCommand(this.meta.cliVersion)],
+          actions: [claimAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          boxActions: [claimBoxAction(this.meta.cliVersion, deadline, recoverySelector(flags.cwd))],
+          commands: [claimCommand(this.meta.cliVersion, recoverySelector(flags.cwd))],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
-    const consoleCommand = publicCliCommand("console", this.meta.cliVersion);
+    const consoleCommand = unscopedCommand("console", this.meta.cliVersion);
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [
@@ -827,7 +887,7 @@ export default class Setup extends BaseCommand {
           ],
           commands: [consoleCommand],
         }
-      : { actions: [], boxActions: [], commands: [] };
+      : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -907,7 +967,7 @@ export default class Setup extends BaseCommand {
             client_id: answer.credentials.clientId ?? null,
             connection: `.zitadel/idps/${slug}.json`,
             // What the developer registers at the provider: the connection's
-            // own route, as `sso enable` reports it.
+            // own route, as `auth-method sso enable` reports it.
             callback_uri: callbackUriFor(issuer, slug),
             client_id_variable: outcome
               ? { variable: credentialVariables(slug).clientId, published: outcome.clientId }
@@ -927,9 +987,8 @@ export default class Setup extends BaseCommand {
         ],
         // A JSON run prints no warnings, so a credential the project never
         // received would otherwise appear only as a `published` status with
-        // nothing to act on. `auth-method sso enable` reports the same recovery
-        // step.
-        next_commands: [
+        // nothing to act on. `auth-method sso enable` reports the same recovery step.
+        ...nextCommandsData([
           ...republishCommands(
             answers.sso.flatMap((answer) => {
               const slug = providerOf(answer.selection).slug;
@@ -948,11 +1007,12 @@ export default class Setup extends BaseCommand {
               ];
             }),
             this.meta.cliVersion,
+            recoverySelector(flags.cwd),
           ),
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
-        ],
+        ]),
       },
     });
   }
@@ -1052,13 +1112,12 @@ async function resolveScaffoldFramework(
     throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
       hint: (
         "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}. ` +
-        runFromHint(guidance.retry)
+        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
       ).trimEnd(),
       nextCommands:
         guidance.serverFlag === "local" && suggested
           ? [
-              publicCliCommand(
+              unscopedCommand(
                 `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
                 guidance.cliVersion,
               ),
@@ -1117,7 +1176,7 @@ function dryRunProject(issuer: string): CreateProject201 {
     name: "dry-run",
     project_secret: "sk_proj_dry_run_full",
     preview_secret: "sk_proj_dry_run_preview",
-    origins: [{ pattern: issuer, kind: "preview" }],
+    origins: [{ pattern: issuer, kind: "primary" }],
     created_at: "2026-04-21T14:03:11.000Z",
   };
 }
@@ -1125,33 +1184,68 @@ function dryRunProject(issuer: string): CreateProject201 {
 /** What a command line describing a custom connection looks like, for an error to show. */
 const SSO_CUSTOM_EXAMPLE = customExample(SETUP_FLAG_NAMES);
 
-/** What `.env.local` holds, or `undefined` when there is no such file. */
-async function readEnvLocal(cwd: string): Promise<Buffer | undefined> {
-  try {
-    return await readFile(join(cwd, ".env.local"));
-  } catch (error) {
-    if (isErrno(error, "ENOENT")) {
-      return undefined;
+/**
+ * The env files the patch merges a project's id and secrets into: `.env.local`
+ * for the app, and `.env.development.local`, which the recovery commands pin
+ * with `--env-file` and which therefore decides which project they target.
+ */
+const CREDENTIAL_ENV_FILES = [".env.local", ".env.development.local"] as const;
+
+/**
+ * What each credential env file holds, or `undefined` for a file that is not
+ * there. Only a missing file counts as absent: any other read error is
+ * rethrown, because reading it as "absent" would make the rollback delete a
+ * pre-existing file it should have restored.
+ */
+export async function readCredentialEnvFiles(
+  cwd: string,
+): Promise<Map<string, Buffer | undefined>> {
+  const before = new Map<string, Buffer | undefined>();
+  for (const file of CREDENTIAL_ENV_FILES) {
+    try {
+      before.set(file, await readFile(join(cwd, file)));
+    } catch (error) {
+      if (!isErrno(error, "ENOENT")) {
+        throw error;
+      }
+      before.set(file, undefined);
     }
-    throw error;
   }
+  return before;
 }
 
 /**
- * Puts `.env.local` back to what {@link readEnvLocal} read before the patch,
- * and removes it when there was none. The patch merged the failed setup's
- * project id and secret into it, and a merge only adds the keys a file is
- * missing, `--force` or not: left in place, they would survive the rerun, and
- * the app would talk to an abandoned project with no schema or login flow.
- * `.env.example` needs nothing: it gets the same empty values on every run.
+ * Puts the credential env files back to what {@link readCredentialEnvFiles}
+ * read before the patch, and removes one setup created. The patch merged the
+ * failed setup's project id and secrets into them, and a merge only adds the
+ * keys a file is missing, `--force` or not: left in place, they would survive
+ * the rerun, and the app would talk to an abandoned project with no schema or
+ * login flow. `.env.example` needs nothing: it gets the same empty values on
+ * every run.
+ *
+ * A file that cannot be restored is reported as a warning rather than thrown:
+ * this runs while setup is already failing, and the real error carries the
+ * remedy the developer needs.
  */
-async function restoreEnvLocal(cwd: string, before: Buffer | undefined): Promise<void> {
-  const path = join(cwd, ".env.local");
-  if (before === undefined) {
-    await rm(path, { force: true });
-    return;
+export async function restoreCredentialEnvFiles(
+  cwd: string,
+  before: ReadonlyMap<string, Buffer | undefined>,
+): Promise<void> {
+  for (const [file, content] of before) {
+    const path = join(cwd, file);
+    try {
+      if (content === undefined) {
+        await rm(path, { force: true });
+      } else {
+        await writeFile(path, content);
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      reportWarning(
+        `Could not restore ${file} after the failed setup (${reason}); it may still name the abandoned project.`,
+      );
+    }
   }
-  await writeFile(path, before);
 }
 
 /**
@@ -1162,7 +1256,7 @@ async function restoreEnvLocal(cwd: string, before: Buffer | undefined): Promise
  * a run that named a provider on the command line is scripted, and stopping
  * to ask would hang it.
  *
- * The secret is never a flag, following `variables set`: it cannot reach
+ * The secret is never a flag, following `variable set`: it cannot reach
  * shell history, a process listing or a CI log. Only a scripted run reads it
  * from stdin — an interactive one is asked, and consuming stdin there would
  * leave the wizard's own prompts reading a stream already at EOF. A terminal
@@ -1252,7 +1346,10 @@ export async function ssoFromFlags(
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
     // piped from the caller's own environment.
-    retry: `printf '%s' "$CLIENT_SECRET" | ${publicCliCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion)}`,
+    retry: inShell(
+      unscopedCommand(`setup --sso ${flags.sso} --sso-client-id <id> ...`, cliVersion),
+      { before: `printf '%s' "$CLIENT_SECRET" | ` },
+    ),
   });
   return { selection, credentials: { clientId: clientId.value, secret } };
 }
@@ -1264,12 +1361,9 @@ export async function ssoFromFlags(
  */
 export type SetupRetryOptions = {
   /**
-   * The directory setup was pointed at, when it was not the shell's own.
-   * Named in the guidance rather than passed as `--cwd` in the command text:
-   * a path can carry spaces and metacharacters, and nothing escapes a
-   * suggested command for a shell -- the same reason the client id is not
-   * interpolated either. Prose the developer reads, not an argument a shell
-   * splits.
+   * The directory setup was pointed at, as typed. Every suggested rerun
+   * carries it as `--cwd`, quoted for a shell, so it configures that project
+   * from wherever it is run.
    */
   cwd?: string;
   framework?: string;
@@ -1293,6 +1387,12 @@ export type SetupRetryOptions = {
    * connection's `${{ NAME }}` from.
    */
   sso?: readonly ProviderSelection[];
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
 };
 
 /**
@@ -1316,6 +1416,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
+  }
+  if (opts.passwordMinLength !== undefined) {
+    parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
@@ -1348,7 +1451,7 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
     parts.push("--non-interactive");
   }
   parts.push("--server local");
-  return parts.join(" ");
+  return `${parts.join(" ")}${cwdArg(opts)}`;
 }
 
 /** Whether `--sso` names a provider this CLI offers. */
@@ -1360,6 +1463,18 @@ const isKnownSsoName = (name: string): boolean =>
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
+/**
+ * The `--password-min-length` a retry carries: the value it means, or nothing
+ * for one the parser refuses, which a retry would only be refused for again.
+ */
+function retryMinLength(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok ? parsed.value : undefined;
+}
+
 export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
@@ -1368,6 +1483,7 @@ export function retryOptionsFromFlags(flags: {
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
+  "password-min-length"?: string;
   sso?: string;
   "sso-client-id"?: string;
   "sso-slug"?: string;
@@ -1415,6 +1531,7 @@ export function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    passwordMinLength: retryMinLength(flags["password-min-length"]),
     // The provider survives on its own. A suggested retry carries `--sso`
     // without `--sso-client-id` -- the id is never put in command text -- so
     // requiring both here would drop the provider from the next suggestion if
@@ -1455,17 +1572,15 @@ function ssoCredentialPublisher(
  * failed project creation -- and the second was missed when this was written
  * inline, which is exactly the kind of thing one copy prevents.
  */
-function runFromHint(retry: SetupRetryOptions): string {
-  if (retry.cwd === undefined || retry.cwd === process.cwd()) {
-    return "";
-  }
-  return `Run these from ${retry.cwd}, which is the project they configure. `;
+/** `--cwd` for a suggested command, when setup was pointed at a directory. */
+function cwdArg(retry: SetupRetryOptions): string {
+  return retry.cwd === undefined ? "" : ` ${shellOption("--cwd", retry.cwd)}`;
 }
 
 function ssoRecovery(
   retry: SetupRetryOptions,
   cliVersion: string,
-): { hint: string; commands: string[] } {
+): { hint: string; commands: SuggestedCommand[] } {
   const chosen = retry.sso ?? [];
   const remaining = chosen.slice(1);
   if (remaining.length === 0) {
@@ -1482,20 +1597,29 @@ function ssoRecovery(
     // what the command does. `auth-method sso enable` asks for the id, exactly as it asks
     // for the secret, which was never put in command text for the same
     // reason.
-    // `--server local`, as the setup retry pins it. Server resolution prefers
-    // `ZITADEL_API_BASE` over the project's own `zitadel.json`, so an
-    // unpinned `auth-method sso enable` run with that variable set would publish the
-    // client id and secret to whatever it names, using the local project's
-    // token -- leaving the local provider unconfigured and the credentials
-    // somewhere nobody asked for. Both callers of this are local-server
-    // failures, so `local` is the server meant in every case.
+    // localRecoverySelector carries `--server local`, as the setup retry
+    // pins it. An unpinned `auth-method sso enable`
+    // takes its server from `ZITADEL_URL`, so with that variable set to
+    // another server it would publish the client id and secret there --
+    // leaving the local provider unconfigured and the credentials somewhere
+    // nobody asked for. Both callers of this are local-server failures, so
+    // `local` is the server meant in every case.
+    //
+    // `--env-file .env.development.local` pins the project and credential too:
+    // `auth-method sso enable` is an EnvironmentCommand that resolves those from the
+    // environment, where the process environment outranks the `.env` files, so
+    // in a shell holding production values `--server local` alone would send
+    // the production token to the local server. `--env-file` outranks the
+    // process environment (unlike `--env`), so it is the one that forces the
+    // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      publicCliCommand(
+      projectCommand(
         `auth-method sso enable --provider ${selectionName(selection)}${
           selection.kind === "custom"
             ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
             : ""
-        } --server local`,
+        }`,
+        localRecoverySelector(retry.cwd),
         cliVersion,
       ),
     ),
@@ -1511,11 +1635,13 @@ async function createProjectWithLocalHint(
   retry: SetupRetryOptions,
 ): Promise<CreateProject201> {
   try {
-    // Register the app's own origin so the backend's origin check allows the
-    // requests the dev proxy forwards from it.
+    // Register the app's own origin as primary: only a primary pattern admits
+    // the requests the dev proxy forwards from it, and a deploy goes to the
+    // project's primary origins. A preview pattern is for the URLs a
+    // pull-request build deploys to, which this is not.
     return await client.createProject({
       name: projectName,
-      origins: [{ pattern: issuer, kind: "preview" }],
+      origins: [{ pattern: issuer, kind: "primary" }],
       seed_defaults: false,
     });
   } catch (error) {
@@ -1526,10 +1652,10 @@ async function createProjectWithLocalHint(
       hint:
         `${normalized.hint ? `${normalized.hint} ` : ""}` +
         "If you meant to use a local Zitadel server, start it first " +
-        `and retry setup with ${retryFlags}. ${runFromHint(retry)}${sso.hint}`.trimEnd(),
+        `and retry setup with ${retryFlags}. ${sso.hint}`.trimEnd(),
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${retryFlags}`, cliVersion),
+        unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
+        unscopedCommand(`setup ${retryFlags}`, cliVersion),
         ...sso.commands,
       ],
       details: {
@@ -1600,10 +1726,10 @@ async function assertLocalServerVersion(
       hint:
         "A server another CLI release started serves that release's API, so setup would stop " +
         `halfway. Run start to restart it on ${expected}; its data stays. ${where}` +
-        `Then rerun setup. ${runFromHint(retry)}`.trimEnd(),
+        "Then rerun setup.",
       nextCommands: [
-        publicCliCommand("start", cliVersion),
-        publicCliCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
+        unscopedCommand(`start ${shellOption("--cwd", nearest.dir)}`, cliVersion),
+        unscopedCommand(`setup ${setupRetryFlags(retry)}`, cliVersion),
       ],
       details: {
         server_url: runtime.server_url,
@@ -1627,7 +1753,6 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
     hint:
       `${normalized.hint ? `${normalized.hint} ` : ""}` +
       "Start local Zitadel first, then rerun setup. " +
-      runFromHint(retry) +
       (retry.sso && retry.sso.length > 0
         ? "The rerun asks for the client id and secret, because a command carries neither. " +
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
@@ -1635,8 +1760,8 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
       sso.hint +
       "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
     nextCommands: [
-      publicCliCommand("start", cliVersion),
-      publicCliCommand(setupCommand, cliVersion),
+      unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
+      unscopedCommand(setupCommand, cliVersion),
       ...sso.commands,
     ],
     details: normalized.details,
@@ -1683,6 +1808,33 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
+ * Whether `--password-min-length` asks for a minimum, rather than none,
+ * nothing, or a value the parser refuses (setup fails on that just after).
+ */
+function setsMinLength(value: string | undefined): boolean {
+  if (value === undefined) {
+    return false;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok && typeof parsed.value === "number";
+}
+
+/**
+ * `--password-min-length`, read with the prompt's parser so the two cannot
+ * disagree. Refused before anything is created.
+ */
+function passwordMinLengthFromFlag(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  if (!parsed.ok) {
+    throw new ZitadelError("E_VALIDATION", `--password-min-length: ${parsed.problem}`);
+  }
+  return parsed.value;
+}
+
+/**
  * Map from the patcher's deterministic output paths to a short noun
  * phrase describing what the file is for. Anything not in the map falls
  * back to the bare path in the narration; add an entry here when a new
@@ -1694,6 +1846,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
   "zitadel.json": { subject: "the Zitadel project configuration" },
   ".env.example": { subject: "the .env example template" },
   ".env.local": { subject: "the local development environment variables" },
+  ".env.development.local": { subject: "the environment variables the CLI reads" },
   ".zitadel/state.json": { subject: "the sync state file" },
   ".zitadel/flows/default-login.json": { subject: "the editable default login flow" },
   ".zitadel/flows/README.md": { subject: "the flows folder README" },
@@ -1701,6 +1854,9 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
+  ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
+  ".zitadel/policies/README.md": { subject: "the policies folder README" },
+  ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
@@ -1791,13 +1947,14 @@ export function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects and how it authenticates —
+  // change what the login collects, how it authenticates and what it enforces —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });

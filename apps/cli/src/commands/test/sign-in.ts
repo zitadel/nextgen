@@ -8,7 +8,7 @@ import {
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 
-import { createZitadelClient, escapeControlCharacters } from "../../lib/api-client";
+import { escapeControlCharacters, type ZitadelClient } from "../../lib/api-client";
 import {
   type CheckResult,
   IDP_CHECKS,
@@ -21,10 +21,14 @@ import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
 import { wrapForBox } from "../../lib/box";
-import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
+import {
+  CommandGroups,
+  EnvironmentCommand,
+  type JsonEnvelope,
+  nonBlankString,
+} from "../../lib/oclif";
+import { nextCommandsData } from "../../lib/oclif/envelope";
 import { reportWarning } from "../../lib/warnings";
-import { publicCliCommand } from "../../lib/public-cli";
-import { readDevelopmentIssuer, readZitadelConfig, readZitadelSecret } from "../../lib/project";
 
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_BODY_BYTES = 1_000_000;
@@ -86,7 +90,7 @@ async function readBounded(response: Response, limit: number): Promise<string> {
  * it finishes. A check that fails makes the command fail; one that could not
  * tell is shown as skipped and never counted as a pass.
  */
-export default class TestSignIn extends BaseCommand {
+export default class TestSignIn extends EnvironmentCommand {
   static override description = "Check that a sign-in provider is set up correctly.";
   static override group = CommandGroups.configuration;
   static override examples = ["<%= config.bin %> test sign-in --provider google"];
@@ -100,20 +104,19 @@ export default class TestSignIn extends BaseCommand {
     const { flags } = await this.parse(TestSignIn);
     await this.toMeta(flags);
     const { cwd } = this.meta;
-    const secret = await readZitadelSecret(cwd);
-    consola.info(`Project   ${secret.project_id}`);
-    consola.info(`Server    ${this.meta.source}`);
+    const { client, projectId } = await this.connect();
     const connections = await this.connections(cwd, flags.provider);
-    const projectIssuer = readDevelopmentIssuer(await readZitadelConfig(cwd));
+    // The callback URI is built from the origin the app serves from.
+    const projectIssuer = this.environment.values.ZITADEL_ISSUER?.value;
     if (projectIssuer === undefined) {
-      throw new ZitadelError("E_VALIDATION", "zitadel.json names no development issuer", {
-        hint: "The callback URI is built from it; run zitadel setup first.",
+      throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+        hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
       });
     }
     const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
       async (done, connection) => [
         ...(await done),
-        await this.checkProvider(connection, projectIssuer),
+        await this.checkProvider(connection, projectIssuer, { client, projectId }),
       ],
       Promise.resolve([]),
     );
@@ -151,9 +154,7 @@ export default class TestSignIn extends BaseCommand {
               ? undefined
               : escaped(providers.length > 1 ? `${first.provider}: ${recovery}` : recovery),
           details: data,
-          nextCommands: [
-            publicCliCommand(`test sign-in --provider ${first.provider}`, this.meta.cliVersion),
-          ],
+          nextCommands: [this.suggest(`test sign-in --provider ${first.provider}`)],
         },
       );
     }
@@ -163,10 +164,9 @@ export default class TestSignIn extends BaseCommand {
       data: {
         ...data,
         next_actions: ["Sign in once to be sure: these checks cannot prove the whole journey."],
-        next_commands:
-          only === undefined
-            ? []
-            : [publicCliCommand(`test sign-in --provider ${only.provider}`, this.meta.cliVersion)],
+        ...nextCommandsData(
+          only === undefined ? [] : [this.suggest(`test sign-in --provider ${only.provider}`)],
+        ),
       },
     });
   }
@@ -175,8 +175,8 @@ export default class TestSignIn extends BaseCommand {
   private async checkProvider(
     connection: ConnectionFile,
     projectIssuer: string,
+    project: { readonly client: ZitadelClient; readonly projectId: string },
   ): Promise<ProviderReport> {
-    const { cwd } = this.meta;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
     const callbackUri = callbackUriFor(projectIssuer, slug);
@@ -189,7 +189,7 @@ export default class TestSignIn extends BaseCommand {
     // connection is still Google; the slug stays for the callback URI and the report.
     const kind = typeof connection.body.template === "string" ? connection.body.template : slug;
     const catalogId = IDP_PROVIDERS.find((id) => id === kind);
-    const clientId = await this.clientId(cwd, oidc.client_id).then(
+    const clientId = await this.clientId(project, oidc.client_id).then(
       (value) => ({ value }),
       (error: unknown) => ({ error: toZitadelError(error) }),
     );
@@ -284,7 +284,10 @@ export default class TestSignIn extends BaseCommand {
   }
 
   /** The client ID: written in the file, or a project variable the file references. */
-  private async clientId(cwd: string, written: unknown): Promise<string> {
+  private async clientId(
+    project: { readonly client: ZitadelClient; readonly projectId: string },
+    written: unknown,
+  ): Promise<string> {
     if (typeof written !== "string" || written === "") {
       throw new ZitadelError("E_VALIDATION", "The connection has no oidc.client_id");
     }
@@ -292,15 +295,13 @@ export default class TestSignIn extends BaseCommand {
     if (name === undefined) {
       return written;
     }
-    const secret = await readZitadelSecret(cwd);
-    const client = createZitadelClient({ baseUrl: this.meta.source, token: secret.project_secret });
-    const { primary } = await client.getVariable(name, {
-      project_id: secret.project_id,
+    const { primary } = await project.client.getVariable(name, {
+      project_id: project.projectId,
       kind: "primary",
     });
     if (typeof primary !== "string" || primary === "") {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no value`, {
-        hint: `Publish it with: zitadel variables set ${name} --project-level`,
+        hint: `Publish it with: zitadel variable set ${name}`,
       });
     }
     return primary;

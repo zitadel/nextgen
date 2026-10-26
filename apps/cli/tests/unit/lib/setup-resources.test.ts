@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,9 +22,11 @@ import { IDPS_DIR } from "../../../src/lib/idp";
 import { acmeSelection, googleSelection } from "../../helpers/idp-values";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
+import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "../../../src/lib/policies";
 import { stableStringify } from "../../../src/lib/json";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
+import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -50,6 +53,7 @@ describe("materializeSetupResources", () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await expect(
@@ -81,6 +85,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -104,6 +109,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -135,6 +141,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: { audience: {}, ...body.flow_definition },
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -168,6 +175,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -208,6 +216,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -232,7 +241,7 @@ describe("materializeSetupResources", () => {
     // is not one of its dependencies) — every command mention must be the
     // runnable public npx form.
     for (const readme of [schemasReadme, flowsReadme]) {
-      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
       expect(readme).not.toMatch(/`zitadel /);
     }
   });
@@ -246,6 +255,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -262,6 +272,294 @@ describe("materializeSetupResources", () => {
   });
 });
 
+describe("materializeSetupResources password policy", () => {
+  /** A client whose schema, flow and policy creates succeed. */
+  function client(): ZitadelClient {
+    return {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
+    } as unknown as ZitadelClient;
+  }
+
+  it("publishes and writes an empty policy when no minimum was given", async () => {
+    const platform = client();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(vi.mocked(platform.publishPolicy)).toHaveBeenCalledWith(
+      { operation: "auth.factor.password.set", config: {} },
+      { project_id: "project_123" },
+    );
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as object;
+    expect(written).toEqual({
+      $schema: "../meta/policy.json",
+      operation: "auth.factor.password.set",
+      config: {},
+    });
+  });
+
+  it("puts the given minimum into the published policy and its file", async () => {
+    const platform = client();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+      passwordMinLength: 12,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 12 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ min_length: 12 });
+  });
+
+  it("records the policy id and the hash setup records for its resources", async () => {
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: false,
+    });
+
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[PASSWORD_POLICY_PATH]).toEqual({
+      id: "pol_01KWHP",
+      hash: hashForState(
+        { normalize: () => ({ operation: "auth.factor.password.set", config: {} }) },
+        {},
+      ),
+    });
+  });
+
+  it("writes the policies README with runnable commands", async () => {
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: false,
+    });
+
+    const readme = await readFile(join(cwd, POLICIES_DIR, "README.md"), "utf8");
+    expect(readme).toContain("min_length");
+    expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
+    expect(readme).not.toMatch(/`zitadel /);
+    expect(result.filesWritten).toContain(join(cwd, POLICIES_DIR, "README.md"));
+  });
+
+  it("refuses an existing policy file before creating anything", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), "{}\n");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(vi.mocked(platform.createSchema)).not.toHaveBeenCalled();
+    expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      hint: expect.stringContaining("--force to keep this policy"),
+    });
+  });
+
+  it("keeps an existing policy file under --force and publishes it as it is", async () => {
+    const platform = client();
+    const existing = `{"$schema":"../meta/policy.json","operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 14, history_depth: 2 },
+    });
+    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+  });
+
+  it("puts a given minimum into an existing policy file under --force, keeping its other settings", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
+    );
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: 10,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 10, history_depth: 2 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ min_length: 10, history_depth: 2 });
+  });
+
+  it("leaves a kept policy file untouched when the given minimum is the one it has", async () => {
+    const existing = `{"operation":"auth.factor.password.set","config":{"min_length":14}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: 14,
+    });
+
+    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+  });
+
+  it("removes the minimum from an existing policy file under --force on an explicit none", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
+    );
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: null,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { history_depth: 2 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ history_depth: 2 });
+  });
+
+  it("refuses an invalid existing policy file under --force in the preflight, before anything is created", async () => {
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
+    );
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("refuses an invalid existing policy file under --force before publishing it", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: true,
+      }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
+  });
+
+  it("goes on without a policy against a server that has no policy endpoints", async () => {
+    takeReportedWarnings();
+    const platform = client();
+    vi.mocked(platform.publishPolicy).mockRejectedValue(
+      new ApiError(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
+    );
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(existsSync(join(cwd, PASSWORD_POLICY_PATH))).toBe(false);
+    expect(existsSync(join(cwd, POLICIES_DIR, "README.md"))).toBe(false);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
+    expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
+  });
+
+  it("still fails on a policy the server refuses", async () => {
+    const platform = client();
+    vi.mocked(platform.publishPolicy).mockRejectedValue(
+      new ApiError(
+        400,
+        "http://localhost:8080/policies",
+        { code: "req.invalid", message: "bad" },
+        "Bad Request",
+      ),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
 describe("materializeSetupResources branding", () => {
   it("never scaffolds branding files or publishes a branding revision (#1039)", async () => {
     const createBranding = vi.fn();
@@ -269,6 +567,7 @@ describe("materializeSetupResources branding", () => {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
       createBranding,
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -307,6 +606,7 @@ describe("materializeSetupResources with a social provider", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
   }
 
@@ -694,6 +994,7 @@ describe("materializeSetupResources with several providers", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({

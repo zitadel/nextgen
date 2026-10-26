@@ -75,6 +75,34 @@ func TestConsoleBaseURL(t *testing.T) {
 	}
 }
 
+func TestPublicOrigin(t *testing.T) {
+	tests := []struct {
+		name       string
+		publicBase string
+		want       string
+		wantErr    bool
+	}{
+		{name: "plain origin", publicBase: "http://localhost:8080", want: "http://localhost:8080"},
+		{name: "trailing slash dropped", publicBase: "https://preview.zitadel.com/", want: "https://preview.zitadel.com"},
+		{name: "path prefix dropped", publicBase: "https://proxy.example.com/nextgen", want: "https://proxy.example.com"},
+		{name: "host lowercased", publicBase: "https://Zitadel.Example.com", want: "https://zitadel.example.com"},
+		{name: "default port dropped", publicBase: "https://zitadel.example.com:443", want: "https://zitadel.example.com"},
+		{name: "other port kept", publicBase: "https://zitadel.example.com:8443", want: "https://zitadel.example.com:8443"},
+		{name: "empty", publicBase: "", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := publicOrigin(tt.publicBase)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestLoadConfigServerPublicBase(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
 	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
@@ -186,6 +214,20 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
+}
+
+func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT", "true")
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_platformadmin,user_01H0000000000000000000000")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"user_platformadmin", "user_01H0000000000000000000000"}, cfg.Platform.Operators)
 }
 
 // TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record

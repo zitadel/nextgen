@@ -234,3 +234,37 @@ func TestCompileReadCursorCoerceFailure(t *testing.T) {
 	require.ErrorAs(t, err, &dbErr)
 	assert.Error(t, dbErr.Parent)
 }
+
+// compileWhereRest continues a WHERE the caller opened with arguments of its
+// own: the list filter, then the keyset, numbered after the caller's.
+func TestCompileWhereRestFollowsTheCallersPredicate(t *testing.T) {
+	t.Parallel()
+
+	byID := database.OrderBy[domain.ProjectField]{
+		Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+		Direction: database.OrderAsc,
+	}
+	cursor := pagination.New(byID, []any{"proj_1"}).Marshal()
+	opened := func() *statementCompiler {
+		var compiler statementCompiler
+		compiler.WriteString(testProjectQuery + " WHERE id IN (")
+		compiler.WriteArg("proj_0")
+		compiler.WriteString(")")
+		return &compiler
+	}
+
+	searched := opened()
+	require.NoError(t, compileWhereRest(searched, &database.ListOptions[domain.ProjectField]{
+		Filter:     database.StringContainsFold(database.Col(domain.ProjectFieldName), "acme"),
+		Pagination: database.Page[domain.ProjectField]{Limit: 5, OrderBy: byID, Cursor: cursor},
+	}, projectSchema))
+	assert.Equal(t, testProjectQuery+" WHERE id IN ($1) AND (LOWER(name) LIKE LOWER('%' || $2 || '%') AND id > $3) ORDER BY id LIMIT $4", searched.String())
+	assert.Equal(t, []any{"proj_0", "acme", "proj_1", uint32(5)}, searched.args)
+
+	// Neither a filter nor a cursor: no dangling AND.
+	plain := opened()
+	require.NoError(t, compileWhereRest(plain, &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{Limit: 5, OrderBy: byID},
+	}, projectSchema))
+	assert.Equal(t, testProjectQuery+" WHERE id IN ($1) ORDER BY id LIMIT $2", plain.String())
+}

@@ -1,5 +1,6 @@
 post:
   operationId: addOrigin
+  x-zitadel-cli: origin add
   summary: Add an origin pattern
   description: |
     Adds one `{pattern, kind}` to the project's origins. A primary pattern

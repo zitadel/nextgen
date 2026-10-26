@@ -179,7 +179,7 @@ func matchingIDPRevision(
 	if same {
 		return connection, nil
 	}
-	result, err := stmts.ListIDPConnectionRevisions(ctx, connection.ProjectID, connection.ID, database.Page[domain.IDPConnectionField]{
+	result, err := stmts.ListIDPConnectionRevisions(WithAuthzListUnrestricted(ctx), connection.ProjectID, connection.ID, database.Page[domain.IDPConnectionField]{
 		Limit:   maxHistoricalRevisions,
 		OrderBy: idpconnection.RevisionsNewestFirst(),
 	})

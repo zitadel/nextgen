@@ -1,0 +1,59 @@
+/* Styles for `<zl-account>` — shadow host rules first, then the painted surface. */
+
+:host {
+  display: block;
+}
+
+/* Full width whatever the identifier's length, so the chip lines up with the
+   fields beneath it. */
+.zr-account {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--zl-spacing-2);
+  inline-size: 100%;
+  min-block-size: var(--zl-spacing-9);
+  padding-block: var(--zl-spacing-1);
+  padding-inline: var(--zl-spacing-3);
+  border: 1px solid var(--zl-border);
+  /* Follows the brand's radius rather than staying a pill: at the default
+     `md` (8px) this is 18px, half the 36px height, so a full pill; a square
+     brand (0) squares it off with the fields, and the steps in between scale. */
+  border-radius: calc(var(--zl-radius-md) * 2.25);
+  background: transparent;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-foreground);
+  text-decoration: none;
+}
+/* The avatar sits closer to the rounded edge than text would. */
+:host([avatar]) .zr-account {
+  padding-inline-start: var(--zl-spacing-1-5);
+}
+.zr-account--action {
+  cursor: pointer;
+  transition: background-color var(--zl-duration-fast) var(--zl-easing-standard);
+}
+.zr-account--action:hover {
+  background: var(--zl-accent);
+}
+.zr-account__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--zl-font-weight-medium);
+}
+.zr-account zl-icon {
+  flex-shrink: 0;
+  color: var(--zl-muted-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zr-account--action {
+    transition: none;
+  }
+}

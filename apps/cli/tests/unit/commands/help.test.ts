@@ -23,6 +23,9 @@ Project commands
   claim:                        Claim this project to make it permanent
   doctor:                       Verify local runtime and project state
   eject:                        Remove managed files and local Zitadel state
+  env:                          Show which server and project resolve, and where each value came from
+  env list:                     List the environments bound in this directory's .env files
+  env add:                      Bind an environment to a project, creating the project if needed
 
 Local server commands
   start:                        Start a local Zitadel server
@@ -33,8 +36,8 @@ Local server commands
   console:                      Open the local console, signed in as the local admin created by \`zitadel start\`
 
 Configuration commands
-  plan:                         Validate config without mutation and preview the sync diff
-  apply:                        Validate and upload repo config to the platform
+  deploy:                       Build a release from .zitadel/ and deploy it to the project
+  pull:                         Rebuild .zitadel/ from the revisions a released snapshot pins
   branding eject:               Take ownership of the login template
   auth-method passkey disable:  Disable passkey sign-in for a user schema
   auth-method passkey enable:   Enable passkey sign-in for a user schema
@@ -44,17 +47,29 @@ Configuration commands
   auth-method sso enable:       Add an identity provider to a user schema
   branding get:                 Get one branding revision by id
   branding list:                List branding
-  flow-definitions get:         Get one flow definition by id
+  deployment create:            Deploy an existing release to the project's origins
+  deployment get:               Read one deployment by id
+  deployment list:              List the project's deployments, newest first
+  deployment rollback:          Roll back to an earlier deployment
+  flow-definitions get:         Get one flow definition by flow name (newest revision) or revision id
   flow-definitions list:        List flow-definitions
-  releases get:                 Get one release by id
-  releases list:                List releases
-  schemas get:                  Get one schema by id
+  origin add:                   Add an origin pattern to the project
+  origin list:                  List the origin patterns on the project
+  origin rm:                    Remove an origin pattern from the project
+  policies get:                 Get one policy by policy id or operation
+  policies list:                List policies
+  release create:               Build a release from .zitadel/ without deploying it
+  release get:                  Get one release by id
+  release list:                 List release
+  release revoke:               Revoke a release so its content is never served again
+  schemas get:                  Get one schema by object type (current revision) or revision id
   schemas list:                 List schemas
   test sign-in:                 Check that a sign-in provider is set up correctly
-  variables delete:             Delete one variable from the project
-  variables get:                Get one variable from the project
-  variables list:               List the variables entered on the project
-  variables set:                Set one variable on the project
+  variable get:                 Get one variable from the project
+  variable list:                List the variables entered on the project
+  variable resolve:             Show the variables the live deployment froze for a target
+  variable rm:                  Remove one variable from the project
+  variable set:                 Set one variable on the project
 
 Resource commands
   resources:                    List the resources this CLI manages and what can be done to each

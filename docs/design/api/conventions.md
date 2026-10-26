@@ -51,8 +51,9 @@ contract — do not code against them.
   `GET /console/runtime.json` (see console ADR 0004), which serves the
   console's own runtime config, not a general capability contract.
 - **Date-based versioning** — a `Zitadel-Version` header with per-credential
-  pinning. The shipped API is unversioned; breaking changes ride the alpha
-  release train.
+  pinning, for opt-in changes within a path major
+  ([ADR 077](../../adrs/077-api-path-prefix.md)). The shipped API is
+  unversioned; breaking changes ride the release train.
 - **Rate-limit headers** — `X-RateLimit-*` on responses.
 - **Expansion** — `expand=` parameters for embedding related resources.
 - **Error envelope extras** — `request_id` correlation and `docs_url`

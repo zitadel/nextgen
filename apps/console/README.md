@@ -145,8 +145,8 @@ production build.
 The runtime document also carries the default project's **publishable key**
 (root ADR 036): a browser-safe, origin-scoped bearer the login widget sends
 on flow calls and the handoff exchange. Sign-in therefore needs no server-side
-credential either. The server serves the document only while one of its UI
-surfaces (console or hosted login) is enabled.
+credential either. The server serves the document whether or not it embeds the
+console.
 
 ## Local development
 

@@ -63,6 +63,8 @@ var operationRolesNextgenSession = map[string][]string{
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
 	GetMyUserSchemaOperation:       []string{},
+	GetPolicyOperation:             []string{},
+	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
@@ -74,6 +76,9 @@ var operationRolesNextgenSession = map[string][]string{
 	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
 	ListMyTeamsOperation:           []string{},
+	ListPoliciesOperation:          []string{},
+	ListPolicyRevisionsOperation:   []string{},
+	ListProjectAdminsOperation:     []string{},
 	ListSchemasOperation:           []string{},
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
@@ -206,6 +211,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyOperation: []string{
+		"policy.read",
+	},
 	GetPolicyRevisionOperation: []string{
 		"policy.read",
 	},
@@ -257,8 +265,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
 	},
+	ListPoliciesOperation: []string{
+		"policy.read",
+	},
+	ListPolicyRevisionsOperation: []string{
+		"policy.read",
+	},
 	ListPreviewsOperation: []string{
 		"deployment.read",
+	},
+	ListProjectAdminsOperation: []string{
+		"project.write",
 	},
 	ListReleasesOperation: []string{
 		"release.read",
