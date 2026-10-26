@@ -138,13 +138,14 @@ instrumentation:
 
 ## Tracing
 
-| YAML key                                        | Environment                                             | Default | Description                                 |
-| ----------------------------------------------- | ------------------------------------------------------- | ------- | ------------------------------------------- |
-| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                        |
-| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`     |
-| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http` |
-| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent |
-| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced  |
+| YAML key                                        | Environment                                             | Default | Description                                    |
+| ----------------------------------------------- | ------------------------------------------------------- | ------- | ---------------------------------------------- |
+| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                           |
+| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`        |
+| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http`    |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent    |
+| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced     |
+| `instrumentation.trace.trust_remote_spans`      | `NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS`      | `false` | Continue the caller's trace from `traceparent` |
 
 - `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
   `exporter.google_project_id`), `auto`.
@@ -160,6 +161,20 @@ instrumentation:
   is idle.
 - A traced request keeps all of its spans, including one span per database
   statement.
+
+With `trust_remote_spans` off (the default), an incoming `traceparent`,
+`tracestate` or `baggage` header is ignored and every request starts a new
+trace, sampled by `fraction`.
+
+With it on, the server span becomes a child of the caller's span and joins the
+caller's trace ID. That also trusts the caller's sampled flag: a caller that
+sends `sampled=1` is recorded and exported **whatever `fraction` says**, and
+so is everything ZITADEL does for that request. A caller that sends
+`sampled=0` is still sampled by `fraction`. Turn it on only when ZITADEL sits
+behind a proxy, gateway or mesh you control that strips or overwrites these
+headers at the edge, never when untrusted callers can reach ZITADEL directly,
+because any of them could force every request to be recorded. The decision is
+recorded in [ADR 080](../adrs/080-incoming-trace-context.md).
 
 ```yaml
 instrumentation:

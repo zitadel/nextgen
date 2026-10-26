@@ -9927,6 +9927,8 @@ type BuildReleaseErrorResponse struct {
 	SchFetchTooManyRedirects SchFetchTooManyRedirects
 	SchNotFound              SchNotFound
 	NotImplemented           NotImplemented
+	PolInvalid               PolInvalid
+	PolRevisionConflict      PolRevisionConflict
 	RelInvalid               RelInvalid
 	RelNotFound              RelNotFound
 	RelPermissionDenied      RelPermissionDenied
@@ -9956,6 +9958,8 @@ const (
 	SchFetchTooManyRedirectsBuildReleaseErrorResponse BuildReleaseErrorResponseType = "sch.fetch_too_many_redirects"
 	SchNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "sch.not_found"
 	NotImplementedBuildReleaseErrorResponse           BuildReleaseErrorResponseType = "not_implemented"
+	PolInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "pol.invalid"
+	PolRevisionConflictBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "pol.revision_conflict"
 	RelInvalidBuildReleaseErrorResponse               BuildReleaseErrorResponseType = "rel.invalid"
 	RelNotFoundBuildReleaseErrorResponse              BuildReleaseErrorResponseType = "rel.not_found"
 	RelPermissionDeniedBuildReleaseErrorResponse      BuildReleaseErrorResponseType = "rel.permission_denied"
@@ -10030,6 +10034,16 @@ func (s BuildReleaseErrorResponse) IsSchNotFound() bool {
 // IsNotImplemented reports whether BuildReleaseErrorResponse is NotImplemented.
 func (s BuildReleaseErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedBuildReleaseErrorResponse
+}
+
+// IsPolInvalid reports whether BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) IsPolInvalid() bool {
+	return s.Type == PolInvalidBuildReleaseErrorResponse
+}
+
+// IsPolRevisionConflict reports whether BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) IsPolRevisionConflict() bool {
+	return s.Type == PolRevisionConflictBuildReleaseErrorResponse
 }
 
 // IsRelInvalid reports whether BuildReleaseErrorResponse is RelInvalid.
@@ -10347,6 +10361,48 @@ func (s BuildReleaseErrorResponse) GetNotImplemented() (v NotImplemented, ok boo
 func NewNotImplementedBuildReleaseErrorResponse(v NotImplemented) BuildReleaseErrorResponse {
 	var s BuildReleaseErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetPolInvalid sets BuildReleaseErrorResponse to PolInvalid.
+func (s *BuildReleaseErrorResponse) SetPolInvalid(v PolInvalid) {
+	s.Type = PolInvalidBuildReleaseErrorResponse
+	s.PolInvalid = v
+}
+
+// GetPolInvalid returns PolInvalid and true boolean if BuildReleaseErrorResponse is PolInvalid.
+func (s BuildReleaseErrorResponse) GetPolInvalid() (v PolInvalid, ok bool) {
+	if !s.IsPolInvalid() {
+		return v, false
+	}
+	return s.PolInvalid, true
+}
+
+// NewPolInvalidBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolInvalid.
+func NewPolInvalidBuildReleaseErrorResponse(v PolInvalid) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolInvalid(v)
+	return s
+}
+
+// SetPolRevisionConflict sets BuildReleaseErrorResponse to PolRevisionConflict.
+func (s *BuildReleaseErrorResponse) SetPolRevisionConflict(v PolRevisionConflict) {
+	s.Type = PolRevisionConflictBuildReleaseErrorResponse
+	s.PolRevisionConflict = v
+}
+
+// GetPolRevisionConflict returns PolRevisionConflict and true boolean if BuildReleaseErrorResponse is PolRevisionConflict.
+func (s BuildReleaseErrorResponse) GetPolRevisionConflict() (v PolRevisionConflict, ok bool) {
+	if !s.IsPolRevisionConflict() {
+		return v, false
+	}
+	return s.PolRevisionConflict, true
+}
+
+// NewPolRevisionConflictBuildReleaseErrorResponse returns new BuildReleaseErrorResponse from PolRevisionConflict.
+func NewPolRevisionConflictBuildReleaseErrorResponse(v PolRevisionConflict) BuildReleaseErrorResponse {
+	var s BuildReleaseErrorResponse
+	s.SetPolRevisionConflict(v)
 	return s
 }
 
@@ -12331,9 +12387,9 @@ func NewPasskeyFactorPayloadCompletedFactorPayload(v PasskeyFactorPayload) Compl
 // same release on any project.
 // A handle names one resource of its kind in a bundle. Two schemas with the
 // same `objectType`, two flow definitions with the same `name`, two IDP
-// connections with the same `slug`, or a schema without an `objectType`
-// refuse the release with `rel.invalid`, with an
-// entry for each such resource.
+// connections with the same `slug`, two policies for the same `operation`,
+// or a schema without an `objectType` refuse the release with `rel.invalid`,
+// with an entry for each such resource.
 // Each kind is optional, and the arrays may be empty: a project that never
 // ejected its branding omits `branding`. The bundle carries at least one
 // resource, and the release it builds pins at most 50, the most a release
@@ -12360,6 +12416,18 @@ type ConfigurationBundle struct {
 	// as `${{ NAME }}` references to variables, never as values, so a bundle
 	// carries no credentials.
 	Idps []IdpConnection `json:"idps"`
+	// Operation policies, one per `.zitadel/policies/<operation>.json`, each
+	// the body `POST /policies` takes. The handle is `operation`: a project
+	// has one policy per operation. An unknown setting or a value outside a
+	// setting's bounds is refused while the request is decoded, with
+	// `req.invalid` and no `details.resources`; a config the operation's
+	// template refuses beyond that, such as settings that contradict each
+	// other, gets a `rel.invalid` entry.
+	// A request served this release reads the policy revision it pins for
+	// the operation, as it reads the user schema, branding and identity
+	// providers, once the release pins a flow; a release that pins a flow
+	// and no policy for an operation means no policy for it.
+	Policies []PublishPolicyRequest `json:"policies"`
 	// The descriptor from `.zitadel/branding/branding.json` with its template
 	// inlined, exactly as `POST /branding` takes it. A project has one
 	// branding, so this is a single object.
@@ -12381,6 +12449,11 @@ func (s *ConfigurationBundle) GetIdps() []IdpConnection {
 	return s.Idps
 }
 
+// GetPolicies returns the value of Policies.
+func (s *ConfigurationBundle) GetPolicies() []PublishPolicyRequest {
+	return s.Policies
+}
+
 // GetBranding returns the value of Branding.
 func (s *ConfigurationBundle) GetBranding() OptBranding {
 	return s.Branding
@@ -12399,6 +12472,11 @@ func (s *ConfigurationBundle) SetFlowDefinitions(val []FlowDefinition) {
 // SetIdps sets the value of Idps.
 func (s *ConfigurationBundle) SetIdps(val []IdpConnection) {
 	s.Idps = val
+}
+
+// SetPolicies sets the value of Policies.
+func (s *ConfigurationBundle) SetPolicies(val []PublishPolicyRequest) {
+	s.Policies = val
 }
 
 // SetBranding sets the value of Branding.
@@ -12474,10 +12552,6 @@ func NewSchemaURLConfigurationBundleSchemasItem(v SchemaURL) ConfigurationBundle
 	return s
 }
 
-type CreateAuthAttemptConflict ErrorDetails
-
-func (*CreateAuthAttemptConflict) createAuthAttemptRes() {}
-
 // CreateAuthAttemptErrorResponse represents sum type.
 type CreateAuthAttemptErrorResponse struct {
 	Type                CreateAuthAttemptErrorResponseType // switch on this field
@@ -12487,6 +12561,7 @@ type CreateAuthAttemptErrorResponse struct {
 	EvtInvalid          EvtInvalid
 	Internal            Internal
 	NotImplemented      NotImplemented
+	ProjMismatch        ProjMismatch
 	ReqInvalid          ReqInvalid
 	EncKeyUnknownAlg    EncKeyUnknownAlg
 	Unavailable         Unavailable
@@ -12503,6 +12578,7 @@ const (
 	EvtInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "evt.invalid"
 	InternalCreateAuthAttemptErrorResponse            CreateAuthAttemptErrorResponseType = "internal"
 	NotImplementedCreateAuthAttemptErrorResponse      CreateAuthAttemptErrorResponseType = "not_implemented"
+	ProjMismatchCreateAuthAttemptErrorResponse        CreateAuthAttemptErrorResponseType = "proj.mismatch"
 	ReqInvalidCreateAuthAttemptErrorResponse          CreateAuthAttemptErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgCreateAuthAttemptErrorResponse    CreateAuthAttemptErrorResponseType = "enc_key.unknown_alg"
 	UnavailableCreateAuthAttemptErrorResponse         CreateAuthAttemptErrorResponseType = "unavailable"
@@ -12536,6 +12612,11 @@ func (s CreateAuthAttemptErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether CreateAuthAttemptErrorResponse is NotImplemented.
 func (s CreateAuthAttemptErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedCreateAuthAttemptErrorResponse
+}
+
+// IsProjMismatch reports whether CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchCreateAuthAttemptErrorResponse
 }
 
 // IsReqInvalid reports whether CreateAuthAttemptErrorResponse is ReqInvalid.
@@ -12679,6 +12760,27 @@ func NewNotImplementedCreateAuthAttemptErrorResponse(v NotImplemented) CreateAut
 	return s
 }
 
+// SetProjMismatch sets CreateAuthAttemptErrorResponse to ProjMismatch.
+func (s *CreateAuthAttemptErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchCreateAuthAttemptErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if CreateAuthAttemptErrorResponse is ProjMismatch.
+func (s CreateAuthAttemptErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchCreateAuthAttemptErrorResponse returns new CreateAuthAttemptErrorResponse from ProjMismatch.
+func NewProjMismatchCreateAuthAttemptErrorResponse(v ProjMismatch) CreateAuthAttemptErrorResponse {
+	var s CreateAuthAttemptErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
 // SetReqInvalid sets CreateAuthAttemptErrorResponse to ReqInvalid.
 func (s *CreateAuthAttemptErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidCreateAuthAttemptErrorResponse
@@ -12769,10 +12871,6 @@ func (s *CreateAuthAttemptErrorResponseStatusCode) SetResponse(val CreateAuthAtt
 }
 
 func (*CreateAuthAttemptErrorResponseStatusCode) createAuthAttemptRes() {}
-
-type CreateAuthAttemptForbidden ErrorDetails
-
-func (*CreateAuthAttemptForbidden) createAuthAttemptRes() {}
 
 // Request to create a new authentication attempt.
 // Ref: #
@@ -22273,16 +22371,15 @@ func (s *ErrorDetails) SetDetails(val OptErrorDetailsDetails) {
 	s.Details = val
 }
 
+func (*ErrorDetails) createAuthAttemptRes()    {}
 func (*ErrorDetails) createBrandingRes()       {}
 func (*ErrorDetails) createFlowDefinitionRes() {}
 func (*ErrorDetails) createHandoffRes()        {}
 func (*ErrorDetails) createProjectRes()        {}
 func (*ErrorDetails) createSessionRes()        {}
-func (*ErrorDetails) getAuthAttemptRes()       {}
 func (*ErrorDetails) getBrandingByIdRes()      {}
 func (*ErrorDetails) getMyUserRes()            {}
 func (*ErrorDetails) initClaimRes()            {}
-func (*ErrorDetails) issueChallengeRes()       {}
 func (*ErrorDetails) listFlowDefinitionsRes()  {}
 func (*ErrorDetails) listMyIdentityLinksRes()  {}
 func (*ErrorDetails) listMyPasskeysRes()       {}
@@ -23815,6 +23912,8 @@ type ExchangeHandoffErrorResponse struct {
 	TknInvalid              TknInvalid
 	TknInvalidTknid         TknInvalidTknid
 	NotImplemented          NotImplemented
+	ProjMismatch            ProjMismatch
+	RelRevoked              RelRevoked
 	ReqInvalid              ReqInvalid
 	SessExchangeConflict    SessExchangeConflict
 	SessInvalidHandoffToken SessInvalidHandoffToken
@@ -23839,6 +23938,8 @@ const (
 	TknInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "tkn.invalid"
 	TknInvalidTknidExchangeHandoffErrorResponse         ExchangeHandoffErrorResponseType = "tkn.invalid_tknid"
 	NotImplementedExchangeHandoffErrorResponse          ExchangeHandoffErrorResponseType = "not_implemented"
+	ProjMismatchExchangeHandoffErrorResponse            ExchangeHandoffErrorResponseType = "proj.mismatch"
+	RelRevokedExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "rel.revoked"
 	ReqInvalidExchangeHandoffErrorResponse              ExchangeHandoffErrorResponseType = "req.invalid"
 	SessExchangeConflictExchangeHandoffErrorResponse    ExchangeHandoffErrorResponseType = "sess.exchange_conflict"
 	SessInvalidHandoffTokenExchangeHandoffErrorResponse ExchangeHandoffErrorResponseType = "sess.invalid_handoff_token"
@@ -23892,6 +23993,16 @@ func (s ExchangeHandoffErrorResponse) IsTknInvalidTknid() bool {
 // IsNotImplemented reports whether ExchangeHandoffErrorResponse is NotImplemented.
 func (s ExchangeHandoffErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedExchangeHandoffErrorResponse
+}
+
+// IsProjMismatch reports whether ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) IsProjMismatch() bool {
+	return s.Type == ProjMismatchExchangeHandoffErrorResponse
+}
+
+// IsRelRevoked reports whether ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedExchangeHandoffErrorResponse
 }
 
 // IsReqInvalid reports whether ExchangeHandoffErrorResponse is ReqInvalid.
@@ -24120,6 +24231,48 @@ func (s ExchangeHandoffErrorResponse) GetNotImplemented() (v NotImplemented, ok 
 func NewNotImplementedExchangeHandoffErrorResponse(v NotImplemented) ExchangeHandoffErrorResponse {
 	var s ExchangeHandoffErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjMismatch sets ExchangeHandoffErrorResponse to ProjMismatch.
+func (s *ExchangeHandoffErrorResponse) SetProjMismatch(v ProjMismatch) {
+	s.Type = ProjMismatchExchangeHandoffErrorResponse
+	s.ProjMismatch = v
+}
+
+// GetProjMismatch returns ProjMismatch and true boolean if ExchangeHandoffErrorResponse is ProjMismatch.
+func (s ExchangeHandoffErrorResponse) GetProjMismatch() (v ProjMismatch, ok bool) {
+	if !s.IsProjMismatch() {
+		return v, false
+	}
+	return s.ProjMismatch, true
+}
+
+// NewProjMismatchExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from ProjMismatch.
+func NewProjMismatchExchangeHandoffErrorResponse(v ProjMismatch) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetProjMismatch(v)
+	return s
+}
+
+// SetRelRevoked sets ExchangeHandoffErrorResponse to RelRevoked.
+func (s *ExchangeHandoffErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedExchangeHandoffErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if ExchangeHandoffErrorResponse is RelRevoked.
+func (s ExchangeHandoffErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedExchangeHandoffErrorResponse returns new ExchangeHandoffErrorResponse from RelRevoked.
+func NewRelRevokedExchangeHandoffErrorResponse(v RelRevoked) ExchangeHandoffErrorResponse {
+	var s ExchangeHandoffErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -32042,6 +32195,8 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -32084,6 +32239,8 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgGetFlowStepErrorResponse            GetFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "unavailable"
@@ -32219,6 +32376,16 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundGetFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedGetFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether GetFlowStepErrorResponse is ReqInvalid.
@@ -32793,6 +32960,48 @@ func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool
 func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetRelNotFound sets GetFlowStepErrorResponse to RelNotFound.
+func (s *GetFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundGetFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if GetFlowStepErrorResponse is RelNotFound.
+func (s GetFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundGetFlowStepErrorResponse(v RelNotFound) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets GetFlowStepErrorResponse to RelRevoked.
+func (s *GetFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedGetFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if GetFlowStepErrorResponse is RelRevoked.
+func (s GetFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedGetFlowStepErrorResponse(v RelRevoked) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 
@@ -59266,6 +59475,52 @@ func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) Pr
 	return d
 }
 
+// NewOptProjMismatchDetails returns new OptProjMismatchDetails with value set to v.
+func NewOptProjMismatchDetails(v ProjMismatchDetails) OptProjMismatchDetails {
+	return OptProjMismatchDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjMismatchDetails is optional ProjMismatchDetails.
+type OptProjMismatchDetails struct {
+	Value ProjMismatchDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjMismatchDetails was set.
+func (o OptProjMismatchDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjMismatchDetails) Reset() {
+	var v ProjMismatchDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjMismatchDetails) SetTo(v ProjMismatchDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjMismatchDetails) Get() (v ProjMismatchDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjMismatchDetails) Or(d ProjMismatchDetails) ProjMismatchDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjMissingIDDetails returns new OptProjMissingIDDetails with value set to v.
 func NewOptProjMissingIDDetails(v ProjMissingIDDetails) OptProjMissingIDDetails {
 	return OptProjMissingIDDetails{
@@ -69372,6 +69627,59 @@ func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
 
 // Merged schema.
 // Ref: #
+type ProjMismatch struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjMismatchDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjMismatch) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjMismatch) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjMismatch) GetDetails() OptProjMismatchDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjMismatch) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjMismatch) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjMismatch) SetDetails(val OptProjMismatchDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjMismatchDetails map[string]jx.Raw
+
+func (s *ProjMismatchDetails) init() ProjMismatchDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
 type ProjMissingID struct {
 	// Merged property.
 	Code string `json:"code"`
@@ -75812,6 +76120,8 @@ type ReleasePointer struct {
 	// `revision_id` is what varies between releases.
 	// - `idp` — the connection's `slug`, so `google` and `github` are
 	// separate resources a release pins separately
+	// - `policy` — the policy's `operation`, so a project's password policy
+	// is one resource however often it is revised
 	// Resources inside a release reference each other by handle rather than by
 	// revision id, so the same handle names the same resource in every release.
 	Handle string `json:"handle"`
@@ -75866,6 +76176,7 @@ const (
 	ReleasePointerKindFlowDefinition ReleasePointerKind = "flow_definition"
 	ReleasePointerKindBranding       ReleasePointerKind = "branding"
 	ReleasePointerKindIdp            ReleasePointerKind = "idp"
+	ReleasePointerKindPolicy         ReleasePointerKind = "policy"
 )
 
 // AllValues returns all ReleasePointerKind values.
@@ -75875,6 +76186,7 @@ func (ReleasePointerKind) AllValues() []ReleasePointerKind {
 		ReleasePointerKindFlowDefinition,
 		ReleasePointerKindBranding,
 		ReleasePointerKindIdp,
+		ReleasePointerKindPolicy,
 	}
 }
 
@@ -75888,6 +76200,8 @@ func (s ReleasePointerKind) MarshalText() ([]byte, error) {
 	case ReleasePointerKindBranding:
 		return []byte(s), nil
 	case ReleasePointerKindIdp:
+		return []byte(s), nil
+	case ReleasePointerKindPolicy:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -75908,6 +76222,9 @@ func (s *ReleasePointerKind) UnmarshalText(data []byte) error {
 		return nil
 	case ReleasePointerKindIdp:
 		*s = ReleasePointerKindIdp
+		return nil
+	case ReleasePointerKindPolicy:
+		*s = ReleasePointerKindPolicy
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -83267,6 +83584,10 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjOriginNotAllowed        ProjOriginNotAllowed
+	ProjPreviewNotLive          ProjPreviewNotLive
+	RelNotFound                 RelNotFound
+	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
 	EncKeyUnknownAlg            EncKeyUnknownAlg
 	Unavailable                 Unavailable
@@ -83309,6 +83630,10 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
+	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
+	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
+	RelRevokedSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "req.invalid"
 	EncKeyUnknownAlgSubmitFlowStepErrorResponse            SubmitFlowStepErrorResponseType = "enc_key.unknown_alg"
 	UnavailableSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "unavailable"
@@ -83444,6 +83769,26 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) IsProjOriginNotAllowed() bool {
+	return s.Type == ProjOriginNotAllowedSubmitFlowStepErrorResponse
+}
+
+// IsProjPreviewNotLive reports whether SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) IsProjPreviewNotLive() bool {
+	return s.Type == ProjPreviewNotLiveSubmitFlowStepErrorResponse
+}
+
+// IsRelNotFound reports whether SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) IsRelNotFound() bool {
+	return s.Type == RelNotFoundSubmitFlowStepErrorResponse
+}
+
+// IsRelRevoked reports whether SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) IsRelRevoked() bool {
+	return s.Type == RelRevokedSubmitFlowStepErrorResponse
 }
 
 // IsReqInvalid reports whether SubmitFlowStepErrorResponse is ReqInvalid.
@@ -84018,6 +84363,90 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjOriginNotAllowed sets SubmitFlowStepErrorResponse to ProjOriginNotAllowed.
+func (s *SubmitFlowStepErrorResponse) SetProjOriginNotAllowed(v ProjOriginNotAllowed) {
+	s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
+	s.ProjOriginNotAllowed = v
+}
+
+// GetProjOriginNotAllowed returns ProjOriginNotAllowed and true boolean if SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
+func (s SubmitFlowStepErrorResponse) GetProjOriginNotAllowed() (v ProjOriginNotAllowed, ok bool) {
+	if !s.IsProjOriginNotAllowed() {
+		return v, false
+	}
+	return s.ProjOriginNotAllowed, true
+}
+
+// NewProjOriginNotAllowedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjOriginNotAllowed.
+func NewProjOriginNotAllowedSubmitFlowStepErrorResponse(v ProjOriginNotAllowed) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjOriginNotAllowed(v)
+	return s
+}
+
+// SetProjPreviewNotLive sets SubmitFlowStepErrorResponse to ProjPreviewNotLive.
+func (s *SubmitFlowStepErrorResponse) SetProjPreviewNotLive(v ProjPreviewNotLive) {
+	s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
+	s.ProjPreviewNotLive = v
+}
+
+// GetProjPreviewNotLive returns ProjPreviewNotLive and true boolean if SubmitFlowStepErrorResponse is ProjPreviewNotLive.
+func (s SubmitFlowStepErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, ok bool) {
+	if !s.IsProjPreviewNotLive() {
+		return v, false
+	}
+	return s.ProjPreviewNotLive, true
+}
+
+// NewProjPreviewNotLiveSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjPreviewNotLive.
+func NewProjPreviewNotLiveSubmitFlowStepErrorResponse(v ProjPreviewNotLive) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNotFound sets SubmitFlowStepErrorResponse to RelNotFound.
+func (s *SubmitFlowStepErrorResponse) SetRelNotFound(v RelNotFound) {
+	s.Type = RelNotFoundSubmitFlowStepErrorResponse
+	s.RelNotFound = v
+}
+
+// GetRelNotFound returns RelNotFound and true boolean if SubmitFlowStepErrorResponse is RelNotFound.
+func (s SubmitFlowStepErrorResponse) GetRelNotFound() (v RelNotFound, ok bool) {
+	if !s.IsRelNotFound() {
+		return v, false
+	}
+	return s.RelNotFound, true
+}
+
+// NewRelNotFoundSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelNotFound.
+func NewRelNotFoundSubmitFlowStepErrorResponse(v RelNotFound) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelNotFound(v)
+	return s
+}
+
+// SetRelRevoked sets SubmitFlowStepErrorResponse to RelRevoked.
+func (s *SubmitFlowStepErrorResponse) SetRelRevoked(v RelRevoked) {
+	s.Type = RelRevokedSubmitFlowStepErrorResponse
+	s.RelRevoked = v
+}
+
+// GetRelRevoked returns RelRevoked and true boolean if SubmitFlowStepErrorResponse is RelRevoked.
+func (s SubmitFlowStepErrorResponse) GetRelRevoked() (v RelRevoked, ok bool) {
+	if !s.IsRelRevoked() {
+		return v, false
+	}
+	return s.RelRevoked, true
+}
+
+// NewRelRevokedSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from RelRevoked.
+func NewRelRevokedSubmitFlowStepErrorResponse(v RelRevoked) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetRelRevoked(v)
 	return s
 }
 

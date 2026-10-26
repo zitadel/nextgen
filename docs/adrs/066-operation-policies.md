@@ -261,18 +261,24 @@ from the context, so the other paths, which have no history to compare with
 or must not learn it, pass it without a hash being verified. The write checks
 that the password it replaces is still the one the history was compared
 with, and fails with `user.conflict` when another change landed in between.
-Instances are published with `POST /policies` and resolved through
-`service.PolicyResolver`, which `service.PolicyService.ResolvePolicy`
-implements: the newest stored revision of the project's policy for the
-operation, and no policy when the project published none, in which case the
-gate applies only the server's own length cap. A flow step where the user
+Instances are published with `POST /policies`, or by a release build that
+carries them, and resolved through `service.PolicyResolver`, which
+`service.PolicyService.ResolvePolicy` implements. A request whose release pins
+a flow (ADR 035, [#536](https://github.com/zitadel/nextgen/issues/536)) gets
+the policy revision that release pins for the operation, as it gets the user
+schema, branding and identity providers the release pins. There is no
+fallback: a release that pins a flow and no policy for the operation means no
+policy, never the newest stored revision, so deleting a policy file and
+deploying switches the policy off, with the confirmation `deploy` asks for
+every removal. A request that resolves no release, or one that pins no flow,
+gets the newest stored revision, as for every other kind, until it resolves a
+release ([#1616](https://github.com/zitadel/nextgen/issues/1616)); runtime
+resolution then serves only what releases pin
+([#2331](https://github.com/zitadel/nextgen/issues/2331)). Without a policy
+the gate applies only the server's own length cap. A flow step where the user
 chooses a password shows and checks the same length bounds before the gate
-runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)). The newest stored
-revision is a stand-in: ADR 035 says a deployment serves only what its
-release pins, so resolution moves to the release's pinned policy revision once
-release-pinned reads exist (scope table in
-[`docs/design/policies/`](../design/policies/README.md)). The
-[catalog index](../design/policies/catalog.md) names the functions.
+runs ([End to end](#end-to-end-a-user-enters-their-password-during-sign-up-via-flow-engine)).
+The [catalog index](../design/policies/catalog.md) names the functions.
 
 ### Policy evaluation trigger (relation to domain events)
 
@@ -506,11 +512,16 @@ is the one with the greatest `created_at`. It has no URL identity or `$ref`
 handling, which a policy does not need. The API publishes
 (`POST /policies`) and has the ADR 063 reads: the list (`GET /policies`),
 the read by `id`, the revisions of one policy and one revision
-(`GET /policies/revisions/{revision_id}`). Templates are not
-release content: they ship with the server, and a release records the catalog
-version it was validated against. Release validation runs the same check as
-publishing (`policy.Engine.ValidateInstance`: known operation and settings,
-types, bounds, config rules) and rejects two instances for the same
+(`GET /policies/revisions/{revision_id}`). A release build
+(`POST /releases/build`) carries instances under `policies`, each the body
+`POST /policies` takes, and publishes them inside the release's transaction:
+an unchanged config reuses the operation's newest revision, a changed one
+appends a revision, and the release pins it under the `policy` kind with the
+operation as its handle. Building one needs `policy.write`, like publishing.
+Templates are not release content: they ship with the server, and a release
+records the catalog version it was validated against. Release validation runs
+the same check as publishing (`policy.Engine.Bind`: known operation and
+settings, types, bounds, config rules) and rejects two instances for the same
 operation.
 
 ### Applicability
