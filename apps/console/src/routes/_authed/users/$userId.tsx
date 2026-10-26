@@ -1,11 +1,12 @@
 import { Link, createFileRoute, useRouter } from "@tanstack/react-router";
 import { GitCommitHorizontal, User } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 
 import { api } from "@/api/zitadel";
 import { DeleteUserDialog } from "@/components/delete-user-dialog";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
 import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/components/detail-page";
+import { type DetailRowItem, DetailRows } from "@/components/detail-rows";
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -114,11 +115,6 @@ const FIELD_LABEL = "text-foreground font-sans leading-normal";
 // `w-full` is applied by an orientation variant that out-specifies a plain
 // utility — so the override has to carry the same variant.
 const PANEL_RULE = "mx-6 w-auto data-[orientation=horizontal]:w-auto";
-// An authentication row: a muted label, its value on the right. 4px block
-// padding, and 18px to the rule between rows (the list's `gap-4.5`).
-const ROW = "flex items-center justify-between gap-4 py-1";
-const ROW_LABEL = "text-muted-foreground min-w-0 truncate text-sm font-medium";
-const ROW_VALUE = "text-foreground shrink-0 text-sm";
 // `schemaProperties` type labels a text or number input or a switch can write;
 // "—" is an untyped property, which accepts a string.
 const WRITABLE_TYPES = new Set(["String", "Number", "Integer", "Boolean", "—"]);
@@ -206,7 +202,7 @@ function UserDetail() {
 
         <TabsContent value="authentication">
           <DetailSection title="Authentication">
-            <AuthenticationRows
+            <DetailRows
               rows={[
                 { key: "password", label: "Password", value: passwordState(passwordSetAt) },
                 { key: "passkey", label: "Passkey", value: passkeyState(passkeys) },
@@ -217,33 +213,6 @@ function UserDetail() {
         </TabsContent>
       </Tabs>
     </Page>
-  );
-}
-
-interface AuthenticationRow {
-  key: string;
-  label: ReactNode;
-  value: ReactNode;
-}
-
-/** The Authentication card's rows: a muted label, its value, a rule between each. */
-function AuthenticationRows({ rows }: { rows: AuthenticationRow[] }) {
-  return (
-    <ul className="flex flex-col gap-4.5">
-      {rows.map((row, index) => (
-        <Fragment key={row.key}>
-          {index > 0 && (
-            <li role="none">
-              <Separator />
-            </li>
-          )}
-          <li className={ROW}>
-            <span className={ROW_LABEL}>{row.label}</span>
-            <span className={ROW_VALUE}>{row.value}</span>
-          </li>
-        </Fragment>
-      ))}
-    </ul>
   );
 }
 
@@ -272,7 +241,7 @@ function passkeyState(passkeys: { created_at: string }[] | undefined): string {
 function identityLinkRows(
   links: UserIdentityLink[] | undefined,
   idps: IdpConnection[] | null,
-): AuthenticationRow[] {
+): DetailRowItem[] {
   if (!links?.length) {
     return [
       {

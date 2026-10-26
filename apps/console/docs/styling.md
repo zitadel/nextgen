@@ -219,6 +219,10 @@ Detail screens come in three compositions, and each has one shell:
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
+A body card of read-only labelled values (User › Authentication, a release's
+Metadata) lists them with `DetailRows` (`src/components/detail-rows.tsx`): the
+label in a 148px column, 218px from `sm`, the value left-aligned beside it.
+
 The first two share the icon tile (`ICON_PLATE`) and the header card
 (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
 copyable, and the created date.
