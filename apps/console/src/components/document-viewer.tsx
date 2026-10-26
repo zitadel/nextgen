@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { stringify as stringifyYaml } from "yaml";
 
 import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
@@ -13,6 +13,9 @@ import { cn } from "@/lib/utils";
  * point of the panel is a document an operator copies into their repo.
  */
 const YAML_OPTIONS = { indent: 2, lineWidth: 0 } as const;
+
+/** What the viewer shows: the document as fields, or its source. */
+type View = "fields" | CodeLanguage;
 
 /** The compact viewer's active tab: `accent` reads on `popover` in both themes. */
 const ACCENT_TAB = "data-[state=active]:bg-accent";
@@ -36,17 +39,24 @@ const ACCENT_TAB = "data-[state=active]:bg-accent";
  * box of its own, starts the tab labels on the code's 16px inset, and caps the
  * code at a popover's height. The active tab takes `accent`: on `popover` a
  * `muted` fill is the surface's own colour in dark mode and would not show.
+ *
+ * `fields` adds a Fields tab before JSON and YAML, open first: the same
+ * document as a list a reader reads rather than copies, so it has no copy
+ * button of its own.
  */
 export function DocumentViewer({
   document,
   noun,
   compact = false,
+  fields,
 }: {
   document: unknown;
   noun: string;
   compact?: boolean;
+  fields?: ReactNode;
 }) {
-  const [format, setFormat] = useState<CodeLanguage>("json");
+  const [view, setView] = useState<View>(fields ? "fields" : "json");
+  const format: CodeLanguage = view === "yaml" ? "yaml" : "json";
 
   const source = useMemo(
     () =>
@@ -54,6 +64,7 @@ export function DocumentViewer({
     [document, format],
   );
   const lines = useHighlighted(source, format);
+  const tab = cn(compact && ACCENT_TAB);
 
   return (
     // `flex-1 min-w-0` so the viewer takes the width the field table leaves and
@@ -74,22 +85,33 @@ export function DocumentViewer({
           compact ? "pr-2 pl-[5px]" : "pr-2.5 pl-3",
         )}
       >
-        <Tabs value={format} onValueChange={(next) => setFormat(next as CodeLanguage)}>
+        <Tabs value={view} onValueChange={(next) => setView(next as View)}>
           <TabsList>
-            <TabsTrigger value="json" variant="muted" className={cn(compact && ACCENT_TAB)}>
+            {fields && (
+              <TabsTrigger value="fields" variant="muted" className={tab}>
+                Fields
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="json" variant="muted" className={tab}>
               JSON
             </TabsTrigger>
-            <TabsTrigger value="yaml" variant="muted" className={cn(compact && ACCENT_TAB)}>
+            <TabsTrigger value="yaml" variant="muted" className={tab}>
               YAML
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <CopyButton
-          value={source}
-          label={`Copy the ${noun} document as ${format.toUpperCase()}`}
-          size="sm"
-        />
+        {view !== "fields" && (
+          <CopyButton
+            value={source}
+            label={`Copy the ${noun} document as ${format.toUpperCase()}`}
+            size="sm"
+          />
+        )}
       </div>
+
+      {view === "fields" && (
+        <div className={cn("overflow-auto", compact ? "max-h-80" : "max-h-[32rem]")}>{fields}</div>
+      )}
 
       {/* The design's code block hugs its content, but it is drawn around a
           ten-line sample; a real schema runs to a few hundred lines, which
@@ -98,6 +120,7 @@ export function DocumentViewer({
           column of JSON. Capping the viewport keeps the hint at the foot and
           the two panels the same order of height the design pairs them at. */}
       <pre
+        hidden={view === "fields"}
         className={cn(
           "overflow-auto p-4 font-mono text-xs leading-5 text-(--zl-syntax-punctuation)",
           compact ? "max-h-80" : "max-h-[32rem]",

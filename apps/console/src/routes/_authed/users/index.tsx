@@ -169,8 +169,10 @@ function UsersScreen() {
     [rows, pinned],
   );
   const scroll = useScrollEdges();
-  const schemaTitles = useMemo(
-    () => new Map(columns.map((group) => [group.schemaId, group.title])),
+  // Each row's schema, for the identity card's title and the attributes
+  // popover's field labels.
+  const schemas = useMemo(
+    () => new Map(columns.map((group) => [group.schemaId, group])),
     [columns],
   );
 
@@ -241,7 +243,7 @@ function UsersScreen() {
                       user={user}
                       sticky
                       card={{
-                        schemaTitle: schemaTitles.get(user.schemaId) ?? user.schemaId,
+                        schemaTitle: schemas.get(user.schemaId)?.title ?? user.schemaId,
                         teamsKnown: teamsExpanded,
                       }}
                     />
@@ -254,7 +256,11 @@ function UsersScreen() {
                       </TableCell>
                     ))}
                     {showAttributes && (
-                      <UserAttributesCell user={user} summary={attributeSummary(user, pinned)} />
+                      <UserAttributesCell
+                        user={user}
+                        summary={attributeSummary(user, pinned)}
+                        schema={schemas.get(user.schemaId)?.schema}
+                      />
                     )}
                     <TableCell className={RESOURCE_CELL}>
                       <StatusBadge status={user.status} />

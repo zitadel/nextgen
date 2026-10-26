@@ -92,6 +92,8 @@ export interface ColumnGroup {
   /** The schema's `title`, else its id. */
   title: string;
   fields: SchemaField[];
+  /** The schema document, for labels and formats below the top level; absent if it did not load. */
+  schema?: UserSchema;
 }
 
 /**
@@ -149,7 +151,7 @@ function columnsFor(
     if (schema) {
       if (!groups.has(schemaId)) {
         const title = field(schema, "title") ?? schemaId;
-        groups.set(schemaId, { schemaId, title, fields: schemaFields(schema) });
+        groups.set(schemaId, { schemaId, title, fields: schemaFields(schema), schema });
       }
       continue;
     }

@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Braces, Info } from "lucide-react";
 
+import { AttributeFields } from "@/components/attribute-fields";
 import { DocumentViewer } from "@/components/document-viewer";
 import {
   RESOURCE_CELL,
@@ -21,6 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatDate } from "@/lib/date";
+import type { UserSchema } from "@/lib/schema";
 import type { AttributeSummary, UserRow } from "@/lib/user-list";
 import { cn } from "@/lib/utils";
 
@@ -230,9 +232,12 @@ export function UserIdCell({ user }: { user: UserRow }) {
 export function UserAttributesCell({
   user,
   summary,
+  schema,
 }: {
   user: UserRow;
   summary: AttributeSummary;
+  /** The user's schema document, for the Fields tab's labels and formats. */
+  schema?: UserSchema;
 }) {
   const empty = summary.entries.length === 0 && summary.more === 0;
   return (
@@ -291,7 +296,14 @@ export function UserAttributesCell({
                 View details
               </Link>
             </div>
-            <DocumentViewer document={user.attributes} noun="attributes" compact />
+            <DocumentViewer
+              document={user.attributes}
+              noun="attributes"
+              compact
+              fields={
+                <AttributeFields attributes={user.attributes} schema={schema} userId={user.id} />
+              }
+            />
           </PopoverContent>
         </Popover>
       )}

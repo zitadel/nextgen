@@ -445,8 +445,14 @@ describe("users screen", () => {
     );
     const dialog = await screen.findByRole("dialog", { name: "Attributes of maya@acme.com" });
     const popover = within(dialog);
-    // The structured value the cell only counts is here in full, with the
-    // record's identity attribute too: the popover is the whole document.
+    // It opens on the fields, the structured value listed inline under its own
+    // heading.
+    expect(popover.getByRole("tab", { name: "Fields", selected: true })).toBeInTheDocument();
+    expect(popover.getByText("address")).toBeInTheDocument();
+    expect(popover.getByText("Main St")).toBeInTheDocument();
+    // The source of the same document, with the record's identity attribute
+    // too: the popover is the whole document.
+    await userEvent.click(popover.getByRole("tab", { name: "JSON" }));
     const json = dialog.querySelector("code");
     expect(json).toHaveTextContent('"street": "Main St"');
     expect(json).toHaveTextContent('"email": "maya@acme.com"');
@@ -454,6 +460,75 @@ describe("users screen", () => {
     // Data, not configuration: no CLI hint about applying it.
     expect(popover.queryByText(/deploy your changes/)).not.toBeInTheDocument();
     expect(popover.getByRole("link", { name: "View details" })).toHaveAttribute(
+      "href",
+      scopedPath("/users/user_1"),
+    );
+  });
+
+  it("labels the fields from the schema, drills into deep objects, and caps the list", async () => {
+    // A customer schema can nest without limit and run to any number of
+    // properties. The popover lists one inline level, opens anything deeper in
+    // place, and stops at a dozen rows with a link to the user.
+    const many = Object.fromEntries(
+      Array.from({ length: 12 }, (_, index) => [`extra${index + 10}`, `v${index}`]),
+    );
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              attributes: {
+                email: "maya@acme.com",
+                companyName: "Acme",
+                address: { street: "Main St", geo: { lat: 47.37, lng: 8.54 } },
+                ...many,
+              },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json({
+          ...BUSINESS_SCHEMA,
+          schema: {
+            ...BUSINESS_SCHEMA.schema,
+            properties: {
+              ...BUSINESS_SCHEMA.schema.properties,
+              address: {
+                type: "object",
+                title: "Postal address",
+                properties: {
+                  street: { type: "string" },
+                  geo: { type: "object", properties: { lat: { type: "number" } } },
+                },
+              },
+            },
+          },
+        }),
+      ),
+    );
+    await renderUsers();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Attributes of maya@acme\.com/ }),
+    );
+    const popover = within(await screen.findByRole("dialog"));
+    // The schema's own titles, the same labels the forms and columns use.
+    expect(popover.getByText("Company name")).toBeInTheDocument();
+    expect(popover.getByText("Postal address")).toBeInTheDocument();
+    // 2 fields of the address's own, then 2 more inside geo: one level too deep.
+    await userEvent.click(popover.getByRole("button", { name: "Open Geo" }));
+    expect(popover.getByRole("navigation", { name: "Attribute path" })).toHaveTextContent(
+      "Fields›address›geo",
+    );
+    expect(popover.getByText("47.37", { selector: "dd" })).toBeInTheDocument();
+    await userEvent.click(popover.getByRole("button", { name: "Fields" }));
+    // 17 rows in all: the address heading and its 2 rows, email, company and
+    // 12 extras.
+    expect(popover.getByRole("link", { name: "View all 17 fields" })).toHaveAttribute(
       "href",
       scopedPath("/users/user_1"),
     );

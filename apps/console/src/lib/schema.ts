@@ -197,6 +197,27 @@ export function resolveSchemaPath(schema: UserSchema, path: string[]): UserSchem
 }
 
 /** A sign-in method as the schema's `x-auth-methods` annotation declares it. */
+/**
+ * One property a schema node declares, or `undefined` where it declares none
+ * by that key (an attribute the schema does not describe).
+ */
+export function declaredProperty(
+  node: UserSchema | undefined,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!node) return undefined;
+  const properties = readProperties(node);
+  return Object.hasOwn(properties, key) ? properties[key] : undefined;
+}
+
+/**
+ * A property's label as the forms and columns show it: its `title`, else the
+ * key humanised. A key the schema does not declare keeps its own spelling.
+ */
+export function schemaPropertyLabel(key: string, property?: Record<string, unknown>): string {
+  return property ? propertyLabel(key, property) : key;
+}
+
 export interface SchemaAuthMethod {
   /** Annotation key — `password`, `passkey`, `magic_link`, `sso`, `otp`. */
   key: string;
