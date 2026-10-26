@@ -389,6 +389,10 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
+For a project set up against a hosted server, `doctor` checks no local
+runtime, unless a local server was started in its directory or a parent, or
+`--port`, `--runtime` or `--image` asks about one.
+
 When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, the user
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
