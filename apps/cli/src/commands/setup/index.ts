@@ -98,7 +98,11 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
-import { ensureInitialCommit, type InitialCommitOutcome } from "./initial-commit";
+import {
+  assertCleanWorktree,
+  ensureInitialCommit,
+  type InitialCommitOutcome,
+} from "./initial-commit";
 import { runInitialDeploy, type InitialDeployOutcome } from "./initial-deploy";
 import { DEPLOY_ARGS } from "../../lib/release";
 import { moveDevPort } from "./move-dev-port";
@@ -324,6 +328,12 @@ export default class Setup extends BaseCommand {
       throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
+    }
+    // Before anything is written: setup commits what it writes, and it can
+    // only tell its own files from the developer's when the tree starts clean.
+    // A dirty repository is refused here, where nothing has happened yet.
+    if (flags.git !== false && !dryRun) {
+      await assertCleanWorktree(cwd);
     }
     // Before anything is detected, created or written: a server another CLI
     // release left running fails setup halfway, after the project exists.
@@ -966,7 +976,7 @@ export default class Setup extends BaseCommand {
         // could not be used.
         git: {
           initialized: commit.kind === "created",
-          commit: commit.kind === "created" ? commit.sha : null,
+          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
         },
         // The first deployment, so the project serves the developer's own
         // `.zitadel/` rather than the resources the server seeds beside a new
@@ -1063,7 +1073,7 @@ export default class Setup extends BaseCommand {
       return { kind: "skipped" };
     }
     const outcome = await ensureInitialCommit(cwd);
-    if (outcome.kind === "created") {
+    if (outcome.kind === "created" || outcome.kind === "committed") {
       consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
     }
     if (outcome.kind === "unavailable") {

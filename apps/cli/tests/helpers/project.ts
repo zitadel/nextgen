@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { promisify } from "node:util";
 
 import { expect } from "vitest";
 
@@ -13,6 +14,8 @@ import { cliPackageRoot } from "./oclif-build";
 import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
+
+const execFileAsync = promisify(execFile);
 
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
@@ -251,6 +254,43 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * Puts the app under version control with everything committed, the state a
+   * developer who already uses git is in before they run setup.
+   */
+  async underVersionControl(): Promise<void> {
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "commit",
+        "--quiet",
+        "--message=feat: the developer's own work",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** Leaves a file nobody has committed, as a developer mid-change would. */
+  async withUncommittedWork(): Promise<void> {
+    await writeFile(join(this.path, "notes.md"), "a note to self\n");
+  }
+
+  /** The subjects of the project's commits, newest first, or [] without a repo. */
+  async commitSubjects(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: this.path });
+      return stdout.split("\n").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
   }
 
   /** `setup` without `--json`, for a spec asserting what the developer reads. */

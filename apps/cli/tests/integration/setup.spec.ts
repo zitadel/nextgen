@@ -135,6 +135,71 @@ describe("setup", () => {
         });
       });
 
+      it("commits into a repository the project is already in", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        await app.setup();
+
+        expect(await app.commitSubjects()).toEqual([
+          "chore: scaffold the project with zitadel setup",
+          "feat: the developer's own work",
+        ]);
+      });
+
+      it("reports that it committed without having made the repository", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+
+        const result = await app.setup();
+
+        expect(app.envelopeOf<SetupPublishData>(result).data.git).toMatchObject({
+          initialized: false,
+          commit: expect.stringMatching(/^[0-9a-f]{40}$/),
+        });
+      });
+
+      it("refuses a repository with uncommitted work", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toFailWith("E_CONFLICT");
+      });
+
+      it("names the untracked file it refused over", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup();
+
+        expect(result).toExplain("untracked file");
+      });
+
+      it("writes nothing into a project it refuses", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+        const before = await app.snapshot();
+
+        await app.setup();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets up a dirty repository anyway under --no-git", async () => {
+        const app = await anApp();
+        await app.underVersionControl();
+        await app.withUncommittedWork();
+
+        const result = await app.setup(["--no-git"]);
+
+        expect(result).toSucceed();
+      });
+
       it("records no commit under --no-git", async () => {
         const app = await anApp();
 

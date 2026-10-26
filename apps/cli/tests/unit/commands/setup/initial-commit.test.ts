@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  assertCleanWorktree,
   ensureInitialCommit,
   INITIAL_COMMIT_SUBJECT,
 } from "../../../../src/commands/setup/initial-commit";
@@ -27,6 +28,30 @@ async function aProject(files: Record<string, string> = {}): Promise<string> {
     await mkdir(join(dir, path, ".."), { recursive: true });
     await writeFile(join(dir, path), content);
   }
+  return dir;
+}
+
+/** A project already under version control, with a clean tree. */
+async function aRepository(): Promise<string> {
+  const dir = await aProject({
+    ".gitignore": "node_modules\n",
+    "app/layout.tsx": "export default () => null;\n",
+  });
+  await run("git", ["init", "--quiet"], { cwd: dir });
+  await run("git", ["add", "--all"], { cwd: dir });
+  await run(
+    "git",
+    [
+      "-c",
+      "user.name=Dev",
+      "-c",
+      "user.email=dev@example.com",
+      "commit",
+      "--quiet",
+      "--message=feat: the developer's own work",
+    ],
+    { cwd: dir },
+  );
   return dir;
 }
 
@@ -137,33 +162,128 @@ describe("ensureInitialCommit", () => {
   });
 
   describe("in a directory that is already a repository", () => {
-    it("leaves the developer's git alone", async () => {
-      const cwd = await aProject();
-      await run("git", ["init", "--quiet"], { cwd });
+    it("commits into it rather than nesting a new repository", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "app/page.tsx"), "export default () => null;\n");
 
       const outcome = await ensureInitialCommit(cwd);
 
-      expect(outcome).toEqual({ kind: "existing-repository" });
+      expect(outcome).toEqual({ kind: "committed", sha: expect.stringMatching(/^[0-9a-f]{40}$/) });
     });
 
-    it("makes no commit, so uncommitted work stays uncommitted", async () => {
-      const cwd = await aProject();
-      await run("git", ["init", "--quiet"], { cwd });
+    it("adds its commit on top of the developer's history", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "app/page.tsx"), "export default () => null;\n");
 
       await ensureInitialCommit(cwd);
 
-      await expect(commitSubjects(cwd)).rejects.toThrow();
+      expect(await commitSubjects(cwd)).toEqual([
+        INITIAL_COMMIT_SUBJECT,
+        "feat: the developer's own work",
+      ]);
     });
 
-    it("creates no nested repository in a subdirectory of one", async () => {
-      const root = await aProject();
-      await run("git", ["init", "--quiet"], { cwd: root });
-      const nested = join(root, "apps/web");
-      await mkdir(nested, { recursive: true });
+    it("keeps a secret out of that commit too", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, ".env"), "SECRET=1\n");
 
-      const outcome = await ensureInitialCommit(nested);
+      await ensureInitialCommit(cwd);
 
-      expect(outcome).toEqual({ kind: "existing-repository" });
+      expect(await trackedFiles(cwd)).not.toContain(".env");
+    });
+  });
+
+  describe("assertCleanWorktree", () => {
+    it("allows a directory that is not a repository at all", async () => {
+      const cwd = await aProject();
+
+      await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    });
+
+    it("allows a repository with nothing uncommitted", async () => {
+      const cwd = await aRepository();
+
+      await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+    });
+
+    it("refuses a repository with a modified file", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "app/layout.tsx"), "the developer's unsaved work\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    });
+
+    it("counts an untracked file as dirty", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+    });
+
+    it("says an untracked file is untracked, not a change", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
+        message: "The git working tree has 1 untracked file",
+      });
+    });
+
+    it("counts the two kinds separately", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "app/layout.tsx"), "changed\n");
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
+        message: "The git working tree has 1 uncommitted change and 1 untracked file",
+      });
+    });
+
+    it("names the offending paths so they can be acted on", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
+        details: { modified: [], untracked: ["notes.md"] },
+      });
+    });
+
+    it("points at --no-git for setting up without touching version control", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
+        hint: expect.stringContaining("--no-git"),
+      });
+    });
+
+    it.each([".gitignore", ".zitadel/local/server.log"])(
+      "allows %s, which the CLI writes itself",
+      async (path) => {
+        const cwd = await aRepository();
+        await mkdir(join(cwd, path, ".."), { recursive: true });
+        await writeFile(join(cwd, path), "written by start\n");
+
+        await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
+      },
+    );
+
+    it("still refuses the developer's own file beside the CLI's", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, ".gitignore"), "node_modules\n.zitadel/local/\n");
+      await writeFile(join(cwd, "notes.md"), "mine\n");
+
+      await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({
+        details: { modified: [], untracked: ["notes.md"] },
+      });
+    });
+
+    it("ignores what .gitignore excludes", async () => {
+      const cwd = await aRepository();
+      await mkdir(join(cwd, "node_modules"), { recursive: true });
+      await writeFile(join(cwd, "node_modules/left.js"), "");
+
+      await expect(assertCleanWorktree(cwd)).resolves.toBeUndefined();
     });
   });
 

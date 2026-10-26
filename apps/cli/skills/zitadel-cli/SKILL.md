@@ -332,22 +332,28 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 
 `setup` ends with an initial deployment, so the project serves the
 `.zitadel/` it just wrote rather than the fallback resources the server seeds
-beside a new project. Before building that release it puts the project under
-version control — `git init` and one commit, `chore: scaffold the project
-with zitadel setup` — but only when the directory is not already inside a
-repository: a project that has git is the developer's, and setup never commits
-into it. The order matters, because the release records the commit it was built
-from and the next `deploy` diffs `.zitadel/` against it; without the commit
-that deploy reports that no diff is available. Both steps run the same way
-non-interactively and in CI, since neither asks anything.
+beside a new project. Before building that release it commits what it wrote:
+`git init` first when the directory is not yet a repository, then one commit,
+`chore: scaffold the project with zitadel setup`. The order matters, because
+the release records the commit it was built from and the next `deploy` diffs
+`.zitadel/` against it; without the commit that deploy reports no diff.
 
+Setup refuses with `E_CONFLICT` when the repository already has uncommitted
+work — untracked files included, which `details.untracked` lists separately
+from `details.modified`. It commits the whole tree, so it can only tell its
+own files from yours when the tree starts clean; otherwise your work would be
+committed under setup's name. Commit or stash first, then rerun. Changes the
+CLI made itself (`.gitignore`, anything under `.zitadel/`) never count, so
+the `start` → `setup` path is unaffected.
+
+Nothing here prompts, so it behaves the same interactively and in CI.
 `data.git` says what happened (`initialized`, and the `commit`, or null),
 and `data.deployment` carries the `release_id`, `content_hash`,
-`deployment_id` and `origins`, or is null. `--no-git` leaves version
-control alone; `--no-deploy` writes the files and leaves publishing to a later
-`deploy`. Neither step can fail setup: the project, its files and its
-credentials are already there, so a failure is reported as a warning naming the
-`deploy` to re-run.
+`deployment_id` and `origins`, or is null. `--no-git` skips both the
+refusal and the commit; `--no-deploy` writes the files and leaves publishing
+to a later `deploy`. Neither the commit nor the deploy can fail setup once the
+project exists: a failure is reported as a warning naming the `deploy` to
+re-run.
 
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
