@@ -5,6 +5,7 @@ import (
 	"os"
 
 	google "github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric"
+	"github.com/ogen-go/ogen/otelogen"
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -15,7 +16,80 @@ import (
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.39.0"
+
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
+
+// metricCardinalityLimit is the most series one instrument may hold. Past
+// it, a new attribute combination is aggregated into one overflow series
+// (`otel.metric.overflow=true`) instead of becoming a series of its own, so
+// an attribute that unexpectedly follows the data costs one series, not one
+// per value. It is the SDK's default, written out so the bound is a decision
+// and not a default nobody chose.
+const metricCardinalityLimit = 2000
+
+// ogenAttributes are the attributes the generated server's request
+// instruments may carry: the operation, and the method, route template and
+// status it served. http.route is the template (`/users/{user_id}`), never
+// the path.
+var ogenAttributes = []attribute.Key{
+	otelogen.OperationIDKey,
+	semconv.HTTPRequestMethodKey,
+	semconv.HTTPRouteKey,
+	semconv.HTTPResponseStatusCodeKey,
+}
+
+// otelhttpAttributes are the same, plus the names otelhttp used before the
+// HTTP conventions were stable. The raw request path (http.target, url.path)
+// is deliberately absent: every distinct /users/{id} would be a series of
+// its own.
+var otelhttpAttributes = []attribute.Key{
+	otelogen.OperationIDKey,
+	semconv.HTTPRequestMethodKey,
+	semconv.HTTPRouteKey,
+	semconv.HTTPResponseStatusCodeKey,
+	"http.method",
+	"http.status_code",
+}
+
+// MeterViews returns the views every meter provider of the server is built
+// with. They are what keeps an attribute from becoming a series: one a view
+// does not allow is dropped before it is aggregated, whatever the code
+// recording it passed.
+//
+//   - ogen's request instruments, which serve every API request, keep the
+//     operation id, method, route template and status code.
+//   - otelhttp, were it ever put in front of a handler, keeps the same.
+//   - each catalogued instrument keeps the attributes its entry declares.
+func MeterViews() []sdkmetric.View {
+	views := []sdkmetric.View{
+		allowAttributes(instrumentation.Scope{Name: otelogen.Name}, "", ogenAttributes),
+		allowAttributes(instrumentation.Scope{Name: otelhttp.ScopeName}, "", otelhttpAttributes),
+	}
+	for _, in := range metrics.Catalogue() {
+		views = append(views, allowAttributes(instrumentation.Scope{Name: metrics.ScopeName}, in.Name, in.AttributeKeys()))
+	}
+	return views
+}
+
+func allowAttributes(scope instrumentation.Scope, name string, keys []attribute.Key) sdkmetric.View {
+	return sdkmetric.NewView(
+		sdkmetric.Instrument{Name: name, Scope: scope},
+		sdkmetric.Stream{AttributeFilter: attribute.NewAllowKeysFilter(keys...)},
+	)
+}
+
+// meterProviderOptions are the options every meter provider of the server is
+// built with, before its reader: the resource, the views and the series
+// bound.
+func meterProviderOptions(resource *resource.Resource) []sdkmetric.Option {
+	return []sdkmetric.Option{
+		sdkmetric.WithResource(resource),
+		sdkmetric.WithView(MeterViews()...),
+		sdkmetric.WithCardinalityLimit(metricCardinalityLimit),
+	}
+}
 
 func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *sdkmetric.MeterProvider, err error) {
 	readerOption, err := cfg.metrics(ctx)
@@ -23,20 +97,7 @@ func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resourc
 		return nil, err
 	}
 
-	// create a view to filter out unwanted attributes
-	view := sdkmetric.NewView(
-		sdkmetric.Instrument{
-			Scope: instrumentation.Scope{Name: otelhttp.ScopeName},
-		},
-		sdkmetric.Stream{
-			AttributeFilter: attribute.NewAllowKeysFilter("http.method", "http.status_code", "http.target"),
-		},
-	)
-
-	opts := []sdkmetric.Option{
-		sdkmetric.WithResource(resource),
-		sdkmetric.WithView(view),
-	}
+	opts := meterProviderOptions(resource)
 	if readerOption != nil {
 		opts = append(opts, readerOption)
 	}
