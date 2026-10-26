@@ -415,7 +415,8 @@ export default class EnvAdd extends BaseCommand {
     const client = createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret });
     consola.start("Deploying .zitadel/ to the new environment");
     try {
-      const { bundle, brandingSources, idpFiles } = await buildBundle(opts.cwd);
+      const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(opts.cwd);
+      this.recordTelemetry({ resources: resourceCount });
       const ctx: StepContext = {
         cwd: opts.cwd,
         client,
@@ -444,6 +445,7 @@ export default class EnvAdd extends BaseCommand {
         message: INITIAL_DEPLOY_MESSAGE,
       });
       const origins = deployment.targets.map((target) => target.origin);
+      this.recordTelemetry({ origin_count: origins.length });
       consola.success(
         `Deployed ${release.content_hash} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
       );
