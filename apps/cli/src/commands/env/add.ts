@@ -288,7 +288,7 @@ export default class EnvAdd extends BaseCommand {
           message: "Deploy .zitadel/ to it now?",
           initialValue: true,
         },
-        { interactive: true, force: false },
+        { interactive: !nonInteractive, force: false },
       );
       if (confirmed) {
         deployment = await this.deployInitialRelease({
