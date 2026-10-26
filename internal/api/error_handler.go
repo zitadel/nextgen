@@ -15,6 +15,7 @@ import (
 	"github.com/ogen-go/ogen/validate"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response
@@ -149,6 +150,10 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return claimErrorResponse(e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	case e.Code == domain.ErrRequestNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, e)
+	case e.Code == domain.ErrRequestMethodNotAllowed().Code:
+		return errorResponseWithStatusCode(http.StatusMethodNotAllowed, e)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -236,10 +241,10 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 	case isDecodeError(err):
 		status = http.StatusBadRequest
 		// Use the stable domain message — do not echo ogen/framework
-		// decode text into the client envelope (ADR 030). The field paths
-		// ogen's validation rejected do go into details.
+		// decode text into the client envelope (ADR 030). The parameter or
+		// the field paths ogen rejected do go into details.
 		invalid := domain.ErrRequestInvalid()
-		if fields := validationFieldPaths(err); len(fields) > 0 {
+		if fields := invalidRequestFields(err); len(fields) > 0 {
 			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
@@ -250,9 +255,44 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		details = resp.Response
 	}
 
+	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
+}
+
+// OgenNotFound answers a path no API operation matches (ADR 076). A browser
+// navigation gets the error page, with home as its way on; everything else
+// gets the req.not_found envelope, so a client can tell a path this server
+// lacks from one that is not a Zitadel API at all. The Accept header decides,
+// and Vary says so to caches.
+func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
+		if errorpage.Wants(r) {
+			errorpage.Write(w, r, errorpage.NotFound(home))
+			return
+		}
+		writeErrorResponse(w, errorResponse(domain.ErrRequestNotFound()))
+	}
+}
+
+// OgenMethodNotAllowed answers a path whose operations do not take the
+// request's method with the req.method_not_allowed envelope and the Allow
+// header ogen would have set (ADR 076). A path the API defines answers the
+// envelope even to a browser: it is an API URL. A CORS preflight keeps ogen's
+// own answer, 204 with the Access-Control-Allow-* headers ogen has already
+// set.
+func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Allow", allowed)
+	writeErrorResponse(w, errorResponse(domain.ErrRequestMethodNotAllowed()))
+}
+
+func writeErrorResponse(w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	data, err := details.MarshalJSON()
+	w.WriteHeader(resp.StatusCode)
+	data, err := resp.Response.MarshalJSON()
 	if err == nil {
 		_, _ = w.Write(data)
 	}
@@ -294,6 +334,18 @@ func securityErrorDetails(err error) api.ErrorDetails {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return domainErrorDetails(unauthorized)
+}
+
+// invalidRequestFields names what a request that would not decode got wrong:
+// the parameter (path, query, header or cookie) by its name in the spec, or
+// the body's fields by validationFieldPaths. Without it the req.invalid
+// message would point at details that are not there.
+func invalidRequestFields(err error) []string {
+	var param *ogenerrors.DecodeParamError
+	if errors.As(err, &param) && param.Name != "" {
+		return []string{param.Name}
+	}
+	return validationFieldPaths(err)
 }
 
 // validationFieldPaths returns the dotted paths of the fields ogen's request

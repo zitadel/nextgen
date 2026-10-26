@@ -1522,7 +1522,10 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // pattern with no live preview answers `403` with `proj.preview_not_live`;
 // nothing deployed to the target answers `409` with `rel.not_deployed`; a
 // revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate and still needs a deployment target.
+// `Origin` passes the gate and still needs a deployment target. A loopback
+// origin passes it too, and so does the server's own origin, from which its
+// console previews a project's login; a step submitted from the server's
+// own origin is still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -6937,130 +6940,6 @@ func (s *Server) handleGetGrantRequest(args [1]string, argsEscaped bool, w http.
 	}
 }
 
-// handleGetHealthRequest handles getHealth operation.
-//
-// Check whether the server is healthy.
-//
-// GET /healthz
-func (s *Server) handleGetHealthRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
-	statusWriter := &codeRecorder{ResponseWriter: w}
-	w = statusWriter
-	otelAttrs := []attribute.KeyValue{
-		otelogen.OperationID("getHealth"),
-		semconv.HTTPRequestMethodKey.String("GET"),
-		semconv.HTTPRouteKey.String("/healthz"),
-	}
-	// Add attributes from config.
-	otelAttrs = append(otelAttrs, s.cfg.Attributes...)
-
-	// Start a span for this request.
-	ctx, span := s.cfg.Tracer.Start(r.Context(), GetHealthOperation,
-		trace.WithAttributes(otelAttrs...),
-		serverSpanKind,
-	)
-	defer span.End()
-
-	// Add Labeler to context.
-	labeler := &Labeler{attrs: otelAttrs}
-	ctx = contextWithLabeler(ctx, labeler)
-
-	// Run stopwatch.
-	startTime := time.Now()
-	defer func() {
-		elapsedDuration := time.Since(startTime)
-
-		attrSet := labeler.AttributeSet()
-		attrs := attrSet.ToSlice()
-		code := statusWriter.status
-		if code != 0 {
-			codeAttr := semconv.HTTPResponseStatusCode(code)
-			attrs = append(attrs, codeAttr)
-			span.SetAttributes(codeAttr)
-		}
-		attrOpt := metric.WithAttributes(attrs...)
-
-		// Increment request counter.
-		s.requests.Add(ctx, 1, attrOpt)
-
-		// Use floating point division here for higher precision (instead of Millisecond method).
-		s.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), attrOpt)
-	}()
-
-	var (
-		recordError = func(stage string, err error) {
-			span.RecordError(err)
-
-			// https://opentelemetry.io/docs/specs/semconv/http/http-spans/#status
-			// Span Status MUST be left unset if HTTP status code was in the 1xx, 2xx or 3xx ranges,
-			// unless there was another error (e.g., network error receiving the response body; or 3xx codes with
-			// max redirects exceeded), in which case status MUST be set to Error.
-			code := statusWriter.status
-			if code < 100 || code >= 500 {
-				span.SetStatus(codes.Error, stage)
-			}
-
-			attrSet := labeler.AttributeSet()
-			attrs := attrSet.ToSlice()
-			if code != 0 {
-				attrs = append(attrs, semconv.HTTPResponseStatusCode(code))
-			}
-
-			s.errors.Add(ctx, 1, metric.WithAttributes(attrs...))
-		}
-		err error
-	)
-
-	var rawBody []byte
-
-	var response GetHealthRes
-	if m := s.cfg.Middleware; m != nil {
-		mreq := middleware.Request{
-			Context:          ctx,
-			OperationName:    GetHealthOperation,
-			OperationSummary: "Check server health",
-			OperationID:      "getHealth",
-			Body:             nil,
-			RawBody:          rawBody,
-			Params:           middleware.Parameters{},
-			Raw:              r,
-		}
-
-		type (
-			Request  = struct{}
-			Params   = struct{}
-			Response = GetHealthRes
-		)
-		response, err = middleware.HookMiddleware[
-			Request,
-			Params,
-			Response,
-		](
-			m,
-			mreq,
-			nil,
-			func(ctx context.Context, request Request, params Params) (response Response, err error) {
-				response, err = s.h.GetHealth(ctx)
-				return response, err
-			},
-		)
-	} else {
-		response, err = s.h.GetHealth(ctx)
-	}
-	if err != nil {
-		defer recordError("Internal", err)
-		s.cfg.ErrorHandler(ctx, w, r, err)
-		return
-	}
-
-	if err := encodeGetHealthResponse(response, w, span); err != nil {
-		defer recordError("EncodeResponse", err)
-		if !errors.Is(err, ht.ErrInternalServerErrorResponse) {
-			s.cfg.ErrorHandler(ctx, w, r, err)
-		}
-		return
-	}
-}
-
 // handleGetIdpByIdRequest handles getIdpById operation.
 //
 // Reads a connection by its id, at its newest revision.
@@ -7485,7 +7364,10 @@ func (s *Server) handleGetIdpRevisionByIdRequest(args [1]string, argsEscaped boo
 
 // handleGetLiveRequest handles getLive operation.
 //
-// Check whether the server is started.
+// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+// Point a liveness probe here. It never checks the database, so an outage
+// of the database does not restart every instance; `GET /readyz` takes an
+// instance out of rotation instead.
 //
 // GET /livez
 func (s *Server) handleGetLiveRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -9195,7 +9077,10 @@ func (s *Server) handleGetProjectRequest(args [1]string, argsEscaped bool, w htt
 
 // handleGetReadyRequest handles getReady operation.
 //
-// Check whether the server is ready to accept requests.
+// Answers whether the server can serve requests, which takes its database answering within a second.
+// Point a readiness probe here, so that a server whose database does not
+// answer gets no requests until it does. The check is one round trip to the
+// database.
 //
 // GET /readyz
 func (s *Server) handleGetReadyRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

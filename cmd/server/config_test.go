@@ -149,8 +149,8 @@ func TestPlatformConfigProvisioningProjectID(t *testing.T) {
 	})
 }
 
-// A UI path at or under the IdP callback's routes would overlap the callback
-// pattern, which ServeMux answers with a panic at boot.
+// A console path at or under the IdP callback's routes would overlap the
+// callback pattern, which ServeMux answers with a panic at boot.
 func TestServerConfigValidate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -158,12 +158,12 @@ func TestServerConfigValidate(t *testing.T) {
 		cfg     ServerConfig
 		wantKey string
 	}{
-		{name: "the default paths validate", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/ui/console", LoginEnabled: true, LoginPath: "/ui/login"}},
-		{name: "a login path under /idp errors", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idp/login"}, wantKey: "server.login_path"},
-		{name: "a login path of /idp itself errors", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idp"}, wantKey: "server.login_path"},
+		{name: "the default path validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/ui/console"}},
+		{name: "a console path under /idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp/console"}, wantKey: "server.console_path"},
+		{name: "a console path of /idp itself errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idp"}, wantKey: "server.console_path"},
 		{name: "a console path under /__nextgen/idp errors", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/__nextgen/idp/admin"}, wantKey: "server.console_path"},
-		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{LoginEnabled: true, LoginPath: "/idps"}},
-		{name: "a disabled surface is not checked", cfg: ServerConfig{LoginEnabled: false, LoginPath: "/idp/login"}},
+		{name: "a path that only shares the prefix's letters validates", cfg: ServerConfig{ConsoleEnabled: true, ConsolePath: "/idps"}},
+		{name: "a disabled console is not checked", cfg: ServerConfig{ConsoleEnabled: false, ConsolePath: "/idp/console"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

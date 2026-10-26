@@ -1,8 +1,8 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { NEUTRAL_MESSAGE } from "../support/copy";
-import { expectNoErrorBoundary } from "../support/screens";
-import { signIn } from "../support/sign-in";
+import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../support/copy";
+import { expectNoErrorBoundary, openAddTeam, uniqueName } from "../support/screens";
+import { completeLogin, signIn } from "../support/sign-in";
 
 test("shows the bootstrapped project in the list and detail views", async ({
   page,
@@ -145,6 +145,8 @@ test("shows the status the API stamped on a seeded user", async ({ page, zitadel
 });
 
 test("gives a colleague admin access to the project, and takes it away", async ({
+  browser,
+  baseURL,
   page,
   zitadel,
   seed,
@@ -155,36 +157,73 @@ test("gives a colleague admin access to the project, and takes it away", async (
   // because both writes and the `expand: ["principal"]` read are server
   // behaviour, and the unit specs prove only what the console does with them.
   //
+  // The list alone would pass with a grant that opens nothing, so the
+  // colleague's own session is what decides: refused before the grant, able to
+  // change the project with it, refused again once it is revoked. The journey's
+  // claim suite proves the hand-off with the platform project bootstrapped;
+  // this lane runs without it, where "Add admin" resolves the colleague in the
+  // project the console signs into (#1295).
+  //
   // Admins live on the project's page (#1238). The operator needs access to the
   // project to open it — a seeded user can sign in but holds no grant.
   const operator = await seed.user();
   const colleague = await seed.user();
-  await signIn(page, zitadel, operator);
+  const teamsUrl = `/teams?project=${zitadel.handle.projectId}`;
 
-  await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
+  // The colleague signs in without the grant `signIn` writes, in a context of
+  // their own: one cookie jar holds one session.
+  const colleagueContext = await browser.newContext({ baseURL });
+  try {
+    const colleaguePage = await colleagueContext.newPage();
+    await completeLogin(colleaguePage, colleague);
+    await colleaguePage.goto(teamsUrl);
+    await expect(colleaguePage.getByText(ERROR_BOUNDARY_TITLE)).toBeVisible();
 
-  await page.getByRole("button", { name: "Add admin", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Add admin" });
-  await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
-  await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
-  await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
+    await signIn(page, zitadel, operator);
+    await page.goto(`/projects/${zitadel.handle.projectId}`);
+    await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
-  // The row is what proves the write landed: it comes back from the list read,
-  // not from the form's own state. The message above says the same thing
-  // whether or not anything was created, which is the point of it.
-  const row = page.getByRole("row").filter({ hasText: colleague.email });
-  await expect(row).toBeVisible();
-  await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Add admin", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "Add admin" });
+    await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
+    await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
+    await expect(page.getByText(NEUTRAL_MESSAGE)).toBeVisible();
 
-  await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-  await page.getByRole("menuitem", { name: "Remove admin" }).click();
-  const confirm = page.getByRole("alertdialog");
-  await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+    // The row is what proves the write landed: it comes back from the list read,
+    // not from the form's own state. The message above says the same thing
+    // whether or not anything was created, which is the point of it.
+    const row = page.getByRole("row").filter({ hasText: colleague.email });
+    await expect(row).toBeVisible();
+    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
 
-  // Gone from the list, which leaves the instance as this test found it.
-  await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
-  await expectNoErrorBoundary(page);
+    // With the grant the colleague's session can write to the project, not only
+    // read it: the team comes back from the list read after `POST /teams`.
+    await colleaguePage.reload();
+    await expect(colleaguePage.getByRole("heading", { name: "Teams", exact: true })).toBeVisible();
+    const team = uniqueName("granted");
+    const addTeam = await openAddTeam(colleaguePage);
+    await addTeam.name.fill(team);
+    await addTeam.submit.click();
+    await expect(addTeam.drawer).toBeHidden();
+    await expect(colleaguePage.getByRole("link", { name: team, exact: true })).toBeVisible();
+    await expectNoErrorBoundary(colleaguePage);
+
+    await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
+    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    const confirm = page.getByRole("alertdialog");
+    await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+
+    // Gone from the list, which leaves the instance as this test found it.
+    await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
+    await expectNoErrorBoundary(page);
+
+    // And the colleague loses the project with the grant: the screen they just
+    // wrote from is refused on its next load.
+    await colleaguePage.reload();
+    await expect(colleaguePage.getByText(ERROR_BOUNDARY_TITLE)).toBeVisible();
+  } finally {
+    await colleagueContext.close();
+  }
 });
 
 test("answers the same way for an address that belongs to nobody", async ({

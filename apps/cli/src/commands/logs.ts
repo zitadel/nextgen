@@ -6,7 +6,6 @@ import { LocalServer } from "../lib/local-server/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "../lib/local-server/server-log";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
 
 export default class Logs extends BaseCommand {
   static override description =
@@ -46,7 +45,7 @@ export default class Logs extends BaseCommand {
     if (!nearest) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
+        nextCommands: [this.suggestUnscoped("start")],
       });
     }
 

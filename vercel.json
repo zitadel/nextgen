@@ -5,7 +5,12 @@
       "root": ".",
       "framework": "go",
       "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh"
+      "buildCommand": "sh apps/cloud/build.sh",
+      "functions": {
+        "apps/cloud/launcher/main.go": {
+          "regions": ["fra1"]
+        }
+      }
     },
     "console": {
       "root": "apps/console",
@@ -25,25 +30,11 @@
         }
       ]
     },
-    "storybook": {
-      "root": "apps/storybook",
-      "framework": "storybook",
-      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build",
-      "devCommand": "NODE_ENV=production storybook build --output-dir node_modules/.cloud-dev --quiet && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
-      "outputDirectory": "dist",
-      "rewrites": [
-        {
-          "source": "/storybook/:path(.*)?",
-          "destination": "/:path"
-        }
-      ]
-    },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/api --filter=@zitadel/api-mock --filter=@zitadel/components && pnpm run build"
     },
     "website": {
       "root": "apps/website",
@@ -95,11 +86,6 @@
       "permanent": false
     },
     {
-      "source": "/storybook",
-      "destination": "/storybook/",
-      "permanent": true
-    },
-    {
       "source": "/changelog/",
       "destination": "/changelog",
       "permanent": true
@@ -119,16 +105,14 @@
       }
     },
     {
-      "source": "/storybook/(.*)",
-      "destination": {
-        "service": "storybook"
-      }
-    },
-    {
       "source": "/schemas/v1/(.*)",
       "destination": {
         "service": "schemas"
       }
+    },
+    {
+      "source": "/telemetry/mixpanel/:path(.*)",
+      "destination": "https://api-eu.mixpanel.com/:path"
     },
     {
       "source": "/docs",
@@ -185,7 +169,7 @@
       }
     }
   ],
-  "regions": ["fra1"],
+  "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],
   "git": {
     "deploymentEnabled": {
       "changeset-release/*": false,

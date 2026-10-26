@@ -140,7 +140,10 @@ type Handler interface {
 	// pattern with no live preview answers `403` with `proj.preview_not_live`;
 	// nothing deployed to the target answers `409` with `rel.not_deployed`; a
 	// revoked release answers `409` with `rel.revoked`. A request with no
-	// `Origin` passes the gate and still needs a deployment target.
+	// `Origin` passes the gate and still needs a deployment target. A loopback
+	// origin passes it too, and so does the server's own origin, from which its
+	// console previews a project's login; a step submitted from the server's
+	// own origin is still refused unless the project lists it.
 	// The response contains an `id` field — the flow handle. Use it as the path
 	// parameter for all subsequent `/flow/{id}/submit` calls.
 	// The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing
@@ -501,12 +504,6 @@ type Handler interface {
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
-	// GetHealth implements getHealth operation.
-	//
-	// Check whether the server is healthy.
-	//
-	// GET /healthz
-	GetHealth(ctx context.Context) (GetHealthRes, error)
 	// GetIdpById implements getIdpById operation.
 	//
 	// Reads a connection by its id, at its newest revision.
@@ -525,7 +522,10 @@ type Handler interface {
 	GetIdpRevisionById(ctx context.Context, params GetIdpRevisionByIdParams) (GetIdpRevisionByIdRes, error)
 	// GetLive implements getLive operation.
 	//
-	// Check whether the server is started.
+	// Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+	// Point a liveness probe here. It never checks the database, so an outage
+	// of the database does not restart every instance; `GET /readyz` takes an
+	// instance out of rotation instead.
 	//
 	// GET /livez
 	GetLive(ctx context.Context) (GetLiveRes, error)
@@ -607,7 +607,10 @@ type Handler interface {
 	GetProject(ctx context.Context, params GetProjectParams) (GetProjectRes, error)
 	// GetReady implements getReady operation.
 	//
-	// Check whether the server is ready to accept requests.
+	// Answers whether the server can serve requests, which takes its database answering within a second.
+	// Point a readiness probe here, so that a server whose database does not
+	// answer gets no requests until it does. The check is one round trip to the
+	// database.
 	//
 	// GET /readyz
 	GetReady(ctx context.Context) (GetReadyRes, error)

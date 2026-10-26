@@ -43,8 +43,8 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
-		"NEXTGEN_SERVER_LOGIN_ENABLED",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
 		"PORT",
 		"VERCEL_BRANCH_URL",
 		"VERCEL_ENV",
@@ -251,17 +251,17 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("VERCEL_ENV", "production")
 	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
-	// Leftovers from an earlier layout must not move the console or the login.
+	// Leftovers from an earlier layout must not move the console.
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
-	t.Setenv("NEXTGEN_SERVER_LOGIN_ENABLED", "false")
+	t.Setenv("NEXTGEN_SERVER_REQUEST_ID_HEADER", "x-request-id")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
 	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
-	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_LOGIN_ENABLED"), "keeps /console/runtime.json mounted")
+	assert.Equal(t, "x-vercel-id", os.Getenv("NEXTGEN_SERVER_REQUEST_ID_HEADER"), "the ID Vercel's dashboard shows")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
@@ -308,6 +308,29 @@ func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
 		}
 	}
 	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
+}
+
+// The other services' functions run in the project-wide regions; the server
+// stays beside its database in Frankfurt. @vercel/go matches a functions key
+// against the entrypoint's path and silently ignores one that does not match.
+func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			Entrypoint string `json:"entrypoint"`
+			Functions  map[string]struct {
+				Regions []string `json:"regions"`
+			} `json:"functions"`
+		} `json:"services"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	server := config.Services["server"]
+	require.Len(t, server.Functions, 1)
+	function, ok := server.Functions[server.Entrypoint]
+	require.True(t, ok, "the server's functions key is its entrypoint, %q", server.Entrypoint)
+	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
 }
 
 // The console service builds into the server's embed directory in the same

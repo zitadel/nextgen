@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { stringify as stringifyYaml } from "yaml";
 
-import { CLI_APPLY, CliCommand, CliHint } from "@/components/cli-hint";
+import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type CodeLanguage, type CodeLine, highlightCode } from "@/lib/highlight";
@@ -125,8 +125,8 @@ export function DocumentViewer({
 
       {!compact && (
         <CliHint>
-          Edit the {noun} locally, then apply your changes with <CliCommand>{CLI_APPLY}</CliCommand>
-          . Applying creates a new revision.
+          Edit the {noun} locally, then deploy your changes with{" "}
+          <CliCommand>{CLI_DEPLOY}</CliCommand>. Deploying creates a new revision.
         </CliHint>
       )}
     </div>

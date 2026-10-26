@@ -13,7 +13,7 @@ import { EMBEDDED_LOGIN_URL, signIn } from "../support/sign-in";
  * ogen API at the origin root, with no proxy in between. That makes the
  * console's API base a real claim about a real routing table instead of a
  * string nobody checks — the claim that shipped wrong, as `/api/*` against a
- * mux that serves `/ui/login`, `/ui/console`, `/console/runtime.json`, `/`.
+ * mux that serves `/ui/console`, `/console/runtime.json`, `/`.
  *
  * Keep the assertions here about *reaching the API*. Console features belong
  * in `src-real/`, which runs the same screens through the Vite dev proxy.

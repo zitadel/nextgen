@@ -85,8 +85,8 @@ function isInertWhenUnclaimed(file) {
 //   `server:test` moves only when Go/API sources move.
 // - The shared next-scaffold surface (the passkey-first preset and test-kit
 //   consumer journeys both scaffold a Next app and drive the login widget):
-//   go side, CLI, generated API client, flow config, the testing kit,
-//   login-ui, the widget atoms, and the Next/core SDKs.
+//   go side, CLI, generated API client, flow config, the testing kit, the
+//   widget atoms, and the Next/core SDKs.
 // - The fresh-app journey additionally answers to every `sdk-*:build`,
 //   because its framework matrix exists to cover the SDKs.
 // - Any change inside the journey project itself triggers all variants.
@@ -97,7 +97,6 @@ const SHARED_JOURNEY_TRIGGERS = [
   "api:build",
   "config:build",
   "testing:build",
-  "login-ui:build",
   "components:build",
   "sdk-core:build",
   "sdk-next:build",

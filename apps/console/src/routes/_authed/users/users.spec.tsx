@@ -448,7 +448,7 @@ describe("users screen", () => {
     expect(json).toHaveTextContent('"email": "maya@acme.com"');
     expect(popover.getByRole("tab", { name: "YAML" })).toBeInTheDocument();
     // Data, not configuration: no CLI hint about applying it.
-    expect(popover.queryByText(/apply your changes/)).not.toBeInTheDocument();
+    expect(popover.queryByText(/deploy your changes/)).not.toBeInTheDocument();
     expect(popover.getByRole("link", { name: "View details" })).toHaveAttribute(
       "href",
       scopedPath("/users/user_1"),

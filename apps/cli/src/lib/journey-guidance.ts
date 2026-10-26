@@ -1,4 +1,6 @@
 import { publicCliCommand } from "./public-cli";
+import { type EnvironmentSelector, projectCommand } from "./suggestion";
+import { DEPLOY_ARGS } from "./release";
 
 /**
  * Guidance copy that commands share, so the story doesn't fork; most of it is
@@ -38,14 +40,21 @@ export function serverLogAction(cliVersion: string): string {
   );
 }
 
-/** The customize/publish pair, in Elina's tested wording. */
-export function customizeAndPublishActions(cliVersion: string): string[] {
+/**
+ * The customize/publish pair, in Elina's tested wording. `selector` is the
+ * run's environment selection, so the quoted commands publish to the project
+ * the run was about.
+ */
+export function customizeAndPublishActions(
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): string[] {
   return [
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${publicCliCommand("plan", cliVersion)} to preview, ` +
-      `then ${publicCliCommand("apply", cliVersion)} to publish.`,
+    `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
   ];
 }
 

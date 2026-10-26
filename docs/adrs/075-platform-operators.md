@@ -1,6 +1,6 @@
 # ADR 075: Platform Operators
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-10-22)
 > **Date:** 2026-10-22
 > **Context:** Who may act on every project of a deployment, and how that
 > authority is stored, resolved, issued and shown to customers. This is the
@@ -12,10 +12,14 @@
 > [ADR 033](033-internal-permission-management.md),
 > [ADR 053](053-cross-project-principals.md) and
 > [ADR 054](054-customer-collaboration-grants.md).
-> **Amends if accepted:**
+> **Amends:**
 > [ADR 054 §10](054-customer-collaboration-grants.md#10-customer-authority-and-staff-authority-remain-separate),
 > whose time-bounded grant branch for staff does not apply to the operator
 > relation: operator access is standing until a narrower support tier exists.
+>
+> **Amendment (2026-10-24):** shipped in #2246 (migration
+> `000036_platform_operator.sql`, `platform.operators` in the server config),
+> with console search across every project an operator can act on (#2248).
 
 ## Context
 

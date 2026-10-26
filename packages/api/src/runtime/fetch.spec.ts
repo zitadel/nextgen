@@ -97,7 +97,19 @@ describe("customFetch", () => {
     const error = await customFetch(`${base}/health`, { method: "GET" }).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 503 });
+    expect(error).toMatchObject({ status: 503, requestId: undefined });
+  });
+
+  it("keeps the server's request ID on the ApiError", async () => {
+    const http = createHttpServer((_req, res) => {
+      res.writeHead(400, { "content-type": "application/json", "x-request-id": "req_01TEST" });
+      res.end(JSON.stringify({ code: "req.invalid", message: "invalid" }));
+    });
+    const base = await listening(http as unknown as Server);
+
+    const error = await customFetch(`${base}/users`, { method: "GET" }).catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 400, requestId: "req_01TEST" });
   });
 });
 

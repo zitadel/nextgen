@@ -112,7 +112,7 @@ Login/flow HTTP and `POST /projects` emit when the handler stamps `project_id`
 (actor/token empty). Path B copies `request_id` from the HTTP request even
 without AuthGate. `createFlow` mints `flow_id` before `CreateAuthAttempt` so
 Path B `auth.attempt.created` shares `flow_id` / `session_id` columns with
-Path A `request.api`. Probes (`healthz` / `readyz` / `livez`) do not.
+Path A `request.api`. Probes (`livez` / `readyz`) do not.
 
 Path A buffer: flush on batch size **N≈100** or age **T≈1s**. Capacity **C**
 (default 2000); drop only when full; never block the request.

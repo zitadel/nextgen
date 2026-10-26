@@ -49,7 +49,7 @@
     },
     "pack": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release", "@zitadel/login-ui#build-release"],
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
     },
     "snapshot": {
@@ -57,14 +57,13 @@
       "dependsOn": [
         "@zitadel/server#test",
         "build-public-packages",
-        "@zitadel/console#build-release",
-        "@zitadel/login-ui#build-release"
+        "@zitadel/console#build-release"
       ],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
     },
     "publish": {
       "cache": false,
-      "dependsOn": ["build-public-packages", "@zitadel/console#build-release", "@zitadel/login-ui#build-release"],
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
     }
   }
