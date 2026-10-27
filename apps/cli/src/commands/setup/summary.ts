@@ -1,12 +1,15 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
+import type { SetupPreset } from "@zitadel/config/defaults";
+import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
 import pc from "picocolors";
 import semver from "semver";
 
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -164,4 +167,33 @@ function stripRange(range: string): string | undefined {
 /** Returns just the file name from a relative path, for the `→ filename` secondary detail in PACKAGE rows. */
 export function fileNameOf(p: string): string {
   return basename(p);
+}
+
+/**
+ * The sign-in configuration the wizard's answers add up to, said once so the
+ * preset, the password policy and the providers need not be pieced together.
+ * It describes what will be configured, not that sign-in works: an enabled
+ * method is not a credential a user has registered. Both presets enable
+ * password and passkey in the schema and differ in which the login flow starts
+ * with.
+ */
+export function signInSummary(answers: {
+  preset: SetupPreset;
+  sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  passwordMinLength?: PasswordMinLength;
+}): string {
+  const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
+  return [
+    answers.preset === "passkey-first"
+      ? "Sign-in starts with a passkey, with email and password as the fallback."
+      : "Sign-in starts with email and password.",
+    "Password and passkey are enabled in the user schema.",
+    // None given is the recommended minimum, which setup writes in its place.
+    answers.passwordMinLength === null
+      ? "Passwords have no minimum length."
+      : `Passwords need at least ${answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH} characters.`,
+    providers.length === 0
+      ? "No external providers will be added."
+      : `External providers: ${providers.join(", ")}.`,
+  ].join("\n");
 }

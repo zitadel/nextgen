@@ -9,6 +9,10 @@
 # `properties`. The CLI's unit tests
 # (apps/cli/tests/unit/lib/telemetry/catalog.test.ts) check what it sends
 # against this file.
+#
+# Mixpanel is paused: the CLI bakes in no token and the service ping has no
+# default one, so neither sends to it (apps/cli/src/lib/telemetry/config.ts).
+# Events keep `mixpanel` as a destination for when it returns.
 
 # What every event carries, whichever component sends it. `<surface>` stands
 # for the component, as in `cli_version`: the release version of a build that
@@ -295,6 +299,11 @@ properties:
     description: >-
       An `IDP_PROVIDERS` slug, `custom` for a developer-described connection
       (never its slug), `none` or `multiple`.
+  password_policy:
+    type: string
+    description: >-
+      `set` when `setup` put a minimum length into the password policy, else
+      `empty`. Never the value.
   files_written_count:
     type: number
     description: How many files `setup` wrote.
@@ -394,11 +403,10 @@ components:
       - invocation_id
       - distinct_id
       - $insert_id
-    # Proof of concept: the copy of an event sent to Vercel Web Analytics, from
-    # runs on the production channel. Its name takes the prefix, and it keeps
-    # the first 8 of these properties that hold a value, in this order.
+    # The copy of an event sent to Vercel Web Analytics, from runs on the
+    # production channel. It keeps the event's name and the first 8 of these
+    # properties that hold a value, in this order.
     vercel:
-      prefix: poc_
       properties: [surface, cli_version, server_kind, command, status, reason, host_agent, non_interactive]
     events:
       cli_command_started:
@@ -481,6 +489,7 @@ components:
         - preset
         - use_case
         - sso
+        - password_policy
         - step
         - files_written_count
         - package_manager
@@ -588,13 +597,9 @@ components:
     # Every server event carries this after the header. It sends no
     # distinct_id: the server has no install id yet.
     context: [dialect, os, arch, ip, $insert_id]
-    # Proof of concept: an event's name takes the prefix in both destinations,
-    # and the Vercel copy keeps these properties.
+    # The Vercel copy keeps these properties.
     vercel:
-      prefix: poc_
       properties: [surface, server_version, server_kind, dialect, os, arch]
-    mixpanel:
-      prefix: poc_
     events:
       service_ping:
         status: emitted

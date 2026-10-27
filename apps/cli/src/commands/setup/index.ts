@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { intro, outro } from "@clack/prompts";
+import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
@@ -45,7 +45,6 @@ import {
   customExample,
   customFlagValues,
   flagText,
-  ENABLE_FLAG_NAMES,
   givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
@@ -56,11 +55,12 @@ import {
   republishCommands,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  ssoEnableArgs,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { brandingGuidanceAction } from "../../lib/journey-guidance";
+import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -90,6 +90,11 @@ import {
 import type { PatchContext } from "../../lib/orca/patchers/types";
 import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
+import {
+  PASSWORD_POLICY_PATH,
+  type PasswordMinLength,
+  parsePasswordMinLength,
+} from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
 import { writeScaffoldManifest } from "../../lib/scaffold-manifest";
 import {
@@ -122,6 +127,7 @@ import {
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  signInSummary,
   url as styleUrl,
   type Row,
   type Section,
@@ -137,6 +143,7 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -198,9 +205,10 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends BaseCommand {
-  static override description = "Create a Zitadel project and scaffold local auth.";
-  static override group = CommandGroups.project;
+export default class Setup extends Promptable(BaseCommand) {
+  static override description =
+    "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
+  static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
     "<%= config.bin %> setup --framework next",
@@ -250,6 +258,10 @@ export default class Setup extends BaseCommand {
     // hidden so scripts and agents still passing it get a targeted error
     // pointing at `branding eject` instead of oclif's unknown-flag error.
     design: nonBlankString({ hidden: true }),
+    "password-min-length": nonBlankString({
+      description:
+        "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
+    }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
         "Social sign-in provider to enable while scaffolding, e.g. google. Skips the wizard's provider question; needs --sso-client-id, and the OAuth application must already be registered with the provider. Pipe the client secret in on stdin; never pass it as a flag.",
@@ -276,15 +288,6 @@ export default class Setup extends BaseCommand {
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(Setup);
-    // First thing `setup` prints, so ahead of `toMeta`, which opens telemetry
-    // (its first-run notice goes to stderr) and can throw on server resolution.
-    await showSkillsHint({
-      env: process.env,
-      interactive:
-        !this.jsonEnabled() &&
-        !flags["non-interactive"] &&
-        Boolean(process.stdout.isTTY && process.stdin.isTTY),
-    });
     // Before toMeta and before anything touches the server or the disk.
     if (flags.design !== undefined) {
       throw setupDesignRemovedError(this.config.version);
@@ -379,7 +382,7 @@ export default class Setup extends BaseCommand {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
       consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
@@ -408,7 +411,6 @@ export default class Setup extends BaseCommand {
     }
     // A new app, created below, or on a dry run only previewed.
     const scaffoldedFramework = detected === undefined;
-
     this.recordTelemetry({
       framework: app.framework,
       renderer: flags.renderer ?? "react",
@@ -418,8 +420,14 @@ export default class Setup extends BaseCommand {
       preset: flags.preset ?? DEFAULT_SETUP_PRESET,
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
+      // Read from the raw flag: it is parsed below, so a bad value fails after
+      // this step is recorded, like the other flags'. 0 sets none, and no
+      // flag the recommended minimum.
+      password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
+    // Read once: a bad value is refused here, before anything is created.
+    const passwordMinLengthFlag = passwordMinLengthFromFlag(flags["password-min-length"]);
 
     // An explicit --dev-port overrides the detected port for the whole run, so
     // the issuer and the registered origin track the requested port (and several
@@ -437,6 +445,7 @@ export default class Setup extends BaseCommand {
       preset: (flags.preset as SetupPreset | undefined) ?? DEFAULT_SETUP_PRESET,
       useCase: (flags["use-case"] as SetupUseCase | undefined) ?? DEFAULT_SETUP_USE_CASE,
       sso: ssoFromCommandLine === undefined ? [] : [ssoFromCommandLine],
+      passwordMinLength: passwordMinLengthFlag,
     };
 
     if (!nonInteractive && !dryRun) {
@@ -446,7 +455,9 @@ export default class Setup extends BaseCommand {
       }
       const promptCtx = {
         input: wizardInput,
-        framework: { id: app.framework },
+        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+        suggest: (args: string) =>
+          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
@@ -454,12 +465,26 @@ export default class Setup extends BaseCommand {
         presetFromFlag: flags.preset !== undefined,
         useCaseFromFlag: flags["use-case"] !== undefined,
         ssoFromFlag: flags.sso !== undefined,
+        passwordMinLengthFromFlag: flags["password-min-length"] !== undefined,
         developmentBuild: isDevelopmentBuild(),
       };
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
+      note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
+    } else if (
+      flags["dev-port"] === undefined &&
+      !(await LocalServer.isPortFree(answers.devPort))
+    ) {
+      // The wizard asks for another port when the detected one is taken. A run
+      // that asks nothing still pins the dev script to it, so it says so, with
+      // the command that puts the app on a free one.
+      reportWarning(
+        portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
+          this.suggestUnscoped(args),
+        ),
+      );
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -480,6 +505,10 @@ export default class Setup extends BaseCommand {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
+      // Whether a minimum goes into the password policy, never the value. None
+      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // keeps a policy file: `files_patched` records what was published.
+      password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -580,6 +609,7 @@ export default class Setup extends BaseCommand {
               useCase: answers.useCase,
               devPort: answers.devPort,
               sso: answers.sso.map((answer) => answer.selection),
+              passwordMinLength: answers.passwordMinLength,
             },
           );
       consola.success(`Created project ${project.id}`);
@@ -617,7 +647,7 @@ export default class Setup extends BaseCommand {
       }
       try {
         resourceResult = dryRun
-          ? { filesWritten: [] }
+          ? { filesWritten: [], passwordMinLengthSet: false }
           : await materializeSetupResources({
               cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
@@ -630,6 +660,7 @@ export default class Setup extends BaseCommand {
               preset: answers.preset,
               useCase: answers.useCase,
               sso: answers.sso,
+              passwordMinLength: answers.passwordMinLength,
               cliVersion: this.meta.cliVersion,
             });
       } catch (error) {
@@ -653,13 +684,15 @@ export default class Setup extends BaseCommand {
           hint:
             cause.hint ??
             (newApp === undefined
-              ? "The project was created but its default schema/flow upload did not finish. " +
-                "Re-run `zitadel setup` to start over; --force overwrites the files setup " +
-                "scaffolds. It does not cover a connection under .zitadel/idps/ -- those are " +
+              ? "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                "--force overwrites the schema and flow files setup scaffolds and keeps an " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
-              : "The project was created but its default schema/flow upload did not finish, " +
-                "so setup removed the new app again. Re-run setup as before to start over."),
+              : "The project was created but its default resources (schema, login flow, " +
+                "password policy) did not all upload, so setup removed the new app again. " +
+                "Re-run setup as before to start over."),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -695,6 +728,14 @@ export default class Setup extends BaseCommand {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    if (!dryRun) {
+      // What was published, which a policy file `--force` keeps decides as much
+      // as the answers recorded before. A dry run publishes nothing and keeps
+      // those.
+      this.recordTelemetry({
+        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+      });
+    }
 
     // After the connection exists, not before: a credential published under a
     // name nothing references yet is an orphan in the project's variables, and
@@ -943,6 +984,19 @@ export default class Setup extends BaseCommand {
           ].join("\n"),
         ),
         style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+      });
+      // After the steps that start the app and test sign-in, outside the box so
+      // the command can be copied without its border.
+      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
+      // Then the skills note, once per machine, as the last thing setup prints.
+      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
+      // so it does not use up the once-per-machine note.
+      await showSkillsHint({
+        env: process.env,
+        interactive:
+          !dryRun &&
+          !flags["non-interactive"] &&
+          Boolean(process.stdout.isTTY && process.stdin.isTTY),
       });
     }
 
@@ -1470,7 +1524,7 @@ export async function ssoFromFlags(
   const secret = await ask({
     kind: "secret",
     name: "client secret",
-    message: "Client secret",
+    message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is
@@ -1516,6 +1570,12 @@ export type SetupRetryOptions = {
    * connection's `${{ NAME }}` from.
    */
   sso?: readonly ProviderSelection[];
+  /**
+   * The minimum password length the run was given: a number, or `null` for
+   * an explicit "none", carried as `--password-min-length 0` so a kept policy
+   * file still loses its minimum on the retry.
+   */
+  passwordMinLength?: PasswordMinLength;
 };
 
 /**
@@ -1539,6 +1599,11 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   }
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
+  }
+  // Even the recommended one, unlike the defaults above: without the flag, a
+  // policy file `--force` keeps keeps its own minimum.
+  if (opts.passwordMinLength !== undefined) {
+    parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
   // only one secret. A retry naming several would not be runnable, which is
@@ -1583,6 +1648,18 @@ const isKnownSsoName = (name: string): boolean =>
  * resolves answers. `--non-interactive` is echoed only when explicitly passed
  * — TTY/JSON-inferred non-interactivity re-infers itself on the retry.
  */
+/**
+ * The `--password-min-length` a retry carries: the value it means, or nothing
+ * for one the parser refuses, which a retry would only be refused for again.
+ */
+function retryMinLength(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok ? parsed.value : undefined;
+}
+
 export function retryOptionsFromFlags(flags: {
   cwd?: string;
   framework?: string;
@@ -1591,6 +1668,7 @@ export function retryOptionsFromFlags(flags: {
   renderer?: string;
   "dev-port"?: number;
   "non-interactive"?: boolean;
+  "password-min-length"?: string;
   sso?: string;
   "sso-client-id"?: string;
   "sso-slug"?: string;
@@ -1638,6 +1716,7 @@ export function retryOptionsFromFlags(flags: {
     renderer: flags.renderer,
     devPort: flags["dev-port"],
     nonInteractive: Boolean(flags["non-interactive"]),
+    passwordMinLength: retryMinLength(flags["password-min-length"]),
     // The provider survives on its own. A suggested retry carries `--sso`
     // without `--sso-client-id` -- the id is never put in command text -- so
     // requiring both here would drop the provider from the next suggestion if
@@ -1719,15 +1798,7 @@ function ssoRecovery(
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      projectCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-        localRecoverySelector(retry.cwd),
-        cliVersion,
-      ),
+      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
     ),
   };
 }
@@ -1914,6 +1985,49 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
+ * What a run that cannot ask says about a taken app port, with the command
+ * that moves the app to `free`. With no free port among the next ones it names
+ * only the flag: a placeholder in a suggested command is a shell redirection.
+ */
+export function portInUseWarning(
+  port: number,
+  free: number | undefined,
+  suggest: (args: string) => SuggestedCommand,
+): string {
+  return free === undefined
+    ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
+}
+
+/**
+ * Whether `--password-min-length` leaves a minimum in the policy: a value, or
+ * no flag, which means the recommended one; not none, or a value the parser
+ * refuses (setup fails on that just after).
+ */
+function setsMinLength(value: string | undefined): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  const parsed = parsePasswordMinLength(value);
+  return parsed.ok && typeof parsed.value === "number";
+}
+
+/**
+ * `--password-min-length`, read with the prompt's parser so the two cannot
+ * disagree. Refused before anything is created.
+ */
+function passwordMinLengthFromFlag(value: string | undefined): PasswordMinLength | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = parsePasswordMinLength(value);
+  if (!parsed.ok) {
+    throw new ZitadelError("E_VALIDATION", `--password-min-length: ${parsed.problem}`);
+  }
+  return parsed.value;
+}
+
+/**
  * Map from the patcher's deterministic output paths to a short noun
  * phrase describing what the file is for. Anything not in the map falls
  * back to the bare path in the narration; add an entry here when a new
@@ -1933,6 +2047,9 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
     subject: "the editable default human user schema",
   },
   ".zitadel/schemas/README.md": { subject: "the schemas folder README" },
+  ".zitadel/policies/auth.factor.password.set.json": { subject: "the editable password policy" },
+  ".zitadel/policies/README.md": { subject: "the policies folder README" },
+  ".zitadel/meta/policy.json": { subject: "the policy dialect spec (editor $schema)" },
   ".zitadel/meta/flow-definition.json": { subject: "the flow dialect spec (editor $schema)" },
   ".zitadel/meta/user-schema.json": { subject: "the user-schema dialect spec" },
   ".zitadel/meta/user-property.json": { subject: "the user-property dialect spec" },
@@ -2023,13 +2140,14 @@ export function buildSummary(opts: {
   }
 
   // The login-customization entry points. These are what a user edits to
-  // change what the login collects and how it authenticates —
+  // change what the login collects, how it authenticates and what it enforces —
   // burying them in the verbose per-file narration above the box means users
   // don't find them (each folder ships a README with the workflow).
   const customizeRows: Row[] = [];
   for (const [label, suffix, dir] of [
     ["User schema", ".zitadel/schemas/default-human-user.json", ".zitadel/schemas/"],
     ["Login flow", ".zitadel/flows/default-login.json", ".zitadel/flows/"],
+    ["Password policy", PASSWORD_POLICY_PATH, ".zitadel/policies/"],
   ] as const) {
     const hit = pickWrittenFile(writtenRel, suffix);
     if (hit) customizeRows.push({ label, value: stylePath(dir), secondary: "see its README.md" });

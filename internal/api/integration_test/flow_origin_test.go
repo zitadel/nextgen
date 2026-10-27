@@ -66,6 +66,29 @@ func TestFlowOrigins(t *testing.T) {
 	})
 }
 
+// TestFlowSubmitFromLivePreview pins that submit admits a live preview Origin
+// through Gate (not primary-only validation). Primary-only would answer
+// req.invalid for a preview URL; Gate reaches the step when a preview row is live.
+func TestFlowSubmitFromLivePreview(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	fixture.deployPreview(t, fixture.release.ID)
+
+	resp, body := openFlow(t, fixture.project, previewOrigin)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	var opened api.FlowResponse
+	require.NoError(t, opened.UnmarshalJSON(body), string(body))
+	zflow := flowCookie(t, resp)
+
+	resp, body = submitFlow(t, opened.ID, zflow, previewOrigin)
+	require.NotEqual(t, domain.ErrRequestInvalid().Code, errorCode(body),
+		"live preview Origin must not be refused as req.invalid: %s", body)
+	assert.Less(t, resp.StatusCode, http.StatusBadRequest, "Origin %s: %s", previewOrigin, body)
+	var answered api.FlowResponse
+	require.NoError(t, answered.UnmarshalJSON(body), string(body))
+}
+
 // openFlow starts a login flow the way a browser on origin does. Sent raw:
 // the generated client cannot set an opaque Origin.
 func openFlow(t *testing.T, projectID, origin string) (*http.Response, []byte) {

@@ -9,13 +9,19 @@ import {
   type ConnectionSlug,
   credentialVariables,
   CUSTOM_PROVIDER,
-  type IdpProvider,
+  DEFAULT_SCOPES,
   IDP_PROVIDERS,
   parseClientId,
   parseClientSecret,
+  parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
+  type Parsed,
+  parseScopes,
   type ProviderName,
   type ProviderSelection,
   providerOf,
+  RESERVED_SLUGS,
   selectionName,
   validated,
 } from "@zitadel/config/idp";
@@ -31,11 +37,15 @@ import {
   applySsoToSchema,
   askConnectionEndpoints,
   callbackUriFor,
+  checkCustomSlug,
+  checkGivenCustomFlags,
   CONNECTION_SCHEMA_REF,
   enabledMethods,
+  type ConnectionFile,
   type ConnectionPlan,
   type FlowFile,
   credentialVariablesOf,
+  type CustomFlagValues,
   customExample,
   customFlagValues,
   ENABLE_FLAG_KEYS,
@@ -45,6 +55,7 @@ import {
   publishClientId,
   type PublishState,
   readConnectionFiles,
+  refuseChangedIssuer,
   reportClientIdOutcome,
   republishArgs,
   selectionFromFlags,
@@ -54,6 +65,7 @@ import {
   type SsoSkipped,
   reportSecretOutcome,
   storeClientSecret,
+  storedCustomSettings,
   type SchemaFile,
   type SecretOutcome,
   type SecretPublisher,
@@ -83,7 +95,7 @@ import { reportWarning } from "../../../lib/warnings";
  */
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.authentication;
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -100,7 +112,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // here names the next move. The check below does that instead.
     [ENABLE_FLAG_KEYS.provider]: Flags.string({
       options: [...IDP_PROVIDERS, CUSTOM_PROVIDER],
-      description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for any other OpenID Connect provider.`,
+      description: `Identity provider to enable, or "${CUSTOM_PROVIDER}" for a custom OpenID Connect (OIDC) provider.`,
     }),
     [ENABLE_FLAG_KEYS.slug]: nonBlankString({
       description: "Name of the custom connection. Schemas and flows refer to it by this.",
@@ -126,16 +138,57 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       cwd,
       schema,
       flows: candidates,
-      preflight: { selection, entry, issuer },
+      preflight: project,
     } = await this.target(flags, {
       // The credentials are published to the project, so the environment is
       // resolved, unlike for the other auth-method commands.
       resolveServer: true,
-      preflight: () => readProject(flags, this.environment.values.ZITADEL_ISSUER?.value),
+      preflight: () =>
+        readProject(
+          flags,
+          this.environment.values.ZITADEL_ISSUER?.value,
+          !this.meta.nonInteractive && !this.meta.dryRun,
+        ),
     });
-    // Resolved before anything is asked for: being turned away after typing a
-    // secret would mean typing it again.
+    const { issuer } = project;
+    const connections = await readConnectionFiles(cwd);
+    // Before dry-run and before the first question, including the ones
+    // `connect()` asks: a Project whose flows all name another schema, or whose
+    // schema or flow was edited by hand where the editors write, must fail
+    // identically whether or not anything was asked.
+    const flows = targetFlows(schema, candidates);
+    // Resolved before anything else is asked for: being turned away after
+    // typing a secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
+    // The schema and flow edits for a slug, with the refusals they bring (an
+    // edit the editors cannot make, or a flow `deploy` would then reject), so
+    // the run stops with nothing changed (ADR 070 §3).
+    const editsFor = (slug: ConnectionSlug): PlannedEdits => {
+      const edits = planEdits(schema, slug, flows);
+      refuseBrokenFlows(
+        schema,
+        edits.schema.document as Record<string, unknown>,
+        edits.flows.map(({ flow, result }) => ({
+          file: flow,
+          after: result.document as Record<string, unknown>,
+        })),
+      );
+      return edits;
+    };
+    // A custom provider's settings are asked here, after the checks on the
+    // Project; the ones that need an answer run the moment the answer that
+    // decides them is given (see `askCustomSettings`).
+    const selection =
+      project.selection ??
+      selectionFromFlags(
+        CUSTOM_PROVIDER,
+        await this.askCustomSettings(project.values, connections, (slug) => {
+          editsFor(slug);
+        }),
+        ENABLE_FLAG_NAMES,
+        customExample(ENABLE_FLAG_NAMES),
+      );
+    const entry = providerOf(selection);
     const { nonInteractive, dryRun } = this.meta;
     // A loopback issuer works only on a server that may fetch from this machine.
     const loopback = loopbackIssuerWarning(selection, await loopbackReach(cwd, server));
@@ -156,7 +209,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           )
         : undefined;
 
-    const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one.
     const clientIdFlag =
       flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
@@ -197,23 +249,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const variable = names.clientSecret;
     const idVariable = names.clientId;
 
-    // Before the dry-run return: a Project whose flows all name another
-    // schema must fail identically either way, or the preview says "would
-    // create" for a run that cannot succeed.
-    const flows = targetFlows(schema, candidates);
-    // The schema and flow edits are worked out now, before the dry-run return
-    // and before the connection is written or a credential published, so a
-    // refusal (an edit the editors cannot make, or a flow `deploy` would then
-    // reject) stops the run with nothing changed (ADR 070 §3).
-    const edits = planEdits(schema, plan.slug, flows);
-    refuseBrokenFlows(
-      schema,
-      edits.schema.document as Record<string, unknown>,
-      edits.flows.map(({ flow, result }) => ({
-        file: flow,
-        after: result.document as Record<string, unknown>,
-      })),
-    );
+    // Worked out before the dry-run return and before the connection is
+    // written or a credential published.
+    const edits = editsFor(plan.slug);
     const outcome = {
       schema,
       before: schema.body,
@@ -288,7 +326,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const piped = await this.input({
         kind: "secret",
         name: "client secret",
-        message: "Client secret",
+        message: `What is the client secret of your ${entry.displayName} OAuth app?`,
         parse: parseClientSecret,
         stdin: true,
         optional: true,
@@ -329,7 +367,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const clientId = await this.input({
         kind: "text",
         name: `client id for ${entry.displayName}`,
-        message: "Client ID",
+        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
         parse: parseClientId,
         given: flags["client-id"],
@@ -343,7 +381,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const secretValue = await this.input({
         kind: "secret",
         name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
         parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
@@ -390,6 +428,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         publish,
       });
       consola.success(`Wrote ${plan.path}`);
+      if (selection.kind === "custom") {
+        for (const note of mappingNotes({
+          file: plan.path,
+          provider: entry.displayName,
+          connection,
+        })) {
+          consola.info(note);
+        }
+      }
     }
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
@@ -436,9 +483,28 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       scopeArgs,
     );
 
+    // A file changed or a connection was created, which only a deploy publishes.
+    const unpublished = !reusing || written.length > 0;
+    const credentialsStored =
+      secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
+    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
+    const name = entry.displayName;
+
     return this.emit({
       status: "ok",
       data: {
+        // Configured is not live, and stored credentials are only claimed once
+        // they reached the Project (a failed or deferred publish warns instead).
+        title: unpublished
+          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
+          : `${name} sign-in is already configured locally.`,
+        ...(unpublished
+          ? {
+              next_actions: [
+                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+              ],
+            }
+          : {}),
         ...this.payload({
           projectId,
           provider,
@@ -453,9 +519,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
-        ...this.followUps(!reusing || written.length > 0, scopeArgs, recovery),
+        ...this.followUps(unpublished, scopeArgs, recovery),
       },
-      pretty: `Enabled ${entry.displayName} for ${schema.name}`,
     });
   }
 
@@ -490,6 +555,67 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       }
     }
     return editedFiles(schema, edits);
+  }
+
+  /**
+   * The settings of a custom connection, asking only for the ones not already
+   * given, in the order that lets each answer decide what comes next. The slug
+   * comes first because it decides the most: it names the file the connection
+   * is kept in, so everything that depends on the slug alone is checked the
+   * moment it is typed (`checkCustomSlug`, then `beforeAsking`), and a connection that already exists
+   * answers the rest from its file. A given value goes through the same parser
+   * as a typed one, and the ones given on the command line were checked under
+   * their flag before this ran (`checkGivenCustomFlags`).
+   *
+   * @param beforeAsking - Raises whatever else is known once the slug is.
+   */
+  private async askCustomSettings(
+    given: CustomFlagValues,
+    files: readonly ConnectionFile[],
+    beforeAsking: (slug: ConnectionSlug) => void,
+  ): Promise<Required<CustomFlagValues>> {
+    const slug = await this.input({
+      kind: "text",
+      name: "connection name",
+      message:
+        "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+      parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+      given: given.slug,
+    });
+    const existing = checkCustomSlug(files, slug, ENABLE_FLAG_NAMES.slug);
+    beforeAsking(slug);
+    // An existing connection is described by its file, so nothing it already
+    // holds is asked again; reuse never applies scopes, so they are not asked.
+    const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug, given);
+    // An issuer given as a flag must be the one the connection was written with:
+    // that is known now, not after the next answer.
+    const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
+    if (existing !== undefined && givenIssuer?.ok) {
+      refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
+    }
+    const displayName = await this.input({
+      kind: "text",
+      name: "display name",
+      message: "What name should the sign-in button show? For example Acme SSO.",
+      parse: parseDisplayName,
+      given: given.displayName ?? stored?.displayName,
+    });
+    const issuer = await this.input({
+      kind: "text",
+      name: "issuer",
+      message: "What is the issuer URL of the provider?",
+      parse: parseIssuer,
+      given: given.issuer ?? stored?.issuer,
+    });
+    const scopes = await this.input({
+      kind: "text",
+      name: "scopes",
+      message: "Which scopes should we request? Separate them with spaces.",
+      parse: parseScopes,
+      given: given.scopes ?? (existing === undefined ? undefined : DEFAULT_SCOPES.join(" ")),
+      initialValue: DEFAULT_SCOPES.join(" "),
+    });
+    return { slug, displayName, issuer, scopes: scopes.join(" ") };
   }
 
   /**
@@ -540,29 +666,41 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 }
 
-/** What the run needs from the Project before the schema is read. */
+/**
+ * What the run needs from the flags before the schema is read. `selection` is
+ * undefined for a custom provider whose settings a person will be asked for
+ * once everything that can fail has passed; `values` are the settings the
+ * flags gave.
+ */
 type ProjectContext = {
-  readonly selection: ProviderSelection;
-  readonly entry: IdpProvider;
+  readonly selection: ProviderSelection | undefined;
+  readonly values: CustomFlagValues;
   readonly issuer: string;
 };
 
 /**
- * The provider to enable and the Project it is enabled for, or a refusal.
+ * This command's `preflight`: quick checks of the flags, and nothing else.
+ *
+ * It runs inside `AuthMethodCommand.target`, before the schema is read, so it
+ * must neither ask a question nor use the network or write anything: anything that
+ * fails later would otherwise fail after the person had answered. Questions
+ * for a custom provider's settings are asked in `run`, after the Project is
+ * connected.
  *
  * The provider and a custom connection's settings are checked first, before
- * the Project is read: a name or issuer the server would refuse on deploy is
- * refused here, where it was typed. The Project is read before anything is
- * asked for: being turned away after typing a secret would mean typing it
- * again.
+ * the Project's issuer: a name or issuer the server would refuse on deploy is
+ * refused here, at once, under its flag.
  *
  * @param flags - `--provider`, which is named rather than prompted for, and
  *   the custom connection's settings.
  * @param issuer - The origin the app serves from, from the environment.
+ * @param interactive - Whether a person is there to be asked for settings left
+ *   out. A dry run never asks, so it is held to the flags like a script is.
  */
 async function readProject(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   issuer: string | undefined,
+  interactive: boolean,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
   if (provider === undefined) {
@@ -572,19 +710,85 @@ async function readProject(
       hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
     });
   }
-  const selection = selectionFromFlags(
-    provider,
-    customFlagValues(flags, ENABLE_FLAG_KEYS),
-    ENABLE_FLAG_NAMES,
-    customExample(ENABLE_FLAG_NAMES),
-  );
-  const entry = providerOf(selection);
+  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
+  // A person at a terminal is asked for the settings they left out, but later:
+  // here the settings they did give are only checked, so nobody is asked before
+  // being turned away. A script, a dry run or --non-interactive is held to the
+  // flags and told which are missing.
+  let selection: ProviderSelection | undefined;
+  if (provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values)) {
+    checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
+  } else {
+    selection = selectionFromFlags(
+      provider,
+      values,
+      ENABLE_FLAG_NAMES,
+      customExample(ENABLE_FLAG_NAMES),
+    );
+  }
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
       hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
     });
   }
-  return { selection, entry, issuer };
+  return { selection, values, issuer };
+}
+
+/**
+ * What the file of an existing custom connection holds, checked as a typed
+ * answer is, or a refusal that names the file and the setting: a stored value
+ * that cannot be used would otherwise surface as an error about a flag the
+ * person never passed. A file with no issuer is not an OIDC connection to
+ * reuse at all, whatever issuer is typed.
+ */
+function usableStoredSettings(
+  file: ConnectionFile,
+  slug: ConnectionSlug,
+  given: CustomFlagValues,
+): CustomFlagValues {
+  const stored = storedCustomSettings(file);
+  if (stored.issuer === undefined) {
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `${file.path} is already named ${slug} and is not an OIDC connection`,
+      {
+        hint: `Fix the file, or choose another ${ENABLE_FLAG_NAMES.slug}, then run the command again.`,
+        details: { file: file.path, slug },
+      },
+    );
+  }
+  // Only a stored value that will be used is held to the rules: one a flag
+  // replaces is not read at all.
+  const usable = <T>(
+    what: string,
+    value: string | undefined,
+    flag: string | undefined,
+    parse: (v: string) => Parsed<T>,
+  ) => {
+    const parsed = flag !== undefined || value === undefined ? undefined : parse(value);
+    if (parsed !== undefined && !parsed.ok) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        `${file.path} holds ${what} that cannot be used: ${parsed.problem}`,
+        {
+          hint: `Fix it in that file, or choose another ${ENABLE_FLAG_NAMES.slug}.`,
+          details: { file: file.path, slug },
+        },
+      );
+    }
+    return flag === undefined ? value : undefined;
+  };
+  return {
+    displayName: usable("a display name", stored.displayName, given.displayName, parseDisplayName),
+    issuer: usable("an issuer", stored.issuer, given.issuer, parseIssuer),
+  };
+}
+
+/** Whether a custom connection's name, button text and issuer were all given. */
+function hasAllCustomSettings(values: CustomFlagValues): boolean {
+  return (
+    values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined
+  );
 }
 
 /**
@@ -654,5 +858,40 @@ function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
   return [
     ...(edits.schema.changed ? [schema.path] : []),
     ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
+  ];
+}
+
+/**
+ * What a person needs to know about the claim mappings a custom connection was
+ * written with, in two parts: the mappings (where they are, which side of each
+ * line is their user schema's and which is the claim the provider must return),
+ * then what verifies a value, which a mapping alone does not. Nothing here
+ * edits a mapping; the connection file is where that happens.
+ */
+function mappingNotes(options: { file: string; provider: string; connection: object }): string[] {
+  const { file, provider, connection } = options;
+  const document = connection as {
+    claim_mapping?: Readonly<Record<string, string>>;
+    verified_claims?: Readonly<Record<string, string | true>>;
+  };
+  const mappings = Object.entries(document.claim_mapping ?? {});
+  if (mappings.length === 0) {
+    return [];
+  }
+  const verified = Object.entries(document.verified_claims ?? {});
+  return [
+    `Claim mappings in ${file}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
+    ...mappings.map(([attribute, claim]) => `  ${attribute} ← ${claim}`),
+    ...(verified.length === 0
+      ? ["Nothing is treated as verified."]
+      : [
+          "Verification, which a mapping alone does not give:",
+          ...verified.map(([attribute, how]) =>
+            how === true
+              ? `  ${attribute} is treated as verified.`
+              : `  ${attribute} is treated as verified only when ${provider} says so in the ${how} claim.`,
+          ),
+        ]),
+    "Edit the mappings in that file if your provider returns other claims.",
   ];
 }

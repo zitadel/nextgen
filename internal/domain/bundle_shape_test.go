@@ -54,6 +54,25 @@ func TestValidateBundleShape(t *testing.T) {
 		assert.Equal(t, 1, failures[2].Index)
 	})
 
+	t.Run("two policies for one operation are both refused", func(t *testing.T) {
+		t.Parallel()
+		input := domain.BundleShapeInput{
+			Policies: []domain.BundleShapePolicy{
+				{Index: 0, Operation: "auth.factor.password.set"},
+				{Index: 1, Operation: "auth.factor.password.set"},
+			},
+		}
+		failures := domain.ValidateBundleShape(input)
+		require.Len(t, failures, 2)
+		for i, failure := range failures {
+			assert.Equal(t, domain.ReleasePointerKindPolicy, failure.Kind)
+			assert.Equal(t, "auth.factor.password.set", failure.Handle)
+			assert.Equal(t, i, failure.Index)
+			assert.Contains(t, failure.Err.Details, "appears twice")
+		}
+		assert.False(t, domain.BundleEmpty(input))
+	})
+
 	t.Run("schema URL entries skip objectType checks", func(t *testing.T) {
 		t.Parallel()
 		failures := domain.ValidateBundleShape(domain.BundleShapeInput{

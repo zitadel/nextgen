@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -87,6 +88,40 @@ func entryValues(set *domain.VariableSet) map[string]any {
 		values[entry.Name] = entry.Value
 	}
 	return values
+}
+
+// DeploymentService.create freezes inside the create transaction, so the
+// deployment row must be visible before that transaction commits. A freeze
+// after deploy returns does not prove it: that read runs on a committed row.
+func TestVariableSetStatements_FreezeSeesTheUncommittedDeployment(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		f := newVariableSetFixture(t, d)
+		f.set(t, "api_url", domain.DeploymentOriginKindPrimary, "https://api.example.test", false)
+
+		var deploymentID string
+		require.NoError(t, d.pool.Transaction(t.Context(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
+			entity, err := domain.NewDeployment(f.projectID, f.releaseID, domain.DeploymentOriginKindPrimary, []string{f.primaryOrigin}, domain.DeploymentMetadata{})
+			if err != nil {
+				return err
+			}
+			serving, err := tx.Statements().GetNewestPerOrigin(ctx, f.projectID, entity.Origins())
+			if err != nil {
+				return err
+			}
+			if err := tx.Statements().CreateDeployment(ctx, entity, serving); err != nil {
+				return err
+			}
+			if _, err := tx.Statements().FreezeDeploymentVariables(ctx, f.projectID, entity.ID); err != nil {
+				return err
+			}
+			deploymentID = entity.ID
+			return nil
+		}))
+
+		assert.Equal(t, map[string]any{
+			"api_url": "https://api.example.test",
+		}, entryValues(f.get(t, deploymentID)))
+	})
 }
 
 // A freeze copies the rows of the deployment's own kind: a primary deployment

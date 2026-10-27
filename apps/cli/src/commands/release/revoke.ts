@@ -3,6 +3,7 @@ import { Flags } from "@oclif/core";
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { mutatedData } from "../../lib/oclif/envelope";
 import { revokeRelease } from "../../lib/release";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel release revoke <release_id>` — mark a release so its content is
@@ -12,7 +13,7 @@ import { revokeRelease } from "../../lib/release";
  * there or roll it back first. Revoking is idempotent and cannot be undone, so
  * it takes the same `--force`-or-confirm gate the destructive commands use.
  */
-export default class ReleaseRevoke extends EnvironmentCommand {
+export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
   static override description = "Revoke a release so its content is never served again.";
   static override group = CommandGroups.configuration;
   static override examples = [

@@ -56,10 +56,20 @@ func WriteHasAuthzProjectFoothold(w ArgWriter, env Env, projectID, homeProjectID
 }
 
 // WriteCheckAuthz emits SELECT (allowed), (foothold) in one round-trip.
+//
+// A Check that names a target (ResourceID, a by-id route after its RSI lookup)
+// gets the target's foothold: only a path that could cover that resource turns
+// a denial into 403, so a resource outside every authorized scope answers like
+// an unknown id (ADR 053 §7). Without a target (creates, project operations,
+// lists) the foothold stays project-wide; the list partial view depends on it.
 func WriteCheckAuthz(w ArgWriter, env Env, params domain.AuthzCheckParams) {
 	w.WriteString("SELECT (")
 	writeCheckAllowed(w, env, params)
 	w.WriteString("), ")
+	if params.ResourceID != "" {
+		writeTargetFoothold(w, env, params)
+		return
+	}
 	writeFoothold(w, env, params.ProjectID, params.HomeProjectID(), params.PrincipalType, params.PrincipalID)
 }
 
@@ -299,8 +309,15 @@ func writeUserMembershipInTeam(w ArgWriter, env Env, projectID, setIDExpr, setID
 // It takes no Env: the caller writes the FROM clause, so nothing here needs the
 // schema qualifier or the dialect clock.
 func writeMembershipEdgeMatch(w ArgWriter, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
+	writeMembershipEdgeMatchIn(w, "", projectID, setIDExpr, setID, memberIDExpr, memberID)
+}
+
+// writeMembershipEdgeMatchIn is writeMembershipEdgeMatch with the home project
+// as an expression or an argument, like the set. An empty member pair omits
+// the member filter, for a caller that ranges over members itself.
+func writeMembershipEdgeMatchIn(w ArgWriter, projectIDExpr, projectID, setIDExpr, setID, memberIDExpr, memberID string) {
 	w.WriteString(`e.project_id = `)
-	w.WriteArg(projectID)
+	writeExprOrArg(w, projectIDExpr, projectID)
 	w.WriteString(`
           AND e.set_type = 'team'`)
 	if setIDExpr != "" || setID != "" {
@@ -309,9 +326,12 @@ func writeMembershipEdgeMatch(w ArgWriter, projectID, setIDExpr, setID, memberID
 		writeExprOrArg(w, setIDExpr, setID)
 	}
 	w.WriteString(`
-          AND e.member_type = 'user'
+          AND e.member_type = 'user'`)
+	if memberIDExpr != "" || memberID != "" {
+		w.WriteString(`
           AND e.member_id = `)
-	writeExprOrArg(w, memberIDExpr, memberID)
+		writeExprOrArg(w, memberIDExpr, memberID)
+	}
 }
 
 // writeDirectPrincipal emits the principal identity test on an assignment row:
@@ -372,6 +392,74 @@ func writeFoothold(w ArgWriter, env Env, projectID, homeProjectID string, princi
 	w.WriteArg(ptype)
 	w.WriteString(` = 'user'
     )
+)`)
+}
+
+// writeTargetFoothold is writeFoothold narrowed to one target: an active
+// assignment whose scope covers it (project-wide, its team, or the resource
+// itself), a membership of the user in the target team or the target's team,
+// or the user's own record.
+func writeTargetFoothold(w ArgWriter, env Env, params domain.AuthzCheckParams) {
+	ptype := params.PrincipalType.String()
+	w.WriteString(`(
+    EXISTS (
+        SELECT 1
+        FROM `)
+	writeTable(w, env, "authz_assignments")
+	w.WriteString(` a
+        WHERE a.project_id = `)
+	w.WriteArg(params.ProjectID)
+	w.WriteString(`
+          AND a.revoked_at IS NULL
+          AND `)
+	writeExpiresActive(w, env, "a")
+	w.WriteString(`
+          AND (a.scope_kind = 'project'`)
+	if params.ResourceTeamID != "" {
+		w.WriteString(`
+               OR (a.scope_kind = 'team' AND a.scope_team_id = `)
+		w.WriteArg(params.ResourceTeamID)
+		w.WriteString(`)`)
+	}
+	w.WriteString(`
+               OR (a.scope_kind = 'resource' AND a.scope_resource_id = `)
+	w.WriteArg(params.ResourceID)
+	w.WriteString(`))
+          AND `)
+	writePrincipalMatch(w, env, "a", ptype, params.PrincipalID, params.HomeProjectID())
+	w.WriteString(`
+    )
+    OR EXISTS (
+        SELECT 1
+        FROM `)
+	writeTable(w, env, "authz_membership_edges")
+	w.WriteString(` e
+        WHERE e.project_id = `)
+	w.WriteArg(params.ProjectID)
+	w.WriteString(`
+          AND e.member_type = 'user'
+          AND e.member_id = `)
+	w.WriteArg(params.PrincipalID)
+	w.WriteString(`
+          AND `)
+	w.WriteArg(ptype)
+	w.WriteString(` = 'user'
+          AND e.set_type = 'team'
+          AND (e.set_id = `)
+	w.WriteArg(params.ResourceID)
+	if params.ResourceTeamID != "" {
+		w.WriteString(` OR e.set_id = `)
+		w.WriteArg(params.ResourceTeamID)
+	}
+	w.WriteString(`)
+    )
+    OR (`)
+	w.WriteArg(ptype)
+	w.WriteString(` = 'user' AND `)
+	w.WriteArg(params.ResourceID)
+	w.WriteString(` = `)
+	w.WriteArg(params.PrincipalID)
+	w.WriteString(`)
 )`)
 }
 

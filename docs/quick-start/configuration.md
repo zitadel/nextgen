@@ -111,11 +111,14 @@ session:
 
 ## Logging
 
-| YAML key                      | Environment                           | Default                                       | Description                   |
-| ----------------------------- | ------------------------------------- | --------------------------------------------- | ----------------------------- |
-| `instrumentation.log.level`   | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`   | `info`                                        | Minimum log level             |
-| `instrumentation.log.format`  | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`  | `text`                                        | Log output encoding           |
-| `instrumentation.log.streams` | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS` | `[runtime, ready, request, service, storage]` | Which log streams are enabled |
+| YAML key                                     | Environment                                          | Default                                       | Description                                                 |
+| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                                           |
+| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                                         |
+| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                               |
+| `instrumentation.log.add_source`             | `NEXTGEN_INSTRUMENTATION_LOG_ADD_SOURCE`             | `true`                                        | Record the file and line that wrote each log line on stderr |
+| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created                         |
+| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `false`                                       | Capture a stack trace when an error is created              |
 
 `level`, `format`, and each entry of `streams` accept either their documented
 string name (below) or the underlying numeric value; string values are
@@ -128,23 +131,36 @@ resolved case-insensitively via each type's `encoding.TextUnmarshaler`.
 - `format`: `disabled`, `text`, `json`, `gcp`, `gcp_error_reporting`.
 - `streams`: `runtime`, `ready`, `request`, `service`, `storage`.
 
+`errors.report_location` and `errors.stack_trace` feed the error line that the
+server logs once per failed API call. Location is one `runtime.Caller` and is
+cheap. A stack is one `debug.Stack()` per error and is expensive on busy
+servers. The error line includes it only at `error` level, so 4xx answers
+never carry one there; other log lines that carry a `domain.Error` include it
+whenever it was captured. Stack capture is off by default. The location and
+the request id already point at the line where the error was created and at
+the request that failed, so turn it on only while debugging a problem.
+
 ```yaml
 instrumentation:
   log:
     level: debug
     format: json
     streams: [request, service]
+    errors:
+      report_location: true
+      stack_trace: true
 ```
 
 ## Tracing
 
-| YAML key                                        | Environment                                             | Default | Description                                 |
-| ----------------------------------------------- | ------------------------------------------------------- | ------- | ------------------------------------------- |
-| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                        |
-| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`     |
-| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http` |
-| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent |
-| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced  |
+| YAML key                                        | Environment                                             | Default | Description                                    |
+| ----------------------------------------------- | ------------------------------------------------------- | ------- | ---------------------------------------------- |
+| `instrumentation.trace.exporter.type`           | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_TYPE`           | unset   | Where spans are sent                           |
+| `instrumentation.trace.exporter.endpoint`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_ENDPOINT`       | unset   | Collector address for `grpc` and `http`        |
+| `instrumentation.trace.exporter.insecure`       | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_INSECURE`       | `false` | Plain-text connection for `grpc` and `http`    |
+| `instrumentation.trace.exporter.batch_duration` | `NEXTGEN_INSTRUMENTATION_TRACE_EXPORTER_BATCH_DURATION` | unset   | Longest wait before buffered spans are sent    |
+| `instrumentation.trace.fraction`                | `NEXTGEN_INSTRUMENTATION_TRACE_FRACTION`                | `1.0`   | Share of incoming requests that are traced     |
+| `instrumentation.trace.trust_remote_spans`      | `NEXTGEN_INSTRUMENTATION_TRACE_TRUST_REMOTE_SPANS`      | `false` | Continue the caller's trace from `traceparent` |
 
 - `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
   `exporter.google_project_id`), `auto`.
@@ -160,6 +176,20 @@ instrumentation:
   is idle.
 - A traced request keeps all of its spans, including one span per database
   statement.
+
+With `trust_remote_spans` off (the default), an incoming `traceparent`,
+`tracestate` or `baggage` header is ignored and every request starts a new
+trace, sampled by `fraction`.
+
+With it on, the server span becomes a child of the caller's span and joins the
+caller's trace ID. That also trusts the caller's sampled flag: a caller that
+sends `sampled=1` is recorded and exported **whatever `fraction` says**, and
+so is everything ZITADEL does for that request. A caller that sends
+`sampled=0` is still sampled by `fraction`. Turn it on only when ZITADEL sits
+behind a proxy, gateway or mesh you control that strips or overwrites these
+headers at the edge, never when untrusted callers can reach ZITADEL directly,
+because any of them could force every request to be recorded. The decision is
+recorded in [ADR 080](../adrs/080-incoming-trace-context.md).
 
 ```yaml
 instrumentation:

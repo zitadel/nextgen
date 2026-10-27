@@ -95,6 +95,43 @@ func TestResolveUserSchemaUnderAnotherBuiltinBase(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrJSONSchemaNotFound())
 }
 
+func TestResolveUserSchemaPinnedRevision(t *testing.T) {
+	v1 := &domain.JSONSchema{URL: "sch_v1", ObjectType: new("human-user")}
+	v2 := &domain.JSONSchema{URL: "sch_v2", ObjectType: new("human-user")}
+	// Listed newest-first, which is what the unpinned lookup returns.
+	schemas := fakeUserSchemas{v2, v1}
+	flow := domain.ReleasePointer{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"}
+	schemaV1 := domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: v1.URL}
+
+	pinned := withPins(t, flow, schemaV1)
+	got, err := resolveUserSchema(pinned, schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	require.NoError(t, err)
+	assert.Same(t, v1, got)
+
+	// A schema id still resolves to the pinned revision, not the id named.
+	got, err = resolveUserSchema(pinned, schemas, domain.BuiltinSchemaBases{}, "proj", v2.URL)
+	require.NoError(t, err)
+	assert.Same(t, v1, got)
+
+	got, err = resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	require.NoError(t, err)
+	assert.Same(t, v2, got)
+
+	got, err = resolveUserSchema(withPins(t, schemaV1), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	require.NoError(t, err)
+	assert.Same(t, v2, got, "a release that pins no flow keeps the newest schema")
+
+	_, err = resolveUserSchema(withPins(t, flow), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	assert.ErrorIs(t, err, domain.ErrInternal(nil))
+}
+
+func withPins(t *testing.T, pointers ...domain.ReleasePointer) context.Context {
+	t.Helper()
+	return WithRuntimeResolution(t.Context(), &RuntimeResolution{
+		Release: &domain.Release{Pointers: pointers},
+	})
+}
+
 func TestSameUserSchema(t *testing.T) {
 	v1 := &domain.JSONSchema{URL: "sch_human_v1", ObjectType: new("human-user")}
 	v2 := &domain.JSONSchema{URL: "sch_human_v2", ObjectType: new("human-user")}

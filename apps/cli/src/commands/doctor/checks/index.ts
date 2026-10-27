@@ -14,6 +14,7 @@ import { FrameworkCheck } from "./framework";
 import { DependencyCheck } from "./dependency";
 import { DependencyVersionCheck } from "./dependency-version";
 import { ManagedFilesCheck } from "./managed-files";
+import { MetaSchemasCheck } from "./meta-schemas";
 import { ProjectMatchCheck } from "./project-match";
 import { SchemaCheck } from "./schema";
 import { ClaimCheck } from "./claim";
@@ -30,6 +31,7 @@ export { SchemaCheck } from "./schema";
 export { DependencyCheck } from "./dependency";
 export { DependencyVersionCheck } from "./dependency-version";
 export { ManagedFilesCheck } from "./managed-files";
+export { MetaSchemasCheck } from "./meta-schemas";
 export { ProjectMatchCheck } from "./project-match";
 export { ClaimCheck } from "./claim";
 
@@ -45,6 +47,7 @@ export const SANITY_CHECKS: ReadonlyArray<SanityCheck> = [
   new DependencyCheck(),
   new DependencyVersionCheck(),
   new ManagedFilesCheck(),
+  new MetaSchemasCheck(),
   new ProjectMatchCheck(),
   new ClaimCheck(),
 ];

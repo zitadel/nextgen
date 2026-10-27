@@ -68,6 +68,37 @@ func (e Error) LogValue() slog.Value {
 	return slog.GroupValue(attrs...)
 }
 
+// BriefLogValue is the shape of an error logged below Error level: code,
+// message and the cause chain. Location and stack stay on Error lines
+// (ADR 030).
+func (e Error) BriefLogValue() slog.Value {
+	attrs := []slog.Attr{
+		slog.String("code", e.Code),
+		slog.String("message", e.Message),
+	}
+	var parent Error
+	switch {
+	case e.Parent == nil:
+	case errors.As(e.Parent, &parent):
+		// Its own brief value: Error() is only the message and would drop
+		// the root cause, and LogValue would bring the stack back in.
+		attrs = append(attrs, slog.Attr{Key: "parent", Value: parent.BriefLogValue()})
+	default:
+		attrs = append(attrs, slog.String("parent", e.Parent.Error()))
+	}
+	return slog.GroupValue(attrs...)
+}
+
+// Brief returns e as an error that logs through BriefLogValue and exposes
+// no location or stack, for lines below Error level (ADR 030).
+func (e Error) Brief() error { return briefError{e} }
+
+type briefError struct{ e Error } // a field, not embedded: Origin's methods must not be promoted
+
+func (b briefError) Error() string { return b.e.Message }
+
+func (b briefError) LogValue() slog.Value { return b.e.BriefLogValue() }
+
 // WithMessage returns a copy with the message overridden.
 // Code is unchanged so errors.Is still matches the original sentinel.
 func (e Error) WithMessage(msg string) Error {
