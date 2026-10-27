@@ -27,4 +27,21 @@ describe("Where", () => {
       "Using your Zitadel server at api.zitadel.cloud.",
     );
   });
+
+  describe("as the place in a footer that has its own wording", () => {
+    it("names the project and the server", () => {
+      expect(new Where("proj-1", "api.zitadel.cloud").plain).toBe(
+        "project proj-1 on api.zitadel.cloud",
+      );
+    });
+
+    it("names the server alone when no project was resolved", () => {
+      expect(new Where(undefined, "api.zitadel.cloud").plain).toBe("api.zitadel.cloud");
+    });
+
+    // "project proj-1 on your Zitadel project" reads as two different places.
+    it("names the project alone when the command reached no server", () => {
+      expect(new Where("proj-1").plain).toBe("project proj-1");
+    });
+  });
 });

@@ -77,6 +77,29 @@ describe("Ending", () => {
       expect(below).not.toContain("Using project proj-1");
     });
 
+    // The same command prints these as its footer when it drew no chain, so
+    // losing them because something happened to open one would make the
+    // output depend on whether an unrelated warning fired.
+    it("keeps what the command added after its listing, once a chain is open", () => {
+      const below = plain(
+        ending({ lines: ["a table"], extras: ["Resolved now: development"] }).render(),
+      );
+
+      expect(below).toContain("Resolved now: development");
+    });
+
+    it("does not repeat those extras in the footer of a standalone ending", () => {
+      const standalone = new Ending(
+        { title: "Found 1 environment", sections: [], extras: ["Resolved now: development"] },
+        nowhere,
+        false,
+      );
+
+      const shown = plain(standalone.renderStandalone());
+
+      expect(shown.match(/Resolved now: development/g)).toHaveLength(1);
+    });
+
     it("drops the blank lines a command's own rendering left at either end", () => {
       const below = plain(ending({ lines: ["", "a table", ""] }).render());
 

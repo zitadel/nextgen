@@ -91,10 +91,21 @@ export class Progress {
   begin(label: string): Step {
     if (!this.drawing.interactive) {
       consola.start(label);
+      // Ending once is the step's contract, not the chain's: a caller that
+      // ends its own step in both a `try` and a `catch` must not narrate the
+      // step twice just because nobody is watching.
+      let narrated = false;
+      const once = (narrate: () => void) => {
+        if (narrated) {
+          return;
+        }
+        narrated = true;
+        narrate();
+      };
       return {
         detail: (text) => consola.info(text),
-        done: (text) => consola.success(text ?? label),
-        fail: (text) => consola.error(text ?? `${label} failed`),
+        done: (text) => once(() => consola.success(text ?? label)),
+        fail: (text) => once(() => consola.error(text ?? `${label} failed`)),
       };
     }
     this.drawing.open();

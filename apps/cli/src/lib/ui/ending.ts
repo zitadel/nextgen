@@ -44,7 +44,7 @@ export class Ending {
       .map((part) => part.trim())
       .filter((part) => part !== "")
       .join(" · ");
-    const body = this.body();
+    const body = this.body(false);
     return [
       ...(body.length === 0 ? [] : [body.join("\n"), ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
@@ -80,13 +80,24 @@ export class Ending {
     ).render()}\n`;
   }
 
-  /** The facts the command stated, then whatever it rendered itself. */
-  private body(): string[] {
+  /**
+   * The facts the command stated, then whatever it rendered itself, then what
+   * it added after that.
+   *
+   * The extras are the footer of a standalone ending, so that path asks for
+   * them separately (`withExtras: false`) and places them itself. Everywhere
+   * else they belong under the body: a command that opened a chain — because
+   * something warned, or because a step span a spinner — must not lose a line
+   * the same command prints without one.
+   */
+  private body(withExtras = true): string[] {
+    const extras = this.summary.extras ?? [];
     return trimBlank([
       ...(this.summary.sections.length === 0
         ? []
         : [new Facts(this.summary.sections).render(), ""]),
       ...(this.summary.lines ?? []),
+      ...(withExtras && extras.length > 0 ? ["", ...extras] : []),
     ]);
   }
 

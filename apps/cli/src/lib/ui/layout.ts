@@ -1,4 +1,4 @@
-import { box } from "consola/utils";
+import { box, stripAnsi } from "consola/utils";
 import pc from "picocolors";
 import wrapAnsi from "wrap-ansi";
 
@@ -13,6 +13,13 @@ import type { Section } from "./summary";
 
 /** The widest anything the CLI draws may be, however wide the terminal is. */
 export const WIDTH = 80;
+
+/**
+ * How wide a line looks on screen. Colour is invisible but not weightless:
+ * a styled line is a dozen characters longer than it reads, so every width
+ * decision here measures what the terminal shows, never `String.length`.
+ */
+const visible = (line: string): number => stripAnsi(line).length;
 
 /** Anything that can turn itself into the text that is printed. */
 export interface Renderable {
@@ -42,12 +49,14 @@ export class Prose implements Renderable {
   }
 
   private wrap(line: string): string {
-    if (/\S {2,}\S/.test(line) || line.length <= this.width) {
+    if (/\S {2,}\S/.test(line) || visible(line) <= this.width) {
       return line;
     }
     const lead = /^\s*/.exec(line)?.[0] ?? "";
     const item = /^(\[\w+\]|\$|-|\d+\.) /.test(line.trimStart()) ? "  " : "";
-    return wrapAnsi(line.trimStart(), this.width - lead.length - item.length)
+    // A line indented further than the width would otherwise ask for a
+    // negative one, which wraps every word onto its own line.
+    return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
       .split("\n")
       .map((part, index) => (index === 0 ? lead : lead + item) + part)
       .join("\n");
@@ -106,16 +115,20 @@ export class Frame implements Renderable {
 
   render(): string {
     const blocks = [
-      ...(this.body.length === 0 ? [] : [this.body.join("\n")]),
+      ...(this.body.length === 0 ? [] : [new Prose(this.body.join("\n"), Frame.INNER).render()]),
       ...this.steps.map((step) => this.step(step)),
       ...(this.footer === undefined ? [] : [new Prose(this.footer, Frame.INNER).render()]),
     ];
     // Not `consola.box`: while a chain is open, consola's own output is drawn
     // inside it. The last line is padded so every box is the same width, which
-    // consola otherwise sizes to its content.
+    // consola otherwise sizes to its content. consola measures a line without
+    // its colour, so the padding must too: a styled last line — a command, or
+    // the dimmed footer — would otherwise count its escapes as width and leave
+    // the box as narrow as whatever it happens to hold.
     const lines = blocks.join("\n\n").split("\n");
     const last = lines.length - 1;
-    lines[last] = (lines[last] ?? "").padEnd(Frame.INNER);
+    const tail = lines[last] ?? "";
+    lines[last] = tail + " ".repeat(Math.max(0, Frame.INNER - visible(tail)));
     return box(lines.join("\n"), {
       title: this.title,
       style: { padding: 1, borderStyle: "rounded", borderColor: "green", marginTop: 0 },

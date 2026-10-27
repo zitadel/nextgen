@@ -52,6 +52,34 @@ describe("Frame", () => {
     expect(widest(narrow)).toBe(widest(wide));
   });
 
+  // Written with real escapes rather than picocolors, which draws nothing
+  // under the test runner: measuring a styled line by its raw length is the
+  // whole bug, so the test has to carry the colour itself.
+  it("is the same width when its last line is coloured, as it is at a terminal", () => {
+    const dim = (text: string) => `\u001b[2m${text}\u001b[22m`;
+
+    const box = new Frame(
+      "Summary",
+      ["Short body."],
+      [{ text: "Do it." }],
+      dim("On host."),
+    ).render();
+
+    expect(widest(box)).toBe(WIDTH);
+  });
+
+  it("is the same width when it ends on a command, which is always coloured", () => {
+    const box = new Frame("Summary", [], [{ text: "Do it:", command: "zitadel deploy" }]).render();
+
+    expect(widest(box)).toBe(WIDTH);
+  });
+
+  it("wraps what the command rendered, not only its steps", () => {
+    const box = new Frame("Summary", [`A headline ${"that keeps going ".repeat(12)}`], []).render();
+
+    expect(widest(box)).toBeLessThanOrEqual(WIDTH);
+  });
+
   it("never draws wider than the width everything else obeys", () => {
     const box = new Frame(
       "Next steps",

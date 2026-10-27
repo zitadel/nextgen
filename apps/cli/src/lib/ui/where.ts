@@ -21,8 +21,13 @@ export class Where {
 
   /** Just the place, for a footer that already has its own wording. */
   get plain(): string {
-    const target = this.project === undefined ? "" : `project ${this.project} on `;
-    return `${target}${this.describeServer().replace(/^your (local )?Zitadel server at /, "")}`;
+    const target = this.project === undefined ? "" : `project ${this.project}`;
+    if (this.server === undefined) {
+      // Nothing to name but the project, and "on your Zitadel project" reads
+      // as a second, different place.
+      return target;
+    }
+    return `${target === "" ? "" : `${target} on `}${this.server}`;
   }
 
   /** The same sentence every time, as the last line of the summary. */

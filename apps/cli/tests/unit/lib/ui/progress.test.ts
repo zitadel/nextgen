@@ -151,5 +151,16 @@ describe("Progress", () => {
       expect(consola.info).toHaveBeenCalledWith("package.json");
       expect(consola.success).toHaveBeenCalledWith("Detected Next.js");
     });
+
+    // Ending once is the step's contract, not the chain's: a caller that ends
+    // its step in both a try and a catch must not say so twice off a terminal.
+    it("ends once when nobody is watching, however many times it is ended", () => {
+      const step = new Progress(chain(false)).begin("Detecting framework");
+      step.done("Detected Next.js");
+      step.fail("Detected nothing");
+
+      expect(consola.success).toHaveBeenCalledTimes(1);
+      expect(consola.error).not.toHaveBeenCalled();
+    });
   });
 });
