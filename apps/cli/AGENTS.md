@@ -42,6 +42,11 @@
 - Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
   fails on a clack import elsewhere.
+- Fail early: run every check that can fail before the first question. A person
+  pays for each answer they must retype, so a bad `--schema`, an ambiguous
+  project or an unreachable server is reported before they are asked anything.
+  In an `auth-method` command, `target()`'s `preflight` hook is for quick flag
+  checks only and never asks; questions go in `run`, after `connect()`.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
   `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so

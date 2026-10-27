@@ -1,4 +1,3 @@
-import type { Asker } from "../../../lib/input";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
@@ -10,7 +9,6 @@ import {
   type ConnectionSlug,
   credentialVariables,
   CUSTOM_PROVIDER,
-  type IdpProvider,
   IDP_PROVIDERS,
   parseClientId,
   parseClientSecret,
@@ -42,6 +40,7 @@ import {
   type CustomFlagValues,
   customExample,
   customFlagValues,
+  existingCustomSettings,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
@@ -131,7 +130,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       cwd,
       schema,
       flows: candidates,
-      preflight: { selection, entry, issuer },
+      preflight: project,
     } = await this.target(flags, {
       // The credentials are published to the project, so the environment is
       // resolved, unlike for the other auth-method commands.
@@ -140,13 +139,29 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         readProject(
           flags,
           this.environment.values.ZITADEL_ISSUER?.value,
-          this.input,
           !this.meta.nonInteractive,
         ),
     });
+    const { issuer } = project;
     // Resolved before anything is asked for: being turned away after typing a
     // secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
+    const connections = await readConnectionFiles(cwd);
+    // The first question of the run, so every check that can fail has passed.
+    // A custom connection that is already in the Project is described by its
+    // file, so only what is missing from both the flags and the file is asked.
+    const selection =
+      project.selection ??
+      selectionFromFlags(
+        CUSTOM_PROVIDER,
+        await askCustomSettings(
+          customSettingsToAsk(project.values, existingCustomSettings(connections, project.values)),
+          this.input,
+        ),
+        ENABLE_FLAG_NAMES,
+        customExample(ENABLE_FLAG_NAMES),
+      );
+    const entry = providerOf(selection);
     const { nonInteractive, dryRun } = this.meta;
     // A loopback issuer works only on a server that may fetch from this machine.
     const loopback = loopbackIssuerWarning(selection, await loopbackReach(cwd, server));
@@ -167,7 +182,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           )
         : undefined;
 
-    const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one.
     const clientIdFlag =
       flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
@@ -578,30 +592,40 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   }
 }
 
-/** What the run needs from the Project before the schema is read. */
+/**
+ * What the run needs from the flags before the schema is read. `selection` is
+ * undefined for a custom provider whose settings a person will be asked for
+ * once everything that can fail has passed; `values` are the settings the
+ * flags gave.
+ */
 type ProjectContext = {
-  readonly selection: ProviderSelection;
-  readonly entry: IdpProvider;
+  readonly selection: ProviderSelection | undefined;
+  readonly values: CustomFlagValues;
   readonly issuer: string;
 };
 
 /**
- * The provider to enable and the Project it is enabled for, or a refusal.
+ * This command's `preflight`: quick checks of the flags, and nothing else.
  *
- * The provider and a custom connection's settings are checked first, before
- * the Project is read: a name or issuer the server would refuse on deploy is
- * refused here, where it was typed. The Project is read before anything is
- * asked for: being turned away after typing a secret would mean typing it
- * again.
+ * It runs inside `AuthMethodCommand.target`, before the schema is read, so it
+ * must neither ask a question nor touch the network or the disk: anything that
+ * fails later would otherwise fail after the person had answered. Questions
+ * for a custom provider's settings are asked in `run`, after the Project is
+ * connected.
+ *
+ * The provider and a custom connection's settings are checked here, where they
+ * were typed: a name or issuer the server would refuse on deploy is refused
+ * at once, under its flag.
  *
  * @param flags - `--provider`, which is named rather than prompted for, and
  *   the custom connection's settings.
  * @param issuer - The origin the app serves from, from the environment.
+ * @param interactive - Whether a person is there to be asked for settings left
+ *   out. When so, a custom provider with settings missing has no selection yet.
  */
 async function readProject(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   issuer: string | undefined,
-  ask: Asker,
   interactive: boolean,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
@@ -612,14 +636,19 @@ async function readProject(
       hint: `Pass --provider, e.g. --provider ${IDP_PROVIDERS[0]}.`,
     });
   }
-  let values = customFlagValues(flags, ENABLE_FLAG_KEYS);
-  // A person at a terminal is asked for the connection's settings they left
-  // out, the way `setup` asks. The mistakes in the ones they gave are named
-  // under their flag first, so nobody is asked before being turned away. A
-  // script, or --non-interactive, is held to the flags and told which are missing.
+  if (issuer === undefined) {
+    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+    });
+  }
+  const values = customFlagValues(flags, ENABLE_FLAG_KEYS);
+  // A person at a terminal is asked for the settings they left out, but later:
+  // here the settings they did give are only checked, so nobody is asked before
+  // being turned away. A script, or --non-interactive, is held to the flags and
+  // told which are missing.
   if (provider === CUSTOM_PROVIDER && interactive && !hasAllCustomSettings(values)) {
     checkGivenCustomFlags(values, ENABLE_FLAG_NAMES);
-    values = await askCustomSettings(values, ask);
+    return { selection: undefined, values, issuer };
   }
   const selection = selectionFromFlags(
     provider,
@@ -627,13 +656,23 @@ async function readProject(
     ENABLE_FLAG_NAMES,
     customExample(ENABLE_FLAG_NAMES),
   );
-  const entry = providerOf(selection);
-  if (issuer === undefined) {
-    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
-      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
-    });
-  }
-  return { selection, entry, issuer };
+  return { selection, values, issuer };
+}
+
+/**
+ * The settings to ask for: each one the flags gave, else the one the connection
+ * of that name already holds, else none, so only what is in neither is asked.
+ */
+function customSettingsToAsk(
+  given: CustomFlagValues,
+  stored: CustomFlagValues | undefined,
+): CustomFlagValues {
+  return {
+    slug: given.slug ?? stored?.slug,
+    displayName: given.displayName ?? stored?.displayName,
+    issuer: given.issuer ?? stored?.issuer,
+    scopes: given.scopes ?? stored?.scopes,
+  };
 }
 
 /** Whether a custom connection's name, button text and issuer were all given. */

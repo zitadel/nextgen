@@ -10,7 +10,8 @@ vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")
 import { password, text } from "@clack/prompts";
 
 import AuthMethodSsoEnable from "../../../../../src/commands/auth-method/sso/enable";
-import { setUpProject } from "../../../../helpers/local-project";
+import { setUpProject, withStdin } from "../../../../helpers/local-project";
+import { runCliForTest } from "../../../../helpers/run-cli";
 import { asTerminal } from "../../../../helpers/terminal";
 
 // The built CLI bundles its own prompts, so a prompt can only be answered by
@@ -116,5 +117,81 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
       "What is the client ID of your Acme SSO OAuth app?",
     ]);
+  });
+
+  it("asks nothing when the schema does not exist, so nobody answers for nothing", async () => {
+    const cwd = await setUpProject();
+
+    // Exit code 4 is the CLI's not-found failure.
+    await expect(enableCustom(cwd, "--schema", "nope")).rejects.toMatchObject({
+      oclif: { exit: 4 },
+    });
+
+    expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
+  });
+
+  it("does not ask for what a connection of that name already holds", async () => {
+    const cwd = await setUpProject();
+    await withStdin("acme-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        ACME.slug,
+        "--display-name",
+        ACME.displayName,
+        "--issuer",
+        ACME.issuer,
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+    vi.mocked(text).mockResolvedValue("acme-client-id" as never);
+
+    await enableCustom(cwd, "--slug", ACME.slug);
+
+    const asked = vi.mocked(text).mock.calls.map(([question]) => question.message);
+    expect(
+      asked.filter((message) =>
+        /call this connection|sign-in button|issuer URL|scopes/.test(message),
+      ),
+    ).toEqual([]);
+  });
+
+  it("explains the claim mappings it wrote for a custom connection", async () => {
+    const cwd = await setUpProject();
+
+    const result = await withStdin("piped-secret", () =>
+      runCliForTest([
+        "auth-method",
+        "sso",
+        "enable",
+        "--cwd",
+        cwd,
+        "--non-interactive",
+        "--provider",
+        "custom",
+        "--slug",
+        "acme-sso",
+        "--display-name",
+        "Acme SSO",
+        "--issuer",
+        "https://sso.acme.example",
+        "--client-id",
+        "acme-client-id",
+      ]),
+    );
+
+    const output = `${result.stdout}${result.stderr}`;
+    expect(output).toContain("Claim mappings in .zitadel/idps/acme-sso.json.");
+    expect(output).toContain("email ← email");
+    expect(output).toContain("Mapping a value does not by itself mark it verified.");
   });
 });
