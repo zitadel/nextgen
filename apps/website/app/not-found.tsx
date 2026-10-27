@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LINK } from "./changelog/release";
+import { LINK } from "./changelog/entry";
 import { links } from "./links";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
@@ -8,8 +8,8 @@ export const metadata: Metadata = { title: "Not found — Zitadel preview" };
 
 /**
  * A path the website has no page for. The cloud sends the website only its
- * own paths (repo-root vercel.json), so a visitor lands here from a release
- * page that does not exist, such as /changelog/v9.9.9 (changelog/[tag]).
+ * own paths (repo-root vercel.json), so a visitor lands here from a
+ * changelog entry that does not exist (changelog/[slug]).
  */
 export default function NotFound() {
   return (
@@ -25,11 +25,11 @@ export default function NotFound() {
             <a href={links.changelog} className={LINK}>
               changelog
             </a>{" "}
-            lists every release from 0.1.0 on, and{" "}
+            has what's new in the preview, and{" "}
             <a href={links.releases} className={LINK}>
               GitHub
             </a>{" "}
-            has the alpha previews before it.
+            the release notes of every version.
           </p>
         </div>
       </main>

@@ -14,8 +14,9 @@
     },
     // The showcase's login previews (app/showcase/login-preview.tsx) import
     // the atoms of @zitadel/components, which Next resolves to the package's
-    // dist/. The changelog reads the published packages and the release notes
-    // Changesets writes into each on every release (app/changelog/releases.ts).
+    // dist/. The changelog finds the release that ships each entry in the
+    // published packages' release notes, which Changesets writes on every
+    // release (app/changelog/entries.ts).
     "build": {
       "dependsOn": ["@zitadel/components#build"],
       "inputs": [

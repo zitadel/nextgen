@@ -1,7 +1,7 @@
 # Agent Instructions — `apps/website`
 
 The hosted cloud's front page at `/` and its changelog at `/changelog`, with
-a page per release at `/changelog/<tag>`.
+a page per entry and a feed under it.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -82,19 +82,16 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The changelog
 
-- Each release leads with its post, `changelog/<version>.md`, which an agent
-  drafts after the release with `skills/zitadel-changelog-post`. The index
-  carries only the posts and the breaking changes, so it stays small as
-  releases grow; every change is on the release's own page.
-- `app/changelog/releases.ts` reads the releases when the site builds: their
-  changes from the published packages' `CHANGELOG.md`, which `build` lists as
-  inputs in `moon.yml` and `turbo.json`. A broken post, or one for a version
-  no `CHANGELOG.md` has, fails the build.
-- Render release Markdown only through `app/changelog/markdown.tsx`, as
+- An entry, `changelog/<slug>.md`, tells one notable change, which an agent
+  drafts with `skills/zitadel-changelog-entries`. The GitHub Releases keep
+  every change of each version; never list them all here.
+- `app/changelog/entries.ts` reads the entries when the site builds, and finds
+  the release that ships each one's pull requests in the published packages'
+  `CHANGELOG.md`, which `build` lists as inputs in `moon.yml` and
+  `turbo.json`. A broken entry fails the build.
+- Render an entry's Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
-- A release's page groups its changes by `COMPONENTS` in
-  `app/changelog/changes.ts`; list a new published package there, or it
-  shows under its bare name.
+  The feed carries each entry's plain-text summary instead.
 - Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
   of `npx skills add zitadel/nextgen --full-depth`, the users' install.
 

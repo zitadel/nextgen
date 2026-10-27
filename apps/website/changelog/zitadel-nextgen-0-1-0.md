@@ -1,5 +1,8 @@
 ---
-date: 2026-10-21
+title: Zitadel NextGen 0.1.0, the first release
+summary: "The first proper release, and the first on npm's latest tag: registration and login live in your app, under your brand, and an empty folder becomes an app with a working login in three commands."
+date: 2026-10-21T23:50Z
+pulls: [2215]
 ---
 
 0.1.0 is the first proper release of Zitadel NextGen, and the first on npm's `latest` tag. Registration and login live in your app, under your brand, while Zitadel guards the credentials, sessions and tokens underneath. An empty folder becomes an app with a working login in three commands, with no account and no Docker:
@@ -40,4 +43,4 @@ This release sums up everything the alpha previews built; those versions are dep
 - **Security:** an auth attempt could issue a session after verifying only the user's identifier ([#2211](https://github.com/zitadel/nextgen/pull/2211)). Upgrade the server, then revoke active sessions whose only factor is `identifier`. Step-up sign-in now needs the session's `session_token` as well as its `session_id` ([#2166](https://github.com/zitadel/nextgen/pull/2166)).
 - **Breaking:** a deploy that names a primary origin answers `400` with `dep.invalid`; deploy with `targets: ["primary"]` ([#1736](https://github.com/zitadel/nextgen/pull/1736)). Also check the new error codes for schema failures (`req.invalid`, [#1894](https://github.com/zitadel/nextgen/pull/1894)) and over-long passwords (`user.password_policy_violation`, [#2107](https://github.com/zitadel/nextgen/pull/2107)), and how `POST /flow` picks the release by `Origin` ([#2043](https://github.com/zitadel/nextgen/pull/2043)).
 
-The changes listed below are the ones since 1.0.0-alpha.28, the last alpha.
+Every change since 1.0.0-alpha.28, the last alpha, is in the [release notes on GitHub](https://github.com/zitadel/nextgen/releases/tag/v0.1.0).

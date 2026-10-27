@@ -1,13 +1,13 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-// The release notes' Markdown as GitHub writes it (GFM), rendered as elements
-// on the server and never as HTML: this origin also serves the console and
-// its session, so the HTML a note holds is dropped (skipHtml), and so is
-// every link or image URL but a relative, http(s) or mailto one
-// (react-markdown's defaultUrlTransform). A note's headings go under the
-// page's: its h1 and h2 one level below the heading it sits under, its h3 two,
-// the rest three, at most h6.
+// The changelog entries' Markdown (GFM), rendered as elements on the server
+// and never as HTML: this origin also serves the console and its session, so
+// the HTML an entry holds is dropped (skipHtml), and so is every link or image
+// URL but a relative, http(s) or mailto one (react-markdown's
+// defaultUrlTransform). An entry's headings go under the page's: its h1 and h2
+// one level below the heading it sits under, its h3 two, the rest three, at
+// most h6.
 const LEVELS = ["h1", "h2", "h3", "h4", "h5", "h6"] as const;
 
 function headings(under: number): Components {

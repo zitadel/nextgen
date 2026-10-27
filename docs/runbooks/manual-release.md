@@ -2,9 +2,9 @@
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
 and the draft GitHub Release shell for `v<version>`. Changesets owns package
-versioning, changelogs, npm publishing, and public package tags. A release's
-story is a post on the website's changelog, drafted by an agent in a pull
-request after the release ([Product notes](#product-notes)).
+versioning, changelogs, npm publishing, and public package tags. Notable
+changes get entries on the website's changelog, which an agent drafts in a
+pull request ([Product notes](#product-notes)).
 
 ## Normal release
 
@@ -24,7 +24,7 @@ request after the release ([Product notes](#product-notes)).
    package facts.
 7. Publish the draft GitHub Release as the automation wrote it
    (`gh release edit v<version> --repo zitadel/nextgen --draft=false`), then add
-   the release's [changelog post](#product-notes).
+   [changelog entries](#product-notes) for the release's notable changes.
 
 ## Manual controls
 
@@ -106,19 +106,21 @@ gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 ## Product notes
 
 The GitHub Release needs no prose: its generated facts block lists each change
-once. The release's story goes on the website's changelog as a post,
-`apps/website/changelog/<version>.md`, once the version PR has merged:
+once. The website's changelog tells the notable changes instead, an entry
+each, `apps/website/changelog/<slug>.md`, saying when it landed on the cloud
+and which release ships it:
 
-1. Have an agent draft it with the `zitadel-changelog-post` skill
-   ([`SKILL.md`](../../apps/website/skills/zitadel-changelog-post/SKILL.md)):
+1. After a release, or once something notable has landed on the cloud, have an
+   agent draft the entries with the `zitadel-changelog-entries` skill
+   ([`SKILL.md`](../../apps/website/skills/zitadel-changelog-entries/SKILL.md)):
    point the agent at that file, or install the skill with
-   `npx skills add zitadel/nextgen --skill zitadel-changelog-post`.
-2. Review its pull request like any other, and merge it.
+   `npx skills add zitadel/nextgen --skill zitadel-changelog-entries`.
+2. Review the pull request like any other, and merge it.
 
-The changelog reads the releases from the repository when the site builds:
-each release's changes from the packages' `CHANGELOG.md`, with its post above
-them ([`releases.ts`](../../apps/website/app/changelog/releases.ts)). Until the
-post merges, the release shows its changes alone.
+An entry names its pull requests, and the site finds the release that ships
+them in the packages' `CHANGELOG.md` when it builds
+([`entries.ts`](../../apps/website/app/changelog/entries.ts)), so an entry
+written before its release shows it once it ships.
 
 Notes above the generated facts are optional and show on GitHub only. Leave
 the block as it is, and edit a draft's notes with `gh release edit`: an API

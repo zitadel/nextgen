@@ -3,33 +3,24 @@ import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
-import { Markdown } from "./markdown";
-import { OpenLinkedRelease } from "./open-linked-release";
-import { BreakingChanges, changeCount, DATE, LINK, releasePath } from "./release";
-import { FIRST_RELEASE, type Release, readReleases } from "./releases";
+import { type Entry, entryPath, readChangelog } from "./entries";
+import { Availability, DATE, LINK } from "./entry";
 
-// Built from the repository (releases.ts), so a deploy brings a release and
-// its post; nothing is read per visit.
+// Built from the repository (entries.ts), so a deploy brings an entry and the
+// release that ships it; nothing is read per visit.
 export const dynamic = "force-static";
-
-/**
- * How many releases the page shows, newest first; the older ones are links to
- * their own pages. Each carries its post and breaking changes, folded or not.
- */
-const SHOWN = 5;
 
 const title = "Changelog — Zitadel preview";
 const description =
-  "What each release of the Zitadel preview changes in the CLI, the server, the console, the login and the SDKs.";
+  "What's new in the Zitadel preview: the CLI, the server, the console, the login and the SDKs.";
 
 // The share image is the front page's (layout.tsx): a page's openGraph
-// replaces the layout's whole. GitHub's feed of the releases stands in for
-// one of the page's own, which would need the posts as HTML (markdown.tsx).
+// replaces the layout's whole.
 export const metadata: Metadata = {
   title,
   description,
   alternates: {
-    types: { "application/atom+xml": [{ url: links.releasesFeed, title: "Zitadel releases" }] },
+    types: { "application/atom+xml": [{ url: links.changelogFeed, title: "Zitadel changelog" }] },
   },
   openGraph: {
     type: "website",
@@ -42,55 +33,69 @@ export const metadata: Metadata = {
 };
 
 export default function ChangelogPage() {
-  const releases = readReleases();
-  const older = releases.slice(SHOWN);
-  const github = (
-    <a href={links.releases} className={LINK}>
-      GitHub
-    </a>
-  );
+  const { entries, releases } = readChangelog();
   return (
     <>
       <SiteHeader current="changelog" />
       <main className="px-6 pt-12 pb-20 md:pt-20 md:pb-28">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="font-heading text-4xl text-text-primary leading-tight tracking-[-0.025em] md:text-5xl">
-            Changelog
-          </h1>
-          <p className="mt-4 text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            What each release of the preview changes.
+        <div className="mx-auto max-w-5xl">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+            <h1 className="font-heading text-4xl text-text-primary leading-tight tracking-[-0.025em] md:text-5xl">
+              Changelog
+            </h1>
+            <a
+              href={links.changelogFeed}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-window-border bg-tint/[0.03] px-3 text-sm text-text-secondary transition-colors hover:bg-tint/[0.07] hover:text-text-primary"
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16" fill="none" className="size-4">
+                <path
+                  d="M3 3a10 10 0 0 1 10 10M3 7a6 6 0 0 1 6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <circle cx="3.75" cy="12.25" r="1.25" fill="currentColor" />
+              </svg>
+              Feed
+            </a>
+          </div>
+          <p className="mt-4 max-w-2xl text-base text-text-secondary leading-7 md:text-lg md:leading-8">
+            What's new in the preview. A change to the server is live on preview.zitadel.com as soon
+            as it lands; the CLI, the SDKs and a self-hosted server get it with the release that
+            ships it.
           </p>
-          {releases.length > 0 ? (
-            <>
-              <ol className="mt-12 border-border-primary border-b">
-                {releases.slice(0, SHOWN).map((release, index) => (
-                  <ReleaseEntry key={release.tag} release={release} open={index === 0} />
-                ))}
-              </ol>
-              {older.length > 0 && (
-                <p className="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary leading-6">
-                  Earlier:
-                  {older.map(({ tag }) => (
-                    <a key={tag} href={releasePath(tag)} className={`font-mono ${LINK}`}>
-                      {tag}
-                    </a>
+          <ol className="mt-12 md:mt-16">
+            {byDay(entries).map(([day, ofDay]) => (
+              <li
+                key={day}
+                className="grid gap-x-12 gap-y-6 border-border-primary border-t py-10 md:grid-cols-[9rem_1fr] md:py-14"
+              >
+                <time
+                  dateTime={day}
+                  className="self-start text-sm text-text-muted leading-6 md:sticky md:top-24"
+                >
+                  {DATE.format(new Date(day))}
+                </time>
+                <ul className="flex flex-col gap-12">
+                  {ofDay.map((entry) => (
+                    <EntrySummary key={entry.slug} entry={entry} />
                   ))}
-                </p>
-              )}
-              <p className="mt-8 text-sm text-text-muted leading-6">
-                Every release from {FIRST_RELEASE} on; {github} also has the alpha previews before
-                it. Follow new releases with{" "}
-                <a href={links.releasesFeed} className={LINK}>
-                  GitHub's feed
-                </a>
-                .
-              </p>
-              <OpenLinkedRelease />
-            </>
-          ) : (
-            <p className="mt-12 rounded-xl border border-window-border bg-window px-5 py-4 text-sm text-text-secondary leading-6">
-              The first release, {FIRST_RELEASE}, is not out yet; {github} has the alpha previews
-              before it.
+                </ul>
+              </li>
+            ))}
+          </ol>
+          {releases.length > 0 && (
+            <p className="mt-4 border-border-primary border-t pt-8 text-sm text-text-muted leading-6">
+              Every change of each release is in its release notes on GitHub:{" "}
+              {releases.map((release, index) => (
+                <span key={release.tag}>
+                  {index > 0 && ", "}
+                  <a href={release.url} className={`font-mono ${LINK}`}>
+                    {release.tag}
+                  </a>
+                </span>
+              ))}
+              .
             </p>
           )}
         </div>
@@ -100,77 +105,30 @@ export default function ChangelogPage() {
   );
 }
 
-/**
- * One release, the newest open and the others folded to their version, date
- * and count: its post first, then its breaking changes in full, and the way
- * to every change on the release's own page.
- */
-function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
-  const { changes } = release;
+/** An entry on the index: its title, which links to its page, its summary, and where it landed. */
+function EntrySummary({ entry }: { entry: Entry }) {
   return (
-    <li id={release.tag} className="scroll-mt-20 border-border-primary border-t">
-      <details open={open} className="group">
-        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-lg py-5 [&::-webkit-details-marker]:hidden">
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 16 16"
-            fill="none"
-            className="mt-1 size-4 shrink-0 -rotate-90 text-text-muted transition-transform group-open:rotate-0"
-          >
-            <path
-              d="M4 6l4 4 4-4"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="font-mono text-sm text-text-primary leading-6 md:text-base">
-              {release.tag}
-            </h2>
-            {release.date && (
-              <time dateTime={release.date} className="text-sm text-text-muted leading-6">
-                {DATE.format(new Date(release.date))}
-              </time>
-            )}
-            <span className="ml-auto font-mono text-text-muted text-xs leading-6">
-              {changeCount(changes)}
-            </span>
-          </div>
-        </summary>
-        <div className="flex flex-col gap-8 pb-10 sm:pl-7">
-          {release.notes && <Markdown under={2}>{release.notes}</Markdown>}
-          <BreakingChanges changes={changes} under={2} />
-          <p className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-            {changes.length > 0 && (
-              <a
-                href={releasePath(release.tag)}
-                className="group/all inline-flex h-9 items-center gap-2 rounded-lg border border-window-border bg-tint/[0.03] px-4 font-semibold text-text-primary transition-colors hover:bg-tint/[0.07]"
-              >
-                All {changes.length} {changes.length === 1 ? "change" : "changes"}
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className="size-4 transition-transform group-hover/all:translate-x-0.5"
-                >
-                  <path
-                    d="M3 8h10M9 4l4 4-4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-            )}
-            <a href={release.url} className={LINK}>
-              {release.tag} on GitHub
-            </a>
-          </p>
-        </div>
-      </details>
+    <li>
+      <h2 className="font-heading text-2xl text-text-primary leading-tight tracking-[-0.015em] md:text-3xl">
+        <a
+          href={entryPath(entry.slug)}
+          className="underline decoration-transparent underline-offset-4 transition-colors hover:decoration-border-secondary"
+        >
+          {entry.title}
+        </a>
+      </h2>
+      <p className="mt-3 text-base text-text-secondary leading-7">{entry.summary}</p>
+      <Availability entry={entry} className="mt-3" />
     </li>
   );
+}
+
+/** The entries by the day they landed, the newest first, as entries.ts sorts them. */
+function byDay(entries: Entry[]): [day: string, entries: Entry[]][] {
+  const days = new Map<string, Entry[]>();
+  for (const entry of entries) {
+    const day = entry.date.slice(0, 10);
+    days.set(day, [...(days.get(day) ?? []), entry]);
+  }
+  return [...days];
 }

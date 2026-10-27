@@ -17,7 +17,7 @@ export const GITHUB_RELEASE_BODY_MAX_CHARS = 125000;
 export const GENERATED_BLOCK_START = "<!-- nextgen-release-facts:start -->";
 export const GENERATED_BLOCK_END = "<!-- nextgen-release-facts:end -->";
 export const PRODUCT_NOTES_PLACEHOLDER =
-  "<!-- Notes above the generated facts are optional and show on GitHub only: the release's story is its post on the website's changelog, apps/website/changelog/<version>.md. -->";
+  "<!-- Notes above the generated facts are optional and show on GitHub only: notable changes get entries on the website's changelog, apps/website/changelog/. -->";
 
 // A change's bump, the highest first, as the CHANGELOG.md headings name them.
 const BUMPS = ["major", "minor", "patch"];
