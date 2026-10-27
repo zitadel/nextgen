@@ -44,6 +44,8 @@
     "@zitadel/e2e",
     "@zitadel/demo-next",
     "@zitadel/demo-nuxt",
-    "@zitadel/storybook"
+    "@zitadel/docs",
+    "@zitadel/storybook",
+    "@zitadel/website"
   ]
 }
