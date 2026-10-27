@@ -502,7 +502,7 @@ catalogs:
       version: 5.31.1
     yaml:
       specifier: ^2.9.0
-      version: 2.9.1
+      version: 2.9.0
     zod:
       specifier: ^4.3.6
       version: 4.4.3
@@ -1198,6 +1198,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../packages/api-mock
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../packages/config
       '@zitadel/sdk-nuxt':
         specifier: workspace:*
         version: link:../packages/sdk-nuxt
