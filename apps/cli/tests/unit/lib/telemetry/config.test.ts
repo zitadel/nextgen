@@ -4,47 +4,53 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveChannel,
   resolveTelemetryEndpoint,
   resolveTelemetryToken,
 } from "../../../../src/lib/telemetry/config";
 
-const DEV_TOKEN = "0fb432b08a9797b87b0eebcbee11706e";
-const PROD_TOKEN = "f56fd7315ccd614fba8eecb2a8966152";
-
-describe("resolveTelemetryToken", () => {
-  it("defaults to the prod project (single generic build, no channel stamp)", () => {
-    expect(resolveTelemetryToken({})).toBe(PROD_TOKEN);
+describe("resolveChannel", () => {
+  it("defaults to production (single generic build, no channel stamp)", () => {
+    expect(resolveChannel({})).toBe("production");
   });
 
-  it("selects the dev project on an explicit development env", () => {
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "development" })).toBe(DEV_TOKEN);
+  it("selects development on an explicit development env", () => {
+    expect(resolveChannel({ ZITADEL_TELEMETRY_ENV: "development" })).toBe("development");
   });
 
-  it("selects prod on an explicit production env", () => {
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: "production" })).toBe(PROD_TOKEN);
-  });
-
-  it("routes an unattended CI run to the dev project as a safeguard", () => {
-    expect(resolveTelemetryToken({ CI: "true" })).toBe(DEV_TOKEN);
-    expect(resolveTelemetryToken({ GITHUB_ACTIONS: "true" })).toBe(DEV_TOKEN);
+  it("treats an unattended CI run as development, as a safeguard", () => {
+    expect(resolveChannel({ CI: "true" })).toBe("development");
+    expect(resolveChannel({ GITHUB_ACTIONS: "true" })).toBe("development");
   });
 
   it("ignores a falsey CI flag (CI=false is not a CI run)", () => {
-    expect(resolveTelemetryToken({ CI: "false" })).toBe(PROD_TOKEN);
+    expect(resolveChannel({ CI: "false" })).toBe("production");
   });
 
   it("lets an explicit production env win over the CI safeguard", () => {
-    expect(resolveTelemetryToken({ CI: "true", ZITADEL_TELEMETRY_ENV: "production" })).toBe(
-      PROD_TOKEN,
-    );
-  });
-
-  it("lets ZITADEL_TELEMETRY_TOKEN override the channel outright", () => {
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: "custom" })).toBe("custom");
+    expect(resolveChannel({ CI: "true", ZITADEL_TELEMETRY_ENV: "production" })).toBe("production");
   });
 
   it("trims surrounding whitespace on the channel env", () => {
-    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_ENV: " production " })).toBe(PROD_TOKEN);
+    expect(resolveChannel({ ZITADEL_TELEMETRY_ENV: " development " })).toBe("development");
+  });
+});
+
+describe("resolveTelemetryToken", () => {
+  it("names no Mixpanel project on any channel while Mixpanel is paused", () => {
+    for (const env of [
+      {},
+      { ZITADEL_TELEMETRY_ENV: "production" },
+      { ZITADEL_TELEMETRY_ENV: "development" },
+      { CI: "true" },
+    ]) {
+      expect(resolveTelemetryToken(env)).toBeUndefined();
+    }
+  });
+
+  it("lets ZITADEL_TELEMETRY_TOKEN name one, trimmed", () => {
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: " custom " })).toBe("custom");
+    expect(resolveTelemetryToken({ ZITADEL_TELEMETRY_TOKEN: " " })).toBeUndefined();
   });
 });
 

@@ -2292,6 +2292,17 @@ func TestFlowDispatch_CombinedFlow_LoginUnknownEmail_FlipsAndCreates(t *testing.
 	require.NoError(t, err)
 	assert.Equal(t, "register-password", afterIdentify.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterIdentify.State.CurrentPurpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, start.Step.Purpose)
+	assert.Nil(t, start.Step.Notice)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, afterIdentify.Step.Purpose)
+	require.NotNil(t, afterIdentify.Step.Notice, "the user asked to sign in, so the sign-up says why")
+	assert.Equal(t, domain.FlowStepNoticeUserNotFound, *afterIdentify.Step.Notice)
+
+	w.ssoIdentities.EXPECT().LoadParked(gomock.Any(), gomock.Any()).Return(nil, nil)
+	rendered, err := w.sm.Render(t.Context(), def, afterIdentify.State)
+	require.NoError(t, err)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, rendered.Step.Purpose)
+	assert.Nil(t, rendered.Step.Notice, "the notice belongs to the move, not to the step")
 
 	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
@@ -2339,6 +2350,9 @@ func TestFlowDispatch_CombinedFlow_RegisterKnownEmail_FlipsToSignin(t *testing.T
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterIdentify.State.CurrentPurpose)
 	assert.Equal(t, "user_alice", afterIdentify.State.CollectedData.UserID,
 		"the flip pins the found user on the attempt, so the flow must know it too")
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, afterIdentify.Step.Purpose)
+	require.NotNil(t, afterIdentify.Step.Notice, "the user asked to sign up, so the sign-in says why")
+	assert.Equal(t, domain.FlowStepNoticeUserAlreadyExists, *afterIdentify.Step.Notice)
 
 	done, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: domain.FlowActionSubmit,
@@ -3985,6 +3999,8 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testin
 	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.State.CurrentPurpose)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toRegister.State.Purpose,
 		"the pinned Purpose must not move on a local re-purpose")
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, toRegister.Step.Purpose)
+	assert.Nil(t, toRegister.Step.Notice, "the user chose to sign up, so there is nothing to explain")
 
 	toLogin, err := w.sm.Process(t.Context(), def, toRegister.State, domain.FlowSubmitInput{
 		Action: "sign_in",
@@ -3994,6 +4010,8 @@ func TestFlowStateMachine_Process_NavigatePurposeSwitch_BothDirections(t *testin
 	assert.Equal(t, "identifier", toLogin.State.CurrentStep)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.State.CurrentPurpose)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.State.Purpose)
+	assert.Equal(t, domain.FlowDefinitionPurposeLogin, toLogin.Step.Purpose)
+	assert.Nil(t, toLogin.Step.Notice)
 }
 
 // Regression: back restoration across a purposed navigation is existing
@@ -5282,6 +5300,8 @@ func TestFlowStateMachine_Render_SSOCollisionFlipsRegisterToLogin(t *testing.T) 
 	result, err := w.sm.Render(t.Context(), def, state)
 	require.NoError(t, err)
 	assert.Equal(t, domain.FlowDefinitionPurposeLogin, result.State.CurrentPurpose)
+	require.NotNil(t, result.Step.Notice, "the sign-up continues as a sign-in, so the step says why")
+	assert.Equal(t, domain.FlowStepNoticeUserAlreadyExists, *result.Step.Notice)
 }
 
 // The attempt already carries another user, or it expired or was handed off:
@@ -6514,6 +6534,28 @@ func TestFlowStateMachine_Render_SSOUserNotFoundPrefillsCollectionStep(t *testin
 	require.NoError(t, err)
 	require.Equal(t, "sso-register", result.Step.Name)
 	assert.Equal(t, map[string]string{"email": "alice@example.com", "given_name": "Alice"}, renderedValues(result.Step.Fields))
+	assert.Nil(t, result.Step.Notice, "a sign-up that stays one has nothing to explain")
+}
+
+// A provider's sign-in with no account turns a sign-in into a sign-up, and
+// the step it lands on says why.
+func TestFlowStateMachine_Render_SSOUserNotFoundOnSignInCarriesNotice(t *testing.T) {
+	t.Parallel()
+	w, def, state := ssoRenderWorld(t)
+	def = withSSOCollectionStep(def)
+	state.Purpose = domain.FlowDefinitionPurposeLogin
+	state.CurrentPurpose = domain.FlowDefinitionPurposeLogin
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true})
+	w.expectParked(parked, nil)
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectCollected(parked, nil)
+
+	result, err := w.sm.Render(t.Context(), def, state)
+	require.NoError(t, err)
+	require.Equal(t, "sso-register", result.Step.Name)
+	assert.Equal(t, domain.FlowDefinitionPurposeRegister, result.Step.Purpose)
+	require.NotNil(t, result.Step.Notice)
+	assert.Equal(t, domain.FlowStepNoticeSSOUserNotFound, *result.Step.Notice)
 }
 
 // The provider's claims fill the fields first, and what earlier steps

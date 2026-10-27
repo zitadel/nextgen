@@ -486,12 +486,15 @@ describe("input", () => {
       ],
     ];
 
-    it.each(prompts)("throws E_VALIDATION from %s", async (_kind, prompt, question) => {
+    it.each(prompts)("throws E_CANCELLED from %s", async (_kind, prompt, question) => {
+      // A cancel is the person's decision, not a value that failed to parse,
+      // so it exits 130 like Ctrl-C anywhere else.
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
       await expect(input(question, ask)).rejects.toMatchObject({
-        code: "E_VALIDATION",
+        code: "E_CANCELLED",
+        exitCode: 130,
         message: "Cancelled by user",
       });
     });
