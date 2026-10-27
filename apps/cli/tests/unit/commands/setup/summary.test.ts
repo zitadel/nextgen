@@ -107,12 +107,12 @@ describe("detectProjectFacts", () => {
 
 describe("signInSummary", () => {
   it("says password-first starts with email and password and enables both methods", () => {
-    expect(signInSummary({ preset: "password-first", sso: [] })).toBe(
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toBe(
       [
         "Sign-in starts with email and password.",
         "Password and passkey are enabled in the user schema.",
         "Passwords have no minimum length.",
-        "No external providers selected.",
+        "No external providers will be added.",
       ].join("\n"),
     );
   });
@@ -129,6 +129,12 @@ describe("signInSummary", () => {
     );
     expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toContain(
       "Passwords have no minimum length.",
+    );
+  });
+
+  it("says the recommended minimum when none was given, which setup then writes", () => {
+    expect(signInSummary({ preset: "password-first", sso: [] })).toContain(
+      "Passwords need at least 15 characters.",
     );
   });
 

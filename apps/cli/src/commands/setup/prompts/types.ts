@@ -93,7 +93,7 @@ export type SetupAnswers = {
   /**
    * The minimum password length to put into the password policy setup
    * writes: a number, `null` for an explicit "none", or `undefined` when none
-   * was given. Without a number the file is written with an empty `config`.
+   * was given, which writes the recommended minimum (`passwordPolicyFile`).
    * Chosen by {@link import("./password-policy").PasswordPolicyPrompt} or
    * `--password-min-length`.
    */

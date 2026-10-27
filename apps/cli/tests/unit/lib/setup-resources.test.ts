@@ -282,7 +282,7 @@ describe("materializeSetupResources password policy", () => {
     } as unknown as ZitadelClient;
   }
 
-  it("publishes and writes an empty policy when no minimum was given", async () => {
+  it("publishes and writes the recommended minimum when none was given", async () => {
     const platform = client();
 
     await materializeSetupResources({
@@ -294,15 +294,37 @@ describe("materializeSetupResources password policy", () => {
     });
 
     expect(vi.mocked(platform.publishPolicy)).toHaveBeenCalledWith(
-      { operation: "auth.factor.password.set", config: {} },
+      { operation: "auth.factor.password.set", config: { min_length: 15 } },
       { project_id: "project_123" },
     );
     const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as object;
     expect(written).toEqual({
       $schema: "../meta/policy.json",
       operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    });
+  });
+
+  it("publishes and writes an empty policy for an explicit none", async () => {
+    const platform = client();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+      passwordMinLength: null,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
       config: {},
     });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({});
   });
 
   it("puts the given minimum into the published policy and its file", async () => {
@@ -342,7 +364,9 @@ describe("materializeSetupResources password policy", () => {
     expect(state.resources[PASSWORD_POLICY_PATH]).toEqual({
       id: "pol_01KWHP",
       hash: hashForState(
-        { normalize: () => ({ operation: "auth.factor.password.set", config: {} }) },
+        {
+          normalize: () => ({ operation: "auth.factor.password.set", config: { min_length: 15 } }),
+        },
         {},
       ),
     });

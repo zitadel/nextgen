@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -34,6 +35,7 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helper
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
+const held: Server[] = [];
 const server = setupServer(...setupPlatformHandlers());
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -50,6 +52,21 @@ function setup(cwd: string, extra: string[] = []) {
     ...extra,
   ]);
 }
+
+/** Holds a port the system picks until the test ends, and says which. */
+async function aHeldPort(): Promise<number> {
+  const holder = createServer();
+  held.push(holder);
+  await new Promise<void>((resolve) => holder.listen({ port: 0 }, () => resolve()));
+  return (holder.address() as AddressInfo).port;
+}
+
+/**
+ * `--dev-port` for a run that checks every warning: setup warns when the app's
+ * detected port is taken, and whatever holds 3000 on the machine running the
+ * tests must not decide what it reports.
+ */
+const PINNED_DEV_PORT = ["--dev-port", "3000"];
 
 /** What `zitadel start` records beside the local admin: which server it started. */
 async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
@@ -80,13 +97,17 @@ async function makeNewAppDirectory(): Promise<string> {
 const CANCELLED = Symbol("cancelled");
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
-async function makeNextProject(): Promise<string> {
+async function makeNextProject(devPort?: number): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
     join(cwd, "package.json"),
-    JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { next: "^15" },
+      ...(devPort === undefined ? {} : { scripts: { dev: `next dev -p ${devPort}` } }),
+    }),
   );
   await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
   return cwd;
@@ -175,6 +196,9 @@ const FRAMEWORK_FIXTURES = [
 afterEach(async () => {
   server.resetHandlers();
   resetPlatformStore();
+  for (const holder of held.splice(0)) {
+    await new Promise<void>((resolve) => holder.close(() => resolve()));
+  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -234,6 +258,33 @@ describe("setup command", () => {
     expect(json.data.next_commands[2]).toMatch(
       /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
     );
+  });
+
+  it("warns, with the command that picks a free port, when the detected one is taken", async () => {
+    // The wizard asks for another port then. A run that asks nothing says so.
+    const port = await aHeldPort();
+    const cwd = await makeNextProject(port);
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { warnings: string[] };
+    expect(json.warnings).toEqual([
+      expect.stringContaining(
+        `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
+      ),
+    ]);
+    expect(json.warnings[0]).toMatch(/ setup --dev-port \d+ --cwd \S+$/);
+  });
+
+  it("does not warn about a taken port that --dev-port chose", async () => {
+    const port = await aHeldPort();
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next", "--dev-port", String(port)]);
+
+    expect(res.exitCode).toBe(0);
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toEqual([]);
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -719,6 +770,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       // The search for local state ends at the home directory; pinning it
       // keeps the developer's own `~/.zitadel/local` out of the test.
@@ -777,6 +829,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       { HOME: cwd, USERPROFILE: cwd },
     );
@@ -1026,6 +1079,10 @@ describe("a retry after a failure before the wizard", () => {
     );
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
       "--password-min-length 0",
+    );
+    // The recommended minimum is what a run without the flag gets anyway.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).not.toContain(
+      "--password-min-length",
     );
     // A refused value would only be refused again.
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(

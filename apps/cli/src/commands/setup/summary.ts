@@ -9,7 +9,7 @@ import semver from "semver";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import type { PasswordMinLength } from "../../lib/policies";
+import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -188,11 +188,12 @@ export function signInSummary(answers: {
       ? "Sign-in starts with a passkey, with email and password as the fallback."
       : "Sign-in starts with email and password.",
     "Password and passkey are enabled in the user schema.",
-    typeof answers.passwordMinLength === "number"
-      ? `Passwords need at least ${answers.passwordMinLength} characters.`
-      : "Passwords have no minimum length.",
+    // None given is the recommended minimum, which setup writes in its place.
+    answers.passwordMinLength === null
+      ? "Passwords have no minimum length."
+      : `Passwords need at least ${answers.passwordMinLength ?? RECOMMENDED_PASSWORD_MIN_LENGTH} characters.`,
     providers.length === 0
-      ? "No external providers selected."
+      ? "No external providers will be added."
       : `External providers: ${providers.join(", ")}.`,
   ].join("\n");
 }

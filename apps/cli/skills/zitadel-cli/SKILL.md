@@ -353,9 +353,10 @@ the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
 `setup` also writes and publishes the password policy
-(`.zitadel/policies/auth.factor.password.set.json`) with no rules; pass
-`--password-min-length <n>` only when the user gives a value, never one you
-chose for them.
+(`.zitadel/policies/auth.factor.password.set.json`) with a minimum length of
+15, NIST's minimum for password-only sign-in and the wizard's default. Pass
+`--password-min-length <n>` only when the user asks for another value (`0` sets
+none), and give test users passwords at least that long.
 When setup fails after scaffolding a new app, before its default schema and
 flow are uploaded, it removes the app again and puts back what the directory
 held, so rerunning the same `setup` starts over.
@@ -416,9 +417,10 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (the dev server exits with
-`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
-the app; never change the port in one file by hand. In a directory with a
+To move a set-up app to another dev port (setup's `warnings` say the port is
+already in use, the dev server exits with `EADDRINUSE`, or another app needs
+the port), run `setup --dev-port <port>` in the app; never change the port in
+one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.
 It allows the new origin on the server first, and a refusal changes nothing.

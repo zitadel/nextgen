@@ -87,10 +87,10 @@ export async function askCustomSettings(
 }
 
 /**
- * "Would you like to add external sign-in providers?" — the one onboarding
- * question that needs something from outside the terminal, so it asks last of
- * the configuration questions and takes "not now" as a first-class answer
- * (#1081).
+ * "Which external sign-in providers would you like to add?" — the one
+ * onboarding question that needs something from outside the terminal, so it
+ * asks last of the configuration questions and takes "not now" as a
+ * first-class answer (#1081).
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
@@ -154,9 +154,11 @@ export class SocialSignInPrompt implements SetupPrompt {
       const clientId = await ctx.input({
         kind: "text",
         name: "client id",
+        // "To skip", not "to add it later": the line after it names the command
+        // that adds it, and the shorter question fits an 80-column terminal.
         message:
           flagged === undefined
-            ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to add it later.`
+            ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to skip.`
             : `What is the client ID of your ${entry.displayName} OAuth app?`,
         parse: flagged === undefined ? clientIdOrSkip : parseClientId,
         given: flagged?.credentials.clientId,
@@ -200,7 +202,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     return ask({
       kind: "multiselect",
       name: "external sign-in providers",
-      message: "Would you like to add external sign-in providers? Press Enter to skip.",
+      message: "Which external sign-in providers would you like to add? Press Enter to skip.",
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.

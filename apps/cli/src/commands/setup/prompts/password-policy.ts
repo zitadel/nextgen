@@ -1,7 +1,5 @@
-import type { PasswordMinLength } from "../../../lib/policies";
+import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../../lib/policies";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
-
-const RECOMMENDED_MIN_LENGTH = 15;
 
 /**
  * "Which minimum length should passwords have?" — a choice of 15
@@ -14,7 +12,7 @@ const RECOMMENDED_MIN_LENGTH = 15;
  * of multi-factor sign-in. The developer still decides; the wizard only says
  * which answer is the safe one, and any other length goes into
  * `.zitadel/policies/` or `--password-min-length`. A run with nobody to ask
- * keeps the flag's value, or none, and never this recommendation.
+ * gets the same 15 unless the flag says otherwise (`passwordPolicyFile`).
  *
  * `--password-min-length` is authoritative and skips the question.
  */
@@ -25,8 +23,9 @@ export class PasswordPolicyPrompt implements SetupPrompt {
     }
     const options: { value: PasswordMinLength; label: string; hint?: string }[] = [
       {
-        value: RECOMMENDED_MIN_LENGTH,
-        label: `${RECOMMENDED_MIN_LENGTH} characters (recommended)`,
+        value: RECOMMENDED_PASSWORD_MIN_LENGTH,
+        // Not "(recommended)": the prompt puts the hint in parentheses too.
+        label: `${RECOMMENDED_PASSWORD_MIN_LENGTH} characters — recommended`,
         hint: "NIST minimum for password-only sign-in",
       },
       { value: 8, label: "8 characters", hint: "NIST minimum with a second factor" },
@@ -36,7 +35,7 @@ export class PasswordPolicyPrompt implements SetupPrompt {
       kind: "select",
       name: "minimum password length",
       message: "Which minimum length should passwords have? You can change it later.",
-      initialValue: RECOMMENDED_MIN_LENGTH,
+      initialValue: RECOMMENDED_PASSWORD_MIN_LENGTH,
       options,
     });
     return { ...answers, passwordMinLength };

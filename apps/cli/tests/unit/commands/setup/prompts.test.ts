@@ -30,7 +30,7 @@ vi.mock("@clack/prompts", () => ({
 // unrelated exports (used transitively via lib/server) stay intact.
 vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn() },
+  LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
 }));
 
 import { confirm, isCancel, log, multiselect, note, password, select, text } from "@clack/prompts";
@@ -269,6 +269,7 @@ describe("DevPortPrompt", () => {
   describe("when the detected port is taken", () => {
     beforeEach(() => {
       vi.mocked(LocalServer.isPortFree).mockResolvedValue(false);
+      vi.mocked(LocalServer.nextFreePort).mockImplementation((port) => Promise.resolve(port + 1));
     });
 
     it("parses the entered text into a number", async () => {
@@ -279,17 +280,27 @@ describe("DevPortPrompt", () => {
       expect(out.devPort).toBe(4000);
     });
 
-    it("says the port is in use and keeps it as the suggestion", async () => {
-      // What holds it may be this app's own dev server, and then it is the
-      // right answer.
+    it("says the port is in use and suggests the next free one", async () => {
+      // Enter, pressed at every question before this one, has to give a port
+      // the dev server can start on.
+      vi.mocked(text).mockResolvedValueOnce("5174" as never);
+
+      await new DevPortPrompt().ask(baseAnswers({ devPort: 5173 }), ctx);
+
+      expect(LocalServer.nextFreePort).toHaveBeenCalledWith(5173);
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
+        message: "Port 5173 is in use. Which port should your app run on?",
+        initialValue: "5174",
+      });
+    });
+
+    it("suggests the taken port when the next ones are taken too", async () => {
+      vi.mocked(LocalServer.nextFreePort).mockResolvedValue(undefined);
       vi.mocked(text).mockResolvedValueOnce("5173" as never);
 
       await new DevPortPrompt().ask(baseAnswers({ devPort: 5173 }), ctx);
 
-      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
-        message: "Port 5173 is in use. Which port should your app run on?",
-        initialValue: "5173",
-      });
+      expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ initialValue: "5173" });
     });
   });
 
@@ -317,7 +328,7 @@ describe("PasswordPolicyPrompt", () => {
       message: "Which minimum length should passwords have? You can change it later.",
       initialValue: 15,
       options: [
-        { value: 15, label: "15 characters (recommended)" },
+        { value: 15, label: "15 characters — recommended" },
         { value: 8, label: "8 characters" },
         { value: null, label: "No minimum" },
       ],
@@ -508,7 +519,7 @@ describe("SocialSignInPrompt", () => {
 
     const question = vi.mocked(multiselect).mock.calls[0]?.[0];
     expect(question?.message).toBe(
-      "Would you like to add external sign-in providers? Press Enter to skip.",
+      "Which external sign-in providers would you like to add? Press Enter to skip.",
     );
     expect(question?.options.map((option) => option.label)).toEqual([
       "Google — requires a Google OAuth app",
@@ -551,7 +562,7 @@ describe("SocialSignInPrompt", () => {
     expect(answers.sso).toEqual([]);
     expect(password).not.toHaveBeenCalled();
     expect(vi.mocked(text).mock.calls[0]?.[0]?.message).toBe(
-      "What is the client ID of your Google OAuth app? Leave it empty to add it later.",
+      "What is the client ID of your Google OAuth app? Leave it empty to skip.",
     );
     expect(log.info).toHaveBeenCalledWith(
       [

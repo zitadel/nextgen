@@ -104,9 +104,10 @@ export async function materializeSetupResources(opts: {
   /**
    * The minimum password length to put into the password policy: a number,
    * `null` for an explicit none, or `undefined` when none was given. The
-   * policy is written and published either way; without a number its
-   * `config` is empty and enforces nothing, and a kept file keeps its
-   * `min_length` only when none was given.
+   * policy is written and published either way. A new one gets the
+   * recommended minimum when none was given, and an empty `config`, which
+   * enforces nothing, for none; a kept file keeps its `min_length` only when
+   * none was given.
    */
   passwordMinLength?: PasswordMinLength;
   /**
@@ -236,11 +237,11 @@ export async function materializeSetupResources(opts: {
     status: flowBody.status,
   });
 
-  // The password policy, created before its file like the connections. The
-  // CLI chooses no value: without one from the developer, `config` is empty.
-  // A policy file already there (only with --force: without it the conflict
-  // check refused it) holds a project's chosen rules, so it is kept and
-  // published as it is; a minimum given now goes into it.
+  // The password policy, created before its file like the connections. A new
+  // one gets the recommended minimum unless the developer gave another or
+  // none. A policy file already there (only with --force: without it the
+  // conflict check refused it) holds a project's chosen rules, so it is kept
+  // and published as it is; a minimum given now goes into it.
   const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
   const policy =
     kept === undefined

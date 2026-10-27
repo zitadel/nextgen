@@ -93,6 +93,7 @@ import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
+  RECOMMENDED_PASSWORD_MIN_LENGTH,
   parsePasswordMinLength,
 } from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
@@ -241,7 +242,7 @@ export default class Setup extends Promptable(BaseCommand) {
     design: nonBlankString({ hidden: true }),
     "password-min-length": nonBlankString({
       description:
-        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+        "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
     }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
@@ -396,7 +397,8 @@ export default class Setup extends Promptable(BaseCommand) {
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
       // Read from the raw flag: it is parsed below, so a bad value fails after
-      // this step is recorded, like the other flags'. 0 sets none.
+      // this step is recorded, like the other flags'. 0 sets none, and no
+      // flag the recommended minimum.
       password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
@@ -447,6 +449,17 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
+    } else if (
+      flags["dev-port"] === undefined &&
+      !(await LocalServer.isPortFree(answers.devPort))
+    ) {
+      // The wizard asks for another port when the detected one is taken. A run
+      // that asks nothing still pins the dev script to it, so it says so, with
+      // the command that puts the app on a free one.
+      const free = await LocalServer.nextFreePort(answers.devPort);
+      reportWarning(
+        `Port ${answers.devPort} is already in use. If that is not this app's dev server, run setup with a free port: ${this.suggestUnscoped(`setup --dev-port ${free ?? "<port>"}`)}`,
+      );
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -467,8 +480,9 @@ export default class Setup extends Promptable(BaseCommand) {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
-      // Whether a minimum went into the password policy, never the value.
-      password_policy: typeof answers.passwordMinLength === "number" ? "set" : "empty",
+      // Whether a minimum went into the password policy, never the value. None
+      // given is the recommended one (`passwordPolicyFile`).
+      password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -1427,7 +1441,10 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
-  if (opts.passwordMinLength !== undefined) {
+  if (
+    opts.passwordMinLength !== undefined &&
+    opts.passwordMinLength !== RECOMMENDED_PASSWORD_MIN_LENGTH
+  ) {
     parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
@@ -1818,12 +1835,13 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
- * Whether `--password-min-length` asks for a minimum, rather than none,
- * nothing, or a value the parser refuses (setup fails on that just after).
+ * Whether `--password-min-length` leaves a minimum in the policy: a value, or
+ * no flag, which means the recommended one; not none, or a value the parser
+ * refuses (setup fails on that just after).
  */
 function setsMinLength(value: string | undefined): boolean {
   if (value === undefined) {
-    return false;
+    return true;
   }
   const parsed = parsePasswordMinLength(value);
   return parsed.ok && typeof parsed.value === "number";
