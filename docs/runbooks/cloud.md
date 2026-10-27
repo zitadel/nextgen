@@ -283,25 +283,37 @@ Every deployment is tested once Vercel built it, on its own URL
 service's contract suite against the deployment, today the docs'
 ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)), the console's
 ([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
-schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
+schemas' ([`e2e/schemas/`](../../e2e/schemas/)), and on a preview the CLI's
+([`e2e/cli/`](../../e2e/cli/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths and
 the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
 which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
 rendering, checks the headers `vercel.json` gives them, and that `/schemas`
-still reaches the API; it needs no browser.
+still reaches the API; it needs no browser. The CLI's packs this commit's
+CLI, as `release:pack` does, and drives it with `--non-interactive --json`
+from an empty directory: `setup --server <deployment>` creates a project,
+then `deploy`, `variable set` and `list`, `origin add` and `list`,
+`deployment list` and `rollback` run on it, and a browser signs up on the
+console to finish the `claim` the CLI starts. Each run leaves that project in
+the deployment's database, so only previews run it, and it skips the
+production domain. The CLI never holds the bypass secret: it reaches the
+deployment through a local proxy, as through a company's TLS-inspecting one,
+that adds it ([`bypass-proxy.ts`](../../e2e/cli/support/bypass-proxy.ts)).
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
   checks land on the pull request: `deployment-checks / docs (Preview)`,
-  `deployment-checks / console (Preview)` and
-  `deployment-checks / schemas (Preview)`.
+  `deployment-checks / console (Preview)`,
+  `deployment-checks / schemas (Preview)` and
+  `deployment-checks / cli (Preview)`.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
   is built, before its Deployment Checks run. It calls the same jobs and sets
   one commit status per suite on the deployed commit, `docs (Production)`,
-  `console (Production)` and `schemas (Production)`. A deployed commit from
+  `console (Production)` and `schemas (Production)`; the CLI's suite does
+  not run. A deployed commit from
   before the schemas service passes the last with nothing to check. A dispatch runs the workflow as it is on `main`: a
   change to it takes effect once merged.
 - The suites reach the protected deployment with the project's Protection
@@ -334,13 +346,16 @@ What starts it, and where the result lands, depends on the environment:
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
   reproduces the run; a failed browser test's screenshots are the
-  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact
-  (the schemas' suite runs no browser and uploads nothing).
+  `docs-deployment-screenshots`, `console-deployment-screenshots` or
+  `cli-deployment-screenshots` artifact (the schemas' suite runs no browser
+  and uploads nothing). The CLI's annotations quote what the failing command
+  printed.
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
   runs the workflow without a new deployment; it reports `docs (dispatch)`,
-  `console (dispatch)` and `schemas (dispatch)`, never production's statuses. A change to
+  `console (dispatch)` and `schemas (dispatch)`, never production's statuses,
+  and with `-f cli=true` `cli (dispatch)`: only for a preview's URL. A change to
   `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
@@ -371,10 +386,13 @@ CLOUD_URL=https://cloud-….vercel.app pnpm check:cloud
 ```
 
 `--filter=@zitadel/docs` runs the docs' suite, `--filter=@zitadel/e2e` the
-console's and the schemas'; a red check's summary names the command that runs
-its suite alone. A new suite is a turbo task that
-`check:cloud` lists, a job in `deployment-checks.yml` and a status in
-`production-checks.yml`'s `SUITES`.
+console's, the schemas' and the CLI's; a red check's summary names the command
+that runs its suite alone. The CLI's suite skips the production domain; never
+point it at a production deployment's own URL, where it would leave a project
+in production's database. A new suite is a turbo task that
+`check:cloud` lists, a job in `deployment-checks.yml` and, unless it writes to
+the deployment as the CLI's does, a status in `production-checks.yml`'s
+`SUITES`.
 
 ## Running the cloud locally
 

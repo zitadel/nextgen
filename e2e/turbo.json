@@ -76,6 +76,23 @@
       "cache": false,
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
+    // The packed CLI against the deployment CLOUD_URL names, beside the
+    // console's and the schemas' suites in `pnpm check:cloud` and the
+    // deployment-checks workflow (previews only: each run leaves a project in
+    // the deployment's database). It packs the CLI with the release's own
+    // code, so its inputs reach outside the package.
+    "cli-deployment": {
+      "inputs": [
+        "cli/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs"
+      ],
+      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "cache": false,
+      "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*", "NODE_EXTRA_CA_CERTS"]
+    },
     // Mock lanes run api-mock's `start` and the demo's `dev`, so they need what
     // those need rather than a production build of the demo.
     "demo-next-mock": {
