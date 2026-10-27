@@ -5060,6 +5060,26 @@ func (s *DeploymentTarget) Validate() error {
 	return nil
 }
 
+func (s DeploymentTargetOrigin) Validate() error {
+	alias := (string)(s)
+	if err := (validate.String{
+		MinLength:     0,
+		MinLengthSet:  false,
+		MaxLength:     2048,
+		MaxLengthSet:  true,
+		Email:         false,
+		Hostname:      false,
+		Regex:         regexMap["^(default|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$"],
+		MinNumeric:    0,
+		MinNumericSet: false,
+		MaxNumeric:    0,
+		MaxNumericSet: false,
+	}).Validate(string(alias)); err != nil {
+		return errors.Wrap(err, "string")
+	}
+	return nil
+}
+
 func (s DeploymentTargetsRequest) Validate() error {
 	alias := ([]string)(s)
 	if alias == nil {
@@ -5086,7 +5106,7 @@ func (s DeploymentTargetsRequest) Validate() error {
 				MaxLengthSet:  true,
 				Email:         false,
 				Hostname:      false,
-				Regex:         regexMap["^(primary|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$"],
+				Regex:         regexMap["^(primary|default|https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?)$"],
 				MinNumeric:    0,
 				MinNumericSet: false,
 				MaxNumeric:    0,

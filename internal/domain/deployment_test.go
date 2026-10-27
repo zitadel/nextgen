@@ -18,6 +18,12 @@ func TestNewDeploymentValidates(t *testing.T) {
 		assert.Equal(t, []string{"https://app.acme.com"}, entity.Origins())
 	})
 
+	t.Run("the default target is the empty origin", func(t *testing.T) {
+		entity, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, []string{DefaultTargetOrigin, "https://app.acme.com"}, DeploymentMetadata{Reason: DeploymentReasonDeploy})
+		require.NoError(t, err)
+		assert.Equal(t, []string{DefaultTargetOrigin, "https://app.acme.com"}, entity.Origins())
+	})
+
 	t.Run("targets are sorted and deduplicated", func(t *testing.T) {
 		origins := []string{"https://www.acme.com", "https://app.acme.com", "https://www.acme.com"}
 		entity, err := NewDeployment("proj_1", "rel_1", DeploymentOriginKindPrimary, origins, DeploymentMetadata{})
@@ -147,6 +153,25 @@ func TestResolveDeploymentTargets(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, DeploymentOriginKindPrimary, kind)
 		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com"}, origins)
+	})
+
+	t.Run("default alone", func(t *testing.T) {
+		kind, origins, err := ResolveDeploymentTargets(nil, []string{DeploymentTargetDefault})
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentOriginKindPrimary, kind)
+		assert.Equal(t, []string{DefaultTargetOrigin}, origins)
+	})
+
+	t.Run("default with primary", func(t *testing.T) {
+		kind, origins, err := ResolveDeploymentTargets(projectOrigins, []string{DeploymentTargetPrimary, DeploymentTargetDefault})
+		require.NoError(t, err)
+		assert.Equal(t, DeploymentOriginKindPrimary, kind)
+		assert.Equal(t, []string{"https://www.acme.com", "https://app.acme.com", DefaultTargetOrigin}, origins)
+	})
+
+	t.Run("default and a preview URL mixed", func(t *testing.T) {
+		_, _, err := ResolveDeploymentTargets(projectOrigins, []string{DeploymentTargetDefault, "https://acme-git-sso-acmeinc.vercel.app"})
+		assert.ErrorIs(t, err, ErrDeploymentInvalid())
 	})
 
 	t.Run("an exact primary origin", func(t *testing.T) {

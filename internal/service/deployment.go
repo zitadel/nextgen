@@ -170,8 +170,9 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	})
 }
 
-// Rollback re-deploys the release of a primary deployment to primary, which
-// covers every current primary origin.
+// Rollback re-deploys the release of a primary deployment. Web origins are
+// the primary keyword, so the project's current primary origins are what
+// comes back. A deployment that named the default target names it again.
 func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeploymentInput) (_ *CreateDeploymentOutput, err error) {
 	ctx, end := startSpan(ctx, "DeploymentService.Rollback")
 	defer end(&err)
@@ -186,12 +187,35 @@ func (s *DeploymentService) Rollback(ctx context.Context, input RollbackDeployme
 	return s.Deploy(ctx, DeployInput{
 		ProjectID:            input.ProjectID,
 		ReleaseID:            previous.ReleaseID,
-		Targets:              []string{domain.DeploymentTargetPrimary},
+		Targets:              rollbackTargets(previous),
 		Reason:               domain.DeploymentReasonRollback,
 		Message:              input.Message,
 		RollbackTo:           &previous.ID,
 		ExpectedDeploymentID: input.ExpectedDeploymentID,
 	})
+}
+
+// rollbackTargets rebuilds the keywords a primary deployment was created
+// with. Concrete web origins fold back into primary; the empty origin is the
+// default target.
+func rollbackTargets(previous *domain.Deployment) []string {
+	targets := make([]string, 0, 2)
+	coversWeb := false
+	coversDefault := false
+	for _, origin := range previous.Origins() {
+		if origin == domain.DefaultTargetOrigin {
+			coversDefault = true
+			continue
+		}
+		coversWeb = true
+	}
+	if coversWeb {
+		targets = append(targets, domain.DeploymentTargetPrimary)
+	}
+	if coversDefault {
+		targets = append(targets, domain.DeploymentTargetDefault)
+	}
+	return targets
 }
 
 func (s *DeploymentService) projectOrigins(ctx context.Context, projectID string) ([]domain.Origin, error) {

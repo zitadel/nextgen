@@ -79,6 +79,22 @@ func TestDeploymentConflictRendersTheDeployment(t *testing.T) {
 	}), resp.DeploymentGuardConflict.Details.Deployment)
 }
 
+func TestDeploymentTargetRendersTheDefaultToken(t *testing.T) {
+	newest := &domain.Deployment{
+		ProjectID:  "proj_1",
+		ID:         "dep_1",
+		ReleaseID:  "rel_1",
+		OriginKind: domain.DeploymentOriginKindPrimary,
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+		DeployedAt: time.Date(2026, 10, 2, 14, 52, 0, 0, time.UTC),
+		Metadata:   domain.DeploymentMetadata{Reason: domain.DeploymentReasonDeploy},
+	}
+	resp, ok := deploymentConflictResponse(domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{Deployment: newest}))
+	require.True(t, ok)
+	require.Len(t, resp.DeploymentGuardConflict.Details.Deployment.Value.Targets, 1)
+	assert.Equal(t, "default", string(resp.DeploymentGuardConflict.Details.Deployment.Value.Targets[0].Origin))
+}
+
 // A revoked release is the other member of the 409 union.
 func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 	resp, ok := deploymentConflictResponse(domain.ErrReleaseRevoked())

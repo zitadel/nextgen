@@ -97,9 +97,11 @@ upgrade, so upgrade the app and rerun rather than retrying.
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
   pull-request builds run. They need the project secret, not the preview token.
-  An empty list admits every origin, so removing the last one opens the project
-  up; `origin rm` asks first and needs `--force` when non-interactive. Removing
-  a preview pattern leaves its live previews served until they expire.
+  An empty list admits no origin except a loopback origin. A caller with no
+  `Origin`, and the server's own origin when the project does not list it,
+  is served the `default` deployment target; `origin rm` asks first and needs
+  `--force` when non-interactive. Removing a preview pattern leaves its live
+  previews served until they expire.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need

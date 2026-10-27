@@ -126,9 +126,12 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // atomically: on success every target serves the release and the record
 // exists; on failure nothing changes and no record is written.
 // Name the release by exactly one of `release_id` or `content_hash`; it
-// must already exist in the project. `targets` is `primary` or preview
-// URLs. The deployment freezes the project's variable values for its kind,
-// with no fallback between primary and preview values.
+// must already exist in the project. `targets` is `primary`, `default`, or
+// preview URLs. `default` may be named with `primary` and is the target a
+// caller with no origin is served. The deployment freezes the project's
+// variable values for its kind, with no fallback between primary and
+// preview values. A deployment that names `default` freezes the primary
+// values.
 // A deployment to `primary` changes nothing when the project's newest
 // primary deployment has the same release and frozen values and covers
 // exactly the current primary origins: the call answers `200` with that
@@ -136,8 +139,9 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // for preview URLs that record renews their previews.
 // Failures:
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-// a primary origin named exactly; `primary` mixed with preview URLs;
-// `primary` on a project with no primary origin; `ttl` with `primary`;
+// a primary origin named exactly; `primary` or `default` mixed with
+// preview URLs; `primary` on a project with no primary origin; `ttl`
+// with `primary` or `default`;
 // `ttl` above 365 days (`P365D`).
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
@@ -165,14 +169,15 @@ func (UnimplementedHandler) CreateDeployment(ctx context.Context, req *CreateDep
 // that deployment's release supplies flow definitions, user schemas and
 // branding. The resolved deployment is sealed into the `_zflow` cookie so
 // later steps keep the same configuration. An origin that matches no pattern
-// answers `403` with `proj.origin_not_allowed`; one that matches a preview
-// pattern with no live preview answers `403` with `proj.preview_not_live`;
-// nothing deployed to the target answers `409` with `rel.not_deployed`; a
-// revoked release answers `409` with `rel.revoked`. A request with no
-// `Origin` passes the gate and still needs a deployment target. A loopback
-// origin passes it too, and so does the server's own origin, from which its
-// console previews a project's login; a step submitted from the server's
-// own origin is still refused unless the project lists it.
+// answers `403` with `proj.origin_not_allowed`, including when the project
+// lists no origins; one that matches a preview pattern with no live preview
+// answers `403` with `proj.preview_not_live`; nothing deployed to a listed
+// origin, a loopback origin, or a live preview answers `409` with
+// `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
+// A request with no `Origin`, and one from the server's own origin when the
+// project does not list that host, is served the `default` target. No
+// default deployment answers `409` with `rel.no_default`. A step submitted
+// from the server's own origin is still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing

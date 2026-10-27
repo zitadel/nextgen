@@ -11,8 +11,10 @@ export interface BootstrapProjectOptions {
   baseUrl: string;
   projectName?: string;
   /**
-   * Origins of the apps that will proxy to this instance. The backend's
-   * origin check rejects forwarded requests from unregistered origins.
+   * Origins of the apps that will proxy to this instance. Each is a primary
+   * origin, and the bootstrap deploys the project's release there. A loopback
+   * origin with nothing deployed is refused, so the app origin has to be one
+   * the deployment names.
    */
   appOrigins?: string[];
   preset?: SetupPreset;
@@ -44,7 +46,7 @@ export async function bootstrapProject(
     name: options.projectName ?? DEFAULT_PROJECT_NAME,
     origins: (options.appOrigins ?? []).map((pattern) => ({
       pattern,
-      kind: "preview" as const,
+      kind: "primary" as const,
     })),
     seed_defaults: false,
   } as Parameters<ZitadelClient["createProject"]>[0])) as Record<string, unknown>;
@@ -76,6 +78,22 @@ export async function bootstrapProject(
     flow_definition: flowBody,
   } as Parameters<ZitadelClient["createFlowDefinition"]>[0])) as Record<string, unknown>;
   const flowId = requireString(flow.id, "flow definition id");
+
+  const release = (await client.createRelease(
+    {
+      pointers: [
+        { kind: "schema", revision_id: schemaId },
+        { kind: "flow_definition", revision_id: flowId },
+      ],
+    },
+    { project_id: projectId },
+  )) as Record<string, unknown>;
+  const releaseId = requireString(release.id, "release id");
+  const targets = options.appOrigins?.length ? ["primary", "default"] : ["default"];
+  await client.createDeployment(
+    { release_id: releaseId, targets },
+    { project_id: projectId },
+  );
 
   return { projectId, projectSecret, previewSecret, schemaId, flowId };
 }

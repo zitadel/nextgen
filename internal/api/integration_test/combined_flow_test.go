@@ -25,6 +25,7 @@ import (
 func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -198,6 +199,7 @@ func combinedPasswordFlowDefinition(userSchema string) api.FlowDefinition {
 func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 
@@ -321,6 +323,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 
 	schemaURL := apischemas.DefaultHumanUserSchemaURL(helpers.BuiltinSchemaBaseURL)
 

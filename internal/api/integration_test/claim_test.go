@@ -130,6 +130,7 @@ func TestClaimHappyPath(t *testing.T) {
 	// The human on the platform project: their earliest active membership is
 	// the personal team the claim lands on.
 	platform := harness.EnsurePlatformProject(t)
+	deployDefaultTarget(t, platform.ID)
 	team, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: platform.ID,
 		Name:      helpers.TeamName(),

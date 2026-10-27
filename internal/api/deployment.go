@@ -250,6 +250,15 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	}
 }
 
+// toAPIDeploymentTargetOrigin maps the stored origin to the wire token. The
+// default target is the empty string in storage and `default` on the wire.
+func toAPIDeploymentTargetOrigin(origin string) api.DeploymentTargetOrigin {
+	if origin == domain.DefaultTargetOrigin {
+		return api.DeploymentTargetOrigin(domain.DeploymentTargetDefault)
+	}
+	return api.DeploymentTargetOrigin(origin)
+}
+
 func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
 	if live {
 		return api.DeploymentStatusLive
@@ -272,7 +281,7 @@ func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api
 		},
 	}
 	for i, target := range entity.Targets {
-		resp.Targets[i] = api.DeploymentTarget{Origin: api.Origin(target.Origin)}
+		resp.Targets[i] = api.DeploymentTarget{Origin: toAPIDeploymentTargetOrigin(target.Origin)}
 	}
 	m := entity.Metadata
 	if m.Message != nil {

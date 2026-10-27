@@ -28,6 +28,7 @@ func newIdpFixture(t *testing.T) idpFixture {
 	t.Helper()
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
+	deployDefaultTarget(t, project.ID)
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)

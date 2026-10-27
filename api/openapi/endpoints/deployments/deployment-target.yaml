@@ -5,7 +5,7 @@ required:
   - origin
 properties:
   origin:
-    $ref: ../../components/schemas/origin.yaml
+    $ref: deployment-target-origin.yaml
   expires_at:
     type: string
     format: date-time

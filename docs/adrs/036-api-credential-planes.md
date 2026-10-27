@@ -308,3 +308,12 @@ a project that lists that origin keeps its own rules there, deployments and
 previews included. Only opening a flow takes this exemption: every later
 step is held to the project's origins without it, so a page on the server's
 own origin can show a project's first step but cannot sign anyone in to it.
+
+## Amendment (2026-10-27): an empty allowlist admits nothing
+
+A project with no origin pattern no longer admits every origin. A loopback
+origin is still always admitted. A request with no `Origin`, and one from
+exactly `server.public_base` when the project does not list that host, is
+served the deployment to the `default` target. No such deployment answers
+`409` with `rel.no_default`. A listed origin, a loopback origin, or a live
+preview with nothing deployed answers `409` with `rel.not_deployed`.

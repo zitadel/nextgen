@@ -476,3 +476,48 @@ func TestDeploymentStatements_ProjectDeleteCascades(t *testing.T) {
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
+
+// The default target is the empty origin. A deployment that names only it
+// stays live beside the primary origins, and a later primary deployment does
+// not clear it.
+func TestDeploymentStatements_DefaultTarget(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin, wwwOrigin)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		primary := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		def := deploy(t, d.stmts, projectID, relA.ID, []string{domain.DefaultTargetOrigin}, deployArgs{})
+		now := time.Now()
+
+		assert.Equal(t, []string{def.ID, primary.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, nil)))
+		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		require.NoError(t, err)
+		require.Len(t, serving, 1)
+		assert.Equal(t, def.ID, serving[0].DeploymentID)
+		assert.Empty(t, serving[0].Origin)
+
+		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, primary.ID, got.ID, "a default-only deployment leaves the primary origins served")
+
+		newer := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, newer.ID, got.ID)
+		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		require.NoError(t, err)
+		require.Len(t, serving, 1)
+		assert.Equal(t, def.ID, serving[0].DeploymentID, "a primary deployment that omits default leaves it")
+
+		replaced := deploy(t, d.stmts, projectID, relB.ID, []string{domain.DefaultTargetOrigin}, deployArgs{})
+		serving, err = d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{domain.DefaultTargetOrigin})
+		require.NoError(t, err)
+		require.Len(t, serving, 1)
+		assert.Equal(t, replaced.ID, serving[0].DeploymentID)
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, newer.ID, got.ID)
+	})
+}

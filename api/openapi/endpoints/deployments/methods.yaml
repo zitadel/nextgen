@@ -8,9 +8,12 @@ post:
     exists; on failure nothing changes and no record is written.
 
     Name the release by exactly one of `release_id` or `content_hash`; it
-    must already exist in the project. `targets` is `primary` or preview
-    URLs. The deployment freezes the project's variable values for its kind,
-    with no fallback between primary and preview values.
+    must already exist in the project. `targets` is `primary`, `default`, or
+    preview URLs. `default` may be named with `primary` and is the target a
+    caller with no origin is served. The deployment freezes the project's
+    variable values for its kind, with no fallback between primary and
+    preview values. A deployment that names `default` freezes the primary
+    values.
 
     A deployment to `primary` changes nothing when the project's newest
     primary deployment has the same release and frozen values and covers
@@ -20,8 +23,9 @@ post:
 
     Failures:
     - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
-      a primary origin named exactly; `primary` mixed with preview URLs;
-      `primary` on a project with no primary origin; `ttl` with `primary`;
+      a primary origin named exactly; `primary` or `default` mixed with
+      preview URLs; `primary` on a project with no primary origin; `ttl`
+      with `primary` or `default`;
       `ttl` above 365 days (`P365D`).
     - `400 dep.variables_missing`: a referenced variable has no value for
       the kind; `details` names the kind and every missing variable.

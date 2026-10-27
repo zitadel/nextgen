@@ -35,6 +35,7 @@ func TestFlowOrigins(t *testing.T) {
 	project, ok := created.(*api.CreateProjectResponse)
 	require.True(t, ok, helpers.MustMarshal(t, created))
 	harness.CleanupProject(t, project.ID)
+	deployDefaultTarget(t, string(project.ID))
 
 	t.Run("an origin the project does not list cannot open a flow", func(t *testing.T) {
 		resp, body := openFlow(t, project.ID, "https://evil.example.test")
@@ -64,6 +65,57 @@ func TestFlowOrigins(t *testing.T) {
 		var answered api.FlowResponse
 		require.NoError(t, answered.UnmarshalJSON(body), string(body))
 	})
+}
+
+// TestDefaultTarget serves a caller with no Origin, and one from the server's
+// own origin, from the default deployment. A primary origin with nothing
+// deployed stays rel.not_deployed.
+func TestDefaultTarget(t *testing.T) {
+	t.Parallel()
+
+	fixture := newDeploymentFixture(t)
+	assertFlowCode(t, fixture.project, "", domain.ErrReleaseNoDefault().Code)
+	assertFlowCode(t, fixture.project, helpers.ConsoleOrigin, domain.ErrReleaseNoDefault().Code)
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+
+	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{
+		ProjectID: api.ProjectID(fixture.project),
+	})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, listResp, helpers.MustMarshal(t, listResp))
+	pointers := fixture.pointers()
+	pinned := map[string]bool{fixture.flowdefID: true}
+	for _, definition := range listResp.(*api.FlowDefinitionListResponse).FlowDefinitions {
+		if pinned[definition.ID] {
+			continue
+		}
+		pointers = append(pointers, api.CreateReleasePointer{
+			Kind:       api.ReleasePointerKindFlowDefinition,
+			RevisionID: definition.ID,
+		})
+		pinned[definition.ID] = true
+	}
+	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: pointers})
+	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
+	deployed := fixture.createDeployment(t, &api.CreateDeploymentRequest{
+		ReleaseID: api.NewOptReleaseID(created.(*api.CreateReleaseCreated).ID),
+		Targets:   api.DeploymentTargetsRequest{domain.DeploymentTargetDefault},
+	})
+	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+	assert.Equal(t, []string{domain.DeploymentTargetDefault}, origins(deployed.(*api.CreateDeploymentCreated).Targets))
+
+	for _, origin := range []string{"", helpers.ConsoleOrigin} {
+		resp, body := openFlow(t, fixture.project, origin)
+		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
+	}
+	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+}
+
+func assertFlowCode(t *testing.T, projectID, origin, code string) {
+	t.Helper()
+	resp, body := openFlow(t, projectID, origin)
+	assert.Equal(t, http.StatusConflict, resp.StatusCode, "Origin %q: %s", origin, body)
+	assert.Equal(t, code, errorCode(body), "Origin %q: %s", origin, body)
 }
 
 // TestFlowSubmitFromLivePreview pins that submit admits a live preview Origin

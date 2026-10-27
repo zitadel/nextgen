@@ -14415,6 +14415,7 @@ type CreateFlowErrorResponse struct {
 	ProjNotFound           ProjNotFound
 	ProjOriginNotAllowed   ProjOriginNotAllowed
 	ProjPreviewNotLive     ProjPreviewNotLive
+	RelNoDefault           RelNoDefault
 	RelNotDeployed         RelNotDeployed
 	RelNotFound            RelNotFound
 	RelRevoked             RelRevoked
@@ -14444,6 +14445,7 @@ const (
 	ProjNotFoundCreateFlowErrorResponse           CreateFlowErrorResponseType = "proj.not_found"
 	ProjOriginNotAllowedCreateFlowErrorResponse   CreateFlowErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveCreateFlowErrorResponse     CreateFlowErrorResponseType = "proj.preview_not_live"
+	RelNoDefaultCreateFlowErrorResponse           CreateFlowErrorResponseType = "rel.no_default"
 	RelNotDeployedCreateFlowErrorResponse         CreateFlowErrorResponseType = "rel.not_deployed"
 	RelNotFoundCreateFlowErrorResponse            CreateFlowErrorResponseType = "rel.not_found"
 	RelRevokedCreateFlowErrorResponse             CreateFlowErrorResponseType = "rel.revoked"
@@ -14528,6 +14530,11 @@ func (s CreateFlowErrorResponse) IsProjOriginNotAllowed() bool {
 // IsProjPreviewNotLive reports whether CreateFlowErrorResponse is ProjPreviewNotLive.
 func (s CreateFlowErrorResponse) IsProjPreviewNotLive() bool {
 	return s.Type == ProjPreviewNotLiveCreateFlowErrorResponse
+}
+
+// IsRelNoDefault reports whether CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) IsRelNoDefault() bool {
+	return s.Type == RelNoDefaultCreateFlowErrorResponse
 }
 
 // IsRelNotDeployed reports whether CreateFlowErrorResponse is RelNotDeployed.
@@ -14893,6 +14900,27 @@ func (s CreateFlowErrorResponse) GetProjPreviewNotLive() (v ProjPreviewNotLive, 
 func NewProjPreviewNotLiveCreateFlowErrorResponse(v ProjPreviewNotLive) CreateFlowErrorResponse {
 	var s CreateFlowErrorResponse
 	s.SetProjPreviewNotLive(v)
+	return s
+}
+
+// SetRelNoDefault sets CreateFlowErrorResponse to RelNoDefault.
+func (s *CreateFlowErrorResponse) SetRelNoDefault(v RelNoDefault) {
+	s.Type = RelNoDefaultCreateFlowErrorResponse
+	s.RelNoDefault = v
+}
+
+// GetRelNoDefault returns RelNoDefault and true boolean if CreateFlowErrorResponse is RelNoDefault.
+func (s CreateFlowErrorResponse) GetRelNoDefault() (v RelNoDefault, ok bool) {
+	if !s.IsRelNoDefault() {
+		return v, false
+	}
+	return s.RelNoDefault, true
+}
+
+// NewRelNoDefaultCreateFlowErrorResponse returns new CreateFlowErrorResponse from RelNoDefault.
+func NewRelNoDefaultCreateFlowErrorResponse(v RelNoDefault) CreateFlowErrorResponse {
+	var s CreateFlowErrorResponse
+	s.SetRelNoDefault(v)
 	return s
 }
 
@@ -21992,14 +22020,14 @@ func (s *DeploymentStatus) UnmarshalText(data []byte) error {
 // One origin a deployment made its release live on.
 // Ref: #
 type DeploymentTarget struct {
-	Origin Origin `json:"origin"`
+	Origin DeploymentTargetOrigin `json:"origin"`
 	// Preview URLs only: the expiry this deployment set. A later deployment
 	// to the URL records its own.
 	ExpiresAt OptDateTime `json:"expires_at"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *DeploymentTarget) GetOrigin() Origin {
+func (s *DeploymentTarget) GetOrigin() DeploymentTargetOrigin {
 	return s.Origin
 }
 
@@ -22009,7 +22037,7 @@ func (s *DeploymentTarget) GetExpiresAt() OptDateTime {
 }
 
 // SetOrigin sets the value of Origin.
-func (s *DeploymentTarget) SetOrigin(val Origin) {
+func (s *DeploymentTarget) SetOrigin(val DeploymentTargetOrigin) {
 	s.Origin = val
 }
 
@@ -22017,6 +22045,8 @@ func (s *DeploymentTarget) SetOrigin(val Origin) {
 func (s *DeploymentTarget) SetExpiresAt(val OptDateTime) {
 	s.ExpiresAt = val
 }
+
+type DeploymentTargetOrigin string
 
 type DeploymentTargetsRequest []string
 
@@ -61069,6 +61099,52 @@ func (o OptRelInvalidDetails) Or(d RelInvalidDetails) RelInvalidDetails {
 	return d
 }
 
+// NewOptRelNoDefaultDetails returns new OptRelNoDefaultDetails with value set to v.
+func NewOptRelNoDefaultDetails(v RelNoDefaultDetails) OptRelNoDefaultDetails {
+	return OptRelNoDefaultDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptRelNoDefaultDetails is optional RelNoDefaultDetails.
+type OptRelNoDefaultDetails struct {
+	Value RelNoDefaultDetails
+	Set   bool
+}
+
+// IsSet returns true if OptRelNoDefaultDetails was set.
+func (o OptRelNoDefaultDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptRelNoDefaultDetails) Reset() {
+	var v RelNoDefaultDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptRelNoDefaultDetails) SetTo(v RelNoDefaultDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptRelNoDefaultDetails) Get() (v RelNoDefaultDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptRelNoDefaultDetails) Or(d RelNoDefaultDetails) RelNoDefaultDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptRelNotDeployedDetails returns new OptRelNotDeployedDetails with value set to v.
 func NewOptRelNotDeployedDetails(v RelNotDeployedDetails) OptRelNotDeployedDetails {
 	return OptRelNotDeployedDetails{
@@ -76395,6 +76471,59 @@ func (s *RelInvalid) SetDetails(val OptRelInvalidDetails) {
 type RelInvalidDetails map[string]jx.Raw
 
 func (s *RelInvalidDetails) init() RelInvalidDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type RelNoDefault struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptRelNoDefaultDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *RelNoDefault) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *RelNoDefault) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *RelNoDefault) GetDetails() OptRelNoDefaultDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *RelNoDefault) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *RelNoDefault) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *RelNoDefault) SetDetails(val OptRelNoDefaultDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type RelNoDefaultDetails map[string]jx.Raw
+
+func (s *RelNoDefaultDetails) init() RelNoDefaultDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}

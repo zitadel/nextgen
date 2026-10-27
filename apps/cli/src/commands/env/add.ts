@@ -330,8 +330,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
                 deployment_id: deployment.deploymentId,
                 origins: [...deployment.origins],
               },
-        // A bound project admits every origin until the first pattern closes
-        // it, so the first step is to add one — `origin add` — before anything
+        // A bound project admits no origin except a loopback origin until the
+        // first pattern is added, so the first step is to add one —
+        // `origin add` — before anything
         // ships. `next_commands` is machine-readable, so the entry is included
         // only when it is actually runnable: a concrete origin (without
         // `--app-url` it would be a `<your-app-url>` placeholder the shell
