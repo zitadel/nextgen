@@ -84,6 +84,18 @@ describe("readPolicyTests", () => {
     expect(suites).toEqual([]);
     expect(issues).toEqual([".zitadel/policies/auth.unknown.test.json does not exist"]);
   });
+
+  it("never reads another operation's test file when one is asked for", async () => {
+    const cwd = await project({
+      [`${OPERATION}.test.json`]: TEST_FILE,
+      "scratch.test.json": { cases: "not a test" },
+    });
+
+    const { suites, issues } = await readPolicyTests(cwd, [OPERATION]);
+
+    expect(issues).toEqual([]);
+    expect(suites.map((suite) => suite.test.operation)).toEqual([OPERATION]);
+  });
 });
 
 describe("policiesFromFiles", () => {
@@ -195,6 +207,29 @@ describe("renderPolicyTestResults", () => {
     };
     expect(renderPolicyTestResults([suite], "rel_1")).toContain(
       "(release rel_1, revision polrev_1)",
+    );
+  });
+
+  it("shows the codes when only the code differs", () => {
+    const suite = {
+      operation: OPERATION,
+      file: "",
+      policy: null,
+      cases: [
+        {
+          name: "wrong code",
+          passed: false,
+          expected: { allowed: false, code: "user.password_empty", violations: ["min_length"] },
+          actual: {
+            allowed: false,
+            code: "user.password_policy_violation",
+            violations: { min_length: 12 },
+          },
+        },
+      ],
+    };
+    expect(renderPolicyTestResults([suite])).toContain(
+      "  ✗ wrong code: expected refused (user.password_empty: min_length), got refused (user.password_policy_violation: min_length)",
     );
   });
 });

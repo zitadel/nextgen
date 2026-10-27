@@ -57,15 +57,18 @@ export function policyTestFileIssues(data: unknown, file: string): string[] {
 
 /**
  * The test files in `.zitadel/policies/`, checked, and the problems found.
- * `operations` narrows them to those operations; one without a test file is a
- * problem, so a typo in the filter never passes silently.
+ * `operations` narrows them to those operations' files, by name and before
+ * anything is parsed, so a broken test file of another operation never
+ * blocks the ones asked for. One without a test file is a problem, so a typo
+ * in the filter never passes silently.
  */
 export async function readPolicyTests(
   cwd: string,
   operations: readonly string[] = [],
 ): Promise<{ suites: PolicyTestSuite[]; issues: string[] }> {
+  const wanted = new Set(operations.map(policyTestFileName));
   const entries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
-    skip: (name) => !isPolicyTestFile(name),
+    skip: (name) => !isPolicyTestFile(name) || (wanted.size > 0 && !wanted.has(name)),
   });
   const suites: PolicyTestSuite[] = [];
   const issues: string[] = [];
@@ -78,18 +81,13 @@ export async function readPolicyTests(
     }
     suites.push({ file, test: policyTestFileSchema.parse(entry.body) });
   }
-  if (operations.length === 0) {
-    return { suites, issues };
-  }
   for (const operation of operations) {
-    if (!suites.some((suite) => suite.test.operation === operation)) {
-      issues.push(`${POLICIES_DIR}/${policyTestFileName(operation)} does not exist`);
+    const file = policyTestFileName(operation);
+    if (!entries.some((entry) => entry.name === file)) {
+      issues.push(`${POLICIES_DIR}/${file} does not exist`);
     }
   }
-  return {
-    suites: suites.filter((suite) => operations.includes(suite.test.operation)),
-    issues,
-  };
+  return { suites, issues };
 }
 
 /** Where a tested config came from: a policy file, a release's revision, or nowhere. */
@@ -237,7 +235,10 @@ export async function runPolicyTests(
   return results;
 }
 
-/** A decision in words: `allowed`, or refused with its rules or its code. */
+/**
+ * A decision in words: `allowed`, or refused with its code and its rules,
+ * each when known, so a mismatch in either shows on the line.
+ */
 function describeDecision(decision: {
   allowed: boolean;
   code?: string;
@@ -246,10 +247,9 @@ function describeDecision(decision: {
   if (decision.allowed) {
     return "allowed";
   }
-  if (decision.violations !== undefined && decision.violations.length > 0) {
-    return `refused (${decision.violations.join(", ")})`;
-  }
-  return decision.code === undefined ? "refused" : `refused (${decision.code})`;
+  const rules = decision.violations?.length ? decision.violations.join(", ") : undefined;
+  const reason = [decision.code, rules].filter((part) => part !== undefined).join(": ");
+  return reason === "" ? "refused" : `refused (${reason})`;
 }
 
 /** Where a suite's policy came from, as its heading names it. */
