@@ -1,28 +1,22 @@
 "use client";
-import { track } from "@vercel/analytics";
 import { usePathname } from "fumadocs-core/framework";
 import { buttonVariants } from "fumadocs-ui/components/ui/button";
 import { Collapsible, CollapsibleContent } from "fumadocs-ui/components/ui/collapsible";
 import { type ReactNode, type SyntheticEvent, useEffect, useState } from "react";
-import { z } from "zod/mini";
+
+import {
+  feedbackRoute,
+  MAX_LENGTH,
+  OPINIONS,
+  type PageFeedback,
+  pageFeedback,
+} from "@/lib/feedback";
 
 // Fumadocs' page feedback (`@fumadocs/cli add feedback`) on Vercel's docs'
-// four-face scale, sent to Vercel Web Analytics as a custom event in place of
-// a server action: the page is static, and the event lands beside the page's
-// views. Its block feedback and GitHub link are left out.
+// four-face scale. A rating goes to feedbackRoute, which sends it on to Vercel
+// Web Analytics as a custom event; its block feedback and GitHub link are left
+// out.
 
-// Web Analytics drops a value longer than 255 characters.
-const MAX_LENGTH = 255;
-
-const OPINIONS = ["awful", "bad", "good", "great"] as const;
-
-const pageFeedback = z.object({
-  opinion: z.enum(OPINIONS),
-  page: z.string(),
-  message: z.string(),
-});
-
-type PageFeedback = z.infer<typeof pageFeedback>;
 type Opinion = PageFeedback["opinion"];
 
 // Each face on a 24px grid, drawn as Lucide draws its faces.
@@ -70,7 +64,7 @@ const FACES: Record<Opinion, { label: string; features: ReactNode }> = {
   },
 };
 
-/** Rates the page it ends: the `docs_feedback` event in Web Analytics. */
+/** Rates the page it ends: lib/feedback.ts's event in Web Analytics. */
 export function Feedback() {
   const page = usePathname();
   const { previous, setPrevious } = useSubmissionStorage(page);
@@ -82,7 +76,14 @@ export function Feedback() {
     if (opinion == null) return;
 
     const feedback: PageFeedback = { opinion, page, message: message.trim().slice(0, MAX_LENGTH) };
-    track("docs_feedback", feedback);
+    // The reader is thanked either way: a lost rating is not theirs to retry.
+    fetch(feedbackRoute, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(feedback),
+      // Outlives a navigation away right after Send.
+      keepalive: true,
+    }).catch(() => {});
     setPrevious(feedback);
     setMessage("");
     setOpinion(null);

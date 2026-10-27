@@ -146,30 +146,32 @@ test("a page wears the console's colours, faces and code colours in both themes"
 });
 
 /**
- * A page ends in Fumadocs' feedback, which Web Analytics receives as a custom
- * event (components/feedback.tsx). The local build cannot load Vercel's
- * script, so the event waits in the queue the script would drain.
+ * A page ends in Fumadocs' feedback, which posts a rating to the docs' own
+ * feedback route (components/feedback.tsx); the route's side is in
+ * agents.spec.ts. The suite also runs against deployments, so the post is
+ * answered here and never becomes an event.
  */
-test("a reader rates a page and the rating reaches Web Analytics", async ({ page }) => {
+test("a reader rates a page and the rating goes to the feedback route", async ({ page }) => {
+  const sent: unknown[] = [];
+  await page.route("**/docs/api/feedback", async (route) => {
+    sent.push(route.request().postDataJSON());
+    await route.fulfill({ status: 204 });
+  });
   await page.goto("/docs/get-started/quickstart");
 
   await page.getByRole("button", { name: "Not very helpful" }).click();
   await page.getByRole("textbox", { name: "Your feedback" }).fill("The steps skip the login.");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
-
-  const queued = await page.evaluate(() => (window as unknown as { vaq?: unknown[][] }).vaq ?? []);
-  expect(queued).toContainEqual([
-    "event",
-    {
-      name: "docs_feedback",
-      data: {
+  await expect
+    .poll(() => sent)
+    .toEqual([
+      {
         opinion: "bad",
         page: "/docs/get-started/quickstart",
         message: "The steps skip the login.",
       },
-    },
-  ]);
+    ]);
 
   // This browser remembers the rating, so a reload thanks rather than asks.
   await page.reload();
