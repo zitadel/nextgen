@@ -36,6 +36,7 @@ import { shellArg, shellOption } from "../../lib/shell";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /** A variable to set on a hosting platform or in a pipeline. A secret is named, never printed. */
 type PlatformVariable = { name: string; value?: string; secret?: boolean };
@@ -62,7 +63,7 @@ type DeployedRelease = {
  * platform builds from git), so the command ends by printing exactly which
  * values the platform and the pipeline need.
  */
-export default class EnvAdd extends BaseCommand {
+export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -123,7 +124,7 @@ export default class EnvAdd extends BaseCommand {
       : await this.input({
           kind: "text",
           name: "server",
-          message: "Server URL",
+          message: "What is the URL of your Zitadel server?",
           flag: "--server",
           initialValue: DEFAULT_SERVER,
           parse: parseServer,
@@ -149,7 +150,7 @@ export default class EnvAdd extends BaseCommand {
         : await this.input({
             kind: "text",
             name: "app URL",
-            message: "URL the app is served from (leave empty to skip)",
+            message: "What URL is your app served from? You can leave this empty to skip it.",
             flag: "--app-url",
             placeholder: "https://app.acme.com",
             parse: (answer: string) => ({ ok: true, value: answer.trim() || undefined }) as const,
@@ -281,7 +282,7 @@ export default class EnvAdd extends BaseCommand {
         {
           kind: "confirm",
           name: "deploy .zitadel/ to the new environment",
-          message: "Deploy .zitadel/ to it now?",
+          message: "Would you like to deploy .zitadel/ to it now?",
           initialValue: true,
         },
         { interactive: !nonInteractive, force: false },

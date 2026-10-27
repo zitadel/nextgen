@@ -19,6 +19,7 @@ import {
   variableScope,
 } from "../../lib/variables";
 import { inShell } from "../../lib/suggestion";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel variable set NAME [VALUE]` — enter or replace one variable on the
@@ -35,7 +36,7 @@ import { inShell } from "../../lib/suggestion";
  * the primary kind only, removing any preview value so a preview never keeps a
  * plaintext copy. `--preview` writes the preview kind alone.
  */
-export default class VariableSet extends EnvironmentCommand {
+export default class VariableSet extends Promptable(EnvironmentCommand) {
   static override description = "Set one variable on the project.";
   static override group = CommandGroups.configuration;
   static override examples = [
@@ -172,7 +173,7 @@ export default class VariableSet extends EnvironmentCommand {
     const value = await this.input({
       kind: flags.secret ? "secret" : "text",
       name: `value for ${name}`,
-      message: `Value for ${name}`,
+      message: `What should the value of ${name} be?`,
       ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.

@@ -308,8 +308,8 @@ Disable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey disable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -322,9 +322,6 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change. Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Disable passkey sign-in for a user schema.
@@ -341,8 +338,8 @@ Enable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey enable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>]
+  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -354,9 +351,6 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change. Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Enable passkey sign-in for a user schema.
@@ -373,8 +367,8 @@ Disable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password disable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method password disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -387,9 +381,6 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change. Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Disable password sign-in for a user schema.
@@ -406,8 +397,8 @@ Enable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password enable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>]
+  $ zitadel auth-method password enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -419,9 +410,6 @@ FLAGS
       --dry-run          Preview without mutating files or the platform.
       --schema=<value>   User schema to change. Required when the Project has more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Enable password sign-in for a user schema.
@@ -438,8 +426,8 @@ Remove an identity provider from a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [--schema <value>] [--provider <value>] [-f]
+  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry]
+    [--schema <value>] [--provider <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -453,9 +441,6 @@ FLAGS
       --provider=<value>  Identity provider to remove.
       --schema=<value>    User schema to change. Required when the Project has more than one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Remove an identity provider from a user schema.
@@ -472,9 +457,9 @@ Add an identity provider to a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--schema <value>] [--provider google|custom] [--slug <value>]
-    [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
+  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e
+    <value>] [--env-file <value>] [--schema <value>] [--provider google|custom] [--slug <value>] [--display-name
+    <value>] [--issuer <value>] [--scopes <value>] [--client-id <value>]
 
 FLAGS
   -c, --cwd=<value>           Project directory to operate on.
@@ -491,16 +476,13 @@ FLAGS
       --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
                               with --env.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for any other OpenID Connect provider.
+      --provider=<option>     Identity provider to enable, or "custom" for a custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
       --schema=<value>        User schema to change. Required when the Project has more than one.
       --scopes=<value>        Scopes the custom connection requests, separated by spaces or commas. Must include openid.
                               Default: openid profile email.
       --slug=<value>          Name of the custom connection. Schemas and flows refer to it by this.
       --[no-]telemetry        Send anonymous usage analytics. Disable with --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Add an identity provider to a user schema.
