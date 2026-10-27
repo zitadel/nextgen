@@ -50,7 +50,7 @@ import { HomeColumn, Page } from "@/components/layout";
  * of the choice being asked for.
  *
  * A row opens the project — selects it and goes to its first screen — rather
- * than a detail page: the project's own page is `Project settings` in the
+ * than a detail page: the project's own page is `Settings` in the
  * sidebar once it is selected, and the row menu links there directly.
  *
  * The list can hold every project of a deployment — a platform operator acts

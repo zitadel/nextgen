@@ -23,7 +23,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
 
   // The directory lists name and creation date. A row opens the project —
   // selects it and lands on its first screen — and the project's own page, where
-  // the id is, is `Project settings` in the sidebar that selection fills.
+  // the id is, is `Settings` in the sidebar that selection fills.
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
   await projectLink.click();
@@ -31,7 +31,7 @@ test("shows the bootstrapped project in the list and detail views", async ({
   await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Project settings" })
+    .getByRole("link", { name: "Settings" })
     .click();
   await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expect(page.getByText(zitadel.handle.projectId, { exact: true })).toBeVisible();
