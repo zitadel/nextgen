@@ -13,7 +13,7 @@ import { asTerminal } from "../../../helpers/terminal";
 class FailingCommand extends BaseCommand {
   public static override readonly id = "errors-test";
   public readonly stderr: string[] = [];
-  public declare ui: BaseCommand["ui"];
+  declare public ui: BaseCommand["ui"];
   public readonly json: unknown[] = [];
   public exitCode: number | undefined;
   private readonly asJson: boolean;
