@@ -8,7 +8,6 @@ import { createZitadelClient } from "../../lib/api-client";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
-import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
 import {
   buildBundle,
@@ -125,8 +124,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     const server = serverFlag
       ? (await resolveServer({ cwd, serverFlag })).value
-      : await this.input({
-          kind: "text",
+      : await this.ask.text({
           name: "server",
           message: "What is the URL of your Zitadel server?",
           flag: "--server",
@@ -151,8 +149,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       flags["app-url"] ??
       (nonInteractive
         ? undefined
-        : await this.input({
-            kind: "text",
+        : await this.ask.text({
             name: "app URL",
             message: "What URL is your app served from? You can leave this empty to skip it.",
             flag: "--app-url",
@@ -279,7 +276,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // never offered one, and a run with nobody to ask gets the suggestion in
     // the envelope instead — there is no flag to deploy without being asked,
     // because an agent that wants one runs `deploy` itself. The question does
-    // not go through `this.input`: that one answers a confirm when `--force`
+    // not go through `this.ask`: that asker answers a confirm when `--force`
     // is given, and here `--force` permits overwriting the env file, so it
     // must never answer it.
     let deployment: DeployedRelease | undefined;
@@ -287,20 +284,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       consola.info(
         "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
       );
-      const confirmed = await input(
-        {
-          kind: "confirm",
-          name: "deploy .zitadel/ to the new environment",
-          message: "Would you like to deploy .zitadel/ to it now?",
-          initialValue: true,
-        },
-        {
-          interactive: !nonInteractive,
-          force: false,
-          before: () => this.ui.open(),
-          after: () => this.ui.answered(),
-        },
-      );
+      const confirmed = await this.ui.questions({ honorForce: false }).confirm({
+        name: "deploy .zitadel/ to the new environment",
+        message: "Would you like to deploy .zitadel/ to it now?",
+        initialValue: true,
+      });
       if (confirmed) {
         deployment = await this.deployInitialRelease({
           cwd,

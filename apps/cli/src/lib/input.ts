@@ -273,33 +273,3 @@ class SessionQuestions implements Questions {
 export function asker(session: Session): Questions {
   return new SessionQuestions(session);
 }
-
-/**
- * A command's `this.input`: a question with its kind written out as a string.
- *
- * @deprecated The typed methods of {@link Questions} replaced it, and
- * `Promptable` hands them out as `this.ask`. The last caller is
- * `commands/env/add.ts`; this, `this.input` and {@link input} go with it.
- */
-export type Asker = {
-  <T>(question: TextQuestion<T> & { kind: "text" | "secret" }): Promise<T>;
-  (question: ConfirmQuestion & { kind: "confirm" }): Promise<boolean>;
-};
-
-/**
- * {@link asker} for a caller that still names the kind in the question.
- *
- * @deprecated See {@link Asker}.
- */
-export function input<T>(
-  question: TextQuestion<T> & { kind: "text" | "secret" },
-  session: Session,
-): Promise<T>;
-export function input(
-  question: ConfirmQuestion & { kind: "confirm" },
-  session: Session,
-): Promise<boolean>;
-export function input(question: AnyQuestion & { kind: Kind }, session: Session): Promise<unknown> {
-  const { kind, ...rest } = question;
-  return askOne(kind, rest, session);
-}

@@ -505,7 +505,7 @@ describe("the source tree", () => {
   // The typed methods are the whole point: a command names the question it is
   // asking by the method it calls, so there is no kind string left to get
   // wrong. Only `lib/input.ts` writes one, because it is the engine behind all
-  // five and the home of the deprecated asker.
+  // five and takes the kind as an argument.
   it("names no question by a kind string outside the engine", async () => {
     const tagged: string[] = [];
     for (const file of await sourceFiles(SRC)) {
@@ -516,8 +516,7 @@ describe("the source tree", () => {
       }
     }
 
-    // `commands/env/add.ts` is the last caller of the deprecated `this.input`.
-    expect(tagged).toEqual(["commands/env/add.ts"]);
+    expect(tagged).toEqual([]);
   });
 });
 

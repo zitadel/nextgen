@@ -41,7 +41,13 @@ export class Ending {
     return !this.inChain && !this.boxed() && this.summary.failed !== true;
   }
 
-  /** The answer and its footer, for a command that drew no chain. */
+  /**
+   * The answer and its footer, for a command that drew no chain.
+   *
+   * The answer is wrapped like everything else, which leaves a table's rows
+   * whole and folds a long sentence rather than running it off the screen;
+   * the footer is one line by construction, so it is left as it is.
+   */
   renderStandalone(): string {
     const said = this.summary.title === "Done" ? [] : [this.summary.title];
     const place = this.where.known ? [this.where.plain] : [];
@@ -51,7 +57,7 @@ export class Ending {
       .join(" · ");
     const body = this.body(false);
     return [
-      ...(body.length === 0 ? [] : [body.join("\n"), ""]),
+      ...(body.length === 0 ? [] : [new Prose(body.join("\n"), WIDTH).render(), ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
       "",
     ].join("\n");

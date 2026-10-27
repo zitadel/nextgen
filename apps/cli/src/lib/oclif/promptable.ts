@@ -1,4 +1,3 @@
-import { type Asker, input as askInput } from "../input";
 import type { Questions } from "../ui";
 import type { BaseCommand } from "./base";
 
@@ -35,21 +34,6 @@ export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase)
     protected get ask(): Questions {
       return this.ui.questions();
     }
-
-    /**
-     * @deprecated {@link ask} replaced it. The last caller is
-     * `commands/env/add.ts`; this goes with it.
-     */
-    protected readonly input: Asker = ((
-      // biome-ignore lint/suspicious/noExplicitAny: an overloaded call cannot be forwarded without it
-      question: any,
-    ) =>
-      askInput(question, {
-        interactive: !this.meta.nonInteractive,
-        force: this.meta.force,
-        before: () => this.ui.open(),
-        after: () => this.ui.answered(),
-      })) as Asker;
   }
   return PromptableCommand;
 }

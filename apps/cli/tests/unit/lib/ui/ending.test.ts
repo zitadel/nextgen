@@ -169,3 +169,29 @@ describe("what a long failure looks like under its closing line", () => {
     expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 });
+
+describe("the answer of a command that drew no chain", () => {
+  const answering = (summary: Partial<Summary>) =>
+    new Ending({ title: "Done", sections: [], ...summary }, nowhere, false);
+
+  // `release create -m x` drew a 98-column headline: the standalone answer was
+  // the one body the layout never folded.
+  it("folds a long answer instead of running it off the screen", () => {
+    const long = `Created a release ${"that keeps going ".repeat(8)}`;
+
+    const shown = plain(answering({ lines: [long] }).renderStandalone());
+
+    expect(Math.max(...shown.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
+  });
+
+  it("still leaves a table's rows whole", () => {
+    const rows = [
+      "name         source                  resolved",
+      "development  .env.development.local  yes      ",
+    ];
+
+    const shown = plain(answering({ lines: rows }).renderStandalone());
+
+    expect(shown).toContain(rows[0] as string);
+  });
+});
