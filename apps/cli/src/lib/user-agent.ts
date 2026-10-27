@@ -27,9 +27,8 @@ import { hostAgent } from "./telemetry/dimensions/host-agent";
 const USER_AGENT_HEADER = "user-agent";
 
 /**
- * Consent outcomes that are the user's own choice. A missing ingestion token
- * or a test run also disables telemetry, but says nothing about what the user
- * wants reported.
+ * Consent outcomes that are the user's own choice. A test run also disables
+ * telemetry, but says nothing about what the user wants reported.
  */
 const OPT_OUT_REASONS: ReadonlySet<Consent["reason"]> = new Set([
   "flag-opt-out",

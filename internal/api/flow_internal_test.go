@@ -187,6 +187,40 @@ func TestToFlowStep_OmitsThePairedIdentifierWhenAbsent(t *testing.T) {
 	require.False(t, got.Identifier.Set)
 }
 
+func TestToFlowStep_CarriesPurposeAndNotice(t *testing.T) {
+	t.Parallel()
+
+	notice := domain.FlowStepNoticeUserNotFound
+	got := toFlowStep(&domain.FlowStep{
+		Name:    "register",
+		Purpose: domain.FlowDefinitionPurposeRegister,
+		Notice:  &notice,
+	})
+
+	require.Equal(t, apigen.NewOptFlowStepPurpose(apigen.FlowStepPurposeRegister), got.Purpose)
+	require.Equal(t, apigen.NewOptNilString(domain.FlowStepNoticeUserNotFound), got.Notice)
+}
+
+func TestToFlowStep_OmitsTheNoticeWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	got := toFlowStep(&domain.FlowStep{Name: "identifier"})
+
+	require.Equal(t, apigen.NewOptFlowStepPurpose(apigen.FlowStepPurposeLogin), got.Purpose)
+	require.False(t, got.Notice.Set)
+}
+
+// A purpose the wire enum lacks would reach clients as a value they were
+// never promised.
+func TestToFlowStep_EveryPurposeIsAWirePurpose(t *testing.T) {
+	t.Parallel()
+
+	for _, purpose := range domain.FlowDefinitionPurposeValues() {
+		got := toFlowStep(&domain.FlowStep{Name: "step", Purpose: purpose})
+		require.NoError(t, got.Purpose.Value.Validate(), purpose.String())
+	}
+}
+
 // Explicit JSON `null` for a transition's action/purpose must map to "not
 // set" — IsSet() alone is also true for ogen's explicit-null state, and
 // reading .Value would silently yield the zero enum (switch / login).

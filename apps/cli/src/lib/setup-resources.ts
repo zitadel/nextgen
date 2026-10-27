@@ -27,7 +27,6 @@ import {
   type ConnectionSlug,
   type ProviderSelection,
   providerOf,
-  selectionName,
 } from "@zitadel/config/idp";
 import {
   normalizeFlowBody,
@@ -51,12 +50,11 @@ import {
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
-  customFlagText,
-  ENABLE_FLAG_NAMES,
   SETUP_FLAG_NAMES,
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
+  ssoEnableArgs,
 } from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
@@ -69,6 +67,13 @@ import { reportWarning } from "./warnings";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
+  /**
+   * Whether the password policy setup published has a minimum length. A kept
+   * policy file decides that as much as the answers do: one without
+   * `min_length` keeps none when none was given. `false` when nothing was
+   * published.
+   */
+  passwordMinLengthSet: boolean;
 };
 
 /**
@@ -104,9 +109,10 @@ export async function materializeSetupResources(opts: {
   /**
    * The minimum password length to put into the password policy: a number,
    * `null` for an explicit none, or `undefined` when none was given. The
-   * policy is written and published either way; without a number its
-   * `config` is empty and enforces nothing, and a kept file keeps its
-   * `min_length` only when none was given.
+   * policy is written and published either way. A new one gets the
+   * recommended minimum when none was given, and an empty `config`, which
+   * enforces nothing, for none; a kept file keeps its `min_length` only when
+   * none was given.
    */
   passwordMinLength?: PasswordMinLength;
   /**
@@ -236,11 +242,11 @@ export async function materializeSetupResources(opts: {
     status: flowBody.status,
   });
 
-  // The password policy, created before its file like the connections. The
-  // CLI chooses no value: without one from the developer, `config` is empty.
-  // A policy file already there (only with --force: without it the conflict
-  // check refused it) holds a project's chosen rules, so it is kept and
-  // published as it is; a minimum given now goes into it.
+  // The password policy, created before its file like the connections. A new
+  // one gets the recommended minimum unless the developer gave another or
+  // none. A policy file already there (only with --force: without it the
+  // conflict check refused it) holds a project's chosen rules, so it is kept
+  // and published as it is; a minimum given now goes into it.
   const kept = opts.force ? await readPasswordPolicyFile(opts.cwd) : undefined;
   const policy =
     kept === undefined
@@ -307,7 +313,10 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, policiesReadme));
   }
 
-  return { filesWritten };
+  return {
+    filesWritten,
+    passwordMinLengthSet: published !== undefined && policy.config.min_length !== undefined,
+  };
 }
 
 /**
@@ -511,15 +520,7 @@ function connectionExists(selection: ProviderSelection): {
       "provider afterwards to reuse it.",
     // Setup stopped before it created a project, so there is no environment
     // to carry: the retry is for after the developer reruns setup.
-    nextCommands: [
-      unscopedCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-      ),
-    ],
+    nextCommands: [unscopedCommand(ssoEnableArgs(selection))],
   };
 }
 

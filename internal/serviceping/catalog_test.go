@@ -25,12 +25,8 @@ type catalog struct {
 	Components map[string]struct {
 		Context []string `yaml:"context"`
 		Vercel  struct {
-			Prefix     string   `yaml:"prefix"`
 			Properties []string `yaml:"properties"`
 		} `yaml:"vercel"`
-		Mixpanel struct {
-			Prefix string `yaml:"prefix"`
-		} `yaml:"mixpanel"`
 		Events map[string]struct {
 			Properties   []string `yaml:"properties"`
 			Destinations []string `yaml:"destinations"`
@@ -54,19 +50,13 @@ func loadCatalog(t *testing.T) catalog {
 func TestPingSendsWhatTheCatalogLists(t *testing.T) {
 	c := loadCatalog(t)
 	server := c.Components["server"]
-	for destination, prefix := range map[string]string{"vercel": server.Vercel.Prefix, "mixpanel": server.Mixpanel.Prefix} {
-		if prefix != EventPrefix {
-			t.Errorf("the catalog's %s prefix for the server is %q, the ping's %q", destination, prefix, EventPrefix)
-		}
-	}
-	name := strings.TrimPrefix(EventName, EventPrefix)
-	event, ok := server.Events[name]
+	event, ok := server.Events[EventName]
 	if !ok {
-		t.Fatalf("the catalog lists no server event %q", name)
+		t.Fatalf("the catalog lists no server event %q", EventName)
 	}
 	for _, destination := range []string{"vercel", "mixpanel"} {
 		if !slices.Contains(event.Destinations, destination) {
-			t.Errorf("the catalog does not send %q to %s", name, destination)
+			t.Errorf("the catalog does not send %q to %s", EventName, destination)
 		}
 	}
 

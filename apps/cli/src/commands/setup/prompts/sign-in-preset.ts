@@ -13,9 +13,12 @@ export class SignInPresetPrompt implements SetupPrompt {
     if (ctx.presetFromFlag) {
       return answers;
     }
+    // Each label names the method offered first and the other one, because
+    // both presets enable password and passkey in the schema: the choice is
+    // only which one the login flow leads with.
     const labels: Record<SetupPreset, string> = {
-      "password-first": "Password first — password-led sign-in; passkeys also enabled",
-      "passkey-first": "Passkey first — passkey-led sign-in; email and password fallback",
+      "password-first": "Email and password, with passkeys also available",
+      "passkey-first": "Passkey, with email and password as the fallback",
     };
     const preset = await ctx.input({
       kind: "select",

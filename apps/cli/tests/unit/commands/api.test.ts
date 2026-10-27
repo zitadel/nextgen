@@ -69,6 +69,11 @@ describe("zitadel api without an operation, at a terminal", () => {
       status: "ok",
       data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
     });
+    expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
+      "Which part of the API would you like to use?",
+      "Which operation would you like to run?",
+    ]);
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe("What is the value of session_id?");
   });
 
   it("offers only what the CLI can call", async () => {

@@ -62,8 +62,9 @@ test("signs in end to end against the embedded API", async ({ page, seed }) => {
   expect(new URL(page.url()).searchParams.get("project")).toBeNull();
 
   // The shell, not the screen: it is what shows the signed-in console was
-  // reached.
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // reached. Projects is the home, drawn without the sidebar.
+  await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Primary" })).toHaveCount(0);
   await expect(page.getByText("No projects yet.")).toBeVisible();
 });
 
