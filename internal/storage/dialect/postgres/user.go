@@ -419,9 +419,11 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 				if err != nil {
 					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
 				}
-				compiler.WriteString("EXISTS (SELECT 1 FROM ")
+				// IN for parity with the sqlite dialect, which needs it. Postgres plans
+				// IN and EXISTS as the same semi join.
+				compiler.WriteString("zitadel_nextgen.users.id IN (SELECT ua.user_id FROM ")
 				compiler.WriteString(userUniqueAttributesTable)
-				compiler.WriteString(" ua WHERE ua.project_id = zitadel_nextgen.users.project_id AND ua.user_id = zitadel_nextgen.users.id AND ua.key = ")
+				compiler.WriteString(" ua WHERE ua.project_id = zitadel_nextgen.users.project_id AND ua.key = ")
 				compiler.WriteArg(a.Key)
 				compiler.WriteString(" AND ua.value_hash = ")
 				compiler.WriteArg(hash[:])

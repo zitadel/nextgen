@@ -301,7 +301,8 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 				if err != nil {
 					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
 				}
-				compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+				// IN for parity with the sqlite dialect, which needs it.
+				compiler.WriteString("users.id IN (SELECT ua.user_id FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.key = ")
 				compiler.WriteArg(a.Key)
 				compiler.WriteString(" AND ua.value_hash = ")
 				compiler.WriteArg(hash[:])
