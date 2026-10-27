@@ -444,7 +444,43 @@ function planCustomConnection(options: {
   const { slug, issuer } = options.input;
   const name = `${slug}.json`;
   const path = `${IDPS_DIR}/${name}`;
-  const holders = options.files.filter((file) => String(file.body.slug ?? "").trim() === slug);
+  const match = checkCustomSlug(options.files, slug, options.slugFlag);
+  if (match === undefined) {
+    return { action: "create", name, path, slug };
+  }
+
+  refuseChangedIssuer(match, slug, issuer, options.slugFlag);
+  const oidc = match.body.oidc;
+  refuseDifferentClientId(match, options.clientId);
+  refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
+  const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
+  const notApplied = [
+    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
+    ...(options.scopesGiven !== true || storedScopes === options.input.scopes.join(" ")
+      ? []
+      : (["scopes"] as const)),
+  ];
+  return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
+}
+
+/**
+ * What a custom connection's slug alone decides: the file it already names, or
+ * a refusal. More than one file with the slug, or a file name the slug would
+ * take that holds another connection, or variable names a new connection would
+ * collide on, are all knowable before anything else about the connection is, so
+ * a command can raise them as soon as it has the slug.
+ *
+ * @returns The single file that declares the slug, or `undefined` when the
+ *   slug is free and a new connection can be created.
+ */
+export function checkCustomSlug(
+  files: readonly ConnectionFile[],
+  slug: ConnectionSlug,
+  slugFlag: string,
+): ConnectionFile | undefined {
+  const name = `${slug}.json`;
+  const path = `${IDPS_DIR}/${name}`;
+  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === slug);
 
   if (holders.length > 1) {
     throw new ZitadelError(
@@ -458,47 +494,67 @@ function planCustomConnection(options: {
   }
 
   const [match] = holders;
-  if (match === undefined) {
-    // Nothing declares the slug, but the file name is where this one would go.
-    if (options.files.some((file) => file.name === name)) {
-      throw new ZitadelError(
-        "E_CONFLICT",
-        `${path} already exists and is not the ${slug} connection`,
-        {
-          hint: `Rename or remove that file, or choose another ${options.slugFlag}, then run the command again.`,
-          details: { file: path, slug },
-        },
-      );
-    }
-    refuseCollidingVariables(credentialVariables(slug), slug, options.files);
-    return { action: "create", name, path, slug };
+  if (match !== undefined) {
+    return match;
   }
-
-  const oidc = match.body.oidc;
-  const existingIssuer =
-    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
-  if (existingIssuer !== issuer) {
+  // Nothing declares the slug, but the file name is where this one would go.
+  if (files.some((file) => file.name === name)) {
     throw new ZitadelError(
       "E_CONFLICT",
-      existingIssuer === undefined
-        ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
-        : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
+      `${path} already exists and is not the ${slug} connection`,
       {
-        hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${options.slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
-        details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
+        hint: `Rename or remove that file, or choose another ${slugFlag}, then run the command again.`,
+        details: { file: path, slug },
       },
     );
   }
-  refuseDifferentClientId(match, options.clientId);
-  refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
-  const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
-  const notApplied = [
-    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
-    ...(options.scopesGiven !== true || storedScopes === options.input.scopes.join(" ")
-      ? []
-      : (["scopes"] as const)),
-  ];
-  return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
+  refuseCollidingVariables(credentialVariables(slug), slug, files);
+  return undefined;
+}
+
+/**
+ * Refuse an issuer other than the one an existing connection was written with.
+ * An applied connection keeps its issuer, so naming another one for the same
+ * slug is a conflict, raised as soon as both are known.
+ */
+export function refuseChangedIssuer(
+  file: ConnectionFile,
+  slug: ConnectionSlug,
+  issuer: string,
+  slugFlag: string,
+): void {
+  const oidc = file.body.oidc;
+  const existingIssuer =
+    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
+  if (existingIssuer === issuer) {
+    return;
+  }
+  throw new ZitadelError(
+    "E_CONFLICT",
+    existingIssuer === undefined
+      ? `${file.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
+      : `${file.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
+    {
+      hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
+      details: { file: file.path, slug, issuer, existing_issuer: existingIssuer ?? null },
+    },
+  );
+}
+
+/**
+ * The display name and issuer a custom connection's file holds, as written, for
+ * the ones it has. Nothing is checked here: a hand-edited file may hold
+ * anything. Scopes are left out because reusing a connection never applies them.
+ */
+export function storedCustomSettings(file: ConnectionFile): {
+  displayName?: string;
+  issuer?: string;
+} {
+  const oidc = file.body.oidc;
+  return {
+    ...(typeof file.body.display_name === "string" ? { displayName: file.body.display_name } : {}),
+    ...(isObject(oidc) && typeof oidc.issuer === "string" ? { issuer: oidc.issuer } : {}),
+  };
 }
 
 /**

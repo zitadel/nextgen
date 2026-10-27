@@ -75,8 +75,10 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
    *   for a later `deploy`.
-   * @param options.preflight - Checks that must answer before the schema is
-   *   read, with whatever they read handed back as `preflight`.
+   * @param options.preflight - Checks of the flags that must answer before the
+   *   schema is read, with what they read handed back as `preflight`. It must
+   *   not ask a question, use the network or write anything: ask in the
+   *   command's own `run`, after `connect()`.
    */
   protected async target<T = undefined>(
     flags: { schema?: string; cwd?: string },

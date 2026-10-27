@@ -5,6 +5,7 @@ import { Flags } from "@oclif/core";
 import { consola } from "consola";
 
 import {
+  type BrandingDesign,
   BRANDING_DESIGNS,
   DEFAULT_BRANDING_CONFIG_PATH,
   DEFAULT_BRANDING_DESIGN,
@@ -143,7 +144,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     });
   }
 
-  private async promptDesign(nonInteractive: boolean): Promise<string> {
+  private async promptDesign(nonInteractive: boolean): Promise<BrandingDesign> {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
@@ -151,9 +152,9 @@ export default class BrandingEject extends Promptable(BaseCommand) {
       kind: "select",
       name: "design",
       message: "Which design would you like to start from?",
-      initialValue: DEFAULT_BRANDING_DESIGN as string,
+      initialValue: DEFAULT_BRANDING_DESIGN,
       options: BRANDING_DESIGNS.map((design) => ({
-        value: design as string,
+        value: design,
         label: BRANDING_DESIGN_INFO[design].label,
         hint: BRANDING_DESIGN_INFO[design].hint,
       })),
