@@ -382,7 +382,13 @@ describe("setup command", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
+    // Inside the summary, like every other step: the box is where a command
+    // says what to do next, so nothing trails after it. Off a terminal the box
+    // is drawn with a plain gutter rather than a border.
+    const shown = res.stdout.trimEnd().split("\n");
+    expect(shown.at(-1)).toContain(expectedPublicCliCommand(""));
+    expect(shown.at(-2)).toContain("Explore all commands:");
+    expect(shown.at(-1)?.trimStart().startsWith(">")).toBe(true);
   });
 
   describe("a custom provider", () => {
