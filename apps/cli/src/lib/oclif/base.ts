@@ -18,7 +18,6 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
 import { Ui } from "../ui";
-import { introFor } from "./intro";
 import { summaryOfText } from "./result-summary";
 import {
   CLI_COMMAND_COMPLETED,
@@ -85,6 +84,14 @@ export const FLAG_VARIABLES: readonly FlagVariable[] = [
 export abstract class BaseCommand extends Command {
   /** Opt into oclif's native `--json` flag and JSON serialisation of the result. */
   static override enableJsonFlag = true;
+
+  /**
+   * What this command is doing, as the heading of its output
+   * (`┌  Listing origins`): a gerund phrase said of the command itself, never of
+   * the project it runs on, which is added after it. A command that sets none
+   * is headed by its own name.
+   */
+  static heading?: string;
 
   /**
    * The group the root help lists this command under (see `lib/oclif/groups`).
@@ -275,8 +282,8 @@ export abstract class BaseCommand extends Command {
       force: this.meta.force,
       verbose: this.meta.verbose,
     });
-    const [withProject, alone] = introFor(this.id ?? "");
-    this.ui.describe(withProject, alone);
+    const named = this.constructor as typeof BaseCommand;
+    this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     this.ui.bridgeNarration();
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;

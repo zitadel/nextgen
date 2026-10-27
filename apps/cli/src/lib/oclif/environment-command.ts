@@ -166,7 +166,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     if (process.stdout.isTTY && !options.quiet) {
       if (this.ui.interactive) {
-        this.ui.context(`project ${projectId} on ${server.replace(/^https?:\/\//, "")}`);
+        this.ui.context(`· ${projectId} on ${server.replace(/^https?:\/\//, "")}`);
       } else {
         consola.info(`Project   ${projectId}`);
         consola.info(`Server    ${server}`);

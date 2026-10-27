@@ -1,4 +1,5 @@
 import type { SuggestedCommand } from "../suggestion";
+import type { Summary } from "../ui";
 import type { BaseCommand } from "./base";
 
 /**
@@ -114,7 +115,7 @@ export type CommandResult =
        * chain, then these facts and next steps. Replaces `pretty` there. Without
        * it the ending is split out of `pretty`.
        */
-      readonly summary?: import("../ui").Summary;
+      readonly summary?: Summary;
       /** Show the ending of the output as a bordered box, for a result with next steps. */
       readonly boxed?: boolean;
     }
