@@ -4,6 +4,7 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { assertVariableName, variableScope } from "../../lib/variables";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel variable rm NAME` — remove one variable from the project.
@@ -12,7 +13,7 @@ import { assertVariableName, variableScope } from "../../lib/variables";
  * without it the variable is removed for both kinds. Destructive, so it takes the
  * same `--force`-or-confirm gate the resource commands' `rm` uses.
  */
-export default class VariableRm extends EnvironmentCommand {
+export default class VariableRm extends Promptable(EnvironmentCommand) {
   static override description = "Remove one variable from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [

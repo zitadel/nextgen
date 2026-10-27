@@ -11,6 +11,15 @@
       {% endif %}
     {% endif %}
 
+    {% comment %}
+      Messages open the card body. A notice says why the visitor is on this
+      screen (the flow moved from sign-in to sign-up by itself, say), so it
+      leads the screen, unlike the errors above the actions.
+    {% endcomment %}
+    {% for message in messages %}
+      <zl-alert severity="{{ message.level }}" data-zl-step-message>{{ message.text_key | t }}</zl-alert>
+    {% endfor %}
+
     {% assign recover = actions | where: "name", "recover" | first %}
     {% assign password_field = fields | where: "type", "password" | first %}
     {% comment %}

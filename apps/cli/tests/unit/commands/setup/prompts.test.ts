@@ -242,7 +242,8 @@ describe("DevPortPrompt", () => {
     await new DevPortPrompt().ask(baseAnswers({ devPort: 3000 }), ctx);
 
     expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
-      message: "Which port should your app run on? Press Enter to use 3000, or edit it first.",
+      message:
+        "Which port should your app's local dev server run on? Press Enter to use 3000, or edit it first.",
       initialValue: "3000",
     });
   });
@@ -273,6 +274,9 @@ describe("PasswordPolicyPrompt", () => {
     const out = await new PasswordPolicyPrompt().ask(baseAnswers(), ctx);
 
     expect(out.passwordMinLength).toBe(12);
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe(
+      "Would you like to set a minimum password length? Leave it empty or enter 0 for none; you can change it in .zitadel/policies/ later.",
+    );
   });
 
   it("records an empty answer as none, and preselects no value", async () => {
@@ -302,6 +306,9 @@ describe("PickFrameworkPrompt", () => {
     const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
 
     expect(id).toBe("next");
+    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+      "Which framework would you like to scaffold?",
+    );
   });
 
   it("throws E_VALIDATION on Ctrl-C", async () => {
@@ -464,7 +471,7 @@ describe("SocialSignInPrompt", () => {
 
     const question = vi.mocked(multiselect).mock.calls[0]?.[0];
     expect(question?.message).toBe(
-      "Add external sign-in providers? (optional) Select any providers you want to add, or press Enter to skip.",
+      "Would you like to add external sign-in providers? This is optional: select any you want, or press Enter to skip.",
     );
     expect(question?.options.map((option) => option.label)).toEqual([
       "Google — requires a Google OAuth app",
@@ -808,10 +815,10 @@ describe("askCustomSettings", () => {
     scopes: "openid",
   };
   const QUESTIONS = {
-    slug: "Name for this connection",
-    displayName: "Name shown on the sign-in button",
-    issuer: "Issuer URL of the provider",
-    scopes: "Scopes to request",
+    slug: "What would you like to call this connection?",
+    displayName: "What name should the sign-in button show?",
+    issuer: "What is the issuer URL of the provider?",
+    scopes: "Which scopes should we request?",
   };
 
   it.each([

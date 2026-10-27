@@ -136,6 +136,7 @@ import {
   unscopedCommand,
 } from "../../lib/suggestion";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * The frameworks `--framework` accepts, derived from Orca's registry so the
@@ -197,7 +198,7 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
  * — each entry is a small class) and {@link PickFrameworkPrompt} (the
  * empty-directory framework choice, before the main wizard).
  */
-export default class Setup extends BaseCommand {
+export default class Setup extends Promptable(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
   static override group = CommandGroups.gettingStarted;
@@ -1348,7 +1349,7 @@ export async function ssoFromFlags(
   const secret = await ask({
     kind: "secret",
     name: "client secret",
-    message: "Client secret",
+    message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,
     stdin: true,
     // A concrete rerun for an agent, never carrying the value: the secret is

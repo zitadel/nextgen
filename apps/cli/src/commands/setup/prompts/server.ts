@@ -64,7 +64,7 @@ export class ServerPrompt implements SetupPrompt {
     const custom = await ctx.input({
       kind: "text",
       name: "server URL",
-      message: "Server URL",
+      message: "What is the URL of your Zitadel server?",
       placeholder: "https://zitadel.internal",
       parse: (value): Parsed<string> => {
         try {
