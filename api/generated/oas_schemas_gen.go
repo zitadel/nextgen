@@ -15,6 +15,7 @@ import (
 // AddOriginErrorResponse represents sum type.
 type AddOriginErrorResponse struct {
 	Type                   AddOriginErrorResponseType // switch on this field
+	AuthCsrfInvalid        AuthCsrfInvalid
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -35,6 +36,7 @@ type AddOriginErrorResponseType string
 
 // Possible values for AddOriginErrorResponseType.
 const (
+	AuthCsrfInvalidAddOriginErrorResponse        AddOriginErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedAddOriginErrorResponse       AddOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "evt.invalid"
 	InternalAddOriginErrorResponse               AddOriginErrorResponseType = "internal"
@@ -49,6 +51,11 @@ const (
 	ReqInvalidAddOriginErrorResponse             AddOriginErrorResponseType = "req.invalid"
 	UnavailableAddOriginErrorResponse            AddOriginErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether AddOriginErrorResponse is AuthCsrfInvalid.
+func (s AddOriginErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidAddOriginErrorResponse
+}
 
 // IsAuthUnauthorized reports whether AddOriginErrorResponse is AuthUnauthorized.
 func (s AddOriginErrorResponse) IsAuthUnauthorized() bool {
@@ -111,6 +118,27 @@ func (s AddOriginErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether AddOriginErrorResponse is Unavailable.
 func (s AddOriginErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableAddOriginErrorResponse
+}
+
+// SetAuthCsrfInvalid sets AddOriginErrorResponse to AuthCsrfInvalid.
+func (s *AddOriginErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidAddOriginErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if AddOriginErrorResponse is AuthCsrfInvalid.
+func (s AddOriginErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidAddOriginErrorResponse returns new AddOriginErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidAddOriginErrorResponse(v AuthCsrfInvalid) AddOriginErrorResponse {
+	var s AddOriginErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets AddOriginErrorResponse to AuthUnauthorized.
@@ -78542,6 +78570,7 @@ func (s *ReleaseSummary) SetRevokedAt(val NilDateTime) {
 // RemoveOriginErrorResponse represents sum type.
 type RemoveOriginErrorResponse struct {
 	Type                   RemoveOriginErrorResponseType // switch on this field
+	AuthCsrfInvalid        AuthCsrfInvalid
 	AuthUnauthorized       AuthUnauthorized
 	EvtInvalid             EvtInvalid
 	Internal               Internal
@@ -78559,6 +78588,7 @@ type RemoveOriginErrorResponseType string
 
 // Possible values for RemoveOriginErrorResponseType.
 const (
+	AuthCsrfInvalidRemoveOriginErrorResponse        RemoveOriginErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRemoveOriginErrorResponse       RemoveOriginErrorResponseType = "auth.unauthorized"
 	EvtInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "evt.invalid"
 	InternalRemoveOriginErrorResponse               RemoveOriginErrorResponseType = "internal"
@@ -78570,6 +78600,11 @@ const (
 	ReqInvalidRemoveOriginErrorResponse             RemoveOriginErrorResponseType = "req.invalid"
 	UnavailableRemoveOriginErrorResponse            RemoveOriginErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RemoveOriginErrorResponse is AuthCsrfInvalid.
+func (s RemoveOriginErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRemoveOriginErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RemoveOriginErrorResponse is AuthUnauthorized.
 func (s RemoveOriginErrorResponse) IsAuthUnauthorized() bool {
@@ -78619,6 +78654,27 @@ func (s RemoveOriginErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RemoveOriginErrorResponse is Unavailable.
 func (s RemoveOriginErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRemoveOriginErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RemoveOriginErrorResponse to AuthCsrfInvalid.
+func (s *RemoveOriginErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRemoveOriginErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RemoveOriginErrorResponse is AuthCsrfInvalid.
+func (s RemoveOriginErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRemoveOriginErrorResponse returns new RemoveOriginErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRemoveOriginErrorResponse(v AuthCsrfInvalid) RemoveOriginErrorResponse {
+	var s RemoveOriginErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RemoveOriginErrorResponse to AuthUnauthorized.
