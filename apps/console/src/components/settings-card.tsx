@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 
 import { DETAIL_CARD } from "@/components/detail-page";
-import { HEADING_MD } from "@/components/typography";
+import { SECTION_HEADING } from "@/components/typography";
 import { Card, CardContent } from "@/components/ui/card";
 import { FieldGroup } from "@/components/ui/field";
 
 /**
- * One section of a settings screen: a heading-md title and a line saying what
+ * One section of a settings screen: a section heading and a line saying what
  * it holds, then its card, 24px under the title row or the section above.
  */
 export function SettingsSection({
@@ -20,7 +20,7 @@ export function SettingsSection({
 }) {
   return (
     <section className="mt-6">
-      <h2 className={HEADING_MD}>{title}</h2>
+      <h2 className={SECTION_HEADING}>{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       <div className="mt-4">{children}</div>
     </section>

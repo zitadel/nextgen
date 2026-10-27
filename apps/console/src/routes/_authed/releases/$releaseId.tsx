@@ -12,7 +12,7 @@ import { ReleaseDeployments } from "@/components/release-deployments";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RevokeReleaseDialog } from "@/components/revoke-release-dialog";
 import { RollbackSheet } from "@/components/rollback-sheet";
-import { HEADING_MD } from "@/components/typography";
+import { SECTION_HEADING } from "@/components/typography";
 import {
   Accordion,
   AccordionContent,
@@ -116,7 +116,7 @@ function ReleaseDetail() {
           <Separator />
 
           {/* The section's own heading, ruled off from the groups it heads. */}
-          <h2 className={HEADING_MD}>Release content</h2>
+          <h2 className={SECTION_HEADING}>Release content</h2>
           <Separator />
 
           {groups.map((group) => (

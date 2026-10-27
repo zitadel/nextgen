@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { MetaCard } from "./detail-meta";
-import { EYEBROW, HEADING_MD, PAGE_TITLE } from "./typography";
+import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource detail screens (Users, Teams,
@@ -34,7 +34,7 @@ export const ICON_PLATE =
 export const DETAIL_CARD = "gap-0 py-0";
 
 /**
- * A body card with a titled section: the title (`zitadel/heading-md`), an
+ * A body card with a titled section: the title (`zitadel/section-heading`), an
  * optional action beside it, an optional note under them, a rule, then
  * `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
@@ -55,9 +55,9 @@ export function DetailSection({
   note?: ReactNode;
 }) {
   const heading = (
-    <span id={titleId} className={HEADING_MD}>
+    <h2 id={titleId} className={SECTION_HEADING}>
       {title}
-    </span>
+    </h2>
   );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>

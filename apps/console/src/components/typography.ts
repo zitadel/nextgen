@@ -4,11 +4,11 @@ export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 trackin
 /** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
 export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
 
-/** A card's section heading: `zitadel/heading-md`, the 16/20 display face. */
-export const HEADING_MD = "text-foreground font-serif text-base leading-5";
+/** A card's section heading: `zitadel/section-heading`, the 16/20 display face. */
+export const SECTION_HEADING = "text-foreground font-serif text-base leading-5";
 
-/** A heading inside a card's body, under its section heading: `zitadel/heading-sm`, the 14/20 display face. */
-export const HEADING_SM = "text-foreground font-serif text-sm leading-5";
+/** A heading inside a card's body, under its section heading: `zitadel/subsection-heading`, the 14/20 display face. */
+export const SUBSECTION_HEADING = "text-foreground font-serif text-sm leading-5";
 
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";

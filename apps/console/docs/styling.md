@@ -120,11 +120,11 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 
-Shared text styles (`PAGE_TITLE`, `HEADING_MD`, `HEADING_SM`, `OVERLINE`,
+Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`, `OVERLINE`,
 `EYEBROW`, the panel table cells) live in `src/components/typography.ts`. A
-section's primary title is `HEADING_MD` (Figma `zitadel/heading-md`, 16/20),
-including `Field definitions` in user schemas and `Steps` in login flows. A
-subordinate heading in a card body uses `HEADING_SM` (`zitadel/heading-sm`,
+section's primary title is `SECTION_HEADING` (Figma `zitadel/section-heading`, 16/20),
+including `Field definitions` in user schemas and `Steps` in login flows. All primary card titles, including Project Detail, Origins and Variables and Secrets, use 16/20. A
+subordinate heading in a card body uses `SUBSECTION_HEADING` (`zitadel/subsection-heading`,
 14/20). The overline is for meta labels, table heads and drill-down breadcrumbs,
 never a section title.
 
