@@ -321,7 +321,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
