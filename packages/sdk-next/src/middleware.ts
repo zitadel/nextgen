@@ -37,8 +37,9 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
 
   const injectedNames = [];
 
-  // This is the only writer of x-nextgen-auth-token: it injects the verified
-  // value for server components, and a client-sent one never reaches here.
+  // This is the only writer of x-nextgen-auth-token: it injects the session
+  // token for server components, verified, or off a protected route an opaque
+  // one unchecked, which auth() checks. A client-sent one never reaches here.
   for (const [name, value] of Object.entries(extra)) {
     headers.set(name, value);
     headers.set(`x-middleware-request-${name}`, value);
@@ -275,12 +276,18 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
 }
 
 /**
- * Judges the session and tunnels the token of a signed-in user to server
- * components via a request header, where `auth()` verifies it again.
- * Redirects to the login page when nobody is signed in on a protected route.
- * Either way the response carries the session cookies the judgement asks for.
- * When the backend cannot say whether the session is live, a protected route
- * answers `503` instead.
+ * Judges the session and tunnels its token to server components via a request
+ * header, where `auth()` verifies it before trusting it. Redirects to the
+ * login page when nobody is signed in on a protected route. Either way the
+ * response carries the session cookies the judgement asks for. When the
+ * backend cannot say whether the session is live, a protected route answers
+ * `503` instead.
+ *
+ * Only a protected route checks an opaque session token with the backend, a
+ * call to the server. Elsewhere the middleware decides nothing by the session,
+ * so it hands the token on unchecked: `auth()` checks it, once per render, and
+ * only on a page that reads the session (ADR 036). A JWT is judged on every
+ * route, which takes no call.
  *
  * @param req  - The incoming edge request.
  * @param opts - Auth handler options.
@@ -288,10 +295,11 @@ interface AuthHandlerOptions extends ResolveSessionOptions {
  */
 async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<NextResponse> {
   const { protectedRoutes, loginPath, pathname, ...verification } = opts;
+  const isProtected = matchesRoutes(pathname, protectedRoutes);
 
   const authHeader = req.headers.get("authorization");
   const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const { auth, undecided, cookies } = await resolveSession(
+  const { auth, undecided, cookies, unchecked } = await resolveSession(
     {
       bearer: bearerToken,
       cookie: (name) => req.cookies.get(name)?.value,
@@ -299,22 +307,22 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
       forwardedProto: req.headers.get("x-forwarded-proto"),
       forwardedHost: req.headers.get("x-forwarded-host"),
     },
-    verification,
+    { ...verification, checkOpaqueSession: isProtected },
   );
 
   let response: NextResponse;
   if (auth.isAuthenticated) {
     const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": auth.session.token });
     response = NextResponse.next({ request: { headers: tunnelled } });
-  } else if (undecided && matchesRoutes(pathname, protectedRoutes)) {
+  } else if (undecided && isProtected) {
     // The backend could not say whether the session is live. The user may well
     // be signed in, so a protected route answers 503 rather than send them to
     // the login page.
     response = new NextResponse("Service Unavailable", { status: 503 });
-  } else if (matchesRoutes(pathname, protectedRoutes)) {
+  } else if (isProtected) {
     response = NextResponse.redirect(loginRedirectUrl(loginPath, req.url), { status: 302 });
   } else {
-    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": "" });
+    const tunnelled = tunnelHeaders(req, { "x-nextgen-auth-token": unchecked ?? "" });
     response = NextResponse.next({ request: { headers: tunnelled } });
   }
 
@@ -322,9 +330,10 @@ async function handleAuth(req: NextRequest, opts: AuthHandlerOptions): Promise<N
   // session of this project still under the shared name is copied to the
   // project's own cookie. A live session that signs no one in here (an
   // anonymous one, or one of another project) keeps its cookie, and so does one
-  // the backend gave no verdict on. The cookies go through the response's
-  // cookie jar, so a middleware composed around this one that sets a cookie of
-  // its own through it keeps them.
+  // the backend gave no verdict on, or was not asked about: off a protected
+  // route, an opaque session's cookie waits for the next protected route. The
+  // cookies go through the response's cookie jar, so a middleware composed
+  // around this one that sets a cookie of its own through it keeps them.
   for (const cookie of cookies) {
     response.cookies.set(cookie.name, cookie.value, {
       path: "/",

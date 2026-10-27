@@ -69,7 +69,7 @@ narrower `matcher` leaves out is never redirected, and stays public.
 The middleware runs on every matched route and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
-2. **Verifies** the session JWT via JWKS using the Web Crypto API
+2. **Checks** the session on protected routes: an opaque session token against the backend's `GET /sessions/me`, a JWT via JWKS using the Web Crypto API. On other routes it checks only a JWT, which takes no call to the backend, and hands an opaque token to `auth()`, so a page that never reads the session costs no call
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in
 
 ### 2. Reading auth in a Server Component

@@ -93,7 +93,7 @@ Don't change the port in only one of these places. Starting the app with `PORT=3
 
 <Steps>
   <Step>Proxy `/__nextgen/*` requests to the Zitadel backend.</Step>
-  <Step>Validate the encrypted session token against `GET /sessions/me`.</Step>
+  <Step>On a protected route, validate the encrypted session token against `GET /sessions/me`. On any other route, `auth()` validates it when the page reads the session, so a page that never reads it costs no call to the backend.</Step>
   <Step>Redirect unauthenticated users from protected routes to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
 </Steps>
 
