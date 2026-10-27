@@ -125,4 +125,11 @@ export type CommandResult =
       readonly data?: unknown;
       readonly nextCommands?: ReadonlyArray<SuggestedCommand>;
       readonly pretty?: string;
+      /**
+       * How a person at a terminal sees the skip, the same shape a success
+       * ends on. Without it the ending is split out of `Skipped: <reason>`,
+       * which states the machine's token for what happened and says nothing
+       * about what the skip left in place or how to go on from it.
+       */
+      readonly summary?: Summary;
     };

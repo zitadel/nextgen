@@ -12,6 +12,7 @@ import { shellArg } from "../lib/shell";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
 import { Promptable } from "../lib/oclif/promptable";
+import type { Summary } from "../lib/ui";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -75,6 +76,36 @@ function assembleNextCommands(
   return commands;
 }
 
+/**
+ * How a declined eject ends. The question was answered on purpose, so the
+ * ending states what that answer left in place and the one command that
+ * changes it, rather than restating the refusal.
+ */
+function cancelledSummary(removeIt: SuggestedCommand): Summary {
+  return {
+    title: "Cancelled, nothing was removed",
+    sections: [],
+    lines: ["Nothing was removed. Zitadel is still set up in this app."],
+    next: [{ text: "Remove it whenever you like:", command: removeIt }],
+    boxed: true,
+  };
+}
+
+/**
+ * How an eject with nothing to remove ends. It is the same shape as a
+ * declined one — what the app looks like now, then the command that moves it
+ * on — because both are a run that changed nothing.
+ */
+function nothingToEjectSummary(setItUp: SuggestedCommand): Summary {
+  return {
+    title: "Nothing to remove",
+    sections: [],
+    lines: ["Zitadel is not set up in this app, so nothing was removed."],
+    next: [{ text: "Set it up whenever you like:", command: setItUp }],
+    boxed: true,
+  };
+}
+
 async function pathExists(path: string): Promise<boolean> {
   try {
     await stat(path);
@@ -129,7 +160,11 @@ export default class Eject extends Promptable(BaseCommand) {
         retry: this.suggestUnscoped("eject --force"),
       }));
     if (!confirmed) {
-      return this.emit({ status: "skipped", reason: "eject-cancelled" });
+      return this.emit({
+        status: "skipped",
+        reason: "eject-cancelled",
+        summary: cancelledSummary(this.suggestUnscoped("eject")),
+      });
     }
 
     const actions = await resolveEjectActions(cwd);
@@ -234,7 +269,12 @@ export default class Eject extends Promptable(BaseCommand) {
     });
 
     if (removed.length === 0 && backedUp.length === 0 && manualSteps.length === 0) {
-      return this.emit({ status: "skipped", reason: "nothing-to-eject", data: { cwd } });
+      return this.emit({
+        status: "skipped",
+        reason: "nothing-to-eject",
+        data: { cwd },
+        summary: nothingToEjectSummary(this.suggestUnscoped("setup")),
+      });
     }
 
     const nextCommands = assembleNextCommands(

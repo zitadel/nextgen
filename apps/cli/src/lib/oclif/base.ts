@@ -413,7 +413,9 @@ export abstract class BaseCommand extends Command {
     if (this.ui.interactive) {
       // A person at a terminal: the result closes the chain the questions began.
       // A command that said everything itself returns nothing, and draws nothing.
-      const own = normalized.status === "ok" ? normalized.summary : undefined;
+      // A skip ends on its own summary too, so a deliberate no-op reads like
+      // every other ending instead of as the reason token the envelope carries.
+      const own = normalized.summary;
       if (own !== undefined) {
         this.ui.finish(this.withOverview(own));
       } else if (rendered !== "" || footer !== undefined || this.ui.opened) {

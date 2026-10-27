@@ -9,7 +9,7 @@ vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clac
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
 import Eject from "../../../src/commands/eject";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 import { MANAGED_MARKER } from "../../../src/lib/paths";
 
@@ -304,6 +304,24 @@ describe("eject asked on a terminal", () => {
   // by running the command from source, where `input` is the one module asked.
   const ejecting = (cwd: string) => asTerminal(() => Eject.run(["--cwd", cwd]));
 
+  /** What eject draws in `cwd` when the confirmation is answered `answer`. */
+  async function drawnWhenAnswering(cwd: string, answer: boolean): Promise<string> {
+    const chunks: string[] = [];
+    const write = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        chunks.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+        return true;
+      });
+    vi.mocked(confirm).mockResolvedValueOnce(answer as never);
+    try {
+      await ejecting(cwd);
+    } finally {
+      write.mockRestore();
+    }
+    return stripAnsi(chunks.join(""));
+  }
+
   afterEach(() => {
     vi.mocked(confirm).mockReset();
     vi.mocked(isCancel).mockReset();
@@ -321,6 +339,50 @@ describe("eject asked on a terminal", () => {
       reason: "eject-cancelled",
     });
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
+  });
+
+  // A declined run changed nothing, so its summary says what is still there
+  // rather than repeating the refusal the closing line already made.
+  it("says what a declined run left in place", async () => {
+    const cwd = await makeManagedProject();
+
+    const shown = await drawnWhenAnswering(cwd, false);
+
+    expect(shown).toContain("Nothing was removed. Zitadel is still set up in this app.");
+  });
+
+  it("offers the eject command again when the answer is no", async () => {
+    const cwd = await makeManagedProject();
+
+    const shown = await drawnWhenAnswering(cwd, false);
+
+    expect(shown).toContain("Remove it whenever you like:");
+  });
+
+  it("never shows a person the reason the envelope carries", async () => {
+    const cwd = await makeManagedProject();
+
+    const shown = await drawnWhenAnswering(cwd, false);
+
+    expect(shown).not.toContain("eject-cancelled");
+  });
+
+  it("points an app that was never set up at setup, not at the reason token", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
+    tempDirs.push(cwd);
+
+    const shown = await drawnWhenAnswering(cwd, true);
+
+    expect(shown).toContain("Zitadel is not set up in this app, so nothing was removed.");
+  });
+
+  it("offers setup to an app that had nothing to remove", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-eject-untouched-"));
+    tempDirs.push(cwd);
+
+    const shown = await drawnWhenAnswering(cwd, true);
+
+    expect(shown).toContain("Set it up whenever you like:");
   });
 
   it("does not ask on a dry run, which removes nothing", async () => {
