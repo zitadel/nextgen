@@ -13386,6 +13386,7 @@ type CreateDeploymentErrorResponse struct {
 	DepInvalid           DepInvalid
 	DepNotFound          DepNotFound
 	DepPermissionDenied  DepPermissionDenied
+	DepVariablesMissing  DepVariablesMissing
 	EnvProjectNotFound   EnvProjectNotFound
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -13396,6 +13397,7 @@ type CreateDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
+	VarDocumentTooDeep   VarDocumentTooDeep
 }
 
 // CreateDeploymentErrorResponseType is oneOf type of CreateDeploymentErrorResponse.
@@ -13409,6 +13411,7 @@ const (
 	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingCreateDeploymentErrorResponse  CreateDeploymentErrorResponseType = "dep.variables_missing"
 	EnvProjectNotFoundCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "evt.invalid"
 	InternalCreateDeploymentErrorResponse             CreateDeploymentErrorResponseType = "internal"
@@ -13419,6 +13422,7 @@ const (
 	RelRevokedCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepCreateDeploymentErrorResponse   CreateDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
@@ -13449,6 +13453,11 @@ func (s CreateDeploymentErrorResponse) IsDepNotFound() bool {
 // IsDepPermissionDenied reports whether CreateDeploymentErrorResponse is DepPermissionDenied.
 func (s CreateDeploymentErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedCreateDeploymentErrorResponse
+}
+
+// IsDepVariablesMissing reports whether CreateDeploymentErrorResponse is DepVariablesMissing.
+func (s CreateDeploymentErrorResponse) IsDepVariablesMissing() bool {
+	return s.Type == DepVariablesMissingCreateDeploymentErrorResponse
 }
 
 // IsEnvProjectNotFound reports whether CreateDeploymentErrorResponse is EnvProjectNotFound.
@@ -13499,6 +13508,11 @@ func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
 func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateDeploymentErrorResponse
+}
+
+// IsVarDocumentTooDeep reports whether CreateDeploymentErrorResponse is VarDocumentTooDeep.
+func (s CreateDeploymentErrorResponse) IsVarDocumentTooDeep() bool {
+	return s.Type == VarDocumentTooDeepCreateDeploymentErrorResponse
 }
 
 // SetAuthCsrfInvalid sets CreateDeploymentErrorResponse to AuthCsrfInvalid.
@@ -13624,6 +13638,27 @@ func (s CreateDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermission
 func NewDepPermissionDeniedCreateDeploymentErrorResponse(v DepPermissionDenied) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetDepVariablesMissing sets CreateDeploymentErrorResponse to DepVariablesMissing.
+func (s *CreateDeploymentErrorResponse) SetDepVariablesMissing(v DepVariablesMissing) {
+	s.Type = DepVariablesMissingCreateDeploymentErrorResponse
+	s.DepVariablesMissing = v
+}
+
+// GetDepVariablesMissing returns DepVariablesMissing and true boolean if CreateDeploymentErrorResponse is DepVariablesMissing.
+func (s CreateDeploymentErrorResponse) GetDepVariablesMissing() (v DepVariablesMissing, ok bool) {
+	if !s.IsDepVariablesMissing() {
+		return v, false
+	}
+	return s.DepVariablesMissing, true
+}
+
+// NewDepVariablesMissingCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from DepVariablesMissing.
+func NewDepVariablesMissingCreateDeploymentErrorResponse(v DepVariablesMissing) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetDepVariablesMissing(v)
 	return s
 }
 
@@ -13834,6 +13869,27 @@ func (s CreateDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok bool)
 func NewUnavailableCreateDeploymentErrorResponse(v Unavailable) CreateDeploymentErrorResponse {
 	var s CreateDeploymentErrorResponse
 	s.SetUnavailable(v)
+	return s
+}
+
+// SetVarDocumentTooDeep sets CreateDeploymentErrorResponse to VarDocumentTooDeep.
+func (s *CreateDeploymentErrorResponse) SetVarDocumentTooDeep(v VarDocumentTooDeep) {
+	s.Type = VarDocumentTooDeepCreateDeploymentErrorResponse
+	s.VarDocumentTooDeep = v
+}
+
+// GetVarDocumentTooDeep returns VarDocumentTooDeep and true boolean if CreateDeploymentErrorResponse is VarDocumentTooDeep.
+func (s CreateDeploymentErrorResponse) GetVarDocumentTooDeep() (v VarDocumentTooDeep, ok bool) {
+	if !s.IsVarDocumentTooDeep() {
+		return v, false
+	}
+	return s.VarDocumentTooDeep, true
+}
+
+// NewVarDocumentTooDeepCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from VarDocumentTooDeep.
+func NewVarDocumentTooDeepCreateDeploymentErrorResponse(v VarDocumentTooDeep) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetVarDocumentTooDeep(v)
 	return s
 }
 
@@ -20891,6 +20947,59 @@ func (s *DepPermissionDenied) SetDetails(val OptDepPermissionDeniedDetails) {
 type DepPermissionDeniedDetails map[string]jx.Raw
 
 func (s *DepPermissionDeniedDetails) init() DepPermissionDeniedDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type DepVariablesMissing struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptDepVariablesMissingDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *DepVariablesMissing) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *DepVariablesMissing) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *DepVariablesMissing) GetDetails() OptDepVariablesMissingDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *DepVariablesMissing) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *DepVariablesMissing) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *DepVariablesMissing) SetDetails(val OptDepVariablesMissingDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type DepVariablesMissingDetails map[string]jx.Raw
+
+func (s *DepVariablesMissingDetails) init() DepVariablesMissingDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -50849,6 +50958,52 @@ func (o OptDepPermissionDeniedDetails) Or(d DepPermissionDeniedDetails) DepPermi
 	return d
 }
 
+// NewOptDepVariablesMissingDetails returns new OptDepVariablesMissingDetails with value set to v.
+func NewOptDepVariablesMissingDetails(v DepVariablesMissingDetails) OptDepVariablesMissingDetails {
+	return OptDepVariablesMissingDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDepVariablesMissingDetails is optional DepVariablesMissingDetails.
+type OptDepVariablesMissingDetails struct {
+	Value DepVariablesMissingDetails
+	Set   bool
+}
+
+// IsSet returns true if OptDepVariablesMissingDetails was set.
+func (o OptDepVariablesMissingDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDepVariablesMissingDetails) Reset() {
+	var v DepVariablesMissingDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDepVariablesMissingDetails) SetTo(v DepVariablesMissingDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDepVariablesMissingDetails) Get() (v DepVariablesMissingDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDepVariablesMissingDetails) Or(d DepVariablesMissingDetails) DepVariablesMissingDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDeploymentCreatedEventDelegationType returns new OptDeploymentCreatedEventDelegationType with value set to v.
 func NewOptDeploymentCreatedEventDelegationType(v DeploymentCreatedEventDelegationType) OptDeploymentCreatedEventDelegationType {
 	return OptDeploymentCreatedEventDelegationType{
@@ -64697,6 +64852,52 @@ func (o OptUserUpdatedPayloadAttributes) Get() (v UserUpdatedPayloadAttributes, 
 
 // Or returns value if set, or given parameter if does not.
 func (o OptUserUpdatedPayloadAttributes) Or(d UserUpdatedPayloadAttributes) UserUpdatedPayloadAttributes {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptVarDocumentTooDeepDetails returns new OptVarDocumentTooDeepDetails with value set to v.
+func NewOptVarDocumentTooDeepDetails(v VarDocumentTooDeepDetails) OptVarDocumentTooDeepDetails {
+	return OptVarDocumentTooDeepDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptVarDocumentTooDeepDetails is optional VarDocumentTooDeepDetails.
+type OptVarDocumentTooDeepDetails struct {
+	Value VarDocumentTooDeepDetails
+	Set   bool
+}
+
+// IsSet returns true if OptVarDocumentTooDeepDetails was set.
+func (o OptVarDocumentTooDeepDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptVarDocumentTooDeepDetails) Reset() {
+	var v VarDocumentTooDeepDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptVarDocumentTooDeepDetails) SetTo(v VarDocumentTooDeepDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptVarDocumentTooDeepDetails) Get() (v VarDocumentTooDeepDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptVarDocumentTooDeepDetails) Or(d VarDocumentTooDeepDetails) VarDocumentTooDeepDetails {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -80748,6 +80949,7 @@ type RollbackDeploymentErrorResponse struct {
 	DepInvalid           DepInvalid
 	DepNotFound          DepNotFound
 	DepPermissionDenied  DepPermissionDenied
+	DepVariablesMissing  DepVariablesMissing
 	EnvProjectNotFound   EnvProjectNotFound
 	EvtInvalid           EvtInvalid
 	Internal             Internal
@@ -80758,6 +80960,7 @@ type RollbackDeploymentErrorResponse struct {
 	RelRevoked           RelRevoked
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
+	VarDocumentTooDeep   VarDocumentTooDeep
 }
 
 // RollbackDeploymentErrorResponseType is oneOf type of RollbackDeploymentErrorResponse.
@@ -80771,6 +80974,7 @@ const (
 	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
 	DepNotFoundRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.not_found"
 	DepPermissionDeniedRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.permission_denied"
+	DepVariablesMissingRollbackDeploymentErrorResponse  RollbackDeploymentErrorResponseType = "dep.variables_missing"
 	EnvProjectNotFoundRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "env.project_not_found"
 	EvtInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "evt.invalid"
 	InternalRollbackDeploymentErrorResponse             RollbackDeploymentErrorResponseType = "internal"
@@ -80781,6 +80985,7 @@ const (
 	RelRevokedRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "rel.revoked"
 	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
 	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
+	VarDocumentTooDeepRollbackDeploymentErrorResponse   RollbackDeploymentErrorResponseType = "var.document_too_deep"
 )
 
 // IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
@@ -80811,6 +81016,11 @@ func (s RollbackDeploymentErrorResponse) IsDepNotFound() bool {
 // IsDepPermissionDenied reports whether RollbackDeploymentErrorResponse is DepPermissionDenied.
 func (s RollbackDeploymentErrorResponse) IsDepPermissionDenied() bool {
 	return s.Type == DepPermissionDeniedRollbackDeploymentErrorResponse
+}
+
+// IsDepVariablesMissing reports whether RollbackDeploymentErrorResponse is DepVariablesMissing.
+func (s RollbackDeploymentErrorResponse) IsDepVariablesMissing() bool {
+	return s.Type == DepVariablesMissingRollbackDeploymentErrorResponse
 }
 
 // IsEnvProjectNotFound reports whether RollbackDeploymentErrorResponse is EnvProjectNotFound.
@@ -80861,6 +81071,11 @@ func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
 func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRollbackDeploymentErrorResponse
+}
+
+// IsVarDocumentTooDeep reports whether RollbackDeploymentErrorResponse is VarDocumentTooDeep.
+func (s RollbackDeploymentErrorResponse) IsVarDocumentTooDeep() bool {
+	return s.Type == VarDocumentTooDeepRollbackDeploymentErrorResponse
 }
 
 // SetAuthCsrfInvalid sets RollbackDeploymentErrorResponse to AuthCsrfInvalid.
@@ -80986,6 +81201,27 @@ func (s RollbackDeploymentErrorResponse) GetDepPermissionDenied() (v DepPermissi
 func NewDepPermissionDeniedRollbackDeploymentErrorResponse(v DepPermissionDenied) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetDepPermissionDenied(v)
+	return s
+}
+
+// SetDepVariablesMissing sets RollbackDeploymentErrorResponse to DepVariablesMissing.
+func (s *RollbackDeploymentErrorResponse) SetDepVariablesMissing(v DepVariablesMissing) {
+	s.Type = DepVariablesMissingRollbackDeploymentErrorResponse
+	s.DepVariablesMissing = v
+}
+
+// GetDepVariablesMissing returns DepVariablesMissing and true boolean if RollbackDeploymentErrorResponse is DepVariablesMissing.
+func (s RollbackDeploymentErrorResponse) GetDepVariablesMissing() (v DepVariablesMissing, ok bool) {
+	if !s.IsDepVariablesMissing() {
+		return v, false
+	}
+	return s.DepVariablesMissing, true
+}
+
+// NewDepVariablesMissingRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from DepVariablesMissing.
+func NewDepVariablesMissingRollbackDeploymentErrorResponse(v DepVariablesMissing) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetDepVariablesMissing(v)
 	return s
 }
 
@@ -81196,6 +81432,27 @@ func (s RollbackDeploymentErrorResponse) GetUnavailable() (v Unavailable, ok boo
 func NewUnavailableRollbackDeploymentErrorResponse(v Unavailable) RollbackDeploymentErrorResponse {
 	var s RollbackDeploymentErrorResponse
 	s.SetUnavailable(v)
+	return s
+}
+
+// SetVarDocumentTooDeep sets RollbackDeploymentErrorResponse to VarDocumentTooDeep.
+func (s *RollbackDeploymentErrorResponse) SetVarDocumentTooDeep(v VarDocumentTooDeep) {
+	s.Type = VarDocumentTooDeepRollbackDeploymentErrorResponse
+	s.VarDocumentTooDeep = v
+}
+
+// GetVarDocumentTooDeep returns VarDocumentTooDeep and true boolean if RollbackDeploymentErrorResponse is VarDocumentTooDeep.
+func (s RollbackDeploymentErrorResponse) GetVarDocumentTooDeep() (v VarDocumentTooDeep, ok bool) {
+	if !s.IsVarDocumentTooDeep() {
+		return v, false
+	}
+	return s.VarDocumentTooDeep, true
+}
+
+// NewVarDocumentTooDeepRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from VarDocumentTooDeep.
+func NewVarDocumentTooDeepRollbackDeploymentErrorResponse(v VarDocumentTooDeep) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetVarDocumentTooDeep(v)
 	return s
 }
 
@@ -92985,6 +93242,59 @@ func (s *UserUpdatedPayload) SetAttributes(val OptUserUpdatedPayloadAttributes) 
 type UserUpdatedPayloadAttributes map[string]jx.Raw
 
 func (s *UserUpdatedPayloadAttributes) init() UserUpdatedPayloadAttributes {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type VarDocumentTooDeep struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptVarDocumentTooDeepDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *VarDocumentTooDeep) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *VarDocumentTooDeep) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *VarDocumentTooDeep) GetDetails() OptVarDocumentTooDeepDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *VarDocumentTooDeep) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *VarDocumentTooDeep) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *VarDocumentTooDeep) SetDetails(val OptVarDocumentTooDeepDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type VarDocumentTooDeepDetails map[string]jx.Raw
+
+func (s *VarDocumentTooDeepDetails) init() VarDocumentTooDeepDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
