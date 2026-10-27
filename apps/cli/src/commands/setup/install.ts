@@ -1,5 +1,3 @@
-import { consola } from "consola";
-
 import type { BoxAction } from "../../lib/box";
 import { ZitadelError } from "../../lib/errors";
 import { customizeAndPublishActions, verifyLoginAction } from "../../lib/journey-guidance";
@@ -61,6 +59,12 @@ export type SetupInstallInput = {
   selector: EnvironmentSelector;
   scaffoldedFramework: boolean;
   skipInstall: boolean;
+  /**
+   * How the install is drawn: the command's `this.ui.task`, so the step sits
+   * in the same chain as every other one setup reports. Passed in rather than
+   * reached for, because this module draws nothing itself.
+   */
+  task: <T>(label: string, work: () => Promise<T>, done?: (result: T) => string) => Promise<T>;
   run?: typeof runPackageCommand;
 };
 
@@ -104,17 +108,21 @@ export async function installDependenciesForSetup(
     });
   }
 
-  consola.start(`Installing dependencies with ${installCommand.display}`);
-  try {
-    await (input.run ?? runPackageCommand)(installCommand, {
-      cwd: input.cwd,
-      env: input.env,
-      redirectStdoutToStderr: input.json,
-    });
-  } catch (error) {
-    throw installFailed(error, installCommand, devCommand, input.cwd);
-  }
-  consola.success("Installed dependencies");
+  await input.task(
+    `Installing dependencies with ${installCommand.display}`,
+    async () => {
+      try {
+        await (input.run ?? runPackageCommand)(installCommand, {
+          cwd: input.cwd,
+          env: input.env,
+          redirectStdoutToStderr: input.json,
+        });
+      } catch (error) {
+        throw installFailed(error, installCommand, devCommand, input.cwd);
+      }
+    },
+    () => "Installed dependencies",
+  );
 
   return outcome({
     install: {

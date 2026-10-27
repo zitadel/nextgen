@@ -24,6 +24,19 @@ async function tempProject(packageJson: Record<string, unknown> = {}): Promise<s
   return dir;
 }
 
+/**
+ * A stand-in for the command's `this.ui.task`: it runs the work and remembers
+ * the label it was given and the line the step settled on.
+ */
+function recordingTask(steps: string[]): SetupInstallInput["task"] {
+  return async (label, work, done) => {
+    steps.push(label);
+    const result = await work();
+    steps.push(done?.(result) ?? label);
+    return result;
+  };
+}
+
 function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
   return {
     cliVersion: "1.2.3",
@@ -36,6 +49,7 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
     selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
     scaffoldedFramework: false,
     skipInstall: false,
+    task: recordingTask([]),
     ...overrides,
   };
 }
@@ -75,6 +89,28 @@ describe("setup dependency installation", () => {
       `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${selector} to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
+  });
+
+  it("reports the install as a step of the command's own chain", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+    const steps: string[] = [];
+
+    await installDependenciesForSetup(input({ cwd, run, task: recordingTask(steps) }));
+
+    expect(steps).toEqual(["Installing dependencies with npm install", "Installed dependencies"]);
+  });
+
+  it("reports no step when there is nothing to install", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+    const steps: string[] = [];
+
+    await installDependenciesForSetup(
+      input({ cwd, run, skipInstall: true, task: recordingTask(steps) }),
+    );
+
+    expect(steps).toEqual([]);
   });
 
   it("stages the human box to the verify mission while the JSON envelope stays complete", async () => {
