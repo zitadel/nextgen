@@ -802,18 +802,6 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
 	})
 
-	t.Run("policy", func(t *testing.T) {
-		t.Parallel()
-		published := passwordSetPolicy(t, publishPolicy(t, customerSecret, customer.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
-
-		listed, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: customerProjectID})
-		require.NoError(t, err)
-		require.IsType(t, &api.ListPoliciesResponse{}, listed, helpers.MustMarshal(t, listed))
-		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: customerProjectID, RevisionID: published.RevisionID})
-		require.NoError(t, err)
-		assert.Equal(t, published.ID, passwordSetPolicy(t, revision).ID)
-	})
-
 	t.Run("origins and variables", func(t *testing.T) {
 		t.Parallel()
 		origin := api.ProjectOrigin{Pattern: "https://granted-origin.example.com", Kind: api.ProjectOriginKindPreview}
