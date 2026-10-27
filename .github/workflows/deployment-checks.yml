@@ -413,6 +413,9 @@ jobs:
   # that project in the deployment's database, so only previews run it, whose
   # database is their branch's own: production-checks.yml's call skips it
   # (which is why it reports no result), and a run by hand only when asked.
+  # So it needs no lookup for its suite, as the jobs above have for
+  # production: a preview's run and a dispatch take this file from the commit
+  # they check out, which therefore has the suite.
   # The CLI reaches the protected deployment through a local proxy that adds
   # the bypass secret (e2e/cli/support/bypass-proxy.ts) and never holds it.
   cli:
