@@ -1,9 +1,10 @@
+import { stripAnsi } from "consola/utils";
 import { describe, expect, it } from "vitest";
 
 import { Facts, Frame, Prose, trimBlank, WIDTH } from "../../../../src/lib/ui/layout";
 import { section } from "../../../../src/lib/ui/summary";
 
-const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
+const plain = (text: string): string => stripAnsi(text);
 const widest = (text: string): number =>
   Math.max(
     ...plain(text)

@@ -1,8 +1,9 @@
+import { stripAnsi } from "consola/utils";
 import { describe, expect, it } from "vitest";
 
 import { GUIDE, MARK } from "../../../../src/lib/ui/marks";
 
-const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
+const plain = (text: string): string => stripAnsi(text);
 
 describe("marks", () => {
   it("gives each kind of line its own glyph", () => {

@@ -1,5 +1,3 @@
-import { consola } from "consola";
-
 import { createZitadelClient, type ZitadelClient } from "../api-client";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
@@ -164,13 +162,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    if (process.stdout.isTTY && !options.quiet) {
-      if (this.ui.interactive) {
-        this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
-      } else {
-        consola.info(`Project   ${projectId}`);
-        consola.info(`Server    ${server}`);
-      }
+    if (!options.quiet) {
+      // Recorded, not printed: the summary says where the command ran, once,
+      // whether a person or a script is reading it.
+      this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
     }
     return {
       client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),

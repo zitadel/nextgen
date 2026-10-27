@@ -33,7 +33,7 @@ export class SchemaCheck extends AbstractSanityCheck {
         status: "warn",
         message:
           `No schema files found in ${SCHEMAS_DIR} — this project predates editable ` +
-          "schema config or setup was interrupted. New projects scaffold editable " +
+          "schema configuration or setup was interrupted. New projects scaffold editable " +
           "defaults via `zitadel setup`.",
         path: this.path,
       };

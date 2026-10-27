@@ -122,8 +122,8 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     for (const file of filesWritten) {
       consola.info(`Wrote ${file}`);
     }
+    // Said once, by the line the command ends on.
     const ejected = `Ejected the ${BRANDING_DESIGN_INFO[design].label} design into ${BRANDING_DIR}/`;
-    consola.success(ejected);
 
     return this.emit({
       status: "ok",
@@ -134,7 +134,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
         files_written: filesWritten,
         next_actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
-          "Deploy --dry-run validates the template and shows the diff; deploy publishes it.",
+          "Run deploy --dry-run to validate the template and see the diff, then deploy to publish it.",
         ],
         // `branding eject` reads no environment, so it has no selector to
         // carry: the follow-ups run against whichever one the developer uses.

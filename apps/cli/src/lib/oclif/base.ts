@@ -20,6 +20,7 @@ import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
+import { claimSkills, eligibleForSkills } from "../skills-hint";
 import { takeReportedWarnings } from "../warnings";
 import type { Summary } from "../ui";
 import { Ui } from "../ui";
@@ -149,6 +150,12 @@ export abstract class BaseCommand extends Command {
 
   /** Everything a command shows a person. Silent until {@link toMeta} finds a terminal. */
   protected ui: Ui = new Ui({ interactive: false, force: false });
+
+  /**
+   * Whether this run may offer the Zitadel skills, resolved while the command
+   * works so the summary can be built without waiting on a filesystem scan.
+   */
+  private skillsOffered = false;
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -286,6 +293,10 @@ export abstract class BaseCommand extends Command {
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     this.ui.bridgeNarration();
+    this.skillsOffered = await eligibleForSkills({
+      env: process.env,
+      interactive: !this.meta.nonInteractive,
+    });
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
@@ -426,12 +437,15 @@ export abstract class BaseCommand extends Command {
    */
   private withOverview(summary: Summary): Summary {
     const steps = summary.next ?? [];
-    if (steps.length === 0 || steps.some((step) => step.text === OVERVIEW)) {
-      return summary;
-    }
+    const overview = steps.some((step) => step.text === OVERVIEW)
+      ? []
+      : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
+    // The skills offer is the last step of the first summary a machine sees,
+    // rather than a block of its own after the box.
+    const skills = this.skillsOffered ? [claimSkills(process.env)] : [];
     return {
       ...summary,
-      next: [...steps, { text: OVERVIEW, command: publicCliCommand("", this.config.version) }],
+      next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],
     };
   }
 

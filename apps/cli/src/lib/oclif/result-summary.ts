@@ -3,7 +3,7 @@ import type { Summary } from "../ui";
 
 /** The lines that say what a command did, as opposed to the detail under them. */
 const RESULT =
-  /^(Deployed|Validated|Set |Removed|Added|Rolled back|Revoked|Would |Skipped:|Zitadel \w+ (passed|failed)|Nothing to|\d+ [a-z-]+s?$|No .+\.$)/;
+  /^(Deployed|Validated|Set |Removed|Added|Rolled back|Revoked|Would |Skipped:|Zitadel \w+ (passed|failed)|Nothing to|\d+ [a-z-]+( [a-z-]+)*\.?$|No .+\.$)/;
 
 /** The widest a closing line may be, server included, so it never wraps. */
 const HEADLINE_WIDTH = 76;
@@ -147,7 +147,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
   const headline = title;
 
   const nextAt = lines.findIndex((line) => line.trim() === "Next:");
-  if ((boxed || nextAt >= 0) && !failed) {
+  if (boxed || nextAt >= 0) {
     // Everything after `Next:` is what to do next; a command that asked for a box
     // without saying `Next:` has a text that is all steps.
     const before = nextAt < 0 ? [] : lines.slice(0, nextAt);
@@ -157,6 +157,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
       lines: [...overflow, ...(nextAt < 0 ? [] : before)],
       next: nextSteps(nextAt < 0 ? lines : lines.slice(nextAt + 1)),
       boxed: true,
+      ...(failed ? { failed } : {}),
       ...(ran === undefined ? {} : { ran }),
     };
   }

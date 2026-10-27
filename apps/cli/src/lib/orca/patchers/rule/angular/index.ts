@@ -176,7 +176,7 @@ export class AngularPatcher extends AbstractRulePatcher {
     return {
       title: "Angular integration",
       detail:
-        "Wrote the app root component + proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
+        "Wrote the app root component and proxy.conf.cjs, added auth routes, and wired the /__nextgen dev proxy into angular.json.",
     };
   }
 }

@@ -118,13 +118,13 @@ import {
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
+  id as styleId,
   url as styleUrl,
   type Row,
   type Section,
 } from "./summary";
 import { shellOption } from "../../lib/shell";
 import type { Step, Summary } from "../../lib/ui";
-import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
   type EnvironmentSelector,
@@ -928,6 +928,8 @@ export default class Setup extends Promptable(BaseCommand) {
         projectFacts,
         writtenRel,
         depsAdded: result.depsAdded,
+        project,
+        server: answers.server,
         issuer,
         scaffoldedFramework,
         scaffoldedBesideFiles,
@@ -940,7 +942,6 @@ export default class Setup extends Promptable(BaseCommand) {
       ];
       if (this.ui.interactive) {
         // The ending of the chain: the headline, the report, then what to run next.
-        this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
         summary = {
           title: "Zitadel is ready",
           sections: [],
@@ -1056,18 +1057,6 @@ export default class Setup extends Promptable(BaseCommand) {
         ]),
       },
     });
-    // The skills note, once per machine, as the last thing setup prints, after
-    // the chain has closed. Only on a run that succeeded: a failed or cancelled
-    // setup never reaches here, so it does not use up the once-per-machine note.
-    if (!this.jsonEnabled()) {
-      await showSkillsHint({
-        env: process.env,
-        interactive:
-          !dryRun &&
-          !flags["non-interactive"] &&
-          Boolean(process.stdout.isTTY && process.stdin.isTTY),
-      });
-    }
     return envelope;
   }
 
@@ -1168,22 +1157,26 @@ async function resolveScaffoldFramework(
     // `setupRetryFlags` pins `--server local`.
     const choices = orca.availableFrameworks().map((choice) => choice.id);
     const suggested = choices.includes("next") ? "next" : choices[0];
-    throw new ZitadelError("E_FRAMEWORK_NOT_DETECTED", "Empty directory — pass --framework", {
-      hint: (
-        "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
-        `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
-      ).trimEnd(),
-      nextCommands:
-        guidance.serverFlag === "local" && suggested
-          ? [
-              unscopedCommand(
-                `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
-                guidance.cliVersion,
-              ),
-            ]
-          : [],
-      details: { frameworks: choices },
-    });
+    throw new ZitadelError(
+      "E_FRAMEWORK_NOT_DETECTED",
+      "This directory is empty, so setup needs --framework",
+      {
+        hint: (
+          "Setup asks which framework to scaffold only in a terminal. Without one, or with " +
+          `--json or --non-interactive, pass --framework with one of: ${choices.join(", ")}.`
+        ).trimEnd(),
+        nextCommands:
+          guidance.serverFlag === "local" && suggested
+            ? [
+                unscopedCommand(
+                  `setup ${setupRetryFlags({ ...guidance.retry, framework: suggested })}`,
+                  guidance.cliVersion,
+                ),
+              ]
+            : [],
+        details: { frameworks: choices },
+      },
+    );
   }
   return new PickFrameworkPrompt().ask(orca.availableFrameworks(), guidance.ask);
 }
@@ -1951,12 +1944,15 @@ export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
+  project: CreateProject201;
+  server: string;
   issuer: string;
   scaffoldedFramework: boolean;
   scaffoldedBesideFiles: boolean;
   sso: readonly SsoDraft[];
 }): Section[] {
-  const { projectFacts, writtenRel, depsAdded, issuer, scaffoldedFramework, sso } = opts;
+  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
+    opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -2042,9 +2038,11 @@ export function buildSummary(opts: {
     });
   }
 
-  // The project and the server are said once, by the summary's closing line
-  // (`Using project … on your Zitadel server at …`), as in every other command.
-  const projectRows: Row[] = [{ label: "App will run", value: styleUrl(issuer) }];
+  const projectRows: Row[] = [
+    { label: "Project id", value: styleId(project.id) },
+    { label: "Server", value: styleUrl(server) },
+    { label: "App will run", value: styleUrl(issuer) },
+  ];
 
   return [
     { title: "Detected", rows: detected },

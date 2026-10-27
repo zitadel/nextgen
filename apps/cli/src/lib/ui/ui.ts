@@ -74,6 +74,14 @@ export class Ui {
   }
 
   /**
+   * Where this command ran, as the one sentence both a person and a script see.
+   * `undefined` when the command reached nothing.
+   */
+  whereItRan(): string | undefined {
+    return this.chain.whereItRan();
+  }
+
+  /**
    * Gives `consola` its reporters back. The base command calls it when the
    * command ends, so the next command in this process starts from a clean slate.
    */

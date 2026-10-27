@@ -97,6 +97,7 @@ const describeWrite = <
     spec.example ?? (flagsAloneMayBeIncomplete(fields) ? undefined : fieldExample(fields));
   const command = `<%= config.bin %> ${topic} ${verb}${verb === "update" ? " <id>" : ""}`;
   return {
+    heading: `${verb === "create" ? "Creating" : "Updating"} ${article(resource.singular)} ${resource.singular}`,
     description:
       verb === "create"
         ? `Create ${article(resource.singular)} ${resource.singular}.`

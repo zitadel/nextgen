@@ -571,7 +571,7 @@ describe("local runtime commands", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("Local Zitadel server is ready.");
     expect(result.stdout).toContain(
-      "  Create an app with authentication. Run setup in this directory",
+      "  Create an app with authentication by running setup in this directory",
     );
     expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("setup --server local")}`);
     expect(result.stdout).not.toContain("handoff");
@@ -689,7 +689,7 @@ describe("local runtime commands", () => {
     expect(envelope.status).toBe("ok");
     expect(envelope.data.urls.api).toBe(serverUrl);
     expect(envelope.data.next_actions.join("\n")).toContain(
-      "Run setup in this directory or a subdirectory",
+      "by running setup in this directory or a subdirectory",
     );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
     // As in the binary case: setup is the only next step, and no `console` one.

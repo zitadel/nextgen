@@ -23,8 +23,8 @@ import { DEPLOY_ARGS } from "./release";
 export function verifyLoginAction(openUrl?: string): string {
   const open = openUrl ? `open ${openUrl}, ` : "";
   return (
-    `Verify auth in the browser: ${open}register a user, log out, ` +
-    "log in again with the same user, and confirm /profile shows Signed in."
+    `Verify auth in the browser: ${open}register a user, sign out, ` +
+    "sign in again with the same user, and confirm /profile shows Signed in."
   );
 }
 

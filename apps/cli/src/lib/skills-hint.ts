@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command } from "./box";
+import { type BoxAction, command } from "./box";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
@@ -32,6 +32,50 @@ const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
  * fail the command the user actually ran, and losing the race to create the marker
  * (`EEXIST`) just means another run is showing the note.
  */
+/**
+ * Whether this machine should be offered the skills: someone is watching, an
+ * agent is installed, and the offer has not been made before. Reads the
+ * filesystem, so it is resolved while the command runs and {@link claimSkills}
+ * is what spends the offer, at the moment the summary is built.
+ */
+export async function eligibleForSkills({ env, interactive }: SkillsHintInput): Promise<boolean> {
+  try {
+    if (!interactive || isCI(env) || isOptedOut(env)) {
+      return false;
+    }
+    if (existsSync(join(telemetryConfigDir(env), SHOWN_FILE))) {
+      return false;
+    }
+    // Detected agents only decide whether the offer is relevant; it does not
+    // name them.
+    return (await rosie.agents()).some((agent) => agent.detected && agent.installPath !== null);
+  } catch {
+    // Nothing here may fail the command the person actually ran.
+    return false;
+  }
+}
+
+/**
+ * Spends the once-per-machine offer and returns the step to put in the
+ * summary, or `undefined` if another run took it first. Written exclusively,
+ * so of two concurrent first runs only one shows it.
+ */
+export function claimSkills(env: NodeJS.ProcessEnv): BoxAction | undefined {
+  try {
+    const shownPath = join(telemetryConfigDir(env), SHOWN_FILE);
+    mkdirSync(dirname(shownPath), { recursive: true });
+    writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
+      flag: "wx",
+    });
+    return {
+      text: "Using an AI coding agent? Install the Zitadel skills so it can work with the CLI:",
+      command: INSTALL_COMMAND,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function showSkillsHint({ env, interactive }: SkillsHintInput): Promise<void> {
   try {
     if (!interactive || isCI(env) || isOptedOut(env)) {

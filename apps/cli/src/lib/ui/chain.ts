@@ -65,6 +65,12 @@ export class Chain implements Wizard {
     this.title = title;
   }
 
+  /** Where this command ran, as a sentence, or `undefined` if it reached nothing. */
+  whereItRan(): string | undefined {
+    const where = new Where(this.project, this.server);
+    return where.known ? where.render() : undefined;
+  }
+
   /** Where this command runs, which its summary opens with. */
   ranAgainst(project: string | undefined, server: string | undefined): void {
     this.project = project ?? this.project;
@@ -124,9 +130,17 @@ export class Chain implements Wizard {
       ...(summary.sections.length === 0 ? [] : [new Facts(summary.sections).render(), ""]),
       ...(summary.lines ?? []),
     ]);
-    const boxed = summary.boxed === true || steps.length > 0 || where.known;
+    // A box frames what the command produced. Where it ran is a footnote to
+    // that, never a reason for a frame of its own.
+    const boxed = summary.boxed === true || steps.length > 0 || body.length > 0;
 
     outro(summary.failed === true ? pc.red(summary.title) : summary.title);
+    if (!boxed) {
+      if (where.known) {
+        process.stdout.write(`${indent(where.render())}\n`);
+      }
+      return;
+    }
     if (boxed) {
       // The report and the steps share one frame: what the command produced and
       // what to do about it belong together.

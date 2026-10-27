@@ -168,7 +168,7 @@ function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean, cliVersio
       console: `${metadata.server_url}/ui/console/`,
     },
     next_actions: [
-      "Create an app with authentication. Run setup in this directory or a subdirectory.",
+      "Create an app with authentication by running setup in this directory or a subdirectory.",
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       serverLogAction(cliVersion),
     ],
