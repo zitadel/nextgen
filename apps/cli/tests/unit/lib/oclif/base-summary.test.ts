@@ -63,6 +63,44 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The widest line drawn, as a terminal measures it. */
+const widest = (shown: string): number =>
+  Math.max(...shown.split("\n").map((line) => line.trimEnd().length));
+
+describe("the generic rendering of a command's data", () => {
+  const project = {
+    project_id: "proj-01K9AA9M3K7E2QX8VB4T",
+    lifecycle: "configured",
+    issuer: "https://auth.acme-corporation.example.com",
+  };
+
+  it("says the project as a sentence, not as columns nothing is aligned to", async () => {
+    const shown = await drawn({ status: "ok", data: { title: "Zitadel status.", project } });
+
+    expect(shown).toContain("Project proj-01K9AA9M3K7E2QX8VB4T, lifecycle configured");
+    expect(shown).not.toContain("project=proj-01K9AA9M3K7E2QX8VB4T");
+  });
+
+  it("keeps the box 80 columns wide with a hosted issuer in it", async () => {
+    const shown = await drawn({ status: "ok", data: { title: "Zitadel status.", project } });
+
+    expect(widest(shown)).toBeLessThanOrEqual(80);
+  });
+
+  // A leftover of the plan/apply → deploy rename: no command emits the key.
+  it("says nothing about an apply key, which nothing emits any more", async () => {
+    const shown = await drawn({
+      status: "ok",
+      data: {
+        title: "Zitadel status.",
+        apply: { config_version: 3, hash: "abcdef123456789", environment: "production" },
+      },
+    });
+
+    expect(shown).not.toContain("Apply:");
+  });
+});
+
 describe("BaseCommand endings for a skip", () => {
   it("closes on the skip's own sentence rather than its reason token", async () => {
     const shown = await drawn(CANCELLED);

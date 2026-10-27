@@ -121,7 +121,7 @@ describe("status", () => {
         const result = await app.runWithoutServer(["status", "--server", "https://self.example"]);
 
         expect(result).toPrint("Zitadel status.");
-        expect(result).toPrint("project=proj-001");
+        expect(result).toPrint("proj-001");
       });
 
       it("names a non-default server", async () => {

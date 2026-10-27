@@ -756,18 +756,22 @@ function warningRenderedInChecks(data: unknown, warning: string): boolean {
 function renderKnownSections(lines: string[], data: Record<string, unknown>): void {
   if (isObject(data.project)) {
     const project = data.project;
-    const segments: string[] = [];
+    // One sentence, not `label=value  label=value`: a label and three values
+    // aligned with nothing were a table in appearance only, and the two spaces
+    // holding them apart were enough to carry the line off the right of the
+    // screen. Said as prose it wraps like every other sentence the CLI writes.
+    const said: string[] = [];
     if (typeof project.project_id === "string") {
-      segments.push(`project=${project.project_id}`);
+      said.push(`Project ${project.project_id}`);
     }
     if (typeof project.lifecycle === "string") {
-      segments.push(`lifecycle=${project.lifecycle}`);
+      said.push(`lifecycle ${project.lifecycle}`);
     }
     if (typeof project.issuer === "string") {
-      segments.push(`issuer=${project.issuer}`);
+      said.push(`issuer ${project.issuer}`);
     }
-    if (segments.length > 0) {
-      lines.push(`Project: ${segments.join("  ")}`);
+    if (said.length > 0) {
+      lines.push(`${said.join(", ")}.`);
     }
   }
 
@@ -779,23 +783,6 @@ function renderKnownSections(lines: string[], data: Record<string, unknown>): vo
     const written = Array.isArray(data.files_written) ? data.files_written.length : 0;
     const skippedCount = Array.isArray(data.files_skipped) ? data.files_skipped.length : 0;
     lines.push(`Files: ${written} written, ${skippedCount} unchanged`);
-  }
-
-  if (isObject(data.apply)) {
-    const apply = data.apply;
-    const bits: string[] = [];
-    if (typeof apply.config_version === "number") {
-      bits.push(`v${apply.config_version}`);
-    }
-    if (typeof apply.hash === "string") {
-      bits.push(`hash=${String(apply.hash).slice(0, 12)}`);
-    }
-    if (typeof apply.environment === "string") {
-      bits.push(`env=${apply.environment}`);
-    }
-    if (bits.length > 0) {
-      lines.push(`Apply: ${bits.join("  ")}`);
-    }
   }
 
   if (Array.isArray(data.checks) && data.checks.length > 0) {
