@@ -250,6 +250,31 @@ describe("parseRelease", () => {
     ]);
   });
 
+  it("reads a change without authors, as the changelog writes it with disableThanks", () => {
+    const body = [
+      "<!-- nextgen-release-facts:start -->",
+      "### Package Changes",
+      "",
+      "#### `@zitadel/cli`",
+      "",
+      "### Minor Changes",
+      "",
+      "- [#1407](https://github.com/zitadel/nextgen/pull/1407) [`abc1234`](https://github.com/zitadel/nextgen/commit/abc1234) - Adds `zitadel pull`.",
+      "<!-- nextgen-release-facts:end -->",
+    ].join("\n");
+
+    expect(parseRelease(release("v0.2.0", { body })).changes).toEqual([
+      {
+        summary: "Adds `zitadel pull`.",
+        bump: "minor",
+        markedBreaking: false,
+        packages: ["@zitadel/cli"],
+        source: { label: "#1407", href: "https://github.com/zitadel/nextgen/pull/1407" },
+        authors: [],
+      },
+    ]);
+  });
+
   it("marks a change with a paragraph that starts with **Breaking:**, first or later", () => {
     const body = [
       "<!-- nextgen-release-facts:start -->",
