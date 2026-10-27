@@ -186,8 +186,14 @@ describe("renderDetail", () => {
   // A record of one field is one line, so nothing lines up with the columns it
   // was laid out in. The mark is how the layout is told they are columns, and
   // without it the label is folded away from the value.
-  it("marks the gap it aligned, so the layout leaves a one-field record whole", () => {
+  it("marks the row it aligned, so the layout leaves a one-field record whole", () => {
     expect(renderDetail(undefined, ["id"], user)).toContain(COLUMN_MARK);
+  });
+
+  // The mark leads the row, so the cells and the spaces between them are what
+  // they always were and anything reading the record still sees `id  user_1`.
+  it("leaves the cells and the gap between them exactly as they read", () => {
+    expect(renderDetail(undefined, ["id"], user)).toMatch(/^.?id {2}user_1$/);
   });
 
   it("marks every field of a record, not only the first", () => {

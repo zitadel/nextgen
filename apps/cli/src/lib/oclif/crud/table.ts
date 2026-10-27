@@ -1,22 +1,15 @@
 import { isObject } from "../../json";
-import { COLUMN_GAP, columnGap } from "../../ui/layout";
+import { COLUMN_GAP, columnRow } from "../../ui/layout";
 
 /**
- * What separates two cells of a table. Taken from the layout rather than
- * written here, so a row this builds is a row the layout recognises as columns
- * and leaves whole instead of folding it like a sentence. A table draws a
- * header and a rule above its first row, so its rows always have a neighbour
- * whose gap they line up with and the alignment speaks for itself.
+ * What separates two cells. Taken from the layout rather than written here, so
+ * a row this builds is a row the layout recognises as columns and leaves whole
+ * instead of folding it like a sentence. A table draws a header and a rule
+ * above its first row, so every row of one has a neighbour whose gap it lines
+ * up with and the alignment speaks for itself; a record can be a single field,
+ * so each of its rows is marked instead.
  */
 const GAP = " ".repeat(COLUMN_GAP);
-
-/**
- * What separates a record's label from its value: the same gap, marked as one
- * a column layout built. A record can be a single field, and one line has
- * nothing to line up with, so without the mark the layout reads it as a
- * sentence and folds the label away from the value.
- */
-const FIELD_GAP = columnGap();
 
 /**
  * The machine form of a list: one record per line, fields separated by tabs,
@@ -96,7 +89,9 @@ export const renderEmpty = (opts: { singular: string; plural?: string }): string
  * `--plain`) gets tab-separated rows with no header and nothing when empty, so
  * `cut`/`awk`/`wc -l` work; a terminal gets the aligned table, a blank line, a
  * {@link renderCount} count, and any `footer` lines. An empty one gets
- * {@link renderEmpty}. Pair it with `listData()` for the JSON envelope.
+ * {@link renderEmpty}, and there is no way to override it: a list that words
+ * "found nothing" for itself is the drift this derives away. Pair it with
+ * `listData()` for the JSON envelope.
  */
 export const renderList = (
   columns: readonly string[],
@@ -105,13 +100,6 @@ export const renderList = (
     plain: boolean;
     singular: string;
     plural?: string;
-    /**
-     * A sentence of this list's own, in place of {@link renderEmpty}. Nothing
-     * should need one: a list that words "found nothing" for itself is the
-     * drift this derives away. It is here only so the lists that still carry
-     * one keep compiling until each is deleted.
-     */
-    empty?: string;
     footer?: readonly string[];
   },
 ): string => {
@@ -119,7 +107,7 @@ export const renderList = (
     return renderRows(columns, rows);
   }
   if (rows.length === 0) {
-    return opts.empty ?? renderEmpty(opts);
+    return renderEmpty(opts);
   }
   return [
     renderTable(columns, rows),
@@ -155,6 +143,9 @@ export const renderDetail = (
     .map((field) => [headerOf(field), readCell(field, item)] as const)
     .filter(([, value]) => value !== "");
   const width = Math.max(0, ...rows.map(([label]) => label.length));
-  const body = rows.map(([label, value]) => `${label.padEnd(width)}${FIELD_GAP}${value}`);
+  // Marked, because a record of one field is one line and has nothing to line
+  // up with: without the mark the layout reads it as a sentence and folds the
+  // label away from the value.
+  const body = rows.map(([label, value]) => columnRow(`${label.padEnd(width)}${GAP}${value}`));
   return [...(heading ? [heading, ""] : []), ...body].join("\n");
 };

@@ -30,30 +30,32 @@ export interface Renderable {
 export const COLUMN_GAP = 2;
 
 /**
- * The mark a column builder leaves in a gap it aligned itself.
+ * The mark a column builder puts on a row it aligned itself.
  *
  * Alignment is evidence only where there is something to align with. A record
  * of one field is one line, so the columns `renderDetail` built have nothing
  * above or below them to agree with and {@link columnRows} cannot see them —
  * and widening that heuristic to cover a lone line is the bug it was written
  * to kill, since a one-row table and a sentence with a stray double space are
- * the same string. So the builder says so instead, in the gap itself: a word
- * joiner, which is zero width, is not whitespace, and does not occur in a
- * value. {@link Prose} removes it from everything it renders, so it reaches
- * the layout and never the eye.
+ * the same string. So the builder says so instead: a word joiner, which is
+ * zero width, is not whitespace, and does not occur in a value.
+ *
+ * It leads the row rather than sitting in the gap, so the cells and the
+ * spaces between them are exactly what they were and a reader, a `grep` and a
+ * test all still see `status  active`. {@link Prose} takes it off everything
+ * it renders, so it reaches the layout and never the eye.
  */
 export const COLUMN_MARK = "\u2060";
 
-/** The gap between two cells, marked as one a column builder aligned. */
-export const columnGap = (width: number = COLUMN_GAP): string =>
-  `${COLUMN_MARK}${" ".repeat(width)}`;
+/** This row, marked as one a column builder aligned itself. */
+export const columnRow = (row: string): string => `${COLUMN_MARK}${row}`;
 
 /** Whatever this text says without its marks, for anything but the layout. */
 export const stripColumnMarks = (text: string): string => text.replaceAll(COLUMN_MARK, "");
 
 /**
  * A line as the terminal shows it. Colour is invisible but not weightless: a
- * styled line is a dozen characters longer than it reads, and a marked gap is
+ * styled line is a dozen characters longer than it reads, and a marked row is
  * one character longer, so every width decision here measures what the
  * terminal shows, never `String.length`.
  */
@@ -171,13 +173,15 @@ export class Facts implements Renderable {
 
   private one(section: Section): string {
     const width = Math.max(0, ...section.facts.map(([label]) => label.length));
-    // One gap, wider than a column gap, in every row, and marked: a section of
-    // one fact is one line, so the alignment it is laid out with has nothing
-    // to agree with and only the mark tells the layout it is a row.
-    const gap = columnGap(COLUMN_GAP + 1);
+    // One gap, wider than a column gap, in every row. Each row is marked as
+    // well: a section of one fact is one line, so the alignment it is laid
+    // out with has nothing to agree with and only the mark says it is a row.
+    const gap = " ".repeat(COLUMN_GAP + 1);
     return [
       ...(section.heading === undefined ? [] : [pc.bold(section.heading)]),
-      ...section.facts.map(([label, value]) => `${pc.dim(label.padEnd(width))}${gap}${value}`),
+      ...section.facts.map(([label, value]) =>
+        columnRow(`${pc.dim(label.padEnd(width))}${gap}${value}`),
+      ),
     ].join("\n");
   }
 }

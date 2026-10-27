@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   COLUMN_MARK,
-  columnGap,
+  columnRow,
   Facts,
   Frame,
   Prose,
@@ -96,35 +96,35 @@ describe("Prose", () => {
   });
 
   // A record of one field is one line, so the alignment its builder laid it
-  // out with has nothing to agree with. The mark in the gap is the builder
-  // saying so, and it is the only thing that separates this line from the
-  // sentence with a stray double space just above.
-  it("leaves a lone row whole when its builder marked the gap it aligned", () => {
-    const row = `value${columnGap()}${"x".repeat(120)}`;
+  // out with has nothing to agree with. The mark is the builder saying so,
+  // and it is the only thing that separates this line from the sentence with
+  // a stray double space just above.
+  it("leaves a lone row whole when its builder marked it", () => {
+    const row = columnRow(`value  ${"x".repeat(120)}`);
 
     expect(new Prose(row, 30).render()).toBe(`value  ${"x".repeat(120)}`);
   });
 
   it("takes the builder's mark back out of everything it renders", () => {
-    const row = `value${columnGap()}held`;
+    const row = columnRow("value  held");
 
     expect(new Prose(row, 30).render()).not.toContain(COLUMN_MARK);
   });
 
   it("takes the mark out of a row it folds as well, so no mark survives a fold", () => {
-    const row = `value${columnGap()}${"x".repeat(120)}`;
+    const row = columnRow(`value  ${"x".repeat(120)}`);
 
     expect(new Prose(row, 30, false).render()).not.toContain(COLUMN_MARK);
   });
 
   it("folds a marked row when the caller says there are no columns", () => {
-    const row = `value${columnGap()}${"x".repeat(120)}`;
+    const row = columnRow(`value  ${"x".repeat(120)}`);
 
     expect(new Prose(row, 30, false).render().split("\n").length).toBeGreaterThan(1);
   });
 
   it("does not count the mark as width, so a marked row fits where it reads as fitting", () => {
-    const row = `ab${columnGap()}cd`;
+    const row = columnRow("ab  cd");
 
     expect(new Prose(row, 6, false).render()).toBe("ab  cd");
   });
