@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -323,23 +324,27 @@ type UserLookup interface {
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	stmts            StatementPool
-	sessions         SessionResolver
-	users            UserLookup
-	passwordVerifier crypto.HashVerifier
+	stmts    StatementPool
+	sessions SessionResolver
+	users    UserLookup
+	hashers  ProjectHasherResolver
+	// defaultVerifier verifies when a project's hasher cannot be resolved.
+	defaultVerifier crypto.RehashingVerifier
 }
 
 func NewAuthAttemptService(
 	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
-	passwordVerifier crypto.HashVerifier,
+	hashers ProjectHasherResolver,
+	defaultVerifier crypto.RehashingVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
-		stmts:            stmts,
-		sessions:         sessions,
-		users:            users,
-		passwordVerifier: passwordVerifier,
+		stmts:           stmts,
+		sessions:        sessions,
+		users:           users,
+		hashers:         hashers,
+		defaultVerifier: defaultVerifier,
 	}
 }
 
@@ -823,13 +828,35 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// Verifying with the project's hasher moves an outdated hash to the
+		// project's method. A policy this server can no longer build must not
+		// lock the project's users out, so the default verifies instead and
+		// nothing is stored.
+		hasher, resolveErr := s.hashers.HasherForProject(ctx, attempt.ProjectID)
+		var verifier crypto.RehashingVerifier = hasher
+		if resolveErr != nil {
+			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "resolving the project's password hasher failed, verifying without rehash",
+				slog.String("project_id", attempt.ProjectID),
+				slog.Any("error", resolveErr),
+			)
+			verifier = s.defaultVerifier
+		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
 		_, end := startSpan(ctx, "password.Verify")
-		verifyErr := password.Verify(p.Password, s.passwordVerifier)
+		updated, verifyErr := password.Verify(p.Password, verifier)
 		end(&verifyErr)
-		if verifyErr != nil {
+		switch {
+		case errors.Is(verifyErr, crypto.ErrRehashFailed):
+			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "the password matched but could not be rehashed",
+				slog.String("project_id", attempt.ProjectID),
+				slog.String("user_id", userFactor.UserID),
+				slog.Any("error", verifyErr),
+			)
+		case verifyErr != nil:
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
+		case updated != "" && resolveErr == nil:
+			s.storePasswordRehash(ctx, password, updated)
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
@@ -1082,6 +1109,18 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 		Name:      registrationFactor.Name,
 		CreatedAt: registrationFactor.GetLastVerifiedAt(),
 	}, nil
+}
+
+// storePasswordRehash is best-effort: the password already matched, and the
+// next sign-in rehashes again.
+func (s *authAttemptService) storePasswordRehash(ctx context.Context, password *domain.UserPassword, updated string) {
+	if err := s.stmts.Statements().UpdateUserPasswordHash(ctx, password, updated); err != nil {
+		getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "storing the password rehash failed",
+			slog.String("project_id", password.ProjectID),
+			slog.String("user_id", password.UserID),
+			slog.Any("error", err),
+		)
+	}
 }
 
 // recordPasskeyUsage persists sign count, backup state, and last-used time after a

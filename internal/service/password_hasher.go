@@ -9,20 +9,20 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// ProjectHasherResolver hands out the hasher a project's new passwords are
-// written with: the project's own choice when it made one, the deployment
-// default otherwise (ADR 029 §Hashing).
+// ProjectHasherResolver hands out the hasher a project's passwords are written
+// with: the project's own choice when it made one, the deployment default
+// otherwise (ADR 029 §Hashing).
 //
-// It is deliberately a hashing surface only. Verification keeps going through
-// the deployment-wide [crypto.HashVerifier], which carries every configured
-// verifier, so a password written under one project's policy stays verifiable
-// after that policy changes, and existing hashes keep working when a project
-// sets its first one.
+// Every hasher it hands out carries every configured verifier, so a password
+// written under one project's policy stays verifiable after that policy
+// changes, and existing hashes keep working when a project sets its first one.
+// Verifying with the project's hasher is what moves an outdated hash to the
+// project's method rather than the deployment default.
 type ProjectHasherResolver interface {
-	// HasherForProject resolves the effective hasher at hash time, which is the
+	// HasherForProject resolves the effective hasher at use time, which is the
 	// only moment a policy can be read honestly: a hasher held from earlier
 	// would keep writing with a method the project has since changed.
-	HasherForProject(ctx context.Context, projectID string) (crypto.Hasher, error)
+	HasherForProject(ctx context.Context, projectID string) (crypto.PasswordHasher, error)
 }
 
 // FixedProjectHasherResolver answers every project with the same hasher. It is
@@ -30,10 +30,10 @@ type ProjectHasherResolver interface {
 // where no project may override it -- a bootstrap path, or a test that is about
 // what gets hashed rather than about which method hashes it.
 type FixedProjectHasherResolver struct {
-	Hasher crypto.Hasher
+	Hasher crypto.PasswordHasher
 }
 
-func (r FixedProjectHasherResolver) HasherForProject(context.Context, string) (crypto.Hasher, error) {
+func (r FixedProjectHasherResolver) HasherForProject(context.Context, string) (crypto.PasswordHasher, error) {
 	return r.Hasher, nil
 }
 
@@ -53,7 +53,7 @@ func NewProjectHasherResolver(pool StatementPool, factory *crypto.HasherFactory)
 	return &projectHasherResolver{pool: pool, factory: factory}
 }
 
-func (r *projectHasherResolver) HasherForProject(ctx context.Context, projectID string) (crypto.Hasher, error) {
+func (r *projectHasherResolver) HasherForProject(ctx context.Context, projectID string) (crypto.PasswordHasher, error) {
 	if projectID == "" {
 		return r.factory.Default(), nil
 	}

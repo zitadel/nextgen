@@ -33,12 +33,19 @@ var (
 	// ErrHashMismatch is returned by VerifyHash when the hash was read and the
 	// password does not match it, as opposed to a hash that cannot be read.
 	ErrHashMismatch = errors.New("the password does not match the hash")
+	// ErrRehashFailed is returned by VerifyAndRehash when the password matched
+	// but the new hash could not be written, such as a password longer than
+	// bcrypt takes.
+	ErrRehashFailed = errors.New("the password matched but could not be rehashed")
 )
 
 type PasswapHasher struct {
 	*passwap.Swapper
 	Prefixes     []string
 	HexSupported bool
+	// verifiers is the Swapper's list, hasher first: Swapper keeps its own
+	// unexported, and VerifyHash walks it without hashing.
+	verifiers []verifier.Verifier
 }
 
 func (h *PasswapHasher) Hash(password string) (string, error) {
@@ -49,12 +56,56 @@ func (h *PasswapHasher) Hash(password string) (string, error) {
 	return encoded, err
 }
 
+// VerifyHash checks target against encoded. It never computes a new hash, so
+// it suits callers that do not store one back, such as the password history.
 func (h *PasswapHasher) VerifyHash(encoded string, target string) error {
-	_, err := h.Swapper.Verify(encoded, target)
-	if errors.Is(err, passwap.ErrPasswordMismatch) {
-		return fmt.Errorf("%w: %w", ErrHashMismatch, err)
-	}
+	_, err := h.verify(encoded, target)
 	return err
+}
+
+// VerifyAndRehash checks target against encoded like VerifyHash. On a match it
+// also returns a new hash of target when encoded was not written by this
+// hasher with its current parameters, and an empty string otherwise.
+func (h *PasswapHasher) VerifyAndRehash(encoded string, target string) (updated string, err error) {
+	outdated, err := h.verify(encoded, target)
+	if err != nil || !outdated {
+		return "", err
+	}
+	updated, err = h.Hash(target)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", ErrRehashFailed, err)
+	}
+	return updated, nil
+}
+
+// verify follows passwap.Swapper.Verify without the hash it computes there:
+// Swapper returns a failed rehash as its only error, which would turn a
+// matching password into a failed one.
+func (h *PasswapHasher) verify(encoded string, target string) (outdated bool, err error) {
+	var skipped []error
+	for i, v := range h.verifiers {
+		result, err := v.Verify(encoded, target)
+		switch result {
+		case verifier.OK:
+			// verifiers[0] is the hasher, so a match there was written with the
+			// current method and parameters. A match by any other verifier
+			// means another method wrote the hash.
+			return i > 0, nil
+		case verifier.NeedUpdate:
+			return true, nil
+		case verifier.Fail:
+			if err != nil {
+				return false, fmt.Errorf("passwap: %w", err)
+			}
+			return false, fmt.Errorf("%w: %w", ErrHashMismatch, passwap.ErrPasswordMismatch)
+		case verifier.Skip:
+			// A later verifier may still read the hash, so every one gets a turn.
+			if err != nil {
+				skipped = append(skipped, err)
+			}
+		}
+	}
+	return false, errors.Join(append(skipped, passwap.ErrNoVerifier)...)
 }
 
 // ValidateHash checks that encoded is parseable by a configured verifier
@@ -288,6 +339,7 @@ func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 		Swapper:      passwap.NewSwapper(hasher, f.verifiers...),
 		Prefixes:     append(prefixes, f.verifierPrefix...),
 		HexSupported: f.hexSupported,
+		verifiers:    append([]verifier.Verifier{hasher}, f.verifiers...),
 	}, nil
 }
 

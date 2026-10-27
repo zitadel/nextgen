@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
@@ -106,15 +107,16 @@ func newAuthAttemptSvc(
 	sessions service.SessionResolver,
 	users service.UserLookup,
 ) service.AuthAttemptService {
-	return newAuthAttemptSvcWithVerifier(ctrl, stmts, sessions, users, nil)
+	return newAuthAttemptSvcWithHashers(ctrl, stmts, sessions, users, nil, nil)
 }
 
-func newAuthAttemptSvcWithVerifier(
+func newAuthAttemptSvcWithHashers(
 	ctrl *gomock.Controller,
 	stmts *mocks.MockAllStatements,
 	sessions service.SessionResolver,
 	users service.UserLookup,
-	verifier crypto.HashVerifier,
+	hashers service.ProjectHasherResolver,
+	defaultVerifier crypto.RehashingVerifier,
 ) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
 	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
@@ -127,7 +129,7 @@ func newAuthAttemptSvcWithVerifier(
 		AnyTimes()
 	statementer.EXPECT().Statements().Return(stmts).AnyTimes()
 	stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	return service.NewAuthAttemptService(service.NewPool(pool), sessions, users, verifier)
+	return service.NewAuthAttemptService(service.NewPool(pool), sessions, users, hashers, defaultVerifier)
 }
 
 func TestAuthAttemptService_Create(t *testing.T) {
@@ -223,7 +225,7 @@ func TestAuthAttemptService_Create(t *testing.T) {
 			},
 		)
 		statementer.EXPECT().Statements().Return(stmts).AnyTimes()
-		svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+		svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil, nil)
 
 		ctx := audit.WithActorSlot(t.Context())
 		audit.BindPublicRequest(ctx, "proj", "flow_1", "sess_1")
@@ -599,7 +601,7 @@ func TestAuthAttemptService_SetSSOCallbackResult(t *testing.T) {
 				},
 			)
 			statementer.EXPECT().Statements().Return(stmts).AnyTimes()
-			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+			svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil, nil)
 
 			err := svc.SetSSOCallbackResult(t.Context(), "proj", check, tt.result, tt.eventType)
 
@@ -813,35 +815,69 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		}
 	}
 
-	t.Run("loads password via stmts and persists success", func(t *testing.T) {
-		ctrl := gomock.NewController(t)
-		verifier := cryptomock.NewMockHashVerifier(ctrl)
-		var succeededFactor domain.AuthFactor
-		stmts := mocks.NewMockAllStatements(ctrl)
-		stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
-			return newPasswordChallengeAttempt(), nil
-		})
-		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{
-			ProjectID:   "proj",
-			UserID:      "user-1",
-			EncodedHash: "encoded",
-		}, nil)
-		verifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
-		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
-			succeededFactor = factor
-			return nil
-		})
+	// The password matches in every row, so every row signs in; they differ in
+	// which hasher verifies and whether a new hash is stored.
+	successTests := map[string]struct {
+		resolveErr error
+		updated    string
+		verifyErr  error
+		storeErr   error
+		wantStore  bool
+	}{
+		"a current hash is not rewritten": {},
+		"an outdated hash is stored":      {updated: "rehashed", wantStore: true},
+		"a failed store still signs in":   {updated: "rehashed", storeErr: errors.New("db down"), wantStore: true},
+		"a failed rehash still signs in": {
+			verifyErr: fmt.Errorf("%w: too long", crypto.ErrRehashFailed),
+		},
+		"an unresolvable hasher verifies with the default and stores nothing": {
+			resolveErr: errors.New("policy unavailable"),
+			updated:    "rehashed",
+		},
+	}
+	for name, tt := range successTests {
+		t.Run(name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			projectHasher := cryptomock.NewMockPasswordHasher(ctrl)
+			defaultVerifier := cryptomock.NewMockRehashingVerifier(ctrl)
+			hashers := mocks.NewMockProjectHasherResolver(ctrl)
+			var succeededFactor domain.AuthFactor
+			stmts := mocks.NewMockAllStatements(ctrl)
+			stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(context.Context, string, string) (*domain.AuthAttempt, error) {
+				return newPasswordChallengeAttempt(), nil
+			})
+			password := &domain.UserPassword{
+				ProjectID:   "proj",
+				UserID:      "user-1",
+				EncodedHash: "encoded",
+			}
+			stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(password, nil)
+			if tt.resolveErr != nil {
+				hashers.EXPECT().HasherForProject(gomock.Any(), "proj").Return(nil, tt.resolveErr)
+				defaultVerifier.EXPECT().VerifyAndRehash("encoded", "secret").Return(tt.updated, tt.verifyErr)
+			} else {
+				hashers.EXPECT().HasherForProject(gomock.Any(), "proj").Return(projectHasher, nil)
+				projectHasher.EXPECT().VerifyAndRehash("encoded", "secret").Return(tt.updated, tt.verifyErr)
+			}
+			if tt.wantStore {
+				stmts.EXPECT().UpdateUserPasswordHash(gomock.Any(), password, tt.updated).Return(tt.storeErr)
+			}
+			stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
+				succeededFactor = factor
+				return nil
+			})
 
-		svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier)
-		got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
-			ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
-			Proof: service.PasswordProof{Password: "secret"},
-		})
+			svc := newAuthAttemptSvcWithHashers(ctrl, stmts, nil, nil, hashers, defaultVerifier)
+			got, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
+				ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
+				Proof: service.PasswordProof{Password: "secret"},
+			})
 
-		require.NoError(t, err)
-		require.NotNil(t, got)
-		assert.IsType(t, &domain.AuthFactorPassword{}, succeededFactor)
-	})
+			require.NoError(t, err)
+			require.NotNil(t, got)
+			assert.IsType(t, &domain.AuthFactorPassword{}, succeededFactor)
+		})
+	}
 
 	t.Run("missing password returns proof rejected and records failure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
