@@ -332,7 +332,7 @@ func newTestUserWithRole(t *testing.T, projectID, schemaURL, userID, email, name
 	return user
 }
 
-func newTestUser(t *testing.T, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
+func newTestUser(t testing.TB, projectID, schemaURL, userID, email, name string) *domain.CreateUser {
 	t.Helper()
 
 	emailAttr, err := domain.NewCreateAttribute("email", email, domain.AttributeUniquenessProject)
