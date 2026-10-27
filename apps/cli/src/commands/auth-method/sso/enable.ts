@@ -45,6 +45,7 @@ import {
   type CustomFlagValues,
   customExample,
   customFlagValues,
+  existingCustomSettings,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
@@ -149,12 +150,17 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // Resolved before anything is asked for: being turned away after typing a
     // secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
+    const connections = await readConnectionFiles(cwd);
     // The first question of the run, so every check that can fail has passed.
+    // A custom connection that is already in the Project is described by its
+    // file, so only what is missing from both the flags and the file is asked.
     const selection =
       project.selection ??
       selectionFromFlags(
         CUSTOM_PROVIDER,
-        await this.askCustomSettings(project.values),
+        await this.askCustomSettings(
+          customSettingsToAsk(project.values, existingCustomSettings(connections, project.values)),
+        ),
         ENABLE_FLAG_NAMES,
         customExample(ENABLE_FLAG_NAMES),
       );
@@ -179,7 +185,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           )
         : undefined;
 
-    const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one.
     const clientIdFlag =
       flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
@@ -696,6 +701,22 @@ async function readProject(
     customExample(ENABLE_FLAG_NAMES),
   );
   return { selection, values, issuer };
+}
+
+/**
+ * The settings to ask for: each one the flags gave, else the one the connection
+ * of that name already holds, else none, so only what is in neither is asked.
+ */
+function customSettingsToAsk(
+  given: CustomFlagValues,
+  stored: CustomFlagValues | undefined,
+): CustomFlagValues {
+  return {
+    slug: given.slug ?? stored?.slug,
+    displayName: given.displayName ?? stored?.displayName,
+    issuer: given.issuer ?? stored?.issuer,
+    scopes: given.scopes ?? stored?.scopes,
+  };
 }
 
 /** Whether a custom connection's name, button text and issuer were all given. */

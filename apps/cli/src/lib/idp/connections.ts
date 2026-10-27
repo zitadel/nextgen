@@ -502,6 +502,34 @@ function planCustomConnection(options: {
 }
 
 /**
+ * The settings of the custom connection a slug names, as its file holds them,
+ * or `undefined` when no single file does. Used to ask only for what a rerun
+ * on a connection that already exists does not already know.
+ */
+export function existingCustomSettings(
+  files: readonly ConnectionFile[],
+  given: { readonly slug?: string },
+): { slug: string; displayName?: string; issuer?: string; scopes?: string } | undefined {
+  if (given.slug === undefined) {
+    return undefined;
+  }
+  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === given.slug);
+  const [match] = holders;
+  if (holders.length !== 1 || match === undefined) {
+    return undefined;
+  }
+  const oidc = match.body.oidc;
+  return {
+    slug: given.slug,
+    ...(typeof match.body.display_name === "string"
+      ? { displayName: match.body.display_name }
+      : {}),
+    ...(isObject(oidc) && typeof oidc.issuer === "string" ? { issuer: oidc.issuer } : {}),
+    ...(isObject(oidc) && Array.isArray(oidc.scopes) ? { scopes: oidc.scopes.join(" ") } : {}),
+  };
+}
+
+/**
  * Decide what to do with the connection for a provider in this Project.
  *
  * A catalog provider has one connection, found by what it is. Reuse is the

@@ -21,6 +21,7 @@ export {
   type ConnectionFile,
   type ConnectionPlan,
   credentialVariablesOf,
+  existingCustomSettings,
   type StoredVariables,
   planConnection,
   refuseResolvedSecret,
