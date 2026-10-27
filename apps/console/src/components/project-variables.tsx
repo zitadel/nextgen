@@ -47,7 +47,6 @@ export function ProjectVariables({ variables }: { variables: Variables }) {
     <DetailSection
       title="Variables and Secrets"
       titleId="project-variables"
-      titleStyle="heading"
       className="mt-4"
       role="region"
       aria-labelledby="project-variables"

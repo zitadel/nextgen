@@ -98,7 +98,6 @@ export function ProjectOrigins({
     <DetailSection
       title="Origins"
       titleId="project-origins"
-      titleStyle="heading"
       className="mt-4"
       role="region"
       aria-labelledby="project-origins"

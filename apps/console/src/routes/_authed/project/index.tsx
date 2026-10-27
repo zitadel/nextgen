@@ -103,7 +103,6 @@ function ProjectDetail() {
           <RenameCard
             id="project-name"
             title="Project Detail"
-            titleStyle="heading"
             layout="inline"
             label="Project name"
             value={project.name}

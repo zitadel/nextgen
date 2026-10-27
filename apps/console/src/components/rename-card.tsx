@@ -19,7 +19,6 @@ import { useSubmit } from "@/hooks/use-submit";
 export function RenameCard({
   id,
   title = "Details",
-  titleStyle,
   layout = "stacked",
   label,
   value,
@@ -30,7 +29,6 @@ export function RenameCard({
   /** The input's id and name. */
   id: string;
   title?: string;
-  titleStyle?: "eyebrow" | "heading";
   layout?: "stacked" | "inline";
   label: string;
   value: string;
@@ -51,7 +49,7 @@ export function RenameCard({
   }, [value, clearError]);
 
   return (
-    <DetailSection title={title} titleStyle={titleStyle} className={className}>
+    <DetailSection title={title} className={className}>
       <div className="flex flex-col gap-4.5">
         <Field orientation={layout === "inline" ? "horizontal" : "vertical"}>
           <FieldLabel htmlFor={id} className={cn(layout === "inline" && "w-[202px] flex-none!")}>
