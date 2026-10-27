@@ -318,7 +318,7 @@ function planCatalogConnection(options: {
       "E_CONFLICT",
       `More than one ${entry.displayName} connection exists: ${names}`,
       {
-        hint: "Keep the one this Project should use and remove the others, then run the command again.",
+        hint: "Keep the one this project should use and remove the others, then run the command again.",
         details: { provider: slug, files: matches.map((m) => m.path) },
       },
     );

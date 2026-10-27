@@ -95,7 +95,7 @@ export async function readSchemaFiles(cwd: string): Promise<SchemaFile[]> {
  */
 export function selectSchema(files: readonly SchemaFile[], requested?: string): SchemaFile {
   if (files.length === 0) {
-    throw new ZitadelError("E_NOT_FOUND", `This Project has no user schema under ${SCHEMAS_DIR}`, {
+    throw new ZitadelError("E_NOT_FOUND", `This project has no user schema under ${SCHEMAS_DIR}`, {
       hint: "Run `zitadel setup` first.",
     });
   }
@@ -103,7 +103,7 @@ export function selectSchema(files: readonly SchemaFile[], requested?: string): 
     const wanted = requested.endsWith(".json") ? basename(requested, ".json") : requested;
     const match = files.find((file) => file.name === wanted);
     if (match === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `This Project has no user schema named ${wanted}`, {
+      throw new ZitadelError("E_NOT_FOUND", `This project has no user schema named ${wanted}`, {
         hint: `Known schemas: ${files.map((f) => f.name).join(", ")}`,
         details: { requested: wanted, known: files.map((f) => f.name) },
       });
@@ -112,7 +112,7 @@ export function selectSchema(files: readonly SchemaFile[], requested?: string): 
   }
   const [only, ...rest] = files;
   if (rest.length > 0 || only === undefined) {
-    throw new ZitadelError("E_VALIDATION", "This Project has more than one user schema", {
+    throw new ZitadelError("E_VALIDATION", "This project has more than one user schema", {
       hint: `Name the one to change with --schema. Known schemas: ${files.map((f) => f.name).join(", ")}`,
       details: { known: files.map((f) => f.name) },
     });

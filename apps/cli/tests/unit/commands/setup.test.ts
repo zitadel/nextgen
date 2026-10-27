@@ -544,7 +544,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_actions.join("\n")).not.toContain("Claim your Project");
+    expect(json.data.next_actions.join("\n")).not.toContain("Claim your project");
     expect(json.data.next_commands.join("\n")).not.toMatch(/claim/);
   });
 

@@ -24,7 +24,12 @@ type CommandClass<T extends BaseCommand> = abstract new (...args: any[]) => T;
 export function Promptable<TBase extends CommandClass<BaseCommand>>(Base: TBase) {
   abstract class PromptableCommand extends Base {
     protected readonly input: Asker = (question) =>
-      askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
+      askInput(question, {
+        interactive: !this.meta.nonInteractive,
+        force: this.meta.force,
+        before: () => this.ui.open(),
+        after: () => this.ui.answered(),
+      });
   }
   return PromptableCommand;
 }

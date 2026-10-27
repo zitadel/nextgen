@@ -165,8 +165,12 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
     if (process.stdout.isTTY && !options.quiet) {
-      consola.info(`Project   ${projectId}`);
-      consola.info(`Server    ${server}`);
+      if (this.ui.interactive) {
+        this.ui.context(`project ${projectId} on ${server.replace(/^https?:\/\//, "")}`);
+      } else {
+        consola.info(`Project   ${projectId}`);
+        consola.info(`Server    ${server}`);
+      }
     }
     return {
       client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),

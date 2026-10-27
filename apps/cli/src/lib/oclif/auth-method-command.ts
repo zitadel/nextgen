@@ -63,7 +63,7 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
       hidden: true,
     } as (typeof environmentFlags)["env-file"],
     schema: nonBlankString({
-      description: "User schema to change. Required when the Project has more than one.",
+      description: "User schema to change. Required when the project has more than one.",
     }),
   };
 

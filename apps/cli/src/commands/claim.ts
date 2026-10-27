@@ -204,7 +204,7 @@ export default class Claim extends EnvironmentCommand {
     consola.box({
       title: "Finish in your browser",
       message: wrapForBox(
-        "Create an account or sign in to claim your Project, make it permanent and start collaborating.",
+        "Create an account or sign in to claim your project, make it permanent and start collaborating.",
       ),
       style: { padding: 1, borderStyle: "rounded", borderColor: "cyan" },
     });
@@ -240,14 +240,14 @@ export default class Claim extends EnvironmentCommand {
     return this.emit({
       status: "ok",
       data: {
-        title: "Your Project is now permanent.",
+        title: "Your project is now permanent.",
         project_id: projectId,
         team_id: completed.team_id,
         claimed_at: completed.claimed_at,
         dashboard_url: completed.dashboard_url,
         // Two entries so the pretty renderer puts the URL on its own line.
         next_actions: [
-          "Manage your Project and collaborate in the Console:",
+          "Manage your project and collaborate in the Console:",
           completed.dashboard_url,
         ],
       },

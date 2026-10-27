@@ -52,8 +52,8 @@ export class ClaimCheck implements SanityCheck {
       // the claim command itself stays suggested either way, since the local
       // record may be stale and the server answers authoritatively.
       const message = state.claimable
-        ? `Claim your Project within ${CLAIM_WINDOW_DAYS} days of creation to make it ` +
-          "permanent and start collaborating with your team. Until then, your Project " +
+        ? `Claim your project within ${CLAIM_WINDOW_DAYS} days of creation to make it ` +
+          "permanent and start collaborating with your team. Until then, your project " +
           "is temporary and its data may be lost. Run `zitadel claim`."
         : `The local record says this project's ${CLAIM_WINDOW_DAYS}-day claim window has ` +
           "closed. Run `zitadel claim` to reconcile: a project claimed from another " +

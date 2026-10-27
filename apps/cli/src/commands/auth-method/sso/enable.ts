@@ -440,11 +440,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !reusing || written.length > 0;
     const credentialsStored =
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
-    const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
+    const stored = credentialsStored ? ["Its credentials are stored in your project."] : [];
     const name = entry.displayName;
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
@@ -598,7 +599,7 @@ async function readProject(
   );
   const entry = providerOf(selection);
   if (issuer === undefined) {
-    throw new ZitadelError("E_VALIDATION", "This Project has no development issuer", {
+    throw new ZitadelError("E_VALIDATION", "This project has no development issuer", {
       hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
     });
   }

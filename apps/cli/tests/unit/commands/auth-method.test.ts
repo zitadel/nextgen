@@ -285,7 +285,7 @@ describe("auth-method password and passkey", () => {
       });
     });
 
-    it("is required when the Project has more than one schema", async () => {
+    it("is required when the project has more than one schema", async () => {
       const cwd = await makeProject(
         { customers: passwordSchema("customers"), staff: passwordSchema("staff") },
         {},

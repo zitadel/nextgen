@@ -17,6 +17,9 @@ import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
+import { Ui } from "../ui";
+import { introFor } from "./intro";
+import { summaryOfText } from "./result-summary";
 import {
   CLI_COMMAND_COMPLETED,
   CLI_COMMAND_FAILED,
@@ -131,6 +134,9 @@ export abstract class BaseCommand extends Command {
 
   /** Resolved context for the current invocation; set by {@link toMeta}. */
   protected meta: GlobalOptions = this.fallbackMeta();
+
+  /** Everything a command shows a person. Silent until {@link toMeta} finds a terminal. */
+  protected ui: Ui = new Ui({ interactive: false, force: false });
 
   /**
    * Anonymous usage analytics for this invocation, created once in
@@ -264,6 +270,14 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
+    this.ui = new Ui({
+      interactive: !this.meta.nonInteractive,
+      force: this.meta.force,
+      verbose: this.meta.verbose,
+    });
+    const [withProject, alone] = introFor(this.id ?? "");
+    this.ui.describe(withProject, alone);
+    this.ui.bridgeNarration();
     this.openTelemetry(typeof flags.telemetry === "boolean" ? flags.telemetry : undefined);
     return this.meta;
   }
@@ -363,11 +377,30 @@ export abstract class BaseCommand extends Command {
     // An empty rendering is written as nothing, not as a blank line: a piped
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     const rendered = renderPretty(normalized, this.meta);
-    if (rendered !== "") {
-      this.log(rendered);
-    }
-    if (normalized.status === "ok" && normalized.footer !== undefined) {
-      this.log(`\n${normalized.footer}`);
+    const footer = normalized.status === "ok" ? normalized.footer : undefined;
+    if (this.ui.interactive) {
+      // A person at a terminal: the result closes the chain the questions began.
+      // A command that said everything itself returns nothing, and draws nothing.
+      const own = normalized.status === "ok" ? normalized.summary : undefined;
+      if (own !== undefined) {
+        this.ui.finish(own);
+      } else if (rendered !== "" || footer !== undefined || this.ui.opened) {
+        this.ui.finish(
+          summaryOfText(
+            footer === undefined ? rendered : `${rendered}\n\n${footer}`,
+            false,
+            normalized.status === "ok" && normalized.boxed === true,
+            this.id,
+          ),
+        );
+      }
+    } else {
+      if (rendered !== "") {
+        this.log(rendered);
+      }
+      if (footer !== undefined) {
+        this.log(`\n${footer}`);
+      }
     }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
@@ -404,6 +437,8 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
+    } else if (this.ui.interactive) {
+      this.ui.finish(summaryOfText(renderError(zitadelError, meta), true, false, this.id));
     } else {
       this.logToStderr(renderError(zitadelError, meta));
     }

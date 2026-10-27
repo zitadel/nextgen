@@ -104,6 +104,10 @@ type Session = {
   force: boolean;
   /** The stream piped input is read from. Defaults to the process's stdin. */
   stdin?: NodeJS.ReadableStream & { isTTY?: boolean };
+  /** Called just before a prompt is drawn, so the caller can open the chain it belongs to. */
+  before?: () => void;
+  /** Called when a prompt has been answered, so the caller can space what follows it. */
+  after?: () => void;
 };
 
 /**
@@ -209,10 +213,12 @@ export async function input<Q extends Question>(question: Q, session: Session): 
           `Pass --force to ${q.name}.`,
         );
       }
+      session.before?.();
       const confirmed = await confirm({
         message: q.message,
         initialValue: q.initialValue ?? false,
       });
+      session.after?.();
       if (isCancel(confirmed)) {
         throw cancelled();
       }
@@ -223,6 +229,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
       if (!session.interactive) {
         throw unsupplied();
       }
+      session.before?.();
       const chosen =
         q.kind === "select"
           ? await select({
@@ -235,6 +242,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
               options: q.options,
               required: q.required,
             });
+      session.after?.();
       if (isCancel(chosen)) {
         throw cancelled();
       }
@@ -271,6 +279,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
       const parsed = q.parse(value ?? "");
       return parsed.ok ? undefined : parsed.problem;
     };
+    session.before?.();
     const typed =
       q.kind === "secret"
         ? await password({ message: q.message, validate })
@@ -280,6 +289,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
             initialValue: q.initialValue,
             placeholder: q.placeholder,
           });
+    session.after?.();
     if (isCancel(typed)) {
       throw cancelled();
     }

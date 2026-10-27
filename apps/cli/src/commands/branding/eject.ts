@@ -119,11 +119,14 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     for (const file of filesWritten) {
       consola.info(`Wrote ${file}`);
     }
-    consola.success(`Ejected the ${design} design into ${BRANDING_DIR}/`);
+    const ejected = `Ejected the ${BRANDING_DESIGN_INFO[design].label} design into ${BRANDING_DIR}/`;
+    consola.success(ejected);
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
+        title: ejected,
         design,
         files_written: filesWritten,
         next_actions: [

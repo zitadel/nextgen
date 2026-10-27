@@ -285,7 +285,12 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           message: "Would you like to deploy .zitadel/ to it now?",
           initialValue: true,
         },
-        { interactive: !nonInteractive, force: false },
+        {
+          interactive: !nonInteractive,
+          force: false,
+          before: () => this.ui.open(),
+          after: () => this.ui.answered(),
+        },
       );
       if (confirmed) {
         deployment = await this.deployInitialRelease({
@@ -308,6 +313,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
     return this.emit({
       status: "ok",
+      boxed: true,
       data: {
         title: `Bound ${name} to ${projectId}.`,
         environment: name,

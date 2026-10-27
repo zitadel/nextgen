@@ -247,7 +247,7 @@ describe("auth-method passkey disable in a terminal without a prompt", () => {
   });
 });
 
-describe("auth-method passkey disable run from inside the Project", () => {
+describe("auth-method passkey disable run from inside the project", () => {
   it("suggests a dry run and a deploy without --cwd", async () => {
     const cwd = await passkeyOnlyProject();
     await writeJson(

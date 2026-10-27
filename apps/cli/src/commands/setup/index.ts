@@ -1,7 +1,6 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 
-import { intro, note, outro } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 import type { CreateProject201 } from "@zitadel/api/generated/model";
 import {
@@ -120,12 +119,13 @@ import {
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
-  signInSummary,
   url as styleUrl,
   type Row,
   type Section,
 } from "./summary";
 import { shellOption } from "../../lib/shell";
+import type { BoxAction } from "../../lib/box";
+import type { Step, Summary } from "../../lib/ui";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
 import {
@@ -331,7 +331,12 @@ export default class Setup extends Promptable(BaseCommand) {
     // question. Interactive only when a person is there, which is also the only
     // time the wizard runs.
     const wizardInput: Asker = (question) =>
-      input(question, { interactive: !nonInteractive, force: false });
+      input(question, {
+        interactive: !nonInteractive,
+        force: false,
+        before: () => this.ui.open(),
+        after: () => this.ui.answered(),
+      });
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
@@ -342,7 +347,7 @@ export default class Setup extends Promptable(BaseCommand) {
 
     const orca = createOrca();
 
-    consola.start(`Detecting framework in ${shortPath(cwd)}`);
+    const detecting = this.ui.begin(`Detecting framework in ${shortPath(cwd)}`);
     // The app the questions are about: the one detected here, or else a new
     // one. Setup creates a new app only once it has every answer, just before
     // it patches it, so cancelling a question leaves the directory as it was,
@@ -356,16 +361,17 @@ export default class Setup extends Promptable(BaseCommand) {
     try {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
-      consola.success(
+      detecting.done(
         `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
         const target = await inspectScaffoldTarget(cwd);
         if (!target.scaffoldable && !force) {
+          detecting.fail();
           throw frameworkDetectionWithScaffoldTarget(error, cwd, target);
         }
-        consola.info(
+        detecting.done(
           target.scaffoldable
             ? "Fresh app directory — setup scaffolds a new project"
             : "Non-empty directory with --force — setup scaffolds a new project",
@@ -381,6 +387,7 @@ export default class Setup extends Promptable(BaseCommand) {
         );
         scaffoldedBesideFiles = !target.scaffoldable;
       } else {
+        detecting.fail();
         throw error;
       }
     }
@@ -423,10 +430,6 @@ export default class Setup extends Promptable(BaseCommand) {
     };
 
     if (!nonInteractive && !dryRun) {
-      // Asking which framework to scaffold opened the wizard already.
-      if (!scaffoldedFramework || flags.framework !== undefined) {
-        intro("Zitadel setup");
-      }
       const promptCtx = {
         input: wizardInput,
         framework: { id: app.framework },
@@ -443,8 +446,6 @@ export default class Setup extends Promptable(BaseCommand) {
       for (const prompt of SETUP_PROMPTS) {
         answers = await prompt.ask(answers, promptCtx);
       }
-      note(signInSummary(answers), "Sign-in");
-      outro("Configuration captured");
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -504,13 +505,17 @@ export default class Setup extends Promptable(BaseCommand) {
     // creates none, so it has no app to patch.
     let created = detected;
     let newApp: UndoableScaffold | undefined;
+    // The step that is running, so a failure ends it as failed.
+    let current: Step | undefined;
     if (created === undefined && dryRun) {
-      consola.info(`Would scaffold a new ${app.framework} project (dry run)`);
+      this.ui
+        .begin(`Scaffolding a new ${app.framework} project`)
+        .done(`Would scaffold a new ${app.framework} project (dry run)`);
     } else if (created === undefined) {
-      consola.start(`Scaffolding a new ${app.framework} project`);
+      current = this.ui.begin(`Scaffolding a new ${app.framework} project`);
       newApp = await orca.scaffoldUndoably(cwd, app.framework, force);
       created = newApp.facts;
-      consola.success(`Scaffolded ${created.id} skeleton`);
+      current.done(`Scaffolded ${created.id} skeleton`);
     }
     // The DevPortPrompt can change the port interactively, so fold the answer
     // back into the framework: the patched dev-server config reads
@@ -543,7 +548,7 @@ export default class Setup extends Promptable(BaseCommand) {
       // `POST /projects` is unauthenticated. CLI-managed projects opt out of
       // server fallback defaults, then setup uploads the local default schema and
       // flow files through the typed resource APIs and records the returned IDs.
-      consola.start(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
+      current = this.ui.begin(`Creating project on ${answers.server}${dryRun ? " (dry run)" : ""}`);
       const unauthClient = createZitadelClient({ baseUrl: answers.server });
       const projectName = defaultProjectName(cwd, app.framework);
       // Register the app's own origin so the backend's origin check allows
@@ -570,7 +575,7 @@ export default class Setup extends Promptable(BaseCommand) {
               passwordMinLength: answers.passwordMinLength,
             },
           );
-      consola.success(`Created project ${project.id}`);
+      current.done(`Created project ${project.id}`);
       this.recordTelemetry({ step: "project_created" });
 
       // `.env.local` as it is before the patch merges this project's id and
@@ -578,10 +583,12 @@ export default class Setup extends Promptable(BaseCommand) {
       const envFilesBefore = await readCredentialEnvFiles(cwd);
       if (framework === undefined) {
         // What the patch writes depends on the files the scaffold creates.
-        consola.info("Would patch the new project (dry run): its files come from the scaffold");
+        this.ui
+          .begin("Patching project files (dry run)")
+          .done("Would patch the new project (dry run): its files come from the scaffold");
         result = { dryRun, files: [], filesWritten: [], filesSkipped: [], depsAdded: [] };
       } else {
-        consola.start(`Patching project files${dryRun ? " (dry run)" : ""}`);
+        current = this.ui.begin(`Patching project files${dryRun ? " (dry run)" : ""}`);
         try {
           result = await patcher.patch(patchContext(framework, project), { cwd, dryRun, force });
         } catch (error) {
@@ -598,10 +605,10 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       for (const file of result.filesWritten) {
         const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-        if (sentence) consola.info(sentence);
+        if (sentence) current?.detail(sentence);
       }
       for (const file of result.filesSkipped) {
-        consola.info(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
+        current?.detail(`Left ${relativeDisplay(cwd, file)} unchanged (already matches target)`);
       }
       try {
         resourceResult = dryRun
@@ -658,6 +665,7 @@ export default class Setup extends Promptable(BaseCommand) {
         });
       }
     } catch (error) {
+      current?.fail();
       if (newApp !== undefined) {
         await removeNewApp(newApp, cwd);
       }
@@ -673,11 +681,11 @@ export default class Setup extends Promptable(BaseCommand) {
     }
     for (const file of resourceResult.filesWritten) {
       const sentence = describeWrittenFile(relativeDisplay(cwd, file), dryRun);
-      if (sentence) consola.info(sentence);
+      if (sentence) current?.detail(sentence);
     }
     const allFilesWritten = [...result.filesWritten, ...resourceResult.filesWritten];
     if (framework !== undefined) {
-      consola.success(
+      current?.done(
         `Patched ${allFilesWritten.length} file${allFilesWritten.length === 1 ? "" : "s"}` +
           (result.filesSkipped.length > 0 ? ` (${result.filesSkipped.length} unchanged)` : ""),
       );
@@ -845,7 +853,9 @@ export default class Setup extends Promptable(BaseCommand) {
             claimed_at: owner.claimed_at,
           });
           ownedByLocalAdmin = { email: admin.email, team_id: owner.team_id };
-          consola.success(`Project owned by ${admin.email} (team ${owner.team_id})`);
+          this.ui
+            .begin("Attaching the project to the local admin")
+            .done(`Project owned by ${admin.email} (team ${owner.team_id})`);
         }
       } catch (error) {
         reportWarning(
@@ -886,6 +896,7 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    let summary: Summary | undefined;
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -899,50 +910,48 @@ export default class Setup extends Promptable(BaseCommand) {
         scaffoldedBesideFiles,
         sso: answers.sso,
       });
-      // Frame the report in a consola box so it reads as a distinct
-      // status panel separate from the per-step narration above it.
-      // `box` accepts ANSI-styled text in the message body, so our
-      // pre-coloured rows (path/url/id helpers) survive intact.
-      // `wrapForBox` caps the content at the terminal width: consola sizes
-      // the frame to the longest line, so an unwrapped sentence wider than
-      // the window would break the right border.
-      consola.box({
-        title: "Zitadel is ready",
-        message: wrapForBox(
-          [
-            renderSummary(sections),
-            "",
-            renderBoxActions([
-              ...installOutcome.boxActions,
-              ...consoleStep.boxActions,
-              ...claimNudge.boxActions,
-            ]),
-          ].join("\n"),
-        ),
-        style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
-      });
-      // After the steps that start the app and test sign-in, outside the box so
-      // the command can be copied without its border.
-      consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
-      // Then the skills note, once per machine, as the last thing setup prints.
-      // Only on a run that succeeded: a failed or cancelled setup never reaches here,
-      // so it does not use up the once-per-machine note.
-      await showSkillsHint({
-        env: process.env,
-        interactive:
-          !dryRun &&
-          !flags["non-interactive"] &&
-          Boolean(process.stdout.isTTY && process.stdin.isTTY),
-      });
+      const nextActions = [
+        ...installOutcome.boxActions,
+        ...consoleStep.boxActions,
+        ...claimNudge.boxActions,
+      ];
+      if (this.ui.interactive) {
+        // The ending of the chain: the headline, the report, then what to run next.
+        summary = {
+          title: "Zitadel is ready",
+          sections: [],
+          lines: renderSummary(sections).split("\n"),
+          next: [...nextActions, ...exploreActions(this.meta.cliVersion)],
+          boxed: true,
+          boxTitle: "Zitadel is ready",
+        };
+      } else {
+        // Nobody at a terminal (--non-interactive): the report as a framed box,
+        // as it has always been, separate from the per-step narration above it.
+        // `wrapForBox` caps the content at the terminal width: consola sizes
+        // the frame to the longest line, so an unwrapped sentence wider than
+        // the window would break the right border.
+        consola.box({
+          title: "Zitadel is ready",
+          message: wrapForBox(
+            [renderSummary(sections), "", renderBoxActions(nextActions)].join("\n"),
+          ),
+          style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+        });
+        // After the steps that start the app and test sign-in, outside the box so
+        // the command can be copied without its border.
+        consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
+      }
     }
 
-    return this.emit({
+    const envelope = this.emit({
       status: "ok",
       // Human-facing output was already shown via consola (box + per-step
       // narration). Pass an empty `pretty` so the base command's fallback
       // renderer doesn't duplicate the summary on stdout. The JSON envelope
       // still carries the full structured payload.
       pretty: "",
+      ...(summary === undefined ? {} : { summary }),
       data: {
         title: "Zitadel is ready.",
         project: { project_id: project.id, issuer },
@@ -1023,6 +1032,19 @@ export default class Setup extends Promptable(BaseCommand) {
         ]),
       },
     });
+    // The skills note, once per machine, as the last thing setup prints, after
+    // the chain has closed. Only on a run that succeeded: a failed or cancelled
+    // setup never reaches here, so it does not use up the once-per-machine note.
+    if (!this.jsonEnabled()) {
+      await showSkillsHint({
+        env: process.env,
+        interactive:
+          !dryRun &&
+          !flags["non-interactive"] &&
+          Boolean(process.stdout.isTTY && process.stdin.isTTY),
+      });
+    }
+    return envelope;
   }
 
   /**
@@ -1036,7 +1058,9 @@ export default class Setup extends Promptable(BaseCommand) {
   ): Promise<JsonEnvelope> {
     const config = await readZitadelConfig(cwd);
     const server = readProjectServer(config);
-    consola.start(`Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`);
+    const moving = this.ui.begin(
+      `Moving the app to ${issuerFromPort(devPort)}${dryRun ? " (dry run)" : ""}`,
+    );
     const move = await moveDevPort({
       cwd,
       devPort,
@@ -1044,9 +1068,12 @@ export default class Setup extends Promptable(BaseCommand) {
       orca: createOrca(),
       cliVersion: this.meta.cliVersion,
       dryRun,
+    }).catch((error: unknown) => {
+      moving.fail();
+      throw error;
     });
     for (const file of move.result.filesWritten) {
-      consola.info(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
+      moving.detail(`${dryRun ? "Would update" : "Updated"} ${relativeDisplay(cwd, file)}`);
     }
     if (move.staleOrigin !== undefined) {
       reportWarning(
@@ -1060,9 +1087,9 @@ export default class Setup extends Promptable(BaseCommand) {
     }
     const moved = move.previousIssuer !== move.issuer;
     if (moved) {
-      consola.success(`Moved from ${move.previousIssuer} to ${move.issuer}`);
+      moving.done(`Moved from ${move.previousIssuer} to ${move.issuer}`);
     } else {
-      consola.success(`Already on ${move.issuer}`);
+      moving.done(`Already on ${move.issuer}`);
     }
     return this.emit({
       status: "ok",
@@ -1996,4 +2023,12 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/** `Explore all commands:` and the command that lists them, as a next step in the box. */
+function exploreActions(cliVersion: string): BoxAction[] {
+  const [text = "", command] = exploreAllCommands(cliVersion)
+    .split("\n")
+    .map((line) => line.trim());
+  return command === undefined ? [] : [{ text, command }];
 }

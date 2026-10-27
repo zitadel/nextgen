@@ -61,6 +61,8 @@
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.
+- Write "project" in lowercase in every message ("stored in your project"), as the prompts
+  do; only product names are capitalised.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new

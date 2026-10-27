@@ -189,7 +189,7 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.stdout).toContain(
-      "Google sign-in is configured locally. Provider credentials are stored on your Project.",
+      "Google sign-in is configured locally. Provider credentials are stored on your project.",
     );
     expect(result.stdout).toContain(
       "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
@@ -204,7 +204,7 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.stdout).toContain("Google sign-in is configured locally.");
-    expect(result.stdout).not.toContain("stored on your Project");
+    expect(result.stdout).not.toContain("stored on your project");
   });
 
   it("names a custom provider by its display name", async () => {
@@ -342,7 +342,7 @@ describe("auth-method sso enable", () => {
     expect(json.data.client_id?.variable).toBe("GOOGLE_CLIENT_ID");
   });
 
-  it("names the schemas when the Project has more than one", async () => {
+  it("names the schemas when the project has more than one", async () => {
     const cwd = await setUpProject({ customers: defaultSchema, employees: defaultSchema });
     const result = await enable(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
     expect(result.exitCode).not.toBe(0);
