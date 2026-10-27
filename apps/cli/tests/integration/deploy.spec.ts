@@ -313,13 +313,13 @@ describe("deploy", () => {
         expect(result).toPrint("Deployed");
       });
 
-      it("names the release and where it went, under the line it closes on", async () => {
+      it("names the release and every origin it went to, under the closing line", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
 
         const result = await app.deployRendered();
 
-        expect(result).toPrint("is now live on https://app.acme.com.");
+        expect(result).toPrint("is now live on http://localhost:3000 and https://app.acme.com.");
       });
     });
   });
