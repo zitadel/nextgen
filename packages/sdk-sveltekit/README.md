@@ -24,19 +24,17 @@ Create (or extend) `src/hooks.server.ts`:
 import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
 
 export const handle = createNextgenHandle({
-  url: process.env.ZITADEL_URL,
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
 ```
 
-Read the config from `process.env` rather than SvelteKit's `$env` modules: the
-public/private env import paths moved between SvelteKit 2 and 3
-(`$env/dynamic/private` → `$app/env/private`), so `process.env` is the one
-version-independent source. In dev, load `.env.local` first with
-`process.loadEnvFile?.('.env.local')` (SvelteKit does not surface `.env` on
-`process.env`); in production the platform provides the variables.
+`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
+from `process.env` rather than SvelteKit's `$env` modules, whose import paths
+moved between SvelteKit 2 and 3 (`$env/dynamic/private` → `$app/env/private`).
+SvelteKit does not put `.env` files on `process.env`, so the hook loads
+`.env.local` into it first; a variable already set wins, and in production the
+platform provides the variables.
 
 The hook runs on every request and does three things in one pass:
 

@@ -48,7 +48,7 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       // The auth boundary is written on every setup; a pre-existing hook at
       // this exact path is a genuine conflict the file-writer refuses (and
       // --force replaces), the same way Next writes its request boundary.
-      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate(ctx) },
+      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate() },
       // The app shell and landing page are written only when setup created the
       // skeleton itself — a pre-existing app keeps its own root layout, theme,
       // and landing page (ADR 044), same as the Next/Nuxt homepage.

@@ -55,16 +55,10 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/hooks.server.ts`. Read the config from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3. SvelteKit does not put `.env` files on `process.env`, so load `.env.local` yourself in development:
+    Create `src/hooks.server.ts`. The hook reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3, and loads `.env.local` into it first, since SvelteKit does not. A variable already set wins, so the platform's variables apply in production:
 
     ```ts
     import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
-
-    try {
-      process.loadEnvFile?.(".env.local");
-    } catch {
-      // .env.local is optional; the platform provides the variables in production.
-    }
 
     export const handle = createNextgenHandle({
       protectedRoutes: ["/profile"],

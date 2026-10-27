@@ -43,17 +43,15 @@ Peer deps: `@sveltejs/kit ^2.0.0 || ^3.0.0`, `svelte ^5.0.0`.
 import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
 
 export const handle = createNextgenHandle({
-  url: process.env.ZITADEL_URL,
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
   loginPath: '/login',
 });
 ```
 
-Read config from `process.env`, not SvelteKit's `$env` modules — their import
-paths moved between SvelteKit 2 and 3. SvelteKit does not surface `.env` files
-on `process.env`, so in dev load `.env.local` first with
-`process.loadEnvFile?.('.env.local')`. Compose with other hooks via
+`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
+from `process.env`, not SvelteKit's `$env` modules — their import paths moved
+between SvelteKit 2 and 3. The hook loads `.env.local` into `process.env`
+first (a variable already set wins), so do not load it yourself. Compose with other hooks via
 `sequence()` from `@sveltejs/kit/hooks`. Sessions count only in the app's own
 project: `projectId`, else `ZITADEL_PROJECT_ID`, else
 `VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in.

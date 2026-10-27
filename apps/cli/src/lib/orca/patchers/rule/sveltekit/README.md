@@ -27,7 +27,8 @@ No config file is edited: the hook is a plain file, so every managed file carrie
 
 ## How the proxy works
 
-The hook reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `process.env`, loading
-`.env.local` itself (SvelteKit's `$env` modules differ across major versions); the URL
-falls back to the server from setup. There is no dev-only proxy, so it works the same in
-production.
+The hook passes only the route policy: `@zitadel/sdk-sveltekit` reads `ZITADEL_URL` and
+`ZITADEL_PROJECT_SECRET` from `process.env`, loading `.env.local` into it first (SvelteKit's
+`$env` modules differ across major versions). The generated file names no Node global, so
+the app type-checks without `@types/node`. There is no dev-only proxy, so it works the same
+in production.

@@ -4,6 +4,7 @@ import type {
   NextgenMiddlewareOptions,
   ResolveSessionOptions,
 } from "@zitadel/sdk-core/middleware";
+
 import { joinURL } from "ufo";
 
 import {
@@ -18,6 +19,8 @@ import {
   resolveSession,
   serializeSessionCookie,
 } from "@zitadel/sdk-core/middleware";
+
+import { loadEnvLocal } from "./lib/env-local";
 
 /**
  * `process` is undefined in some edge/serverless runtimes; read env defensively
@@ -320,11 +323,6 @@ function withNoStore(response: Response): Response {
  * ```ts
  * import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
  *
- * // SvelteKit does not surface .env files on process.env; load it in dev.
- * try {
- *   process.loadEnvFile?.(".env.local");
- * } catch {}
- *
  * export const handle = createNextgenHandle({
  *   protectedRoutes: ["/admin*", "/dashboard*"],
  *   loginPath: "/login",
@@ -332,7 +330,8 @@ function withNoStore(response: Response): Response {
  * ```
  *
  * `url` and `projectSecret` default to `ZITADEL_URL` / `ZITADEL_PROJECT_SECRET`
- * from `process.env` (version-independent, unlike SvelteKit's `$env` modules).
+ * from `process.env` (version-independent, unlike SvelteKit's `$env` modules),
+ * after loading `.env.local` into it.
  * A session counts only in the app's own project: `projectId`, else
  * `ZITADEL_PROJECT_ID`, else `VITE_ZITADEL_PROJECT_ID`.
  * Compose it with other hooks via `sequence()` from `@sveltejs/kit/hooks`.
@@ -344,6 +343,7 @@ function withNoStore(response: Response): Response {
 export function createNextgenHandle(
   options: NextgenMiddlewareOptions & { projectSecret?: string } = {},
 ): NextgenHandle {
+  loadEnvLocal();
   const {
     url = PROCESS_ENV.ZITADEL_URL ?? "http://localhost:8080",
     projectId = PROCESS_ENV.ZITADEL_PROJECT_ID || PROCESS_ENV.VITE_ZITADEL_PROJECT_ID,
