@@ -49,7 +49,12 @@ import { LocalServer } from "../../../src/lib/local-server/server";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
@@ -79,9 +84,13 @@ function drawnLines(): string {
     .join("\n");
 }
 
-/** What a framed report says, a line at a time, with the frame taken off. */
+/**
+ * What a framed report says, a line at a time, with the frame taken off.
+ * The frame is coloured, so its glyphs leave escapes behind: strip those too
+ * or a border becomes a line of invisible characters rather than nothing.
+ */
 function framed(output: string): string[] {
-  return output
+  return stripAnsi(output)
     .split("\n")
     .map((line) => line.replaceAll(/[│╭╮╰╯─]/g, "").trim())
     .filter((line) => line !== "");

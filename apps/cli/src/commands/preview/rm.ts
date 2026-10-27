@@ -69,8 +69,7 @@ export default class PreviewRm extends Promptable(PreviewCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `remove ${url} from the project`,
       message: `Remove ${url} from the project?`,
       retry: this.suggest(`preview rm ${shellArg(url)} --force`),

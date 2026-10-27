@@ -103,7 +103,6 @@ export default class PreviewList extends PreviewCommand {
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "preview",
-        empty: "No live previews.",
         footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
       }),
     });
