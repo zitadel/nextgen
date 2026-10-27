@@ -121,11 +121,15 @@ describe("setup dependency installation", () => {
 
     // The box ends on one breadcrumb instead of the customize/publish pair —
     // those steps only make sense after the first successful login.
-    expect(result.boxActions.at(-1)).toEqual({
-      text:
-        "Once login works, this shows your next steps (customizing is covered in " +
-        "your README's Zitadel section):",
+    // One sentence per fact: the step that introduces a command says when to
+    // run it, and where customizing is written up is a sentence of its own
+    // rather than a parenthesis inside that one.
+    expect(result.boxActions.at(-2)).toEqual({
+      text: "Once login works, this shows your next steps:",
       command: `npx @zitadel/cli@1.2.3 status${selector}`,
+    });
+    expect(result.boxActions.at(-1)).toEqual({
+      text: "Customizing the login is covered in your README's Zitadel section.",
     });
     const boxText = result.boxActions
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))
@@ -149,7 +153,12 @@ describe("setup dependency installation", () => {
 
     const result = await installDependenciesForSetup(input({ cwd, run, skipInstall: true }));
 
-    expect(result.boxActions[0]).toEqual({ text: "Install dependencies:", command: "npm install" });
+    // A sentence, not a second label: it says why the step is there at all,
+    // which `Run next:` — the one label — cannot.
+    expect(result.boxActions[0]).toEqual({
+      text: "Setup did not install the new dependencies, so install them first:",
+      command: "npm install",
+    });
     expect(result.nextActions[0]).toBe("Install dependencies: npm install");
   });
 

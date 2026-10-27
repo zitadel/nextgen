@@ -132,6 +132,7 @@ export default class Doctor extends BaseCommand {
             image,
             port,
             this.localServers(),
+            this.meta.cliVersion,
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
@@ -328,7 +329,7 @@ export function failureAdvice(
 
   if (failedNames.has("state-dir")) {
     return {
-      hint: "The local Zitadel state directory is not writable. Fix directory permissions, then rerun `zitadel doctor`.",
+      hint: `The local Zitadel state directory is not writable. Fix directory permissions, then rerun ${unscopedCommand("doctor", cliVersion)}.`,
       nextCommands: [unscopedCommand("doctor", cliVersion)],
     };
   }
@@ -344,8 +345,8 @@ export function failureAdvice(
     return {
       hint:
         `Port ${String(port)} is already in use. Stop the process using it, ` +
-        `run \`${stopCommand}\` for CLI-managed local runtimes, then rerun ` +
-        `\`${retryCommand}\`; or choose another port with \`${alternatePortCommand}\`.`,
+        `run ${stopCommand} for CLI-managed local runtimes, then rerun ` +
+        `${retryCommand}; or choose another port with ${alternatePortCommand}.`,
       nextCommands: [stopCommand, retryCommand, alternatePortCommand],
     };
   }
@@ -366,7 +367,7 @@ export function failureAdvice(
       hint:
         "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
         (nextCommands.length === 0
-          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
+          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run ${unscopedCommand("doctor --json", cliVersion)} and use details.suggested_args for the exact arguments.`
           : ""),
       nextCommands,
       suggestedArgs,
@@ -383,7 +384,7 @@ export function failureAdvice(
 
   if (failedNames.has("environment")) {
     return {
-      hint: "The resolved environment could not connect. Check the server, project and credential it resolves with `zitadel env`, then rerun `zitadel doctor` with the same --env / --env-file.",
+      hint: `The resolved environment could not connect. Check the server, project and credential it resolves with ${projectCommand("env", selector, cliVersion)}, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
       nextCommands: [
         projectCommand("env", selector, cliVersion),
         projectCommand("doctor", selector, cliVersion),
@@ -394,13 +395,13 @@ export function failureAdvice(
   const hasProjectFailure = failed.some((check) => !LOCAL_RUNTIME_CHECK_NAMES.has(check.name));
   if (hasProjectFailure) {
     return {
-      hint: `Run \`${projectCommand("doctor --fix", selector, cliVersion)}\` to re-apply missing managed files.`,
+      hint: `Run ${projectCommand("doctor --fix", selector, cliVersion)} to re-apply missing managed files.`,
       nextCommands: [projectCommand("doctor --fix", selector, cliVersion)],
     };
   }
 
   return {
-    hint: "Fix the reported checks, then rerun `zitadel doctor`.",
+    hint: `Fix the reported checks, then rerun ${projectCommand("doctor", selector, cliVersion)}.`,
     nextCommands: [projectCommand("doctor", selector, cliVersion)],
   };
 }
@@ -439,7 +440,7 @@ export function advisoryForWarnings(
     // authoritatively.
     if (local === undefined) {
       nextActions.push(
-        "Claim this project with `zitadel claim` once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.",
+        `Claim this project with ${unscopedCommand("claim", cliVersion)} once .env.development.local sets ZITADEL_PROJECT_ID and ZITADEL_PROJECT_SECRET to the project in .zitadel/secret; until then claim would resolve a different project.`,
       );
     } else {
       nextActions.push(
@@ -583,6 +584,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  cliVersion: string,
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
   if (runtimeBackend === "binary") {
@@ -640,7 +642,7 @@ async function runLocalRuntimeChecks(
                 ? `Image ${image} is available locally`
                 : `Image ${image} is available from the registry`;
             } catch (error) {
-              throw new Error(imageUnavailableMessage(image, error), { cause: error });
+              throw new Error(imageUnavailableMessage(image, error, cliVersion), { cause: error });
             }
           },
           "warn",
@@ -895,10 +897,10 @@ async function check(
   }
 }
 
-function imageUnavailableMessage(image: string, error: unknown): string {
+function imageUnavailableMessage(image: string, error: unknown, cliVersion: string): string {
   const detail = error instanceof Error ? error.message : String(error);
   const suffix = detail.trim() ? ` (${detail.trim()})` : "";
-  return `Image ${image} is not available to Docker${suffix}; \`zitadel start\` may need a pull or a different image.`;
+  return `Image ${image} is not available to Docker${suffix}; ${unscopedCommand("start", cliVersion)} may need a pull or a different image.`;
 }
 
 /** The project `.zitadel/secret` records, or nothing when it cannot be read. */

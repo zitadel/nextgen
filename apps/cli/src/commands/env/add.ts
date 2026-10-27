@@ -44,7 +44,7 @@ type PlatformVariable = { name: string; value?: string; secret?: boolean };
 const SERVER_RENDERED = ["next", "nuxt"];
 
 /** The message the release this command publishes carries. */
-const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from env add";
 
 /** What the initial deploy published, for the envelope to report. */
 type DeployedRelease = {
@@ -378,9 +378,15 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         // without the project secret in the file it would fail to authenticate.
         ...(needsOrigin
           ? [
-              writtenKeys.has("ZITADEL_PROJECT_SECRET")
-                ? `Allow this project's origin: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`
-                : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}: zitadel origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary${newEnvironment}`,
+              `${
+                writtenKeys.has("ZITADEL_PROJECT_SECRET")
+                  ? "Allow this project's origin"
+                  : `Allow this project's origin once ZITADEL_PROJECT_SECRET is in ${file}`
+              }: ${projectCommand(
+                `origin add ${issuer === undefined ? "'<your-app-url>'" : shellArg(issuer)} --kind primary`,
+                newEnvironment,
+                cliVersion,
+              )}`,
             ]
           : []),
         // Said even when nobody could be asked, because it is the one thing
@@ -391,14 +397,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           ? [
               `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
               ...(hasSomewhereToLand
-                ? [`Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`]
+                ? [`Deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)}`]
                 : [
-                    `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary${newEnvironment}`,
-                    `Then deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`,
+                    `Give it an origin first: ${projectCommand("origin add '<your-app-url>' --kind primary", newEnvironment, cliVersion)}`,
+                    `Then deploy to it: ${projectCommand(DEPLOY_ARGS, newEnvironment, cliVersion)}`,
                   ]),
             ]
           : []),
-        `Check what resolves: zitadel env${newEnvironment}`,
+        `Check what resolves: ${projectCommand("env", newEnvironment, cliVersion)}`,
         "",
         "The deployed app never reads that file. Set these where it is built and run.",
         "",
@@ -477,7 +483,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       };
     } catch (error) {
       reportWarning(
-        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish it.`,
+        `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run ${projectCommand(DEPLOY_ARGS, opts.selector, this.meta.cliVersion)} to publish it.`,
       );
       return undefined;
     }

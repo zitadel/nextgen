@@ -235,7 +235,7 @@ describe("ServerPrompt", () => {
     );
   });
 
-  it("lists the local server as unavailable, saying how to start it, when none is detected", async () => {
+  it("lists the local server as unavailable, and says to start it, when none is detected", async () => {
     vi.mocked(select).mockResolvedValueOnce("https://preview.zitadel.com" as never);
 
     await new ServerPrompt().ask(baseAnswers(), ctx);
@@ -245,7 +245,7 @@ describe("ServerPrompt", () => {
       {
         value: "__local_not_running__",
         label: "Local server",
-        hint: "not running — run zitadel start first",
+        hint: "not running — start it first",
         disabled: true,
       },
       { value: "__custom__", label: "Custom URL (self-hosted)" },

@@ -49,12 +49,15 @@ export class ServerPrompt implements SetupPrompt {
           ? {
               value: detected,
               label: `Local server (${detected})`,
-              hint: "started with zitadel start",
+              // The option's hint says what this server is, not how to get
+              // one: a command named here is one nobody can run until the
+              // question is answered, and the option below is disabled.
+              hint: "already running on this machine",
             }
           : {
               value: LOCAL_NOT_RUNNING,
               label: "Local server",
-              hint: "not running — run zitadel start first",
+              hint: "not running — start it first",
               disabled: true,
             },
         { value: CUSTOM, label: "Custom URL (self-hosted)" },

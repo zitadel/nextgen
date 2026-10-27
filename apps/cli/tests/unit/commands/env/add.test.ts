@@ -12,7 +12,12 @@ vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).c
 import { confirm, text } from "@clack/prompts";
 
 import EnvAdd from "../../../../src/commands/env/add";
-import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../../helpers/run-cli";
 import { asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
@@ -203,7 +208,9 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd));
 
       expect(out).toContain(
-        "Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file .env.production.local",
+        `Give it an origin first: ${expectedPublicCliCommand(
+          "origin add '<your-app-url>' --kind primary",
+        )} --env-file .env.production.local`,
       );
     });
 
@@ -256,7 +263,9 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
       expect(out).toContain(
-        "Deploy to it: zitadel deploy -m '<what changed>' --env-file .env.production.local",
+        `Deploy to it: ${expectedPublicCliCommand(
+          "deploy -m '<what changed>'",
+        )} --env-file .env.production.local`,
       );
     });
 

@@ -126,14 +126,14 @@ export default class VariableResolve extends EnvironmentCommand {
   ): Promise<ZitadelError> {
     if (origin === undefined) {
       return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project", {
-        hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
+        hint: "Deploy first, then resolve its variables.",
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
     const origins = (await client.getProject(projectId)).origins ?? [];
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
-        hint: `Deploy to it first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
+        hint: "Deploy to it first, then resolve its variables.",
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
@@ -143,7 +143,7 @@ export default class VariableResolve extends EnvironmentCommand {
       )
     ) {
       return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
-        hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
+        hint: "A preview URL is served by a pull-request build, not by a deploy from here; resolve its variables once that build has deployed it.",
       });
     }
     return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project`, {

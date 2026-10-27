@@ -59,7 +59,7 @@ export class DependencyVersionCheck implements SanityCheck {
         message:
           `${mismatched.map(([name, version]) => `${name}@${version}`).join(", ")} ` +
           `does not match this CLI's version (${ctx.cliVersion}); scaffolded files and ` +
-          `guidance target the CLI's train — update with \`${remedy}\``,
+          `guidance target the CLI's train — update with ${remedy}`,
         details: {
           mismatched: mismatched.map(([name, version]) => ({
             name,

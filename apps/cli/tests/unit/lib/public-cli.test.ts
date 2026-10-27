@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+import { join, relative, sep } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
+import { sourceFiles } from "../../helpers/source-files";
 import {
   maskPublicCliVersion,
   normalizePublicCliCommand,
@@ -191,5 +195,95 @@ describe("optionArgs", () => {
 
   it("joins a value that starts with a dash to its option", () => {
     expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
+  });
+});
+
+/**
+ * The one name, enforced over the source rather than per call site.
+ *
+ * A reader of a terminal sees one command spelling or three. The public
+ * `npx @zitadel/cli@<version> …` form is the one that runs on their machine —
+ * the CLI is not a dependency of the app it scaffolds — so it is the only
+ * spelling human output uses, and {@link publicCliCommand}, through a
+ * `lib/suggestion.ts` builder, is the only thing that writes it. Two spellings
+ * reach the terminal by hand, and this scan refuses both: a command written
+ * out as bare `zitadel …`, which does not exist on the reader's PATH, and a
+ * backtick, which a terminal prints as a backtick rather than as code.
+ *
+ * Comments are exempt — the bare spelling is the readable one to write about a
+ * command in prose about the code — so they are blanked before a rule reads a
+ * line, which is also why a failure's line number is the one in the file.
+ */
+describe("the CLI names itself once in human output", () => {
+  const COMMANDS = join(import.meta.dirname, "../../../src/commands");
+
+  /**
+   * The commands whose prose still spells a command by hand. Pinned rather
+   * than fixed here because each is another chain's to convert; the list is
+   * what stops the debt growing while they are.
+   */
+  const NOT_YET_CONVERTED = [
+    "commands/api/index.ts",
+    "commands/api/ls.ts",
+    "commands/deployment/rollback.ts",
+    "commands/env/index.ts",
+    "commands/env/list.ts",
+    "commands/logs.ts",
+    "commands/release/create.ts",
+    "commands/reset.ts",
+    "commands/resources-list.ts",
+    "commands/resources.ts",
+    "commands/start.ts",
+    "commands/stop.ts",
+  ];
+
+  /** The source with every comment blanked, keeping each line where it was. */
+  const blankComments = (source: string): string =>
+    source.replaceAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) =>
+      comment.replaceAll(/[^\n]/g, " "),
+    );
+
+  /** The double-quoted string literals on a line, quotes included. */
+  const quoted = (line: string): string[] => line.match(/"(?:[^"\\\n]|\\.)*"/g) ?? [];
+
+  /** The string literals on a line a person could end up reading: both kinds. */
+  const literals = (line: string): string[] => [
+    ...quoted(line),
+    ...(line.match(/`(?:[^`\\\n]|\\.)*`/g) ?? []),
+  ];
+
+  /** A path as a failure names it, with forward slashes on every platform. */
+  const asWritten = (file: string): string =>
+    relative(join(COMMANDS, ".."), file).split(sep).join("/");
+
+  async function offenders(offends: (line: string) => boolean): Promise<string[]> {
+    const files = await sourceFiles(COMMANDS);
+    const found = await Promise.all(
+      files.map(async (file) => {
+        const name = asWritten(file);
+        if (NOT_YET_CONVERTED.includes(name)) {
+          return [];
+        }
+        const lines = blankComments(await readFile(file, "utf8")).split("\n");
+        return lines.flatMap((line, index) => (offends(line) ? [`${name}:${index + 1}`] : []));
+      }),
+    );
+    return found.flat().sort();
+  }
+
+  it("quotes no command in backticks, which a terminal does not render", async () => {
+    // An escaped backtick is one inside a template literal; a plain one inside
+    // a double-quoted string is the other way a backtick reaches the terminal.
+    const offends = (line: string): boolean =>
+      line.includes("\\`") || quoted(line).some((literal) => literal.includes("`"));
+
+    expect(await offenders(offends)).toEqual([]);
+  });
+
+  it("writes out no bare zitadel command for a person to copy", async () => {
+    const offends = (line: string): boolean =>
+      literals(line).some((literal) => /\bzitadel [a-z]/.test(literal));
+
+    expect(await offenders(offends)).toEqual([]);
   });
 });

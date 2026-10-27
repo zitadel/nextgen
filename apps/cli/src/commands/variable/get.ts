@@ -53,8 +53,8 @@ export default class VariableGet extends EnvironmentCommand {
     if (value === undefined) {
       throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value`, {
         hint: flags.preview
-          ? "A name has a preview value only once one is set with `--preview`."
-          : "Set one with `variable set`.",
+          ? "A name has a preview value only once one is set with --preview."
+          : `Set one with ${this.suggest(`variable set ${name} '<value>'`)}.`,
       });
     }
     const row = toVariableRow(name, value);

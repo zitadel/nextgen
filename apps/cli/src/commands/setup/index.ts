@@ -116,7 +116,7 @@ import {
   formatFrameworkLine,
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
-  renderSummary,
+  summarySections,
   id as styleId,
   url as styleUrl,
   type Row,
@@ -664,7 +664,7 @@ export default class Setup extends Promptable(BaseCommand) {
             cause.hint ??
             (newApp === undefined
               ? "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload. Rerun `zitadel setup` to start over; " +
+                `password policy) did not all upload. Rerun ${this.suggestUnscoped("setup")} to start over; ` +
                 "--force overwrites the schema and flow files setup scaffolds and keeps an " +
                 "existing password policy file. It does not cover a connection under .zitadel/idps/ — those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
@@ -862,7 +862,7 @@ export default class Setup extends Promptable(BaseCommand) {
           // so an unattached project is one the local admin never sees. A
           // server started by hand has no local admin anywhere, hence the "if".
           reportWarning(
-            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If \`zitadel start\` started this server, run setup from the directory it ran in, or one inside it.`,
+            `No local admin for ${answers.server} in ${cwd} or its parents, so the project is not attached to a team and the local console will not list it. If ${this.suggestUnscoped("start")} started this server, run setup from the directory it ran in, or one inside it.`,
           );
         }
         if (admin) {
@@ -934,6 +934,10 @@ export default class Setup extends Promptable(BaseCommand) {
     // ending, so only the text one names it here.
     let summary: Summary | undefined;
     let report = "";
+    // Where setup ran, as the box's last line, the way every other command's
+    // box states it. Setup learns its project while it works rather than
+    // before its first question, so it says so here.
+    this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -953,12 +957,14 @@ export default class Setup extends Promptable(BaseCommand) {
         ...claimNudge.boxActions,
       ];
       summary = {
-        title: "Zitadel is ready",
-        sections: [],
-        lines: renderSummary(sections).split("\n"),
+        // The chain closes on what the run did, in the past tense every other
+        // wizard closes on, and the box it opens is the `Summary` every other
+        // box is titled: a run that says "Zitadel is ready" twice in four
+        // lines has said it once too often.
+        title: "Set up Zitadel in this app",
+        sections: summarySections(sections),
         next: nextActions,
         boxed: true,
-        boxTitle: "Zitadel is ready",
       };
       if (!this.ui.interactive) {
         report = this.ui.ending({
@@ -1940,7 +1946,7 @@ const SENTENCE_BY_PATH: Record<string, { subject: string }> = {
 };
 
 /**
- * Builds the section list driving {@link renderSummary} for the setup command.
+ * Builds the section list driving {@link summarySections} for the setup command.
  * Exported so its wording is unit-tested.
  */
 export function buildSummary(opts: {

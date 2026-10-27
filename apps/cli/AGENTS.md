@@ -36,6 +36,17 @@
 
 ## Command code
 
+- Name the CLI one way in anything a person reads — a hint, a warning, a box
+  line, a description: the public `npx @zitadel/cli@<version> …` form, from a
+  `src/lib/suggestion.ts` builder, never bare `zitadel …` and never in
+  backticks. `tests/unit/lib/public-cli.test.ts` scans `src/commands` for both.
+  - Say it once: when the run's own step already prints the command, the
+    prose says what to do and leaves the spelling to the step.
+- `Run next:` is the only label that introduces a command. Anything else that
+  introduces one is a sentence saying what the command cannot say for itself —
+  why it is there, or when to run it — ending in a colon, one fact per
+  sentence. `Explore all commands:` is the exception: it closes every box by
+  pointing at the command index, not at this run's next step.
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.
@@ -69,8 +80,11 @@
   - Add where the answer comes from or where it goes, in the same message: "It
     will be stored on the project as GOOGLE_CLIENT_SECRET."
   - A confirmation that acts on something may be a short direct question, as
-    long as it names the thing and, when it is not obvious, what happens:
-    "Delete user usr_1?" or "Revoke rel_1? Its content can never be served again."
+    long as it names the thing and, when it is not obvious, what happens. It
+    stays one question: fold the consequence into it rather than adding a
+    second sentence, and use the verb the command's own result uses.
+    "Delete user usr_1?" or "Revoke rel_1 so its content can never be served
+    again?"; "Roll back to dep_1 …?", never "Re-apply dep_1 …?".
   - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
     "Remove FOO from the project?"); a terminal does not render backticks.
   - Ask the same thing the same way in every command that asks it.

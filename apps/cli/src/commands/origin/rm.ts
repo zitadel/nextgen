@@ -87,7 +87,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
         // Named in the text, not as a next command: the URL is the developer's
         // to fill in, and a `<url>` placeholder is a shell redirection. The
         // selector keeps it on the environment that was just opened up.
-        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`.`,
+        `${pattern} was the project's last origin, so the project now admits every origin. Add the ones it should admit with ${this.suggest("origin add <url> --kind primary")}.`,
       );
     }
 

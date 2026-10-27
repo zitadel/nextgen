@@ -416,10 +416,12 @@ describe("setup command", () => {
 
     expect(res.exitCode).toBe(0);
     // Inside the summary, like every other step: the box is where a command
-    // says what to do next, so nothing trails after it.
+    // says what to do next. Only where the run happened comes after it, which
+    // is the last line of every other command's box too.
     const shown = framed(res.stdout);
-    expect(shown.at(-1)).toContain(expectedPublicCliCommand(""));
-    expect(shown.at(-2)).toContain("Explore all commands:");
+    expect(shown.at(-1)).toContain("Using project ");
+    expect(shown.at(-2)).toContain(expectedPublicCliCommand(""));
+    expect(shown.at(-3)).toContain("Explore all commands:");
   });
 
   it("frames the report under its own headline when nobody is at a terminal", async () => {
@@ -431,10 +433,26 @@ describe("setup command", () => {
     ]);
 
     expect(res.exitCode).toBe(0);
-    expect(framed(res.stdout)).toContain("Zitadel is ready");
+    // The same box every other command draws: titled `Summary`, with the
+    // facts as plain `label   value` rows rather than ticked, SCREAMING ones.
+    expect(framed(res.stdout)).toContain("Summary");
+    expect(res.stdout).not.toContain("Zitadel is ready");
+    expect(res.stdout).not.toContain("✓");
+    expect(res.stdout).not.toContain("DETECTED");
     // The report is the whole of what is shown: the generic renderer would
     // have restated the payload's own title under it.
     expect(res.stdout).not.toContain("Zitadel is ready.");
+  });
+
+  it("closes the box with the project and server it ran against", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      ...["setup", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ...["--non-interactive", "--dry-run", "--skip-install", "--framework", "next"],
+    ]);
+
+    expect(framed(res.stdout).at(-1)).toContain("Using project ");
   });
 
   describe("a custom provider", () => {
@@ -847,7 +865,9 @@ describe("setup command", () => {
     expect(json.warnings[0]).toContain(
       `No local admin for http://localhost:9942 in ${cwd} or its parents`,
     );
-    expect(json.warnings[0]).toContain("If `zitadel start` started this server");
+    expect(json.warnings[0]).toContain("started this server, run setup from the directory");
+    expect(json.warnings[0]).toContain("npx @zitadel/cli@");
+    expect(json.warnings[0]).not.toContain("`");
     expect(json.data.next_actions.join("\n")).not.toContain("No local admin");
     // No project to manage there, so the console is not suggested.
     expect(json.data.next_commands.join("\n")).not.toMatch(/ console$/m);
@@ -1295,7 +1315,7 @@ describe("setup asked on a terminal", () => {
     await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
   });
 
-  it("closes the chain on the one line its report is titled with", async () => {
+  it("closes the chain on what the run did, not on the box's own title", async () => {
     const cwd = await makeNextProject();
     vi.mocked(confirm).mockResolvedValueOnce(true as never);
     vi.mocked(select)
@@ -1306,7 +1326,9 @@ describe("setup asked on a terminal", () => {
 
     await settingUp(cwd, "--skip-install");
 
-    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Zitadel is ready"));
+    // Past tense, like every other wizard's closing line, and not a second
+    // copy of the title of the box it opens.
+    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Set up Zitadel in this app"));
   });
 
   it("says in the chain that a step it could not finish gave up", async () => {

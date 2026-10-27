@@ -136,7 +136,10 @@ export default class BrandingEject extends Promptable(BaseCommand) {
         files_written: filesWritten,
         next_actions: [
           `Edit ${DEFAULT_BRANDING_TEMPLATE_PATH} — the login UI is yours now.`,
-          "Run deploy --dry-run to validate the template and see the diff, then deploy to publish it.",
+          // The two commands are the box's own steps, so the sentence says
+          // what they are for and leaves the spelling to them: a suggestion
+          // written out here as well would name each command twice.
+          "Validate the template and see the diff with a dry run, then publish it.",
         ],
         // `branding eject` reads no environment, so it has no selector to
         // carry: the follow-ups run against whichever one the developer uses.

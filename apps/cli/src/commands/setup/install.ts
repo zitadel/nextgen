@@ -153,9 +153,18 @@ function outcome(input: {
     `Start your project: ${input.devCommand} (then open ${input.issuer}/login)`,
     verifyLoginAction(),
   ];
+  // Every step is a sentence that says what its command cannot say for
+  // itself — why it is here, or when to run it. `Run next:` is the label for
+  // commands nothing introduces, and a box that introduces its own commands
+  // never needs it.
   const boxActions: BoxAction[] = [
     ...(input.includeInstallCommand
-      ? [{ text: "Install dependencies:", command: input.install.command }]
+      ? [
+          {
+            text: "Setup did not install the new dependencies, so install them first:",
+            command: input.install.command,
+          },
+        ]
       : []),
     { text: `Start your project (then open ${input.issuer}/login):`, command: input.devCommand },
     { text: verifyLoginAction() },
@@ -164,10 +173,8 @@ function outcome(input: {
     {
       text: "The dev server keeps its terminal busy. Open a second terminal in this directory for further commands.",
     },
-    {
-      text: "Once login works, this shows your next steps (customizing is covered in your README's Zitadel section):",
-      command: statusCommand,
-    },
+    { text: "Once login works, this shows your next steps:", command: statusCommand },
+    { text: "Customizing the login is covered in your README's Zitadel section." },
   ];
   return {
     install: input.install,

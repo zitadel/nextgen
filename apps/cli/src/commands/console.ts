@@ -17,7 +17,7 @@ import { resolveCwd } from "../lib/paths";
  */
 export default class Console extends BaseCommand {
   static override description =
-    "Open the local console, signed in as the local admin.\n\nThe local admin is the one `zitadel start` created. Run this in the directory `zitadel start` ran in, or one inside it: the local admin is read from the nearest `.zitadel/local/` on the way up.";
+    "Open the local console, signed in as the local admin.\n\nThe local admin is the one the start command created. Run this in the directory it ran in, or one inside it: the local admin is read from the nearest .zitadel/local/ on the way up.";
 
   static override heading = "Opening the local console";
   static override group = CommandGroups.localDevelopment;
@@ -49,7 +49,7 @@ export default class Console extends BaseCommand {
     const admin = await readLocalAdmin(localDir);
     if (!admin) {
       throw new ZitadelError("E_VALIDATION", "No local admin in this directory or its parents", {
-        hint: "Run this from the directory `zitadel start` ran in, or one inside it. If the server was never started, run `zitadel start` first; it creates the local admin the console signs in as.",
+        hint: `Run this from the directory the local server was started in, or one inside it. If it was never started, start it with ${this.suggestUnscoped("start")} first; that is what creates the local admin the console signs in as.`,
         nextCommands: [this.suggestUnscoped("start")],
       });
     }
@@ -87,7 +87,9 @@ export default class Console extends BaseCommand {
         signed_in_as: admin.email,
         sign_in_url: signInUrl,
         browser_opened: opened,
-        next_actions: ["The link signs you in once. Run `zitadel console` again for a fresh one."],
+        next_actions: [
+          `The link signs you in once. Run ${this.suggestUnscoped("console")} again for a fresh one.`,
+        ],
       },
     });
   }

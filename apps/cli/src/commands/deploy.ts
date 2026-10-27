@@ -89,7 +89,7 @@ export default class Deploy extends EnvironmentCommand {
       landing = origins.filter((entry) => entry.kind === "primary").map((entry) => entry.pattern);
       if (landing.length === 0) {
         throw new ZitadelError("E_VALIDATION", "The project has no primary origin to deploy to", {
-          hint: `Add one with \`zitadel origin add <url> --kind primary${this.environmentSelector()}\`, then deploy.`,
+          hint: `Add one with ${this.suggest("origin add <url> --kind primary")}, then deploy.`,
           nextCommands: [this.suggest("origin list")],
         });
       }
@@ -195,7 +195,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Rerun \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Rerun ${this.suggest(DEPLOY_ARGS)}; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },

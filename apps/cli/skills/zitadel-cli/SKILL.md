@@ -207,6 +207,9 @@ Each invocation prints one JSON object:
   is structured context.
 - `next_commands`: the suggested follow-ups, inside `data` on success and at
   the top level on a no-op or failure. Prefer these over free-text hints.
+- A command named in a `hint`, a `warning` or a `next_actions` line is written
+  the same way `next_commands` writes it — `npx @zitadel/cli@<version> …`,
+  unquoted — so prose and follow-up never name the same command two ways.
 - `warnings`: things that went wrong without stopping the command, such as a
   value that was not published. Always present on success (often empty), and
   present on a no-op or failure when there are any. Read them before you report

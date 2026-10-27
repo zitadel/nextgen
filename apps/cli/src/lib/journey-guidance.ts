@@ -77,7 +77,7 @@ export function customizeAndPublishActions(
  */
 export function brandingGuidanceAction(cliVersion: string): string {
   return (
-    "Change how the login looks: it is a component in your app, so theme it with `--zl-*` " +
+    "Change how the login looks: it is a component in your app, so theme it with --zl-* " +
     "custom properties in your own stylesheet and build any page layout around it in your " +
     "code. To change the widget's structure, " +
     `${publicCliCommand("branding eject", cliVersion)} scaffolds an editable template ` +

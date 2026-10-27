@@ -217,7 +217,7 @@ export default class Pull extends EnvironmentCommand {
       const deployment = live.find(servesPrimary);
       if (deployment === undefined) {
         throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
-          hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
+          hint: `Deploy first with ${this.suggest(DEPLOY_ARGS)}, then pull.`,
         });
       }
       return deployment.release_id;

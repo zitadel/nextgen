@@ -78,7 +78,7 @@ import {
   nonBlankString,
 } from "../../../lib/oclif";
 import { environmentFlags } from "../../../lib/oclif/environment-flags";
-import { inShell, type SuggestedCommand } from "../../../lib/suggestion";
+import { inShell, type SuggestedCommand, unscopedCommand } from "../../../lib/suggestion";
 import { reportWarning } from "../../../lib/warnings";
 
 /**
@@ -153,6 +153,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           flags,
           this.environment.values.ZITADEL_ISSUER?.value,
           !this.meta.nonInteractive && !this.meta.dryRun,
+          this.meta.cliVersion,
         ),
     });
     const { issuer } = project;
@@ -702,6 +703,7 @@ async function readProject(
   flags: { readonly [K in (typeof ENABLE_FLAG_KEYS)[keyof typeof ENABLE_FLAG_KEYS]]?: string },
   issuer: string | undefined,
   interactive: boolean,
+  cliVersion: string,
 ): Promise<ProjectContext> {
   const provider = flags[ENABLE_FLAG_KEYS.provider];
   if (provider === undefined) {
@@ -729,7 +731,7 @@ async function readProject(
   }
   if (issuer === undefined) {
     throw new ZitadelError("E_VALIDATION", "This project has no development issuer", {
-      hint: "Run `zitadel setup` first, or set ZITADEL_ISSUER to the origin your app serves from.",
+      hint: `Run ${unscopedCommand("setup", cliVersion)} first, or set ZITADEL_ISSUER to the origin your app serves from.`,
     });
   }
   return { selection, values, issuer };
