@@ -24,6 +24,22 @@ func (s AddOriginErrorResponse) Encode(e *jx.Encoder) {
 
 func (s AddOriginErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidAddOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedAddOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -258,6 +274,9 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidAddOriginErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedAddOriginErrorResponse
 					found = true
@@ -311,6 +330,10 @@ func (s *AddOriginErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidAddOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedAddOriginErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
@@ -112618,6 +112641,22 @@ func (s RemoveOriginErrorResponse) Encode(e *jx.Encoder) {
 
 func (s RemoveOriginErrorResponse) encodeFields(e *jx.Encoder) {
 	switch s.Type {
+	case AuthCsrfInvalidRemoveOriginErrorResponse:
+		e.FieldStart("code")
+		e.Str("auth.csrf_invalid")
+		{
+			s := s.AuthCsrfInvalid
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case AuthUnauthorizedRemoveOriginErrorResponse:
 		e.FieldStart("code")
 		e.Str("auth.unauthorized")
@@ -112804,6 +112843,9 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 					return err
 				}
 				switch typ {
+				case "auth.csrf_invalid":
+					s.Type = AuthCsrfInvalidRemoveOriginErrorResponse
+					found = true
 				case "auth.unauthorized":
 					s.Type = AuthUnauthorizedRemoveOriginErrorResponse
 					found = true
@@ -112848,6 +112890,10 @@ func (s *RemoveOriginErrorResponse) Decode(d *jx.Decoder) error {
 		return errors.New("unable to detect sum type variant")
 	}
 	switch s.Type {
+	case AuthCsrfInvalidRemoveOriginErrorResponse:
+		if err := s.AuthCsrfInvalid.Decode(d); err != nil {
+			return err
+		}
 	case AuthUnauthorizedRemoveOriginErrorResponse:
 		if err := s.AuthUnauthorized.Decode(d); err != nil {
 			return err
