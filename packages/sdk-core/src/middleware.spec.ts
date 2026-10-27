@@ -1122,6 +1122,29 @@ describe("resolveSession", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // A render layer that checks the session itself, sdk-next's auth(), is
+  // handed the token instead: nothing is asked, so nothing is known to clear or
+  // copy.
+  it.each([
+    ["the project's own cookie", { [OWN]: "opaque-token" }],
+    ["the server's cookie", { [SERVER_SESSION_COOKIE]: "opaque-token" }],
+  ])("hands an opaque session in %s on unchecked when told to", async (_label, cookies) => {
+    const fetchMock = backend(() => new Response(null, { status: 401 }));
+
+    const resolved = await resolveSession(request(cookies), {
+      ...OPTIONS,
+      checkOpaqueSession: false,
+    });
+
+    expect(resolved).toEqual({
+      auth: SIGNED_OUT,
+      undecided: false,
+      cookies: [],
+      unchecked: "opaque-token",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   describe("with JWTs", () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const jwk = {
@@ -1174,6 +1197,27 @@ describe("resolveSession", () => {
         undecided: false,
       });
     });
+
+    // Judging a JWT takes no call to the backend, so it is judged either way.
+    it.each([
+      ["a JWT of this project", {}, { signedIn: true, cookies: [] }],
+      ["an expired JWT", { exp: 1 }, { signedIn: false, cookies: [CLEARED] }],
+    ])(
+      "judges a cookie holding %s when told not to check an opaque one",
+      async (_label, claims, expected) => {
+        keysAnd();
+
+        const { auth, cookies, unchecked } = await resolveSession(request({ [OWN]: jwt(claims) }), {
+          ...OPTIONS,
+          checkOpaqueSession: false,
+        });
+
+        expect({ signedIn: auth.isAuthenticated, cookies, unchecked }).toEqual({
+          ...expected,
+          unchecked: undefined,
+        });
+      },
+    );
 
     it("copies a JWT of this project out of the server's cookie, for as long as it lives", async () => {
       backend(() => Response.json({ keys: [jwk] }));

@@ -61,10 +61,13 @@ const checkOpaqueSession = cache(
  *   `identifier`, `identifierProperty`, `display`). The lookup is deduplicated
  *   per render pass via React `cache()`.
  *
- * The header alone is never proof of anything: on routes the middleware
+ * The header alone is never proof of anything, so `auth()` verifies every
+ * value it reads. Off a protected route the middleware hands an opaque token
+ * on unchecked, so that a page that never reads the session costs no call to
+ * the backend: there `auth()` is the one check. On routes the middleware
  * `matcher` does not cover, the middleware cannot refuse a forged
- * client-supplied header, so `auth()` re-verifies every value it reads.
- * A header value that fails verification is treated as signed out.
+ * client-supplied header. A header value that fails verification is treated
+ * as signed out.
  *
  * Either way a session counts only in the app's own project: `projectId`,
  * else `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`, else the

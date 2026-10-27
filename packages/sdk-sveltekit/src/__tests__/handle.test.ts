@@ -919,7 +919,7 @@ describe("server middleware", () => {
     expect(served.status).toBe(302);
   });
 
-  it("clears a dead session cookie on a public page", async () => {
+  it("reads a dead session cookie as signed out on a public page", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
@@ -928,6 +928,7 @@ describe("server middleware", () => {
       OPTIONS,
     );
 
+    expect(served.auth).toEqual({ isAuthenticated: false, session: null });
     expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });

@@ -116,11 +116,14 @@ function captureFetch(response: () => Response = () => new Response("{}", { stat
   return calls;
 }
 
-/** Answers the opaque-session lookup (`GET /sessions/me`) with `response`. */
+/**
+ * Answers the opaque-session lookup (`GET /sessions/me`) with `response`, a
+ * copy each time: the middleware and `auth()` may both ask.
+ */
 function sessionsMe(response: Response): void {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => response),
+    vi.fn(async () => response.clone()),
   );
 }
 
@@ -235,11 +238,10 @@ async function serve(
       inbound.set(name.slice("x-middleware-request-".length), value);
     }
   }
-  const token = inbound.get("x-nextgen-auth-token");
+  // A server component reads the session with auth(), which checks the token
+  // the middleware handed on: off a protected route, an opaque one unchecked.
   const auth = continued
-    ? ((token
-        ? { isAuthenticated: true, session: { token } }
-        : { isAuthenticated: false, session: null }) as AuthResult)
+    ? await readAuth({ "x-nextgen-auth-token": inbound.get("x-nextgen-auth-token") ?? "" }, options)
     : undefined;
   return {
     answered: !continued,
@@ -262,13 +264,13 @@ function configureProject(configured?: string, environment?: string): ServeOptio
   return { projectId: configured };
 }
 
-async function readAuth(context: unknown): Promise<AuthResult> {
+async function readAuth(context: unknown, options: ServeOptions = {}): Promise<AuthResult> {
   mockHeaders.clear();
   for (const [name, value] of Object.entries((context ?? {}) as Record<string, string>)) {
     mockHeaders.set(name, value);
   }
   const { auth } = await import("../auth.js");
-  return auth();
+  return auth(options);
 }
 
 function expectHandlerType(): void {
@@ -884,7 +886,9 @@ describe("server middleware", () => {
     expect(served.status).toBe(302);
   });
 
-  it("clears a dead session cookie on a public page", async () => {
+  // Off a protected route the middleware leaves an opaque session to auth(),
+  // so the cookie stays until a protected route finds it dead and clears it.
+  it("reads a dead session cookie as signed out on a public page", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
@@ -893,8 +897,8 @@ describe("server middleware", () => {
       OPTIONS,
     );
 
-    expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
-    expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
+    expect(served.auth).toEqual({ isAuthenticated: false, session: null });
+    expect(served.headers.get("set-cookie")).toBeNull();
   });
 
   it("clears a dead session cookie and redirects on a protected route", async () => {
@@ -911,6 +915,7 @@ describe("server middleware", () => {
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("clears the cookie of a session that is gone", async () => {
     sessionsMe(
       Response.json(
@@ -920,7 +925,7 @@ describe("server middleware", () => {
     );
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1075,12 +1080,13 @@ describe("server middleware", () => {
   });
 
   // A shared cache must hand neither the cookie nor the session token in it to
-  // the next visitor.
+  // the next visitor. On a protected route: only there does the middleware ask
+  // about an opaque session.
   it("keeps a page that sets a session cookie out of shared caches", async () => {
     sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       { headers: { cookie: `${SHARED}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1089,11 +1095,12 @@ describe("server middleware", () => {
     expect(served.headers.get("cache-control")).toBe("private, no-store");
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("copies with Secure behind a TLS proxy that talks to the app over loopback", async () => {
     sessionsMe(Response.json({ project_id: PROJECT, user_id: "u1" }));
 
     const served = await serve(
-      "http://127.0.0.1:3000/",
+      "http://127.0.0.1:3000/admin",
       {
         headers: {
           cookie: `${SHARED}=opaque-session-token`,
@@ -1108,12 +1115,13 @@ describe("server middleware", () => {
   });
 
   // Safari drops a Secure cookie over plain http, and it would keep sending
-  // the dead one.
+  // the dead one. On a protected route: only there does the middleware ask
+  // about an opaque session.
   it("clears a dead session cookie without Secure over plain http to a loopback address", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
-      "http://127.0.0.1:3000/",
+      "http://127.0.0.1:3000/admin",
       { headers: { cookie: `${SESSION}=opaque-session-token` } },
       OPTIONS,
     );
@@ -1123,11 +1131,12 @@ describe("server middleware", () => {
     expect(cleared).not.toMatch(/; Secure(;|$)/i);
   });
 
+  // On a protected route: only there does the middleware ask about an opaque session.
   it("clears only this project's dead session cookie", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
-      `${ORIGIN}/`,
+      `${ORIGIN}/admin`,
       {
         headers: {
           cookie: `${SHARED}=console; __nextgen_session_${OTHER_PROJECT}=other; ${SESSION}=dead`,
