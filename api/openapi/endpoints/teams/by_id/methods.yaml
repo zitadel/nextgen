@@ -52,6 +52,8 @@ delete:
     team.owns_project`: deactivating it would leave the project owned by a
     dead team and so unmanageable. No endpoint releases that ownership yet,
     so such a team cannot currently be deactivated through the API.
+    Deactivating any other team that would leave a project with nobody who
+    can administer it is refused with `409 proj.last_admin`.
   tags:
     - Teams
   parameters:
@@ -83,7 +85,12 @@ delete:
           schema:
             $ref: ../../../components/error-details.yaml
     '409':
-      description: The team still owns a project and cannot be deactivated.
+      description: |
+        The team still owns a project and cannot be deactivated
+        (`team.owns_project`), or deactivating it would leave a project
+        without someone who can administer it (`proj.last_admin`). Grant
+        admin to someone else, then retry. For `proj.last_admin`,
+        `details.details.project_ids` names the projects.
       content:
         application/json:
           schema:

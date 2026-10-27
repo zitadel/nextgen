@@ -46,6 +46,7 @@ Flow `Fields` value decode failures attach `{field}` only (no parser text, no pa
 | `domain/policy.go` `PolicyInvalidDetails` | typed `{violations: [{setting} \| {config_rule, settings}]}` | **Reference** — every setting and config rule a published policy fails, by name, never a value |
 | `service/auth_attempt.go` unsupported proof | was string `WithDetails` | **Fixed** — moved to `Message` |
 | `domain/deployment.go` `ErrDeploymentInvalid` | explanation | **Fixed** — callers set it with `WithMessage` |
+| `domain/project.go` `ErrProjectLastAdmin` | typed `{project_ids}` | **Reference** — the projects the change would leave with nobody who can administer them; the message names the same ids |
 | `deployment.go` `deploymentConflictResponse` | typed `{deployment}` | **Reference** — hand-built typed 409, so `details.deployment` is flat and in the API's deployment shape |
 | `service/list.go`, `service/project.go`, `service/team.go` filter/sort strings | string `WithDetails` | **Deferred** — inventory only this PR |
 | crypto / token / signing / encryption `WithDetails` | strings or maps | **Deferred** — often internal; review before promoting to public details |

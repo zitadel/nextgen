@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -263,15 +264,21 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "ok",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(activeTeam("team_1"), nil)
 				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
+				s.EXPECT().ListProjectsTouchedByAdminRemoval(gomock.Any(), domain.AdminRemoval{TeamID: "team_1"}).Return(nil, nil)
+				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
 			},
 		},
 		{
 			name:   "already deactivated does not emit",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, nil)
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(&domain.Team{
+					ProjectID: "proj_1",
+					ID:        "team_1",
+					Status:    domain.TeamStatusDeactivated,
+				}, nil)
 				// InsertEvent must not be required; AnyTimes helper still allows zero calls.
 			},
 		},
@@ -279,13 +286,16 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "unknown team",
 			teamID: "missing",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "missing").Return(false, nil)
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "missing").Return(nil, database.NewNoRowFoundError(nil))
 			},
 		},
 		{
 			name:   "deactivate fails",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(activeTeam("team_1"), nil)
+				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil)
+				s.EXPECT().ListProjectsTouchedByAdminRemoval(gomock.Any(), domain.AdminRemoval{TeamID: "team_1"}).Return(nil, nil)
 				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
@@ -296,17 +306,34 @@ func TestTeamService_Delete(t *testing.T) {
 			name:   "team that owns a project is refused",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(activeTeam("team_1"), nil)
 				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(true, nil)
 				// No event: the transaction rolls back, so nothing is recorded.
 			},
 			wantErr: domain.ErrTeamOwnsProject(),
 		},
 		{
+			name:   "last administrator is refused before deactivate",
+			teamID: "team_1",
+			setupStmt: func(s *servicemocks.MockAllStatements) {
+				gomock.InOrder(
+					s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(activeTeam("team_1"), nil),
+					s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, nil),
+					s.EXPECT().ListProjectsTouchedByAdminRemoval(gomock.Any(), domain.AdminRemoval{TeamID: "team_1"}).
+						Return([]string{"proj_b", "proj_a"}, nil),
+					s.EXPECT().LockProject(gomock.Any(), "proj_a").Return(nil),
+					s.EXPECT().LockProject(gomock.Any(), "proj_b").Return(nil),
+					s.EXPECT().ListProjectsLosingLastAdmin(gomock.Any(), domain.AdminRemoval{TeamID: "team_1"}).
+						Return([]string{"proj_b"}, nil),
+				)
+			},
+			wantErr: domain.ErrProjectLastAdmin(nil),
+		},
+		{
 			name:   "ownership lookup fails",
 			teamID: "team_1",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().DeactivateTeam(gomock.Any(), "proj_1", "team_1").Return(true, nil)
+				s.EXPECT().GetTeamByID(gomock.Any(), "proj_1", "team_1").Return(activeTeam("team_1"), nil)
 				s.EXPECT().HasActiveOwningTeamGrant(gomock.Any(), "team_1").Return(false, assert.AnError)
 			},
 			wantErr: domain.ErrInternal(assert.AnError),
@@ -322,6 +349,10 @@ func TestTeamService_Delete(t *testing.T) {
 			err := svc.Delete(t.Context(), "proj_1", tc.teamID)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
+				if errors.Is(tc.wantErr, domain.ErrProjectLastAdmin(nil)) {
+					assert.Contains(t, err.Error(), "proj_b")
+					assert.Contains(t, err.Error(), "Grant admin to someone else")
+				}
 				return
 			}
 			require.NoError(t, err)
@@ -739,6 +770,10 @@ func TestTeamService_List_ValidationErrors(t *testing.T) {
 			assert.Nil(t, resp)
 		})
 	}
+}
+
+func activeTeam(id string) *domain.Team {
+	return &domain.Team{ProjectID: "proj_1", ID: id, Status: domain.TeamStatusActive}
 }
 
 func newMockedTeamService(t *testing.T, setupStmt func(*servicemocks.MockAllStatements)) *service.TeamService {

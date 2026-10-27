@@ -387,3 +387,38 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }
+
+// ListProjectsTouchedByAdminRemoval implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	return s.listAdminRemovalProjects(ctx, removal, false)
+}
+
+// ListProjectsLosingLastAdmin implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	return s.listAdminRemovalProjects(ctx, removal, true)
+}
+
+func (s authzAssignmentStatements) listAdminRemovalProjects(ctx context.Context, removal domain.AdminRemoval, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastAdmin(&c, spannerAuthzEnv(), removal)
+	} else {
+		authz.WriteProjectsTouchedByAdminRemoval(&c, spannerAuthzEnv(), removal)
+	}
+	var ids []string
+	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {
+		var qErr error
+		ids, qErr = collectRows(iter, func(row *spanner.Row) (string, error) {
+			var id string
+			if err := row.Columns(&id); err != nil {
+				return "", err
+			}
+			return id, nil
+		})
+		return qErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return ids, nil
+}

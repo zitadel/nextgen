@@ -517,7 +517,8 @@ func TestGrantQuery(t *testing.T) {
 	require.True(t, ok, helpers.MustMarshal(t, teamGrantResp))
 
 	revokedUserID := harness.CreateUserWithTeam(t, platform.ID)
-	revokedResp, err := client.CreateGrant(t.Context(), userIDGrant(revokedUserID, api.CreateGrantRequestRelationAdmin), api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
+	// Viewer, so revoking it is not the last person who can administer the project.
+	revokedResp, err := client.CreateGrant(t.Context(), userIDGrant(revokedUserID, api.CreateGrantRequestRelationViewer), api.CreateGrantParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
 	revokedGrant, ok := revokedResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, revokedResp))
@@ -694,7 +695,8 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.True(t, ok, helpers.MustMarshal(t, teamGrantResp))
 
 	deletedUserID := harness.CreateUserWithTeam(t, platform.ID)
-	deletedGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(deletedUserID, api.CreateGrantRequestRelationAdmin), createParams)
+	// Viewer, so deleting the user is not the last person who can administer the project.
+	deletedGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(deletedUserID, api.CreateGrantRequestRelationViewer), createParams)
 	require.NoError(t, err)
 	deletedGrant, ok := deletedGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, deletedGrantResp))

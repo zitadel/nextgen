@@ -19465,6 +19465,10 @@ func (s *CsrfTokenResponseHeaders) SetResponse(val CsrfTokenResponse) {
 
 func (*CsrfTokenResponseHeaders) getMySessionCsrfTokenRes() {}
 
+type DeleteGrantConflict ErrorDetails
+
+func (*DeleteGrantConflict) deleteGrantRes() {}
+
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {
 	Type                  DeleteGrantErrorResponseType // switch on this field
@@ -19475,6 +19479,7 @@ type DeleteGrantErrorResponse struct {
 	GrantPermissionDenied GrantPermissionDenied
 	Internal              Internal
 	NotImplemented        NotImplemented
+	ProjLastAdmin         ProjLastAdmin
 	ReqInvalid            ReqInvalid
 	Unavailable           Unavailable
 }
@@ -19491,6 +19496,7 @@ const (
 	GrantPermissionDeniedDeleteGrantErrorResponse DeleteGrantErrorResponseType = "grant.permission_denied"
 	InternalDeleteGrantErrorResponse              DeleteGrantErrorResponseType = "internal"
 	NotImplementedDeleteGrantErrorResponse        DeleteGrantErrorResponseType = "not_implemented"
+	ProjLastAdminDeleteGrantErrorResponse         DeleteGrantErrorResponseType = "proj.last_admin"
 	ReqInvalidDeleteGrantErrorResponse            DeleteGrantErrorResponseType = "req.invalid"
 	UnavailableDeleteGrantErrorResponse           DeleteGrantErrorResponseType = "unavailable"
 )
@@ -19528,6 +19534,11 @@ func (s DeleteGrantErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether DeleteGrantErrorResponse is NotImplemented.
 func (s DeleteGrantErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedDeleteGrantErrorResponse
+}
+
+// IsProjLastAdmin reports whether DeleteGrantErrorResponse is ProjLastAdmin.
+func (s DeleteGrantErrorResponse) IsProjLastAdmin() bool {
+	return s.Type == ProjLastAdminDeleteGrantErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteGrantErrorResponse is ReqInvalid.
@@ -19687,6 +19698,27 @@ func NewNotImplementedDeleteGrantErrorResponse(v NotImplemented) DeleteGrantErro
 	return s
 }
 
+// SetProjLastAdmin sets DeleteGrantErrorResponse to ProjLastAdmin.
+func (s *DeleteGrantErrorResponse) SetProjLastAdmin(v ProjLastAdmin) {
+	s.Type = ProjLastAdminDeleteGrantErrorResponse
+	s.ProjLastAdmin = v
+}
+
+// GetProjLastAdmin returns ProjLastAdmin and true boolean if DeleteGrantErrorResponse is ProjLastAdmin.
+func (s DeleteGrantErrorResponse) GetProjLastAdmin() (v ProjLastAdmin, ok bool) {
+	if !s.IsProjLastAdmin() {
+		return v, false
+	}
+	return s.ProjLastAdmin, true
+}
+
+// NewProjLastAdminDeleteGrantErrorResponse returns new DeleteGrantErrorResponse from ProjLastAdmin.
+func NewProjLastAdminDeleteGrantErrorResponse(v ProjLastAdmin) DeleteGrantErrorResponse {
+	var s DeleteGrantErrorResponse
+	s.SetProjLastAdmin(v)
+	return s
+}
+
 // SetReqInvalid sets DeleteGrantErrorResponse to ReqInvalid.
 func (s *DeleteGrantErrorResponse) SetReqInvalid(v ReqInvalid) {
 	s.Type = ReqInvalidDeleteGrantErrorResponse
@@ -19789,6 +19821,7 @@ type DeleteTeamErrorResponse struct {
 	EvtInvalid           EvtInvalid
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjLastAdmin        ProjLastAdmin
 	ReqInvalid           ReqInvalid
 	TeamTeamNotFound     TeamTeamNotFound
 	TeamOwnsProject      TeamOwnsProject
@@ -19805,6 +19838,7 @@ const (
 	EvtInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "evt.invalid"
 	InternalDeleteTeamErrorResponse             DeleteTeamErrorResponseType = "internal"
 	NotImplementedDeleteTeamErrorResponse       DeleteTeamErrorResponseType = "not_implemented"
+	ProjLastAdminDeleteTeamErrorResponse        DeleteTeamErrorResponseType = "proj.last_admin"
 	ReqInvalidDeleteTeamErrorResponse           DeleteTeamErrorResponseType = "req.invalid"
 	TeamTeamNotFoundDeleteTeamErrorResponse     DeleteTeamErrorResponseType = "team.team_not_found"
 	TeamOwnsProjectDeleteTeamErrorResponse      DeleteTeamErrorResponseType = "team.owns_project"
@@ -19828,6 +19862,11 @@ func (s DeleteTeamErrorResponse) IsInternal() bool { return s.Type == InternalDe
 // IsNotImplemented reports whether DeleteTeamErrorResponse is NotImplemented.
 func (s DeleteTeamErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedDeleteTeamErrorResponse
+}
+
+// IsProjLastAdmin reports whether DeleteTeamErrorResponse is ProjLastAdmin.
+func (s DeleteTeamErrorResponse) IsProjLastAdmin() bool {
+	return s.Type == ProjLastAdminDeleteTeamErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteTeamErrorResponse is ReqInvalid.
@@ -19936,6 +19975,27 @@ func (s DeleteTeamErrorResponse) GetNotImplemented() (v NotImplemented, ok bool)
 func NewNotImplementedDeleteTeamErrorResponse(v NotImplemented) DeleteTeamErrorResponse {
 	var s DeleteTeamErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastAdmin sets DeleteTeamErrorResponse to ProjLastAdmin.
+func (s *DeleteTeamErrorResponse) SetProjLastAdmin(v ProjLastAdmin) {
+	s.Type = ProjLastAdminDeleteTeamErrorResponse
+	s.ProjLastAdmin = v
+}
+
+// GetProjLastAdmin returns ProjLastAdmin and true boolean if DeleteTeamErrorResponse is ProjLastAdmin.
+func (s DeleteTeamErrorResponse) GetProjLastAdmin() (v ProjLastAdmin, ok bool) {
+	if !s.IsProjLastAdmin() {
+		return v, false
+	}
+	return s.ProjLastAdmin, true
+}
+
+// NewProjLastAdminDeleteTeamErrorResponse returns new DeleteTeamErrorResponse from ProjLastAdmin.
+func NewProjLastAdminDeleteTeamErrorResponse(v ProjLastAdmin) DeleteTeamErrorResponse {
+	var s DeleteTeamErrorResponse
+	s.SetProjLastAdmin(v)
 	return s
 }
 
@@ -20085,6 +20145,10 @@ type DeleteTeamUnauthorized ErrorDetails
 
 func (*DeleteTeamUnauthorized) deleteTeamRes() {}
 
+type DeleteUserByIDConflict ErrorDetails
+
+func (*DeleteUserByIDConflict) deleteUserByIDRes() {}
+
 // DeleteUserByIDErrorResponse represents sum type.
 type DeleteUserByIDErrorResponse struct {
 	Type                 DeleteUserByIDErrorResponseType // switch on this field
@@ -20093,6 +20157,7 @@ type DeleteUserByIDErrorResponse struct {
 	EvtInvalid           EvtInvalid
 	Internal             Internal
 	NotImplemented       NotImplemented
+	ProjLastAdmin        ProjLastAdmin
 	ReqInvalid           ReqInvalid
 	Unavailable          Unavailable
 	UserNotFound         UserNotFound
@@ -20109,6 +20174,7 @@ const (
 	EvtInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "evt.invalid"
 	InternalDeleteUserByIDErrorResponse             DeleteUserByIDErrorResponseType = "internal"
 	NotImplementedDeleteUserByIDErrorResponse       DeleteUserByIDErrorResponseType = "not_implemented"
+	ProjLastAdminDeleteUserByIDErrorResponse        DeleteUserByIDErrorResponseType = "proj.last_admin"
 	ReqInvalidDeleteUserByIDErrorResponse           DeleteUserByIDErrorResponseType = "req.invalid"
 	UnavailableDeleteUserByIDErrorResponse          DeleteUserByIDErrorResponseType = "unavailable"
 	UserNotFoundDeleteUserByIDErrorResponse         DeleteUserByIDErrorResponseType = "user.not_found"
@@ -20138,6 +20204,11 @@ func (s DeleteUserByIDErrorResponse) IsInternal() bool {
 // IsNotImplemented reports whether DeleteUserByIDErrorResponse is NotImplemented.
 func (s DeleteUserByIDErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedDeleteUserByIDErrorResponse
+}
+
+// IsProjLastAdmin reports whether DeleteUserByIDErrorResponse is ProjLastAdmin.
+func (s DeleteUserByIDErrorResponse) IsProjLastAdmin() bool {
+	return s.Type == ProjLastAdminDeleteUserByIDErrorResponse
 }
 
 // IsReqInvalid reports whether DeleteUserByIDErrorResponse is ReqInvalid.
@@ -20262,6 +20333,27 @@ func (s DeleteUserByIDErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedDeleteUserByIDErrorResponse(v NotImplemented) DeleteUserByIDErrorResponse {
 	var s DeleteUserByIDErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastAdmin sets DeleteUserByIDErrorResponse to ProjLastAdmin.
+func (s *DeleteUserByIDErrorResponse) SetProjLastAdmin(v ProjLastAdmin) {
+	s.Type = ProjLastAdminDeleteUserByIDErrorResponse
+	s.ProjLastAdmin = v
+}
+
+// GetProjLastAdmin returns ProjLastAdmin and true boolean if DeleteUserByIDErrorResponse is ProjLastAdmin.
+func (s DeleteUserByIDErrorResponse) GetProjLastAdmin() (v ProjLastAdmin, ok bool) {
+	if !s.IsProjLastAdmin() {
+		return v, false
+	}
+	return s.ProjLastAdmin, true
+}
+
+// NewProjLastAdminDeleteUserByIDErrorResponse returns new DeleteUserByIDErrorResponse from ProjLastAdmin.
+func NewProjLastAdminDeleteUserByIDErrorResponse(v ProjLastAdmin) DeleteUserByIDErrorResponse {
+	var s DeleteUserByIDErrorResponse
+	s.SetProjLastAdmin(v)
 	return s
 }
 
@@ -32329,6 +32421,7 @@ type GetFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastAdmin               ProjLastAdmin
 	RelNotFound                 RelNotFound
 	RelRevoked                  RelRevoked
 	ReqInvalid                  ReqInvalid
@@ -32373,6 +32466,7 @@ const (
 	InternalGetFlowStepErrorResponse                    GetFlowStepErrorResponseType = "internal"
 	TknInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedGetFlowStepErrorResponse              GetFlowStepErrorResponseType = "not_implemented"
+	ProjLastAdminGetFlowStepErrorResponse               GetFlowStepErrorResponseType = "proj.last_admin"
 	RelNotFoundGetFlowStepErrorResponse                 GetFlowStepErrorResponseType = "rel.not_found"
 	RelRevokedGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "rel.revoked"
 	ReqInvalidGetFlowStepErrorResponse                  GetFlowStepErrorResponseType = "req.invalid"
@@ -32510,6 +32604,11 @@ func (s GetFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether GetFlowStepErrorResponse is NotImplemented.
 func (s GetFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedGetFlowStepErrorResponse
+}
+
+// IsProjLastAdmin reports whether GetFlowStepErrorResponse is ProjLastAdmin.
+func (s GetFlowStepErrorResponse) IsProjLastAdmin() bool {
+	return s.Type == ProjLastAdminGetFlowStepErrorResponse
 }
 
 // IsRelNotFound reports whether GetFlowStepErrorResponse is RelNotFound.
@@ -33094,6 +33193,27 @@ func (s GetFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok bool
 func NewNotImplementedGetFlowStepErrorResponse(v NotImplemented) GetFlowStepErrorResponse {
 	var s GetFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastAdmin sets GetFlowStepErrorResponse to ProjLastAdmin.
+func (s *GetFlowStepErrorResponse) SetProjLastAdmin(v ProjLastAdmin) {
+	s.Type = ProjLastAdminGetFlowStepErrorResponse
+	s.ProjLastAdmin = v
+}
+
+// GetProjLastAdmin returns ProjLastAdmin and true boolean if GetFlowStepErrorResponse is ProjLastAdmin.
+func (s GetFlowStepErrorResponse) GetProjLastAdmin() (v ProjLastAdmin, ok bool) {
+	if !s.IsProjLastAdmin() {
+		return v, false
+	}
+	return s.ProjLastAdmin, true
+}
+
+// NewProjLastAdminGetFlowStepErrorResponse returns new GetFlowStepErrorResponse from ProjLastAdmin.
+func NewProjLastAdminGetFlowStepErrorResponse(v ProjLastAdmin) GetFlowStepErrorResponse {
+	var s GetFlowStepErrorResponse
+	s.SetProjLastAdmin(v)
 	return s
 }
 
@@ -60121,6 +60241,52 @@ func (o OptProjClaimWindowExpiredDetails) Or(d ProjClaimWindowExpiredDetails) Pr
 	return d
 }
 
+// NewOptProjLastAdminDetails returns new OptProjLastAdminDetails with value set to v.
+func NewOptProjLastAdminDetails(v ProjLastAdminDetails) OptProjLastAdminDetails {
+	return OptProjLastAdminDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptProjLastAdminDetails is optional ProjLastAdminDetails.
+type OptProjLastAdminDetails struct {
+	Value ProjLastAdminDetails
+	Set   bool
+}
+
+// IsSet returns true if OptProjLastAdminDetails was set.
+func (o OptProjLastAdminDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptProjLastAdminDetails) Reset() {
+	var v ProjLastAdminDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptProjLastAdminDetails) SetTo(v ProjLastAdminDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptProjLastAdminDetails) Get() (v ProjLastAdminDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptProjLastAdminDetails) Or(d ProjLastAdminDetails) ProjLastAdminDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptProjMismatchDetails returns new OptProjMismatchDetails with value set to v.
 func NewOptProjMismatchDetails(v ProjMismatchDetails) OptProjMismatchDetails {
 	return OptProjMismatchDetails{
@@ -70788,6 +70954,59 @@ func (*ProjClaimWindowExpired) initClaimRes() {}
 type ProjClaimWindowExpiredDetails map[string]jx.Raw
 
 func (s *ProjClaimWindowExpiredDetails) init() ProjClaimWindowExpiredDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
+// Merged schema.
+// Ref: #
+type ProjLastAdmin struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptProjLastAdminDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *ProjLastAdmin) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *ProjLastAdmin) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *ProjLastAdmin) GetDetails() OptProjLastAdminDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *ProjLastAdmin) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *ProjLastAdmin) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *ProjLastAdmin) SetDetails(val OptProjLastAdminDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type ProjLastAdminDetails map[string]jx.Raw
+
+func (s *ProjLastAdminDetails) init() ProjLastAdminDetails {
 	m := *s
 	if m == nil {
 		m = map[string]jx.Raw{}
@@ -85127,6 +85346,7 @@ type SubmitFlowStepErrorResponse struct {
 	Internal                    Internal
 	TknInvalid                  TknInvalid
 	NotImplemented              NotImplemented
+	ProjLastAdmin               ProjLastAdmin
 	ProjOriginNotAllowed        ProjOriginNotAllowed
 	ProjPreviewNotLive          ProjPreviewNotLive
 	RelNotFound                 RelNotFound
@@ -85173,6 +85393,7 @@ const (
 	InternalSubmitFlowStepErrorResponse                    SubmitFlowStepErrorResponseType = "internal"
 	TknInvalidSubmitFlowStepErrorResponse                  SubmitFlowStepErrorResponseType = "tkn.invalid"
 	NotImplementedSubmitFlowStepErrorResponse              SubmitFlowStepErrorResponseType = "not_implemented"
+	ProjLastAdminSubmitFlowStepErrorResponse               SubmitFlowStepErrorResponseType = "proj.last_admin"
 	ProjOriginNotAllowedSubmitFlowStepErrorResponse        SubmitFlowStepErrorResponseType = "proj.origin_not_allowed"
 	ProjPreviewNotLiveSubmitFlowStepErrorResponse          SubmitFlowStepErrorResponseType = "proj.preview_not_live"
 	RelNotFoundSubmitFlowStepErrorResponse                 SubmitFlowStepErrorResponseType = "rel.not_found"
@@ -85312,6 +85533,11 @@ func (s SubmitFlowStepErrorResponse) IsTknInvalid() bool {
 // IsNotImplemented reports whether SubmitFlowStepErrorResponse is NotImplemented.
 func (s SubmitFlowStepErrorResponse) IsNotImplemented() bool {
 	return s.Type == NotImplementedSubmitFlowStepErrorResponse
+}
+
+// IsProjLastAdmin reports whether SubmitFlowStepErrorResponse is ProjLastAdmin.
+func (s SubmitFlowStepErrorResponse) IsProjLastAdmin() bool {
+	return s.Type == ProjLastAdminSubmitFlowStepErrorResponse
 }
 
 // IsProjOriginNotAllowed reports whether SubmitFlowStepErrorResponse is ProjOriginNotAllowed.
@@ -85906,6 +86132,27 @@ func (s SubmitFlowStepErrorResponse) GetNotImplemented() (v NotImplemented, ok b
 func NewNotImplementedSubmitFlowStepErrorResponse(v NotImplemented) SubmitFlowStepErrorResponse {
 	var s SubmitFlowStepErrorResponse
 	s.SetNotImplemented(v)
+	return s
+}
+
+// SetProjLastAdmin sets SubmitFlowStepErrorResponse to ProjLastAdmin.
+func (s *SubmitFlowStepErrorResponse) SetProjLastAdmin(v ProjLastAdmin) {
+	s.Type = ProjLastAdminSubmitFlowStepErrorResponse
+	s.ProjLastAdmin = v
+}
+
+// GetProjLastAdmin returns ProjLastAdmin and true boolean if SubmitFlowStepErrorResponse is ProjLastAdmin.
+func (s SubmitFlowStepErrorResponse) GetProjLastAdmin() (v ProjLastAdmin, ok bool) {
+	if !s.IsProjLastAdmin() {
+		return v, false
+	}
+	return s.ProjLastAdmin, true
+}
+
+// NewProjLastAdminSubmitFlowStepErrorResponse returns new SubmitFlowStepErrorResponse from ProjLastAdmin.
+func NewProjLastAdminSubmitFlowStepErrorResponse(v ProjLastAdmin) SubmitFlowStepErrorResponse {
+	var s SubmitFlowStepErrorResponse
+	s.SetProjLastAdmin(v)
 	return s
 }
 

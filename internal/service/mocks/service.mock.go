@@ -5471,6 +5471,84 @@ func (c *MockAllStatementsListProjectsCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
+// ListProjectsLosingLastAdmin mocks base method.
+func (m *MockAllStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectsLosingLastAdmin", ctx, removal)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectsLosingLastAdmin indicates an expected call of ListProjectsLosingLastAdmin.
+func (mr *MockAllStatementsMockRecorder) ListProjectsLosingLastAdmin(ctx, removal any) *MockAllStatementsListProjectsLosingLastAdminCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastAdmin", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsLosingLastAdmin), ctx, removal)
+	return &MockAllStatementsListProjectsLosingLastAdminCall{Call: call}
+}
+
+// MockAllStatementsListProjectsLosingLastAdminCall wrap *gomock.Call
+type MockAllStatementsListProjectsLosingLastAdminCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListProjectsLosingLastAdminCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListProjectsLosingLastAdminCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListProjectsLosingLastAdminCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectsTouchedByAdminRemoval mocks base method.
+func (m *MockAllStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectsTouchedByAdminRemoval", ctx, removal)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectsTouchedByAdminRemoval indicates an expected call of ListProjectsTouchedByAdminRemoval.
+func (mr *MockAllStatementsMockRecorder) ListProjectsTouchedByAdminRemoval(ctx, removal any) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsTouchedByAdminRemoval", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsTouchedByAdminRemoval), ctx, removal)
+	return &MockAllStatementsListProjectsTouchedByAdminRemovalCall{Call: call}
+}
+
+// MockAllStatementsListProjectsTouchedByAdminRemovalCall wrap *gomock.Call
+type MockAllStatementsListProjectsTouchedByAdminRemovalCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListReleases mocks base method.
 func (m *MockAllStatements) ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error) {
 	m.ctrl.T.Helper()
@@ -6011,6 +6089,44 @@ func (c *MockAllStatementsLockPolicyCall) Do(f func(context.Context, string, str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsLockPolicyCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsLockPolicyCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LockProject mocks base method.
+func (m *MockAllStatements) LockProject(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockProject", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockProject indicates an expected call of LockProject.
+func (mr *MockAllStatementsMockRecorder) LockProject(ctx, id any) *MockAllStatementsLockProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockProject", reflect.TypeOf((*MockAllStatements)(nil).LockProject), ctx, id)
+	return &MockAllStatementsLockProjectCall{Call: call}
+}
+
+// MockAllStatementsLockProjectCall wrap *gomock.Call
+type MockAllStatementsLockProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLockProjectCall) Return(arg0 error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLockProjectCall) Do(f func(context.Context, string) error) *MockAllStatementsLockProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLockProjectCall) DoAndReturn(f func(context.Context, string) error) *MockAllStatementsLockProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -7310,6 +7426,44 @@ func (c *MockProjectStatementsListProjectsCall) Do(f func(context.Context, *data
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockProjectStatementsListProjectsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) *MockProjectStatementsListProjectsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// LockProject mocks base method.
+func (m *MockProjectStatements) LockProject(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LockProject", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LockProject indicates an expected call of LockProject.
+func (mr *MockProjectStatementsMockRecorder) LockProject(ctx, id any) *MockProjectStatementsLockProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LockProject", reflect.TypeOf((*MockProjectStatements)(nil).LockProject), ctx, id)
+	return &MockProjectStatementsLockProjectCall{Call: call}
+}
+
+// MockProjectStatementsLockProjectCall wrap *gomock.Call
+type MockProjectStatementsLockProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectStatementsLockProjectCall) Return(arg0 error) *MockProjectStatementsLockProjectCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectStatementsLockProjectCall) Do(f func(context.Context, string) error) *MockProjectStatementsLockProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectStatementsLockProjectCall) DoAndReturn(f func(context.Context, string) error) *MockProjectStatementsLockProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -12750,6 +12904,84 @@ func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) Do(f func(context.C
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)) *MockAuthzAssignmentStatementsListProjectAdminsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectsLosingLastAdmin mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectsLosingLastAdmin", ctx, removal)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectsLosingLastAdmin indicates an expected call of ListProjectsLosingLastAdmin.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsLosingLastAdmin(ctx, removal any) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastAdmin", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsLosingLastAdmin), ctx, removal)
+	return &MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectsTouchedByAdminRemoval mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectsTouchedByAdminRemoval", ctx, removal)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectsTouchedByAdminRemoval indicates an expected call of ListProjectsTouchedByAdminRemoval.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsTouchedByAdminRemoval(ctx, removal any) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsTouchedByAdminRemoval", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsTouchedByAdminRemoval), ctx, removal)
+	return &MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

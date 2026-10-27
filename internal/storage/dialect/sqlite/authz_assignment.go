@@ -368,3 +368,39 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 	}
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }
+
+// ListProjectsTouchedByAdminRemoval implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	return s.listAdminRemovalProjects(ctx, removal, false)
+}
+
+// ListProjectsLosingLastAdmin implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+	return s.listAdminRemovalProjects(ctx, removal, true)
+}
+
+func (s authzAssignmentStatements) listAdminRemovalProjects(ctx context.Context, removal domain.AdminRemoval, losing bool) ([]string, error) {
+	var c statementCompiler
+	if losing {
+		authz.WriteProjectsLosingLastAdmin(&c, sqliteAuthzEnv(), removal)
+	} else {
+		authz.WriteProjectsTouchedByAdminRemoval(&c, sqliteAuthzEnv(), removal)
+	}
+	rows, err := s.client.Query(ctx, c.String(), c.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, wrapError(err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, wrapError(err)
+	}
+	return ids, nil
+}

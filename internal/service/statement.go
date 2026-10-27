@@ -82,6 +82,12 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+	// LockProject locks the project row until the transaction ends. Callers
+	// that lock several projects do it in project id order, one row at a time.
+	// Postgres and Spanner take FOR UPDATE; SQLite already holds the write lock
+	// from BEGIN IMMEDIATE, so its statement is a plain read. Returns
+	// [database.NoRowFoundError] when no project carries the id.
+	LockProject(ctx context.Context, id string) error
 }
 
 // OriginStatements persists project origin patterns under the natural key
@@ -769,6 +775,20 @@ type AuthzAssignmentStatements interface {
 	// project's admin teams that viewerUserID is also an active member of.
 	// Each carries every way they administer the project.
 	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
+	// ListProjectsTouchedByAdminRemoval returns the projects, ordered by
+	// project id, where removal matches someone who can administer the project
+	// now. The same three sources as ListProjectAdmins, with no viewer filter
+	// and no page limit: an active member of the owning team, an existing user
+	// with an unexpired admin grant, or an active member of a team with an
+	// unexpired admin grant. Viewer and editor grants, platform operators, and
+	// the project secret do not count. A project that already has nobody in
+	// that set is absent.
+	ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error)
+	// ListProjectsLosingLastAdmin returns the projects from
+	// ListProjectsTouchedByAdminRemoval where nobody who can administer the
+	// project would remain after removal. One person reached by two sources
+	// counts once, and stays when only one of those sources is removed.
+	ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth

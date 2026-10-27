@@ -3800,7 +3800,9 @@ func (s *Server) handleCreateUserRequest(args [0]string, argsEscaped bool, w htt
 // Soft-revokes a grant this API manages and emits `authz.revoked`.
 // Already-revoked, missing, project-secret setup, and owning-team grants
 // return 404. The row is not un-revoked. Expired grants can still be
-// revoked so the unique binding can be reused.
+// revoked so the unique binding can be reused. Revoking an admin grant
+// that would leave the project with nobody who can administer it returns
+// 409 `proj.last_admin` and changes nothing.
 // Accepts either a project secret (`oauth2`) or a user-bound Console
 // session cookie (`nextgenSession`). Cookie-authenticated requests
 // follow the scheme's CSRF rules (`nextgenSession`).
@@ -4022,6 +4024,8 @@ func (s *Server) handleDeleteGrantRequest(args [1]string, argsEscaped bool, w ht
 // team.owns_project`: deactivating it would leave the project owned by a
 // dead team and so unmanageable. No endpoint releases that ownership yet,
 // so such a team cannot currently be deactivated through the API.
+// Deactivating any other team that would leave a project with nobody who
+// can administer it is refused with `409 proj.last_admin`.
 //
 // DELETE /teams/{team_id}
 func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -4211,7 +4215,9 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 // Deletes a user and removes them from every team they belong to.
 // The user is removed, not deactivated, and the deletion emits `user.deleted`.
 // With a project secret the request is idempotent: deleting a user that exists
-// in no project succeeds without changing anything.
+// in no project succeeds without changing anything. Deleting a user who is the
+// last person who can administer a project returns 409 `proj.last_admin` and
+// changes nothing.
 //
 // DELETE /users/{user_id}
 func (s *Server) handleDeleteUserByIDRequest(args [1]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

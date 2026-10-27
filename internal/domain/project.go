@@ -58,6 +58,25 @@ func ErrProjectClaimWindowExpired() Error {
 	)
 }
 
+// ProjectLastAdminDetails names the projects a change would leave with nobody
+// who can administer them. The wire nests this under details.details.
+type ProjectLastAdminDetails struct {
+	ProjectIDs []string `json:"project_ids"`
+}
+
+// ErrProjectLastAdmin refuses a change that would remove the last person who
+// can administer a project. The literal message is what the error schema
+// records; the call site overrides it with [Error.WithMessage] so the text a
+// client reads names projectIDs. Code stays proj.last_admin either way.
+func ErrProjectLastAdmin(projectIDs []string) Error {
+	return newError(
+		PrefixProject.ErrorCodePrefix("last_admin"),
+		"This change would leave a project without someone who can administer it. Grant admin to someone else, then try again.",
+		ProjectLastAdminDetails{ProjectIDs: projectIDs},
+		nil,
+	)
+}
+
 // Project is a minimal representation of the object defined [here](https://github.com/zitadel/nextgen/blob/main/docs/design/api/resource-map.md#projects)
 // It is hardly ever modified but read a lot therefore it should be stored in global tables.
 type Project struct {

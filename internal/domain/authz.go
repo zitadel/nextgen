@@ -415,6 +415,16 @@ const (
 	ProjectAdminFieldUserID
 )
 
+// AdminRemoval is the one thing a change drops from the set of people who can
+// administer a project. Exactly one field is set. An empty field matches
+// nothing, so excluding a grant does not drop an owning-team source (its grant
+// id is empty) and excluding a team does not drop a grant to a user.
+type AdminRemoval struct {
+	UserID  string
+	GrantID string
+	TeamID  string
+}
+
 // ProjectAdminSourceRecord is one way a person administers a project: through
 // the owning team, an admin grant to a team they are an active member of, or
 // an admin grant to them.

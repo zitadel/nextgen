@@ -220,6 +220,11 @@ func (s *GrantService) Revoke(ctx context.Context, projectID, id string) (err er
 		if asgn.RevokedAt != nil || !isManagedGrant(asgn) {
 			return domain.ErrGrantNotFound()
 		}
+		if asgn.Relation == "admin" {
+			if err := ensureProjectAdminRemains(ctx, tx.Statements(), domain.AdminRemoval{GrantID: asgn.ID}); err != nil {
+				return err
+			}
+		}
 		if err := tx.Statements().RevokeAuthzAssignment(ctx, projectID, id); err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrGrantNotFound()
