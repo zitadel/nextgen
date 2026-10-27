@@ -106,6 +106,7 @@ import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
   PickFrameworkPrompt,
+  type PromptContext,
   SETUP_PROMPTS,
   type SetupAnswers,
   type SsoDraft,
@@ -431,8 +432,11 @@ export default class Setup extends Promptable(BaseCommand) {
     };
 
     if (!nonInteractive && !dryRun) {
-      const promptCtx = {
+      const promptCtx: PromptContext = {
         input: wizardInput,
+        note: (title, lines) => this.ui.note(title, lines),
+        say: (text) => this.ui.say(text),
+        spinner: (label, options) => this.ui.spinner(label, options),
         framework: { id: app.framework, displayName: orca.displayName(app.framework) },
         suggest: (args: string) =>
           projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
