@@ -10,6 +10,7 @@ import { ZitadelError } from "../../../../src/lib/errors";
 import { Ui } from "../../../../src/lib/ui/ui";
 
 const watched = () => new Ui({ interactive: true, force: false });
+const normally = () => new Ui({ interactive: true, force: false }, "plain");
 const forced = () => new Ui({ interactive: true, force: true });
 const scripted = () => new Ui({ interactive: false, force: false });
 
@@ -156,11 +157,11 @@ describe("Ui", () => {
       );
     });
 
-    // A command that only answers says the same fact in the footer's own
-    // words. Grepping for the box's wording here asserts nothing: only the
-    // boxed renderer ever writes "Using".
-    it("says it in the footer's words for a command that drew no box", () => {
-      const ui = watched();
+    // A normal command says the same fact in the footer's own words. Grepping
+    // for the box's wording here asserts nothing: only the boxed renderer
+    // ever writes "Using".
+    it("says it in the footer's words for a normal command", () => {
+      const ui = normally();
       ui.ranAgainst("proj-1", "api.zitadel.cloud");
       ui.finish({ title: "Removed the origin", sections: [] });
 

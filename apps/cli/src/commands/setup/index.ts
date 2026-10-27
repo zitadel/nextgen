@@ -201,7 +201,7 @@ export default class Setup extends Promptable(BaseCommand) {
 
   static override heading = "Setting up Zitadel";
 
-  static override summarises = true;
+  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [

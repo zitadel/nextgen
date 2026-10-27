@@ -68,7 +68,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
 
   static override heading = "Adding an environment";
 
-  static override summarises = true;
+  static override wizard = true;
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",

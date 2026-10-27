@@ -9,7 +9,7 @@ vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 
-import { asTerminal } from "../../../../helpers/terminal";
+import { asTerminalTyping } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
@@ -471,30 +471,39 @@ describe("delete confirmation", () => {
   );
 
   it("asks the question with the verb, the resource and the id", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    const { shown } = await asTerminalTyping(["y"], () => deleting("revoke").run(["team_1"]));
 
-    await asTerminal(() => deleting("revoke").run(["team_1"]));
+    expect(shown).toContain("Revoke team team_1?");
+  });
 
-    expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ message: "Revoke team team_1?" });
+  // A generated resource command is a normal command, so its one question is a
+  // plain line: no chain around it, and no prompt drawn in one.
+  it("asks it plainly, not as a drawn prompt", async () => {
+    const { shown } = await asTerminalTyping(["y"], () => deleting("revoke").run(["team_1"]));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(shown).toContain("Revoke team team_1? [y/N] ");
   });
 
   it("is skipped when the answer is no", async () => {
-    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+    const { result } = await asTerminalTyping(["n"], () => deleting("delete").run(["team_1"]));
 
-    const envelope = await asTerminal(() => deleting("delete").run(["team_1"]));
-
-    expect(JSON.parse(JSON.stringify(envelope))).toMatchObject({
+    expect(JSON.parse(JSON.stringify(result))).toMatchObject({
       status: "skipped",
       reason: "delete-cancelled",
     });
   });
 
-  it("fails instead of skipping on Ctrl-C", async () => {
-    vi.mocked(isCancel).mockReturnValue(true);
-    vi.mocked(confirm).mockResolvedValueOnce(Symbol("cancel") as never);
+  it("fails instead of skipping when the person walks away", async () => {
+    await expect(
+      asTerminalTyping([], () => deleting("delete").run(["team_1"])),
+    ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_CANCELLED } }));
+  });
 
-    await expect(asTerminal(() => deleting("delete").run(["team_1"]))).rejects.toThrow();
+  // Clack's `└  Cancelled.` closes a chain, and a normal command never opened one.
+  it("closes no chain when the person walks away", async () => {
+    await asTerminalTyping([], () => deleting("delete").run(["team_1"])).catch(() => undefined);
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(cancel).not.toHaveBeenCalled();
   });
 });

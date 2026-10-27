@@ -8,8 +8,6 @@ export default class AuthMethodPasskeyDisable extends AuthMethodCommand {
   static override group = CommandGroups.authentication;
 
   static override heading = "Disabling passkey sign-in";
-
-  static override summarises = true;
   static override examples = [
     "<%= config.bin %> auth-method passkey disable",
     "<%= config.bin %> auth-method passkey disable --schema customers",

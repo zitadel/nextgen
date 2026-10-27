@@ -26,8 +26,6 @@ export default class Start extends BaseCommand {
   static override group = CommandGroups.gettingStarted;
 
   static override heading = "Starting the local Zitadel server";
-
-  static override summarises = true;
   static override groupOrder = 2;
   static override flags = {
     image: nonBlankString({ description: "Container image to run." }),

@@ -3,12 +3,13 @@ import { consola } from "consola";
 import pc from "picocolors";
 
 import { ZitadelError } from "../errors";
-import { asker } from "../input";
+import { asker, plainAsker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { GUTTER, Prose, WIDTH } from "./layout";
 import { MARK } from "./marks";
 import type { Narratable } from "./narration";
+import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
 import type { Questions } from "./questions";
 import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
@@ -20,10 +21,12 @@ import { Where } from "./where";
  * overview in `index.ts` draws one), and the only place `@clack/prompts` is
  * drawn with.
  *
- * It opens itself at the first thing the person sees, so a run that shows
- * nothing draws no frame, and it is closed exactly once, by {@link Chain.finish}
- * or {@link Chain.abort}. With a non-interactive {@link Audience} it draws
- * nothing at all and narration falls back to plain `consola` lines.
+ * Only a wizard has one. It opens itself at the first thing the person sees,
+ * so a run that shows nothing draws no frame, and it is closed exactly once,
+ * by {@link Chain.finish} or {@link Chain.abort}. A `plain`
+ * {@link Presentation} draws no chain however the run goes, and with a
+ * non-interactive {@link Audience} nothing is drawn at all; either way
+ * narration falls back to plain `consola` lines.
  *
  * A command never opens or closes it: it asks ({@link Chain.questions}), notes
  * what the person must act on, reports its work, and the base command closes
@@ -38,10 +41,17 @@ export class Chain implements Drawing, Narratable {
   /** Whether a prompt or a box was the last thing drawn, so the next line needs a blank guide line. */
   private gap = false;
   private readonly audience: Audience;
+  private readonly presentation: Presentation;
   private readonly progress = new Progress(this);
 
-  constructor(audience: Audience) {
+  constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.audience = audience;
+    this.presentation = presentation;
+  }
+
+  /** Whether this command's output is a chain at all. See {@link Presentation}. */
+  private get drawsAChain(): boolean {
+    return this.presentation === "wizard" && this.audience.interactive;
   }
 
   describe(title: string): void {
@@ -70,8 +80,16 @@ export class Chain implements Drawing, Narratable {
     this.gap = false;
   }
 
-  /** One line in the chain: its mark, then the text. A blank guide line first after a prompt. */
+  /**
+   * One line in the chain: its mark, then the text. A blank guide line first
+   * after a prompt. A command with no chain to draw it in says it plainly, so
+   * a line of narration cannot grow a gutter around a normal command.
+   */
   narrate(symbol: string, text: string): void {
+    if (this.presentation === "plain" && this.audience.interactive) {
+      consola.log(text);
+      return;
+    }
     this.open();
     // A bridged line is whatever the caller passed `consola`, so it obeys no
     // width of its own: wrapped here, or a long warning runs past the gutter.
@@ -83,7 +101,7 @@ export class Chain implements Drawing, Narratable {
   }
 
   open(): void {
-    if (this.audience.interactive && !this.opened) {
+    if (this.drawsAChain && !this.opened) {
       this.opened = true;
       intro(this.title);
     }
@@ -98,9 +116,9 @@ export class Chain implements Drawing, Narratable {
     if (this.ended || !this.audience.interactive) {
       return;
     }
-    const ending = new Ending(summary, this.where(summary.ran), this.opened);
-    // A command that answered without asking anything draws no chain: its
-    // answer stands on its own, with a footer rather than a closing line.
+    const ending = new Ending(summary, this.where(summary.ran), this.presentation);
+    // A normal command draws no chain: its answer stands on its own, with a
+    // footer rather than a closing line, however the run went.
     if (ending.standalone) {
       this.ended = true;
       process.stdout.write(ending.renderStandalone());
@@ -120,7 +138,7 @@ export class Chain implements Drawing, Narratable {
    * The caller decides where it goes, so the chain's own state is left alone.
    */
   ending(summary: Summary): string {
-    return new Ending(summary, this.where(summary.ran), this.opened).render() ?? "";
+    return new Ending(summary, this.where(summary.ran), this.presentation).render() ?? "";
   }
 
   /**
@@ -147,8 +165,10 @@ export class Chain implements Drawing, Narratable {
   }
 
   /**
-   * The five questions, bound to this chain: each one opens the chain before
-   * its prompt is drawn and leaves the blank guide line it needs after it.
+   * The five questions, asked the way this command presents itself. A wizard's
+   * are drawn in its chain: each one opens the chain before its prompt and
+   * leaves the blank guide line it needs after it. A normal command's are
+   * plain lines, which open nothing and space nothing.
    *
    * `honorForce` false drops this command's `--force` as an answer, for
    * `setup`, whose `--force` means "overwrite files" and so must never answer
@@ -156,16 +176,17 @@ export class Chain implements Drawing, Narratable {
    * command that drops it cannot leave another question dropping it too.
    */
   questions(honorForce: boolean): Questions {
-    return asker({
+    const session = {
       interactive: this.audience.interactive,
       force: honorForce && this.audience.force,
-      before: () => this.open(),
-      after: () => this.answered(),
-    });
+    };
+    return this.presentation === "plain"
+      ? plainAsker(session)
+      : asker({ ...session, before: () => this.open(), after: () => this.answered() });
   }
 
   say(text: string): void {
-    if (this.audience.interactive) {
+    if (this.drawsAChain) {
       this.narrate(MARK.info, text);
       return;
     }
@@ -173,7 +194,7 @@ export class Chain implements Drawing, Narratable {
   }
 
   note(title: string, lines: readonly string[]): void {
-    if (this.audience.interactive) {
+    if (this.drawsAChain) {
       this.open();
       // A box is never wider than 80 columns, so its lines are wrapped to fit.
       note(new Prose(lines.join("\n"), WIDTH - 8).render(), title);
@@ -201,10 +222,17 @@ export class Chain implements Drawing, Narratable {
    * A spinner the caller stops itself, for work whose shape rules out
    * {@link task}. With nobody watching it is a {@link QuietSpinner}, so the
    * caller never asks whether it may draw.
+   *
+   * A normal command's spinner keeps out of the gutter and opens nothing:
+   * waiting on a page of results is worth saying, and is not a reason for the
+   * command to grow a chain around its answer.
    */
   spinner(label: string, options: { guide?: boolean } = {}): Spinner {
     if (!this.audience.interactive) {
       return new QuietSpinner();
+    }
+    if (this.presentation === "plain") {
+      return new DrawnSpinner(label, false);
     }
     this.open();
     return new DrawnSpinner(label, options.guide !== false);

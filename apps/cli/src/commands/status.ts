@@ -53,7 +53,7 @@ export default class Status extends EnvironmentCommand {
 
   static override heading = "Checking the status";
 
-  static override summarises = true;
+  static override wizard = true;
   static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {

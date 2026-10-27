@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { select, text } from "@clack/prompts";
+import { select } from "@clack/prompts";
 import { Config } from "@oclif/core";
 
 import Api from "../../../src/commands/api/index";
 import { makeProject } from "../../helpers/local-project";
 import { cliPackageRoot } from "../../helpers/oclif-build";
 import { stripAnsi } from "../../helpers/run-cli";
+import { type Answer, asTerminalTyping } from "../../helpers/terminal";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -37,14 +38,30 @@ afterEach(() => {
   restore(process.stdout, tty.stdout);
   restore(process.stdin, tty.stdin);
   vi.mocked(select).mockReset();
-  vi.mocked(text).mockReset();
   vi.restoreAllMocks();
 });
 
-/** Run `zitadel api` from source with its output kept out of the test log. */
-async function api(...argv: string[]) {
-  return apiIn(await makeProject({ linked: true }), ...argv);
+/**
+ * Run `zitadel api` from source with a person typing `answers` at the plain
+ * questions it asks, and give back what it wrote.
+ */
+async function asking(answers: Answer[], ...argv: string[]) {
+  const cwd = await makeProject({ linked: true });
+  vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  vi.spyOn(console, "log").mockImplementation(() => undefined);
+  const config = await Config.load({ root: cliPackageRoot });
+  return asTerminalTyping(answers, () =>
+    Api.run(["--cwd", cwd, "--no-telemetry", "--server", "http://localhost:8080", ...argv], config),
+  );
 }
+
+/** Types the number the listing gave the choice whose line holds `label`. */
+const picking =
+  (label: string): Answer =>
+  (shown: string) => {
+    const line = shown.split("\n").find((one) => /^\s*\d+\)/.test(one) && one.includes(label));
+    return /^\s*(\d+)\)/.exec(line ?? "")?.[1] ?? "";
+  };
 
 /** Run `zitadel api` from source in `cwd`. */
 async function apiIn(cwd: string, ...argv: string[]) {
@@ -59,34 +76,43 @@ async function apiIn(cwd: string, ...argv: string[]) {
 }
 
 describe("zitadel api without an operation, at a terminal", () => {
+  const choosingRevokeSession: Answer[] = [
+    picking("Sessions"),
+    picking("DELETE /sessions/{session_id}"),
+    "sess_1",
+  ];
+
   it("asks for the part of the API, the operation and its path parameters", async () => {
-    vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
-    vi.mocked(select).mockResolvedValueOnce("revokeSession" as never);
-    vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
+    const { result } = await asking(choosingRevokeSession, "--dry-run");
 
-    const envelope = await api("--dry-run");
-
-    expect(envelope).toMatchObject({
+    expect(result).toMatchObject({
       status: "ok",
       data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
     });
-    expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
-      "Which part of the API would you like to use?",
-      "Which operation would you like to run?",
-    ]);
-    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe("What is the value of session_id?");
+  });
+
+  it("words each of its three questions as a question", async () => {
+    const { shown } = await asking(choosingRevokeSession, "--dry-run");
+
+    expect(stripAnsi(shown)).toContain("Which part of the API would you like to use?");
+    expect(stripAnsi(shown)).toContain("Which operation would you like to run?");
+    expect(stripAnsi(shown)).toContain("What is the value of session_id? ");
+  });
+
+  // `api` is a normal command, so it asks plainly: numbered choices, with no
+  // chain drawn around them.
+  it("numbers its choices rather than drawing a prompt", async () => {
+    const { shown } = await asking(choosingRevokeSession, "--dry-run");
+
+    expect(select).not.toHaveBeenCalled();
+    expect(stripAnsi(shown)).toMatch(/^ {2}\d+\) {2}Sessions$/m);
   });
 
   it("offers only what the CLI can call", async () => {
-    vi.mocked(select).mockResolvedValueOnce("Sessions" as never);
-    vi.mocked(select).mockResolvedValueOnce("getSession" as never);
-    vi.mocked(text).mockResolvedValueOnce("sess_1" as never);
+    const { shown } = await asking(choosingRevokeSession, "--dry-run");
 
-    await api("--dry-run");
-
-    const offered = vi.mocked(select).mock.calls[1]?.[0].options.map((option) => option.value);
-    expect(offered).toContain("getSession");
-    expect(offered).not.toContain("getMySession");
+    expect(stripAnsi(shown)).toContain("GET /sessions/{session_id}");
+    expect(stripAnsi(shown)).not.toContain("GET /sessions/me");
   });
 });
 

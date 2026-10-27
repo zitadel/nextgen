@@ -9,7 +9,7 @@ import { asTerminal } from "../../../helpers/terminal";
 /** A command that ends on a summary, so its box is what the assertions read. */
 class SummarisingCommand extends BaseCommand {
   public static override readonly id = "summary-test";
-  public static override summarises = true;
+  public static override wizard = true;
 
   public override jsonEnabled(): boolean {
     return false;

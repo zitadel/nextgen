@@ -80,7 +80,7 @@ export default class Claim extends EnvironmentCommand {
 
   static override heading = "Claiming the project";
 
-  static override summarises = true;
+  static override wizard = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
 

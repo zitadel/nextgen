@@ -18,8 +18,6 @@ export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
   static override group = CommandGroups.configuration;
 
   static override heading = "Revoking a release";
-
-  static override summarises = true;
   static override examples = [
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
     "<%= config.bin %> release revoke rel_01KX3RG8A7F0N9WD3P2E4YM5C1 --force",

@@ -44,6 +44,12 @@
   prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
   kind of question and no `kind` string: a unit test fails on a clack import
   elsewhere and on a `kind:` question outside the engine.
+- A command draws one of two shapes, and the shape is the command's, never
+  inferred from how a run went (`src/lib/ui/presentation.ts`). A wizard sets
+  `static override wizard = true` and gets the chain, the drawn prompts and
+  the summary box; every other command draws neither chain nor box, asks on a
+  plain line, and ends on its answer and one dim footer. Adding a question, a
+  warning or a `--force` to a command must not change its shape.
 - Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
   `consola` or a write to `process.stdout`/`process.stderr` in a new file.
   `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.

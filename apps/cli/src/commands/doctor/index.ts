@@ -79,7 +79,7 @@ export default class Doctor extends BaseCommand {
 
   static override heading = "Checking the setup";
 
-  static override summarises = true;
+  static override wizard = true;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),

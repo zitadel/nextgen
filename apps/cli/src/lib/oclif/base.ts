@@ -22,7 +22,7 @@ import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { claimSkills, eligibleForSkills } from "../skills-hint";
 import { takeReportedWarnings } from "../warnings";
-import type { Summary } from "../ui";
+import type { Presentation, Summary } from "../ui";
 import { Ui } from "../ui";
 import { summaryOfText } from "./result-summary";
 import {
@@ -100,17 +100,21 @@ export abstract class BaseCommand extends Command {
   static heading?: string;
 
   /**
-   * Whether this command ends on a summary: the box holding what it did, what
-   * to do next, and where it ran.
+   * Whether this command is a wizard: it walks a person through something, so
+   * it draws a chain (`┌`/`│`/`└`), asks its questions inside it, and closes
+   * on the summary box holding what it did, what to do next and where it ran.
    *
-   * It belongs to the kind of command, not to what one run happened to
-   * produce. A command that *does* something — sets a project up, ejects it,
-   * enables a provider, reports on its health — summarises. A command that
-   * *answers* something — any list, get or resolve — does not: the table or
-   * the record is the answer, and a border around it only gets in the way of
-   * reading and copying it.
+   * It belongs to the kind of command and nothing else, which is the whole
+   * point of declaring it: an unset one is a normal command, and a normal
+   * command draws no chain and no box on any run, however many questions it
+   * asked, whatever it warned about, and whether or not `--force` spared it a
+   * question. See {@link Presentation}.
+   *
+   * {@link Presentation} names the ten that set it. A command that merely
+   * *does* something — `variable rm`, `users delete` — is not one of them,
+   * however much it asks on the way.
    */
-  static summarises?: boolean;
+  static wizard?: boolean;
 
   /**
    * The group the root help lists this command under (see `lib/oclif/groups`).
@@ -162,7 +166,7 @@ export abstract class BaseCommand extends Command {
   protected meta: GlobalOptions = this.fallbackMeta();
 
   /** Everything a command shows a person. Silent until {@link toMeta} finds a terminal. */
-  protected ui: Ui = new Ui({ interactive: false, force: false });
+  protected ui: Ui = new Ui({ interactive: false, force: false }, this.presentation());
 
   /**
    * Whether this run may offer the Zitadel skills, resolved while the command
@@ -302,7 +306,10 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
-    this.ui = new Ui({ interactive: !this.meta.nonInteractive, force: this.meta.force });
+    this.ui = new Ui(
+      { interactive: !this.meta.nonInteractive, force: this.meta.force },
+      this.presentation(),
+    );
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     this.ui.bridgeNarration();
@@ -456,7 +463,10 @@ export abstract class BaseCommand extends Command {
   private withOverview(summary: Summary): Summary {
     const steps = summary.next ?? [];
     if (!this.summarises()) {
-      return { ...summary, next: [], boxed: false };
+      // A normal command has no box, and no overview step either: that is a
+      // wizard's last word. Its own steps are kept, and the ending writes them
+      // out as lines rather than losing the command to run next.
+      return { ...summary, boxed: false };
     }
     const overview = steps.some((step) => step.text === OVERVIEW)
       ? []
@@ -470,9 +480,14 @@ export abstract class BaseCommand extends Command {
     };
   }
 
-  /** Whether this command ends on a summary. See {@link BaseCommand.summarises}. */
+  /** Which of the two shapes this command draws. See {@link BaseCommand.wizard}. */
+  private presentation(): Presentation {
+    return (this.constructor as typeof BaseCommand).wizard === true ? "wizard" : "plain";
+  }
+
+  /** Whether this command ends on a summary box, which only a wizard does. */
   private summarises(): boolean {
-    return (this.constructor as typeof BaseCommand).summarises === true;
+    return this.presentation() === "wizard";
   }
 
   /**

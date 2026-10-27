@@ -88,30 +88,11 @@ describe("Ending", () => {
       expect(below).toContain("Resolved now: development");
     });
 
-    // A dim unmarked footer is right for an answer and wrong for an error:
-    // it would make "Error E_NOT_FOUND: …" read exactly like "No variables
-    // on the project".
-    it("never lets a failure take the footer shape an answer takes", () => {
-      const failure = new Ending(
-        { title: "Error E_NOT_FOUND: variable not found", sections: [], failed: true },
-        nowhere,
-        false,
-      );
-
-      expect(failure.standalone).toBe(false);
-    });
-
-    it("lets an answer that asked nothing take it", () => {
-      const answer = new Ending({ title: "No variables", sections: [] }, nowhere, false);
-
-      expect(answer.standalone).toBe(true);
-    });
-
     it("does not repeat those extras in the footer of a standalone ending", () => {
       const standalone = new Ending(
         { title: "Found 1 environment", sections: [], extras: ["Resolved now: development"] },
         nowhere,
-        false,
+        "plain",
       );
 
       const shown = plain(standalone.renderStandalone());
@@ -170,9 +151,70 @@ describe("what a long failure looks like under its closing line", () => {
   });
 });
 
-describe("the answer of a command that drew no chain", () => {
+describe("which shape an ending takes", () => {
+  const normally = (summary: Partial<Summary>, where = nowhere) =>
+    new Ending({ title: "Done", sections: [], ...summary }, where, "plain");
+
+  // The shape is the command's, so nothing a run happens to produce — a
+  // question, a warning, a failure, a box the command asked for — may change
+  // it. That is the whole defect: `--force` used to change how a command
+  // looked, because it decided whether anything opened a chain.
+  it.each([
+    ["an answer", {}],
+    ["a failure", { failed: true }],
+    ["a summary that asked for a box", { boxed: true }],
+    ["a summary with steps", { next: [{ text: "Deploy it:", command: "zitadel deploy" }] }],
+  ])("stands on its own for a normal command ending on %s", (_what, summary) => {
+    expect(normally(summary).standalone).toBe(true);
+  });
+
+  it("never frames a normal command's summary, even one that asked for a frame", () => {
+    expect(plain(normally({ boxed: true, lines: ["a detail"] }).render())).not.toContain("╭");
+  });
+
+  it("frames the same summary for a wizard", () => {
+    expect(plain(ending({ boxed: true, lines: ["a detail"] }).render())).toContain("╭");
+  });
+
+  // With no box to hold them, dropping the steps would lose the command the
+  // person is meant to run next, which is what an ending is read for.
+  it("writes a normal command's next steps out as lines", () => {
+    const shown = plain(
+      normally({
+        title: "Started the local Zitadel server",
+        next: [{ text: "Create an app:", command: "zitadel setup --server local" }],
+      }).renderStandalone(),
+    );
+
+    expect(shown).toContain("Create an app:\n  $ zitadel setup --server local");
+  });
+
+  // A dim unmarked footer is right for an answer and wrong for an error: it
+  // would make "Error E_NOT_FOUND: …" read exactly like "No variables on the
+  // project". With no chain to close in red, the headline itself is red.
+  it("says a normal command's failure in red above what it has to say", () => {
+    const shown = normally({
+      title: "Error E_NOT_FOUND: variable not found",
+      lines: ["Check the name."],
+      failed: true,
+    }).renderStandalone();
+
+    expect(shown).toContain(pc.red("Error E_NOT_FOUND: variable not found"));
+    expect(plain(shown)).toContain("Check the name.");
+  });
+
+  it("keeps where it ran out of a failure, which is not an answer", () => {
+    const shown = plain(
+      normally({ title: "Error E_NOT_FOUND: nope", failed: true }, somewhere).renderStandalone(),
+    );
+
+    expect(shown).not.toContain("proj-1");
+  });
+});
+
+describe("the answer of a normal command, which draws no chain", () => {
   const answering = (summary: Partial<Summary>) =>
-    new Ending({ title: "Done", sections: [], ...summary }, nowhere, false);
+    new Ending({ title: "Done", sections: [], ...summary }, nowhere, "plain");
 
   // `release create -m x` drew a 98-column headline: the standalone answer was
   // the one body the layout never folded.

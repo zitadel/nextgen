@@ -62,6 +62,11 @@ class FailingCommand extends BaseCommand {
   }
 }
 
+/** The same, as one of the ten wizards, which is what has a chain to close. */
+class FailingWizard extends FailingCommand {
+  public static override wizard = true;
+}
+
 describe("BaseCommand errors", () => {
   it("prints the error block for a failure", async () => {
     const cmd = new FailingCommand(false);
@@ -98,6 +103,40 @@ describe("BaseCommand on an interrupted run", () => {
   });
 
   it("closes a chain the interrupt left open", async () => {
+    const cmd = new FailingWizard(false);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      cmd.ui.say("something happened");
+      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+      // A real run ends by giving consola its reporters back; without it the
+      // next command in this process keeps drawing into this chain.
+      cmd.ui.releaseNarration();
+    });
+
+    expect(intro).toHaveBeenCalled();
+    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
+    vi.restoreAllMocks();
+  });
+
+  it("closes nothing when the interrupt arrived before anything was drawn", async () => {
+    const cmd = new FailingWizard(false);
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    await asTerminal(async () => {
+      await cmd.open();
+      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
+      cmd.ui.releaseNarration();
+    });
+
+    expect(outro).not.toHaveBeenCalled();
+    vi.restoreAllMocks();
+  });
+
+  // A normal command has no chain, so an interrupt leaves nothing open and
+  // nothing to close, however much it said on the way.
+  it("opens and closes nothing for a normal command", async () => {
     const cmd = new FailingCommand(false);
     vi.spyOn(process.stdout, "write").mockImplementation(() => true);
 
@@ -107,20 +146,7 @@ describe("BaseCommand on an interrupted run", () => {
       await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
     });
 
-    expect(intro).toHaveBeenCalled();
-    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
-    vi.restoreAllMocks();
-  });
-
-  it("closes nothing when the interrupt arrived before anything was drawn", async () => {
-    const cmd = new FailingCommand(false);
-    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-
-    await asTerminal(async () => {
-      await cmd.open();
-      await cmd.fail(new ZitadelError("E_CANCELLED", "Cancelled"));
-    });
-
+    expect(intro).not.toHaveBeenCalled();
     expect(outro).not.toHaveBeenCalled();
     vi.restoreAllMocks();
   });

@@ -1,6 +1,7 @@
 import type { Audience } from "./audience";
 import { Chain } from "./chain";
 import { Narration } from "./narration";
+import type { Presentation } from "./presentation";
 import type { Report, Step } from "./progress";
 import type { Questions } from "./questions";
 import type { Spinner } from "./spinner";
@@ -41,9 +42,11 @@ import type { Summary } from "./summary";
 export class Ui {
   private readonly chain: Chain;
   private readonly narration: Narration;
+  private readonly presentation: Presentation;
 
-  constructor(audience: Audience) {
-    this.chain = new Chain(audience);
+  constructor(audience: Audience, presentation: Presentation = "wizard") {
+    this.presentation = presentation;
+    this.chain = new Chain(audience, presentation);
     this.narration = new Narration(this.chain);
   }
 
@@ -95,10 +98,12 @@ export class Ui {
 
   /**
    * Draws the narration the CLI still writes with `consola` inside the chain,
-   * until {@link releaseNarration}.
+   * until {@link releaseNarration}. A normal command has no chain to draw it
+   * in, so its `consola` lines stay its own: a warning must not be what turns
+   * a normal command into a wizard.
    */
   bridgeNarration(): void {
-    if (this.interactive) {
+    if (this.interactive && this.presentation === "wizard") {
       this.narration.install();
     }
   }

@@ -135,7 +135,7 @@ export default class Eject extends Promptable(BaseCommand) {
 
   static override heading = "Ejecting Zitadel from this app";
 
-  static override summarises = true;
+  static override wizard = true;
   static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {

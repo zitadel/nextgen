@@ -1,6 +1,7 @@
 import pc from "picocolors";
 
 import { Facts, Frame, Prose, WIDTH } from "./layout";
+import type { Presentation } from "./presentation";
 import type { Summary } from "./summary";
 import type { Where } from "./where";
 
@@ -9,36 +10,34 @@ import type { Where } from "./where";
  * the chain closes on, and what is drawn under it.
  *
  * It is pure string work, like the rest of the layout, so the decision every
- * command's ending turns on — whether there is enough to deserve a box — is
- * asserted in a unit test rather than inferred from a terminal recording.
+ * command's ending turns on — which of the two shapes it is — is asserted in
+ * a unit test rather than inferred from a terminal recording.
  *
- * A box frames what the command produced, with where it ran as its last line.
- * Where it ran is a footnote to the report and never a reason for a frame of
- * its own: a command that produced nothing says it in the chain's own gutter.
+ * A wizard's box frames what the command produced, with where it ran as its
+ * last line. A normal command has neither a chain to close nor a box to fill:
+ * its answer starts at the left margin, with one dim footer line under it.
  */
 export class Ending {
   private readonly summary: Summary;
   private readonly where: Where;
-  private readonly inChain: boolean;
+  private readonly presentation: Presentation;
 
-  constructor(summary: Summary, where: Where, inChain = true) {
+  constructor(summary: Summary, where: Where, presentation: Presentation = "wizard") {
     this.summary = summary;
     this.where = where;
-    this.inChain = inChain;
+    this.presentation = presentation;
   }
 
   /**
-   * A command that only answers something, and asked nothing on the way, draws
-   * no chain at all: its answer starts at the left margin, with one dim footer
-   * line under it saying what the answer amounts to and where it came from.
-   *
-   * Never a failure. The footer is dim and unmarked, which is right for an
-   * answer and wrong for an error: it would make `Error E_NOT_FOUND: …` read
-   * exactly like `No variables on the project`. A failure always closes a
-   * chain, so it ends on a red line with a mark against it.
+   * Whether this ending stands on its own rather than closing a chain, which
+   * follows the command's {@link Presentation} and nothing about the run. A
+   * normal command's answer starts at the left margin, with one dim footer
+   * line under it saying what the answer amounts to and where it came from —
+   * whether or not it asked a question, warned, or was spared its question by
+   * `--force`.
    */
   get standalone(): boolean {
-    return !this.inChain && !this.boxed() && this.summary.failed !== true;
+    return this.presentation === "plain";
   }
 
   /**
@@ -47,15 +46,23 @@ export class Ending {
    * The answer is wrapped like everything else, which leaves a table's rows
    * whole and folds a long sentence rather than running it off the screen;
    * the footer is one line by construction, so it is left as it is.
+   *
+   * A failure says so in red above what it has to say, rather than in the
+   * footer: the footer is dim and unmarked, which is right for an answer and
+   * wrong for an error — it would make `Error E_NOT_FOUND: …` read exactly
+   * like `No variables on the project`.
    */
   renderStandalone(): string {
+    const body = this.body(false);
+    if (this.summary.failed === true) {
+      return `${[pc.red(this.summary.title), ...body].join("\n")}\n`;
+    }
     const said = this.summary.title === "Done" ? [] : [this.summary.title];
     const place = this.where.known ? [this.where.plain] : [];
     const footer = [...said, ...(this.summary.extras ?? []), ...place]
       .map((part) => part.trim())
       .filter((part) => part !== "")
       .join(" · ");
-    const body = this.body(false);
     return [
       ...(body.length === 0 ? [] : [new Prose(body.join("\n"), WIDTH).render(), ""]),
       ...(footer === "" ? [] : [pc.dim(footer)]),
@@ -112,17 +119,33 @@ export class Ending {
         ? []
         : [new Facts(this.summary.sections).render(), ""]),
       ...(this.summary.lines ?? []),
+      ...this.steps(),
       ...(withExtras && extras.length > 0 ? ["", ...extras] : []),
     ]);
   }
 
   /**
-   * Whether to frame what the command ended on. Only something to do next
-   * earns a frame: a table or a record is what was asked for, and a border
-   * around it helps nobody and breaks copying a wide one.
+   * What to do next, written out as lines, for a normal command: it has no box
+   * to hold the steps, and dropping them would lose the command a person is
+   * meant to run next — the one thing an ending is most often read for.
+   */
+  private steps(): string[] {
+    const steps = this.presentation === "plain" ? (this.summary.next ?? []) : [];
+    return steps.flatMap((step) => [
+      step.text,
+      ...(step.command === undefined ? [] : step.command.split("\n").map((one) => `  $ ${one}`)),
+    ]);
+  }
+
+  /**
+   * Whether to frame what the command ended on. Only a wizard is ever framed:
+   * a normal command's table or record is what was asked for, and a border
+   * around it helps nobody and breaks copying a wide one. A summary that asks
+   * for a box it is not entitled to is refused here rather than anywhere
+   * else, so one marker decides the whole shape.
    */
   private boxed(): boolean {
-    return this.summary.boxed === true;
+    return this.summary.boxed === true && this.presentation === "wizard";
   }
 }
 

@@ -8,9 +8,12 @@
  * `tests/unit/lib/ui/index.test.ts` fails on a file outside this directory
  * that draws for itself.
  *
- * One command's output, from its first line to its last:
+ * There are two presentations, and which one a command draws is a property of
+ * the command ({@link Presentation}), never of how one run happened to go.
  *
- *     ┌  Listing origins                                 ← what the command is doing
+ * A wizard's output, from its first line to its last:
+ *
+ *     ┌  Setting Zitadel up                              ← what the command is doing
  *     │
  *     ◇  What should the value of GREETING be?           ← a question, with the answer under it
  *     │  hello
@@ -24,8 +27,15 @@
  *                                                           next steps, both outside the
  *                                                           gutter so they copy cleanly
  *
+ * A normal command's, which is every other command's:
+ *
+ *     Remove GREETING from the project? [y/N] y           ← a question, answered on its line
+ *     Removed GREETING from the project · project proj-1 on localhost:8111
+ *                                                         ↑ the answer, then one dim footer
+ *
  * The parts, in the order a command meets them:
  *
+ * - {@link Presentation} — which of the two shapes the command draws.
  * - {@link Audience} — who is watching, which decides whether anything is drawn.
  * - {@link Ui} — the chain for one command, which is the only way in.
  * - {@link Questions} — the one way a command asks a person something, one
@@ -42,6 +52,7 @@
  * could render a frame itself could render one that does not match.
  */
 export type { Audience } from "./audience";
+export type { Presentation } from "./presentation";
 export type { Report, Step } from "./progress";
 export type {
   Choice,

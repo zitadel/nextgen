@@ -20,8 +20,9 @@ import { type Parsed, parseClientId } from "@zitadel/config/idp";
 import type { ZitadelError } from "../../../src/lib/errors";
 
 import { clackInputImports } from "../../helpers/drawing-boundary";
+import { typing } from "../../helpers/terminal";
 import { sourceFiles } from "../../helpers/source-files";
-import { asker, type Session } from "../../../src/lib/input";
+import { asker, plainAsker, type Session } from "../../../src/lib/input";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
@@ -484,6 +485,318 @@ describe("asker", () => {
 
       expect(cancel).toHaveBeenCalledWith("Cancelled.");
     });
+  });
+});
+
+describe("plainAsker", () => {
+  describe("a text question", () => {
+    it("asks it on one line, with the answer typed after it", async () => {
+      const talk = typing("https://app.acme.com");
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text({
+        name: "origin",
+        message: "What URL is your app served from?",
+        parse: (value): Parsed<string> => ({ ok: true, value }),
+      });
+
+      expect(talk.shown()).toBe("What URL is your app served from? ");
+    });
+
+    it("gives back what parse made of the answer", async () => {
+      const talk = typing("abc");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text(
+        typed(),
+      );
+
+      expect(answer).toBe("abc");
+    });
+
+    it("says why an answer was refused and asks for another", async () => {
+      const talk = typing("bad", "good");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text({
+        ...typed(),
+        parse: refuseBad,
+      });
+
+      expect(answer).toBe("good");
+      expect(talk.shown()).toContain("Not that one.\n");
+    });
+
+    it("offers the initial value as the default an empty answer takes", async () => {
+      const talk = typing("");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text({
+        ...typed(),
+        initialValue: "abc",
+      });
+
+      expect(answer).toBe("abc");
+      expect(talk.shown()).toContain("[abc]");
+    });
+
+    it("is never asked when a flag already answered it", async () => {
+      const talk = typing();
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text({
+        ...typed(),
+        given: "abc",
+      });
+
+      expect(talk.shown()).toBe("");
+    });
+
+    it("is never asked when a pipe already answered it", async () => {
+      const talk = typing();
+
+      const answer = await plainAsker({
+        ...ask,
+        stdin: piped("abc\n"),
+        stdout: talk.stdout,
+      }).text({ ...typed(), stdin: true });
+
+      expect(answer).toBe("abc");
+      expect(talk.shown()).toBe("");
+    });
+
+    it("refuses by the question's own name with nobody to ask", async () => {
+      await expect(
+        plainAsker({ ...scripted, stdin: keyboard() }).text({ ...typed(), flag: "--client-id" }),
+      ).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "No client id supplied",
+        hint: "Pass --client-id.",
+      });
+    });
+  });
+
+  describe("a confirmation", () => {
+    const question = { name: "remove the variable", message: "Remove GREETING?" };
+
+    it("spells the default out and reads the answer on the same line", async () => {
+      const talk = typing("y");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm(
+        question,
+      );
+
+      expect(answer).toBe(true);
+      expect(talk.shown()).toBe("Remove GREETING? [y/N] ");
+    });
+
+    it.each([
+      ["y", true],
+      ["yes", true],
+      ["Y", true],
+      ["n", false],
+      ["no", false],
+    ])("reads %s as %s", async (typed_, expected) => {
+      const talk = typing(typed_);
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm(question),
+      ).toBe(expected);
+    });
+
+    it("takes an empty answer as the default", async () => {
+      const talk = typing("");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm(question),
+      ).toBe(false);
+    });
+
+    it("shows a default of yes as the one an empty answer takes", async () => {
+      const talk = typing("");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm({
+        ...question,
+        initialValue: true,
+      });
+
+      expect(answer).toBe(true);
+      expect(talk.shown()).toContain("[Y/n]");
+    });
+
+    it("asks again when the answer is neither", async () => {
+      const talk = typing("maybe", "n");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm(question),
+      ).toBe(false);
+      expect(talk.shown()).toContain("Please answer yes or no.\n");
+    });
+
+    // The whole point of the two presentations: --force removes the question
+    // and changes nothing else, so the command looks the same either way.
+    it("is answered by --force without writing anything at all", async () => {
+      const talk = typing();
+
+      const answer = await plainAsker({
+        ...ask,
+        force: true,
+        stdin: talk.stdin,
+        stdout: talk.stdout,
+      }).confirm(question);
+
+      expect(answer).toBe(true);
+      expect(talk.shown()).toBe("");
+    });
+
+    it("still requires --force with nobody to ask", async () => {
+      await expect(plainAsker(scripted).confirm(question)).rejects.toMatchObject({
+        code: "E_VALIDATION",
+        message: "Cannot remove the variable without --force in non-interactive mode",
+      });
+    });
+  });
+
+  describe("a choice", () => {
+    const framework = { name: "framework", message: "Which framework?", options };
+
+    it("numbers the options under the question", async () => {
+      const talk = typing("2");
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select(framework);
+
+      expect(talk.shown()).toContain("Which framework?\n  1)  A\n  2)  B\n");
+    });
+
+    it("gives back the value of the option that was named", async () => {
+      const talk = typing("2");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select(framework),
+      ).toBe("b");
+    });
+
+    it("asks again when the answer names no option", async () => {
+      const talk = typing("9", "1");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select(framework),
+      ).toBe("a");
+      expect(talk.shown()).toContain("Please answer with a number between 1 and 2.");
+    });
+
+    it("takes an empty answer as the initial value", async () => {
+      const talk = typing("");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select({
+        ...framework,
+        initialValue: "b",
+      });
+
+      expect(answer).toBe("b");
+    });
+
+    // A choice that exists but is not available yet is shown with its hint and
+    // left unnumbered, so there is no number that chooses it.
+    it("shows a disabled option without a number of its own", async () => {
+      const talk = typing("1");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select({
+        name: "server",
+        message: "Which server?",
+        options: [
+          { value: "local", label: "Local", hint: "not running", disabled: true },
+          { value: "cloud", label: "Cloud" },
+        ],
+      });
+
+      expect(answer).toBe("cloud");
+      expect(talk.shown()).toContain("  -)  Local — not running\n  1)  Cloud\n");
+    });
+  });
+
+  describe("several choices", () => {
+    const providers = { name: "providers", message: "Which providers?", options };
+
+    it("takes them as numbers separated by commas", async () => {
+      const talk = typing("1,2");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).multiselect(providers),
+      ).toEqual(["a", "b"]);
+    });
+
+    it("asks again when one of them names no option", async () => {
+      const talk = typing("1,9", "2");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).multiselect(providers),
+      ).toEqual(["b"]);
+    });
+
+    it("asks again for an empty answer when one is required", async () => {
+      const talk = typing("", "1");
+
+      expect(
+        await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).multiselect(providers),
+      ).toEqual(["a"]);
+      expect(talk.shown()).toContain("Please answer with at least one number.");
+    });
+
+    it("takes an empty answer as none when none is required", async () => {
+      const talk = typing("");
+
+      const answer = await plainAsker({
+        ...ask,
+        stdin: talk.stdin,
+        stdout: talk.stdout,
+      }).multiselect({
+        ...providers,
+        required: false,
+      });
+
+      expect(answer).toEqual([]);
+    });
+  });
+
+  describe("a secret", () => {
+    it("is asked on one line and never echoed", async () => {
+      const talk = typing("hunter2");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).secret(
+        typed("client secret"),
+      );
+
+      expect(answer).toBe("hunter2");
+      expect(talk.shown()).not.toContain("hunter2");
+    });
+  });
+
+  describe("walking away from a question", () => {
+    it("is a cancellation, not an empty answer", async () => {
+      const talk = typing();
+
+      await expect(
+        plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).text(typed()),
+      ).rejects.toMatchObject({ code: "E_CANCELLED", exitCode: 130 });
+    });
+
+    // Clack's `└  Cancelled.` closes a chain, and a normal command has none.
+    it("closes no chain on the way out", async () => {
+      const talk = typing();
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout })
+        .text(typed())
+        .catch(() => undefined);
+
+      expect(cancel).not.toHaveBeenCalled();
+    });
+  });
+
+  it("draws none of clack's prompts, whatever it is asked", async () => {
+    const talk = typing("y");
+
+    await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).confirm({
+      name: "x",
+      message: "X?",
+    });
+
+    expect(confirm).not.toHaveBeenCalled();
   });
 });
 

@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
-import { intro, log, note, outro } from "@clack/prompts";
+import { intro, log, note, outro, spinner } from "@clack/prompts";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
+import { asTerminalTyping } from "../../../helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
+const normally = () => new Chain({ interactive: true, force: false }, "plain");
 const scripted = () => new Chain({ interactive: false, force: false });
 
 let written: string[] = [];
@@ -71,8 +73,8 @@ describe("Chain", () => {
     expect(printed()).not.toContain("╭");
   });
 
-  it("names where it ran in the footer's words when it drew no box", () => {
-    const chain = watching();
+  it("names where it ran in the footer's words for a normal command", () => {
+    const chain = normally();
     chain.describe("Removing an origin");
     chain.ranAgainst("proj-1", "api.zitadel.cloud");
     chain.finish({ title: "Removed the origin", sections: [] });
@@ -187,5 +189,87 @@ describe("Chain", () => {
     chain.narrate("!", "a short warning");
 
     expect(vi.mocked(log.message).mock.calls[0]?.[0]).toBe("a short warning");
+  });
+});
+
+// The defect this presentation fixes: the shape used to be decided at the end
+// of the run by asking whether anything had opened the chain, so a question or
+// a warning turned a normal command into a wizard and `--force` turned it back.
+describe("a normal command's chain, which is no chain at all", () => {
+  const removing = (chain: Chain) => {
+    chain.describe("Removing a variable");
+    chain.ranAgainst("proj-1", "localhost:8111");
+  };
+  const removed = { title: "Removed B from the project", sections: [] };
+
+  it("opens nothing, whatever the command said on the way", () => {
+    const chain = normally();
+    removing(chain);
+    chain.say("the project is in development");
+    chain.finish(removed);
+
+    expect(intro).not.toHaveBeenCalled();
+    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).not.toContain("│");
+  });
+
+  it("ends on its answer and one footer line", () => {
+    const chain = normally();
+    removing(chain);
+    chain.finish(removed);
+
+    expect(printed()).toBe("Removed B from the project · project proj-1 on localhost:8111\n");
+  });
+
+  it("never frames a summary that asked for a box", () => {
+    const chain = normally();
+    removing(chain);
+    chain.finish({
+      ...removed,
+      boxed: true,
+      next: [{ text: "Deploy it:", command: "zitadel deploy" }],
+    });
+
+    expect(printed()).not.toContain("╭");
+  });
+
+  it("says a failure with no chain to close", () => {
+    const chain = normally();
+    removing(chain);
+    chain.finish({ title: "Error E_NOT_FOUND: no such variable", sections: [], failed: true });
+
+    expect(outro).not.toHaveBeenCalled();
+    expect(printed()).toContain("Error E_NOT_FOUND: no such variable");
+  });
+
+  it("keeps a spinner out of the gutter it does not have", () => {
+    normally().spinner("Fetching users");
+
+    expect(intro).not.toHaveBeenCalled();
+    expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+  });
+
+  // `--force` is a flag about whether to ask. The only difference it may make
+  // to what a person sees is that the question is absent.
+  it("looks the same forced as it does answering, but for the question", async () => {
+    const run = (force: boolean) => async () => {
+      const chain = new Chain({ interactive: true, force }, "plain");
+      removing(chain);
+      await chain.questions(true).confirm({
+        name: "remove the variable",
+        message: "Remove B from the project?",
+      });
+      chain.finish(removed);
+    };
+
+    const forced = await asTerminalTyping([], run(true));
+    const answered = await asTerminalTyping(["y"], run(false));
+
+    expect(stripAnsi(forced.shown)).toBe(
+      "Removed B from the project · project proj-1 on localhost:8111\n",
+    );
+    expect(stripAnsi(answered.shown)).toBe(
+      `Remove B from the project? [y/N] ${stripAnsi(forced.shown)}`,
+    );
   });
 });
