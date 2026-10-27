@@ -38,7 +38,7 @@ import { optionArgs } from "../../../lib/public-cli";
  */
 export default class AuthMethodSsoDisable extends AuthMethodCommand {
   static override description = "Remove an identity provider from a user schema.";
-  static override group = CommandGroups.configuration;
+  static override group = CommandGroups.authentication;
   static override examples = [
     "<%= config.bin %> auth-method sso disable --provider google",
     "<%= config.bin %> auth-method sso disable --provider google --schema customers",

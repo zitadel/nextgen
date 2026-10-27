@@ -45,8 +45,8 @@ the build's base and the console path together.
 
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
-the server's service ping go there, so released CLIs and servers depend on
-the path: keep it, ahead of the server's catch-all.
+the server's service ping send to Mixpanel through it once Mixpanel is no
+longer paused: keep it, ahead of the server's catch-all.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
@@ -493,10 +493,10 @@ project and imports the root admin.
   only a few new ones, not one per request: 40 parallel password checks
   on a preview with at most 16 warm instances started 3, and the warm
   instances' handler time rose from about 0.3 s to a median of 0.7 s.
-  To tell the two apart, compare a request's `handling request` log time
-  with the edge arrival in its Vercel request ID
-  (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold start,
-  a long handler time is sharing.
+  To tell the two apart, take a request's `request served` log time minus
+  its `duration`, and compare it with the edge arrival in its Vercel
+  request ID (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold
+  start, a long handler time is sharing.
 - **Connections:** four per instance through PlanetScale's PgBouncer, which
   pools per database and role: on `preview` every preview database is a
   pool of its own, so the cluster's `max_connections` bounds how many

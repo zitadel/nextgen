@@ -10,6 +10,7 @@ import { collectPages } from "../../lib/oclif/crud/paging";
 import { renderTable } from "../../lib/oclif/crud/table";
 import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
+import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
 
 /**
@@ -23,7 +24,7 @@ import { reportWarning } from "../../lib/warnings";
  * pins, and that users keep theirs: configuration rolls back, user data does
  * not.
  */
-export default class DeploymentRollback extends EnvironmentCommand {
+export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
   static override examples = [

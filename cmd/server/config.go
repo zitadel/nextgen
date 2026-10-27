@@ -36,7 +36,7 @@ type Config struct {
 	// Origins configures write validation for project origin patterns.
 	Origins OriginsConfig `mapstructure:"origins"`
 	// ServicePing reports the deployment's version and dialect to Vercel
-	// Web Analytics and Mixpanel (proof of concept, off by default).
+	// Web Analytics, and to Mixpanel given a token (off by default).
 	ServicePing serviceping.Config `mapstructure:"service_ping"`
 }
 

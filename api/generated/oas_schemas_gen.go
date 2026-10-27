@@ -13352,6 +13352,7 @@ func (*CreateDeploymentCreated) createDeploymentRes() {}
 // CreateDeploymentErrorResponse represents sum type.
 type CreateDeploymentErrorResponse struct {
 	Type                 CreateDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -13374,6 +13375,7 @@ type CreateDeploymentErrorResponseType string
 
 // Possible values for CreateDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidCreateDeploymentErrorResponse      CreateDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedCreateDeploymentErrorResponse     CreateDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "dep.invalid"
@@ -13390,6 +13392,11 @@ const (
 	ReqInvalidCreateDeploymentErrorResponse           CreateDeploymentErrorResponseType = "req.invalid"
 	UnavailableCreateDeploymentErrorResponse          CreateDeploymentErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether CreateDeploymentErrorResponse is AuthCsrfInvalid.
+func (s CreateDeploymentErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidCreateDeploymentErrorResponse
+}
 
 // IsAuthUnauthorized reports whether CreateDeploymentErrorResponse is AuthUnauthorized.
 func (s CreateDeploymentErrorResponse) IsAuthUnauthorized() bool {
@@ -13464,6 +13471,27 @@ func (s CreateDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether CreateDeploymentErrorResponse is Unavailable.
 func (s CreateDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableCreateDeploymentErrorResponse
+}
+
+// SetAuthCsrfInvalid sets CreateDeploymentErrorResponse to AuthCsrfInvalid.
+func (s *CreateDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidCreateDeploymentErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if CreateDeploymentErrorResponse is AuthCsrfInvalid.
+func (s CreateDeploymentErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidCreateDeploymentErrorResponse returns new CreateDeploymentErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidCreateDeploymentErrorResponse(v AuthCsrfInvalid) CreateDeploymentErrorResponse {
+	var s CreateDeploymentErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets CreateDeploymentErrorResponse to AuthUnauthorized.
@@ -27260,6 +27288,20 @@ type FlowStep struct {
 	// Step name from the flow definition.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
+	// What the flow does on this step. A login moves between `login` and
+	// `register` by itself: an identifier with no account continues as a
+	// sign-up, and one with an account continues a sign-up as a sign-in.
+	// A page that titles the login itself follows this value rather than
+	// the step's `name`, which the flow definition chooses.
+	Purpose OptFlowStepPurpose `json:"purpose"`
+	// Localisation key that tells the user why the flow moved to this
+	// step's `purpose` without being asked: `notice.user_not_found` (an
+	// identifier with no account, now signing up),
+	// `notice.user_already_exists` (an identifier that has an account, now
+	// signing in) or `notice.sso_user_not_found` (a provider's sign-in
+	// with no account, now signing up). Present only on the step right
+	// after the move, not when the user chose it.
+	Notice OptNilString `json:"notice"`
 	// Error from a previous failed submission. Field-validation failures
 	// carry localisation text keys: `error.<field>_<rule>` per violation
 	// (e.g. `error.email_required`; the `format` rule is spelled
@@ -27340,6 +27382,16 @@ func (s *FlowStep) GetTexts() OptStepTexts {
 	return s.Texts
 }
 
+// GetPurpose returns the value of Purpose.
+func (s *FlowStep) GetPurpose() OptFlowStepPurpose {
+	return s.Purpose
+}
+
+// GetNotice returns the value of Notice.
+func (s *FlowStep) GetNotice() OptNilString {
+	return s.Notice
+}
+
 // GetError returns the value of Error.
 func (s *FlowStep) GetError() OptNilString {
 	return s.Error
@@ -27393,6 +27445,16 @@ func (s *FlowStep) SetName(val string) {
 // SetTexts sets the value of Texts.
 func (s *FlowStep) SetTexts(val OptStepTexts) {
 	s.Texts = val
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *FlowStep) SetPurpose(val OptFlowStepPurpose) {
+	s.Purpose = val
+}
+
+// SetNotice sets the value of Notice.
+func (s *FlowStep) SetNotice(val OptNilString) {
+	s.Notice = val
 }
 
 // SetError sets the value of Error.
@@ -27795,6 +27857,80 @@ func (s *FlowStepIdentifier) SetValue(val string) {
 // SetAutocomplete sets the value of Autocomplete.
 func (s *FlowStepIdentifier) SetAutocomplete(val string) {
 	s.Autocomplete = val
+}
+
+// What the flow does on this step. A login moves between `login` and
+// `register` by itself: an identifier with no account continues as a
+// sign-up, and one with an account continues a sign-up as a sign-in.
+// A page that titles the login itself follows this value rather than
+// the step's `name`, which the flow definition chooses.
+type FlowStepPurpose string
+
+const (
+	FlowStepPurposeLogin       FlowStepPurpose = "login"
+	FlowStepPurposeRegister    FlowStepPurpose = "register"
+	FlowStepPurposeRecovery    FlowStepPurpose = "recovery"
+	FlowStepPurposeProfiling   FlowStepPurpose = "profiling"
+	FlowStepPurposeReauth      FlowStepPurpose = "reauth"
+	FlowStepPurposeLinkAccount FlowStepPurpose = "link_account"
+)
+
+// AllValues returns all FlowStepPurpose values.
+func (FlowStepPurpose) AllValues() []FlowStepPurpose {
+	return []FlowStepPurpose{
+		FlowStepPurposeLogin,
+		FlowStepPurposeRegister,
+		FlowStepPurposeRecovery,
+		FlowStepPurposeProfiling,
+		FlowStepPurposeReauth,
+		FlowStepPurposeLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepPurposeLogin:
+		return []byte(s), nil
+	case FlowStepPurposeRegister:
+		return []byte(s), nil
+	case FlowStepPurposeRecovery:
+		return []byte(s), nil
+	case FlowStepPurposeProfiling:
+		return []byte(s), nil
+	case FlowStepPurposeReauth:
+		return []byte(s), nil
+	case FlowStepPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepPurpose) UnmarshalText(data []byte) error {
+	switch FlowStepPurpose(data) {
+	case FlowStepPurposeLogin:
+		*s = FlowStepPurposeLogin
+		return nil
+	case FlowStepPurposeRegister:
+		*s = FlowStepPurposeRegister
+		return nil
+	case FlowStepPurposeRecovery:
+		*s = FlowStepPurposeRecovery
+		return nil
+	case FlowStepPurposeProfiling:
+		*s = FlowStepPurposeProfiling
+		return nil
+	case FlowStepPurposeReauth:
+		*s = FlowStepPurposeReauth
+		return nil
+	case FlowStepPurposeLinkAccount:
+		*s = FlowStepPurposeLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #
@@ -52473,6 +52609,52 @@ func (o OptFlowStepIdentifier) Get() (v FlowStepIdentifier, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowStepIdentifier) Or(d FlowStepIdentifier) FlowStepIdentifier {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepPurpose returns new OptFlowStepPurpose with value set to v.
+func NewOptFlowStepPurpose(v FlowStepPurpose) OptFlowStepPurpose {
+	return OptFlowStepPurpose{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepPurpose is optional FlowStepPurpose.
+type OptFlowStepPurpose struct {
+	Value FlowStepPurpose
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepPurpose was set.
+func (o OptFlowStepPurpose) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepPurpose) Reset() {
+	var v FlowStepPurpose
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepPurpose) SetTo(v FlowStepPurpose) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepPurpose) Get() (v FlowStepPurpose, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepPurpose) Or(d FlowStepPurpose) FlowStepPurpose {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -79875,6 +80057,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) SetDeploymentID(val Deployment
 // RevokeReleaseErrorResponse represents sum type.
 type RevokeReleaseErrorResponse struct {
 	Type                RevokeReleaseErrorResponseType // switch on this field
+	AuthCsrfInvalid     AuthCsrfInvalid
 	AuthUnauthorized    AuthUnauthorized
 	EvtInvalid          EvtInvalid
 	Internal            Internal
@@ -79892,6 +80075,7 @@ type RevokeReleaseErrorResponseType string
 
 // Possible values for RevokeReleaseErrorResponseType.
 const (
+	AuthCsrfInvalidRevokeReleaseErrorResponse     RevokeReleaseErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRevokeReleaseErrorResponse    RevokeReleaseErrorResponseType = "auth.unauthorized"
 	EvtInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "evt.invalid"
 	InternalRevokeReleaseErrorResponse            RevokeReleaseErrorResponseType = "internal"
@@ -79903,6 +80087,11 @@ const (
 	ReqInvalidRevokeReleaseErrorResponse          RevokeReleaseErrorResponseType = "req.invalid"
 	UnavailableRevokeReleaseErrorResponse         RevokeReleaseErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RevokeReleaseErrorResponse is AuthCsrfInvalid.
+func (s RevokeReleaseErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRevokeReleaseErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RevokeReleaseErrorResponse is AuthUnauthorized.
 func (s RevokeReleaseErrorResponse) IsAuthUnauthorized() bool {
@@ -79952,6 +80141,27 @@ func (s RevokeReleaseErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RevokeReleaseErrorResponse is Unavailable.
 func (s RevokeReleaseErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRevokeReleaseErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RevokeReleaseErrorResponse to AuthCsrfInvalid.
+func (s *RevokeReleaseErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRevokeReleaseErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RevokeReleaseErrorResponse is AuthCsrfInvalid.
+func (s RevokeReleaseErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRevokeReleaseErrorResponse returns new RevokeReleaseErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRevokeReleaseErrorResponse(v AuthCsrfInvalid) RevokeReleaseErrorResponse {
+	var s RevokeReleaseErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RevokeReleaseErrorResponse to AuthUnauthorized.
@@ -80476,6 +80686,7 @@ func (*RollbackDeploymentCreated) rollbackDeploymentRes() {}
 // RollbackDeploymentErrorResponse represents sum type.
 type RollbackDeploymentErrorResponse struct {
 	Type                 RollbackDeploymentErrorResponseType // switch on this field
+	AuthCsrfInvalid      AuthCsrfInvalid
 	AuthUnauthorized     AuthUnauthorized
 	DepConflict          DepConflict
 	DepInvalid           DepInvalid
@@ -80498,6 +80709,7 @@ type RollbackDeploymentErrorResponseType string
 
 // Possible values for RollbackDeploymentErrorResponseType.
 const (
+	AuthCsrfInvalidRollbackDeploymentErrorResponse      RollbackDeploymentErrorResponseType = "auth.csrf_invalid"
 	AuthUnauthorizedRollbackDeploymentErrorResponse     RollbackDeploymentErrorResponseType = "auth.unauthorized"
 	DepConflictRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "dep.conflict"
 	DepInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "dep.invalid"
@@ -80514,6 +80726,11 @@ const (
 	ReqInvalidRollbackDeploymentErrorResponse           RollbackDeploymentErrorResponseType = "req.invalid"
 	UnavailableRollbackDeploymentErrorResponse          RollbackDeploymentErrorResponseType = "unavailable"
 )
+
+// IsAuthCsrfInvalid reports whether RollbackDeploymentErrorResponse is AuthCsrfInvalid.
+func (s RollbackDeploymentErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidRollbackDeploymentErrorResponse
+}
 
 // IsAuthUnauthorized reports whether RollbackDeploymentErrorResponse is AuthUnauthorized.
 func (s RollbackDeploymentErrorResponse) IsAuthUnauthorized() bool {
@@ -80588,6 +80805,27 @@ func (s RollbackDeploymentErrorResponse) IsReqInvalid() bool {
 // IsUnavailable reports whether RollbackDeploymentErrorResponse is Unavailable.
 func (s RollbackDeploymentErrorResponse) IsUnavailable() bool {
 	return s.Type == UnavailableRollbackDeploymentErrorResponse
+}
+
+// SetAuthCsrfInvalid sets RollbackDeploymentErrorResponse to AuthCsrfInvalid.
+func (s *RollbackDeploymentErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidRollbackDeploymentErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if RollbackDeploymentErrorResponse is AuthCsrfInvalid.
+func (s RollbackDeploymentErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidRollbackDeploymentErrorResponse returns new RollbackDeploymentErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidRollbackDeploymentErrorResponse(v AuthCsrfInvalid) RollbackDeploymentErrorResponse {
+	var s RollbackDeploymentErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
 }
 
 // SetAuthUnauthorized sets RollbackDeploymentErrorResponse to AuthUnauthorized.

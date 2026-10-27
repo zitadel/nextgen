@@ -41,6 +41,16 @@ export function serverLogAction(cliVersion: string): string {
 }
 
 /**
+ * Where the list of every command is: the CLI run with no subcommand. Setup,
+ * status and every command's help end with it, after their own next steps, so
+ * the overview can be found without already knowing it exists. The command is on
+ * a line of its own, with nothing around it, so it can be copied as written.
+ */
+export function exploreAllCommands(cliVersion: string): string {
+  return ["Explore all commands:", `  ${publicCliCommand("", cliVersion)}`].join("\n");
+}
+
+/**
  * The customize/publish pair, in Elina's tested wording. `selector` is the
  * run's environment selection, so the quoted commands publish to the project
  * the run was about.

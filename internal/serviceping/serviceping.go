@@ -1,9 +1,6 @@
 // Package serviceping reports, on an interval, which version and storage
-// dialect a deployment runs, as one anonymous event to Vercel Web Analytics
-// and to Mixpanel.
-//
-// Proof of concept: the event is named with a poc_ prefix so proof traffic
-// never mixes with a released ping's events, and the ping is off by default.
+// dialect a deployment runs, as one anonymous event to Vercel Web Analytics,
+// and to Mixpanel when it is given a token. The ping is off by default.
 package serviceping
 
 import (
@@ -22,25 +19,19 @@ import (
 	"time"
 )
 
-// EventPrefix keeps proof traffic apart from a released ping's events; the
-// product analytics catalog lists the event without it.
-const EventPrefix = "poc_"
-
 // EventName is the event every ping sends.
-const EventName = EventPrefix + "service_ping"
+const EventName = "service_ping"
 
 // DefaultVercelEndpoint is the cloud project's Web Analytics intake, the URL
 // `@vercel/analytics/server` posts custom events to.
 const DefaultVercelEndpoint = "https://preview.zitadel.com/_vercel/insights/event"
 
 // DefaultMixpanelEndpoint is Mixpanel's track API behind the cloud's proxy,
-// the `/telemetry/mixpanel/*` rewrite in the repo-root vercel.json.
+// the `/telemetry/mixpanel/*` rewrite in the repo-root vercel.json. There is
+// no default token: Mixpanel is paused, as it is for the CLI
+// (apps/cli/src/lib/telemetry/config.ts), so the ping sends it nothing
+// unless `service_ping.mixpanel_token` names a project.
 const DefaultMixpanelEndpoint = "https://preview.zitadel.com/telemetry/mixpanel/track"
-
-// DefaultMixpanelToken is the CLI's production project's ingestion token. It
-// can only add events, so it is published on purpose, as the CLI's copy is
-// (apps/cli/src/lib/telemetry/config.ts).
-const DefaultMixpanelToken = "f56fd7315ccd614fba8eecb2a8966152"
 
 // MaxProperties is the custom-event property limit of Web Analytics Plus.
 const MaxProperties = 8
