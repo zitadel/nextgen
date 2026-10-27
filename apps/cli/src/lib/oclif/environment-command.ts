@@ -162,11 +162,10 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
     const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
-    if (!options.quiet) {
-      // Recorded, not printed: the summary says where the command ran, once,
-      // whether a person or a script is reading it.
-      this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
-    }
+    // Recorded, never printed here: the summary says where the command ran,
+    // once, at its foot. `quiet` used to suppress two `ℹ` lines printed at this
+    // point; there are none to suppress, so every command records it.
+    this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
     return {
       client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),
       projectId,

@@ -666,7 +666,7 @@ describe("auth-method sso enable", () => {
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Google sign-in is configured locally.");
+        expect(result).toPrint("Google sign-in is configured locally");
       });
 
       it("renders text rather than a json envelope", async () => {

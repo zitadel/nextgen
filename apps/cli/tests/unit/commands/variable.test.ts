@@ -253,9 +253,13 @@ describe("variable list", () => {
     server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
     // The harness captures stdout, so process.stdout.isTTY is undefined here —
-    // the same condition a pipe or a redirect creates.
+    // the same condition a pipe or a redirect creates. The terminal run drops
+    // --non-interactive too: that flag is a person saying there is nobody to
+    // draw for, whatever the stream is.
     const piped = await runCliForTest(["variable", "list", ...plainArgs(cwd)]);
-    const terminal = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
+    const terminal = await asPerson(() =>
+      runCliForTest(["variable", "list", "--cwd", cwd, "--server", DEFAULT_SERVER]),
+    );
 
     expect(piped.exitCode).toBe(0);
     expect(piped.stdout.trim()).toBe("A\tb\t-");
