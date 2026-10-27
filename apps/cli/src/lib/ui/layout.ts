@@ -131,18 +131,3 @@ export class Frame implements Renderable {
     ].join("\n");
   }
 }
-
-/** Everything under the closing line clears the chain's gutter by this much. */
-export const indent = (text: string): string => text.replace(/^(?=.)/gm, "   ");
-
-/** Drops the blank lines a command's own rendering leaves at either end. */
-export function trimBlank(lines: readonly string[]): string[] {
-  const out = [...lines];
-  while (out[0]?.trim() === "") {
-    out.shift();
-  }
-  while (out.at(-1)?.trim() === "") {
-    out.pop();
-  }
-  return out;
-}

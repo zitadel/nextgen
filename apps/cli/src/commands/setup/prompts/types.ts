@@ -10,6 +10,7 @@ import {
 import type { Asker } from "../../../lib/input";
 import type { FrameworkChoice } from "../../../lib/orca";
 import type { SuggestedCommand } from "../../../lib/suggestion";
+import type { Spinner } from "../../../lib/ui";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -112,6 +113,24 @@ export type PromptContext = {
    * this Next.js app?" would be answered yes without asking. This one never is.
    */
   readonly input: Asker;
+  /**
+   * Something the person must read or go and do outside the terminal, such as
+   * registering an OAuth application, as the one boxed thing a prompt draws.
+   * It goes through the UI package for the same reason `input` does: a prompt
+   * that drew its own box would draw one that matches nothing else.
+   */
+  readonly note: (title: string, lines: readonly string[]) => void;
+  /**
+   * One line in the chain that is not a question, such as what happens now
+   * that a provider was skipped.
+   */
+  readonly say: (text: string) => void;
+  /**
+   * A spinner for a probe that takes long enough to need saying so, stopped or
+   * cleared by the prompt that started it. It draws nothing when nobody is
+   * watching, so a prompt never tests for a terminal.
+   */
+  readonly spinner: (label: string, options?: { guide?: boolean }) => Spinner;
   /**
    * The framework of the app setup integrates: its id and the name a question
    * shows ("Next.js"). Nothing more: a new app does not exist while the wizard

@@ -1,7 +1,8 @@
-import { log, spinner } from "@clack/prompts";
+import { log } from "@clack/prompts";
 import { consola } from "consola";
 
 import { GUIDE, MARK } from "./marks";
+import { DrawnSpinner } from "./spinner";
 import type { Report, Step } from "./wizard";
 
 /**
@@ -10,107 +11,133 @@ import type { Report, Step } from "./wizard";
  * reported underneath. With nobody at a terminal the same thing is narrated as
  * plain `consola` lines, which `--json` silences.
  *
- * Only {@link Chain} calls these; a command reaches them through
- * `wizard.task(...)` or `wizard.begin(...)`.
+ * Only the chain builds one; a command reaches it through `wizard.task(...)`
+ * or `wizard.begin(...)`.
  */
 
-/** What the chain lends its progress lines: how to draw them in it. */
-export type Drawing = {
+/**
+ * What the chain lends its progress lines: how to draw them in it. The chain
+ * implements it, rather than handing over itself, so progress can open and
+ * space the chain and do nothing else to it.
+ */
+export interface Drawing {
+  /** Whether a person is watching. When false nothing is drawn, only narrated. */
   readonly interactive: boolean;
   /** Opens the chain, so the first thing drawn is under its heading. */
   open(): void;
   /** The chain's spacing is settled; what follows needs no blank guide line. */
   closeGap(): void;
-};
-
-/** Writes one line under a result, in the chain's gutter. */
-const detailLine = (text: string): void => {
-  log.message(text, { symbol: GUIDE, spacing: 0 });
-};
-
-/**
- * A step the caller ends itself, for a run of work the surrounding code cannot
- * wrap in a callback. It ends once: a second `done` or `fail` does nothing.
- */
-export function beginStep(drawing: Drawing, label: string): Step {
-  if (!drawing.interactive) {
-    consola.start(label);
-    return {
-      detail: (text) => consola.info(text),
-      done: (text) => consola.success(text ?? label),
-      fail: (text) => consola.error(text ?? `${label} failed`),
-    };
-  }
-  drawing.open();
-  const details: string[] = [];
-  const progress = spinner();
-  progress.start(label);
-  let ended = false;
-  const end = (symbol: string, text: string) => {
-    if (ended) {
-      return;
-    }
-    ended = true;
-    progress.clear();
-    drawing.closeGap();
-    log.message(text, { symbol, spacing: 0 });
-    for (const line of details) {
-      detailLine(line);
-    }
-  };
-  return {
-    detail: (text) => details.push(text),
-    done: (text) => end(MARK.done, text ?? label),
-    fail: (text) => end(MARK.failed, text ?? `${label} failed`),
-  };
 }
 
+/** One line a task reported, waiting to be drawn with its verbs aligned. */
+type Line = { mark: string; verb: string; subject: string };
+
 /**
- * Work as a callback, which is how a command should do it: the step cannot be
- * left unfinished, and what the work reports is listed under its result with
- * the verbs aligned.
+ * Draws the progress of one chain's work. It is a class rather than two loose
+ * functions because both ways of reporting work — the callback and the
+ * hand-ended step — need the same chain, the same marks and the same alignment,
+ * and the only difference between them is who decides that the work is over.
  */
-export async function runTask<T>(
-  drawing: Drawing,
-  label: string,
-  work: (report: Report) => Promise<T>,
-  done?: (result: T) => string,
-): Promise<T> {
-  const lines: { mark: string; verb: string; subject: string }[] = [];
-  const line = (mark: string) => (verb: string, subject: string) => {
-    lines.push({ mark, verb, subject });
-  };
-  const report: Report = {
-    done: line(""),
-    skipped: line(MARK.skipped),
-    warning: line(MARK.warning),
-  };
-  if (!drawing.interactive) {
-    consola.start(label);
-    const result = await work(report);
-    for (const { verb, subject } of lines) {
-      consola.info(`${verb} ${subject}`);
-    }
-    consola.success(done?.(result) ?? label);
-    return result;
+export class Progress {
+  private readonly drawing: Drawing;
+
+  constructor(drawing: Drawing) {
+    this.drawing = drawing;
   }
-  drawing.open();
-  const progress = spinner();
-  progress.start(label);
-  try {
-    const result = await work(report);
-    progress.clear();
-    drawing.closeGap();
-    // The spinner already drew the blank guide line above the title.
-    log.message(done?.(result) ?? label, { symbol: MARK.done, spacing: 0 });
+
+  /**
+   * Work as a callback, which is how a command should do it: the step cannot be
+   * left unfinished, and what the work reports is listed under its result with
+   * the verbs aligned.
+   */
+  async run<T>(
+    label: string,
+    work: (report: Report) => Promise<T>,
+    done?: (result: T) => string,
+  ): Promise<T> {
+    const lines: Line[] = [];
+    const report = Progress.collect(lines);
+    if (!this.drawing.interactive) {
+      consola.start(label);
+      const result = await work(report);
+      for (const { verb, subject } of lines) {
+        consola.info(`${verb} ${subject}`);
+      }
+      consola.success(done?.(result) ?? label);
+      return result;
+    }
+    this.drawing.open();
+    const progress = new DrawnSpinner(label);
+    try {
+      const result = await work(report);
+      progress.clear();
+      this.drawing.closeGap();
+      // The spinner already drew the blank guide line above the title.
+      log.message(done?.(result) ?? label, { symbol: MARK.done, spacing: 0 });
+      Progress.draw(lines);
+      return result;
+    } catch (error) {
+      progress.clear();
+      log.message(`${label} failed`, { symbol: MARK.failed, spacing: 0 });
+      throw error;
+    }
+  }
+
+  /**
+   * A step the caller ends itself, for a run of work the surrounding code
+   * cannot wrap in a callback. It ends once: a second `done` or `fail` does
+   * nothing.
+   */
+  begin(label: string): Step {
+    if (!this.drawing.interactive) {
+      consola.start(label);
+      return {
+        detail: (text) => consola.info(text),
+        done: (text) => consola.success(text ?? label),
+        fail: (text) => consola.error(text ?? `${label} failed`),
+      };
+    }
+    this.drawing.open();
+    const details: string[] = [];
+    const progress = new DrawnSpinner(label);
+    let ended = false;
+    const end = (symbol: string, text: string) => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      progress.clear();
+      this.drawing.closeGap();
+      log.message(text, { symbol, spacing: 0 });
+      for (const line of details) {
+        Progress.detail(line);
+      }
+    };
+    return {
+      detail: (text) => details.push(text),
+      done: (text) => end(MARK.done, text ?? label),
+      fail: (text) => end(MARK.failed, text ?? `${label} failed`),
+    };
+  }
+
+  /** A {@link Report} that remembers what it was told, in the order it was told. */
+  private static collect(lines: Line[]): Report {
+    const line = (mark: string) => (verb: string, subject: string) => {
+      lines.push({ mark, verb, subject });
+    };
+    return { done: line(""), skipped: line(MARK.skipped), warning: line(MARK.warning) };
+  }
+
+  /** What a task reported, under its result, with the verbs in one column. */
+  private static draw(lines: readonly Line[]): void {
     const width = Math.max(0, ...lines.map((entry) => entry.verb.length));
     for (const { mark, verb, subject } of lines) {
-      detailLine(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`);
+      Progress.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`);
     }
-    return result;
-  } catch (error) {
-    progress.clear();
-    log.message(`${label} failed`, { symbol: MARK.failed, spacing: 0 });
-    throw error;
+  }
+
+  /** Writes one line under a result, in the chain's gutter. */
+  private static detail(text: string): void {
+    log.message(text, { symbol: GUIDE, spacing: 0 });
   }
 }

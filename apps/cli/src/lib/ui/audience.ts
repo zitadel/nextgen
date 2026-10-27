@@ -19,7 +19,8 @@ export type Audience = {
   /**
    * The command's `--force`, which answers its confirmations yes without
    * asking. A command whose `--force` means something else (setup's overwrites
-   * files) runs its questions with {@link Wizard} options that drop it.
+   * files) opens its wizard with `honorForce: false`, which drops it for that
+   * command without touching the invocation's audience.
    */
   readonly force: boolean;
 };

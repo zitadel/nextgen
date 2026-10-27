@@ -33,7 +33,7 @@ vi.mock("../../../../src/lib/local-server/server", async (importOriginal) => ({
   LocalServer: { detectUrl: vi.fn(), isPortFree: vi.fn(), nextFreePort: vi.fn() },
 }));
 
-import { confirm, isCancel, log, multiselect, note, password, select, text } from "@clack/prompts";
+import { confirm, isCancel, multiselect, password, select, text } from "@clack/prompts";
 import { IDP_PROVIDERS, type ProviderSelection } from "@zitadel/config/idp";
 
 import {
@@ -79,8 +79,20 @@ function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
 
 const ask: Asker = (question) => input(question, { interactive: true, force: false });
 
+/** What a prompt drew, as setup's own context would have drawn it. */
+const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
+const said = vi.fn<(text: string) => void>();
+/** The box a prompt drew, as the one string the reader sees. */
+const noteShown = (call = 0): { title?: string; body: string } => {
+  const [title, lines] = noted.mock.calls[call] ?? [];
+  return { title, body: (lines ?? []).join("\n") };
+};
+
 const ctx: PromptContext = {
   input: ask,
+  note: noted,
+  say: said,
+  spinner: () => ({ message: vi.fn(), stop: vi.fn(), clear: vi.fn() }),
   framework: FRAMEWORK,
   cwd: "/tmp/app",
   // As setup builds it: aimed at the project setup creates.
@@ -546,9 +558,7 @@ describe("SocialSignInPrompt", () => {
     ]);
     // The URI has to be exact — the vendor matches it literally — and the
     // port answered a moment earlier is what decides it.
-    expect(vi.mocked(note).mock.calls[0]?.[0]).toContain(
-      "http://localhost:4321/__nextgen/idp/google/callback",
-    );
+    expect(noteShown().body).toContain("http://localhost:4321/__nextgen/idp/google/callback");
   });
 
   it("drops a provider whose client id is left empty, and says how to add it later", async () => {
@@ -564,7 +574,7 @@ describe("SocialSignInPrompt", () => {
     expect(vi.mocked(text).mock.calls[0]?.[0]?.message).toBe(
       "What is the client ID of your Google OAuth app? Leave it empty to skip.",
     );
-    expect(log.info).toHaveBeenCalledWith(
+    expect(said).toHaveBeenCalledWith(
       [
         "Skipped Google. Once its OAuth application exists, add it with:",
         "npx @zitadel/cli@1.2.3 auth-method sso enable --provider google --env-file .env.development.local",
@@ -677,10 +687,10 @@ describe("SocialSignInPrompt", () => {
 
       await new SocialSignInPrompt().ask(baseAnswers({ devPort: 4321 }), ctx);
 
-      const [shown, title] = vi.mocked(note).mock.calls[0] ?? [];
-      expect(shown).toContain("http://localhost:4321/__nextgen/idp/acme-sso/callback");
-      expect(shown).toContain("https://sso.acme.example");
-      expect(shown).not.toContain("undefined");
+      const { title, body } = noteShown();
+      expect(body).toContain("http://localhost:4321/__nextgen/idp/acme-sso/callback");
+      expect(body).toContain("https://sso.acme.example");
+      expect(body).not.toContain("undefined");
       expect(title).toBe("Acme SSO sign-in");
     });
 
@@ -751,7 +761,7 @@ describe("SocialSignInPrompt", () => {
       expect(password).not.toHaveBeenCalled();
       // The connection as described, so the later command asks only for the
       // credentials.
-      expect(vi.mocked(log.info).mock.calls[0]?.[0]).toContain(
+      expect(said.mock.calls[0]?.[0]).toContain(
         "npx @zitadel/cli@1.2.3 auth-method sso enable --provider custom --slug acme-sso",
       );
     });

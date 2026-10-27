@@ -45,6 +45,13 @@ export interface Wizard {
   /** Yes or no. The command's `--force` answers it yes without asking. */
   confirm(question: ConfirmQuestion): Promise<boolean>;
   /**
+   * One line in the chain that states something the run has settled, such as
+   * what happens now that a provider was skipped. It is not a question, not a
+   * step that did work ({@link task}) and not something to go and do
+   * ({@link note}); with nobody watching it is a plain `consola` line.
+   */
+  say(text: string): void;
+  /**
    * Something the person must read or go and do outside the terminal, such as
    * registering an OAuth app. It is the only boxed thing inside a chain; what
    * merely happened is a {@link task}'s line, and what is left to do is the

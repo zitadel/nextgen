@@ -13,7 +13,7 @@ import type { BoxAction } from "../box";
 export type Fact = readonly [label: string, value: string];
 
 /** A group of facts under an optional heading. */
-export type Section = { heading?: string; facts: readonly Fact[] };
+export type Section = { readonly heading?: string; readonly facts: readonly Fact[] };
 
 /**
  * Builds a section.
@@ -26,32 +26,37 @@ export const section = (heading: string | undefined, ...facts: Fact[]): Section 
   facts,
 });
 
-/** What a command ends on. */
+/**
+ * What a command ends on. Every field is read-only: a summary is a value the
+ * command returned and the chain is about to draw, so a later step that wants
+ * a different ending builds a different summary (`{ ...summary, next }`)
+ * rather than reaching into one that has already been handed over.
+ */
 export type Summary = {
   /**
    * The one line that closes the chain: what happened, as a sentence, with no
    * full stop. It is a single line; anything longer belongs in {@link lines}.
    * Where it ran is {@link ran}, not part of this.
    */
-  title: string;
+  readonly title: string;
   /** Facts worth stating, such as the project and the file that was written. */
-  sections: readonly Section[];
+  readonly sections: readonly Section[];
   /** Anything the command renders itself, such as a table, under the facts. */
-  lines?: readonly string[];
+  readonly lines?: readonly string[];
   /** What to do next, each step a sentence and the commands it asks for. */
-  next?: readonly BoxAction[];
+  readonly next?: readonly BoxAction[];
   /** The headline is a failure, so it closes the chain in red. */
-  failed?: boolean;
+  readonly failed?: boolean;
   /** Draw the box even with no steps, for a command whose body is instructions. */
-  boxed?: boolean;
+  readonly boxed?: boolean;
   /** The box's own title. Defaults to "Summary". */
-  boxTitle?: string;
+  readonly boxTitle?: string;
   /**
-   * Where the command ran, as the box's first line: the project and the server
+   * Where the command ran, as the box's last line: the project and the server
    * it spoke to. Every command that reaches a server states it, in one place,
    * rather than printing it before the first question.
    */
-  ran?: string;
+  readonly ran?: string;
 };
 
 /**
@@ -59,6 +64,6 @@ export type Summary = {
  * a person sees. Both are required, so a command cannot produce one without the
  * other.
  */
-export type Outcome<D> = { data: D; summary: Summary };
+export type Outcome<D> = { readonly data: D; readonly summary: Summary };
 
 export const outcome = <D>(data: D, summary: Summary): Outcome<D> => ({ data, summary });

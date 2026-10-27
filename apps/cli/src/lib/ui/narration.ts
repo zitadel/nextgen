@@ -1,8 +1,6 @@
 import { consola, type ConsolaReporter } from "consola";
 import { format } from "node:util";
-import pc from "picocolors";
 
-import type { Chain } from "./chain";
 import { GUIDE, MARK } from "./marks";
 
 /**
@@ -20,25 +18,38 @@ import { GUIDE, MARK } from "./marks";
  * command in the same process — every command in the unit tests — would keep
  * drawing into a chain that has closed.
  */
+
+/** What the bridge needs of the chain it draws into, and nothing more. */
+export interface Narratable {
+  /** One line in the chain: its mark, then the text. */
+  narrate(symbol: string, text: string): void;
+}
+
+/** The mark a consola level deserves. An unlisted level is a plain gutter line. */
 const MARKS: Readonly<Record<string, string>> = {
   success: MARK.done,
   ready: MARK.done,
-  info: pc.cyan("ℹ"),
-  start: pc.cyan("◐"),
+  info: MARK.info,
+  start: MARK.started,
   warn: MARK.warning,
   error: MARK.failed,
   fail: MARK.failed,
   fatal: MARK.failed,
-  debug: pc.dim("·"),
-  trace: pc.dim("·"),
+  debug: MARK.detail,
+  trace: MARK.detail,
 };
 
 export class Narration {
-  private readonly chain: Chain;
+  private readonly chain: Narratable;
   private previous: ConsolaReporter[] | undefined;
 
-  constructor(chain: Chain) {
+  constructor(chain: Narratable) {
     this.chain = chain;
+  }
+
+  /** Whether consola is currently drawing into the chain. */
+  get installed(): boolean {
+    return this.previous !== undefined;
   }
 
   /** Draws consola's output into the chain until {@link restore}. */

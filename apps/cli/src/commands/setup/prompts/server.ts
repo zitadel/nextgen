@@ -1,5 +1,3 @@
-import { spinner } from "@clack/prompts";
-
 import type { Parsed } from "@zitadel/config/idp";
 
 import { LocalServer } from "../../../lib/local-server/server";
@@ -37,7 +35,7 @@ export class ServerPrompt implements SetupPrompt {
     if (ctx.serverFlag) {
       return answers;
     }
-    const detected = await detectLocalServer(ctx.cwd);
+    const detected = await detectLocalServer(ctx);
 
     const choice = await ctx.input({
       kind: "select",
@@ -92,10 +90,9 @@ export class ServerPrompt implements SetupPrompt {
  * line behind, because the options it decides already say what it found, and
  * it draws no guide line of its own, which clearing would leave behind.
  */
-async function detectLocalServer(cwd: string): Promise<string | undefined> {
-  const s = spinner({ withGuide: false });
-  s.start("Checking for a local Zitadel server");
-  const detected = await LocalServer.detectUrl(cwd);
-  s.clear();
+async function detectLocalServer(ctx: PromptContext): Promise<string | undefined> {
+  const probing = ctx.spinner("Checking for a local Zitadel server", { guide: false });
+  const detected = await LocalServer.detectUrl(ctx.cwd);
+  probing.clear();
   return detected;
 }

@@ -1,5 +1,3 @@
-import { log, note } from "@clack/prompts";
-
 import {
   credentialVariables,
   CUSTOM_PROVIDER,
@@ -148,7 +146,7 @@ export class SocialSignInPrompt implements SetupPrompt {
               developmentBuild: ctx.developmentBuild === true,
               ask: ctx.input,
             })));
-      this.announce(entry, answers.devPort, endpoints?.issuer);
+      this.announce(ctx, entry, answers.devPort, endpoints?.issuer);
 
       const clientId = await ctx.input({
         kind: "text",
@@ -163,7 +161,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         given: flagged?.credentials.clientId,
       });
       if (clientId === undefined) {
-        log.info(
+        ctx.say(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
             ctx.suggest(ssoEnableArgs(selection)),
@@ -219,26 +217,23 @@ export class SocialSignInPrompt implements SetupPrompt {
    * can be shown rather than left for the developer to work out, which
    * matters because the vendor matches it literally.
    */
-  private announce(entry: IdpProvider, devPort: number, issuer?: Issuer): void {
-    note(
-      [
-        // Where to register depends on who is actually answering: pointing a
-        // developer at the vendor's console when the connection runs against
-        // their own stand-in would be worse than saying nothing.
-        ...(issuer === undefined
-          ? [
-              entry.consoleUrl === undefined
-                ? `Register a client at ${entry.issuer}, as an OAuth application:`
-                : "Register an OAuth application at:",
-              ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
-            ]
-          : ["Register a client with the provider at:", issuer]),
-        "",
-        "Redirect URI:",
-        callbackUriFor(issuerFromPort(devPort), entry.slug),
-      ].join("\n"),
-      `${entry.displayName} sign-in`,
-    );
+  private announce(ctx: PromptContext, entry: IdpProvider, devPort: number, issuer?: Issuer): void {
+    ctx.note(`${entry.displayName} sign-in`, [
+      // Where to register depends on who is actually answering: pointing a
+      // developer at the vendor's console when the connection runs against
+      // their own stand-in would be worse than saying nothing.
+      ...(issuer === undefined
+        ? [
+            entry.consoleUrl === undefined
+              ? `Register a client at ${entry.issuer}, as an OAuth application:`
+              : "Register an OAuth application at:",
+            ...(entry.consoleUrl === undefined ? [] : [entry.consoleUrl]),
+          ]
+        : ["Register a client with the provider at:", issuer]),
+      "",
+      "Redirect URI:",
+      callbackUriFor(issuerFromPort(devPort), entry.slug),
+    ]);
   }
 
   /** Describe a custom connection from scratch: nothing was given on the command line. */

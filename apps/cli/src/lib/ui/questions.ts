@@ -12,8 +12,17 @@ import type { SuggestedCommand } from "../suggestion";
  * and the same question is asked the same way by every command that asks it.
  */
 
-/** One option of a `select` or a `multiselect`. */
-export type Choice<V> = { value: V; label: string; hint?: string };
+/**
+ * One option of a `select` or a `multiselect`. A `disabled` one is shown, with
+ * its hint always visible, but cannot be chosen: for a choice that exists but
+ * is not available yet, such as a local server that is not running.
+ */
+export type Choice<V> = {
+  readonly value: V;
+  readonly label: string;
+  readonly hint?: string;
+  readonly disabled?: boolean;
+};
 
 /** What every question says about itself, whatever it asks for. */
 type Question = {

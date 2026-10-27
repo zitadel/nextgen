@@ -1,4 +1,3 @@
-import { spinner } from "@clack/prompts";
 import { Flags } from "@oclif/core";
 
 import { nonBlankString } from "../../flags";
@@ -174,10 +173,9 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const asked = flags.limit !== undefined || flags["page-token"] !== undefined;
     const all = paged && (flags.all === true || (spec.drains === true && !asked));
     // `--all` is one request per page, so a wide drain would otherwise sit
-    // silent. The spinner is terminal-only: no animation reaches a pipe, and
-    // `--json` has already silenced everything.
-    const progress = all && process.stdout.isTTY && !this.jsonEnabled() ? spinner() : undefined;
-    progress?.start(`Fetching ${topic}`);
+    // silent. `this.ui` hands out a spinner that draws nothing when nobody is
+    // watching, so no animation reaches a pipe and `--json` stays one envelope.
+    const progress = all ? this.ui.spinner(`Fetching ${topic}`) : undefined;
     let fetched = 0;
     let drained = false;
     // The spinner owns the cursor and a SIGINT handler until it is stopped, so a

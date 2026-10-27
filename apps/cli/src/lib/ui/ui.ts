@@ -1,6 +1,7 @@
 import type { Audience } from "./audience";
 import { Chain } from "./chain";
 import { Narration } from "./narration";
+import type { Spinner } from "./spinner";
 import type { Outcome, Summary } from "./summary";
 import type { Report, Step, Wizard } from "./wizard";
 
@@ -17,7 +18,7 @@ import type { Report, Step, Wizard } from "./wizard";
  *   static override heading = "Removing an origin";
  *
  *   override async execute() {
- *     return this.ui.wizard(async (w) => {
+ *     return this.ui.wizard("Removing an origin", async (w) => {
  *       if (!(await w.confirm({ name: "remove the origin", message: `Remove ${pattern}?` }))) {
  *         return outcome({ removed: false }, { title: "Nothing was removed", sections: [] });
  *       }
@@ -27,26 +28,55 @@ import type { Report, Step, Wizard } from "./wizard";
  *   }
  * }
  * ```
+ *
+ * The members below `wizard` are the base command's, not a command's: they
+ * name the chain, bridge `consola` into it and close it on the result the
+ * command returned. A command that reaches for them is a command drawing
+ * outside its own chain.
  */
 export class Ui {
-  private readonly audience: Audience;
   private readonly chain: Chain;
   private readonly narration: Narration;
 
   constructor(audience: Audience) {
-    this.audience = audience;
     this.chain = new Chain(audience);
     this.narration = new Narration(this.chain);
   }
 
   /** Whether anything is drawn: false under `--json`, `--non-interactive` and no terminal. */
   get interactive(): boolean {
-    return this.audience.interactive;
+    return this.chain.interactive;
   }
 
   /** Whether the chain has been drawn into. */
   get opened(): boolean {
     return this.chain.isOpen;
+  }
+
+  /**
+   * Runs a whole command as one chain and returns its data. The chain opens at
+   * the first thing the person sees and closes on the summary. When nobody is
+   * there, questions are answered from flags and stdin only and nothing is
+   * drawn, so `--json` stays one envelope.
+   *
+   * `honorForce: false` is for `setup`, whose `--force` means "overwrite files"
+   * and so must never answer a question.
+   */
+  async wizard<D>(
+    title: string,
+    steps: (wizard: Wizard) => Promise<Outcome<D>>,
+    options: { honorForce?: boolean } = {},
+  ): Promise<D> {
+    this.chain.describe(title);
+    this.chain.honorForce(options.honorForce !== false);
+    try {
+      const result = await steps(this.chain);
+      this.chain.finish(result.summary);
+      return result.data;
+    } catch (error) {
+      this.chain.abort(error);
+      throw error;
+    }
   }
 
   /** Names the chain by what the command is doing: `Listing origins`. */
@@ -64,21 +94,13 @@ export class Ui {
   }
 
   /**
-   * Draws the narration the CLI still writes with `consola` inside the chain.
-   * See {@link bridgeNarration}.
+   * Draws the narration the CLI still writes with `consola` inside the chain,
+   * until {@link releaseNarration}.
    */
   bridgeNarration(): void {
-    if (this.audience.interactive) {
+    if (this.interactive) {
       this.narration.install();
     }
-  }
-
-  /**
-   * Where this command ran, as the one sentence both a person and a script see.
-   * `undefined` when the command reached nothing.
-   */
-  whereItRan(): string | undefined {
-    return this.chain.whereItRan();
   }
 
   /**
@@ -111,6 +133,11 @@ export class Ui {
     return this.chain.task(label, work, done);
   }
 
+  /** One line that states a fact, outside a `wizard` callback (see {@link Wizard.say}). */
+  say(text: string): void {
+    this.chain.say(text);
+  }
+
   /** Something the person must read or do (see {@link Wizard.note}). */
   note(title: string, lines: readonly string[]): void {
     this.chain.note(title, lines);
@@ -125,34 +152,18 @@ export class Ui {
     return this.chain.begin(label);
   }
 
+  /**
+   * A spinner the caller stops itself, for work that neither {@link task} nor
+   * {@link begin} fits: a probe whose result decides the next question, or a
+   * loop that renames the spinner as it goes. It draws nothing when nobody is
+   * watching, so no caller tests for a terminal.
+   */
+  spinner(label: string, options: { guide?: boolean } = {}): Spinner {
+    return this.chain.spinner(label, options);
+  }
+
   /** Closes the chain on its summary. A command does not call this; the base command does. */
   finish(summary: Summary): void {
     this.chain.finish(summary);
-  }
-
-  /**
-   * Runs a whole command as one chain and returns its data. The chain opens at
-   * the first thing the person sees and closes on the summary. When nobody is
-   * there, questions are answered from flags and stdin only and nothing is
-   * drawn, so `--json` stays one envelope.
-   *
-   * `honorForce: false` is for `setup`, whose `--force` means "overwrite files"
-   * and so must never answer a question.
-   */
-  async wizard<D>(
-    title: string,
-    steps: (wizard: Wizard) => Promise<Outcome<D>>,
-    options: { honorForce?: boolean } = {},
-  ): Promise<D> {
-    this.chain.describe(title);
-    this.chain.honorForce(options.honorForce !== false);
-    try {
-      const result = await steps(this.chain);
-      this.chain.finish(result.summary);
-      return result.data;
-    } catch (error) {
-      this.chain.abort(error);
-      throw error;
-    }
   }
 }

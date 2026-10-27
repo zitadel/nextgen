@@ -1,0 +1,155 @@
+import { stripAnsi } from "consola/utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+
+import { log, spinner } from "@clack/prompts";
+import { consola } from "consola";
+
+import { type Drawing, Progress } from "../../../../src/lib/ui/progress";
+
+/** A chain that remembers what progress asked of it, and draws nothing. */
+const chain = (interactive: boolean): Drawing & { opened: number; gaps: number } => ({
+  interactive,
+  opened: 0,
+  gaps: 0,
+  open() {
+    this.opened += 1;
+  },
+  closeGap() {
+    this.gaps += 1;
+  },
+});
+
+/** Every line drawn in the chain, in order, with its mark. */
+const drawn = (): string[] =>
+  vi
+    .mocked(log.message)
+    .mock.calls.map(([text, options]) =>
+      `${stripAnsi(String(options?.symbol ?? ""))} ${stripAnsi(String(text))}`.trim(),
+    );
+
+beforeEach(() => {
+  vi.spyOn(consola, "start").mockImplementation(() => undefined);
+  vi.spyOn(consola, "info").mockImplementation(() => undefined);
+  vi.spyOn(consola, "success").mockImplementation(() => undefined);
+  vi.spyOn(consola, "error").mockImplementation(() => undefined);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
+
+describe("Progress", () => {
+  describe("work as a callback", () => {
+    it("returns what the work returned", async () => {
+      await expect(new Progress(chain(true)).run("Fetching", async () => 42)).resolves.toBe(42);
+    });
+
+    it("spins while it runs and says so when it is done", async () => {
+      await new Progress(chain(true)).run("Removing the origin", async () => undefined);
+
+      expect(spinner).toHaveBeenCalled();
+      expect(drawn()).toEqual(["✔ Removing the origin"]);
+    });
+
+    it("lets the work name its own result", async () => {
+      await new Progress(chain(true)).run(
+        "Fetching users",
+        async () => ["a", "b"],
+        (users) => `Fetched ${users.length} users`,
+      );
+
+      expect(drawn()).toEqual(["✔ Fetched 2 users"]);
+    });
+
+    it("lists what the work reported under its result, verbs aligned", async () => {
+      await new Progress(chain(true)).run("Writing", async (report) => {
+        report.done("Wrote", ".env.local");
+        report.skipped("Left", "flows/default-login.json");
+        report.warning("Check", "no claim_mapping");
+      });
+
+      expect(drawn().slice(1)).toEqual([
+        "│   Wrote  .env.local",
+        "│ – Left   flows/default-login.json",
+        "│ ! Check  no claim_mapping",
+      ]);
+    });
+
+    it("says the step failed and lets the error through", async () => {
+      const boom = new Error("boom");
+
+      await expect(
+        new Progress(chain(true)).run("Removing the origin", () => Promise.reject(boom)),
+      ).rejects.toBe(boom);
+      expect(drawn()).toEqual(["✖ Removing the origin failed"]);
+    });
+
+    it("opens the chain before it draws into it", async () => {
+      const drawing = chain(true);
+
+      await new Progress(drawing).run("Fetching", async () => undefined);
+
+      expect(drawing.opened).toBe(1);
+    });
+
+    it("narrates as plain lines when nobody is watching", async () => {
+      await new Progress(chain(false)).run("Fetching users", async (report) => {
+        report.done("Wrote", ".env.local");
+      });
+
+      expect(spinner).not.toHaveBeenCalled();
+      expect(consola.start).toHaveBeenCalledWith("Fetching users");
+      expect(consola.info).toHaveBeenCalledWith("Wrote .env.local");
+      expect(consola.success).toHaveBeenCalledWith("Fetching users");
+    });
+  });
+
+  describe("a step the caller ends itself", () => {
+    it("ends with the result it is given", () => {
+      new Progress(chain(true)).begin("Detecting framework").done("Detected Next.js");
+
+      expect(drawn()).toEqual(["✔ Detected Next.js"]);
+    });
+
+    it("falls back to its own label when the caller names no result", () => {
+      new Progress(chain(true)).begin("Detecting framework").done();
+
+      expect(drawn()).toEqual(["✔ Detecting framework"]);
+    });
+
+    it("lists the detail it collected under its result", () => {
+      const step = new Progress(chain(true)).begin("Patching project files");
+      step.detail("src/app/page.tsx");
+      step.done("Patched 1 file");
+
+      expect(drawn()).toEqual(["✔ Patched 1 file", "│ src/app/page.tsx"]);
+    });
+
+    it("ends once, however many times it is ended", () => {
+      const step = new Progress(chain(true)).begin("Detecting framework");
+      step.done("Detected Next.js");
+      step.fail("Detected nothing");
+
+      expect(drawn()).toEqual(["✔ Detected Next.js"]);
+    });
+
+    it("marks a step that failed", () => {
+      new Progress(chain(true)).begin("Detecting framework").fail();
+
+      expect(drawn()).toEqual(["✖ Detecting framework failed"]);
+    });
+
+    it("narrates as plain lines when nobody is watching", () => {
+      const step = new Progress(chain(false)).begin("Detecting framework");
+      step.detail("package.json");
+      step.done("Detected Next.js");
+
+      expect(spinner).not.toHaveBeenCalled();
+      expect(consola.info).toHaveBeenCalledWith("package.json");
+      expect(consola.success).toHaveBeenCalledWith("Detected Next.js");
+    });
+  });
+});

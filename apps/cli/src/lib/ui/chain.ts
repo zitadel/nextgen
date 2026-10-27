@@ -5,7 +5,11 @@ import pc from "picocolors";
 import { ZitadelError } from "../errors";
 import { input } from "../input";
 import type { Audience } from "./audience";
-import { Facts, Frame, indent, Prose, trimBlank, WIDTH } from "./layout";
+import { Ending } from "./ending";
+import { Prose, WIDTH } from "./layout";
+import { MARK } from "./marks";
+import type { Narratable } from "./narration";
+import { type Drawing, Progress } from "./progress";
 import type {
   ConfirmQuestion,
   MultiselectQuestion,
@@ -13,35 +17,26 @@ import type {
   SelectQuestion,
   TextQuestion,
 } from "./questions";
+import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
-import { beginStep, type Drawing, runTask } from "./progress";
 import type { Report, Step, Wizard } from "./wizard";
 
 /**
- * The chain: one command's output from its first line to its last, and the only
- * place `@clack/prompts` is drawn with.
- *
- *     ┌  Listing origins · proj-1 on api.zitadel.cloud   ← what the command is doing, and where
- *     │
- *     ◇  What should the value of GREETING be?           ← a question, with the answer under it
- *     │  hello
- *     │
- *     ✔  Set GREETING on the project                     ← a step that finished
- *     │  Wrote  .env.local                               ← what that step did
- *     │
- *     └  Set GREETING on the project                     ← the one line the command ends on
- *
- *        primary   hello                                 ← the facts, and then one box of
- *                                                           next steps, both outside the
- *                                                           gutter so they copy cleanly
+ * The chain: one command's output from its first line to its last (the package
+ * overview in `index.ts` draws one), and the only place `@clack/prompts` is
+ * drawn with.
  *
  * It opens itself at the first thing the person sees, so a run that shows
  * nothing draws no frame, and it is closed exactly once, by {@link Chain.finish}
  * or {@link Chain.abort}. With a non-interactive {@link Audience} it draws
  * nothing at all and narration falls back to plain `consola` lines.
+ *
+ * It implements {@link Wizard}, which is all a command is given of it: a
+ * command asks, notes and reports work, and never opens or closes the chain
+ * it is drawing into.
  */
-export class Chain implements Wizard {
+export class Chain implements Wizard, Drawing, Narratable {
   private opened = false;
   private ended = false;
   private title = "zitadel";
@@ -50,6 +45,7 @@ export class Chain implements Wizard {
   /** Whether a prompt or a box was the last thing drawn, so the next line needs a blank guide line. */
   private gap = false;
   private readonly audience: Audience;
+  private readonly progress = new Progress(this);
   /**
    * Whether this command's `--force` may answer its confirmations. Separate from
    * the audience, which is the invocation's and not one command's to change.
@@ -65,12 +61,6 @@ export class Chain implements Wizard {
     this.title = title;
   }
 
-  /** Where this command ran, as a sentence, or `undefined` if it reached nothing. */
-  whereItRan(): string | undefined {
-    const where = new Where(this.project, this.server);
-    return where.known ? where.render() : undefined;
-  }
-
   /** Where this command runs, which its summary opens with. */
   ranAgainst(project: string | undefined, server: string | undefined): void {
     this.project = project ?? this.project;
@@ -81,6 +71,10 @@ export class Chain implements Wizard {
     this.forcing = honor && this.audience.force;
   }
 
+  get interactive(): boolean {
+    return this.audience.interactive;
+  }
+
   get isOpen(): boolean {
     return this.opened;
   }
@@ -89,14 +83,8 @@ export class Chain implements Wizard {
     this.gap = true;
   }
 
-  /** The audience, with the hooks that keep the chain's spacing right around a prompt. */
-  private asking(): Audience & { before: () => void; after: () => void } {
-    return {
-      ...this.audience,
-      force: this.forcing,
-      before: () => this.open(),
-      after: () => this.answered(),
-    };
+  closeGap(): void {
+    this.gap = false;
   }
 
   /** One line in the chain: its mark, then the text. A blank guide line first after a prompt. */
@@ -124,36 +112,11 @@ export class Chain implements Wizard {
       return;
     }
     this.ended = true;
-    const steps = summary.next ?? [];
-    const where = new Where(this.project, this.server ?? summary.ran);
-    const body = trimBlank([
-      ...(summary.sections.length === 0 ? [] : [new Facts(summary.sections).render(), ""]),
-      ...(summary.lines ?? []),
-    ]);
-    // A box frames what the command produced. Where it ran is a footnote to
-    // that, never a reason for a frame of its own.
-    const boxed = summary.boxed === true || steps.length > 0 || body.length > 0;
-
-    outro(summary.failed === true ? pc.red(summary.title) : summary.title);
-    if (!boxed) {
-      if (where.known) {
-        process.stdout.write(`${indent(where.render())}\n`);
-      }
-      return;
-    }
-    if (boxed) {
-      // The report and the steps share one frame: what the command produced and
-      // what to do about it belong together.
-      process.stdout.write(
-        `\n${new Frame(
-          summary.boxTitle ?? "Summary",
-          body,
-          steps,
-          where.known ? where.render() : undefined,
-        ).render()}\n`,
-      );
-    } else if (body.length > 0) {
-      process.stdout.write(`${indent(body.join("\n"))}\n`);
+    const ending = new Ending(summary, this.where(summary.ran));
+    outro(ending.line);
+    const below = ending.render();
+    if (below !== undefined) {
+      process.stdout.write(below);
     }
   }
 
@@ -195,6 +158,14 @@ export class Chain implements Wizard {
     return input({ kind: "confirm", ...question }, this.asking());
   }
 
+  say(text: string): void {
+    if (this.audience.interactive) {
+      this.narrate(MARK.info, text);
+      return;
+    }
+    consola.info(text);
+  }
+
   note(title: string, lines: readonly string[]): void {
     if (this.audience.interactive) {
       this.open();
@@ -209,7 +180,7 @@ export class Chain implements Wizard {
   }
 
   begin(label: string): Step {
-    return beginStep(this.drawing(), label);
+    return this.progress.begin(label);
   }
 
   task<T>(
@@ -217,17 +188,38 @@ export class Chain implements Wizard {
     work: (report: Report) => Promise<T>,
     done?: (result: T) => string,
   ): Promise<T> {
-    return runTask(this.drawing(), label, work, done);
+    return this.progress.run(label, work, done);
   }
 
-  /** What {@link beginStep} and {@link runTask} need to draw inside this chain. */
-  private drawing(): Drawing {
+  /**
+   * A spinner the caller stops itself, for work whose shape rules out
+   * {@link task}. With nobody watching it is a {@link QuietSpinner}, so the
+   * caller never asks whether it may draw.
+   */
+  spinner(label: string, options: { guide?: boolean } = {}): Spinner {
+    if (!this.audience.interactive) {
+      return new QuietSpinner();
+    }
+    this.open();
+    return new DrawnSpinner(label, options.guide !== false);
+  }
+
+  /** Where this command ran, from what it reported and what its summary knew. */
+  private where(ran?: string): Where {
+    return new Where(this.project, this.server ?? ran);
+  }
+
+  /**
+   * The audience a question is asked of: this command's `--force` rather than
+   * the invocation's, with the hooks that open the chain before a prompt is
+   * drawn and leave the blank guide line it needs after it.
+   */
+  private asking(): Audience & { before: () => void; after: () => void } {
     return {
-      interactive: this.audience.interactive,
-      open: () => this.open(),
-      closeGap: () => {
-        this.gap = false;
-      },
+      ...this.audience,
+      force: this.forcing,
+      before: () => this.open(),
+      after: () => this.answered(),
     };
   }
 }

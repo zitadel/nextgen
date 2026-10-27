@@ -42,6 +42,9 @@
 - Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
   fails on a clack import elsewhere.
+- Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
+  `consola` or a write to `process.stdout`/`process.stderr` in a new file.
+  `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
 - Fail early: run every check that does not depend on an answer before the
   first question, and each one that does as soon as its answer is given.
 - A command that asks anything extends `Promptable(...)`

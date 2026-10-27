@@ -1,7 +1,7 @@
 import { stripAnsi } from "consola/utils";
 import { describe, expect, it } from "vitest";
 
-import { Facts, Frame, Prose, trimBlank, WIDTH } from "../../../../src/lib/ui/layout";
+import { Facts, Frame, Prose, WIDTH } from "../../../../src/lib/ui/layout";
 import { section } from "../../../../src/lib/ui/summary";
 
 const plain = (text: string): string => stripAnsi(text);
@@ -93,12 +93,6 @@ describe("Facts", () => {
 
     expect(heading).toBe("Project");
     expect(first?.indexOf("proj-1")).toBe(second?.indexOf("api.zitadel.cloud"));
-  });
-});
-
-describe("trimBlank", () => {
-  it("drops the blank lines at either end and keeps the ones between", () => {
-    expect(trimBlank(["", "a", "", "b", ""])).toEqual(["a", "", "b"]);
   });
 });
 
