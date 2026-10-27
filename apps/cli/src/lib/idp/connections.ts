@@ -337,7 +337,7 @@ function planCatalogConnection(options: {
         "E_VALIDATION",
         `${match.path} is a ${entry.displayName} connection with no usable slug`,
         {
-          hint: "Give the connection file a slug -- the schemas and flows reference it by that name.",
+          hint: "Give the connection file a slug — the schemas and flows reference it by that name.",
           details: { file: match.path, problem: matchSlug.problem },
         },
       );

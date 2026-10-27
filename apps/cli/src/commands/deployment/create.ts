@@ -39,7 +39,7 @@ export default class DeploymentCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: flags.release, targets },
-        pretty: `Would deploy ${flags.release} to ${targets.join(", ")}. Nothing was deployed (dry run).`,
+        pretty: `Would deploy ${flags.release} to ${targets.join(", ")} (dry run)`,
       });
     }
 

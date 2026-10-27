@@ -69,7 +69,7 @@ export default class VariableResolve extends EnvironmentCommand {
       ].sort();
       throw new ZitadelError(
         "E_VALIDATION",
-        "More than one deployment is live; name which origin to resolve with --origin.",
+        "More than one deployment is live; name which origin to resolve with --origin",
         {
           hint: `Live origins: ${origins.join(", ")}.`,
           nextCommands: origins.map((o) =>
@@ -125,14 +125,14 @@ export default class VariableResolve extends EnvironmentCommand {
     origin: string | undefined,
   ): Promise<ZitadelError> {
     if (origin === undefined) {
-      return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project.", {
+      return new ZitadelError("E_NOT_FOUND", "Nothing is deployed to the project", {
         hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
     }
     const origins = (await client.getProject(projectId)).origins ?? [];
     if (origins.some((entry) => entry.kind === "primary" && entry.pattern === origin)) {
-      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
         hint: `Deploy to it first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then resolve its variables.`,
         nextCommands: [this.suggest(DEPLOY_ARGS)],
       });
@@ -142,11 +142,11 @@ export default class VariableResolve extends EnvironmentCommand {
         (entry) => entry.kind === "preview" && originMatchesPattern(entry.pattern, origin),
       )
     ) {
-      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}.`, {
+      return new ZitadelError("E_NOT_FOUND", `Nothing is deployed to ${origin}`, {
         hint: "A preview URL is served by a pull-request build, not by `deploy`; resolve its variables once that build has deployed it.",
       });
     }
-    return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project.`, {
+    return new ZitadelError("E_NOT_FOUND", `${origin} is not an origin of the project`, {
       hint: "Check the origin for a typo, or list the project's origins.",
       nextCommands: [this.suggest("origin list")],
     });

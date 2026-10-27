@@ -93,7 +93,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, deployment_id: targetId },
-        pretty: `Would re-apply ${targetId}. Nothing was rolled back (dry run).`,
+        pretty: `Would re-apply ${targetId} (dry run)`,
       });
     }
 

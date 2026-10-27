@@ -21,6 +21,7 @@
  */
 export type { Audience } from "./audience";
 export { Facts, Frame, Prose, type Renderable, WIDTH } from "./layout";
+export { Narration } from "./narration";
 export { Where } from "./where";
 export { GUIDE, MARK } from "./marks";
 export type {

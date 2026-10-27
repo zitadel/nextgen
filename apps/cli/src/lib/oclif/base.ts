@@ -491,6 +491,9 @@ export abstract class BaseCommand extends Command {
    */
   protected override async finally(error: Error | undefined): Promise<void> {
     stopListeningForInterrupt();
+    // `consola` is process-wide: the chain borrows its reporters while this
+    // command runs and must give them back however the command ended.
+    this.ui.releaseNarration();
     await this.telemetry?.shutdown(1000);
     if (this.telemetry?.enabled) {
       setTimeout(() => process.exit(process.exitCode ?? 0), 250).unref();

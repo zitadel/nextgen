@@ -322,7 +322,7 @@ function boundaryConflict(existing: string, target: string, unknownVersion: bool
       `${existing} aside and rerun setup, then merge it into ${target}.`;
   return new ZitadelError(
     "E_CONFLICT",
-    `Next.js 16 won't start with both ${existing} and the ${target} setup writes`,
+    `Next.js 16 will not start with both ${existing} and the ${target} setup writes`,
     { hint: `${remedy} ${PREFLIGHT_FORCE_NOTE}`, details },
   );
 }

@@ -45,7 +45,7 @@ export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
       return this.emit({
         status: "ok",
         data: { dry_run: true, release_id: releaseId },
-        pretty: `Would revoke ${releaseId}. Nothing was revoked (dry run).`,
+        pretty: `Would revoke ${releaseId} (dry run)`,
       });
     }
 

@@ -393,7 +393,7 @@ function expiredError(message: string, claimAgain: SuggestedCommand): ZitadelErr
 function claimWindowExpiredError(): ZitadelError {
   return new ZitadelError(
     "E_VALIDATION",
-    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed.`,
+    `This project was not claimed within ${CLAIM_WINDOW_DAYS} days of creation, so it can no longer be claimed`,
     {
       hint: "The project still works for now, but it stays temporary and its data may be lost. To get a claimable project, run `zitadel setup` in a fresh directory (here it would just skip as already initialized) and claim the new one within the window.",
     },

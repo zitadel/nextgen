@@ -368,13 +368,13 @@ export async function requireValueInteractive(
     {
       kind: SECRET_KEYS.has(key) ? "secret" : "text",
       name: key,
-      message: `${key} for the ${name} environment`,
+      message: `What is the value of ${key} for the ${name} environment?`,
       // Persist (and return) the normalized form, matching how the resolver
       // stores a server value, so the file and this run agree with every later run.
       parse: (answer: string) => {
         const typed = answer.trim();
         if (typed === "") {
-          return { ok: false, problem: `Enter ${key}.` } as const;
+          return { ok: false, problem: `${key} cannot be empty` } as const;
         }
         return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
       },

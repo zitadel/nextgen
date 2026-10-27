@@ -127,7 +127,7 @@ function validateBundleShapes(ctx: StepContext): void {
     `Configuration validation failed (${failures.length} ${noun}):\n` +
       failures.map((failure) => `  - ${failure}`).join("\n"),
     {
-      hint: "These are the same rules the server enforces. Fix the file(s) and re-run.",
+      hint: "These are the same rules the server enforces. Fix the files named above and rerun.",
       details: { issues: failures },
     },
   );
@@ -169,7 +169,7 @@ function validateFlows(ctx: StepContext): void {
     `Flow validation failed (${failures.length} ${noun}):\n` +
       failures.map(({ handle, issue }) => `  - ${handle}: ${issue.message}`).join("\n"),
     {
-      hint: "These are the same rules the server enforces. Fix the flow definition(s) and re-run.",
+      hint: "These are the same rules the server enforces. Fix the flow definitions named above and rerun.",
       details: {
         issues: failures.map(({ handle, issue }) => ({
           handle,

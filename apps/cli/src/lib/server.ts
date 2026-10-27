@@ -64,7 +64,7 @@ export async function resolveServer(input: ResolveServerInput): Promise<Resolved
 export function parseServer(value: string): Parsed<string> {
   const typed = value.trim();
   if (typed === "") {
-    return { ok: false, problem: "Enter the server URL." };
+    return { ok: false, problem: "The server URL cannot be empty" };
   }
   try {
     return { ok: true, value: serverOrigin(typed) };

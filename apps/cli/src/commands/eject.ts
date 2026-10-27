@@ -244,7 +244,7 @@ export default class Eject extends Promptable(BaseCommand) {
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel ejected. Remote project is untouched.",
+        title: "Zitadel ejected, and the remote project is untouched.",
         files_removed: removed,
         files_preserved: preserved,
         backed_up: backedUp,

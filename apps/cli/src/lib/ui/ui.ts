@@ -1,6 +1,6 @@
 import type { Audience } from "./audience";
 import { Chain } from "./chain";
-import { bridgeNarration } from "./narration";
+import { Narration } from "./narration";
 import type { Outcome, Summary } from "./summary";
 import type { Report, Step, Wizard } from "./wizard";
 
@@ -31,10 +31,12 @@ import type { Report, Step, Wizard } from "./wizard";
 export class Ui {
   private readonly audience: Audience;
   private readonly chain: Chain;
+  private readonly narration: Narration;
 
   constructor(audience: Audience) {
     this.audience = audience;
     this.chain = new Chain(audience);
+    this.narration = new Narration(this.chain);
   }
 
   /** Whether anything is drawn: false under `--json`, `--non-interactive` and no terminal. */
@@ -67,8 +69,16 @@ export class Ui {
    */
   bridgeNarration(): void {
     if (this.audience.interactive) {
-      bridgeNarration(this.chain);
+      this.narration.install();
     }
+  }
+
+  /**
+   * Gives `consola` its reporters back. The base command calls it when the
+   * command ends, so the next command in this process starts from a clean slate.
+   */
+  releaseNarration(): void {
+    this.narration.restore();
   }
 
   /** Opens the chain if it is not open. Called before anything is drawn. */

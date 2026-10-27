@@ -198,14 +198,14 @@ const VARIABLE_NAME_MAX = 255;
 /** Reject a name the platform would refuse, naming it. */
 export function assertVariableName(name: string): void {
   if (!VARIABLE_NAME.test(name)) {
-    throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}.`, {
+    throw new ZitadelError("E_VALIDATION", `Invalid variable name ${JSON.stringify(name)}`, {
       hint: "A variable name contains only letters, digits and underscores.",
     });
   }
   if (name.length > VARIABLE_NAME_MAX) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}.`,
+      `Variable name is ${name.length} characters; the limit is ${VARIABLE_NAME_MAX}`,
       { hint: "Shorten the name." },
     );
   }

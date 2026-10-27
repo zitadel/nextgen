@@ -75,7 +75,7 @@ export default class ReleaseCreate extends EnvironmentCommand {
       return this.emit({
         status: "ok",
         data: { dry_run: true, resources: resourceCount },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. No release was created (dry run).`,
+        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and created no release (dry run)`,
       });
     }
 

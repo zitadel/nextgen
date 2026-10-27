@@ -29,7 +29,7 @@ export function envLine(key: string, value: string): string {
   if (/[\n\r]/.test(value)) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `Cannot persist ${key}: its value contains a line break.`,
+      `Cannot persist ${key}: its value contains a line break`,
       {
         hint: "A .env value is a single line; remove the newline or store the value another way.",
       },
@@ -50,7 +50,7 @@ export function envLine(key: string, value: string): string {
   if (faithful === undefined) {
     throw new ZitadelError(
       "E_VALIDATION",
-      `Cannot persist ${key}: no .env quoting reads its value back unchanged.`,
+      `Cannot persist ${key}: no .env quoting reads its value back unchanged`,
       { hint: "Set it in the process environment instead of a .env file." },
     );
   }

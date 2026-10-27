@@ -132,6 +132,6 @@ describe("parseServer", () => {
   });
 
   it("reports an empty answer", () => {
-    expect(parseServer("  ")).toEqual({ ok: false, problem: "Enter the server URL." });
+    expect(parseServer("  ")).toEqual({ ok: false, problem: "The server URL cannot be empty" });
   });
 });

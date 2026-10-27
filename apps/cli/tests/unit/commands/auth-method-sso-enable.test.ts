@@ -189,10 +189,10 @@ describe("auth-method sso enable", () => {
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
     expect(result.stdout).toContain(
-      "Google sign-in is configured locally. Provider credentials are stored on your project.",
+      "Google sign-in is configured locally and its credentials are stored in your project",
     );
     expect(result.stdout).toContain(
-      "Deploy the configuration to make Google sign-in available in your app, then reload your app and test Google sign-in.",
+      "Deploy it to make Google sign-in available in your app, then reload the app and test it:",
     );
     expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("deploy --dry-run")}`);
   });
@@ -203,8 +203,8 @@ describe("auth-method sso enable", () => {
 
     const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
 
-    expect(result.stdout).toContain("Google sign-in is configured locally.");
-    expect(result.stdout).not.toContain("stored on your project");
+    expect(result.stdout).toContain("Google sign-in is configured locally");
+    expect(result.stdout).not.toContain("credentials are stored");
   });
 
   it("names a custom provider by its display name", async () => {
@@ -231,8 +231,8 @@ describe("auth-method sso enable", () => {
       ]),
     );
 
-    expect(result.stdout).toContain("Acme SSO sign-in is configured locally.");
-    expect(result.stdout).toContain("then reload your app and test Acme SSO sign-in.");
+    expect(result.stdout).toContain("Acme SSO sign-in is configured locally");
+    expect(result.stdout).toContain("then reload the app and test it:");
   });
 
   it("does not offer a deploy when rerunning changed nothing", async () => {
@@ -241,8 +241,8 @@ describe("auth-method sso enable", () => {
 
     const result = await enableRendered(cwd);
 
-    expect(result.stdout).toContain("Google sign-in is already configured locally.");
-    expect(result.stdout).not.toContain("Deploy the configuration");
+    expect(result.stdout).toContain("Google sign-in is already configured locally");
+    expect(result.stdout).not.toContain("Deploy it to make");
   });
 
   it("prints the callback URI on reuse in text mode", async () => {

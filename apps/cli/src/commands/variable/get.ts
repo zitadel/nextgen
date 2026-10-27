@@ -51,7 +51,7 @@ export default class VariableGet extends EnvironmentCommand {
     // does, so the row projection is shared rather than duplicated.
     const value = (await client.getVariable(name, scope))[scope.kind];
     if (value === undefined) {
-      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value.`, {
+      throw new ZitadelError("E_NOT_FOUND", `Variable ${name} has no ${scope.kind} value`, {
         hint: flags.preview
           ? "A name has a preview value only once one is set with `--preview`."
           : "Set one with `variable set`.",

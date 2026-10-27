@@ -1760,7 +1760,7 @@ describe("DependencyVersionCheck", () => {
       cliVersion: "0.1.0-alpha.18",
     });
     expect(outcome.status).toBe("pass");
-    expect(outcome.message).toContain("no exactly-pinned");
+    expect(outcome.message).toContain("No exactly-pinned");
   });
 
   it("skips the comparison for non-release CLI versions", async () => {

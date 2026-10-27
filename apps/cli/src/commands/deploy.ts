@@ -124,7 +124,7 @@ export default class Deploy extends EnvironmentCommand {
           resources: resourceCount,
           targets: ["primary"],
         },
-        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"}. Nothing was deployed (dry run).`,
+        pretty: `Validated ${resourceCount} resource${resourceCount === 1 ? "" : "s"} and deployed nothing (dry run)`,
       });
     }
 
@@ -193,7 +193,7 @@ export default class Deploy extends EnvironmentCommand {
         "E_CONFLICT",
         "Another deploy changed the targets since this one was prepared",
         {
-          hint: `Re-run \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
+          hint: `Rerun \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`; it will build and deploy against the current state.`,
           details: current === undefined ? undefined : { current_deployment: current },
           nextCommands: [this.suggest("deployment list --live")],
         },

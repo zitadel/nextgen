@@ -5,11 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-vi.mock("@clack/prompts", () => ({
-  confirm: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockReturnValue(false),
-}));
+vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
 
 import { cancel, confirm, isCancel } from "@clack/prompts";
 

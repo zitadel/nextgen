@@ -391,7 +391,7 @@ function refuseLastMethod(input: {
   throw new ZitadelError("E_VALIDATION", `${schema.path} would have no way to sign in left`, {
     hint:
       "Enable another method first, such as `zitadel auth-method sso enable --provider <name>`. " +
-      "If the schema's users are only managed through the API, re-run with --force " +
+      "If the schema's users are only managed through the API, rerun with --force " +
       "(the first of details.suggested_args holds the exact arguments).",
     details: {
       file: schema.path,

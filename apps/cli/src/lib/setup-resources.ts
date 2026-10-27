@@ -569,7 +569,7 @@ function requiredString(value: unknown, label: string): string {
   if (typeof value === "string" && value.length > 0) {
     return value;
   }
-  throw new ZitadelError("E_VALIDATION", `Missing ${label} in server response.`);
+  throw new ZitadelError("E_VALIDATION", `Missing ${label} in the server response`);
 }
 
 function isErrno(error: unknown, code: string): boolean {

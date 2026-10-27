@@ -181,8 +181,8 @@ export default class Pull extends EnvironmentCommand {
         ...nextCommandsData(nextCommands),
       },
       pretty: dryRun
-        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run).\n${summary}`
-        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}.\n${summary}`,
+        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)\n${summary}`
+        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}\n${summary}`,
     });
   }
 
@@ -211,13 +211,13 @@ export default class Pull extends EnvironmentCommand {
       const live = await listLiveDeployments(client, projectId);
       const deployment = live.find(servesPrimary);
       if (deployment === undefined) {
-        throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet.", {
+        throw new ZitadelError("E_NOT_FOUND", "Nothing is deployed to a primary origin yet", {
           hint: `Deploy first with \`zitadel ${DEPLOY_ARGS}${this.environmentSelector()}\`, then pull.`,
         });
       }
       return deployment.release_id;
     }
-    throw new ZitadelError("E_VALIDATION", `Don't know how to pull "${target}".`, {
+    throw new ZitadelError("E_VALIDATION", `Cannot pull "${target}"`, {
       hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
     });
   }

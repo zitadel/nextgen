@@ -91,14 +91,14 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
     // lose digits, and one stored as a boolean is meaningless. Refused before
     // anything is asked for, so no secret is typed only to be turned away.
     if (flags.secret && type !== "string") {
-      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string.", {
+      throw new ZitadelError("E_VALIDATION", "A secret is stored as a string", {
         hint: "Drop --as, or drop --secret for a non-credential number or boolean.",
       });
     }
     // A secret never comes from the command line: it would land in shell history
     // and a process listing. It is prompted for or piped instead.
     if (flags.secret && args.value !== undefined) {
-      throw new ZitadelError("E_VALIDATION", "A secret value is not given on the command line.", {
+      throw new ZitadelError("E_VALIDATION", "A secret value is not given on the command line", {
         hint: "Drop the value and pipe it in, or let the prompt ask for it.",
       });
     }
@@ -131,7 +131,7 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
       if (typeof held === "object" && held !== null) {
         throw new ZitadelError(
           "E_VALIDATION",
-          `${name} is a secret, so its preview value must be one too.`,
+          `${name} is a secret, so its preview value must be one too`,
           {
             hint: "Set the preview value with --secret, piped in or prompted for.",
             nextCommands: [

@@ -667,14 +667,14 @@ export default class Setup extends Promptable(BaseCommand) {
             cause.hint ??
             (newApp === undefined
               ? "The project was created but its default resources (schema, login flow, " +
-                "password policy) did not all upload. Re-run `zitadel setup` to start over; " +
+                "password policy) did not all upload. Rerun `zitadel setup` to start over; " +
                 "--force overwrites the schema and flow files setup scaffolds and keeps an " +
-                "existing password policy file. It does not cover a connection under .zitadel/idps/ -- those are " +
+                "existing password policy file. It does not cover a connection under .zitadel/idps/ — those are " +
                 "yours, so setup never replaces or removes one; delete it to scaffold a fresh " +
                 "one, or keep it and enable the provider after setup to reuse it."
               : "The project was created but its default resources (schema, login flow, " +
                 "password policy) did not all upload, so setup removed the new app again. " +
-                "Re-run setup as before to start over."),
+                "Rerun setup as before to start over."),
           nextCommands:
             cause.nextCommands ??
             (newApp === undefined ? [this.suggestUnscoped("setup --force")] : []),
@@ -1811,7 +1811,7 @@ function localSetupHint(error: unknown, retry: SetupRetryOptions, cliVersion: st
           "To script it instead, add --sso-client-id and --non-interactive, and pipe the secret in. "
         : "") +
       sso.hint +
-      "After setup succeeds, follow its next_commands to start the app and verify registration, logout, and login in the browser.",
+      "After setup succeeds, follow its next_commands to check in the browser that registration, sign-out and sign-in all work.",
     nextCommands: [
       unscopedCommand(`start${cwdArg(retry)}`, cliVersion),
       unscopedCommand(setupCommand, cliVersion),
