@@ -47,6 +47,41 @@ function sentence(id: string | undefined, title: string): string {
 const INLINE = /^(.*?): ((?:zitadel|npx|npm|pnpm|yarn|bun|rm|git) .+)$/;
 
 /**
+ * Whether a line asks the reader to run something: a `$ cmd` line, or a
+ * sentence that names the command after a colon. It is the only thing that
+ * makes a line a step, so a list of file names stays a list of file names and
+ * a variable assignment is never offered as something to execute.
+ */
+const asksForACommand = (line: string): boolean => line.startsWith("$ ") || INLINE.test(line);
+
+/**
+ * Splits a boxed command's own text into the report it wrote and the steps it
+ * asked for.
+ *
+ * A command that wants a box and never writes a `Next:` line still has a body:
+ * three instructions each deliberately on their own line are three lines, not
+ * one paragraph, and the lists under them are lists. So only the lines that
+ * name a command become steps — in the order the text put them, under the
+ * report rather than mixed into it — and everything else is left exactly as
+ * the command wrote it.
+ */
+function bodyAndSteps(lines: readonly string[]): { body: string[]; steps: BoxAction[] } {
+  const body: string[] = [];
+  const asked: string[] = [];
+  for (const line of lines) {
+    if (asksForACommand(line.trim())) {
+      asked.push(line);
+    } else {
+      body.push(line);
+    }
+  }
+  while (body.at(-1)?.trim() === "") {
+    body.pop();
+  }
+  return { body, steps: nextSteps(asked) };
+}
+
+/**
  * The steps a box lists, from the lines of a command's own text. A step is a
  * sentence and, under it, the commands it asks for: `$ cmd` lines, lines
  * indented under a sentence ending in a colon, or a command the sentence names
@@ -166,14 +201,18 @@ export function summaryOfText(
 
   const nextAt = lines.findIndex((line) => line.trim() === "Next:");
   if (boxed || nextAt >= 0) {
-    // Everything after `Next:` is what to do next; a command that asked for a box
-    // without saying `Next:` has a text that is all steps.
-    const before = nextAt < 0 ? [] : lines.slice(0, nextAt);
+    // Everything after `Next:` is what to do next. A command that asked for a
+    // box without saying `Next:` wrote a body, not a list of steps, so its text
+    // is split rather than poured whole into the steps.
+    const split =
+      nextAt < 0
+        ? bodyAndSteps(lines)
+        : { body: lines.slice(0, nextAt), steps: nextSteps(lines.slice(nextAt + 1)) };
     return {
       title: headline,
       sections: [],
-      lines: [...overflow, ...(nextAt < 0 ? [] : before)],
-      next: nextSteps(nextAt < 0 ? lines : lines.slice(nextAt + 1)),
+      lines: [...overflow, ...split.body],
+      next: split.steps,
       boxed: true,
       ...(extras.length === 0 ? {} : { extras }),
       ...(failed ? { failed } : {}),

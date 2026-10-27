@@ -46,6 +46,70 @@ describe("summaryOfText", () => {
   });
 });
 
+describe("a boxed command that never said Next:", () => {
+  // `env add` writes three instructions, each deliberately on its own line.
+  // Poured into the steps they came back as one run-on paragraph with three
+  // pasteable commands buried in it.
+  const text = [
+    "Added the staging environment, bound to proj-1",
+    "",
+    ".env.staging.local holds ZITADEL_URL, ZITADEL_PROJECT_ID.",
+    "",
+    "Nothing is deployed to staging yet, so it serves the server's defaults.",
+    "Deploy to it: zitadel deploy --env-file .env.staging.local",
+    "Check what resolves: zitadel env --env-file .env.staging.local",
+  ].join("\n");
+
+  it("keeps the body lines it wrote apart instead of running them together", () => {
+    const summary = summaryOfText(text, false, true);
+
+    expect(summary.lines).toContain(".env.staging.local holds ZITADEL_URL, ZITADEL_PROJECT_ID.");
+    expect(summary.lines).toContain(
+      "Nothing is deployed to staging yet, so it serves the server's defaults.",
+    );
+  });
+
+  it("lifts only the lines that name a command into the steps", () => {
+    expect(summaryOfText(text, false, true).next).toEqual([
+      { text: "Deploy to it:", command: "zitadel deploy --env-file .env.staging.local" },
+      { text: "Check what resolves:", command: "zitadel env --env-file .env.staging.local" },
+    ]);
+  });
+
+  // `pull` listed the files it had just written, and every one of them was
+  // drawn as a command to run.
+  it("leaves a list under its heading in the body rather than offering it as commands", () => {
+    const summary = summaryOfText(
+      "Pulled 2 files from rel_1\n\nFiles written:\n  .zitadel/schemas/user.json\n  .zitadel/flows/login.json",
+      false,
+      true,
+    );
+
+    expect(summary.next).toEqual([]);
+    expect(summary.lines).toContain("Files written:");
+    expect(summary.lines).toContain("  .zitadel/schemas/user.json");
+  });
+
+  it("never offers a variable assignment as something to execute", () => {
+    const summary = summaryOfText(
+      "Added it\n\nHosting platform, production scope:\n  ZITADEL_URL=https://api.zitadel.cloud\n  ZITADEL_PROJECT_SECRET  (secret, copy it from .env.staging.local)",
+      false,
+      true,
+    );
+
+    expect(
+      summary.next?.flatMap((step) => (step.command === undefined ? [] : [step.command])),
+    ).toEqual([]);
+  });
+
+  it("still lifts a bare command line into the one standard label", () => {
+    const summary = summaryOfText("Did it\n\nSomething happened.\n$ zitadel deploy", false, true);
+
+    expect(summary.next).toEqual([{ text: "Run next:", command: "zitadel deploy" }]);
+    expect(summary.lines).toContain("Something happened.");
+  });
+});
+
 describe("nextSteps", () => {
   it("keeps commands under the sentence that introduces them", () => {
     expect(nextSteps(["Deploy it:", "  $ zitadel deploy"])).toEqual([
