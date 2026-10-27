@@ -755,12 +755,23 @@ describe("proxySessionCookies", () => {
     const SIGN_OUT = { method: "DELETE", path: "/sessions/me", search: "" };
     const SIGN_IN = { method: "POST", path: "/sessions/exchange", search: "" };
     const CLEARED_SHARED = "__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax";
+    const CSRF_TOKEN = "csrf-of-earlier";
 
-    /** Answers the proxy's own calls: the session check with `check`, a revoke with 204. */
-    function server(check: () => Response) {
-      const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) =>
-        init?.method === "DELETE" ? new Response(null, { status: 204 }) : check(),
-      );
+    /**
+     * Answers the proxy's own calls: the session check with `check`, the CSRF
+     * token read with `csrf`, a revoke with `revoke`.
+     */
+    function server(
+      check: () => Response,
+      csrf: () => Response = () => Response.json({ csrf_token: CSRF_TOKEN }),
+      revoke: () => Response = () => new Response(null, { status: 204 }),
+    ) {
+      const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return revoke();
+        }
+        return new URL(url).pathname === "/sessions/me/csrf" ? csrf() : check();
+      });
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
     }
@@ -797,9 +808,65 @@ describe("proxySessionCookies", () => {
         "http://auth.test/sessions/me",
         expect.objectContaining({
           method: "DELETE",
+          headers: expect.objectContaining({ cookie: "__nextgen_session=earlier" }),
+        }),
+      );
+    });
+
+    // The server refuses a sign-out without the session's token (ADR 053 §5).
+    it("ends the second session with the CSRF token the server gives for it", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `http://auth.test/sessions/me/csrf?project_id=${PROJECT}`,
+        expect.objectContaining({
+          method: "GET",
           headers: { cookie: "__nextgen_session=earlier" },
         }),
       );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        "http://auth.test/sessions/me",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: { cookie: "__nextgen_session=earlier", "X-Zitadel-CSRF": CSRF_TOKEN },
+        }),
+      );
+    });
+
+    it.each([
+      ["the token read is refused", () => new Response(null, { status: 401 }), undefined],
+      [
+        "the token read gets no answer",
+        () => {
+          throw new TypeError("fetch failed");
+        },
+        undefined,
+      ],
+      [
+        "the revoke is refused",
+        undefined,
+        () => Response.json({ code: "auth.csrf_invalid" }, { status: 403 }),
+      ],
+    ])("clears the second session's cookie even when %s", async (_label, csrf, revoke) => {
+      server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }), csrf, revoke);
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(setCookies).toContain(CLEARED_SHARED);
     });
 
     it("asks for and ends the second session at an address given with a trailing slash", async () => {
@@ -814,6 +881,7 @@ describe("proxySessionCookies", () => {
 
       expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
         [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
+        [`http://auth.test/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
         ["http://auth.test/sessions/me", "DELETE"],
       ]);
     });
