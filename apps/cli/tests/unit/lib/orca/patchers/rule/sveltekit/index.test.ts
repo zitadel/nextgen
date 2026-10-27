@@ -41,6 +41,7 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/hooks.server.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("@zitadel/sdk-sveltekit/server");
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("createNextgenHandle");
+    expect(writeContents(plan, "src/env.ts")).toContain("defineEnvVars");
 
     expect(writeContents(plan, "src/routes/+layout.svelte")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/+page.svelte")).toContain(MANAGED_MARKER);
@@ -179,6 +180,7 @@ describe("SvelteKitPatcher.artifacts", () => {
       rendererId: "svelte",
     });
     expect(artifacts.markedFiles).toContain("src/hooks.server.ts");
+    expect(artifacts.fileClasses?.["src/env.ts"]).toBe("infrastructure");
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
     expect(artifacts.configEdits).toEqual(["package.json"]);
