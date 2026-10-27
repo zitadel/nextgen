@@ -144,3 +144,34 @@ test("a page wears the console's colours, faces and code colours in both themes"
   // The tokens switched with the theme, not only the attribute.
   expect(looks.dark).not.toBe(looks.light);
 });
+
+/**
+ * A page ends in Fumadocs' feedback, which Web Analytics receives as a custom
+ * event (components/feedback.tsx). The local build cannot load Vercel's
+ * script, so the event waits in the queue the script would drain.
+ */
+test("a reader rates a page and the rating reaches Web Analytics", async ({ page }) => {
+  await page.goto("/docs/get-started/quickstart");
+
+  await page.getByRole("button", { name: "Not very helpful" }).click();
+  await page.getByRole("textbox", { name: "Your feedback" }).fill("The steps skip the login.");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
+
+  const queued = await page.evaluate(() => (window as unknown as { vaq?: unknown[][] }).vaq ?? []);
+  expect(queued).toContainEqual([
+    "event",
+    {
+      name: "docs_feedback",
+      data: {
+        opinion: "bad",
+        page: "/docs/get-started/quickstart",
+        message: "The steps skip the login.",
+      },
+    },
+  ]);
+
+  // This browser remembers the rating, so a reload thanks rather than asks.
+  await page.reload();
+  await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
+});
