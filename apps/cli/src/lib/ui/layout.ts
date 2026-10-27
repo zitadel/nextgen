@@ -72,9 +72,13 @@ export function reflow(text: string, width: number): string {
  * A step's sentence is wrapped to fit; its commands are not. A command broken
  * across lines cannot be copied, so one longer than the frame widens it.
  */
-export function renderBox(title: string, steps: readonly BoxAction[]): string {
+export function renderBox(
+  title: string,
+  body: readonly string[],
+  steps: readonly BoxAction[],
+): string {
   const inner = WIDTH - 7;
-  const lines = steps
+  const blocks = steps
     .map((step) =>
       [
         reflow(step.text, inner),
@@ -83,7 +87,9 @@ export function renderBox(title: string, steps: readonly BoxAction[]): string {
           : step.command.split("\n").map((command) => `  ${pc.bold(pc.cyan(command))}`)),
       ].join("\n"),
     )
-    .join("\n\n")
+    .join("\n\n");
+  const lines = [...(body.length === 0 ? [] : [body.join("\n"), ""]), blocks]
+    .join("\n")
     .split("\n");
   // Not `consola.box`: while a chain is open, consola's own output is drawn
   // inside it. The last line is padded so every box is the same width, which

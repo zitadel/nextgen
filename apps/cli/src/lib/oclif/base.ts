@@ -10,13 +10,18 @@ import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
-import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
+import {
+  normalizePublicCliCommand,
+  normalizePublicCliCommands,
+  publicCliCommand,
+} from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
 import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
 import { takeReportedWarnings } from "../warnings";
+import type { Summary } from "../ui";
 import { Ui } from "../ui";
 import { summaryOfText } from "./result-summary";
 import {
@@ -277,11 +282,7 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       isTTY,
     };
-    this.ui = new Ui({
-      interactive: !this.meta.nonInteractive,
-      force: this.meta.force,
-      verbose: this.meta.verbose,
-    });
+    this.ui = new Ui({ interactive: !this.meta.nonInteractive, force: this.meta.force });
     const named = this.constructor as typeof BaseCommand;
     this.ui.describe(named.heading ?? `zitadel ${(this.id ?? "").replaceAll(":", " ")}`.trim());
     this.ui.bridgeNarration();
@@ -390,14 +391,16 @@ export abstract class BaseCommand extends Command {
       // A command that said everything itself returns nothing, and draws nothing.
       const own = normalized.status === "ok" ? normalized.summary : undefined;
       if (own !== undefined) {
-        this.ui.finish(own);
+        this.ui.finish(this.withOverview(own));
       } else if (rendered !== "" || footer !== undefined || this.ui.opened) {
         this.ui.finish(
-          summaryOfText(
-            footer === undefined ? rendered : `${rendered}\n\n${footer}`,
-            false,
-            normalized.status === "ok" && normalized.boxed === true,
-            this.id,
+          this.withOverview(
+            summaryOfText(
+              footer === undefined ? rendered : `${rendered}\n\n${footer}`,
+              false,
+              normalized.status === "ok" && normalized.boxed === true,
+              this.id,
+            ),
           ),
         );
       }
@@ -414,6 +417,22 @@ export abstract class BaseCommand extends Command {
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * The command overview as the last step of a summary that has steps, so every
+   * box ends the same way and the overview can be found from anywhere without
+   * already knowing it exists. A summary that names it already keeps its own.
+   */
+  private withOverview(summary: Summary): Summary {
+    const steps = summary.next ?? [];
+    if (steps.length === 0 || steps.some((step) => step.text === OVERVIEW)) {
+      return summary;
+    }
+    return {
+      ...summary,
+      next: [...steps, { text: OVERVIEW, command: publicCliCommand("", this.config.version) }],
+    };
   }
 
   /**
@@ -761,3 +780,6 @@ function suffixBlock(opts: GlobalOptions): string {
   const suffix = sourceSuffix(opts);
   return suffix ? ` ${suffix}` : "";
 }
+
+/** The last step of every box: where to find every command. */
+const OVERVIEW = "Explore all commands:";

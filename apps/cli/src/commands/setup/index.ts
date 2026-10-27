@@ -124,7 +124,6 @@ import {
   type Section,
 } from "./summary";
 import { shellOption } from "../../lib/shell";
-import type { BoxAction } from "../../lib/box";
 import type { Step, Summary } from "../../lib/ui";
 import { showSkillsHint } from "../../lib/skills-hint";
 import { reportWarning } from "../../lib/warnings";
@@ -946,7 +945,7 @@ export default class Setup extends Promptable(BaseCommand) {
           title: "Zitadel is ready",
           sections: [],
           lines: renderSummary(sections).split("\n"),
-          next: [...nextActions, ...exploreActions(this.meta.cliVersion)],
+          next: nextActions,
           boxed: true,
           boxTitle: "Zitadel is ready",
         };
@@ -2058,12 +2057,4 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
-}
-
-/** `Explore all commands:` and the command that lists them, as a next step in the box. */
-function exploreActions(cliVersion: string): BoxAction[] {
-  const [text = "", command] = exploreAllCommands(cliVersion)
-    .split("\n")
-    .map((line) => line.trim());
-  return command === undefined ? [] : [{ text, command }];
 }

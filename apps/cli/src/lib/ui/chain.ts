@@ -48,10 +48,15 @@ export class Chain implements Wizard {
   /** Whether a prompt or a box was the last thing drawn, so the next line needs a blank guide line. */
   private gap = false;
   private readonly audience: Audience;
+  /**
+   * Whether this command's `--force` may answer its confirmations. Separate from
+   * the audience, which is the invocation's and not one command's to change.
+   */
+  private forcing: boolean;
 
   constructor(audience: Audience) {
-    // Copied: `honorForce` changes it for this command only.
-    this.audience = { ...audience };
+    this.audience = audience;
+    this.forcing = audience.force;
   }
 
   describe(title: string | undefined, context?: string): void {
@@ -60,9 +65,7 @@ export class Chain implements Wizard {
   }
 
   honorForce(honor: boolean): void {
-    if (!honor) {
-      this.audience.force = false;
-    }
+    this.forcing = honor && this.audience.force;
   }
 
   get isOpen(): boolean {
@@ -75,7 +78,12 @@ export class Chain implements Wizard {
 
   /** The audience, with the hooks that keep the chain's spacing right around a prompt. */
   private asking(): Audience & { before: () => void; after: () => void } {
-    return { ...this.audience, before: () => this.open(), after: () => this.answered() };
+    return {
+      ...this.audience,
+      force: this.forcing,
+      before: () => this.open(),
+      after: () => this.answered(),
+    };
   }
 
   /** One line in the chain: its mark, then the text. A blank guide line first after a prompt. */
@@ -115,11 +123,12 @@ export class Chain implements Wizard {
         ? pc.red(summary.title)
         : summary.title.replace(/\(server: [^)]+\)$/, (server) => pc.dim(server)),
     );
-    if (body.length > 0) {
+    if (boxed) {
+      // The report and the steps share one frame: what the command produced and
+      // what to do about it belong together.
+      process.stdout.write(`\n${renderBox(summary.boxTitle ?? "Next steps", body, steps)}\n`);
+    } else if (body.length > 0) {
       process.stdout.write(`${indent(body.join("\n"))}\n`);
-    }
-    if (boxed && steps.length > 0) {
-      process.stdout.write(`\n${renderBox(summary.boxTitle ?? "Next steps", steps)}\n`);
     }
   }
 

@@ -40,16 +40,23 @@ describe("reflow", () => {
 
 describe("renderBox", () => {
   it("is the same width whatever it holds", () => {
-    const narrow = renderBox("Next steps", [{ text: "Short." }]);
-    const wide = renderBox("Next steps", [{ text: "A sentence that is a good deal longer." }]);
+    const narrow = renderBox("Next steps", [], [{ text: "Short." }]);
+    const wide = renderBox("Next steps", [], [{ text: "A sentence that is a good deal longer." }]);
 
     expect(widest(narrow)).toBe(widest(wide));
   });
 
   it("never draws wider than the width everything else obeys", () => {
-    const box = renderBox("Next steps", [
-      { text: `Deploy it, ${"and then some more words ".repeat(10)}:`, command: "zitadel deploy" },
-    ]);
+    const box = renderBox(
+      "Next steps",
+      [],
+      [
+        {
+          text: `Deploy it, ${"and then some more words ".repeat(10)}:`,
+          command: "zitadel deploy",
+        },
+      ],
+    );
 
     expect(widest(box)).toBeLessThanOrEqual(WIDTH);
   });
@@ -57,11 +64,11 @@ describe("renderBox", () => {
   it("keeps a command longer than the box whole, so it can still be copied", () => {
     const command = `zitadel deploy ${"-".repeat(200)}`;
 
-    expect(plain(renderBox("Next steps", [{ text: "Run next:", command }]))).toContain(command);
+    expect(plain(renderBox("Next steps", [], [{ text: "Run next:", command }]))).toContain(command);
   });
 
   it("puts each command on its own line under the sentence that asks for it", () => {
-    const box = plain(renderBox("Next steps", [{ text: "Run next:", command: "a\nb" }]));
+    const box = plain(renderBox("Next steps", [], [{ text: "Run next:", command: "a\nb" }]));
 
     expect(box).toContain("Run next:");
     expect(box.indexOf("a")).toBeLessThan(box.indexOf("b"));
@@ -82,5 +89,21 @@ describe("sectionLines", () => {
 describe("trimBlank", () => {
   it("drops the blank lines at either end and keeps the ones between", () => {
     expect(trimBlank(["", "a", "", "b", ""])).toEqual(["a", "", "b"]);
+  });
+});
+
+describe("renderBox with a report", () => {
+  it("keeps the report and the steps in one frame", () => {
+    const box = plain(
+      renderBox(
+        "Zitadel is ready",
+        ["PROJECT", "✓ Id   proj-1"],
+        [{ text: "Start it:", command: "npm run dev" }],
+      ),
+    );
+
+    expect(box).toContain("PROJECT");
+    expect(box).toContain("npm run dev");
+    expect(box.indexOf("PROJECT")).toBeLessThan(box.indexOf("npm run dev"));
   });
 });
