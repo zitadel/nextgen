@@ -6,7 +6,7 @@ import { ZitadelError } from "../errors";
 import { input } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
-import { Prose, WIDTH } from "./layout";
+import { GUTTER, Prose, WIDTH } from "./layout";
 import { MARK } from "./marks";
 import type { Narratable } from "./narration";
 import { type Drawing, Progress } from "./progress";
@@ -21,9 +21,6 @@ import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
 import type { Report, Step, Wizard } from "./wizard";
-
-/** What the chain's own gutter (`│  `) costs a line drawn inside it. */
-const GUTTER = 3;
 
 /**
  * The chain: one command's output from its first line to its last (the package
@@ -133,6 +130,14 @@ export class Chain implements Wizard, Drawing, Narratable {
     if (below !== undefined) {
       process.stdout.write(below);
     }
+  }
+
+  /**
+   * The same ending as text instead of drawn, for a run nothing is drawn into.
+   * The caller decides where it goes, so the chain's own state is left alone.
+   */
+  ending(summary: Summary): string {
+    return new Ending(summary, this.where(summary.ran), this.opened).render() ?? "";
   }
 
   /**

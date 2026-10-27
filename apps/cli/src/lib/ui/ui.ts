@@ -175,4 +175,14 @@ export class Ui {
   finish(summary: Summary): void {
     this.chain.finish(summary);
   }
+
+  /**
+   * The ending as text, for a command whose report is the whole point of the
+   * run and which therefore has to show one with nobody at a terminal, where
+   * {@link finish} draws nothing. The command returns it as its own rendering;
+   * it is laid out here so that the two endings cannot drift apart.
+   */
+  ending(summary: Summary): string {
+    return this.chain.ending(summary);
+  }
 }

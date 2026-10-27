@@ -170,6 +170,29 @@ describe("Ui", () => {
       expect(printed()).not.toContain("Using");
     });
 
+    // `setup` is the one command whose report is the whole point of the run,
+    // so it has to show one off a terminal too, where nothing is drawn.
+    it("hands back the ending as text, for a command that has to show one anyway", () => {
+      const text = scripted().ending({
+        title: "Zitadel is ready",
+        sections: [],
+        lines: ["Project id   proj-1"],
+        next: [{ text: "Start your project:", command: "npm run dev" }],
+        boxed: true,
+        boxTitle: "Zitadel is ready",
+      });
+
+      expect(stripAnsi(text)).toContain("Zitadel is ready");
+      expect(stripAnsi(text)).toContain("Project id   proj-1");
+      expect(stripAnsi(text)).toContain("npm run dev");
+    });
+
+    it("writes nothing of its own when it hands the ending back", () => {
+      scripted().ending({ title: "Zitadel is ready", sections: [], boxed: true });
+
+      expect(printed()).toBe("");
+    });
+
     it("hands out a spinner that draws nothing when nobody is watching", () => {
       scripted().spinner("Fetching users").stop("Fetched 3 users");
 
