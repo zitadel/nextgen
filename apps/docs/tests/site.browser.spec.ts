@@ -175,3 +175,18 @@ test("a reader rates a page and the rating reaches Web Analytics", async ({ page
   await page.reload();
   await expect(page.getByText("Thank you for your feedback!")).toBeVisible();
 });
+
+test("an unsent rating stays on its page when the reader moves on", async ({ page }) => {
+  await page.goto("/docs/get-started/quickstart");
+  await page.getByRole("button", { name: "Very helpful", exact: true }).click();
+  await page.getByRole("textbox", { name: "Your feedback" }).fill("Meant for the quickstart.");
+
+  // A sidebar link is a client-side navigation: the card must start over.
+  await page.getByRole("link", { name: "Agent setup" }).first().click();
+  await expect(page.getByRole("heading", { level: 1, name: "Agent setup" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Very helpful", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(page.getByRole("textbox", { name: "Your feedback" })).toHaveCount(0);
+});
