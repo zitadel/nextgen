@@ -2,7 +2,8 @@ title: EvaluatePolicyResponse
 type: object
 description: |
   The decision the operation would reach for the request. A refusal carries
-  the error code and violations the live operation would answer with.
+  the error code and violations an API call of the operation would answer
+  with; a login flow shows the same rules as field errors instead.
 required:
   - allowed
 properties:
@@ -12,8 +13,8 @@ properties:
   code:
     type: string
     description: |
-      The error code the live operation would answer with, set only when it
-      would refuse, for example `user.password_empty` or
+      The error code an API call of the operation would answer with, set
+      only when it would refuse, for example `user.password_empty` or
       `user.password_policy_violation`.
   violations:
     type: object

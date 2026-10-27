@@ -65,8 +65,10 @@ second evaluator would drift. The server evaluates instead.
   reads and writes nothing of the project. It takes `operation`, `config`
   (required, checked exactly as a publish checks it), `input` and `facts`,
   and answers `allowed`, plus on a refusal the live operation's error `code`
-  and `violations`. A test written against it therefore holds for the real
-  operation.
+  and `violations`. The decision and the failed rules hold wherever the
+  operation runs; `code` and `violations` are an API call's answer, while a
+  login flow shows the same rules as field errors on the password field
+  (`error.x-auth-methods#password_<rule>`, from `PasswordPolicyStepError`).
 - `input` is what the operation's request carries, in the operation's terms:
   the password, not its length. The server runs the live operation's own
   check on it (NFC, code points, the empty and 64-character guards), so the

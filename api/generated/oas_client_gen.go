@@ -396,9 +396,11 @@ type Invoker interface {
 	// terms (a password, not its length): the server derives what the policy
 	// checks with the code the live operation runs, guards included. `facts`
 	// states what the operation would look up at runtime, such as whether the
-	// candidate matches one of the user's kept passwords. A refusal answers the
-	// error code and violations the live operation would, so a test written
-	// against this endpoint holds for the real operation.
+	// candidate matches one of the user's kept passwords.
+	// The decision and the names of the failed rules hold wherever the
+	// operation runs. `code` and `violations` are what an API call answers; a
+	// login flow shows the same rules as field errors on the password field
+	// (`error.x-auth-methods#password_<rule>` in `step.error`).
 	// Which policy a project or release applies is not decided here: read it
 	// and pass its config.
 	// The caller needs read access to the project in `project_id`.
@@ -4591,9 +4593,11 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 // terms (a password, not its length): the server derives what the policy
 // checks with the code the live operation runs, guards included. `facts`
 // states what the operation would look up at runtime, such as whether the
-// candidate matches one of the user's kept passwords. A refusal answers the
-// error code and violations the live operation would, so a test written
-// against this endpoint holds for the real operation.
+// candidate matches one of the user's kept passwords.
+// The decision and the names of the failed rules hold wherever the
+// operation runs. `code` and `violations` are what an API call answers; a
+// login flow shows the same rules as field errors on the password field
+// (`error.x-auth-methods#password_<rule>` in `step.error`).
 // Which policy a project or release applies is not decided here: read it
 // and pass its config.
 // The caller needs read access to the project in `project_id`.

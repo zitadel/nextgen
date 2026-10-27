@@ -22907,13 +22907,14 @@ func NewPasswordSetEvaluateRequestEvaluatePolicyRequest(v PasswordSetEvaluateReq
 }
 
 // The decision the operation would reach for the request. A refusal carries
-// the error code and violations the live operation would answer with.
+// the error code and violations an API call of the operation would answer
+// with; a login flow shows the same rules as field errors instead.
 // Ref: #
 type EvaluatePolicyResponse struct {
 	// Whether the operation would go ahead.
 	Allowed bool `json:"allowed"`
-	// The error code the live operation would answer with, set only when it
-	// would refuse, for example `user.password_empty` or
+	// The error code an API call of the operation would answer with, set
+	// only when it would refuse, for example `user.password_empty` or
 	// `user.password_policy_violation`.
 	Code OptString `json:"code"`
 	// Every failed rule keyed by name with the value of the setting it is
