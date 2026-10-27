@@ -127,10 +127,17 @@ describe("release detail", () => {
     expect(screen.getByText("inactive")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Copy Release ID" })).toBeInTheDocument();
 
-    // One group per kind the release pins, in the design's order, each pointer
-    // named by its document rather than its handle.
+    // All semantic h2 headings in visual order: release content, pinned groups,
+    // deployment, and metadata. Each pointer is named by its document.
     const groups = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(groups).toEqual(["Release content", "User schemas", "Login flows", "Branding"]);
+    expect(groups).toEqual([
+      "Release content",
+      "User schemas",
+      "Login flows",
+      "Branding",
+      "Deployment of this release",
+      "Metadata",
+    ]);
     expect(screen.getByRole("button", { name: /^Customer sch_1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Default login flow_1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Default br_1$/ })).toBeInTheDocument();
