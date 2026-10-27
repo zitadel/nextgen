@@ -1,5 +1,6 @@
 ---
 "@zitadel/server": minor
+"@zitadel/config": minor
 ---
 
-Rework the console navigation: logo and collapse toggle in the sidebar, an account menu (you, theme, sign-out) under the person's name, project and team switchers and a ⌘K search in the top bar, and one title line on every screen. Settings is your profile, generated from your own user schema, with your generated avatar, your passkeys and linked accounts. Team detail gains Overview and Members tabs.
+Rework the console navigation: logo and collapse toggle in the sidebar, project and team switchers and a ⌘K search in the top bar, an account menu with theme and sign-out, and one title line per screen. Settings is your profile, with your passkeys and linked accounts, and teams gain Overview and Members tabs. `@zitadel/config/server` exports `DEFAULT_SERVER`, the CLI's default server.

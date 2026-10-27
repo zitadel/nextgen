@@ -6,6 +6,6 @@
 "@zitadel/cli": patch
 ---
 
-`<zitadel-login>` now tells visitors why it switched between sign-in and sign-up by itself. An email with no account on the sign-in screen goes on as a sign-up, with a note that no account was found. An email that already has an account on the sign-up screen goes on as a sign-in, and says so. A sign-in with an identity provider that has no account yet gets the same note.
+`<zitadel-login>` now says why it switched between sign-in and sign-up by itself: an email without an account becomes a sign-up, with a note to fix a typo in the email field, and one with an account a sign-in; an identity provider sign-in without an account gets the same note. Flow API steps carry `purpose` and, after a switch, `notice`.
 
-Every step the flow API returns now carries `purpose` (`login`, `register`, …), and the step right after such a switch carries `notice`: `notice.user_not_found`, `notice.user_already_exists` or `notice.sso_user_not_found`. A page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names. Reword a notice with `locales`. The login designs `zitadel branding eject` copies show the notice; a design ejected earlier shows it once its template renders `messages`.
+**Upgrading a page or design from an earlier release:** a page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names, and a design ejected earlier shows the notice once its template renders `messages`, as the designs `zitadel branding eject` copies now do.

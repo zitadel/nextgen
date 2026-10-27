@@ -2,4 +2,4 @@
 "@zitadel/server": minor
 ---
 
-The access log now has one `INFO` line per request, `request served`, written when the request ends, with the method, the path without its query, the operation id, the status, the response size and the duration. The opening `handling request` line, the status-dependent level and the `error_code` field are gone: errors are logged as `api error` lines instead. Query values are no longer logged for any route.
+The access log now writes one `INFO` line per request, `request served`, with its method, path without the query, operation id, status, size, duration and, inside a sampled trace, `TraceID` and `SpanID`. The `handling request` line and the `error_code` field are gone; errors are logged as `api error` lines. The IdP callback now has a server span of its own.
