@@ -7,6 +7,7 @@ import { test } from "vitest";
 import {
   GENERATED_BLOCK_END,
   GENERATED_BLOCK_START,
+  GITHUB_PULL_REQUEST_BODY_MAX_CHARS,
   GITHUB_RELEASE_BODY_MAX_CHARS,
   PRODUCT_NOTES_PLACEHOLDER,
   collectReleaseChanges,
@@ -15,6 +16,7 @@ import {
   fitGeneratedReleaseFacts,
   parseChangelogEntries,
   renderGeneratedReleaseFacts,
+  renderVersionPullRequestBody,
   upsertGeneratedBlock,
   upsertProductGithubRelease,
 } from "./release-github.mjs";
@@ -577,4 +579,87 @@ test("renderGeneratedReleaseFacts still renders the untruncated block", async ()
   );
   const roundTripped = upsertGeneratedBlock(`notes\n\n${block}`, block);
   assert.ok(roundTripped.startsWith("notes"));
+});
+
+test("the version pull request lists each change once under the release's tag, without the platform packages", async () => {
+  const shared = "[#7](https://github.com/zitadel/nextgen/pull/7) - Sign-ins keep their project.";
+  const packages = [
+    {
+      name: "@x/server",
+      path: "packages/server",
+      version: "9.9.9-alpha.1",
+      group: "Minor Changes",
+      entry: shared,
+    },
+    {
+      name: "@x/sdk",
+      path: "packages/sdk",
+      version: "9.9.9-alpha.1",
+      group: "Minor Changes",
+      entry: shared,
+    },
+    {
+      name: "@zitadel/server-linux-x64",
+      path: "apps/server-linux-x64",
+      version: "9.9.9-alpha.1",
+      entry: "Platform package detail.",
+    },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
+
+  const { body, omitted } = await renderVersionPullRequestBody({ repoRoot, metadata });
+
+  assert.deepEqual(omitted, []);
+  assert.ok(body.startsWith(`Merging this pull request releases \`${TAG}\``));
+  assert.ok(body.includes(`#### Minor Changes\n\n- \`@x/server\`, \`@x/sdk\`: ${shared}\n`));
+  assert.equal(body.split(shared).length, 2);
+  assert.ok(!body.includes("server-linux-x64"));
+});
+
+test("the version pull request omits changes to stay under GitHub's limit and points at its diff", async () => {
+  const packages = [
+    { name: "@x/huge", path: "packages/huge", version: "9.9.9-alpha.1", entry: "y".repeat(70000) },
+    { name: "@x/tiny", path: "packages/tiny", version: "9.9.9-alpha.1", entry: "a small fix" },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
+
+  const { body, omitted } = await renderVersionPullRequestBody({ repoRoot, metadata });
+
+  assert.deepEqual(
+    omitted.map(({ packages }) => packages),
+    [["@x/huge"]],
+  );
+  assert.ok(body.length <= GITHUB_PULL_REQUEST_BODY_MAX_CHARS);
+  assert.ok(
+    body.includes(
+      `#### Patch Changes\n\n- \`@x/tiny\`: a small fix\n\n_1 patch change omitted to keep this description under GitHub's ${GITHUB_PULL_REQUEST_BODY_MAX_CHARS}-character limit; see \`packages/huge/CHANGELOG.md\` in this pull request._`,
+    ),
+  );
+});
+
+test("a breaking change too long for the version pull request fails instead of being omitted", async () => {
+  const packages = [
+    {
+      name: "@x/huge",
+      path: "packages/huge",
+      version: "9.9.9-alpha.1",
+      group: "Minor Changes",
+      entry: `**Breaking:** ${"y".repeat(70000)}`,
+    },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
+
+  await assert.rejects(
+    renderVersionPullRequestBody({ repoRoot, metadata }),
+    /every change but the breaking ones omitted/,
+  );
 });
