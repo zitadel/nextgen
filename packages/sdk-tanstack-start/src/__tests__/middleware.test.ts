@@ -261,6 +261,11 @@ function expectHandlerType(): void {
   expectTypeOf(createNextgenRequestMiddleware({ url: "http://localhost:4000" })).toExtend<
     (ctx: RequestMiddlewareContext) => Promise<Response>
   >();
+  // TanStack Start types next() as returning its result with or without a promise.
+  expectTypeOf(createNextgenRequestMiddleware({ url: "http://localhost:4000" })).toBeCallableWith({
+    request: new Request("http://localhost:3000/"),
+    next: () => ({ response: new Response("ok") }),
+  });
 }
 
 const ORIGIN = "http://localhost:3000";
