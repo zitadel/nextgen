@@ -138,6 +138,7 @@ func (c Config) Validate() error {
 		c.Platform.Validate,
 		c.HTTPClient.Validate,
 		c.Schema.Validate,
+		c.Events.Retention.Validate,
 	} {
 		if err := validate(); err != nil {
 			return err
