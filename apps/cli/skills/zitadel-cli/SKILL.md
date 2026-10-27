@@ -499,6 +499,23 @@ missing or outdated (after an upgrade that changed a dialect), and
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
 
+## Claiming a project
+
+A project on a hosted server stays temporary until a person claims it, within
+14 days of `setup`. Claiming signs that person in with their own Zitadel
+account in a browser, so it is their step: hand them the link, and never open
+it yourself. Plain `claim` waits for the browser step and prints nothing on
+stdout until it ends, so run `claim --no-wait --non-interactive --json`
+instead. It returns at once with `data.claim_url`, the link to give the person
+verbatim, and `data.expires_at`, when it stops working (about 10 minutes).
+Then run the `claim --challenge-id …` command in `data.next_commands`: it
+waits for the person to finish, returns `data.dashboard_url`, and records the
+owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
+names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
+new `--no-wait` link. A project that already has a team is `skipped` with
+`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
+and no `next_commands`, since a new link cannot reopen it.
+
 ## Reference files
 
 Load on demand:
