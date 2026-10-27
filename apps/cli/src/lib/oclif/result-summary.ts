@@ -153,12 +153,14 @@ export function summaryOfText(
   }
   title = sentence(id, title.replace(/\.$/, ""));
 
-  // A title that is still too long to read as one line is replaced by a plain
-  // one and said in full underneath; a command should not produce one.
+  // A title too long to read as one line is replaced by a short one and said
+  // in full underneath. A failure keeps its code, which is the part a person
+  // acts on and the only part of a long server message that is predictable;
+  // a success has nothing worth keeping, so it says "Done".
   const overflow: string[] = [];
-  if (!failed && title.length > HEADLINE_WIDTH) {
+  if (title.length > HEADLINE_WIDTH) {
     overflow.push(title);
-    title = "Done";
+    title = failed ? (/^(Error\s+[A-Z0-9_]+)\b/.exec(title)?.[1] ?? "The command failed") : "Done";
   }
   const headline = title;
 

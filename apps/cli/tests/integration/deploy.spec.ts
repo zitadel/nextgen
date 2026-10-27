@@ -310,16 +310,16 @@ describe("deploy", () => {
 
         const result = await app.deployRendered();
 
-        expect(result).toPrint("Deployed sha256:");
+        expect(result).toPrint("Deployed");
       });
 
-      it("still gives the whole content hash under the line it closes on", async () => {
+      it("names the release and where it went, under the line it closes on", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin("https://app.acme.com");
 
         const result = await app.deployRendered();
 
-        expect(result).toPrint("Content hash  sha256:");
+        expect(result).toPrint("is now live on https://app.acme.com.");
       });
     });
   });

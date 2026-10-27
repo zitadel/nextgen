@@ -214,21 +214,45 @@ export default class Deploy extends EnvironmentCommand {
         origins: servedOrigins,
         ...nextCommandsData([this.suggest("deployment list")]),
       },
-      pretty: [
-        `Deployed ${abbreviate(release.content_hash)}`,
-        `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
-        ...servedOrigins.map((served) => `  - ${served}`),
-        `  Content hash  ${release.content_hash}`,
-      ].join("\n"),
+      pretty: [deployed(resourceCount), liveOn(release.content_hash, servedOrigins)].join("\n"),
+      summary: {
+        title: deployed(resourceCount),
+        sections: [],
+        lines: [liveOn(release.content_hash, servedOrigins)],
+        boxed: true,
+      },
     });
   }
 }
 
+/** What the run did, as the one sentence the chain closes on. */
+export function deployed(resources: number): string {
+  return `Deployed ${resources} resource${resources === 1 ? "" : "s"}`;
+}
+
+/**
+ * Where the release went, as one sentence.
+ *
+ * The origins are named inside it rather than listed under it: a deploy
+ * usually lands on one, and a bullet list of a single item is not a list. The
+ * hash is the short one — the full digest identifies the release to a machine
+ * and is in the envelope, where a machine reads it.
+ */
+export function liveOn(hash: string, origins: readonly string[]): string {
+  const release = `Release ${abbreviate(hash)} is now live`;
+  if (origins.length === 0) {
+    return `${release}.`;
+  }
+  const where =
+    origins.length === 1 ? origins[0] : `${origins.slice(0, -1).join(", ")} and ${origins.at(-1)}`;
+  return `${release} on ${where}.`;
+}
+
 /**
  * A content hash short enough to close the chain on. `sha256:` and 64 hex
- * digits is wider than a closing line may be, so the whole line is thrown away
- * and replaced by `Done`; the digest is cut to the 12 characters that identify
- * it in practice, and the full hash stays in the body under it.
+ * digits is wider than a closing line may be, so the digest is cut to the 12
+ * characters that identify it in practice; the full hash stays in the
+ * envelope, where something might match on it.
  */
 export function abbreviate(hash: string): string {
   const separator = hash.indexOf(":");

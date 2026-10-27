@@ -72,3 +72,29 @@ describe("nextSteps", () => {
     ]);
   });
 });
+
+describe("a failure too long to close a chain on", () => {
+  const long = `Error E_NOT_FOUND: GET ${"http://host/deployments?project_id=x&live=true".repeat(3)} returned 404`;
+
+  // The closing line is one line. A server message pasted into it runs off
+  // the screen, and the code is the part a person acts on.
+  it("closes on the code alone", () => {
+    expect(summaryOfText(long, true).title).toBe("Error E_NOT_FOUND");
+  });
+
+  it("still says the whole thing underneath", () => {
+    expect(summaryOfText(long, true).lines?.[0]).toBe(long);
+  });
+
+  it("leaves a failure that already fits alone", () => {
+    expect(summaryOfText("Error E_NOT_FOUND: variable not found", true).title).toBe(
+      "Error E_NOT_FOUND: variable not found",
+    );
+  });
+
+  it("falls back to plain words when the text names no code", () => {
+    expect(summaryOfText(`Something went wrong ${"and on ".repeat(20)}`, true).title).toBe(
+      "The command failed",
+    );
+  });
+});

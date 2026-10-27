@@ -136,3 +136,23 @@ describe("Ending", () => {
     });
   });
 });
+
+describe("what a long failure looks like under its closing line", () => {
+  // A server pastes a URL into its message; the message must still fold
+  // rather than run off the right of the screen.
+  it("wraps the body of an unboxed ending", () => {
+    const long = `GET http://host/deployments?project_id=x returned 404 ${"and then some more words ".repeat(6)}`;
+
+    const below = plain(ending({ lines: [long], failed: true }).render());
+
+    expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
+  });
+
+  it("still leaves a table's rows whole", () => {
+    const row = "development  .env.development.local  http://mock.zitadel.test  proj-1  yes";
+
+    const below = plain(ending({ lines: [row] }).render());
+
+    expect(below).toContain(row);
+  });
+});

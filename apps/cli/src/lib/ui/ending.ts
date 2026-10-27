@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { Facts, Frame } from "./layout";
+import { Facts, Frame, Prose, WIDTH } from "./layout";
 import type { Summary } from "./summary";
 import type { Where } from "./where";
 
@@ -73,7 +73,11 @@ export class Ending {
       // A listing is what the command was asked for, printed as it is. Where it
       // ran is part of a summary, so a command that has no summary does not
       // say it: the table is the answer, and nothing else belongs under it.
-      return body.length === 0 ? undefined : `${indent(body.join("\n"))}\n`;
+      // Wrapped like everything else, which leaves a table's rows alone and
+      // folds a long error message instead of running it off the screen.
+      return body.length === 0
+        ? undefined
+        : `${indent(new Prose(body.join("\n"), WIDTH - INDENT).render())}\n`;
     }
     // The report and the steps share one frame: what the command produced and
     // what to do about it belong together.
@@ -117,7 +121,8 @@ export class Ending {
 }
 
 /** Everything under the closing line clears the chain's gutter by this much. */
-const indent = (text: string): string => text.replace(/^(?=.)/gm, "   ");
+const INDENT = 3;
+const indent = (text: string): string => text.replace(/^(?=.)/gm, " ".repeat(INDENT));
 
 /** Drops the blank lines a command's own rendering leaves at either end. */
 function trimBlank(lines: readonly string[]): string[] {
