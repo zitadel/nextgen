@@ -1,7 +1,14 @@
+import { Flags } from "@oclif/core";
+
 import { BaseCommand, type JsonEnvelope } from "../lib/oclif";
 import { describeRegistry } from "../lib/oclif/crud";
+import { renderList } from "../lib/oclif/crud/table";
+import { listData } from "../lib/oclif/envelope";
 import { CommandGroups } from "../lib/oclif/groups";
 import { RESOURCES } from "./resources";
+
+/** The columns `resources` renders, in order. */
+const COLUMNS = ["topic", "verbs", "filters"] as const;
 
 /**
  * `zitadel resources` — what the resource surface exposes, in one call.
@@ -14,14 +21,20 @@ import { RESOURCES } from "./resources";
  */
 export default class ResourcesList extends BaseCommand {
   static override id = "resources";
-  static override group = CommandGroups.resources;
-  static override groupOrder = 0;
-  static override description = "List the resources this CLI manages and what can be done to each.";
+  static override group = CommandGroups.diagnostics;
+  static override description =
+    "List the resources this CLI manages.\n\nShows what can be done to each.";
   static override examples = [
     "<%= config.bin %> resources",
     "<%= config.bin %> resources --json",
-    '<%= config.bin %> resources --json | jq -r \'.data.resources[] | "\\(.topic): \\(.verbs | join(", "))"\'',
+    '<%= config.bin %> resources --json | jq -r \'.data.items[] | "\\(.topic): \\(.verbs | join(", "))"\'',
   ];
+  static override flags = {
+    plain: Flags.boolean({
+      description:
+        "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+    }),
+  };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(ResourcesList);
@@ -40,22 +53,17 @@ export default class ResourcesList extends BaseCommand {
         .map((filter) => filter.field)
         .join(", "),
     }));
-    const width = (key: keyof (typeof rows)[number]) =>
-      Math.max(key.length, ...rows.map((row) => row[key].length));
-    const widths = { topic: width("topic"), verbs: width("verbs"), filters: width("filters") };
-    const line = (topic: string, verbs: string, filters: string) =>
-      `${topic.padEnd(widths.topic)}  ${verbs.padEnd(widths.verbs)}  ${filters}`.trimEnd();
 
+    const plain = flags.plain || !process.stdout.isTTY;
     return this.emit({
       status: "ok",
-      data: { resources, count: resources.length },
-      pretty: [
-        line("resource", "verbs", "filter on"),
-        line("-".repeat(widths.topic), "-".repeat(widths.verbs), "-".repeat(widths.filters)),
-        ...rows.map((row) => line(row.topic, row.verbs, row.filters)),
-        "",
-        `${resources.length} resources. Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`,
-      ].join("\n"),
+      data: listData(resources),
+      pretty: renderList(COLUMNS, rows, {
+        plain,
+        singular: "resource",
+        empty: "No resources.",
+        footer: [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`],
+      }),
     });
   }
 }

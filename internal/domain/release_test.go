@@ -1,7 +1,6 @@
 package domain_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,66 +29,87 @@ func pointers() []domain.ReleasePointer {
 	}
 }
 
+// content holds the revisions [pointers] describes.
+func content() domain.ReleaseContent {
+	return domain.ReleaseContent{
+		Schemas: []*domain.JSONSchema{
+			{URL: "https://example.com/schemas/default-human-user.json", ObjectType: new("human-user")},
+		},
+		FlowDefinitions: []*domain.FlowDefinition{{ID: "flowdef_01KWHG09JXA7F0N9WD3P2E4YM5", Name: "default-login"}},
+		Branding:        &domain.Branding{ID: "brnd_01KWH1P4MYS7F0N9WD3P2E4YM5"},
+	}
+}
+
 func TestNewRelease(t *testing.T) {
 	t.Parallel()
 
-	release, err := domain.NewRelease("proj_1", pointers(), domain.ReleaseMetadata{Message: new("initial import")})
+	release, err := domain.NewRelease("proj_1", content(), domain.ReleaseMetadata{Message: new("initial import")})
 	require.NoError(t, err)
 
 	assert.Equal(t, "proj_1", release.ProjectID)
 	assert.Empty(t, release.ID, "the dialect mints the id on insert")
-	assert.Len(t, release.ContentHash, 64)
+	assert.Equal(t, domain.ReleaseContentHash(pointers()), release.ContentHash)
 
 	// Sorted by (kind, handle), so the stored order is the hashed order and a
 	// release read back compares equal to one built from the same set.
-	assert.Equal(t, []domain.ReleasePointerKind{
-		domain.ReleasePointerKindBranding,
-		domain.ReleasePointerKindFlowDefinition,
-		domain.ReleasePointerKindSchema,
-	}, []domain.ReleasePointerKind{
-		release.Pointers[0].Kind,
-		release.Pointers[1].Kind,
-		release.Pointers[2].Kind,
-	})
+	assert.Equal(t, []domain.ReleasePointer{pointers()[2], pointers()[1], pointers()[0]}, release.Pointers)
 }
 
 func TestNewReleaseRejects(t *testing.T) {
 	t.Parallel()
 
-	duplicate := append(pointers(), domain.ReleasePointer{
-		Kind:       domain.ReleasePointerKindSchema,
-		Handle:     "human-user",
-		RevisionID: "sch_a_later_revision",
-	})
+	duplicate := content()
+	duplicate.Schemas = append(duplicate.Schemas, &domain.JSONSchema{URL: "sch_a_later_revision", ObjectType: new("human-user")})
 
-	blankHandle := pointers()
-	blankHandle[0].Handle = "  "
+	blankHandle := content()
+	blankHandle.FlowDefinitions[0].Name = "  "
 
-	blankRevision := pointers()
-	blankRevision[1].RevisionID = ""
+	blankRevision := content()
+	blankRevision.Branding.ID = ""
 
-	unknownKind := pointers()
-	unknownKind[2].Kind = domain.ReleasePointerKind(42)
-
-	for name, given := range map[string][]domain.ReleasePointer{
-		"no pointers":             nil,
-		"an empty pointer set":    {},
+	for name, given := range map[string]domain.ReleaseContent{
+		"no revisions":            {},
 		"the same resource twice": duplicate,
 		"a blank handle":          blankHandle,
 		"a blank revision id":     blankRevision,
-		"a kind outside the enum": unknownKind,
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			_, err := domain.NewRelease("proj_1", given, domain.ReleaseMetadata{})
-			require.Error(t, err)
-
-			domErr, ok := errors.AsType[domain.Error](err)
-			require.True(t, ok)
-			assert.Equal(t, domain.ErrReleaseInvalid(nil, nil).Code, domErr.Code)
+			assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
 		})
 	}
+}
+
+func TestNewReleasePinsPolicyByOperation(t *testing.T) {
+	t.Parallel()
+
+	withPolicy := content()
+	withPolicy.Policies = []*domain.Policy{{ID: "pol_1", RevisionID: "polrev_1", Operation: "auth.factor.password.set"}}
+
+	release, err := domain.NewRelease("proj_1", withPolicy, domain.ReleaseMetadata{})
+	require.NoError(t, err)
+	assert.Contains(t, release.Pointers, domain.ReleasePointer{
+		Kind:       domain.ReleasePointerKindPolicy,
+		Handle:     "auth.factor.password.set",
+		RevisionID: "polrev_1",
+	})
+
+	// One policy per operation: two revisions of it cannot be pinned together.
+	withPolicy.Policies = append(withPolicy.Policies, &domain.Policy{ID: "pol_1", RevisionID: "polrev_2", Operation: "auth.factor.password.set"})
+	_, err = domain.NewRelease("proj_1", withPolicy, domain.ReleaseMetadata{})
+	assert.ErrorIs(t, err, domain.ErrReleaseInvalid(nil, nil))
+}
+
+func TestNewReleaseRejectsSchemaWithoutObjectType(t *testing.T) {
+	t.Parallel()
+
+	unparsed := content()
+	unparsed.Schemas[0].ObjectType = nil
+
+	_, err := domain.NewRelease("proj_1", unparsed, domain.ReleaseMetadata{})
+	assert.ErrorIs(t, err, domain.ErrReleaseRevisionUnpinnable(nil))
 }
 
 // TestReleaseContentHashIsGolden pins the canonical form. The hash is the
@@ -107,10 +127,10 @@ func TestReleaseContentHashIsGolden(t *testing.T) {
 func TestReleaseContentHashIgnoresMetadata(t *testing.T) {
 	t.Parallel()
 
-	bare, err := domain.NewRelease("proj_1", pointers(), domain.ReleaseMetadata{})
+	bare, err := domain.NewRelease("proj_1", content(), domain.ReleaseMetadata{})
 	require.NoError(t, err)
 
-	annotated, err := domain.NewRelease("proj_1", pointers(), domain.ReleaseMetadata{
+	annotated, err := domain.NewRelease("proj_1", content(), domain.ReleaseMetadata{
 		Message:  new("a different message entirely"),
 		GitSHA:   new("4a5b6c7d8e9f0a1b2c3d4e5f60718293a4b5c6d7"),
 		GitDirty: true,

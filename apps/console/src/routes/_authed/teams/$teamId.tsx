@@ -1,75 +1,85 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { AlertCircle, Box, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Box } from "lucide-react";
+import { useMemo } from "react";
 
-import { EYEBROW, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { api } from "@/api/zitadel";
+import { MetaRule, MetaValue } from "@/components/detail-meta";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
+import { Page } from "@/components/layout";
+import { RenameCard } from "@/components/rename-card";
+import {
+  LoadMore,
+  RESOURCE_CELL,
+  RESOURCE_TABLE_WRAP,
+  ResourceEmptyRow,
+  ResourceHeadCell,
+  ResourceHeaderRow,
+  ResourceRow,
+} from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
-import { Alert, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-
-import { api } from "../../../api/zitadel";
-import { describeError } from "../../../lib/api-error";
-import { formatDate } from "../../../lib/date";
+import { UserIdCell, UserIdentityCell } from "@/components/user-cells";
+import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLoadMore } from "@/hooks/use-load-more";
+import { nullOnForbidden } from "@/lib/api-error";
+import { formatDate } from "@/lib/date";
+import {
+  projectScopeDeps,
+  requireProjectScope,
+  useRequiredProjectScope,
+} from "@/lib/project-scope";
+import { fetchTeamMembers, toUserRow } from "@/lib/user-list";
 
 /**
- * Team detail.
+ * Team detail: a resource inside Teams, not a scope of its own. The sidebar
+ * keeps the project's nav with Teams marked, and the team's sections are tabs,
+ * as on user detail. A team becomes a sidebar scope once it owns configuration
+ * (Console ADR 0005).
  *
  * The header card carries `TEAM ID` and `CREATED`. The design draws a third cell,
  * `PRIMARY DOMAIN`, which is deliberately not built: a domain that discovers and
  * claims a team is security-relevant, so it needs its own model — verification,
  * and more than one domain per team — rather than a string on `team-response`.
  * That model is not defined yet, so the cell is left out rather than shown empty.
- *
  */
 export const Route = createFileRoute("/_authed/teams/$teamId")({
-  staticData: { scope: "project" },
-  loader: ({ params }) => api.getTeam(params.teamId),
+  staticData: { scope: "project", resource: "team" },
+  loaderDeps: projectScopeDeps,
+  loader: async ({ params, deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const [team, members] = await Promise.all([
+      api.getTeam(params.teamId),
+      // Listing members needs `team_membership.read`, which a grant on only
+      // part of the project does not carry: a refusal costs the Members tab
+      // its list, not the team its page.
+      nullOnForbidden(fetchMembers(projectId, params.teamId)),
+    ]);
+    return { team, members };
+  },
   component: TeamDetail,
 });
 
+interface MembersPage {
+  items: Record<string, unknown>[];
+  nextPageToken?: string;
+}
+
+/** One page of members. */
+async function fetchMembers(
+  projectId: string,
+  teamId: string,
+  pageToken?: string,
+): Promise<MembersPage> {
+  const page = await fetchTeamMembers(projectId, teamId, pageToken);
+  return { items: page.users, nextPageToken: page.next_page_token ?? undefined };
+}
+
 function TeamDetail() {
-  const team = Route.useLoaderData();
+  const { team, members } = Route.useLoaderData();
   const router = useRouter();
 
-  // `Tenant name` is the design's label for the team's own `name` — the only
-  // field `PATCH /teams/{team_id}` accepts. Kept as drawn rather than relabelled
-  // `Team name`, which the decisions log's open naming question would have to
-  // settle first.
-  const [name, setName] = useState(team.name);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
-
-  // A save re-runs the loader, and an edit elsewhere invalidates it; either way
-  // the field follows the record rather than holding a stale draft.
-  useEffect(() => {
-    setName(team.name);
-    setError(undefined);
-  }, [team]);
-
-  const trimmed = name.trim();
-  const dirty = trimmed !== team.name;
-
-  async function save() {
-    if (!dirty || trimmed === "" || saving) return;
-    setSaving(true);
-    setError(undefined);
-    try {
-      await api.updateTeam(team.id, { name: trimmed });
-      await router.invalidate();
-    } catch (cause) {
-      setError(describeError(cause, "Could not save the team."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <DetailPage>
+    <Page>
       <DetailHeader
         icon={Box}
         title={team.name}
@@ -83,48 +93,89 @@ function TeamDetail() {
         }
       />
 
-      <Card className={`${DETAIL_BODY} gap-0 rounded-xl py-0`}>
-        {/* `Card Content`: inset 24px, 20px top and bottom, with a 16px gap
-            between the header, the rule and the grid. */}
-        <CardContent className="flex flex-col gap-4 px-6 py-5">
-          <span className={EYEBROW}>Details</span>
-          <Separator />
-          <div className="flex flex-col gap-[18px]">
-            <Field>
-              <FieldLabel htmlFor="team-tenant-name">Tenant name</FieldLabel>
-              <Input
-                id="team-tenant-name"
-                name="tenant-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                maxLength={200}
-              />
-            </Field>
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle aria-hidden />
-                <AlertTitle>{error}</AlertTitle>
-              </Alert>
+      <Tabs defaultValue="overview" className={`${DETAIL_BODY} gap-6`}>
+        <TabsList aria-label="Team detail sections">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          {/* `Tenant name` is the design's label for the team's own `name`, the only
+              field `PATCH /teams/{team_id}` accepts. Relabelling it `Team name`
+              waits on the decisions log's open naming question. */}
+          <RenameCard
+            id="team-tenant-name"
+            label="Tenant name"
+            value={team.name}
+            onSave={async (name) => {
+              await api.updateTeam(team.id, { name });
+              await router.invalidate();
+            }}
+            errorFallback="Could not save the team."
+          />
+        </TabsContent>
+
+        <TabsContent value="members">
+          {members ? (
+            <Members teamId={team.id} loaded={members} />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Your access does not include this team&apos;s members.
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
+    </Page>
+  );
+}
+
+/**
+ * The team's active members, by the identity the Users list leads with
+ * (display → identifier → id, ADR 058), each opening their user. Read-only:
+ * no endpoint adds or removes a membership yet.
+ */
+function Members({ teamId, loaded }: { teamId: string; loaded: MembersPage }) {
+  const projectId = useRequiredProjectScope();
+  const paging = useLoadMore(
+    loaded,
+    // A later page refused shows as Load more's error rather than an empty list.
+    (pageToken) => fetchMembers(projectId, teamId, pageToken),
+    "Could not load more members.",
+  );
+  const rows = useMemo(
+    () => [...loaded.items, ...paging.extra].map((user, index) => toUserRow(user, index, [])),
+    [loaded.items, paging.extra],
+  );
+
+  return (
+    <>
+      <div className={RESOURCE_TABLE_WRAP}>
+        <Table className="text-xs">
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell>User</ResourceHeadCell>
+              <ResourceHeadCell>Status</ResourceHeadCell>
+              <ResourceHeadCell>ID</ResourceHeadCell>
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <ResourceEmptyRow colSpan={3}>No members yet.</ResourceEmptyRow>
+            ) : (
+              rows.map((user) => (
+                <ResourceRow key={user.id} className="group">
+                  <UserIdentityCell user={user} />
+                  <TableCell className={RESOURCE_CELL}>
+                    <StatusBadge status={user.status} />
+                  </TableCell>
+                  <UserIdCell user={user} />
+                </ResourceRow>
+              ))
             )}
-            <div className="flex justify-end">
-              {/* `Variant=Secondary, State=Disabled, Size=sm` — the design's
-                  resting Save is the secondary fill, which `disabled:opacity-50`
-                  then dims. The default (primary) variant stays a bright
-                  call-to-action even greyed out. */}
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1 px-2.5 text-xs"
-                onClick={() => void save()}
-                disabled={!dirty || trimmed === "" || saving}
-              >
-                {saving && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                Save
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </DetailPage>
+          </TableBody>
+        </Table>
+      </div>
+      <LoadMore paging={paging} />
+    </>
   );
 }

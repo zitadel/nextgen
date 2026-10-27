@@ -1,16 +1,13 @@
 get:
   operationId: getProject
+  x-zitadel-cli: projects get
   summary: Get project
   description: |
     Returns the current state of a project.
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-path.yaml
   security:
     - oauth2:
         # project.write, not project.read: project.read is carried by the
@@ -28,7 +25,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../project-response.yaml
+            $ref: ../project-detail-response.yaml
     '401':
       description: Missing or invalid credentials.
       content:
@@ -46,17 +43,14 @@ get:
 
 patch:
   operationId: patchProject
+  x-zitadel-cli: projects update
   summary: Update project
   description: |
     Updates the state of a project.
   tags:
     - Projects
   parameters:
-    - name: project_id
-      in: path
-      required: true
-      schema:
-        $ref: ../../../components/schemas/project-id.yaml
+    - $ref: ../../../components/parameters/project-id-path.yaml
   security:
     - oauth2:
         - project.write
@@ -76,7 +70,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../project-response.yaml
+            $ref: ../project-detail-response.yaml
     '400':
       description: Invalid request body.
       content:

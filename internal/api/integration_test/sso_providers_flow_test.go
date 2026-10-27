@@ -31,7 +31,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -77,6 +77,9 @@ func ssoLoginFlowDefinition(userSchema string) api.FlowDefinition {
 				Transitions: api.NewOptFlowDefinitionStepTransitions(api.FlowDefinitionStepTransitions{
 					"submit":            api.FlowDefinitionStepTransitionsItem{Target: "done"},
 					"sso_authenticated": api.FlowDefinitionStepTransitionsItem{Target: "done"},
+					// An SSO collision binds the owner only when the step
+					// routes this outcome; the owner then signs in here.
+					"user_already_exists": api.FlowDefinitionStepTransitionsItem{Target: "identifier"},
 				}),
 			},
 			{

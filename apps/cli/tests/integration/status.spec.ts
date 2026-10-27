@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
 import { anApp, aSetUpApp, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 /** A project configured against a self-hosted server, without being set up. */
 async function aConfiguredApp(): Promise<ScaffoldedApp> {
@@ -11,7 +13,6 @@ async function aConfiguredApp(): Promise<ScaffoldedApp> {
   await app.writeConfig({
     project: "proj-001",
     server: "https://self.example",
-    environments: { development: { issuer: "http://localhost:3000" } },
   });
   await app.writeLocalSecret("proj-001");
   return app;
@@ -55,20 +56,23 @@ describe("status", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("offers plan while nobody has registered", async () => {
+      it("calls a server running although its recorded process has died", async () => {
         const app = await aSetUpApp();
+        await app.startLocalServer({ shape: "orphaned" });
 
         const result = await app.status();
 
-        expect(result).toSuggest("plan");
+        expect(
+          app.envelopeOf<{ server: { lifecycle: string } }>(result).data.server.lifecycle,
+        ).toBe("running");
       });
 
-      it("withholds apply while nobody has registered", async () => {
+      it("offers a dry-run deploy while nobody has registered", async () => {
         const app = await aSetUpApp();
 
         const result = await app.status();
 
-        expect(result).not.toSuggest("apply");
+        expect(result).toSuggest("deploy --dry-run");
       });
 
       it("asks for a registered user before anything else", async () => {
@@ -80,10 +84,24 @@ describe("status", () => {
         expect(data.next_actions.join("\n")).toContain("register a user");
       });
 
+      it("reports the project the environment resolves under --env", async () => {
+        const app = await aSetUpApp();
+        await app.bindEnvironment("production", {
+          ZITADEL_URL: "https://prod.example",
+          ZITADEL_PROJECT_ID: "proj_prod",
+        });
+
+        const result = await app.run(["status", "--env", "production", "--json"]);
+
+        expect(
+          app.envelopeOf<{ project: { project_id: string } }>(result).data.project.project_id,
+        ).toBe("proj_prod");
+      });
+
       it("calls config pointing at a project that no longer exists orphaned", async () => {
         const app = await anApp();
         await app.writeConfig({
-          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          $schema: "./.zitadel/meta/project.json",
           project: "orphan",
           server: "https://api.zitadel.cloud",
         });

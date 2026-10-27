@@ -11,12 +11,26 @@ import (
 )
 
 func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttemptRequest) (api.CreateAuthAttemptRes, error) {
+	scopeCtx, ok := GetScopeContext(ctx)
+	if !ok {
+		return nil, domain.ErrAuthUnauthorized(nil)
+	}
+	if bodyProjectID := string(req.GetProjectID()); bodyProjectID != "" && bodyProjectID != scopeCtx.ProjectID {
+		return nil, domain.ErrProjectMismatch()
+	}
+
+	// TODO(#1616): never resolves, so the seal stays empty and later revoke
+	// checks no-op. Resolve the project default and answer rel.not_deployed when nothing is deployed.
 	input := service.CreateAuthAttemptInput{
-		ProjectID: string(req.GetProjectID()),
+		ProjectID: scopeCtx.ProjectID,
 	}
-	if sessionID, ok := req.GetSessionID().Get(); ok {
-		input.SessionID = new(string(sessionID))
+	sessionID, err := h.provenSessionID(ctx, input.ProjectID,
+		string(req.GetSessionID().Or("")), string(req.GetSessionToken().Or("")),
+		domain.ErrAuthAttemptInvalidRequest)
+	if err != nil {
+		return nil, err
 	}
+	input.SessionID = sessionID
 	// TODO: handle challenge nonce in the future
 
 	attempt, err := h.authAttemptService.Create(ctx, input)

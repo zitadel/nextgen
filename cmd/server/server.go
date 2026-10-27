@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -24,6 +25,9 @@ import (
 	slogctx "github.com/veqryn/slog-context"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 
 	oasapi "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api"
@@ -31,22 +35,26 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/platform"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
+	"github.com/zitadel/nextgen/internal/build"
 	"github.com/zitadel/nextgen/internal/cache"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/errreport"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
+	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/staticui/console"
-	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	_ "github.com/zitadel/nextgen/internal/storage/dialect/all"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 	"github.com/zitadel/nextgen/internal/storage/dialect/sqlite"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
 
@@ -124,17 +132,26 @@ func addServerFlags(cmd *cobra.Command, applyMigrations *bool, userFiles *[]stri
 		"Fail the start instead of generating a master key when none is configured (server.generate_master_key: false)")
 }
 
-func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) error {
-	var err error
+// run is the server's lifetime. Its result is named so that the deferred report
+// sees what the caller gets. The early returns that declare err in an if or
+// case scope (`if err := f(); err != nil { return ... }`) never reached the
+// function-scoped err the defer used to check, so those failures went
+// unreported (#1409); the `x, err :=` returns reused that err, but it held the
+// unwrapped cause rather than the value returned.
+func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bool) (err error) {
 	sfs := &ShutdownFuncs{}
 	defer func() {
+		// Logged before the shutdown funcs run: one of them shuts down the
+		// OTel logger provider, after which a record reaches stderr only.
 		if err != nil {
 			slog.Error("run error", slogctx.Err(err))
 		}
-		err = sfs.Exec(context.WithoutCancel(ctx))
-		if err != nil {
-			slog.Error("shutdown error", slogctx.Err(err))
-			os.Exit(1)
+		// Kept apart from err: assigning the shutdown outcome to it would hand
+		// the caller nil after a clean shutdown of a failed start, and the
+		// process would exit 0.
+		if shutdownErr := sfs.Exec(context.WithoutCancel(ctx)); shutdownErr != nil {
+			slog.Error("shutdown error", slogctx.Err(shutdownErr))
+			err = errors.Join(err, shutdownErr)
 			return
 		}
 		slog.Info("shut down application")
@@ -180,7 +197,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	// ── Repositories ─────────────────
 	serviceDBPool := service.NewPool(pool.(service.Pool))
-	schemaStore := serviceDBPool.Statements()
 	sessionResolver := service.SessionStatementsResolver{Pool: serviceDBPool}
 
 	// ── Schema Stuff ─────────────────
@@ -207,10 +223,18 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	schemaResolverWithHTTP := domain.NewJSONSchemaResolver(schemaCache, 10, cfg.Schema.ResolveTimeout, egressClient, builtinPublicBase)
 	// storageSchemaResolver without an HTTP client to fetch tenant schemas from the cache/storage
 	storageSchemaResolver := domain.NewJSONSchemaResolver(schemaCache, 10, 0, nil, builtinPublicBase)
-	schemaValidator, err := domain.NewSchemaValidator(builtinPublicBase.String())
+	// The config string rather than the parsed URL: an empty base is the
+	// validator's error to report, not a nil dereference here.
+	schemaValidator, err := domain.NewSchemaValidator(cfg.Schema.BuiltinPublicBase)
 	if err != nil {
 		return fmt.Errorf("failed to build schema validator: %w", err)
 	}
+	// The built-in schema namespace, built once and handed to everything that
+	// reads a schema by URL: users, flows, releases and bootstrap documents
+	// name the default schema under whichever base was current when they were
+	// written, and must find the row the project stores it at under any other.
+	builtinBases := domain.BuiltinSchemaBasesFor(cfg.Schema.BuiltinPublicBase)
+	schemaStore := domain.WithBuiltinSchemaAliases(serviceDBPool.Statements(), builtinBases)
 
 	userLookup := service.UserStatementsLookup{Pool: serviceDBPool}
 	userRefs := service.StatementsUserRefResolver{Pool: serviceDBPool}
@@ -242,10 +266,11 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	})
 	projectService := service.NewProjectService(
 		serviceDBPool,
-		builtinPublicBase.String(),
+		cfg.Schema.BuiltinPublicBase,
 		schemaValidator,
 		keyService,
 		hasherFactory,
+		cfg.Origins.SharedHosts,
 	)
 
 	// Bootstrap runs here rather than straight after the migrations because it
@@ -258,16 +283,22 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), userFiles); err != nil {
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
 		return fmt.Errorf("failed to bootstrap users: %w", err)
 	}
 
-	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator)
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
+	}
+
+	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
-		schemaService,
 		schemaValidator,
 		nil,
+		builtinBases,
 	)
 	teamService := service.NewTeamService(serviceDBPool)
 	// The claim and dashboard URLs hang off the console, reached at the
@@ -277,21 +308,51 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
+	// The console previews a project's login from the public base, so opening
+	// a flow admits its origin for every project; no later step does.
+	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
+	if err != nil {
+		return err
+	}
 	claimService := service.NewClaimService(serviceDBPool, consoleBase, cfg.Platform.ResolvedProjectID())
 	grantService := service.NewGrantService(serviceDBPool, userRefs, cfg.Platform.ResolvedProjectID())
 	brandingService := service.NewBrandingService(serviceDBPool)
-	environmentService := service.NewEnvironmentService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
-	releaseService := service.NewReleaseService(serviceDBPool)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
 	deploymentService := service.NewDeploymentService(serviceDBPool)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
+	// Operation policies (ADR 066). Every template is compiled and checked
+	// here, so a template the server cannot evaluate stops it before it
+	// serves traffic. A project's published instance is resolved per password
+	// set through the policy service; without one, the gate holds passwords to
+	// the server's length cap only.
+	policyEngine, err := policy.New()
+	if err != nil {
+		return fmt.Errorf("failed to compile the policy catalog: %w", err)
+	}
+	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
+	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
+	if err != nil {
+		return err
+	}
 	userService := service.NewUserService(
 		serviceDBPool,
 		schemaStore,
 		projectHashers,
+		passwordPolicy,
 		userRefs,
+		builtinBases,
 	)
 
 	// The platform project's registration side effect (#527): every flow-created
@@ -311,23 +372,29 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	flowAuth := service.NewFlowAuthAttemptAdapter(authAttemptSvc, schemaStore)
 	createUserHandler := service.NewFlowCreateUserHandler(
 		projectHashers,
+		passwordPolicy,
 		userService,
 		schemaStore,
 		serviceDBPool,
 	)
 	stateMachine := domain.NewFlowStateMachine(
 		storageSchemaResolver,
-		schemaStore,
+		// The raw statements: the state machine only hands this store to the
+		// resolver, which follows the namespace itself, so the aliasing wrapper
+		// would only double the reads of a miss.
+		serviceDBPool.Statements(),
 		fields,
 		createUserHandler,
 		flowAuth,
 		service.NewFlowSSOProviderResolver(idpConnectionService),
-		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService),
+		service.NewFlowSSOIdentityResolver(serviceDBPool, idpConnectionService, userService, schemaStore, projectHashers, passwordPolicy),
 		service.NewFlowSSORedirectIssuer(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient),
+		passwordPolicy,
 		time.Now,
 	)
+	ssoCallback := service.NewFlowSSOCallback(idpConnectionService, authAttemptSvc, keyService, variableService, egressClient)
 
-	flowService := service.NewFlowService(serviceDBPool, stateMachine)
+	flowService := service.NewFlowService(serviceDBPool, stateMachine, builtinBases)
 	tokenService := service.NewTokenService(keyService, serviceDBPool)
 
 	// ── Default project resolution ──
@@ -367,6 +434,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	defer shipper.Close()
 
+	pinger := serviceping.New(cfg.ServicePing, serviceping.Facts{
+		Version:    build.Version(),
+		Commit:     build.Commit(),
+		Dialect:    databaseDialectName(cfg),
+		OnVercel:   os.Getenv("VERCEL") == "1",
+		PublicBase: cfg.Server.PublicBase,
+	})
+	pinger.Start()
+	defer pinger.Close()
+
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -378,10 +456,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			flowDefinitionSvc,
 			teamService,
 			brandingService,
-			environmentService,
 			releaseService,
-			idpConnectionService,
 			deploymentService,
+			idpConnectionService,
 			eventService,
 			tokenService,
 			keyService,
@@ -392,20 +469,17 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 			// Resolved, not the raw pin: in bootstrap mode project_id is empty
 			// and an empty handler pin rejects every claim/complete session.
 			cfg.Platform.ResolvedProjectID(),
-		).WithPersonalTeamEnsurer(personalTeams),
-		api.NewSecurityHandler(tokenService),
-		oasapi.WithMiddleware(
-			middleware.AddOperationIdToContext(),
-			// logging is done at net/http level
-		),
-		oasapi.WithMeterProvider(telemetry.MeterProvider()),
-		oasapi.WithTracerProvider(telemetry.TracerProvider()),
-		oasapi.WithErrorHandler(api.OgenErrorHandler))
+		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
+		// The same platform project the handler resolves: sessions homed there
+		// can reach the platform operator path (ADR 075).
+		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
+		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
 	}
 
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
+		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
 		requestEventBuf)
 	if err != nil {
@@ -414,7 +488,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 
 	httpServer := &http.Server{
 		Addr:              cfg.Server.Address,
-		Handler:           mux,
+		Handler:           withIncomingTraceContext(cfg.Instrumentation.Trace, telemetry.TextMapPropagator(), mux),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -481,13 +555,49 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	return base.String(), nil
 }
 
+// publicOrigin is the browser origin of the deployment's public base: where
+// its console runs. A browser never spells out the scheme's default port, so
+// neither does this.
+func publicOrigin(publicBase string) (string, error) {
+	base, err := url.Parse(publicBase)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse server public base: %w", err)
+	}
+	host := base.Host
+	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
+		host = strings.TrimSuffix(host, ":"+port)
+	}
+	origin, err := domain.NormalizeOrigin(base.Scheme + "://" + host)
+	if err != nil {
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
+}
+
 // ----------------------------- CONFIG --------------------------------------
 
 // configOverride sets a value that outranks the config file and the
 // environment, which is what a command-line flag has to do.
 type configOverride func(*viper.Viper)
 
+// loadConfig reads the configuration the server serves with: readConfig's,
+// plus the master keys, one generated when none is configured and
+// generation is on.
 func loadConfig(configPath string, overrides ...configOverride) (Config, error) {
+	cfg, err := readConfig(configPath, overrides...)
+	if err != nil {
+		return Config{}, err
+	}
+	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+// readConfig reads and validates the configuration without touching the
+// master keys, which only serving needs: `migrate` reads its configuration
+// here, so it neither requires a master key nor generates one.
+func readConfig(configPath string, overrides ...configOverride) (Config, error) {
 	v := viper.NewWithOptions(viper.ExperimentalBindStruct())
 	v.SetEnvPrefix("NEXTGEN")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -502,8 +612,6 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
-	v.SetDefault("server.login_enabled", true)
-	v.SetDefault("server.login_path", "/ui/login")
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)
@@ -556,7 +664,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("schema.lru_cache_size", 1000) // todo: temp, review
 	v.SetDefault("keys.crypter_lru_cache_size", 1000)
 	v.SetDefault("keys.signing_key_lru_cache_size", 1000)
-	v.SetDefault("schema.builtin_public_base", "https://nextgen.com/api/schemas") // todo: temp, review
+	// An identifier namespace, not an address: it is stamped into documents
+	// and stored rows, so moving it means adding the new base to
+	// domain.KnownBuiltinSchemaBases, which keeps every earlier one resolving.
+	v.SetDefault("schema.builtin_public_base", configdefaults.DefaultBuiltinSchemaBase)
 	v.SetDefault("schema.resolve_timeout", domain.DefaultJSONSchemaResolveTimeout)
 	// Egress policy for user-injectable URLs (ADR 061). The deny list
 	// blocks by default; allow_list carves exceptions out of it, e.g.
@@ -568,7 +679,12 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("httpclient.allow_https_downgrade", false)
 	v.SetDefault("httpclient.deny_list", httputil.DefaultDenyList)
 	v.SetDefault("httpclient.allow_list", []string{})
-	v.SetDefault("session.default_ttl", domain.SessionAnonymousTTL)
+	// origins.shared_hosts is not SetDefault'd: viper merges map defaults with
+	// overrides, which would break replace-defaults. Nil after unmarshal means
+	// "use DefaultSharedHosts"; an explicit empty map disables the checks.
+	// default_ttl is the lifetime of a signed-in session, not of the
+	// anonymous shell POST /sessions mints (domain.SessionAnonymousTTL).
+	v.SetDefault("session.default_ttl", domain.SessionDefaultTTL)
 	v.SetDefault("session.max_ttl", 720*time.Hour)
 	// Empty means "the deployment's first-created non-platform project is the
 	// default" (Console ADR 0004 §2; the built-in platform row is skipped by
@@ -577,11 +693,19 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	// platform.bootstrap_project explicitly opts in (#605).
 	v.SetDefault("platform.project_id", "")
 	v.SetDefault("platform.bootstrap_project", false)
+	// Empty: nobody is a platform operator (ADR 075).
+	v.SetDefault("platform.operators", []string{})
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
+	v.SetDefault("service_ping.enabled", false)
+	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
+	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
+	// Empty: Mixpanel is paused, so the ping sends it nothing by default.
+	v.SetDefault("service_ping.mixpanel_token", "")
+	v.SetDefault("service_ping.interval", 24*time.Hour)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
 	v.SetDefault("instrumentation.log.streams", []zlog.Stream{
@@ -593,9 +717,13 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	})
 	v.SetDefault("instrumentation.log.format", instrumentation.LogFormatText)
 	v.SetDefault("instrumentation.log.add_source", true)
+	// The location is cheap and stays on. A stack is one debug.Stack() per
+	// error, so it is opt-in. See ADR 030.
 	v.SetDefault("instrumentation.log.errors.report_location", true)
-	v.SetDefault("instrumentation.log.errors.stack_trace", true)
+	v.SetDefault("instrumentation.log.errors.stack_trace", false)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
+	// Off: an incoming traceparent is not used. See ADR 080.
+	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
 
 	// AutomaticEnv only resolves nested keys viper already knows about
 	// (via default, config file, fields of config struct or explicit BindEnv).
@@ -638,12 +766,16 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 		// reaching non-string slice fields such as []zlog.Stream.
 		mapstructure.StringToTimeDurationHookFunc(),
 		stringToWeakSliceHookFunc(","),
+		stringToRegexpHookFunc(),
 		// Lets enum types generated by enumer (zlog.Level, zlog.Stream,
 		// instrumentation.LogFormat, ...) decode from their documented string
 		// names via the encoding.TextUnmarshaler they already implement.
 		mapstructure.TextUnmarshallerHookFunc(),
 	))); err != nil {
 		return Config{}, fmt.Errorf("decode config: %w", err)
+	}
+	if cfg.Origins.SharedHosts == nil {
+		cfg.Origins.SharedHosts = domain.DefaultSharedHosts
 	}
 	// Create the data dir configuration actually selected, not the default
 	// computed above — an explicit empty data_dir still means the default.
@@ -653,11 +785,10 @@ func loadConfig(configPath string, overrides ...configOverride) (Config, error) 
 	if err := ensureServerDataDir(cfg.Server.DataDir); err != nil {
 		return Config{}, err
 	}
-	if err := ensureServerMasterKey(&cfg.Server); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
-
-	return cfg, cfg.Validate()
+	return cfg, nil
 }
 
 // stringToWeakSliceHookFunc splits a string into a slice on sep, without
@@ -678,6 +809,18 @@ func stringToWeakSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
 	}
 }
 
+// stringToRegexpHookFunc compiles string config values into *regexp.Regexp
+// (including map values of that type). Bad patterns fail config load.
+func stringToRegexpHookFunc() mapstructure.DecodeHookFunc {
+	regexpPtr := reflect.TypeOf((*regexp.Regexp)(nil))
+	return func(f reflect.Type, t reflect.Type, data any) (any, error) {
+		if f.Kind() != reflect.String || t != regexpPtr {
+			return data, nil
+		}
+		return regexp.Compile(data.(string))
+	}
+}
+
 // mustBindEnv panics on viper's documented "this can't fail in
 // normal use" BindEnv error path. Keeps the env wiring readable
 // without sprinkling error handling at every binding.
@@ -689,20 +832,37 @@ func mustBindEnv(v *viper.Viper, key string) {
 
 // ----------------------------- HTTP --------------------------------------
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
-	mux := http.NewServeMux()
-
-	if cfg.LoginEnabled {
-		if err := login.ValidateDist(); err != nil {
-			return nil, err
-		}
-		loginHandler, err := login.Handler(cfg.LoginPath)
-		if err != nil {
-			return nil, fmt.Errorf("build login UI handler: %w", err)
-		}
-		mux.Handle(cfg.LoginPath, loginHandler)
-		mux.Handle(cfg.LoginPath+"/", loginHandler)
+// apiServerOptions are the options of the ogen API server that buildHTTPMux
+// mounts, shared with the test of that chain. home is the way on that the
+// error page of a path nothing answers offers a person (ADR 076).
+func apiServerOptions(tracerProvider trace.TracerProvider, meterProvider metric.MeterProvider, home *errorpage.Link) []oasapi.ServerOption {
+	return []oasapi.ServerOption{
+		oasapi.WithMiddleware(
+			middleware.AddOperationIdToContext(),
+			// logging is done at net/http level
+		),
+		oasapi.WithMeterProvider(meterProvider),
+		oasapi.WithTracerProvider(api.NewOgenTracerProvider(tracerProvider)),
+		oasapi.WithErrorHandler(api.OgenErrorHandler),
+		oasapi.WithNotFound(api.OgenNotFound(home)),
+		oasapi.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 	}
+}
+
+// consoleLink is the console's start page as an error page's way on. The
+// path is where the console lives even when this server does not serve it:
+// the hosted cloud runs it as a service of its own, and the claim and
+// dashboard links the server hands out assume the same.
+func consoleLink(consolePath string) *errorpage.Link {
+	consolePath = strings.TrimSuffix(consolePath, "/")
+	if consolePath == "" {
+		return nil
+	}
+	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
+}
+
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
 		if err := console.ValidateDist(); err != nil {
@@ -716,28 +876,51 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		mux.Handle(cfg.ConsolePath+"/", consoleHandler)
 	}
 
-	// Pre-session runtime metadata for the embedded UI surfaces (Console
-	// ADR 0004 §3). Named for the console, which carries it first, but it
-	// describes the deployment — the default project and its publishable key
-	// — and the hosted login shell resolves the project it signs into from
-	// the same two fields, so it is mounted for either surface rather than
-	// only alongside the console. Registered as an exact path, so it wins
-	// over the catch-all API mount below.
-	if cfg.ConsoleEnabled || cfg.LoginEnabled {
-		mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
-	}
+	// Pre-session runtime metadata for the console (Console ADR 0004 §3): the
+	// default project and its publishable key. Mounted whether or not this
+	// binary serves the console, because a console served elsewhere reads it
+	// from here: the hosted cloud's console service, and the console's dev
+	// server through its proxy. Registered as an exact path, so it wins over
+	// the catch-all API mount below.
+	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 
-	mux.Handle("/",
-		middleware.Chain(apiHandler,
-			func(next http.Handler) http.Handler { return middleware.WithRequestContextMiddleware(reqIdGen, next) },
-			middleware.WithLogging,
+	chain := func(h http.Handler, redactQuery ...string) http.Handler {
+		return middleware.Chain(h,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
+			api.WithCSRFRequest,
 			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
-		),
-	)
+		)
+	}
+	// The same chain: the callback reads its cookie by the request scheme
+	// (WithRequestHostMiddleware). Its code is a credential and its state is
+	// single-use, so the request log hides both: a log line must not be able
+	// to replay a sign-in. Both spellings serve one handler: the prefixed path
+	// arrives when the instance is the browser origin, the stripped one through
+	// a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler, "code", "state")
+	mux.Handle(api.IDPCallbackPattern, callback)
+	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	mux.Handle("/", chain(apiHandler))
 	return mux, nil
+}
+
+// withIncomingTraceContext decides what an incoming trace context means for
+// the server span. Unless cfg.TrustRemoteSpans is set it returns next
+// unchanged, so traceparent, tracestate and baggage are ignored and every
+// request starts a new trace. When set, the caller's context is extracted
+// ahead of everything else, so the request logs and the server span both see
+// it. ADR 080 records the decision.
+func withIncomingTraceContext(cfg instrumentation.TraceConfig, propagator propagation.TextMapPropagator, next http.Handler) http.Handler {
+	if !cfg.TrustRemoteSpans {
+		return next
+	}
+	return middleware.WithRemoteTraceContext(propagator)(next)
 }
 
 // ----------------------------- STORAGE --------------------------------------
@@ -777,6 +960,19 @@ func buildDatabaseDialect(cfg Config) (database.Dialect, error) {
 		return nil, fmt.Errorf("build database dialect: %w", err)
 	}
 	return dialect, nil
+}
+
+// databaseDialectName names the configured dialect without connecting, for
+// the service ping; an unconfigured database is the sqlite default.
+func databaseDialectName(cfg Config) string {
+	if len(cfg.Database.Raw) == 0 {
+		return "sqlite"
+	}
+	dialect, err := cfg.Database.Build()
+	if err != nil {
+		return "unknown"
+	}
+	return dialect.Name()
 }
 
 func defaultSQLitePath(dataDir string) string {

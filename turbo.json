@@ -1,0 +1,255 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  // Prototype of the moon → Turborepo migration (docs/design/build/
+  // turborepo-migration.md). Every moon task has a turbo task: the shared ones
+  // here, the rest in each package's turbo.json ("extends": ["//"]), which
+  // mirrors that package's moon.yml edge for edge. Both runners run the same
+  // package.json scripts. Moon stays the runner of record (CI, local docs)
+  // until the cutover; the hosted cloud (vercel.json, apps/cloud/build.sh)
+  // builds with turbo since the pilot.
+  //
+  // Without this, turbo writes its own block into the root AGENTS.md whenever
+  // it detects an AI agent running it.
+  "agentGuidance": false,
+  // Tasks see only the variables listed on them, turbo's built-in list (PATH,
+  // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
+  // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
+  "envMode": "strict",
+  // Vite inference would hash the VITE_VERCEL_* variables Vercel sets in a
+  // build. Turbo leaves them out in the Vite service's build, where Vercel
+  // names the prefix (TURBO_CI_VENDOR_ENV_KEY), but not in the server's, so
+  // the same packages got other keys there than in the console's build and
+  // were built twice per deployment. No build here reads
+  // them. A negation here also applies to framework inference.
+  "globalEnv": ["!VITE_VERCEL_*"],
+  "globalPassThroughEnv": [
+    // Where Go keeps its toolchain, module and build caches; their contents
+    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
+    // so the Go tasks list those as hashed `env` instead.
+    "GOPATH",
+    "GOCACHE",
+    "GOMODCACHE",
+    "GOTMPDIR",
+    "GOTOOLCHAIN",
+    "GOPROXY",
+    "GOSUMDB",
+    "GONOSUMDB",
+    "GONOSUMCHECK",
+    "GOPRIVATE",
+    "GONOPROXY",
+    "GOINSECURE",
+    // Telemetry opt-outs honoured by the CLI, Playwright, Next.js, Nuxt and
+    // Storybook (CI sets DO_NOT_TRACK).
+    "DO_NOT_TRACK",
+    "ZITADEL_TELEMETRY",
+    "NEXT_TELEMETRY_DISABLED",
+    "NUXT_TELEMETRY_DISABLED",
+    "STORYBOOK_DISABLE_TELEMETRY",
+    // Playwright's browser store and the temp dir the test harnesses use.
+    "PLAYWRIGHT_BROWSERS_PATH",
+    "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD",
+    "TMPDIR",
+    "LC_ALL",
+    // Vercel keeps corepack enabled for a turbo build only when this is
+    // listed here (it checks the file); the cloud's builds run its `pnpm`.
+    "COREPACK_HOME"
+  ],
+  // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
+  // to any of them re-runs every task. Turbo hashes each package's slice of
+  // pnpm-lock.yaml on its own, so the lockfile is not listed.
+  "globalDependencies": [
+    ".nvmrc",
+    ".npmrc",
+    "package.json",
+    "pnpm-workspace.yaml",
+    "devbox.json",
+    "devbox.lock",
+    "tsconfig.base.json",
+    "biome.json",
+    "vitest.shared.mjs",
+    "vitest.shared.d.mts"
+  ],
+  "tasks": {
+    // ---- The standard tasks of every TypeScript package (.moon/tasks/
+    // typescript.yml). Dependencies are per package; `^build` is deliberately
+    // not used: it follows devDependencies too, and the console's
+    // @zitadel/testing (dev-real only) would pull the CLI and the server
+    // build into every console build (pilot finding 2).
+    "lint": {},
+    "typecheck": {},
+    "build": {
+      "outputs": ["dist/**"]
+    },
+    "test": {},
+
+    // ---- Task shapes several packages share. Release builds clean and
+    // rewrite dist in one script (scripts/release-clean.mjs), never cached.
+    "build-release": {
+      "cache": false,
+      "outputs": ["dist/**"]
+    },
+    // Chromium for the browser-mode Vitest projects; the `test` task of those
+    // packages depends on it so the test gate provisions it in CI.
+    "install-browsers": {
+      "cache": false
+    },
+    "generate": {
+      "outputs": ["src/generated/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
+    "preview": {
+      "cache": false,
+      "persistent": true
+    },
+    // The e2e lanes boot real servers and browsers: never cached, and they
+    // see the harness, server and Docker variables a developer or CI sets.
+    // The values moon's task `env` blocks set live in the package.json scripts
+    // too, as defaults the caller's own value overrides (e.g.
+    // NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false}).
+    "e2e": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "e2e-local": {
+      "cache": false,
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
+    },
+
+    // ---- The root project (moon's `workspace`): the scripts/*.mjs
+    // orchestration. The root package's default inputs are the whole
+    // repository, so every root task lists its inputs: the cached ones as
+    // moon.yml does, the uncached ones so that only a change to their own
+    // scripts marks them affected (scripts/ci-mode.mjs).
+    //
+    // The root lint checks the whole repository, so its inputs are every file
+    // Biome checks (moon's workspace:lint has no inputs and is never selected
+    // by affectedness, which is a gap rather than a behaviour to copy).
+    "//#lint": {
+      "inputs": ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}", "biome.json"]
+    },
+    "//#test": {
+      "inputs": [
+        "scripts/ci-mode.mjs",
+        "scripts/ci-mode.test.mjs",
+        "scripts/dev-process.mjs",
+        "scripts/dev-process.test.mjs",
+        "scripts/shims/pnpm",
+        "scripts/generate-meta-schemas.ts",
+        "scripts/generate-meta-schemas.test.ts",
+        "scripts/release-artifacts.mjs",
+        "scripts/release-github.mjs",
+        "scripts/release-github.test.mjs",
+        "scripts/release-manifest.mjs",
+        "scripts/render-builtin-schemas.mjs",
+        "scripts/render-builtin-schemas.test.mjs",
+        "api/openapi/endpoints/schemas/*.json",
+        "scripts/assert-file.mjs",
+        "vitest.config.ts"
+      ]
+    },
+    "//#check-typecheck": {
+      "inputs": [
+        "scripts/check-typecheck-programs.mjs",
+        "scripts/check-typecheck-programs.test.mjs",
+        "scripts/assert-file.mjs",
+        "apps/*/moon.yml",
+        "packages/*/moon.yml",
+        "apps/*/package.json",
+        "packages/*/package.json",
+        "apps/*/tsconfig*.json",
+        "packages/*/tsconfig*.json",
+        "e2e/moon.yml",
+        "e2e/package.json",
+        "e2e/tsconfig*.json",
+        "vitest.config.ts"
+      ]
+    },
+    "//#check-openapi-rules": {
+      "inputs": [
+        "scripts/openapi-casing-rules.test.mjs",
+        "scripts/assert-file.mjs",
+        "scripts/testdata/openapi-casing/**",
+        "redocly.yaml",
+        ".redocly.lint-ignore.yaml",
+        "vitest.config.ts"
+      ]
+    },
+    // Checks the moon graph against .moon/AGENTS.md; kept while both runners
+    // are configured. Turbo takes its package graph from package.json, so the
+    // rule "the moon edge and the npm dependency go together" has no turbo
+    // counterpart to check.
+    "//#check-moon-graph": {
+      "inputs": [
+        "scripts/check-moon-graph.mjs",
+        "moon.yml",
+        "apps/*/moon.yml",
+        "packages/*/moon.yml",
+        "tools/*/moon.yml",
+        "e2e/moon.yml",
+        "apps/*/package.json",
+        "packages/*/package.json",
+        "e2e/package.json"
+      ]
+    },
+    "//#check-adrs": {
+      "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]
+    },
+    "//#doctor": {
+      "cache": false,
+      "inputs": ["scripts/doctor.mjs", "scripts/dev-process.mjs"]
+    },
+    // `workspace:cli` is not a turbo task: it is interactive, which turbo only
+    // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    "//#server": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/console#build"],
+      "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#cloud": {
+      "cache": false,
+      "persistent": true,
+      "inputs": ["scripts/run-cloud.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "passThroughEnv": ["CLOUD_DEV_PORT", "CLOUD_DEV_DEBUG", "NEXTGEN_*", "GOFLAGS"]
+    },
+    "//#server-debug": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@zitadel/console#build"],
+      "inputs": [
+        "scripts/run-server-debug.mjs",
+        "scripts/server-build.mjs",
+        "scripts/dev-process.mjs",
+        "scripts/task-runner.mjs"
+      ],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
+    },
+    // The local runtime image: the server cross-compiled for linux with the
+    // console's dist embedded. Needs Docker, so it stays out of CI.
+    "//#build-local-image": {
+      "cache": false,
+      "dependsOn": ["@zitadel/console#build"],
+      "inputs": ["scripts/build-local-runtime-image.mjs", "scripts/dev-process.mjs", "Dockerfile"],
+      "passThroughEnv": ["ZITADEL_*", "DOCKER_*", "GOFLAGS"]
+    },
+    "//#smoke-container": {
+      "cache": false,
+      "dependsOn": ["//#build-local-image"],
+      "inputs": ["scripts/smoke-container.mjs", "scripts/dev-process.mjs"],
+      "passThroughEnv": ["ZITADEL_*", "DOCKER_*"]
+    },
+    "//#check": {
+      "cache": false,
+      "inputs": ["scripts/check.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
+      "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "DOCKER_*", "TESTCONTAINERS_*", "GOFLAGS"]
+    }
+  }
+}

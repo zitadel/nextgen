@@ -1,7 +1,15 @@
+import type { PasswordMinLength } from "../../../lib/policies";
 import type { SetupPreset, SetupUseCase } from "@zitadel/config/defaults";
-import type { ConnectionEndpoints } from "@zitadel/config/idp";
+import {
+  type ConnectionEndpoints,
+  type Credentials,
+  type ProviderSelection,
+  providerOf,
+} from "@zitadel/config/idp";
 
-import type { FrameworkFacts } from "../../../lib/orca";
+import type { Asker } from "../../../lib/input";
+import type { FrameworkChoice } from "../../../lib/orca";
+import type { SuggestedCommand } from "../../../lib/suggestion";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -14,29 +22,55 @@ import type { FrameworkFacts } from "../../../lib/orca";
  * value, otherwise prompt and write).
  */
 /**
- * A social provider chosen during setup, with the credentials of the OAuth
- * application the developer registered for it.
+ * A social provider chosen during setup, with whatever of its application's
+ * credentials is known so far.
  *
- * Both credentials are required. Choosing a provider and then withholding one
- * scaffolds a sign-in button that cannot work: the connection document stores
- * `${{ NAME }}` references, and the engine resolves them from the project's
- * variables, so a missing value fails at the provider with `invalid_client`
- * long after setup reported success. Declining the provider is the answer for
- * "not now" — `sso enable` adds it once the OAuth application exists.
- *
- * Neither value is ever written to a `.zitadel/` file.
+ * Flags seed a draft and the wizard completes it, so until then either
+ * credential may be missing. {@link SsoAnswer} is a draft that has both, and
+ * everything that publishes a credential takes that type: choosing a provider
+ * and then withholding one scaffolds a sign-in button that cannot work, and it
+ * should not be possible to write the code that lets it happen.
  */
-export type SsoAnswer = {
-  readonly provider: string;
-  readonly clientId: string;
-  readonly secret: string;
+export type SsoDraft = {
+  readonly selection: ProviderSelection;
+  readonly credentials: Partial<Credentials>;
   /**
    * Where the connection points, when not at the vendor. Asked for only on a
-   * development build, whose one job is standing the provider up locally —
-   * see {@link import("./social-sign-in").SocialSignInPrompt}.
+   * development run (ZITADEL_CLI_DEV), whose one job is standing the provider
+   * up locally — see {@link import("./social-sign-in").SocialSignInPrompt}.
    */
   readonly endpoints?: ConnectionEndpoints;
 };
+
+/**
+ * A provider with both credentials. Both are required: the connection document
+ * stores `${{ NAME }}` references, and the engine resolves them from the
+ * project's variables, so a missing value fails at the provider with
+ * `invalid_client` long after setup reported success. Declining the provider is
+ * the answer for "not now" — `auth-method sso enable` adds it once the OAuth
+ * application exists.
+ *
+ * Neither value is ever written to a `.zitadel/` file.
+ */
+export type SsoAnswer = SsoDraft & { readonly credentials: Credentials };
+
+/**
+ * The drafts as answers, for a run that goes on to publish credentials.
+ *
+ * The wizard asks for whatever a flag left out, and a scripted run refuses
+ * before this point without the client id or the secret on stdin, so a draft
+ * that reaches here without one is a bug in setup and not something to ask
+ * the developer about.
+ */
+export function completeSso(drafts: readonly SsoDraft[]): SsoAnswer[] {
+  return drafts.map((draft) => {
+    const { clientId, secret } = draft.credentials;
+    if (clientId === undefined || secret === undefined) {
+      throw new Error(`no credentials were collected for ${providerOf(draft.selection).slug}`);
+    }
+    return { ...draft, credentials: { clientId, secret } };
+  });
+}
 
 export type SetupAnswers = {
   server: string;
@@ -48,25 +82,62 @@ export type SetupAnswers = {
   /**
    * Social providers to enable while scaffolding, empty for email sign-in
    * only. Chosen by {@link import("./social-sign-in").SocialSignInPrompt};
-   * `sso enable` adds one to an existing Project later, so this is never the
-   * only way in.
+   * `auth-method sso enable` adds one to an existing Project later, so this is
+   * never the only way in.
    *
    * A list because a project may offer several at once, and the schema and
    * flow already carry `sso_providers` as a list of slugs — one answer per
    * provider, each with its own credentials.
    */
-  sso: readonly SsoAnswer[];
+  sso: readonly SsoDraft[];
+  /**
+   * The minimum password length to put into the password policy setup
+   * writes: a number, `null` for an explicit "none", or `undefined` when none
+   * was given, which writes the recommended minimum (`passwordPolicyFile`).
+   * Chosen by {@link import("./password-policy").PasswordPolicyPrompt} or
+   * `--password-min-length`.
+   */
+  passwordMinLength?: PasswordMinLength;
 };
 
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
-  readonly framework: FrameworkFacts;
+  /**
+   * How a prompt asks its question: `input`, so every question the wizard
+   * asks behaves like every other question the CLI asks.
+   *
+   * Deliberately not the command's `this.input`. That one answers a `confirm`
+   * when the command's `--force` is given, and setup's `--force` means "overwrite
+   * files", so with it a prompt such as "Would you like to set up Zitadel in
+   * this Next.js app?" would be answered yes without asking. This one never is.
+   */
+  readonly input: Asker;
+  /**
+   * The framework of the app setup integrates: its id and the name a question
+   * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
+   * asks, because setup creates it once it has every answer.
+   */
+  readonly framework: FrameworkChoice;
+  /**
+   * A command for this app's project, for a question that names what to run
+   * once setup is done, such as adding a skipped provider. It carries the
+   * selector setup's own recovery commands carry, so it reaches the project
+   * setup creates and not one the shell's environment names.
+   */
+  readonly suggest: (args: string) => SuggestedCommand;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}
    * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it
    * to detect a managed local server started here.
    */
   readonly cwd: string;
+  /**
+   * Whether the developer already named the framework: picked it to scaffold
+   * an empty directory, or passed `--framework`. Then
+   * {@link import("./framework-confirm").FrameworkConfirmPrompt} has nothing
+   * left to confirm and skips itself.
+   */
+  readonly frameworkChosen?: boolean;
   /**
    * The raw `--server` flag value as the user passed it, or `undefined`
    * when not provided. Prompts use this to skip themselves when the flag
@@ -106,8 +177,14 @@ export type PromptContext = {
    */
   readonly ssoFromFlag?: boolean;
   /**
-   * Whether this CLI was built from source rather than released. Only a
-   * development build asks where a provider's endpoints are — see
+   * Whether `--password-min-length` was passed explicitly. When set, the flag
+   * is authoritative and {@link import("./password-policy").PasswordPolicyPrompt}
+   * skips itself.
+   */
+  readonly passwordMinLengthFromFlag?: boolean;
+  /**
+   * Whether this is a development run (the ZITADEL_CLI_DEV opt-in). Only a
+   * development run asks where a provider's endpoints are — see
    * {@link import("./social-sign-in").SocialSignInPrompt}. Passed in rather
    * than read from the bundle so a test can drive both answers.
    */

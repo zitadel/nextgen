@@ -1,25 +1,28 @@
 # Constraints
 
-A login form has to render "at least 15 characters" *before* anyone types,
+A login form has to render "at least 12 characters" *before* anyone types,
 which means part of the policy has to reach an unauthenticated client.
 Alongside `evaluate`, every policy therefore answers a second query,
-`constraints`: computed from the template and the instance's config
-alone, with no request context, so it resolves before the user has typed
-anything.
+`constraints`: computed from the instance's settings alone, with no request
+context, so it resolves before the user has typed anything.
 
-`policy.Engine.Constraints` returns the rule list with, for each rule, the
-`public` settings it reads:
+`policy.Bound.Constraints` returns every active rule keyed by name with the
+value of its setting:
 
 ```json
 {
-  "operation": "user.password.save",
-  "rules": {
-    "min_length": { "min_length": 15 },
-    "max_length": { "max_length": 64 },
-    "history":    { "history_depth": 4 }
-  }
+  "operation": "auth.factor.password.set",
+  "rules": { "min_length": 12, "max_length": 32, "history_depth": 4 }
 }
 ```
+
+With no instance, or an empty `config`, `rules` is empty: nothing is
+enforced, so nothing is announced.
+
+The shape is the one the flow field's `validation` object already uses
+(`{ "min_length": 12, "max_length": 32 }`, an absent key meaning no rule),
+and a denial's `violations` uses it too. A client renders the hint before
+submit and the error after it from the same keys.
 
 ## The invariant
 
@@ -30,12 +33,15 @@ unreachable from login themes
 ([keycloak#32553](https://github.com/keycloak/keycloak/issues/32553)).
 
 With a rule list the invariant holds by construction: `constraints` is the
-list of rule names, each with the `public` settings it reads. A rule is in
-`constraints` because it exists, not because a conformance suite proved it.
-Which settings a rule reads is known statically from its checked expression,
-so nothing is authored twice. The invariant is about rules being
-discoverable, not values being public: a user learns that a blocklist check
-exists; they cannot download the blocklist.
+set of active rules, each with its setting, and a rule is active in both
+queries under the same condition. Which setting a rule reads is known
+statically from its checked expression, so nothing is authored twice.
+
+Every rule today is a requirement the caller fixes by changing the input, so
+every rule and its setting are disclosed. A rule that must stay hidden (a
+lockout threshold an attacker would budget against) is not a requirement in
+that sense; the first one brings a disclosure marker, required on every rule,
+and drops out of both `constraints` and the denial detail.
 
 Client-side validation is UX, never enforcement. The server re-checks
 everything: the flow engine's payload validation and the policy gate are the
@@ -47,19 +53,25 @@ For flows, the flow engine embeds constraints in the step it already sends;
 no new endpoint, and the client contract does not change:
 
 ```json
-{ "type": "string", "minLength": 15, "maxLength": 64 }
+{ "min_length": 12, "max_length": 32 }
 ```
 
-`service.PasswordPolicy.FieldValidation` projects the constraints onto
-`domain.FlowFieldValidation`, and the flow state machine reads it with the
-flow's project id (`FlowStateMachineRuntime.WithPasswordSaveRules`, wired in
-`cmd/server/server.go`) for every step where the password is saved, so the
-`x-auth-methods#password` field carries the project's `minLength` and
-`maxLength`. Where the password is verified instead (a login), the field
-carries no length rules: a stored password that predates a stricter policy
-must still sign in. The field validator re-checks the rules server-side on
-submit (`SchemaFieldResolver.Validate`) before the domain operation and the
-full policy evaluation run.
+On every step where the password is saved (registration, a reset), the
+`x-auth-methods#password` field's `validation` carries the project's
+`min_length`, and `max_length` as the lower of the policy's value and the
+domain cap of 64, so a form knows the cap even when no policy is set. Where
+the password is verified instead (a login), the field carries no length
+rules: a stored password that predates a stricter policy must still sign in.
+The field validator re-checks the rules on submit, counting the NFC-normalized
+candidate in code points, before the domain operation and the full policy
+evaluation run, so a candidate below the minimum is refused on the step that
+collects it. The flow engine reads the bounds through `domain.FlowPasswordPolicy`
+(`service.PasswordPolicy.PasswordLengthBounds`) when it resolves a step's
+fields, at render and at submit. Whether the user chooses the password there
+is the `chooses` field of the purpose's entry in `passwordPurposes` (register
+and recovery choose, sign-in does not); the autocomplete token beside it only
+tells a password manager what the form asks for. What the bounds disclose is
+in [ADR 066](../../adrs/066-operation-policies.md#what-a-step-discloses).
 
 ## The read endpoint (not built yet)
 
@@ -69,30 +81,25 @@ projection needs a read endpoint, unauthenticated because the login form is
 pre-auth.
 
 ```http
-GET /policies/user.password.save/constraints
+GET /policies/auth.factor.password.set/constraints
 ```
 ```json
 {
-  "operation": "user.password.save",
+  "operation": "auth.factor.password.set",
   "release": "rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
-  "rules": {
-    "min_length": { "min_length": 15 },
-    "max_length": { "max_length": 64 },
-    "history":    { "history_depth": 4 }
-  }
+  "rules": { "min_length": 12, "max_length": 32, "history_depth": 4 }
 }
 ```
 
 Four properties of that endpoint are load-bearing:
 
 - The path names the projection, not the document.
-  `GET /policies/{operation}` would imply the instance itself, and that
-  includes private settings. Returning `constraints` under its own path makes
-  it structurally impossible to serve the private half by accident.
-- It never 404s for a catalogued operation. With no instance authored the
-  template defaults apply, so the endpoint still answers. A 404 means the
-  operation is not in the catalogue: a client bug, not an unconfigured
-  project.
+  `GET /policies/{operation}` would imply the instance itself. Returning
+  `constraints` under its own path keeps the two apart, which matters once a
+  hidden rule exists.
+- It never 404s for a catalogued operation. With no instance it answers with
+  empty `rules`. A 404 means the operation is not in the catalogue: a client
+  bug, not an unconfigured project.
 - It is cacheable on the release. Constraints change only when a release
   is deployed, so the response carries its `release` id and that id is the
   `ETag`. This waits for release-pinned resolution; today the newest stored

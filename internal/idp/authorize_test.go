@@ -14,7 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-const redirectURI = "https://app.example.test/__nextgen/idp/callback"
+const redirectURI = "https://app.example.test/__nextgen/idp/google/callback"
 
 func TestNewAuthorizeRedirect(t *testing.T) {
 	// Every endpoint is overridden, so construction makes no request; the

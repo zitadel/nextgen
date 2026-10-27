@@ -90,8 +90,8 @@ The most common workflow looks like this:
 1.  Update your schema.
 2.  If you've added, removed or renamed fields, update the corresponding
     login flow in `.zitadel/flows/`.
-3.  Run `zitadel plan` to preview the changes.
-4.  Run `zitadel apply` to publish them.
+3.  Run `zitadel deploy --dry-run` to preview the changes.
+4.  Run `zitadel deploy` to publish them.
 
 ## Why do I need to update the login flow?
 
@@ -122,6 +122,15 @@ Finally, update the login flow if users should be able to enter it.
 ## Make a field optional
 
 Remove it from `required`.
+
+## Show a user's name
+
+List the properties a user's name is made of in `x-display`, in order:
+`"x-display": ["givenName", "familyName"]`. Your app reads the result as the
+session's display name; without it, it has only the user's email. Users keep
+the schema revision they signed up under, so the name shows for those who
+sign up after you deploy it. The `consumer` and `business` use cases set it
+for you.
 
 ## Enable passkeys
 

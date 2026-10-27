@@ -27,6 +27,7 @@ type CheckPrTitleModule = {
 };
 
 const load = async (): Promise<CheckPrTitleModule> =>
+  // @ts-expect-error -- the script is a plain .mjs with no declaration file
   (await import("../../../../../scripts/check-pr-title.mjs")) as unknown as CheckPrTitleModule;
 
 const config = {
@@ -93,9 +94,8 @@ describe("isNonShippingFile", () => {
     // Scaffolded into a customer's project, so it is product, not repo docs.
     "packages/config/defaults/README-schemas.md",
     "apps/cli/src/lib/orca/patchers/rule/next/README.md",
-    // The console and login UI ship inside the server container.
+    // The console ships inside the server container.
     "apps/console/src/routes/users.tsx",
-    "apps/login-ui/src/app.ts",
     // On the release train since #692 — customers install it from npm.
     "packages/testing/src/passkey.ts",
   ])("treats %s as shipping", async (file) => {
@@ -114,7 +114,7 @@ describe("isNonShippingFile", () => {
     ".nvmrc",
     "apps/console/AGENTS.md",
     "apps/console/docs/styling.md",
-    "apps/console-e2e/tests/users.spec.ts",
+    "e2e/console/tests/users.spec.ts",
     "apps/demo-next/next-env.d.ts",
     "apps/storybook/main.ts",
     "packages/api-mock/src/handlers.ts",
@@ -143,7 +143,7 @@ describe("checkPrTitle", () => {
       title: "feat: extend the api-mock flow fixtures",
       files: [
         "packages/api-mock/src/handlers.ts",
-        "apps/console-e2e/playwright.real.config.mts",
+        "e2e/console/playwright.real.config.mts",
         "apps/demo-next/next-env.d.ts",
       ],
       config,
@@ -161,7 +161,7 @@ describe("checkPrTitle", () => {
       files: [
         "packages/testing/src/passkey.ts",
         "packages/testing/tests/unit/passkey.test.ts",
-        "apps/demo-next-e2e/src-real/passkey.spec.ts",
+        "e2e/demo-next/src-real/passkey.spec.ts",
       ],
       config,
     });
@@ -322,7 +322,7 @@ describe("checkPrTitle", () => {
 
 describe("suggestType", () => {
   it.each([
-    [["packages/api-mock/src/x.ts", "apps/console-e2e/a.spec.ts"], "test"],
+    [["packages/api-mock/src/x.ts", "e2e/console/a.spec.ts"], "test"],
     [[".github/workflows/ci.yml"], "ci"],
     [["docs/adrs/030.md", "AGENTS.md"], "docs"],
     [["packages/design-tokens/scripts/build.ts", ".github/workflows/sync.yml"], "build"],

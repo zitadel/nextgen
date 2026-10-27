@@ -1,0 +1,123 @@
+post:
+  operationId: rollbackDeployment
+  x-zitadel-cli: deployment rollback
+  summary: Roll back to a deployment
+  description: |
+    Re-deploys the release of the deployment named in the path to `primary`,
+    with the variable values it froze: a new deployment with `reason:
+    rollback` and `rollback_to` naming it. Like any deployment to `primary`,
+    it covers every current primary origin. Idempotent like a deployment to
+    `primary`: when nothing would change it answers `200` with the newest
+    primary deployment.
+
+    Failures:
+    - `400 dep.invalid`: the deployment went to preview URLs (deploy to the
+      preview again instead), or the project has no primary origin.
+    - `404 dep.not_found`: no deployment of the project has that id.
+    - `409 dep.conflict`: `expected_deployment_id` is not the project's
+      newest primary deployment; `details.deployment` is that deployment.
+    - `409 rel.revoked`: the release is revoked.
+  tags:
+    - Deployments
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/deployment-id.yaml
+  security:
+    - oauth2:
+        - deployment.write
+    - nextgenSession: []
+  requestBody:
+    required: false
+    content:
+      application/json:
+        schema:
+          $ref: rollback-deployment-request.yaml
+        examples:
+          rollback:
+            summary: Roll back with a message
+            value:
+              message: phone_number broke sign-up
+  responses:
+    '200':
+      description: |
+        Nothing changed. The body is the newest primary deployment, with its
+        own `reason`, `message` and `deployed_at`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment.yaml
+    '201':
+      description: |
+        The rollback deployment was created and every primary origin serves
+        the release again.
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment.yaml
+          examples:
+            rolledBack:
+              summary: Rolled back to an earlier deployment
+              value:
+                id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                kind: primary
+                targets:
+                  - origin: https://app.acme.com
+                  - origin: https://www.acme.com
+                status: live
+                deployed_at: '2026-10-02T15:03:00Z'
+                metadata:
+                  reason: rollback
+                  message: phone_number broke sign-up
+                  rollback_to: dep_01KX4SB9C8E1F0N9WD3P2E4YM5
+                  deployed_by: user_01KWH3B72K7M7F0N9WD3P2E4YM
+                  deployed_by_type: human
+    '400':
+      description: '`dep.invalid`, as the operation lists.'
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+          examples:
+            preview:
+              summary: The deployment targeted preview URLs
+              value:
+                code: dep.invalid
+                message: a deployment to preview URLs cannot be rolled back
+    '409':
+      description: '`dep.conflict` (guard mismatch) or `rel.revoked`.'
+      content:
+        application/json:
+          schema:
+            $ref: ../../deployment-conflict.yaml
+          examples:
+            conflict:
+              summary: Another deployment is the newest primary one
+              value:
+                code: dep.conflict
+                message: 'deployment: the deployment it replaces does not match expected_deployment_id'
+                details:
+                  deployment:
+                    id: dep_01KX6P8D0E3F7F0N9WD3P2E4YM7
+                    project_id: proj_01KWH1P4MYS7F0N9WD3P2E4YM5
+                    release_id: rel_01KX2QF7Z6D0F0N9WD3P2E4YM40
+                    kind: primary
+                    targets:
+                      - origin: https://app.acme.com
+                      - origin: https://www.acme.com
+                    status: live
+                    deployed_at: '2026-10-02T15:03:00Z'
+                    metadata:
+                      reason: deploy
+                      message: soften the sign-in page contrast
+                      rollback_to: null
+                      deployed_by: null
+                      deployed_by_type: null
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'release: revoked'
+    default:
+      $ref: rollbackDeployment-error-response.yaml

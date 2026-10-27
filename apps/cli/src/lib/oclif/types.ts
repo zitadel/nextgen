@@ -1,3 +1,6 @@
+import type { SuggestedCommand } from "../suggestion";
+import type { BaseCommand } from "./base";
+
 /**
  * Fields present on every JSON envelope regardless of status. Agents key off
  * these to correlate output with the CLI version, the command that ran, and the
@@ -29,6 +32,8 @@ export type SkippedEnvelope = EnvelopeMeta & {
   reason: string;
   data?: unknown;
   next_commands?: string[];
+  /** Warnings reported before the command stopped; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
@@ -43,6 +48,8 @@ export type ErrorEnvelope = EnvelopeMeta & {
   hint?: string;
   next_commands?: string[];
   details?: unknown;
+  /** Warnings reported before the command failed; present only when there are any. */
+  warnings?: string[];
 };
 
 /**
@@ -74,9 +81,23 @@ export type GlobalOptions = {
 };
 
 /**
+ * An environment variable that sets what a global flag sets. The code that
+ * reads it declares it and reads it by `name`, and the CLI reference lists it
+ * beside the flag (`FLAG_VARIABLES` in `./base`).
+ */
+export type FlagVariable = {
+  readonly name: string;
+  /** The global flag it stands in for, without `--`. */
+  readonly flag: keyof (typeof BaseCommand)["baseFlags"];
+  readonly description: string;
+  /** How it ranks against the flag and the other sources of the setting. */
+  readonly precedence: string;
+};
+
+/**
  * What a command body returns to {@link import("./base").BaseCommand.emit}: a
  * success or a deliberate skip. The optional `pretty` string lets a command
- * supply a bespoke human rendering (e.g. the `apply` plan diff); otherwise the
+ * supply a bespoke human rendering (e.g. `deploy`'s summary); otherwise the
  * generic renderer formats `data`. Failures are thrown as `ZitadelError`,
  * never returned.
  */
@@ -86,11 +107,13 @@ export type CommandResult =
       readonly data: unknown;
       readonly warnings?: ReadonlyArray<string>;
       readonly pretty?: string;
+      /** Printed in human mode after everything else, and never part of the envelope. */
+      readonly footer?: string;
     }
   | {
       readonly status: "skipped";
       readonly reason: string;
       readonly data?: unknown;
-      readonly nextCommands?: ReadonlyArray<string>;
+      readonly nextCommands?: ReadonlyArray<SuggestedCommand>;
       readonly pretty?: string;
     };

@@ -4,7 +4,6 @@ package stmttest
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -18,416 +17,462 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/deployment"
 )
 
-func ensureDeploymentProject(t *testing.T, stmts service.AllStatements) string {
-	t.Helper()
-	projectID := "proj-dep-" + uniqueSuffix(t)
-	require.NoError(t, stmts.CreateProject(t.Context(), newTestProject(projectID)))
-	t.Cleanup(func() { _, _ = stmts.DeleteProjectByID(context.Background(), projectID) })
-	return projectID
+const (
+	appOrigin = "https://app.acme.com"
+	wwwOrigin = "https://www.acme.com"
+	gitOrigin = "https://acme-git-sso-acmeinc.vercel.app"
+	shaOrigin = "https://acme-k3x9v2-acmeinc.vercel.app"
+)
+
+type deployArgs struct {
+	kind     domain.DeploymentOriginKind
+	metadata domain.DeploymentMetadata
+	ttl      time.Duration
 }
 
-func createDeployment(t *testing.T, stmts service.AllStatements, entity *domain.Deployment, expected *string) *domain.Deployment {
+func previewDeploy(ttl time.Duration) deployArgs {
+	return deployArgs{kind: domain.DeploymentOriginKindPreview, ttl: ttl}
+}
+
+// deploy writes a deployment the way the service does: against what its
+// origins serve, renewing previews for a preview deploy.
+func deploy(t *testing.T, stmts service.AllStatements, projectID, releaseID string, origins []string, args deployArgs) *domain.Deployment {
 	t.Helper()
-	created, err := stmts.CreateDeployment(t.Context(), entity, expected)
+	entity, err := tryDeploy(t, stmts, projectID, releaseID, origins, args)
 	require.NoError(t, err)
-	require.True(t, created, "expected a new deployment, got the idempotent answer %s", entity.ID)
 	return entity
 }
 
-func mustNewDeployment(t *testing.T, projectID, environmentID, releaseID string, reason domain.DeploymentReason, source *string) *domain.Deployment {
+func tryDeploy(t *testing.T, stmts service.AllStatements, projectID, releaseID string, origins []string, args deployArgs) (*domain.Deployment, error) {
 	t.Helper()
-	entity, err := domain.NewDeployment(projectID, environmentID, releaseID, domain.DeploymentMetadata{
-		Reason:              reason,
-		SourceEnvironmentID: source,
-	})
+	entity, err := domain.NewDeployment(projectID, releaseID, args.kind, origins, args.metadata)
 	require.NoError(t, err)
-	return entity
+	serving, err := stmts.GetNewestPerOrigin(t.Context(), projectID, entity.Origins())
+	require.NoError(t, err)
+	if err := stmts.CreateDeployment(t.Context(), entity, serving); err != nil {
+		return entity, err
+	}
+	if args.kind == domain.DeploymentOriginKindPreview {
+		require.NoError(t, stmts.UpsertPreviews(t.Context(), projectID, entity.Origins(), entity.DeployedAt.Add(args.ttl), entity.DeployedAt))
+	}
+	return entity, nil
 }
 
-func TestDeploymentStatements_CreateAndGetByID(t *testing.T) {
+func history(t *testing.T, stmts service.AllStatements, projectID, origin string) []*domain.Deployment {
+	t.Helper()
+	result, err := stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &origin, 50))
+	require.NoError(t, err)
+	return result.Items
+}
+
+func live(t *testing.T, stmts service.AllStatements, projectID string, now time.Time, releaseID *string) []*domain.Deployment {
+	t.Helper()
+	result, err := stmts.ListLiveDeployments(unfilteredListCtx(t), now, deployment.LiveListOptions(projectID, releaseID, 50))
+	require.NoError(t, err)
+	return result.Items
+}
+
+// One deployment over several origins is one operation: one id, one
+// deployed_at, every origin, and each origin now serves it.
+func TestDeploymentStatements_FanOutIsOneOperation(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
+		projectID := ensureReleaseProject(t, d.stmts)
 		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 
-		entity := mustNewDeployment(t, projectID, env.ID, rel.ID, domain.DeploymentReasonDeploy, nil)
-		entity.Metadata.Message = new("hotfix for the login outage")
-		entity.Metadata.DeployedBy = new("user_1")
-		entity.Metadata.DeployedByType = new(domain.EventActorTypeHuman)
-		createDeployment(t, d.stmts, entity, nil)
+		dep := deploy(t, d.stmts, projectID, rel.ID, []string{wwwOrigin, appOrigin}, deployArgs{
+			metadata: domain.DeploymentMetadata{
+				Message:        new("add phone_number"),
+				DeployedBy:     new("user_1"),
+				DeployedByType: new(domain.EventActorTypeHuman),
+			},
+		})
+		assert.True(t, domain.PrefixDeployment.Matches(dep.ID), "id %q is not dep_-prefixed", dep.ID)
+		assert.WithinDuration(t, time.Now(), dep.DeployedAt, 5*time.Second)
 
-		// The id is minted by the dialect, not the caller (ADR 047).
-		assert.True(t, domain.PrefixDeployment.Matches(entity.ID), "id %q is not dep_-prefixed", entity.ID)
-		assert.False(t, entity.DeployedAt.IsZero())
-		assert.WithinDuration(t, time.Now(), entity.DeployedAt, 5*time.Second)
-
-		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindDeployment, projectID, entity.ID)
+		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, dep.ID)
 		require.NoError(t, err)
-		assert.Equal(t, domain.ResourceKindDeployment, scope.ResourceKind)
-		assert.Nil(t, scope.TeamID)
-
-		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, entity.ID)
-		require.NoError(t, err)
-		assert.Equal(t, entity.ProjectID, got.ProjectID)
-		assert.Equal(t, entity.ID, got.ID)
-		assert.Equal(t, env.ID, got.EnvironmentID)
 		assert.Equal(t, rel.ID, got.ReleaseID)
-		assert.Equal(t, domain.DeploymentReasonDeploy, got.Metadata.Reason)
-		assert.Nil(t, got.Metadata.SourceEnvironmentID)
-		assert.Equal(t, "hotfix for the login outage", *got.Metadata.Message)
+		assert.Equal(t, domain.DeploymentOriginKindPrimary, got.OriginKind)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got.Origins())
+		assert.True(t, dep.DeployedAt.Equal(got.DeployedAt))
+		assert.Equal(t, "add phone_number", *got.Metadata.Message)
+		assert.Nil(t, got.Metadata.RollbackTo)
 		assert.Equal(t, "user_1", *got.Metadata.DeployedBy)
 		assert.Equal(t, domain.EventActorTypeHuman, *got.Metadata.DeployedByType)
-		assert.Equal(t, entity.DeployedAt, got.DeployedAt)
 
-		// The create swapped the environment's pointer in the same
-		// transaction.
-		gotEnv, err := d.stmts.GetEnvironmentByName(t.Context(), projectID, "prod")
+		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{appOrigin, wwwOrigin})
 		require.NoError(t, err)
-		require.NotNil(t, gotEnv.CurrentDeploymentID)
-		assert.Equal(t, entity.ID, *gotEnv.CurrentDeploymentID)
-	})
-}
-
-// A deployment with no user identity behind it — a project secret used from
-// CI — carries nil actor fields, which has to survive the round trip rather
-// than coming back as empty strings.
-func TestDeploymentStatements_NilActorRoundTrips(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-
-		entity := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, rel.ID, domain.DeploymentReasonDeploy, nil), nil)
-
-		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, entity.ID)
-		require.NoError(t, err)
-		assert.Nil(t, got.Metadata.DeployedBy)
-		assert.Nil(t, got.Metadata.DeployedByType)
-		assert.Nil(t, got.Metadata.SourceEnvironmentID)
-		assert.Nil(t, got.Metadata.Message)
-	})
-}
-
-func TestDeploymentStatements_SecondCreateReplacesCurrent(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
-
-		first := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
-		second := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relB.ID, domain.DeploymentReasonDeploy, nil), nil)
-
-		gotEnv, err := d.stmts.GetEnvironmentByName(t.Context(), projectID, "prod")
-		require.NoError(t, err)
-		require.NotNil(t, gotEnv.CurrentDeploymentID)
-		assert.Equal(t, second.ID, *gotEnv.CurrentDeploymentID)
-
-		// Both rows exist: the log is append-only, replacement is only the
-		// pointer moving.
-		for _, id := range []string{first.ID, second.ID} {
-			_, err := d.stmts.GetDeploymentByID(t.Context(), projectID, id)
-			assert.NoError(t, err)
+		require.Len(t, serving, 2)
+		for _, s := range serving {
+			assert.Equal(t, dep.ID, s.DeploymentID)
+			assert.Equal(t, rel.ID, s.ReleaseID)
+			assert.True(t, dep.DeployedAt.Equal(s.DeployedAt))
 		}
-	})
-}
 
-// A promotion records where the release came from, as it stood at deployment
-// time.
-func TestDeploymentStatements_PromoteRecordsSource(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		dev := createEnvironment(t, d.stmts, projectID, "dev")
-		prod := createEnvironment(t, d.stmts, projectID, "prod")
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-
-		promotion := mustNewDeployment(t, projectID, prod.ID, rel.ID, domain.DeploymentReasonPromote, &dev.ID)
-		promotion.Metadata.SourceEnvironmentName = &dev.Name
-		entity := createDeployment(t, d.stmts, promotion, nil)
-
-		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, entity.ID)
+		scope, err := d.stmts.GetResourceScopeInProject(t.Context(), domain.ResourceKindDeployment, projectID, dep.ID)
 		require.NoError(t, err)
-		assert.Equal(t, domain.DeploymentReasonPromote, got.Metadata.Reason)
-		require.NotNil(t, got.Metadata.SourceEnvironmentID)
-		assert.Equal(t, dev.ID, *got.Metadata.SourceEnvironmentID)
-		require.NotNil(t, got.Metadata.SourceEnvironmentName)
-		assert.Equal(t, dev.Name, *got.Metadata.SourceEnvironmentName)
+		assert.Equal(t, projectID, scope.ProjectID)
 	})
 }
 
-func TestDeploymentStatements_ExpectedCurrentGuard(t *testing.T) {
+func TestDeploymentStatements_FreshProject(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
+		projectID := ensureReleaseProject(t, d.stmts)
 
-		// Expecting a deployment while the environment has none is a
-		// mismatch with empty details: nothing runs there.
-		_, err := d.stmts.CreateDeployment(t.Context(),
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil),
-			new("dep_not_current"))
-		de, ok := errors.AsType[domain.Error](err)
-		require.True(t, ok, "expected a domain error, got %v", err)
-		assert.Equal(t, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code, de.Code)
-		assert.Equal(t, domain.DeploymentConflictDetails{}, de.Details)
-
-		first := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
-
-		// A matching expectation passes.
-		second := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relB.ID, domain.DeploymentReasonDeploy, nil), &first.ID)
-
-		// A stale expectation fails and reports what actually runs, and the
-		// failed attempt writes nothing.
-		_, err = d.stmts.CreateDeployment(t.Context(),
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonRollback, nil),
-			&first.ID)
-		de, ok = errors.AsType[domain.Error](err)
-		require.True(t, ok, "expected a domain error, got %v", err)
-		assert.Equal(t, domain.DeploymentConflictDetails{
-			CurrentDeploymentID: second.ID,
-			CurrentReleaseID:    relB.ID,
-		}, de.Details)
-
-		gotEnv, err := d.stmts.GetEnvironmentByName(t.Context(), projectID, "prod")
+		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{appOrigin})
 		require.NoError(t, err)
-		assert.Equal(t, second.ID, *gotEnv.CurrentDeploymentID)
+		assert.Empty(t, serving)
+		assert.Empty(t, live(t, d.stmts, projectID, time.Now(), nil))
+		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
 	})
 }
 
-func TestDeploymentStatements_UnknownEnvironmentIsNoRowFound(t *testing.T) {
+// NewestOfKindOptions finds the project's newest primary deployment past a
+// newer preview one.
+func TestDeploymentStatements_NewestOfKind(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
+		projectID := ensureReleaseProject(t, d.stmts)
 		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		newestPrimary := func() *domain.Deployment {
+			t.Helper()
+			result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
+			require.NoError(t, err)
+			if len(result.Items) == 0 {
+				return nil
+			}
+			require.Len(t, result.Items, 1)
+			return result.Items[0]
+		}
 
-		_, err := d.stmts.CreateDeployment(t.Context(),
-			mustNewDeployment(t, projectID, "env_does_not_exist", rel.ID, domain.DeploymentReasonDeploy, nil), nil)
+		assert.Nil(t, newestPrimary())
+		first := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		assert.Equal(t, first.ID, newestPrimary().ID)
+
+		second := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		assert.Equal(t, second.ID, newestPrimary().ID)
+	})
+}
+
+// GetNewestPerOrigin answers per origin, for the named origins of the project only.
+func TestDeploymentStatements_NewestPerOrigin(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		otherProject := ensureReleaseProject(t, d.stmts)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+		otherRel := createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
+
+		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin}, previewDeploy(time.Hour))
+		deploy(t, d.stmts, otherProject, otherRel.ID, []string{wwwOrigin}, deployArgs{})
+
+		serving, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{appOrigin, wwwOrigin, gitOrigin, shaOrigin})
+		require.NoError(t, err)
+		byOrigin := map[string]domain.OriginDeployment{}
+		for _, s := range serving {
+			byOrigin[s.Origin] = s
+		}
+		require.Len(t, byOrigin, 3, "an origin with nothing deployed has no row")
+		assert.Equal(t, appOnly.ID, byOrigin[appOrigin].DeploymentID)
+		assert.Equal(t, relB.ID, byOrigin[appOrigin].ReleaseID)
+		assert.Equal(t, domain.DeploymentOriginKindPrimary, byOrigin[appOrigin].Kind)
+		assert.Equal(t, both.ID, byOrigin[wwwOrigin].DeploymentID)
+		assert.Equal(t, domain.DeploymentOriginKindPreview, byOrigin[gitOrigin].Kind)
+	})
+}
+
+// A rollback appends: the earlier deployments stay as they were.
+func TestDeploymentStatements_RollbackAppends(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		relOld := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relNew := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+		origins := []string{appOrigin, wwwOrigin}
+
+		first := deploy(t, d.stmts, projectID, relOld.ID, origins, deployArgs{})
+		second := deploy(t, d.stmts, projectID, relNew.ID, origins, deployArgs{})
+		rollback := deploy(t, d.stmts, projectID, relOld.ID, origins, deployArgs{
+			metadata: domain.DeploymentMetadata{
+				Reason:     domain.DeploymentReasonRollback,
+				Message:    new("phone_number broke sign-up"),
+				RollbackTo: new(first.ID),
+			},
+		})
+
+		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, rollback.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.DeploymentReasonRollback, got.Metadata.Reason)
+		assert.Equal(t, first.ID, *got.Metadata.RollbackTo)
+
+		unchanged, err := d.stmts.GetDeploymentByID(t.Context(), projectID, first.ID)
+		require.NoError(t, err)
+		assert.True(t, first.DeployedAt.Equal(unchanged.DeployedAt))
+
+		assert.Equal(t, []string{rollback.ID, second.ID, first.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, appOrigin)))
+	})
+}
+
+// The optimistic lock: deploys that insert against the same read all take
+// the same seq, so exactly one writes and the others fail with a UniqueError,
+// leaving no partial rows.
+func TestDeploymentStatements_OptimisticLockAdmitsOneDeploy(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		base := createRelease(t, d.stmts, projectID, "base", domain.ReleaseMetadata{})
+		deploy(t, d.stmts, projectID, base.ID, []string{appOrigin}, deployArgs{})
+		read, err := d.stmts.GetNewestPerOrigin(t.Context(), projectID, []string{appOrigin})
+		require.NoError(t, err)
+
+		const racers = 4
+		releases := make([]*domain.Release, racers)
+		for i := range racers {
+			releases[i] = createRelease(t, d.stmts, projectID, string(rune('a'+i)), domain.ReleaseMetadata{})
+		}
+		errs := make([]error, racers)
+		var wg sync.WaitGroup
+		for i := range racers {
+			wg.Go(func() {
+				// wwwOrigin is new to every racer, appOrigin is contended:
+				// a loser must not leave its www row behind.
+				entity, err := domain.NewDeployment(projectID, releases[i].ID, domain.DeploymentOriginKindPrimary, []string{appOrigin, wwwOrigin}, domain.DeploymentMetadata{})
+				if err == nil {
+					err = d.stmts.CreateDeployment(context.Background(), entity, read)
+				}
+				errs[i] = err
+			})
+		}
+		wg.Wait()
+
+		won := 0
+		for _, err := range errs {
+			if err == nil {
+				won++
+				continue
+			}
+			assert.ErrorIs(t, err, new(database.UniqueError))
+		}
+		assert.Equal(t, 1, won)
+		assert.Len(t, history(t, d.stmts, projectID, appOrigin), 2)
+		assert.Len(t, history(t, d.stmts, projectID, wwwOrigin), 1)
+	})
+}
+
+// The live view lists each deployment some origin still serves, narrowed to
+// those origins, and drops a preview URL once its preview has expired.
+func TestDeploymentStatements_LiveView(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin, wwwOrigin)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		primaries := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		previews := deploy(t, d.stmts, projectID, relB.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
+
+		now := time.Now()
+		got := live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got), "newest first")
+		assert.Equal(t, []string{gitOrigin, shaOrigin}, got[0].Origins())
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got[1].Origins())
+		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, now, new(relB.ID))))
+
+		// An origin no longer primary drops out of the primary deployment.
+		_, _, err := d.stmts.DeleteOriginByPattern(t.Context(), projectID, wwwOrigin)
+		require.NoError(t, err)
+		got = live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
+		assert.Equal(t, []string{appOrigin}, got[1].Origins())
+
+		// A URL that became a primary origin is no preview any more.
+		addPrimaryOrigins(t, d.stmts, projectID, gitOrigin)
+		got = live(t, d.stmts, projectID, now, nil)
+		require.Equal(t, []string{previews.ID, primaries.ID}, deployment.DeploymentIDs(got))
+		assert.Equal(t, []string{shaOrigin}, got[0].Origins())
+
+		// Expired previews serve nothing.
+		later := now.Add(2 * time.Hour)
+		assert.Equal(t, []string{primaries.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
+
+		// Only the newest primary deployment serves.
+		newer := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		assert.Equal(t, []string{newer.ID}, deployment.DeploymentIDs(live(t, d.stmts, projectID, later, nil)))
+		assert.Equal(t, []string{previews.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, shaOrigin)))
+	})
+}
+
+// GetLiveDeployment checks the origin and its liveness on the same origin row:
+// app and www serve the newest primary deployment; once it stops covering www,
+// www serves nothing.
+func TestDeploymentStatements_LiveDeploymentOfOneOrigin(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin, wwwOrigin)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		previews := deploy(t, d.stmts, projectID, relA.ID, []string{gitOrigin, shaOrigin}, previewDeploy(time.Hour))
+		now := time.Now()
+
+		got, err := d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, both.ID, got.ID)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got.Origins(), "narrowed to the origins it still serves")
+
+		// The newest primary deployment does not cover www, so www serves nothing.
+		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, appOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, appOnly.ID, got.ID)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, wwwOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, gitOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, previews.ID, got.ID)
+
+		// An expired preview serves nothing, even while its sibling lives.
+		require.NoError(t, d.stmts.UpsertPreviews(t.Context(), projectID, []string{gitOrigin}, now.Add(-time.Minute), previews.DeployedAt))
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, gitOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		got, err = d.stmts.GetLiveDeployment(t.Context(), projectID, shaOrigin, now)
+		require.NoError(t, err)
+		assert.Equal(t, []string{shaOrigin}, got.Origins())
+
+		// A URL that became a primary origin answers by the primary rule.
+		addPrimaryOrigins(t, d.stmts, projectID, shaOrigin)
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, shaOrigin, now)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+
+		_, err = d.stmts.GetLiveDeployment(t.Context(), projectID, "https://nothing.acme.com", now)
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
-func TestDeploymentStatements_UnknownReleaseIsForeignKeyError(t *testing.T) {
+// ServesOrigin keeps the deployment serving the origin even when a newer one
+// that once named it sorts first and serves other origins.
+func TestDeploymentStatements_ListServingOneOrigin(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
+		projectID := ensureReleaseProject(t, d.stmts)
+		addPrimaryOrigins(t, d.stmts, projectID, appOrigin)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
 
-		_, err := d.stmts.CreateDeployment(t.Context(),
-			mustNewDeployment(t, projectID, env.ID, "rel_does_not_exist", domain.DeploymentReasonDeploy, nil), nil)
-		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		primary := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, rel.ID, []string{wwwOrigin, gitOrigin}, previewDeploy(time.Hour))
+		addPrimaryOrigins(t, d.stmts, projectID, wwwOrigin)
+		now := time.Now()
 
-		// The refused insert left the pointer alone.
-		gotEnv, err := d.stmts.GetEnvironmentByName(t.Context(), projectID, "prod")
+		opts := deployment.LiveListOptions(projectID, nil, 1)
+		opts.Filter = database.And(opts.Filter, deployment.ServesOrigin(wwwOrigin, now))
+		result, err := d.stmts.ListLiveDeployments(unfilteredListCtx(t), now, opts)
 		require.NoError(t, err)
-		assert.Nil(t, gotEnv.CurrentDeploymentID)
+		assert.Equal(t, []string{primary.ID}, deployment.DeploymentIDs(result.Items))
+		assert.Empty(t, result.NextCursor)
 	})
 }
 
-func TestDeploymentStatements_GetByIDUnknownIsNoRowFound(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
+// addPrimaryOrigins registers patterns as primary origins of the project.
+func addPrimaryOrigins(t *testing.T, stmts service.AllStatements, projectID string, patterns ...string) {
+	t.Helper()
+	for _, pattern := range patterns {
+		_, err := stmts.InsertOrigin(t.Context(), projectID, domain.Origin{Pattern: pattern, Kind: domain.OriginKindPrimary})
+		require.NoError(t, err)
+	}
+}
 
-		_, err := d.stmts.GetDeploymentByID(t.Context(), projectID, "dep_does_not_exist")
-		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+// An origin no longer deployed to keeps its history.
+func TestDeploymentStatements_HistoryOutlivesTheOrigin(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		relA := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		relB := createRelease(t, d.stmts, projectID, "0002", domain.ReleaseMetadata{})
+
+		both := deploy(t, d.stmts, projectID, relA.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		appOnly := deploy(t, d.stmts, projectID, relB.ID, []string{appOrigin}, deployArgs{})
+
+		assert.Equal(t, []string{both.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, wwwOrigin)))
+		got, err := d.stmts.GetDeploymentByID(t.Context(), projectID, both.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, got.Origins())
+		assert.Equal(t, []string{appOnly.ID, both.ID}, deployment.DeploymentIDs(history(t, d.stmts, projectID, appOrigin)))
+	})
+}
+
+func TestDeploymentStatements_ListIsProjectScopedNewestFirst(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID := ensureReleaseProject(t, d.stmts)
+		otherProject := ensureReleaseProject(t, d.stmts)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		otherRel := createRelease(t, d.stmts, otherProject, "0001", domain.ReleaseMetadata{})
+
+		first := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin}, deployArgs{})
+		second := deploy(t, d.stmts, projectID, rel.ID, []string{wwwOrigin}, deployArgs{})
+		deploy(t, d.stmts, otherProject, otherRel.ID, []string{appOrigin}, deployArgs{})
+
+		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, nil, 50))
+		require.NoError(t, err)
+		assert.Equal(t, []string{second.ID, first.ID}, deployment.DeploymentIDs(result.Items))
+		assert.Equal(t, []string{wwwOrigin}, result.Items[0].Origins())
+
+		assert.Empty(t, history(t, d.stmts, otherProject, wwwOrigin))
 	})
 }
 
 func TestDeploymentStatements_GetByIDs(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		dev := createEnvironment(t, d.stmts, projectID, "dev")
-		prod := createEnvironment(t, d.stmts, projectID, "prod")
+		projectID := ensureReleaseProject(t, d.stmts)
 		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		a := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin, wwwOrigin}, deployArgs{})
+		b := deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 
-		onDev := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, dev.ID, rel.ID, domain.DeploymentReasonDeploy, nil), nil)
-		onProd := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, prod.ID, rel.ID, domain.DeploymentReasonDeploy, nil), nil)
-
-		// Unknown ids are simply absent, not an error: the caller hydrates
-		// whatever pointers it holds.
-		got, err := d.stmts.GetDeploymentsByIDs(t.Context(), projectID,
-			[]string{onDev.ID, onProd.ID, "dep_does_not_exist"})
+		got, err := d.stmts.GetDeploymentsByIDs(t.Context(), projectID, []string{a.ID, b.ID, "dep_does_not_exist"})
 		require.NoError(t, err)
-		gotIDs := make([]string, 0, len(got))
+		byID := map[string]*domain.Deployment{}
 		for _, entity := range got {
-			gotIDs = append(gotIDs, entity.ID)
+			byID[entity.ID] = entity
 		}
-		assert.ElementsMatch(t, []string{onDev.ID, onProd.ID}, gotIDs)
+		require.Len(t, byID, 2)
+		assert.Equal(t, []string{appOrigin, wwwOrigin}, byID[a.ID].Origins())
+		assert.Equal(t, domain.DeploymentOriginKindPreview, byID[b.ID].OriginKind)
 
-		empty, err := d.stmts.GetDeploymentsByIDs(t.Context(), projectID, nil)
-		require.NoError(t, err)
-		assert.Empty(t, empty)
-	})
-}
-
-func TestDeploymentStatements_ListNewestFirst(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		dev := createEnvironment(t, d.stmts, projectID, "dev")
-		prod := createEnvironment(t, d.stmts, projectID, "prod")
-		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
-
-		first := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, prod.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
-		onDev := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, dev.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
-		second := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, prod.ID, relB.ID, domain.DeploymentReasonRollback, nil), nil)
-
-		// Filtered to prod: its history, current first, dev's row absent.
-		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &prod.ID, 10))
-		require.NoError(t, err)
-		require.Len(t, result.Items, 2)
-		assert.Equal(t, second.ID, result.Items[0].ID)
-		assert.Equal(t, first.ID, result.Items[1].ID)
-
-		// Unfiltered: every environment of the project, newest first.
-		result, err = d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, nil, 10))
-		require.NoError(t, err)
-		require.Len(t, result.Items, 3)
-		assert.Equal(t, second.ID, result.Items[0].ID)
-		assert.Equal(t, onDev.ID, result.Items[1].ID)
-		assert.Equal(t, first.ID, result.Items[2].ID)
-	})
-}
-
-// Deleting the project cascades environments, releases and deployments away
-// together. The release FK is CASCADE rather than NO ACTION exactly so this
-// works regardless of which child table the cascade reaches first.
-func TestDeploymentStatements_ProjectDeleteCascades(t *testing.T) {
-	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := "proj-dep-del-" + uniqueSuffix(t)
-		require.NoError(t, d.stmts.CreateProject(t.Context(), newTestProject(projectID)))
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
-		entity := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, rel.ID, domain.DeploymentReasonDeploy, nil), nil)
-
-		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
-		require.NoError(t, err)
-
-		_, err = d.stmts.GetDeploymentByID(t.Context(), projectID, entity.ID)
+		_, err = d.stmts.GetDeploymentByID(t.Context(), projectID, "dep_does_not_exist")
 		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }
 
-// Deploying the release an environment already runs writes nothing and
-// answers with the deployment that made it live; the same release returning
-// after something else ran in between is a new act and a new row.
-func TestDeploymentStatements_CreateIsIdempotentOnRunningRelease(t *testing.T) {
+// An unknown release or project trips the insert's foreign keys and writes
+// nothing.
+func TestDeploymentStatements_References(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
+		projectID := ensureReleaseProject(t, d.stmts)
 
-		first := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
+		_, err := tryDeploy(t, d.stmts, projectID, "rel_does_not_exist", []string{appOrigin}, deployArgs{})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
+		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
 
-		// Same release again: no new row, and the entity is overwritten with
-		// the record that made it live — its reason and timestamp, not this
-		// call's.
-		again := mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonRollback, nil)
-		again.Metadata.Message = new("a different message entirely")
-		created, err := d.stmts.CreateDeployment(t.Context(), again, nil)
-		require.NoError(t, err)
-		assert.False(t, created)
-		assert.Equal(t, first.ID, again.ID)
-		assert.Equal(t, domain.DeploymentReasonDeploy, again.Metadata.Reason)
-		assert.Nil(t, again.Metadata.Message, "the answer is the record as it was created")
-		assert.Equal(t, first.DeployedAt, again.DeployedAt)
-
-		// A matching guard combined with the idempotent answer still passes.
-		guarded := mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil)
-		created, err = d.stmts.CreateDeployment(t.Context(), guarded, &first.ID)
-		require.NoError(t, err)
-		assert.False(t, created)
-
-		// Something else runs, then relA returns: that is a new act.
-		createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relB.ID, domain.DeploymentReasonDeploy, nil), nil)
-		back := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonRollback, nil), nil)
-		assert.NotEqual(t, first.ID, back.ID)
-
-		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &env.ID, 10))
-		require.NoError(t, err)
-		assert.Len(t, result.Items, 3, "two idempotent answers wrote nothing")
+		_, err = tryDeploy(t, d.stmts, "proj_does_not_exist", "rel_does_not_exist", []string{appOrigin}, deployArgs{})
+		assert.ErrorIs(t, err, new(database.ForeignKeyError))
 	})
 }
 
-// A deployment created inside a transaction that began before a competing
-// deployment committed must still stamp a deployed_at after it: the stamp
-// follows the moment of the insert, not the transaction start. Otherwise the
-// newest-first list would order the current deployment behind the one it
-// replaced — postgres' now() is transaction-start time, so it once failed
-// exactly this way.
-func TestDeploymentStatements_LateDeployInEarlyTransactionStampsLast(t *testing.T) {
+// Deleting a project takes its deployments, their origins and previews with it,
+// although a deployment holds its release.
+func TestDeploymentStatements_ProjectDeleteCascades(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
-		if d.name == "sqlite" {
-			// A single writer: no second deployment can commit while another
-			// transaction is open, so the interleaving cannot be built here.
-			// The stamp is taken inside the transaction, after the write
-			// lock, which closes the same hole (see the dialect's
-			// CreateDeployment).
-			t.Skip("sqlite serializes writers; interleaving not constructible")
-		}
-		projectID := ensureDeploymentProject(t, d.stmts)
-		env := createEnvironment(t, d.stmts, projectID, "prod")
-		relA := createRelease(t, d.stmts, projectID, "000a", domain.ReleaseMetadata{})
-		relB := createRelease(t, d.stmts, projectID, "000b", domain.ReleaseMetadata{})
+		projectID := ensureReleaseProject(t, d.stmts)
+		rel := createRelease(t, d.stmts, projectID, "0001", domain.ReleaseMetadata{})
+		dep := deploy(t, d.stmts, projectID, rel.ID, []string{appOrigin}, deployArgs{})
+		deploy(t, d.stmts, projectID, rel.ID, []string{gitOrigin}, previewDeploy(time.Hour))
 
-		// Built on the test goroutine: the helpers use require, which calls
-		// runtime.Goexit on failure — inside the goroutine below that would
-		// leave begunCh unclosed and deadlock the test instead of failing it.
-		second := mustNewDeployment(t, projectID, env.ID, relB.ID, domain.DeploymentReasonDeploy, nil)
-
-		var begun, proceed sync.Once
-		begunCh := make(chan struct{})
-		proceedCh := make(chan struct{})
-		lateErr := make(chan error, 1)
-		go func() {
-			// Nothing here may call require or close over test helpers that
-			// do; the goroutine only runs the transaction and reports.
-			lateErr <- d.pool.Transaction(context.Background(), func(ctx context.Context, tx service.Statementer[service.AllStatements]) error {
-				// Once per attempt: spanner retries aborted attempts, and a
-				// closed channel lets a retry pass straight through.
-				begun.Do(func() { close(begunCh) })
-				<-proceedCh
-				_, err := tx.Statements().CreateDeployment(ctx, second, nil)
-				return err
-			})
-		}()
-
-		// The first deployment commits while the goroutine's transaction is
-		// already open. Selected against the error channel: a transaction
-		// that fails before its callback runs — pool exhausted, connection
-		// reset — never closes begunCh, and waiting on it alone would hang
-		// the test instead of failing it.
-		select {
-		case <-begunCh:
-		case err := <-lateErr:
-			t.Fatalf("the late transaction ended before its deployment ran: %v", err)
-		}
-		first := createDeployment(t, d.stmts,
-			mustNewDeployment(t, projectID, env.ID, relA.ID, domain.DeploymentReasonDeploy, nil), nil)
-		proceed.Do(func() { close(proceedCh) })
-		require.NoError(t, <-lateErr)
-
-		assert.False(t, second.DeployedAt.Before(first.DeployedAt),
-			"the late deploy stamped %s, before the deploy that committed first (%s)",
-			second.DeployedAt, first.DeployedAt)
-
-		result, err := d.stmts.ListDeployments(unfilteredListCtx(t), deployment.ListOptions(projectID, &env.ID, 10))
+		_, err := d.stmts.DeleteProjectByID(t.Context(), projectID)
 		require.NoError(t, err)
-		require.Len(t, result.Items, 2)
-		assert.Equal(t, second.ID, result.Items[0].ID,
-			"the current deployment must be the first row of its environment's history")
+
+		_, err = d.stmts.GetDeploymentByID(t.Context(), projectID, dep.ID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		assert.Empty(t, history(t, d.stmts, projectID, appOrigin))
+		_, err = d.stmts.GetPreview(t.Context(), projectID, gitOrigin)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
 	})
 }

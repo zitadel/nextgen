@@ -12,6 +12,7 @@ import (
 // ExchangeStore is the dialect IO surface used by [RunExchange].
 type ExchangeStore interface {
 	GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error)
+	GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error)
 	GetSessionByID(ctx context.Context, projectID, sessionID string) (*domain.Session, error)
 	InsertSession(ctx context.Context, session *domain.Session) error
 	LoadVerifiedChecks(ctx context.Context, projectID, id string, onAttempt bool) ([]StoredCheck, error)
@@ -39,6 +40,22 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 	if !attempt.IsCompleted() {
 		return nil, domain.ErrSessionInvalidHandoffToken()
 	}
+	// Refuse after handoff validation so an expired or incomplete token still
+	// answers sess.invalid_handoff_token and never reveals that the sealed
+	// release was revoked. Inside the exchange TX so a revoke racing the
+	// exchange cannot issue a session.
+	if attempt.ReleaseID != "" {
+		release, err := store.GetReleaseByID(ctx, projectID, attempt.ReleaseID)
+		if err != nil {
+			return nil, err
+		}
+		if release.Revoked() {
+			return nil, domain.ErrReleaseRevoked()
+		}
+	}
+	// Resolved once, so that a new session and an upgraded anonymous shell
+	// get the same lifetime.
+	ttl = ExchangeTTL(ttl)
 
 	var target *domain.Session
 	if attempt.SessionID != nil {
@@ -50,7 +67,7 @@ func RunExchange(ctx context.Context, store ExchangeStore, projectID, handoffTok
 			return nil, err
 		}
 	} else {
-		target = &domain.Session{ProjectID: projectID, TimeToLive: ExchangeTTL(ttl)}
+		target = &domain.Session{ProjectID: projectID, TimeToLive: ttl}
 		if err := store.InsertSession(ctx, target); err != nil {
 			return nil, exchangeConflict(err)
 		}

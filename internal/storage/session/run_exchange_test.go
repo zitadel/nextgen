@@ -19,6 +19,8 @@ import (
 type fakeExchangeStore struct {
 	attempt        *domain.AuthAttempt
 	attemptErr     error
+	release        *domain.Release
+	releaseErr     error
 	sessions       map[string]*domain.Session
 	getSessionErr  error
 	insertErr      error
@@ -36,6 +38,7 @@ type fakeExchangeStore struct {
 	updatedTTL     time.Duration
 	tokenPrev      string
 	inserted       *domain.Session
+	releaseLookups int
 }
 
 func (f *fakeExchangeStore) GetAuthAttemptByHandoffToken(context.Context, string, []byte) (*domain.AuthAttempt, error) {
@@ -43,6 +46,14 @@ func (f *fakeExchangeStore) GetAuthAttemptByHandoffToken(context.Context, string
 		return nil, f.attemptErr
 	}
 	return f.attempt, nil
+}
+
+func (f *fakeExchangeStore) GetReleaseByID(context.Context, string, string) (*domain.Release, error) {
+	f.releaseLookups++
+	if f.releaseErr != nil {
+		return nil, f.releaseErr
+	}
+	return f.release, nil
 }
 
 func (f *fakeExchangeStore) GetSessionByID(_ context.Context, _, sessionID string) (*domain.Session, error) {
@@ -163,11 +174,91 @@ func TestRunExchange_stepUpExistingSession(t *testing.T) {
 	assert.Equal(t, "tok-rotated", got.TokenID)
 }
 
+// An exchange without a TTL leaves a session with the signed-in default,
+// whether it creates the session or upgrades an anonymous shell; neither may
+// keep the shell's short lifetime.
+func TestRunExchange_withoutTTLUsesSessionDefault(t *testing.T) {
+	t.Parallel()
+	verified := []session.StoredCheck{
+		{ID: "c1", Type: domain.AuthCheckTypePassword, LastVerifiedAt: time.Now(), OnAttempt: true},
+	}
+
+	t.Run("new session", func(t *testing.T) {
+		t.Parallel()
+		store := &fakeExchangeStore{attempt: completedAttempt("proj", nil), attemptChecks: verified}
+		got, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+		require.NoError(t, err)
+		assert.Equal(t, domain.SessionDefaultTTL, got.TimeToLive)
+		assert.Equal(t, domain.SessionDefaultTTL, store.updatedTTL)
+	})
+
+	t.Run("upgraded anonymous shell", func(t *testing.T) {
+		t.Parallel()
+		sid := "sess-shell"
+		store := &fakeExchangeStore{
+			attempt: completedAttempt("proj", &sid),
+			sessions: map[string]*domain.Session{
+				sid: {ProjectID: "proj", ID: sid, TokenID: "tok-shell", TimeToLive: domain.SessionAnonymousTTL},
+			},
+			attemptChecks: verified,
+		}
+		got, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+		require.NoError(t, err)
+		assert.Equal(t, sid, got.ID)
+		assert.Nil(t, store.inserted, "the shell is upgraded in place")
+		assert.Equal(t, domain.SessionDefaultTTL, store.updatedTTL)
+	})
+}
+
 func TestRunExchange_invalidHandoff(t *testing.T) {
 	t.Parallel()
 	store := &fakeExchangeStore{attemptErr: domain.ErrAuthAttemptNotFound()}
 	_, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
 	assert.ErrorIs(t, err, domain.ErrSessionInvalidHandoffToken())
+}
+
+func TestRunExchange_revokedRelease(t *testing.T) {
+	t.Parallel()
+	revokedAt := time.Now().UTC()
+	attempt := completedAttempt("proj", nil)
+	attempt.ReleaseID = "rel_1"
+	store := &fakeExchangeStore{
+		attempt: attempt,
+		release: &domain.Release{ProjectID: "proj", ID: "rel_1", RevokedAt: &revokedAt},
+	}
+	_, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+	assert.ErrorIs(t, err, domain.ErrReleaseRevoked())
+	assert.Equal(t, 1, store.releaseLookups)
+}
+
+func TestRunExchange_expiredHandoffPrefersInvalidTokenOverRevoked(t *testing.T) {
+	t.Parallel()
+	revokedAt := time.Now().UTC()
+	// Handed off far enough in the past that HandoffTokenExpiration has elapsed.
+	handedOffAt := time.Now().UTC().Add(-domain.HandoffTokenExpiration - time.Minute)
+	attempt := completedAttempt("proj", nil)
+	attempt.ReleaseID = "rel_1"
+	attempt.HandedOffAt = &handedOffAt
+	store := &fakeExchangeStore{
+		attempt: attempt,
+		release: &domain.Release{ProjectID: "proj", ID: "rel_1", RevokedAt: &revokedAt},
+	}
+	_, err := session.RunExchange(t.Context(), store, "proj", "plain", 0)
+	assert.ErrorIs(t, err, domain.ErrSessionInvalidHandoffToken())
+	assert.Equal(t, 0, store.releaseLookups, "invalid handoff must not reveal release revoke")
+}
+
+func TestRunExchange_emptyReleaseIDSkipsReleaseLookup(t *testing.T) {
+	t.Parallel()
+	store := &fakeExchangeStore{
+		attempt: completedAttempt("proj", nil),
+		attemptChecks: []session.StoredCheck{
+			{ID: "c1", Type: domain.AuthCheckTypePassword, LastVerifiedAt: time.Now(), OnAttempt: true},
+		},
+	}
+	_, err := session.RunExchange(t.Context(), store, "proj", "plain", time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 0, store.releaseLookups)
 }
 
 func TestRunExchange_missingSessionConflict(t *testing.T) {

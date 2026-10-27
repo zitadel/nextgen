@@ -9,7 +9,16 @@ import { parseJson, runCliForTest } from "../../../helpers/run-cli";
  */
 describe("a flag that must not be blank", () => {
   it("refuses an empty value, where oclif's own check passes it", async () => {
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "", "--json"]);
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "",
+      "--json",
+    ]);
 
     expect(result.exitCode).not.toBe(0);
     const json = parseJson(result.stdout) as { code: string; hint?: string };
@@ -18,7 +27,16 @@ describe("a flag that must not be blank", () => {
   });
 
   it("refuses a value that is only whitespace", async () => {
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "   ", "--json"]);
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "   ",
+      "--json",
+    ]);
 
     expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
   });
@@ -26,7 +44,15 @@ describe("a flag that must not be blank", () => {
   it("still refuses a missing value the way oclif always did", async () => {
     // Unquoted `--client-id $UNSET` drops the word entirely; that path was
     // never broken and must keep its own wording.
-    const result = await runCliForTest(["sso", "enable", "--provider", "google", "--client-id", "--json"]);
+    const result = await runCliForTest([
+      "auth-method",
+      "sso",
+      "enable",
+      "--provider",
+      "google",
+      "--client-id",
+      "--json",
+    ]);
 
     expect(result.exitCode).not.toBe(0);
     expect((parseJson(result.stdout) as { message: string }).message).toContain("expects a value");
@@ -35,7 +61,7 @@ describe("a flag that must not be blank", () => {
 
 describe("an argument that must not be blank", () => {
   it("refuses an empty name before the command runs", async () => {
-    const result = await runCliForTest(["variables", "get", "", "--project-level", "--json"]);
+    const result = await runCliForTest(["variable", "get", "", "--json"]);
 
     expect(result.exitCode).not.toBe(0);
     const json = parseJson(result.stdout) as { code: string; message: string };
@@ -44,10 +70,11 @@ describe("an argument that must not be blank", () => {
   });
 
   it("leaves a real name alone, trimmed", async () => {
-    // Reaching the owner check means the argument parsed; the point is that
-    // a padded value is not refused and arrives without its padding.
-    const result = await runCliForTest(["variables", "get", "  FOO  ", "--json"]);
+    // A padded value parses and is trimmed, so the run gets past the blank
+    // check and fails later for want of a resolved server, not for the name.
+    const result = await runCliForTest(["variable", "get", "  FOO  ", "--json"]);
 
-    expect((parseJson(result.stdout) as { message: string }).message).toContain("Name the owner");
+    const json = parseJson(result.stdout) as { message: string };
+    expect(json.message).not.toMatch(/empty value|Invalid variable name/);
   });
 });

@@ -11,32 +11,19 @@ dependsOn:
   - "cli"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "config:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
       - "config:build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
       - "config:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
       - "config:build-release"
     outputs:
       - "dist/**/*"
@@ -51,25 +38,27 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"
 
-  # Boots a real local server (binary runtime + SQLite by default). Kept out
-  # of CI and the cache: it spawns OS processes and takes a few seconds per boot.
+  # Boots a real local server (binary runtime + SQLite by default). Not cached
+  # (it spawns OS processes). Runs in CI as a dependency of `e2e:all` — the
+  # kit's own real-instance suite, alongside the e2e app lanes — and so, like
+  # them, is `runInCI: "skip"`: CI's e2e step runs it, not the build-and-test
+  # graph. The command unsets CI / GITHUB_ACTIONS to behave as a local run
+  # (the old workflow used `env -u CI`); a task `env` entry would not override
+  # the runner's values.
   test-integration:
-    command: "corepack pnpm run test:integration"
+    command: "env -u CI -u GITHUB_ACTIONS corepack pnpm run test:integration"
     deps:
       - "build"
       - "cli:build"
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      # server:build embeds the console/login UIs via its task deps; keep the
-      # server-hosted surfaces off anyway — these tests drive the API and
-      # app-embedded login, not /ui/*.
-      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
+      # server:build embeds the console via its task deps; keep it off anyway —
+      # these tests drive the API and app-embedded login, not /ui/console.
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
     options:
       cache: false
-      runInCI: false
+      runInCI: "skip"

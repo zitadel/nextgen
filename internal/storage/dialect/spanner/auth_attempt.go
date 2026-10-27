@@ -18,11 +18,11 @@ import (
 
 const (
 	authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal,` +
+		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id,` +
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
-	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)`
+	createAuthAttemptStmt     = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal, deployment_id, release_id) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9)`
 	createAuthCheckStmt       = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count) VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, 0)`
 	deleteAuthAttemptByIDStmt = `DELETE FROM auth_attempts WHERE project_id = @p1 AND id = @p2`
 	handoffAuthAttemptStmt    = `UPDATE auth_attempts SET handoff_token = @p1, handed_off_at = @p2 WHERE project_id = @p3 AND id = @p4 AND handed_off_at IS NULL THEN RETURN handed_off_at`
@@ -51,7 +51,11 @@ const (
 	// attempt's row and inserts the new one inside withTransaction.
 	deleteSSOStateStmt    = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3`
 	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
-	insertSSOStateStmt    = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
+	// markSSOCallbackCollisionStmt replaces the parked result with the
+	// collision marker alone.
+	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = @p5` +
+		` WHERE project_id = @p1 AND auth_attempt_id = @p2 AND type = @p3 AND id = @p4`
+	insertSSOStateStmt = `INSERT INTO checks (project_id, auth_attempt_id, type, id, last_challenged_at, challenge_payload, lookup_hash, failure_count)` +
 		` VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7, 0)`
 	selectPendingSSOStateStmt = `SELECT c.id, c.auth_attempt_id, c.challenge_payload, aa.created_at, aa.time_to_live` +
 		` FROM checks c` +
@@ -106,7 +110,8 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 	}
 
 	return withTransaction(ctx, as.db, func(ctx context.Context, tx queryExecutor) error {
-		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, attempt.ID, req, ttlNanos, authattempt.SessionIDArg(attempt.SessionID), now, attempt.Internal).statement()
+		stmt := buildStatement(createAuthAttemptStmt, attempt.ProjectID, attempt.ID, req, ttlNanos, authattempt.SessionIDArg(attempt.SessionID), now, attempt.Internal,
+			authattempt.EmptyStringArg(attempt.DeploymentID), authattempt.EmptyStringArg(attempt.ReleaseID)).statement()
 		if _, err := tx.Update(ctx, stmt); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", err)
 		}
@@ -201,6 +206,8 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 			requiredChecks   []spanner.NullInt64
 			checkType        spanner.NullInt64
 			timeToLiveNanos  spanner.NullInt64
+			deploymentID     spanner.NullString
+			releaseID        spanner.NullString
 			challengeID      spanner.NullString
 			lastChallengedAt spanner.NullTime
 			verifiedAt       spanner.NullTime
@@ -212,6 +219,7 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if err := row.Columns(
 			&attempt.ProjectID, &attempt.ID, &handoffToken, &handedOffAt, &sessionID,
 			&requiredChecks, &attempt.CreatedAt, &checkType, &timeToLiveNanos, &attempt.Internal,
+			&deploymentID, &releaseID,
 			&challengeID, &lastChallengedAt, &verifiedAt, &lastFailedAt, &failureCount, &challenge, &factor,
 		); err != nil {
 			return fmt.Errorf("failed to scan auth attempt: %w", err)
@@ -235,6 +243,12 @@ func (as authAttemptStatements) scan(iter *spanner.RowIterator, attempt *domain.
 		if timeToLiveNanos.Valid {
 			d := time.Duration(timeToLiveNanos.Int64)
 			attempt.TimeToLive = &d
+		}
+		if deploymentID.Valid {
+			attempt.DeploymentID = deploymentID.StringVal
+		}
+		if releaseID.Valid {
+			attempt.ReleaseID = releaseID.StringVal
 		}
 
 		if !checkType.Valid {
@@ -608,6 +622,24 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 	n, err := as.db.Update(ctx, stmt)
 	if err != nil {
 		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadString(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	stmt := buildStatement(markSSOCallbackCollisionStmt,
+		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID, encodeSpannerJSONPtr(payload)).statement()
+	n, err := as.db.Update(ctx, stmt)
+	if err != nil {
+		return fmt.Errorf("failed to mark sso callback collision: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrSSOStateInvalid()

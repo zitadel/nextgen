@@ -45,7 +45,7 @@
    not repainted the way every other surface is. These roles are deliberately
    absent from `PALETTE_MAP` (`branding-to-tokens.ts`),
    which is what keeps branding out of them; their defaults are the design's
-   outline button, so the shipped page matches Figma with no tenant input.
+   outline button, so the shipped page matches the design with no tenant input.
    Hover and pressed mix toward the button's own foreground rather than
    `--zl-accent`, which branding does paint. */
 .zr-sso__list zl-button::part(root) {
@@ -60,9 +60,10 @@
   background: color-mix(in srgb, var(--zl-provider) 90%, var(--zl-provider-foreground));
 }
 
-/* The mark holds its size when the label beside it wraps. Its colours are its
-   own — every path in the glyph carries an explicit fill — so nothing here
-   needs to stop it inheriting the button's text colour. */
+/* The mark holds its size when the label beside it wraps. Nothing here sets
+   its colour: a multicolour mark (Google) states a fill per path, and a
+   monochrome one (GitHub) inherits `--zl-provider-foreground` from the button,
+   so it flips with light and dark mode. */
 .zr-sso__mark {
   flex: 0 0 auto;
   display: inline-flex;

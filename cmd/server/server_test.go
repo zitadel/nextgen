@@ -1,6 +1,11 @@
 package server
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +17,7 @@ import (
 	"github.com/zitadel/passwap/argon2"
 	"github.com/zitadel/passwap/bcrypt"
 
+	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
@@ -69,6 +75,34 @@ func TestConsoleBaseURL(t *testing.T) {
 	}
 }
 
+func TestPublicOrigin(t *testing.T) {
+	tests := []struct {
+		name       string
+		publicBase string
+		want       string
+		wantErr    bool
+	}{
+		{name: "plain origin", publicBase: "http://localhost:8080", want: "http://localhost:8080"},
+		{name: "trailing slash dropped", publicBase: "https://preview.zitadel.com/", want: "https://preview.zitadel.com"},
+		{name: "path prefix dropped", publicBase: "https://proxy.example.com/nextgen", want: "https://proxy.example.com"},
+		{name: "host lowercased", publicBase: "https://Zitadel.Example.com", want: "https://zitadel.example.com"},
+		{name: "default port dropped", publicBase: "https://zitadel.example.com:443", want: "https://zitadel.example.com"},
+		{name: "other port kept", publicBase: "https://zitadel.example.com:8443", want: "https://zitadel.example.com:8443"},
+		{name: "empty", publicBase: "", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := publicOrigin(tt.publicBase)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestLoadConfigServerPublicBase(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
 	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
@@ -81,6 +115,43 @@ func TestLoadConfigServerPublicBase(t *testing.T) {
 	cfg, err = loadConfig(configPath)
 	require.NoError(t, err)
 	assert.Equal(t, "http://localhost:9999", cfg.Server.PublicBase)
+}
+
+// TestLoadConfigSessionDefaults pins the session lifetimes of a server started
+// with no session settings. session.default_ttl used to default to the
+// anonymous shell's 10 minutes, which signed every user out 10 minutes after
+// they signed in.
+func TestLoadConfigSessionDefaults(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, domain.SessionDefaultTTL, cfg.Session.DefaultTTL)
+	assert.Equal(t, 720*time.Hour, cfg.Session.MaxTTL)
+	assert.Greater(t, cfg.Session.DefaultTTL, domain.SessionAnonymousTTL,
+		"a signed-in session must outlive an anonymous shell")
+
+	t.Setenv("NEXTGEN_SESSION_DEFAULT_TTL", "168h")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, 168*time.Hour, cfg.Session.DefaultTTL)
+}
+
+// TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
+// Decision 5: the report location is on and the stack trace is off.
+func TestLoadConfigErrorDefaults(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION", "")
+	t.Setenv("NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.True(t, cfg.Instrumentation.Log.Errors.ReportLocation)
+	assert.False(t, cfg.Instrumentation.Log.Errors.StackTrace)
 }
 
 // TestLoadConfigDefaultsToArgon2id locks in the ADR 029 default: with no
@@ -158,4 +229,69 @@ func TestLoadConfigAcceptsStreamsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []zlog.Stream{zlog.StreamRequest, zlog.StreamService}, cfg.Instrumentation.Log.Streams)
+}
+
+func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT", "true")
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_platformadmin,user_01H0000000000000000000000")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"user_platformadmin", "user_01H0000000000000000000000"}, cfg.Platform.Operators)
+}
+
+// TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
+// did not fire for the early returns that declare err in an if's scope, among
+// them the bootstrap return this test drives, so such a failed start was only
+// visible through main's log.Fatal, which slog.SetDefault bridges in at INFO.
+// The failure here is the report's own, a data dir that was never migrated,
+// and the record has to come out at ERROR, past a warn level, carrying the
+// error run returns.
+func TestRunLogsTheErrorItReturns(t *testing.T) {
+	_, configPath := tempServerConfig(t)
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	// Fails at a return that shadows err: the bootstrap needs the tables that
+	// nothing created in this data dir.
+	cfg.Platform.BootstrapProject = true
+	cfg.Instrumentation.Log.Level = zlog.LevelWarning
+	// With no format, setUpLogging builds on the slog default installed when
+	// run starts, which is how its records land in the buffer below instead of
+	// on stderr.
+	cfg.Instrumentation.Log.Format = instrumentation.LogFormatUnspecified
+
+	var records bytes.Buffer
+	previous, previousOutput, previousFlags := slog.Default(), log.Writer(), log.Flags()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&records, nil)))
+	// slog.SetDefault also points the log package at the new handler, and
+	// reinstating a stdlib default does not point it back.
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+		log.SetOutput(previousOutput)
+		log.SetFlags(previousFlags)
+	})
+
+	// Bounded so that a start which no longer fails is reported instead of
+	// waited on until go test's own timeout.
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	err = run(ctx, cfg, nil, false)
+	require.ErrorContains(t, err, "failed to bootstrap platform project")
+
+	var runError map[string]any
+	for line := range strings.SplitSeq(strings.TrimSpace(records.String()), "\n") {
+		var record map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &record), line)
+		if record["msg"] == "run error" {
+			runError = record
+		}
+	}
+	require.NotNil(t, runError, "no \"run error\" record in:\n%s", records.String())
+	assert.Equal(t, "ERROR", runError["level"])
+	assert.Equal(t, err.Error(), runError["err"])
 }

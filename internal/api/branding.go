@@ -44,7 +44,7 @@ func (h *Handler) GetBrandingById(ctx context.Context, params api.GetBrandingByI
 }
 
 func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParams) (api.ListBrandingRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), brandingAccess, domain.ResourceKindBranding)
+	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), brandingAccess, domain.ResourceKindBranding)
 	if err != nil {
 		return nil, err
 	}
@@ -62,30 +62,33 @@ func (h *Handler) ListBranding(ctx context.Context, params api.ListBrandingParam
 	return &resp, nil
 }
 
-// resolveBranding resolves the branding a flow response should carry: the
-// latest stored revision for the project, or the built-in default (ADR 040).
-// Resolution failures degrade to the default on purpose — a broken branding
-// lookup must never take the login down.
+// resolveBranding resolves the branding a flow response should carry.
+// Resolution failures degrade to the built-in default on purpose — a broken
+// branding lookup must never take the login down (ADR 040).
 func (h *Handler) resolveBranding(ctx context.Context, projectID string) api.Branding {
 	if h.brandingService == nil || projectID == "" {
 		return defaultBranding()
 	}
-	branding, err := h.brandingService.GetLatest(ctx, projectID)
+	branding, err := service.ResolveFlowBranding(ctx, h.brandingService, projectID)
 	if err != nil {
-		// Deliberate degrade, but never a silent one: without this line a
-		// flaky lookup presents as "my branding intermittently disappears"
-		// with nothing to grep for.
-		zlog.GetLoggingContext(ctx).Warn(
-			"branding resolution failed; serving default branding",
-			"project_id", projectID,
-			"err", err,
-		)
+		warnBrandingDegraded(ctx, projectID, err)
 		return defaultBranding()
 	}
 	if branding == nil {
 		return defaultBranding()
 	}
 	return toAPIBranding(branding)
+}
+
+func warnBrandingDegraded(ctx context.Context, projectID string, err error) {
+	// Deliberate degrade, but never a silent one: without this line a
+	// flaky lookup presents as "my branding intermittently disappears"
+	// with nothing to grep for.
+	zlog.GetLoggingContext(ctx).Warn(
+		"branding resolution failed; serving default branding",
+		"project_id", projectID,
+		"err", err,
+	)
 }
 
 // defaultBranding is the fallback when a project has no stored branding

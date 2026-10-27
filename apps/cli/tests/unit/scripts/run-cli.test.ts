@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
+type Env = Record<string, string | undefined>;
+
 type RunCliModule = {
+  withDevelopmentTelemetry: (env: Env) => Env;
   assertFreshInstall: (
     root?: string,
     statFn?: (path: string) => Promise<{ mtimeMs: number }>,
@@ -19,6 +22,8 @@ type RunCliModule = {
     buildLocalRuntimeImage?: (options: {
       env: Record<string, string | undefined>;
     }) => Promise<unknown>;
+    isExecutable?: (path: string) => boolean;
+    stopLocalRegistry?: (registry: unknown) => Promise<void>;
     localRegistryWorkDir?: string;
     prepareLocalRegistry?: (options: Record<string, unknown>) => Promise<{
       env: Record<string, string | undefined>;
@@ -49,10 +54,25 @@ type BuildLocalRuntimeImageModule = {
   LOCAL_RUNTIME_IMAGE: string;
 };
 
+type DevProcessModule = {
+  withWorkspaceTools: (env: Env, options?: { isExecutable?: (path: string) => boolean }) => Env;
+};
+
 let runCli: RunCliModule;
 let runtimeImage: BuildLocalRuntimeImageModule;
+let devProcess: DevProcessModule;
+
+/** The env the wrapper hands its builds: `env` with the workspace tools on PATH. */
+const toolEnv = (env: Env): Env => devProcess.withWorkspaceTools(env);
 
 const noop = async (): Promise<void> => undefined;
+
+/** Signature of the injected process runner, so `run.mock.calls` is typed. */
+type RunSpawn = (
+  execPath: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+) => Promise<void>;
 
 beforeAll(async () => {
   runCli = (await import(
@@ -61,6 +81,9 @@ beforeAll(async () => {
   runtimeImage = (await import(
     new URL("../../../../../scripts/build-local-runtime-image.mjs", import.meta.url).href
   )) as BuildLocalRuntimeImageModule;
+  devProcess = (await import(
+    new URL("../../../../../scripts/dev-process.mjs", import.meta.url).href
+  )) as DevProcessModule;
 });
 
 describe("run-cli wrapper", () => {
@@ -155,9 +178,9 @@ describe("run-cli wrapper", () => {
     await expect(
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 1000 })),
     ).rejects.toThrow(remedy);
-    await expect(
-      runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 })),
-    ).rejects.toThrow(remedy);
+    await expect(runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000 }))).rejects.toThrow(
+      remedy,
+    );
     await expect(
       runCli.assertFreshInstall("/repo", statFor({ [lockfile]: 2000, [installed]: 2000 })),
     ).resolves.toBeUndefined();
@@ -197,16 +220,16 @@ describe("run-cli wrapper", () => {
       assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
-        expect(options.env).toBe(env);
+        expect(options.env).toEqual(toolEnv(env));
       },
       buildLocalServerBinary: async (options) => {
         calls.push("build-server");
-        expect(options.env).toBe(env);
+        expect(options.env).toEqual(toolEnv(env));
         return { path: "/repo/dist/server/nextgen", version: "dev+abcdef123456" };
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
-        expect(options.env).toBe(env);
+        expect(options.env).toEqual(toolEnv(env));
       },
       run: async (command, args, options) => {
         calls.push("run-cli");
@@ -220,7 +243,7 @@ describe("run-cli wrapper", () => {
 
     expect(calls).toEqual(["build-cli", "build-server", "run-cli"]);
     expect(runEnv).toMatchObject({
-      PATH: "/bin",
+      PATH: toolEnv({ PATH: "/bin" }).PATH,
       ZITADEL_SERVER_BINARY: "/repo/dist/server/nextgen",
       ZITADEL_SERVER_BINARY_VERSION: "dev+abcdef123456",
     });
@@ -240,7 +263,7 @@ describe("run-cli wrapper", () => {
       assertFreshInstall: noop,
       buildCli: async (options) => {
         calls.push("build-cli");
-        expect(options.env).toBe(env);
+        expect(options.env).toEqual(toolEnv(env));
       },
       buildLocalServerBinary: async () => {
         calls.push("build-server");
@@ -248,7 +271,7 @@ describe("run-cli wrapper", () => {
       },
       buildLocalRuntimeImage: async (options) => {
         calls.push("build-image");
-        expect(options.env).toBe(env);
+        expect(options.env).toEqual(toolEnv(env));
       },
       run: async (command, args, options) => {
         calls.push("run-cli");
@@ -262,7 +285,7 @@ describe("run-cli wrapper", () => {
 
     expect(calls).toEqual(["build-cli", "build-image", "run-cli"]);
     expect(runEnv).toMatchObject({
-      PATH: "/bin",
+      PATH: toolEnv({ PATH: "/bin" }).PATH,
       ZITADEL_LOCAL_IMAGE: runtimeImage.LOCAL_RUNTIME_IMAGE,
     });
     expect(env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
@@ -274,7 +297,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--image", "custom:tag"],
@@ -289,7 +312,7 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
+    expect(run!.mock.calls[0]?.[2].env).not.toHaveProperty("ZITADEL_LOCAL_IMAGE");
   });
 
   it("skips the builder when ZITADEL_LOCAL_IMAGE is set", async () => {
@@ -298,7 +321,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start"],
@@ -313,7 +336,7 @@ describe("run-cli wrapper", () => {
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(buildLocalRuntimeImage).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_LOCAL_IMAGE).toBe("custom:tag");
   });
 
   it("preserves an explicit local server binary override for binary start", async () => {
@@ -321,7 +344,7 @@ describe("run-cli wrapper", () => {
       path: "/repo/dist/server/nextgen",
       version: "dev+abcdef123456",
     }));
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["start", "--runtime", "binary"],
@@ -335,7 +358,7 @@ describe("run-cli wrapper", () => {
 
     expect(buildLocalServerBinary).not.toHaveBeenCalled();
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
+    expect(run!.mock.calls[0]?.[2].env.ZITADEL_SERVER_BINARY).toBe("/tmp/custom-nextgen");
   });
 
   it("skips the local server binary build for dry-run start", async () => {
@@ -379,7 +402,7 @@ describe("run-cli wrapper", () => {
   });
 
   it("runs the CLI from the original invocation directory", async () => {
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local", "--skip-install"],
@@ -391,14 +414,14 @@ describe("run-cli wrapper", () => {
     });
 
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
-    expect(run.mock.calls[0]?.[1].slice(1)).toEqual([
+    expect(run!.mock.calls[0]?.[1][0]).toMatch(/apps\/cli\/bin\/run\.js$/);
+    expect(run!.mock.calls[0]?.[1].slice(1)).toEqual([
       "setup",
       "--server",
       "local",
       "--skip-install",
     ]);
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
   });
 
   it("prepares a local package registry for setup and forwards npm env to the CLI", async () => {
@@ -416,7 +439,7 @@ describe("run-cli wrapper", () => {
         },
       };
     });
-    const run = vi.fn(noop);
+    const run = vi.fn<RunSpawn>(noop);
 
     await runCli.main({
       args: ["setup", "--server", "local"],
@@ -429,12 +452,17 @@ describe("run-cli wrapper", () => {
     });
 
     expect(prepareLocalRegistry).toHaveBeenCalledOnce();
+    // Only what a generated app installs, over the proxy store of earlier runs.
+    expect(prepareLocalRegistry.mock.calls[0]?.[0]).toMatchObject({
+      packageSet: "app",
+      resetStorage: false,
+    });
     expect(run).toHaveBeenCalledOnce();
-    expect(run.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
-    expect(run.mock.calls[0]?.[2].env).toMatchObject({
+    expect(run!.mock.calls[0]?.[2].cwd).toBe("/tmp/myapp");
+    expect(run!.mock.calls[0]?.[2].env).toMatchObject({
       INIT_CWD: "/tmp/myapp",
       NPM_CONFIG_USERCONFIG: "/tmp/local-registry/verdaccio.npmrc",
-      PATH: "/bin",
+      PATH: toolEnv({ PATH: "/bin" }).PATH,
       npm_config_registry: "http://127.0.0.1:51234",
     });
   });
@@ -477,5 +505,67 @@ describe("run-cli wrapper", () => {
     expect(stderrOutput).toContain("[zitadel-cli]");
     expect(stderrOutput).toContain("captured stdout");
     expect(stderrOutput).toContain("captured stderr");
+  });
+
+  it("puts a pnpm stand-in on the PATH of every build and of the CLI when none is installed", async () => {
+    const buildCli = vi.fn(async (_options: { env: Env }): Promise<void> => undefined);
+    const run = vi.fn<RunSpawn>(noop);
+
+    await runCli.main({
+      args: ["doctor"],
+      env: { PATH: "/bin" },
+      assertFreshInstall: noop,
+      buildCli,
+      isExecutable: () => false,
+      run,
+    });
+
+    const [first] = (buildCli.mock.calls[0]?.[0].env.PATH ?? "").split(":");
+    expect(first).toMatch(/scripts\/shims$/);
+    expect(run.mock.calls[0]?.[2].env.PATH).toBe(buildCli.mock.calls[0]?.[0].env.PATH);
+  });
+
+  it("sends the CLI's telemetry to the development project unless the caller chose one", async () => {
+    expect(runCli.withDevelopmentTelemetry({ PATH: "/bin" })).toEqual({
+      PATH: "/bin",
+      ZITADEL_TELEMETRY_ENV: "development",
+    });
+    expect(runCli.withDevelopmentTelemetry({ ZITADEL_TELEMETRY_ENV: "production" })).toEqual({
+      ZITADEL_TELEMETRY_ENV: "production",
+    });
+
+    const run = vi.fn<RunSpawn>(noop);
+    await runCli.main({
+      args: ["doctor"],
+      env: { PATH: "/bin" },
+      assertFreshInstall: noop,
+      buildCli: vi.fn(noop),
+      run,
+    });
+    expect(run.mock.calls[0]?.[2].env.ZITADEL_TELEMETRY_ENV).toBe("development");
+  });
+
+  it("stops a started registry when publishing to it fails", async () => {
+    const registry = { name: "verdaccio" };
+    const stopLocalRegistry = vi.fn(async (_registry: unknown): Promise<void> => undefined);
+    const run = vi.fn<RunSpawn>(noop);
+
+    await expect(
+      runCli.main({
+        args: ["setup", "--server", "local"],
+        env: { INIT_CWD: "/tmp/myapp", PATH: "/bin" },
+        assertFreshInstall: noop,
+        buildCli: vi.fn(noop),
+        prepareLocalRegistry: async (options) => {
+          await (options.onStarted as (started: unknown) => void)(registry);
+          throw new Error("npm publish failed");
+        },
+        run,
+        stopLocalRegistry,
+      }),
+    ).rejects.toThrow("npm publish failed");
+
+    expect(stopLocalRegistry).toHaveBeenCalledWith(registry);
+    expect(run).not.toHaveBeenCalled();
   });
 });

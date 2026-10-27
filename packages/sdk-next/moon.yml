@@ -6,39 +6,24 @@ dependsOn:
   - "api"
   - "components"
   - "sdk-core"
+  - "sdk-react"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-    deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
+      # the edge tests import this package's built dist.
+      - "build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
-      - "api:build"
-      - "components:build"
-      - "sdk-core:build"
-    outputs:
-      - "dist/**/*"
+      - "sdk-react:build"
 
   build-release:
     script: |
       node ../../scripts/release-clean.mjs local-dist
       corepack pnpm run build
     deps:
-      - "api:build-release"
-      - "components:build-release"
-      - "sdk-core:build-release"
+      - "sdk-react:build-release"
     outputs:
       - "dist/**/*"
     options:
@@ -54,6 +39,5 @@ tasks:
       mutex: "public-dist"
 
   test:
-    command: "corepack pnpm run test:all"
     deps:
       - "build"

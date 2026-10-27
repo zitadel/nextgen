@@ -1,0 +1,70 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The release graph. Each build-release cleans and rewrites the dist
+  // directory the dev builds and tests of the same graph read, so moon runs
+  // every entry point's dependencies one after the other
+  // (runDepsInParallel: false). Turbo has no serial option, so the order is
+  // written as edges: the public packages' release builds start after cli's
+  // tests (api's release build depends on them, every other one on api's
+  // through its package edges) and then run in parallel on the same package
+  // edges as their dev builds, and the two UI release builds wait for all of
+  // them. What remains unordered: the server's tests run alongside the
+  // release builds in `snapshot`, and the console release build rewrites the
+  // embedded dist they compiled — see the migration plan.
+  "tasks": {
+    "changesets": {
+      "cache": false
+    },
+    "check-graph": {
+      "cache": false
+    },
+    "build-public-packages": {
+      "cache": false,
+      "dependsOn": [
+        "check-graph",
+        "@zitadel/cli#build-release",
+        "@zitadel/api#build-release",
+        "@zitadel/config#build-release",
+        "@zitadel/components#build-release",
+        "@zitadel/sdk-core#build-release",
+        "@zitadel/sdk-next#build-release",
+        "@zitadel/sdk-nuxt#build-release",
+        "@zitadel/sdk-react#build-release",
+        "@zitadel/sdk-vue#build-release",
+        "@zitadel/sdk-angular#build-release",
+        "@zitadel/sdk-solid#build-release",
+        "@zitadel/sdk-svelte#build-release",
+        "@zitadel/sdk-qwik#build-release",
+        "@zitadel/sdk-sveltekit#build-release",
+        "@zitadel/sdk-solid-start#build-release",
+        "@zitadel/sdk-qwik-router#build-release",
+        "@zitadel/sdk-tanstack-start#build-release",
+        "@zitadel/testing#build-release"
+      ]
+    },
+    "version": {
+      "cache": false,
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
+    },
+    "pack": {
+      "cache": false,
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*"]
+    },
+    "snapshot": {
+      "cache": false,
+      "dependsOn": [
+        "@zitadel/server#test",
+        "build-public-packages",
+        "@zitadel/console#build-release"
+      ],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "RELEASE_SKIP_CONTAINER"]
+    },
+    "publish": {
+      "cache": false,
+      "dependsOn": ["build-public-packages", "@zitadel/console#build-release"],
+      "passThroughEnv": ["GITHUB_*", "NPM_*", "NODE_AUTH_TOKEN", "BASE_SHA", "RECOVER_VERSION", "ZITADEL_*", "DOCKER_*", "GOFLAGS", "ACTIONS_*"]
+    }
+  }
+}

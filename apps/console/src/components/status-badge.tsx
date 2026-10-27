@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * The lifecycle status pill, shared by every resource that has one — users
- * (`active`, `suspended`, `deactivated`, `pending_purge`) and teams (`active`,
- * `deactivated`).
+ * (`active`, `suspended`, `deactivated`, `pending_purge`), teams (`active`,
+ * `deactivated`) and deployments (`live`, `inactive`).
  *
  * `Badge` is the design-system component and already carries every
  * dimension of the pill — `h-5`, `gap-1`, `px-2 py-0.5`, `rounded-full`,
@@ -12,18 +12,18 @@ import { cn } from "@/lib/utils";
  * the component's own left icon slot (`showLeftIcon`), filled with a dot rather
  * than a glyph.
  *
- * Only `active` carries a colour in the design (`base/success`). Every other
- * status renders a neutral dot rather than inventing a semantic colour the
- * design has not chosen.
+ * Only the state that is in force, `active` or a deployment's `live`, carries
+ * a colour in the design (`base/success`). Every other status renders a
+ * neutral dot rather than inventing a semantic colour the design has not
+ * chosen.
  *
  * The label is the API's own value, title-cased. The Teams mock writes the
  * second state as `Inactive`, but the endpoint returns `deactivated` and the
  * team detail reads the same field — showing two words for one state would be
  * the console inventing vocabulary the API does not have.
  *
- * `bg-success` rather than Tailwind's own `green-500`: v4 moved its palette to
- * oklch, so `green-500` renders `(0,201,80)` where the design system's value is
- * `(34,197,94)`. The utility no longer matches the token it is named after.
+ * `bg-success`, not `green-500`: Tailwind's oklch green renders `(0,201,80)`,
+ * the design-system value is `(34,197,94)`.
  */
 const DOT = "size-2.5 shrink-0 rounded-full";
 
@@ -36,7 +36,10 @@ export function StatusBadge({ status }: { status?: string }) {
     <Badge variant="secondary" className="capitalize">
       <span
         aria-hidden
-        className={cn(DOT, status === "active" ? "bg-success" : "bg-muted-foreground")}
+        className={cn(
+          DOT,
+          status === "active" || status === "live" ? "bg-success" : "bg-muted-foreground",
+        )}
       />
       {status.replace(/_/g, " ")}
     </Badge>

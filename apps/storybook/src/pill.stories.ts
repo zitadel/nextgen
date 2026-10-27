@@ -10,15 +10,15 @@ interface PillArgs {
 }
 
 /**
- * Pill atom (`<zl-pill>`). Renders an anchor when `href` is set (the
- * "Secured with Zitadel" attribution chip) and a span otherwise.
+ * Pill atom (`<zl-pill>`). Renders an anchor when `href` is set and a span
+ * otherwise.
  *
  * One controls-driven story: tone, label, and href are knobs.
  */
 const meta: Meta<PillArgs> = {
   title: "Atoms/Pill",
   tags: ["autodocs"],
-  args: { label: "Secured with Zitadel", tone: "neutral", href: "" },
+  args: { label: "Active", tone: "neutral", href: "" },
   argTypes: {
     label: { control: "text" },
     tone: { control: "select", options: ["neutral", "outline", "success", "error"] },

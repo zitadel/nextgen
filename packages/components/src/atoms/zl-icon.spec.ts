@@ -5,10 +5,9 @@ import { SHIPPED_ICON_NAMES } from "./zl-icon.js";
 import type { ZlIcon } from "./zl-icon.js";
 
 /**
- * `<zl-icon>` renders a curated Lucide glyph. The key invariant the code
- * comment promises ("keep playgrounds and parity tests in sync") is that
- * every name in `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so
- * a name added to the union without a node entry fails the build.
+ * `<zl-icon>` renders a curated Lucide glyph. Every name in
+ * `SHIPPED_ICON_NAMES` maps to a real glyph — asserted here so a name added
+ * to the union without a node entry fails the build.
  */
 describe("<zl-icon>", () => {
   let host: HTMLDivElement;
@@ -60,7 +59,9 @@ describe("<zl-icon>", () => {
   it("adds the spin modifier class when spin is set", async () => {
     const el = mount(`<zl-icon name="spinner" spin decorative></zl-icon>`);
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(true);
+    expect(el.shadowRoot?.querySelector(".zr-icon")?.classList.contains("zr-icon--spin")).toBe(
+      true,
+    );
   });
 
   it("adds a tone modifier class for non-default tones", async () => {
@@ -108,5 +109,18 @@ describe("brand marks and colour", () => {
     const paths = [...(svg?.querySelectorAll("path") ?? [])];
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.every((path) => path.getAttribute("fill") !== null)).toBe(true);
+  });
+
+  it("leaves a monochrome mark's paths unfilled, so GitHub follows the label colour", async () => {
+    brandHost.innerHTML = `<zl-icon name="brand-github" size="16" decorative></zl-icon>`;
+    const el = brandHost.querySelector("zl-icon") as ZlIcon;
+    await el.updateComplete;
+    const svg = el.shadowRoot?.querySelector("svg");
+
+    expect(svg?.getAttribute("fill")).toBe("currentColor");
+    expect(svg?.getAttribute("stroke")).toBeNull();
+    const paths = [...(svg?.querySelectorAll("path") ?? [])];
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((path) => path.getAttribute("fill") === null)).toBe(true);
   });
 });

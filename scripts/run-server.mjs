@@ -2,13 +2,15 @@
 import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, run } from "./dev-process.mjs";
+import { runnerCommand } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
 
 try {
   if (!isHelp(args) && args[0] !== "migrate" && args[0] !== "completion") {
-    await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+    const build = runnerCommand(["console:build"]);
+    await run(build.command, build.args, { cwd: repoRoot });
   }
   await run("go", ["run", ".", ...args], { cwd: repoRoot });
 } catch (error) {

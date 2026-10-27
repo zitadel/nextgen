@@ -1,0 +1,20 @@
+title: RollbackDeploymentRequest
+type: object
+description: |
+  What to record alongside the rollback; the release, variable values and
+  targets are not chosen here.
+additionalProperties: false
+properties:
+  message:
+    type: string
+    maxLength: 1024
+    description: |
+      A short free-form summary of why the rollback happened. Recorded on
+      the new deployment's metadata.
+    example: phone_number broke sign-up
+  expected_deployment_id:
+    description: |
+      Roll back only if the project's newest primary deployment is this one.
+      Otherwise the request fails with `409 dep.conflict` and nothing
+      changes. Not stored.
+    $ref: ../../../../components/schemas/deployment-id.yaml

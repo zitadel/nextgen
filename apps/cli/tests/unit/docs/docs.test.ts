@@ -34,7 +34,9 @@ async function skillMarkdown(): Promise<string[]> {
   return [
     join(root, "README.md"),
     join(skillDir, "SKILL.md"),
-    ...refs.filter((name) => name.endsWith(".md")).map((name) => join(skillDir, "references", name)),
+    ...refs
+      .filter((name) => name.endsWith(".md"))
+      .map((name) => join(skillDir, "references", name)),
   ];
 }
 
@@ -56,6 +58,7 @@ describe("agent contract", () => {
     expect(skill).toContain("## Golden path");
     expect(skill).toContain("--non-interactive --json");
     expect(skill).toContain("E_PORT_IN_USE");
+    expect(skill).toContain("E_CREDENTIAL_MISSING");
   });
 
   it("delegates the command surface to runtime discovery instead of hardcoding it", async () => {

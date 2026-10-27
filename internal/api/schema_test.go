@@ -15,9 +15,9 @@ import (
 // turned a body without sso into invalid JSON.
 func TestUserSchemaRoundTrip(t *testing.T) {
 	bodies := map[string]string{
-		"no sso":             `{"kind":"user-schema","metaSchema":"https://x/user-schema.json","x-auth-methods":{"password":{"enabled":true}}}`,
-		"sso disabled":       `{"kind":"user-schema","metaSchema":"https://x/user-schema.json","x-auth-methods":{"sso":{"enabled":false}}}`,
-		"sso with providers": `{"kind":"user-schema","metaSchema":"https://x/user-schema.json","x-auth-methods":{"sso":{"enabled":true,"providers":["google","github"]}}}`,
+		"no sso":             `{"kind":"user-schema","objectType":"human-user","metaSchema":"https://x/user-schema.json","x-auth-methods":{"password":{"enabled":true}}}`,
+		"sso disabled":       `{"kind":"user-schema","objectType":"human-user","metaSchema":"https://x/user-schema.json","x-auth-methods":{"sso":{"enabled":false}}}`,
+		"sso with providers": `{"kind":"user-schema","objectType":"human-user","metaSchema":"https://x/user-schema.json","x-auth-methods":{"sso":{"enabled":true,"providers":["google","github"]}}}`,
 	}
 	for name, body := range bodies {
 		t.Run(name, func(t *testing.T) {

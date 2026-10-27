@@ -26,13 +26,6 @@ function suggestionsIn(envelope: Envelope): string[] {
   return envelope.next_commands ?? envelope.data?.next_commands ?? [];
 }
 
-interface PlanTotals {
-  creates: number;
-  updates: number;
-  deletes: number;
-  total: number;
-}
-
 function envelopeOf(result: CliResult): Envelope {
   try {
     return parseJson(result.stdout) as Envelope;
@@ -190,22 +183,11 @@ expect.extend({
           : `expected the output to say "${text}", but it was:\n\n${output.trim().slice(0, 600)}`,
     };
   },
-
-  toReportNothingToDo(received: PlanTotals) {
-    const pending = received.creates + received.updates + received.deletes;
-    const pass = pending === 0 && received.total === 0;
-    return {
-      pass,
-      message: () =>
-        pass
-          ? `expected something left to reconcile, but the plan was empty`
-          : `expected nothing left to reconcile, but the plan has ${received.creates} creates, ${received.updates} updates, ${received.deletes} deletes (total ${received.total})`,
-    };
-  },
 });
 
 declare module "vitest" {
-  interface Matchers<T = unknown> {
+  // biome-ignore lint/suspicious/noExplicitAny: must match vitest's own `Matchers<T = any>` type parameter exactly for declaration merging (TS2428).
+  interface Matchers<T = any> {
     /** Exit 0 and an envelope that is not an error. */
     toSucceed(): T;
     /** Exit 0 and `status: "skipped"` — the command found nothing to do. */
@@ -231,7 +213,5 @@ declare module "vitest" {
     toPrintNoJson(): T;
     /** The output, stdout or stderr, contains this text. */
     toSay(text: string): T;
-    /** Plan totals that are all zero. */
-    toReportNothingToDo(): T;
   }
 }

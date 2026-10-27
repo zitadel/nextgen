@@ -1,0 +1,28 @@
+get:
+  operationId: getPolicy
+  x-zitadel-cli: policies get
+  summary: Get a policy
+  description: |
+    Reads a policy as its newest revision, the one that applies the next time
+    its operation runs.
+
+    The lookup is scoped to the project in `project_id`: a policy of another
+    project answers not found exactly as an unknown id does.
+  tags:
+    - Policies
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/policy-id.yaml
+  security:
+    - oauth2:
+        - policy.read
+    - nextgenSession: []
+  responses:
+    '200':
+      description: The policy was retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: ../policy.yaml
+    default:
+      $ref: getPolicy-error-response.yaml

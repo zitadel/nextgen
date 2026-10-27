@@ -4,6 +4,8 @@
  * barrel side-effect-registers the elements.
  */
 
+import "../internal/lit-dev-mode.js";
+
 import "./zitadel-login.js";
 import "./zitadel-logout.js";
 import "./zitadel-session.js";
@@ -38,9 +40,11 @@ export {
   mandatoryGatesMarkerComment,
   MANDATORY_GATES_MARKER,
 } from "./mandatory-gates.js";
+import defaultTemplateSource from "./templates/default.liquid";
+import layoutChromeCssSource from "./templates/layout-chrome.css?inline";
 export { createSanitiser } from "./sanitiser.js";
-export { default as defaultTemplate } from "./templates/default.liquid";
-export { default as layoutChromeCss } from "./templates/layout-chrome.css?inline";
+export const defaultTemplate: string = defaultTemplateSource;
+export const layoutChromeCss: string = layoutChromeCssSource;
 export { startFlow, submitStep, getCurrentStep } from "./api-client.js";
 export {
   validateBranding,

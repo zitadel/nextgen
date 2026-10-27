@@ -4,8 +4,33 @@ import type { CreateFlow201, CreateFlow201StepFieldsItem } from "@zitadel/api/ge
 import type { SeedContext } from "./seed";
 import type { InstanceHandle, MintedSession, SeededUser } from "./types";
 
-/** Mirrors the server's session cookie (internal/api/session.go). */
+/**
+ * Mirrors the server's session cookie (internal/api/session.go): the name a
+ * direct call to the server sends, and the one an app keeps behind a proxy that
+ * passes the server's cookie through, such as an SPA's in production.
+ */
 export const SESSION_COOKIE_NAME = "__nextgen_session";
+
+/**
+ * The cookie an app keeps its session in on its own origin behind a server SDK
+ * (Next.js, Nuxt, SvelteKit, SolidStart, TanStack Start, Qwik Router) or the dev
+ * proxy `zitadel setup` writes for an SPA: `__nextgen_session_<projectId>`. The
+ * proxy renames the server's cookie, so the apps and the Console on one host
+ * keep a session each (ADR 073).
+ *
+ * Mirrors `sessionCookieName` in `@zitadel/sdk-core`, including the
+ * percent-encoding of every byte outside `[A-Za-z0-9_-]`.
+ */
+export function sessionCookieName(projectId: string): string {
+  let name = `${SESSION_COOKIE_NAME}_`;
+  for (const byte of new TextEncoder().encode(projectId)) {
+    const char = String.fromCharCode(byte);
+    name += /[A-Za-z0-9_-]/.test(char)
+      ? char
+      : `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
+  }
+  return name;
+}
 
 const MAX_FLOW_STEPS = 6;
 
@@ -65,11 +90,17 @@ export async function mintSession(
         },
       };
     }
-    response = await flowFetch(handle, jar, origin, `/flow/${encodeURIComponent(response.id)}/submit`, {
-      session_token: response.session_token,
-      action: "submit",
-      fields: collectFields(response, values),
-    });
+    response = await flowFetch(
+      handle,
+      jar,
+      origin,
+      `/flow/${encodeURIComponent(response.id)}/submit`,
+      {
+        session_token: response.session_token,
+        action: "submit",
+        fields: collectFields(response, values),
+      },
+    );
   }
 
   throw new Error(
@@ -118,8 +149,7 @@ async function flowFetch(
   jar.absorb(response);
   const parsed = (await response.json().catch(() => undefined)) as CreateFlow201 | undefined;
   if (!response.ok || !parsed) {
-    const detail =
-      parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
+    const detail = parsed && typeof parsed === "object" ? ` — ${JSON.stringify(parsed)}` : "";
     // An origin-allowlist rejection without an Origin header is a
     // configuration gap, not a flow problem — say how to close it. (No eager
     // check: a project with an empty allowlist may accept originless calls.)
@@ -138,7 +168,10 @@ async function flowFetch(
  * convention — from the known email/password values. An unknown required
  * field means this flow needs more than a password login can provide.
  */
-function collectFields(response: CreateFlow201, values: Record<string, string>): Record<string, string> {
+function collectFields(
+  response: CreateFlow201,
+  values: Record<string, string>,
+): Record<string, string> {
   const fields: Record<string, string> = {};
   for (const field of response.step.fields ?? []) {
     const value = values[fieldKey(field)];

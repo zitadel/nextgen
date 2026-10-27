@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { forwardedArgs, formatCommand, run } from "./dev-process.mjs";
 import { assertServerBuildPackage, gitInfo, serverLdflags } from "./server-build.mjs";
+import { runnerCommand } from "./task-runner.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const args = withServerMigrateArgs(forwardedArgs());
@@ -26,14 +27,17 @@ try {
     process.stderr.write(`\n[server-debug] build: ${formatCommand("go", buildArgs)}\n`);
     process.stderr.write(`[server-debug] run:   ${formatCommand(`./${out}`, args)}\n\n`);
     if (args[0] !== "migrate" && args[0] !== "completion") {
-      await run("moon", ["run", "console:build", "login-ui:build"], { cwd: repoRoot });
+      const build = runnerCommand(["console:build"]);
+      await run(build.command, build.args, { cwd: repoRoot });
     }
     await run("go", buildArgs, { cwd: repoRoot });
     await runBinary(`./${out}`, args, repoRoot);
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1);
+  process.exit(
+    typeof error === "object" && error !== null && typeof error.code === "number" ? error.code : 1,
+  );
 }
 
 async function runBinary(command, binaryArgs, cwd) {

@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -14,132 +17,137 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		return nil, err
 	}
 
-	projectID := string(params.ProjectID)
-
-	// The decoder fills the schema default (deploy) when the body omits the
-	// reason, and the wire enum is closed, so the parse error branch is
-	// unreachable over HTTP.
-	reason, err := domain.DeploymentReasonString(string(req.Reason.Or(api.DeploymentReasonDeploy)))
-	if err != nil {
-		return nil, domain.ErrDeploymentInvalid("unknown reason", err)
+	// Not in the schema: ogen cannot generate an exactly-one constraint.
+	if req.ReleaseID.Set == req.ContentHash.Set {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("name the release by exactly one of release_id and content_hash")
 	}
-
-	// Names are the wire address of an environment and stop being useful the
-	// moment the request is understood, so both are resolved to ids here —
-	// once, at the edge — and everything below works on ids the record keeps.
-	env, err := h.environmentService.GetByName(ctx, projectID, string(req.Environment))
-	if err != nil {
-		return nil, err
+	// TODO(#1574): look the release up by its digest.
+	if req.ContentHash.Set {
+		return nil, domain.ErrNotImplemented()
 	}
-	var sourceEnvironmentID, sourceEnvironmentName *string
-	if source, ok := req.SourceEnvironment.Get(); ok {
-		// Shape before existence: a source on a non-promotion is invalid
-		// whatever name it carries, so it answers 400 rather than leaking
-		// whether the name resolves. The domain check repeats this as
-		// defense for in-process callers.
-		if reason != domain.DeploymentReasonPromote {
-			return nil, domain.ErrDeploymentInvalid("source_environment is only valid with reason promote", nil)
-		}
-		sourceEnv, err := h.environmentService.GetByName(ctx, projectID, string(source))
+	input := service.DeployInput{
+		ProjectID: string(params.ProjectID),
+		ReleaseID: string(req.ReleaseID.Value),
+		Targets:   req.Targets,
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
+	}
+	if reason, ok := req.Reason.Get(); ok {
+		parsed, err := domain.DeploymentReasonString(string(reason))
 		if err != nil {
-			return nil, err
+			return nil, domain.ErrDeploymentInvalid().WithMessage("unknown reason").WithParent(err)
 		}
-		sourceEnvironmentID = &sourceEnv.ID
-		// The name as it resolved, snapshotted onto the record: the history
-		// stays readable after a rename, and the id stays the identity.
-		sourceEnvironmentName = &sourceEnv.Name
-	}
-
-	input := service.CreateDeploymentInput{
-		ProjectID:             projectID,
-		EnvironmentID:         env.ID,
-		ReleaseID:             string(req.ReleaseID),
-		Reason:                reason,
-		SourceEnvironmentID:   sourceEnvironmentID,
-		SourceEnvironmentName: sourceEnvironmentName,
+		input.Reason = parsed
 	}
 	if message, ok := req.Message.Get(); ok {
 		input.Message = &message
 	}
-	if expected, ok := req.ExpectedCurrentDeploymentID.Get(); ok {
-		value := string(expected)
-		input.ExpectedCurrentDeploymentID = &value
+	if expected, ok := req.ExpectedDeploymentID.Get(); ok {
+		input.ExpectedDeploymentID = new(string(expected))
 	}
 
-	result, err := h.deploymentService.Create(ctx, input)
+	result, err := h.deploymentService.Deploy(ctx, input)
+	if conflict, ok := deploymentConflictResponse(err); ok {
+		return conflict, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	// 201 only when this call made the release live. Deploying what already
-	// runs answers 200 with the deployment that made it live, so a re-run of
-	// `zitadel deploy` on unchanged content is a no-op rather than a growing
-	// log of identical rows.
-	deployment := toAPIDeployment(result.Deployment)
+	// Created or not, the deployment is the newest to its targets.
+	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
 	if result.Created {
-		created := api.CreateDeploymentCreated(deployment)
+		created := api.CreateDeploymentCreated(resp)
 		return &created, nil
 	}
-	reused := api.CreateDeploymentOK(deployment)
-	return &reused, nil
+	unchanged := api.CreateDeploymentOK(resp)
+	return &unchanged, nil
+}
+
+func (h *Handler) RollbackDeployment(ctx context.Context, req api.OptRollbackDeploymentRequest, params api.RollbackDeploymentParams) (api.RollbackDeploymentRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
+	}
+
+	input := service.RollbackDeploymentInput{
+		ProjectID:    string(params.ProjectID),
+		DeploymentID: string(params.DeploymentID),
+	}
+	if body, ok := req.Get(); ok {
+		if message, ok := body.Message.Get(); ok {
+			input.Message = &message
+		}
+		if expected, ok := body.ExpectedDeploymentID.Get(); ok {
+			input.ExpectedDeploymentID = new(string(expected))
+		}
+	}
+
+	result, err := h.deploymentService.Rollback(ctx, input)
+	if conflict, ok := deploymentConflictResponse(err); ok {
+		return conflict, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	// Created or not, the deployment is the project's newest primary one.
+	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
+	if result.Created {
+		created := api.RollbackDeploymentCreated(resp)
+		return &created, nil
+	}
+	unchanged := api.RollbackDeploymentOK(resp)
+	return &unchanged, nil
 }
 
 func (h *Handler) GetDeploymentById(ctx context.Context, params api.GetDeploymentByIdParams) (api.GetDeploymentByIdRes, error) {
-	// Deployments are addressed by a path id, but the read is scoped to the
-	// project the caller named, so a deployment of another project reads as
-	// an unknown id rather than a forbidden one and is no existence oracle.
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
-
-	entity, err := h.deploymentService.Get(ctx, string(params.ProjectID), string(params.DeploymentID))
+	entity, live, err := h.deploymentService.Read(ctx, string(params.ProjectID), string(params.DeploymentID))
 	if err != nil {
 		return nil, err
 	}
-	deployment := toAPIDeployment(entity)
-	return &deployment, nil
+	resp := toAPIDeployment(entity, toAPIDeploymentStatus(live))
+	return &resp, nil
+}
+
+func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDeploymentVariablesParams) (api.GetDeploymentVariablesRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
+		return nil, err
+	}
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
+		return nil, err
+	}
+	return nil, domain.ErrNotImplemented()
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
-	ctx, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
 	if err != nil {
 		return nil, err
 	}
-
-	input := service.ListDeploymentsInput{
-		ProjectID: string(params.ProjectID),
-		PageToken: string(params.PageToken.Value),
-		Limit:     int(params.Limit.Value),
-	}
-	for _, expand := range params.Expand {
-		if expand == api.DeploymentExpandRelease {
-			input.IncludeReleases = true
-		}
-	}
-	// Expanding answers 403 rather than a silently missing property: a
-	// caller could not tell that from a release that failed to resolve. The
-	// release is a different resource under a different permission, so it is
-	// gated on its own (ADR 059).
-	if input.IncludeReleases {
+	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
+	// A Console session mints no scopes, so the list check's project-wide
+	// decision stands in for release.read (#1300 §4, as the users list does
+	// for its expands): a session that reads the project reads its releases.
+	scopeCtx, _ := GetScopeContext(ctx)
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if includeReleases && !sessionReads {
 		if err := requireReleaseRead(ctx); err != nil {
 			return nil, err
 		}
 	}
-	// The filter resolves like every other environment address: a name
-	// nothing answers to is env.not_found rather than an empty history —
-	// which is why it takes environment.read on its own, like the release
-	// expand does: the answer says whether an environment exists, and that
-	// is the environment's permission to give, not the deployment log's.
-	if name, ok := params.EnvironmentName.Get(); ok {
-		if err := requireEnvironmentRead(ctx); err != nil {
-			return nil, err
-		}
-		env, err := h.environmentService.GetByName(ctx, string(params.ProjectID), string(name))
-		if err != nil {
-			return nil, err
-		}
-		input.EnvironmentID = &env.ID
-	}
 
+	input := service.ListDeploymentsInput{
+		ProjectID:       string(params.ProjectID),
+		Live:            params.Live.Value,
+		IncludeReleases: includeReleases,
+		PageToken:       string(params.PageToken.Value),
+		Limit:           int(params.Limit.Value),
+	}
+	if origin, ok := params.Origin.Get(); ok {
+		input.Origin = new(string(origin))
+	}
 	result, err := h.deploymentService.List(ctx, input)
 	if err != nil {
 		return nil, err
@@ -147,11 +155,9 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 
 	resp := api.ListDeploymentsResponse{Deployments: make([]api.Deployment, len(result.Items))}
 	for i, entity := range result.Items {
-		resp.Deployments[i] = toAPIDeployment(entity)
-		if result.ReleasesByID != nil {
-			if release, ok := result.ReleasesByID[entity.ReleaseID]; ok {
-				resp.Deployments[i].Release = api.NewOptRelease(toAPIRelease(release))
-			}
+		resp.Deployments[i] = toAPIDeployment(entity, toAPIDeploymentStatus(result.Live[entity.ID]))
+		if release, ok := result.ReleasesByID[entity.ReleaseID]; ok {
+			resp.Deployments[i].Release = api.NewOptRelease(toAPIRelease(release))
 		}
 	}
 	if result.NextPageToken != "" {
@@ -160,64 +166,126 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	return &resp, nil
 }
 
-/* ---------------- CONVERTERS ---------------- */
+func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
+	// A preview has no id for a list filter to scope, so access is
+	// project-wide or nothing.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
+		return nil, err
+	}
 
-// toAPIDeployment writes absent metadata fields as explicit nulls rather
-// than omitting them, so a client reading `deployed_by` finds the same shape
-// whether the deployment was made by a person or by a pipeline.
-func toAPIDeployment(entity *domain.Deployment) api.Deployment {
-	metadata := api.DeploymentMetadata{
-		Reason: api.NewOptDeploymentReason(api.DeploymentReason(entity.Metadata.Reason.String())),
+	result, err := h.deploymentService.ListPreviews(ctx, service.ListPreviewsInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
 	}
-	if message := entity.Metadata.Message; message != nil {
-		metadata.Message.SetTo(*message)
+
+	resp := api.ListPreviewsResponse{Previews: make([]api.Preview, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Previews[i] = api.Preview{
+			Origin:    api.Origin(entity.Origin),
+			ExpiresAt: entity.ExpiresAt,
+			CreatedAt: entity.CreatedAt,
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
+}
+
+func (h *Handler) RemovePreview(ctx context.Context, req *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
+		return nil, err
+	}
+	if err := h.deploymentService.RemovePreview(ctx, string(params.ProjectID), string(req.Origin)); err != nil {
+		return nil, err
+	}
+	return &api.RemovePreviewNoContent{}, nil
+}
+
+// deploymentConflictResponse answers dep.conflict with the typed 409, whose
+// details.deployment is the deployment the write replaces. Through NewError
+// the details would nest under details.details.
+func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok {
+		return nil, false
+	}
+	if de.Code == domain.ErrReleaseRevoked().Code {
+		resp := api.NewReleaseRevokedConflictDeploymentConflict(api.ReleaseRevokedConflict{Code: de.Code, Message: de.Message})
+		return &resp, true
+	}
+	if de.Code != domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code {
+		return nil, false
+	}
+	body := api.DeploymentGuardConflict{Code: de.Code, Message: de.Message}
+	if details, _ := de.Details.(domain.DeploymentConflictDetails); details.Deployment != nil {
+		// The deployment a write replaces is the newest one.
+		body.Details.Deployment = api.NewNilDeployment(toAPIDeployment(details.Deployment, api.DeploymentStatusLive))
 	} else {
-		metadata.Message.SetToNull()
+		body.Details.Deployment.SetToNull()
 	}
-	if source := entity.Metadata.SourceEnvironmentID; source != nil {
-		metadata.SourceEnvironmentID.SetTo(*source)
-	} else {
-		metadata.SourceEnvironmentID.SetToNull()
-	}
-	if sourceName := entity.Metadata.SourceEnvironmentName; sourceName != nil {
-		metadata.SourceEnvironmentName.SetTo(api.EnvironmentName(*sourceName))
-	} else {
-		metadata.SourceEnvironmentName.SetToNull()
-	}
-	if deployedBy := entity.Metadata.DeployedBy; deployedBy != nil {
-		metadata.DeployedBy.SetTo(*deployedBy)
-	} else {
-		metadata.DeployedBy.SetToNull()
-	}
-	if actorType := entity.Metadata.DeployedByType; actorType != nil {
-		metadata.DeployedByType.SetTo(api.DeploymentMetadataDeployedByType(*actorType))
-	} else {
-		metadata.DeployedByType.SetToNull()
-	}
-	return api.Deployment{
-		ID:            api.DeploymentID(entity.ID),
-		ProjectID:     api.ProjectID(entity.ProjectID),
-		EnvironmentID: entity.EnvironmentID,
-		ReleaseID:     api.ReleaseID(entity.ReleaseID),
-		DeployedAt:    entity.DeployedAt,
-		Metadata:      metadata,
-	}
+	resp := api.NewDeploymentGuardConflictDeploymentConflict(body)
+	return &resp, true
 }
 
 // deploymentErrorResponse maps the deployment error codes onto statuses.
-// dep.conflict is the failed expected_current_deployment_id check: the 409
-// details carry the environment's actual current deployment and release.
+// dep.conflict is the failed expected_deployment_id check: the 409 details
+// carry the deployment the write would replace.
 func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrDeploymentNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrDeploymentInvalid(nil, nil).Code:
+	case domain.ErrDeploymentInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrDeploymentPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+func toAPIDeploymentStatus(live bool) api.DeploymentStatus {
+	if live {
+		return api.DeploymentStatusLive
+	}
+	return api.DeploymentStatusInactive
+}
+
+// toAPIDeployment converts a deployment.
+func toAPIDeployment(entity *domain.Deployment, status api.DeploymentStatus) api.Deployment {
+	resp := api.Deployment{
+		ID:         api.DeploymentID(entity.ID),
+		ProjectID:  api.ProjectID(entity.ProjectID),
+		ReleaseID:  api.ReleaseID(entity.ReleaseID),
+		Kind:       api.DeploymentKind(entity.OriginKind.String()),
+		Targets:    make([]api.DeploymentTarget, len(entity.Targets)),
+		Status:     status,
+		DeployedAt: entity.DeployedAt,
+		Metadata: api.DeploymentMetadata{
+			Reason: api.DeploymentReason(entity.Metadata.Reason.String()),
+		},
+	}
+	for i, target := range entity.Targets {
+		resp.Targets[i] = api.DeploymentTarget{Origin: api.Origin(target.Origin)}
+	}
+	m := entity.Metadata
+	if m.Message != nil {
+		resp.Metadata.Message = api.NewOptNilString(*m.Message)
+	}
+	if m.RollbackTo != nil {
+		resp.Metadata.RollbackTo = api.NewOptNilDeploymentID(api.DeploymentID(*m.RollbackTo))
+	}
+	if m.DeployedBy != nil {
+		resp.Metadata.DeployedBy = api.NewOptNilString(*m.DeployedBy)
+	}
+	if m.DeployedByType != nil {
+		resp.Metadata.DeployedByType = api.NewOptNilDeploymentMetadataDeployedByType(api.DeploymentMetadataDeployedByType(*m.DeployedByType))
+	}
+	return resp
 }

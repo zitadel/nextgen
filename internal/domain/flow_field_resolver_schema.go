@@ -158,9 +158,10 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		Type:      fieldType,
 		Challenge: challenge,
 		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
+		// No length rule here: whether the user chooses the password depends
+		// on the purpose on the flow state, which the step's fields are
+		// resolved against at render and at submit alike (see
+		// FlowStateMachineRuntime.applyPasswordPolicy).
 	}, nil
 }
 
@@ -527,4 +528,77 @@ func (x xAuthMethodsReader) IsEnabled(method string) bool {
 	}
 	enabled, _ := entry["enabled"].(bool)
 	return enabled
+}
+
+// SSOProviders returns the IDP connection slugs under `sso.providers`, or
+// none when SSO is not enabled.
+func (x xAuthMethodsReader) SSOProviders() []string {
+	if !x.IsEnabled("sso") {
+		return nil
+	}
+	methods, _ := x.raw.V.(map[string]any)
+	sso, _ := methods["sso"].(map[string]any)
+	providers, _ := sso["providers"].([]any)
+	slugs := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if slug, ok := provider.(string); ok {
+			slugs = append(slugs, slug)
+		}
+	}
+	return slugs
+}
+
+// requirednessKeywords can make a property required outside a `required`
+// list, or (a reference) hide what a subschema requires.
+var requirednessKeywords = map[string]bool{
+	"allOf": true, "anyOf": true, "oneOf": true, "not": true,
+	"if": true, "then": true, "else": true,
+	"dependentRequired": true, "dependentSchemas": true, "dependencies": true,
+	"$ref": true, "$dynamicRef": true,
+}
+
+// ComposesRequiredness reports whether this level or any subschema below it
+// carries a keyword in [requirednessKeywords], so [schemaReader.RequiredPaths]
+// would not see every requirement.
+func (r schemaReader) ComposesRequiredness() bool {
+	return composesRequiredness(r.s)
+}
+
+func composesRequiredness(s *jsonschema.Schema) bool {
+	if s == nil {
+		return false
+	}
+	for _, part := range s.Parts {
+		if part.Keyword.Generated {
+			continue
+		}
+		if requirednessKeywords[part.Keyword.Name] {
+			return true
+		}
+		var subs []*jsonschema.Schema
+		switch v := part.Value.(type) {
+		case types.PartSchema:
+			subs = []*jsonschema.Schema{v.S}
+		case *types.PartSchema:
+			subs = []*jsonschema.Schema{v.S}
+		case types.PartSchemas:
+			subs = v
+		case types.PartMapSchema:
+			for _, sub := range v {
+				subs = append(subs, sub)
+			}
+		case types.PartSchemaOrSchemas:
+			subs = append(v.Schemas, v.Schema)
+		case types.PartMapArrayOrSchema:
+			for _, sub := range v {
+				subs = append(subs, sub.Schema)
+			}
+		}
+		for _, sub := range subs {
+			if composesRequiredness(sub) {
+				return true
+			}
+		}
+	}
+	return false
 }

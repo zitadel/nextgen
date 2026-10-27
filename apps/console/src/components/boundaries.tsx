@@ -1,12 +1,29 @@
-import { useRouter } from "@tanstack/react-router";
+import { Link, useMatch, useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { ApiError } from "@zitadel/api/runtime/fetch";
-import { AlertCircle, Loader2, TriangleAlert } from "lucide-react";
+import { ApiError, apiErrorCode } from "@zitadel/api/runtime/fetch";
+import { Loader2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
-import { fetchSession, invalidateSessionCache } from "../auth/session";
+import { fetchSession, invalidateSessionCache } from "@/auth/session";
+import { describeError } from "@/lib/api-error";
+import { routerRelativeHref } from "@/lib/base-path";
+import { withoutTrailingSlash } from "@/lib/project-scope";
+
+import { navItemFor, useNavItems } from "./app-shell/use-nav-items";
+import { EYEBROW } from "./typography";
+
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    /**
+     * What a detail screen shows, as a lower-case noun: `"user"`. A 404 there
+     * says which thing is gone, "User not found", and leads back to the
+     * sidebar entry the screen sits beneath.
+     */
+    resource?: string;
+  }
+}
 
 const STATE_ROW = "flex items-center justify-center gap-2 text-muted-foreground";
 
@@ -23,6 +40,86 @@ function StatePage({ children }: { children: ReactNode }) {
       <div className="w-full max-w-xl">{children}</div>
     </div>
   );
+}
+
+/**
+ * The anatomy every error page shares (ADR 076): the status, a title, one
+ * sentence, a way on and, for a refused request, the request ID to quote,
+ * which finds the request in the server's logs. Not the error code: it is for
+ * programs, the sentence already says it for people, and the logs hold it.
+ * The docs and the server's own page show the same parts in their own chrome.
+ */
+function ErrorPage({
+  status,
+  title,
+  children,
+  action,
+  requestId,
+}: {
+  status?: number;
+  title: string;
+  children: ReactNode;
+  action?: ReactNode;
+  requestId?: string;
+}) {
+  return (
+    <StatePage>
+      <div role="alert" className="flex flex-col items-center gap-3 text-center">
+        {status !== undefined && <p className={EYEBROW}>Error {status}</p>}
+        <h1 className="text-foreground font-serif text-2xl leading-8 tracking-tight text-balance">
+          {title}
+        </h1>
+        <p className="text-muted-foreground max-w-md text-sm leading-6 text-balance">{children}</p>
+        {action && <div className="mt-3">{action}</div>}
+        {requestId && (
+          <p className="text-muted-foreground mt-3 text-xs">
+            Request ID <code className="font-mono">{requestId}</code>
+          </p>
+        )}
+      </div>
+    </StatePage>
+  );
+}
+
+/**
+ * The way on from an error page: Projects, without the selected project. Not
+ * the start page, which lands on Users while a project is selected, and not
+ * with the project, which every link keeps (`retainSearchParams` in
+ * `routes/_authed.tsx`): either would lead back to the screen that failed,
+ * as it does for a `?project=` the server refuses. An explicit `undefined`
+ * is what tells the middleware to drop it.
+ */
+function ProjectsLink() {
+  return (
+    <Button asChild>
+      <Link to="/projects" search={{ project: undefined }}>
+        Go to Projects
+      </Link>
+    </Button>
+  );
+}
+
+interface NavLink {
+  to: string;
+  label: string;
+}
+
+/**
+ * For a 404 on a detail screen, what is gone and the list the screen sits
+ * beneath, where the person was a step before. The project stays selected; if
+ * it is what is missing, the list fails in turn and offers Projects.
+ */
+function useGone(error: unknown): { resource: string; list: NavLink } | undefined {
+  const match = useMatch({ strict: false, shouldThrow: false });
+  const items = useNavItems();
+  const resource = match?.staticData.resource;
+  if (!match || !resource || !(error instanceof ApiError) || error.status !== 404) {
+    return undefined;
+  }
+  const path = withoutTrailingSlash(match.fullPath);
+  const item = navItemFor(items, path);
+  if (!item?.to || item.to === path) return undefined;
+  return { resource, list: { to: item.to, label: item.nav.label } };
 }
 
 /** Shared pending boundary (Console ADR 0001). */
@@ -52,11 +149,17 @@ export function PendingState() {
  *   Console session, for instance). Redirecting would bounce straight back and
  *   loop, so this renders an honest error state instead.
  *
- * 403 stays a rendered state — signed in, but no access.
+ * A `403 sess.project_mismatch` is probed the same way: the cookie now holds a
+ * session of another project, such as an app's on the same host, so the
+ * console's own session is gone. Any other 403 stays a rendered state —
+ * signed in, but no access.
  */
 export function ErrorState({ error }: ErrorComponentProps) {
   const router = useRouter();
-  const unauthenticated = error instanceof ApiError && error.status === 401;
+  const gone = useGone(error);
+  const unauthenticated =
+    error instanceof ApiError &&
+    (error.status === 401 || apiErrorCode(error) === "sess.project_mismatch");
   // null = probing, true = signed in (render copy), false = redirecting.
   const [sessionAlive, setSessionAlive] = useState<boolean | null>(null);
 
@@ -72,12 +175,9 @@ export function ErrorState({ error }: ErrorComponentProps) {
       }
       setSessionAlive(false);
       const { pathname, searchStr } = router.state.location;
-      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
-      const href = `${pathname}${searchStr}`;
-      const next = base && href.startsWith(base) ? href.slice(base.length) : href;
       void router.navigate({
         to: "/login",
-        search: { next: next === "/" ? undefined : next },
+        search: { next: routerRelativeHref(`${pathname}${searchStr}`) },
       });
     });
     return () => {
@@ -88,17 +188,16 @@ export function ErrorState({ error }: ErrorComponentProps) {
   if (unauthenticated) {
     if (sessionAlive) {
       return (
-        <StatePage>
-          <Alert variant="destructive">
-            <AlertCircle aria-hidden />
-            <AlertTitle>Console API not authorized</AlertTitle>
-            <AlertDescription>
-              You are signed in, but the server did not accept your session for this request.
-              Signing out and in again may help; if it persists, this screen calls an operation the
-              console session cannot use yet.
-            </AlertDescription>
-          </Alert>
-        </StatePage>
+        <ErrorPage
+          status={error.status}
+          title="Console API not authorized"
+          requestId={error.requestId}
+          action={<ProjectsLink />}
+        >
+          You are signed in, but the server did not accept your session for this request. Signing
+          out and in again may help; if it persists, this screen calls an operation the console
+          session cannot use yet.
+        </ErrorPage>
       );
     }
     return (
@@ -111,48 +210,95 @@ export function ErrorState({ error }: ErrorComponentProps) {
     );
   }
 
-  const { heading, message } = describeError(error);
+  // The page names what is gone itself: the server's `user not found` only
+  // repeats the status, under a title that would say it again.
+  if (gone) {
+    const { resource, list } = gone;
+    return (
+      <ErrorPage
+        status={404}
+        title={`${resource.charAt(0).toUpperCase()}${resource.slice(1)} not found`}
+        requestId={error instanceof ApiError ? error.requestId : undefined}
+        action={
+          <Button asChild>
+            <Link to={list.to}>Back to {list.label}</Link>
+          </Button>
+        }
+      >
+        There is no {resource} with this ID. It may have been deleted, or the link may be broken.
+      </ErrorPage>
+    );
+  }
+
+  const { title, message, retry } = describeBoundaryError(error);
   return (
-    <StatePage>
-      <Alert variant="destructive">
-        <AlertCircle aria-hidden />
-        <AlertTitle>{heading}</AlertTitle>
-        <AlertDescription>{message}</AlertDescription>
-      </Alert>
-    </StatePage>
+    <ErrorPage
+      status={error instanceof ApiError ? error.status : undefined}
+      title={title}
+      requestId={error instanceof ApiError ? error.requestId : undefined}
+      action={
+        retry ? (
+          <Button onClick={() => void router.invalidate()}>Try again</Button>
+        ) : (
+          <ProjectsLink />
+        )
+      }
+    >
+      {message}
+    </ErrorPage>
   );
 }
 
-/** Shared not-found boundary. */
+/** Shared not-found boundary: a path no route matches. */
 export function NotFoundState() {
   return (
-    <StatePage>
-      <Alert>
-        <TriangleAlert aria-hidden />
-        <AlertTitle>Not found</AlertTitle>
-        <AlertDescription>
-          The page or resource you were looking for does not exist.
-        </AlertDescription>
-      </Alert>
-    </StatePage>
+    <ErrorPage status={404} title="Page not found" action={<ProjectsLink />}>
+      There is nothing at this address. The link may be broken, or the page may have moved.
+    </ErrorPage>
   );
 }
 
-function describeError(error: unknown): { heading: string; message: string } {
+/**
+ * The title and sentence for a failed load. The server owns the sentence
+ * (`describeError`); the title says what kind of failure it is, in the words
+ * every error page uses (ADR 076). A server fault or a request that got no
+ * answer may pass on a second try; a refusal will not.
+ */
+function describeBoundaryError(error: unknown): { title: string; message: string; retry: boolean } {
   if (error instanceof ApiError) {
     if (error.status === 403) {
       return {
-        heading: "Not authorized",
-        message: "You are signed in, but this account does not have access to this resource.",
+        title: "No access",
+        message: describeError(error, "You are signed in, but this account cannot open this page."),
+        retry: false,
+      };
+    }
+    if (error.status === 404) {
+      return {
+        title: "Not found",
+        message: describeError(error, "What this page shows does not exist, or no longer does."),
+        retry: false,
+      };
+    }
+    if (error.status >= 500) {
+      return {
+        title: "Something went wrong",
+        message: describeError(
+          error,
+          "The server could not complete this request. Try again in a moment.",
+        ),
+        retry: true,
       };
     }
     return {
-      heading: `Request failed (${error.status})`,
-      message: error.message,
+      title: "Request failed",
+      message: describeError(error, "The server could not complete this request."),
+      retry: false,
     };
   }
   return {
-    heading: "Something went wrong",
-    message: error instanceof Error ? error.message : "An unexpected error occurred.",
+    title: "Something went wrong",
+    message: describeError(error, "An unexpected error occurred."),
+    retry: true,
   };
 }

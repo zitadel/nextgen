@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
 import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -10,6 +10,23 @@ interface ResourceRow {
   readonly topic: string;
   readonly verbs?: string[];
 }
+
+const ACME_CONNECTION_FLAGS = [
+  "--slug",
+  "acme-sso",
+  "--protocol",
+  "oidc",
+  "--display-name",
+  "Acme SSO",
+  "--oidc-issuer",
+  "https://sso.acme.example",
+  "--oidc-client-id",
+  "abc123",
+  "--oidc-client-secret",
+  "${{ ACME_SSO_CLIENT_SECRET }}",
+  "--oidc-scopes",
+  "openid",
+];
 
 describe("resources", () => {
   describe("against an invalid server", () => {
@@ -88,10 +105,42 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        expect(data.resources.map((row) => row.topic)).toEqual(
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        expect(data.items.map((row) => row.topic)).toEqual(
           expect.arrayContaining(["users", "teams", "sessions", "idps", "schemas"]),
         );
+      });
+
+      it.each([
+        ["users", "delete", "user_1"],
+        ["teams", "deactivate", "team_1"],
+        ["sessions", "revoke", "sess_1"],
+      ])("refuses %s %s without --force when no one can be asked", async (topic, verb, id) => {
+        const app = await aSetUpApp();
+
+        const result = await app.run([topic, verb, id, "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest(`${topic} ${verb} ${id} --force`);
+      });
+
+      it("registers a connection made from its nested fields", async () => {
+        const app = await aSetUpApp();
+
+        await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
+
+        expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
+      });
+
+      it("reads a policy by its operation", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        expect(await app.publish()).toSucceed();
+
+        const result = await app.run(["policies", "get", PASSWORD_POLICY, "--json"]);
+
+        expect(app.envelopeOf<{ config: object }>(result).data.config).toEqual({ min_length: 12 });
       });
 
       it("says what can be done to each topic", async () => {
@@ -99,8 +148,8 @@ describe("resources", () => {
 
         const result = await app.run(["resources", "--json"]);
 
-        const { data } = app.envelopeOf<{ resources: ResourceRow[] }>(result);
-        for (const row of data.resources) {
+        const { data } = app.envelopeOf<{ items: ResourceRow[] }>(result);
+        for (const row of data.items) {
           expect(row.verbs ?? [], `${row.topic} lists no verbs`).not.toEqual([]);
         }
       });

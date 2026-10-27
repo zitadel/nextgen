@@ -4,22 +4,19 @@ layer: "library"
 stack: "frontend"
 dependsOn:
   - "api"
+  - "components"
 
 tasks:
-  lint:
-    command: "corepack pnpm run lint"
-
   typecheck:
-    command: "corepack pnpm run typecheck"
     deps:
-      - "api:build"
+      # contract.spec.ts imports @zitadel/components/events from its dist, and
+      # the edge specs import this package's built dist.
+      - "components:build"
+      - "build"
 
   build:
-    command: "corepack pnpm run build"
     deps:
       - "api:build"
-    outputs:
-      - "dist/**/*"
 
   build-release:
     script: |
@@ -37,4 +34,48 @@ tasks:
       runInCI: false
 
   test:
-    command: "corepack pnpm run test:all"
+    deps:
+      # contract.spec.ts imports @zitadel/components/events from its dist, and
+      # the edge specs import this package's built dist.
+      - "components:build"
+      - "build"
+    inputs:
+      - "**/*"
+      # contract.spec.ts reads these SDK specs to check their copied
+      # SERVER_RENDER_CASES tables and standard-attribute test titles and bodies for drift.
+      - "/packages/sdk-react/src/index.spec.tsx"
+      - "/packages/sdk-vue/src/components.spec.ts"
+      - "/packages/sdk-angular/src/lib/components.spec.ts"
+      - "/packages/sdk-svelte/src/index.spec.ts"
+      - "/packages/sdk-svelte/src/index.ssr.spec.ts"
+      - "/packages/sdk-solid/src/index.spec.tsx"
+      - "/packages/sdk-solid/src/index.ssr.spec.tsx"
+      - "/packages/sdk-qwik/src/index.spec.tsx"
+      - "/packages/sdk-qwik/src/index.ssr.spec.tsx"
+      # The client SDK entries, their edge specs and the configs that declare the edge project.
+      - "/packages/sdk-react/src/index.tsx"
+      - "/packages/sdk-vue/src/index.ts"
+      - "/packages/sdk-angular/src/public-api.ts"
+      - "/packages/sdk-svelte/src/lib/index.ts"
+      - "/packages/sdk-solid/src/index.tsx"
+      - "/packages/sdk-qwik/src/index.tsx"
+      - "/packages/sdk-next/src/client.ts"
+      - "/packages/sdk-nuxt/src/index.ts"
+      - "/packages/sdk-tanstack-start/src/react.tsx"
+      - "/packages/sdk-*/src/*.edge.spec.{ts,tsx}"
+      - "/packages/*/vitest.config.ts"
+      # And the meta-framework SDKs' server tests, to check they share their titles.
+      - "/packages/sdk-*/src/__tests__/*.test.ts"
+      - "/packages/sdk-*/src/__tests__/*/*.test.ts"
+      # It also reads every SDK's manifest and docs, and the demo apps' manifests
+      # and sources, to check that apps go through their SDK.
+      - "/packages/sdk-*/package.json"
+      - "/packages/sdk-*/README.md"
+      - "/packages/sdk-*/skills/**/SKILL.md"
+      - "/apps/demo-*/package.json"
+      - "/apps/demo-*/**/*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,vue,svelte,astro}"
+      - "!/apps/demo-*/**/node_modules/**/*"
+      # And every published package's manifest and build config, to check it
+      # ships no declaration map without its sources.
+      - "/packages/*/package.json"
+      - "/packages/*/tsconfig.lib.json"

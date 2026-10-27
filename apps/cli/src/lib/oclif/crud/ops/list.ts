@@ -3,13 +3,13 @@ import { Flags } from "@oclif/core";
 
 import { nonBlankString } from "../../flags";
 
-import { publicCliCommand } from "../../../public-cli";
 import type { CommandResult, GlobalOptions } from "../../types";
 import { collectPages } from "../paging";
 import { wireOf } from "../wire";
 import { type ParsedFilter, parseFilter, parseSort } from "../query";
 import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
+import { shellOption } from "../../../shell";
 import { fieldPaths, itemSchemaOf } from "../paths";
 import { renderRows, renderTable } from "../table";
 import type { Json, ListSpec } from "../types";
@@ -19,6 +19,7 @@ import {
   type OperationStatics,
   ResourceCommand,
 } from "./command";
+import { nextCommandsData } from "../../envelope";
 
 /**
  * `<topic> list`: one page by default, `--all` to drain, `--filter` / `--sort`
@@ -88,9 +89,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
       description: `List ${topic}.${spec.drains === true ? " Fetches every page unless --limit or --page-token asks for one." : ""}`,
       examples: [
         `<%= config.bin %> ${topic} list --json`,
-        ...(paged && spec.drains !== true
-          ? [`<%= config.bin %> ${topic} list --all --json`]
-          : []),
+        ...(paged && spec.drains !== true ? [`<%= config.bin %> ${topic} list --all --json`] : []),
         ...(filters[0]
           ? [
               `<%= config.bin %> ${topic} list --filter ${filters[0].field}=${filters[0].operations[0]}:<value>${sorts[0] ? ` --sort ${sorts[0]}:desc` : ""}`,
@@ -104,7 +103,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
 
   protected override async execute(
     { flags }: OperationInput,
-    meta: GlobalOptions,
+    _meta: GlobalOptions,
   ): Promise<CommandResult> {
     const { topic, resource, spec, options } = this.definition;
     const wire = wireOf(options.wire);
@@ -112,7 +111,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     // typo fails without contacting the server at all.
     const shape = fieldPaths(itemSchemaOf(spec.response, spec.items));
     const early = shape ? chosenColumns(flags.fields, resource.columns, [], shape) : undefined;
-    const ctx = await this.connect(meta);
+    const ctx = await this.context();
     // An unpaged endpoint has no cursor flags to read and would reject the
     // parameters anyway, so nothing is sent and one request is the whole list.
     const paged = spec.paged !== false;
@@ -194,8 +193,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         items: spec.items,
         all,
         nextPageToken: wire.nextPageToken,
-        token:
-          paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
+        token: paged && typeof flags["page-token"] === "string" ? flags["page-token"] : undefined,
       },
     )
       .then((page) => {
@@ -221,11 +219,13 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
     const nextCommands =
       next && !all
         ? [
-            publicCliCommand(
-              [`${topic} list`, ...repeatedFlags(flags), `--page-token ${shellArg(next)}`, "--json"].join(
-                " ",
-              ),
-              meta.cliVersion,
+            this.suggest(
+              [
+                `${topic} list`,
+                ...repeatedFlags(flags),
+                shellOption("--page-token", next),
+                "--json",
+              ].join(" "),
             ),
           ]
         : [];
@@ -235,7 +235,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         items,
         count: items.length,
         [wire.nextPageToken]: next,
-        ...(nextCommands.length > 0 ? { next_commands: nextCommands } : {}),
+        ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
       },
       pretty: plain
         ? renderRows(columns, items)
@@ -245,7 +245,7 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
               renderTable(columns, items),
               "",
               `${items.length} ${items.length === 1 ? resource.singular : topic}`,
-              ...(next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : []),
+              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
             ].join("\n"),
     };
   }
@@ -258,18 +258,12 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
  */
 const repeatedFlags = (flags: Json): readonly string[] => {
   const limit = typeof flags.limit === "number" ? [`--limit ${flags.limit}`] : [];
-  const sort = typeof flags.sort === "string" ? [`--sort ${shellArg(flags.sort)}`] : [];
-  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map(
-    (filter) => `--filter ${shellArg(String(filter))}`,
+  const sort = typeof flags.sort === "string" ? [shellOption("--sort", flags.sort)] : [];
+  const filters = (Array.isArray(flags.filter) ? flags.filter : []).map((filter) =>
+    shellOption("--filter", String(filter)),
   );
   return [...limit, ...sort, ...filters];
 };
-
-/** Quote a value that a shell would otherwise split or interpret. */
-const shellArg = (value: string): string =>
-  /^[A-Za-z0-9_.:@/=+-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
-
-
 
 /**
  * Parsed filters as the flat query parameters a GET list expects. A field
@@ -281,10 +275,13 @@ const queryParams = (parsed: readonly ParsedFilter[]): Json =>
     const key = field.params?.[operation] ?? field.field;
     const existing = params[key];
     if (field.combine !== "or") {
-      return { ...params, [key]: value };
+      params[key] = value;
+      return params;
     }
-    return {
-      ...params,
-      [key]: Array.isArray(existing) ? [...existing, value] : existing === undefined ? [value] : [existing, value],
-    };
+    params[key] = Array.isArray(existing)
+      ? [...existing, value]
+      : existing === undefined
+        ? [value]
+        : [existing, value];
+    return params;
   }, {});

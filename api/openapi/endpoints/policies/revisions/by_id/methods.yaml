@@ -1,0 +1,26 @@
+get:
+  operationId: getPolicyRevision
+  summary: Get a policy revision
+  description: |
+    Reads one revision of a policy, newest or not.
+
+    The lookup is scoped to the project in `project_id`: a revision of another
+    project answers not found exactly as an unknown id does.
+  tags:
+    - Policies
+  security:
+    - oauth2:
+        - policy.read
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/policy-revision-id.yaml
+  responses:
+    '200':
+      description: The revision was retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: ../../policy.yaml
+    default:
+      $ref: getPolicyRevision-error-response.yaml

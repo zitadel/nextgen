@@ -3,7 +3,8 @@ package domain
 import "time"
 
 // PrefixIDPIdentityLink namespaces identity link ids ("idplink_01KWH3B...").
-// Storage-only: no API addresses a link by id.
+// No API addresses a link by id; GET /users/{user_id}/identity_links lists a
+// user's links.
 const PrefixIDPIdentityLink ResourcePrefix = "idplink"
 
 // IDPIdentityLink pins one provider subject on one connection to one user.

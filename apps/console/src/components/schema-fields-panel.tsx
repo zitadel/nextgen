@@ -1,6 +1,8 @@
 import { Check, ChevronRight, X } from "lucide-react";
 import { Fragment, useState } from "react";
 
+import { OVERLINE, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -13,6 +15,7 @@ import {
   type SchemaProperty,
   type UserSchema,
   resolveSchemaPath,
+  schemaDesignation,
   schemaProperties,
 } from "@/lib/schema";
 
@@ -29,14 +32,18 @@ const ROOT_LABEL = "Schema";
  * row whose type is `Object` opens that object's own properties and pushes a
  * breadcrumb segment; the breadcrumb walks back up.
  *
+ * The leaf the schema's `x-identifier` names, and each of its `x-display`
+ * parts, carries that keyword as a badge beside its key, so what signs a user
+ * in and what names them reads off the table rather than only off the
+ * document — in the words the users table's hover card uses.
+ *
  * D14 also calls for a search field once an attribute list gets long. Nothing
  * here is long yet — the shipped presets define one to four properties — so the
  * control is left out rather than shipped empty; add it with the schema that
  * needs it.
  *
- * The panel carries no timestamp: the design's `Last changed` line was removed
- * from both this component and the drill-in frame, and the date a
- * schema was created now lives on the list row instead.
+ * The panel carries no timestamp: the date a schema was created lives on the
+ * list row.
  */
 export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
   const [path, setPath] = useState<string[]>([]);
@@ -49,7 +56,7 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
-      <Breadcrumb path={path} onNavigate={setPath} />
+      <PathBreadcrumb path={path} onNavigate={setPath} />
 
       {/* `table-fixed` so the declared column widths are exact rather than a
           hint the auto layout can widen. The design pads the row by 8px and
@@ -77,6 +84,7 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
               <PropertyRow
                 key={property.key}
                 property={property}
+                designation={schemaDesignation(schema, [...path, property.key])}
                 onDrillIn={() => setPath([...path, property.key])}
               />
             ))
@@ -87,17 +95,19 @@ export function SchemaFieldsPanel({ schema }: { schema: UserSchema }) {
   );
 }
 
-// Figma's column labels use the display face, uppercase 12px with 0.72px
-// tracking — the same treatment the users table gives its headers.
-const HEAD_CELL =
-  "h-auto px-0 py-3 font-serif text-xs font-normal tracking-[0.72px] text-muted-foreground uppercase";
-const BODY_CELL = "truncate px-0 py-3 text-sm";
+/** The standard focus ring, for the raw buttons below. */
+const FOCUS_RING = "outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
+const HEAD_CELL = PANEL_HEAD_CELL;
+const BODY_CELL = `${PANEL_BODY_CELL} truncate`;
 
 function PropertyRow({
   property,
+  designation,
   onDrillIn,
 }: {
   property: SchemaProperty;
+  designation: ReturnType<typeof schemaDesignation>;
   onDrillIn: () => void;
 }) {
   return (
@@ -110,11 +120,20 @@ function PropertyRow({
           <button
             type="button"
             onClick={onDrillIn}
-            className="flex items-center gap-1.5 text-left after:absolute after:inset-0 after:content-['']"
+            className={`flex items-center gap-1.5 rounded-sm text-left after:absolute after:inset-0 ${FOCUS_RING}`}
           >
             {property.key}
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
           </button>
+        ) : designation ? (
+          // The key gives way to the badge, which never truncates. The space
+          // separates the two in the cell's accessible name.
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate">{property.key}</span>{" "}
+            <Badge variant="secondary" className="font-mono font-normal">
+              {designation}
+            </Badge>
+          </span>
         ) : (
           property.key
         )}
@@ -146,10 +165,23 @@ function PropertyRow({
  *
  * Deep paths elide the middle (`Schema › … › datum › reference`) so the trail
  * stays on one line; the ellipsis is inert because it stands for more than one
- * level and picking which to jump to would be a guess.
+ * level and picking which to jump to would be a guess. The Users list's
+ * attribute Fields view walks a user's attributes with it too.
  */
-function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: string[]) => void }) {
-  const segments = [ROOT_LABEL, ...path];
+export function PathBreadcrumb({
+  path,
+  onNavigate,
+  rootLabel = ROOT_LABEL,
+  label = "Schema path",
+}: {
+  path: string[];
+  onNavigate: (next: string[]) => void;
+  /** The first segment, standing for the document root. */
+  rootLabel?: string;
+  /** The navigation landmark's accessible name. */
+  label?: string;
+}) {
+  const segments = [rootLabel, ...path];
   const last = segments.length - 1;
   const at = (depth: number) => ({ label: segments[depth] ?? "", depth });
   const visible =
@@ -158,11 +190,11 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
       : segments.map((label, depth) => ({ label, depth }));
 
   return (
-    <nav aria-label="Schema path" className="flex flex-wrap items-center gap-1.5">
+    <nav aria-label={label} className="flex flex-wrap items-center gap-1.5">
       {visible.map((segment, index) => {
         const current = segment.depth === last;
         return (
-          <Fragment key={`${segment.label}-${index}`}>
+          <Fragment key={segment.depth}>
             {index > 0 && (
               <span aria-hidden className="text-[13px] text-muted-foreground">
                 ›
@@ -179,7 +211,7 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
               <button
                 type="button"
                 onClick={() => onNavigate(path.slice(0, segment.depth))}
-                className={`${SEGMENT} text-muted-foreground hover:text-foreground`}
+                className={`${SEGMENT} rounded-sm text-muted-foreground hover:text-foreground ${FOCUS_RING}`}
               >
                 {segment.label}
               </button>
@@ -191,4 +223,4 @@ function Breadcrumb({ path, onNavigate }: { path: string[]; onNavigate: (next: s
   );
 }
 
-const SEGMENT = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
+const SEGMENT = OVERLINE;

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -17,54 +17,51 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.lib.json",
-    "typecheck": "tsc --build tsconfig.json",
+    "build": "tsdown && attw --pack . --profile=esm-only",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
-    "lint": "eslint ."
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "exports": {
     ".": {
       "@zitadel/source": "./src/index.ts",
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "./types": {
       "@zitadel/source": "./src/types.ts",
-      "types": "./dist/types.d.ts",
-      "import": "./dist/types.js"
+      "types": "./dist/types.d.mts",
+      "import": "./dist/types.mjs"
     },
     "./jwt": {
       "@zitadel/source": "./src/jwt.ts",
-      "types": "./dist/jwt.d.ts",
-      "import": "./dist/jwt.js"
+      "types": "./dist/jwt.d.mts",
+      "import": "./dist/jwt.mjs"
     },
     "./middleware": {
       "@zitadel/source": "./src/middleware.ts",
-      "types": "./dist/middleware.d.ts",
-      "import": "./dist/middleware.js"
+      "types": "./dist/middleware.d.mts",
+      "import": "./dist/middleware.mjs"
     }
   },
   "publishConfig": {
     "access": "public"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*"
+    "@zitadel/api": "workspace:*",
+    "ufo": "catalog:"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@eslint/json": "catalog:",
-    "@eslint/markdown": "catalog:",
+    "@edge-runtime/vm": "catalog:",
+    "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-import-resolver-typescript": "catalog:",
-    "eslint-plugin-import": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "prettier": "catalog:",
+    "@zitadel/components": "workspace:*",
+    "jsdom": "catalog:",
+    "tsdown": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
     "vite": "catalog:",
     "vitest": "catalog:"
   }

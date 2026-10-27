@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Smartphone, Sun, Workflow } from "lucide-react";
+import { publishedSides } from "@zitadel/components";
+import {
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Paintbrush,
+  Smartphone,
+  Sun,
+  SunMoon,
+  Workflow,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -7,10 +17,19 @@ import {
   type PreviewJourney,
   type PreviewState,
 } from "@/components/branding/login-preview";
+import { PreviewStage } from "@/components/branding/preview-stage";
 import { SettingsPanel } from "@/components/branding/settings-panel";
-import { RESOURCE_HEADER, RESOURCE_PAGE } from "@/components/resource-list";
+import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -23,13 +42,17 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { BrandingRevision } from "@/lib/branding-palette";
 import { flowDisplayName } from "@/lib/flow-definition";
 
-import { api } from "../../../api/zitadel";
-import { projectScopeDeps, requireProjectScope } from "../../../lib/project-scope";
+import { api } from "@/api/zitadel";
+import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/branding/")({
-  // Nested under Login flows, as in the design: branding is how those flows
-  // render, not a resource of its own. Sub-rows carry no icon.
-  staticData: { scope: "project", nav: { label: "Branding", order: 1, parent: "/flow-definitions" } },
+  // Order 6: right after Login flows, whose screens it styles, as the design's
+  // single-level sidebar places it.
+  staticData: {
+    scope: "project",
+    nav: { label: "Branding", order: 6, icon: Paintbrush },
+  },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     // Newest first, so the head of the list is what visitors see today. The
@@ -97,18 +120,40 @@ const STATE_LABELS: Record<PreviewState, string> = {
   success: "Success",
 };
 
-// The flow selector is drawn as a ghost button, not a bordered select: no
-// border or shadow, and its icons take the foreground colour rather than the
-// muted one a bordered trigger uses.
-const GHOST_TRIGGER =
-  "h-9 gap-1.5 border-0 px-2.5 font-medium shadow-none hover:bg-accent hover:text-accent-foreground dark:bg-transparent dark:hover:bg-accent [&_svg:not([class*='text-'])]:text-foreground";
-
 /**
  * Which side the preview paints: a fixed side, or `revision` to leave it to
- * the revision's own `theme.mode` — what a visitor gets. A pinned side still
- * cannot reach one the revision does not publish.
+ * the revision's own `theme.mode` — what a visitor gets.
  */
 type PreviewTheme = "light" | "dark" | "revision";
+
+// The menu's order, with the user menu's icons, so the trigger shows the side
+// on screen. Keyed like `STATE_LABELS`, so a new side has to be labelled here.
+const THEMES: Record<PreviewTheme, { label: string; icon: LucideIcon }> = {
+  revision: { label: "From branding", icon: SunMoon },
+  light: { label: "Light", icon: Sun },
+  dark: { label: "Dark", icon: Moon },
+};
+
+/**
+ * The side a revision that publishes only the other one cannot paint. The
+ * element then paints the published side whatever it is asked for
+ * (`publishedSides`); with both or neither published, either side paints.
+ */
+function unpublishedSide(revision: BrandingRevision): PreviewTheme | undefined {
+  const [only, second] = publishedSides(revision);
+  if (!only || second) return undefined;
+  return only === "light" ? "dark" : "light";
+}
+
+/** What "From branding" paints, resolved as the element does it. */
+function revisionSide(revision: BrandingRevision): string {
+  const [only, second] = publishedSides(revision);
+  if (only && !second) return THEMES[only].label;
+  const mode = revision.theme?.mode;
+  // `auto`, and an unset mode, which a widget treats as `auto`, follow the
+  // operator's operating system, not the console's own theme.
+  return mode === "light" || mode === "dark" ? THEMES[mode].label : "System";
+}
 
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
@@ -149,24 +194,25 @@ function BrandingScreen() {
   // Derived like `activeJourney`: a pick this step cannot show previews the
   // default, and comes back when a step that can show it is served.
   const activeState = states && !states.includes(state) ? "default" : state;
-  // Unset, a widget follows the visitor: the panel shows `auto` for it too.
-  const revisionMode = revision.theme?.mode ?? "auto";
+  // Derived like `activeState`: a side this revision does not publish is not
+  // offered, and a pick of it previews the revision's own until one does.
+  const unpublished = unpublishedSide(revision);
+  const activeTheme = theme === unpublished ? "revision" : theme;
+  const ActiveThemeIcon = THEMES[activeTheme].icon;
 
   return (
-    <div className={`${RESOURCE_PAGE} pt-4`}>
-      <div className={`${RESOURCE_HEADER} flex h-9 items-center`}>
-        <h1 className="font-serif text-2xl leading-6 tracking-tight text-foreground">Branding</h1>
-      </div>
+    <Page fill>
+      <ResourceTitle>Branding</ResourceTitle>
 
       {/* Three rows on a phone, one on a desktop: the flow selector, then the
           tabs with the environment buttons edge-aligned, then the state
           selector, which is too wide to share the tabs' row at that width.
           The separators only exist inline. */}
-      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-[10px] lg:px-2">
+      <div className="mt-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-2.5 lg:px-2">
         {flows.length > 0 && (
-          <div className="flex items-center justify-between gap-[10px]">
+          <div className="flex items-center justify-between gap-2.5">
             <Select value={activeFlowName} onValueChange={setFlowName}>
-              <SelectTrigger aria-label="Previewed flow" className={GHOST_TRIGGER}>
+              <SelectTrigger aria-label="Previewed flow" variant="ghost">
                 <Workflow />
                 <SelectValue />
               </SelectTrigger>
@@ -186,7 +232,7 @@ function BrandingScreen() {
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-x-[10px] gap-y-2 lg:flex-1">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 lg:flex-1">
           <Tabs
             value={activeJourney}
             onValueChange={(value) => setJourney(value as PreviewJourney)}
@@ -201,13 +247,10 @@ function BrandingScreen() {
           </Tabs>
           {/* After the tabs, as the design orders the row: flow, screen, state.
               No icon on this one; the flow selector alone carries its glyph. */}
-          <div className="order-last flex basis-full items-center gap-[10px] sm:order-none sm:basis-auto">
+          <div className="order-last flex basis-full items-center gap-2.5 sm:order-none sm:basis-auto">
             <Separator orientation="vertical" className="hidden h-5! lg:block" />
-            <Select
-              value={activeState}
-              onValueChange={(value) => setState(value as PreviewState)}
-            >
-              <SelectTrigger aria-label="Previewed state" className={GHOST_TRIGGER}>
+            <Select value={activeState} onValueChange={(value) => setState(value as PreviewState)}>
+              <SelectTrigger aria-label="Previewed state" variant="ghost">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent position="popper" sideOffset={4}>
@@ -234,53 +277,77 @@ function BrandingScreen() {
             >
               {narrow ? <Smartphone /> : <Monitor />}
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Switch the previewed theme"
-              onClick={() => setTheme(nextTheme(theme))}
-              title={
-                theme === "revision"
-                  ? `Theme: ${revisionMode} (from the branding in use)`
-                  : `Theme: ${theme}`
-              }
-            >
-              <Sun />
-            </Button>
+            {/* A menu rather than a cycling button: three sides behind one
+                glyph left the operator guessing which one was on screen. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Previewed theme: ${THEMES[activeTheme].label}`}
+                  title={`Theme: ${THEMES[activeTheme].label}`}
+                >
+                  <ActiveThemeIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Previewed theme</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={activeTheme}
+                  onValueChange={(value) => setTheme(value as PreviewTheme)}
+                >
+                  {Object.entries(THEMES).map(([id, entry]) => (
+                    <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
+                      <entry.icon aria-hidden />
+                      {entry.label}
+                      {/* What a visitor gets, and why a side is not offered. */}
+                      {(id === "revision" || id === unpublished) && (
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {id === "revision" ? revisionSide(revision) : "Not published"}
+                        </span>
+                      )}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
       {/* The panel is long and the preview is content-sized, so the row takes
-          its height from the viewport and the panel scrolls inside it —
-          otherwise the grid stretches the preview to the panel's full length.
+          what the page leaves under the toolbar (`Page fill`, `flex-1`) and
+          the panel scrolls inside it — otherwise the grid stretches the
+          preview to the panel's full length, and a fixed `100vh` offset
+          overflows whenever the chrome above changes.
           302px is the design's 300 plus the 1px card border each side, so the
           content the rows align to is the 276 the design lays them out in. */}
-      <div className="mt-3 grid gap-4 lg:h-[calc(100vh-11rem)] lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
-        <Card className="flex min-h-[29rem] items-center justify-center overflow-auto border-foreground/10 p-6 shadow-xs lg:min-h-[32rem]">
-          {/* The widget is content-sized, so the preview constrains the width
-              rather than the element: that is what an embedding page does. */}
-          <div className={narrow ? "w-[24rem]" : "w-full max-w-[32rem]"}>
-            <LoginPreview
-              journey={activeJourney}
-              flowName={activeFlowName}
-              theme={theme}
-              state={activeState}
-              successStep={selected?.successStep}
-              onStates={(next) => setServed({ preview, states: next })}
-            />
-          </div>
-        </Card>
+      <div className="mt-3 grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_302px] lg:px-2">
+        <PreviewStage className="flex min-h-[29rem] overflow-auto rounded-md border border-foreground/10 bg-card p-6 shadow-xs transition-colors duration-300 lg:min-h-[32rem]">
+          {(onGround) => (
+            // The widget is content-sized, so the preview constrains the width
+            // rather than the element: that is what an embedding page does.
+            // Centred by auto margins, not the stage's alignment: a step
+            // taller than the stage (an error banner) then starts at its top
+            // and scrolls, instead of spilling above where it cannot.
+            <div className={narrow ? "m-auto w-96" : "m-auto w-full max-w-lg"}>
+              <LoginPreview
+                journey={activeJourney}
+                flowName={activeFlowName}
+                theme={activeTheme}
+                state={activeState}
+                successStep={selected?.successStep}
+                onStates={(next) => setServed({ preview, states: next })}
+                onGround={onGround}
+              />
+            </div>
+          )}
+        </PreviewStage>
 
         <Card className="min-h-0 overflow-hidden border-foreground/10 p-0 shadow-xs">
           <SettingsPanel revision={revision} />
         </Card>
       </div>
-    </div>
+    </Page>
   );
-}
-
-function nextTheme(current: PreviewTheme): PreviewTheme {
-  if (current === "revision") return "light";
-  return current === "light" ? "dark" : "revision";
 }

@@ -9,7 +9,7 @@ import { expectedPublicCliCommand, parseJson, runCliForTest } from "../helpers/r
 
 const platform = usePlatformMock();
 
-/** `"sso enable --flag"` and `"sso:enable"` both name the id `sso:enable`. */
+/** `"auth-method sso enable --flag"` and `"auth-method:sso:enable"` name the same id. */
 function commandIdFromArgs(args: string): string | undefined {
   const words: string[] = [];
   for (const token of args.trim().split(/\s+/)) {
@@ -39,10 +39,10 @@ async function suggestedCommandIds(): Promise<Set<string>> {
   for (const file of await typescriptFiles(join(import.meta.dirname, "../../src"))) {
     const source = await readFile(file, "utf8");
     for (const match of source.matchAll(/publicCliCommand\(\s*(["`])([^"`$]*)/g)) {
-      const id = commandIdFromArgs(match[2]);
+      const id = commandIdFromArgs(match[2]!);
       if (id) commands.add(id);
     }
-    for (const match of source.matchAll(/["`]zitadel\s+([^"`]*)/g)) {
+    for (const match of source.matchAll(/["`]zitadel\s+([^"`$]*)/g)) {
       const id = commandIdFromArgs(match[1] ?? "");
       if (id) commands.add(id);
     }
@@ -57,7 +57,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isNotZitadel();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -68,7 +68,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.isUnavailable();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -79,7 +79,7 @@ describe("the cli", () => {
         const app = await anApp();
         platform.refusesConnections();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -91,7 +91,7 @@ describe("the cli", () => {
       it("names the failure when run before setup", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
       });
@@ -99,30 +99,42 @@ describe("the cli", () => {
       it("points at setup as the way out", async () => {
         const app = await anApp();
 
-        const result = await app.apply();
+        const result = await app.deploy();
 
         expect(result).toSuggest(expectedPublicCliCommand("setup"));
       });
 
-      it("resolves the real server when nothing says otherwise", async () => {
+      it("has no server of its own when nothing names one", async () => {
         const app = await anApp();
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://api.zitadel.cloud");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
-      it("prefers the server named in zitadel.json", async () => {
+      it("takes the server from ZITADEL_URL in the project's env file", async () => {
+        const app = await anApp();
+        await app.bindEnvironment("development", {
+          ZITADEL_URL: "https://self.example",
+          ZITADEL_PROJECT_ID: "existing",
+        });
+
+        const result = await app.runWithoutServer(["status", "--json"]);
+
+        expect(app.envelopeOf(result).source).toBe("https://self.example");
+      });
+
+      it("ignores the server named in zitadel.json", async () => {
         const app = await anApp();
         await app.writeConfig({
-          $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+          $schema: "./.zitadel/meta/project.json",
           project: "existing",
           server: "https://self.example",
         });
 
         const result = await app.runWithoutServer(["status", "--json"]);
 
-        expect(app.envelopeOf(result).source).toBe("https://self.example");
+        expect(app.envelopeOf(result).source).toBe("");
       });
 
       it("only ever suggests commands a user can run", async () => {
@@ -136,7 +148,9 @@ describe("the cli", () => {
 
         const suggested = await suggestedCommandIds();
 
-        expect([...suggested].sort()).toEqual(expect.arrayContaining(["apply", "doctor", "setup"]));
+        expect([...suggested].sort()).toEqual(
+          expect.arrayContaining(["deploy", "doctor", "setup"]),
+        );
         for (const command of suggested) {
           expect(visible, `${command} is suggested but not a visible command`).toContain(command);
         }

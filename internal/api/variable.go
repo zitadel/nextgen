@@ -14,17 +14,16 @@ func (h *Handler) GetVariables(ctx context.Context, params api.GetVariablesParam
 		return nil, err
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	kind, err := fromAPIVariableKind(params.Kind)
+	if err != nil {
+		return nil, err
+	}
+	vars, err := h.variableService.GetVariables(ctx, variableOwner(params.ProjectID), kind)
 	if err != nil {
 		return nil, err
 	}
 
-	vars, err := h.variableService.GetVariables(ctx, owner)
-	if err != nil {
-		return nil, err
-	}
-
-	out, err := toAPIVariables(vars)
+	out, err := toAPIVariablesByKind(vars)
 	if err != nil {
 		return nil, err
 	}
@@ -36,27 +35,27 @@ func (h *Handler) GetVariable(ctx context.Context, params api.GetVariableParams)
 		return nil, err
 	}
 
-	name := string(params.VariableName)
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	kind, err := fromAPIVariableKind(params.Kind)
 	if err != nil {
 		return nil, err
 	}
-	variables, err := h.variableService.GetVariables(ctx, owner, name)
+	variables, err := h.variableService.GetVariables(ctx, variableOwner(params.ProjectID), kind, string(params.VariableName))
 	if err != nil {
 		return nil, err
 	}
-	// At most one row: the read admits one owner and the primary key makes a
-	// name unique within it, so there is nothing to choose between. Empty means
-	// this owner has not entered the name -- another owner of the same project
-	// may hold it, and that is still a miss here, because nothing is inherited.
+	// At most one row per kind: the name is unique within the project and
+	// kind. No row for any kind asked for is the name not being held there,
+	// a name held for the other kind alone included.
 	if len(variables) == 0 {
 		return nil, domain.ErrVariableNotFound()
 	}
-	value, err := toAPIVariable(variables[0])
-	if err != nil {
-		return nil, err
+	var out api.VariableByKind
+	for _, variable := range variables {
+		if err := setAPIVariableByKind(&out, variable); err != nil {
+			return nil, err
+		}
 	}
-	return &value, nil
+	return &out, nil
 }
 
 func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRequest, params api.UpdateVariablesParams) (api.UpdateVariablesRes, error) {
@@ -73,10 +72,11 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 			WithMessage("the request body must name at least one variable")
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	kind, err := fromAPIVariableKind(params.Kind)
 	if err != nil {
 		return nil, err
 	}
+	owner := variableOwner(params.ProjectID)
 
 	writes := make([]service.VariableToSet, 0, len(req))
 	for name, input := range req {
@@ -90,15 +90,17 @@ func (h *Handler) UpdateVariables(ctx context.Context, req api.UpdateVariablesRe
 		writes = append(writes, service.VariableToSet{Name: name, Value: value, IsSecret: isSecret})
 	}
 
-	if err := h.variableService.SetVariables(ctx, owner, writes); err != nil {
+	if err := h.variableService.SetVariables(ctx, owner, kind, writes); err != nil {
 		return nil, err
 	}
 
-	vars, err := h.variableService.GetVariables(ctx, owner)
+	// The response is the read the request's kind would get, so a caller
+	// writing one kind sees that kind alone.
+	vars, err := h.variableService.GetVariables(ctx, owner, kind)
 	if err != nil {
 		return nil, err
 	}
-	out, err := toAPIVariables(vars)
+	out, err := toAPIVariablesByKind(vars)
 	if err != nil {
 		return nil, err
 	}
@@ -114,11 +116,11 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 		return nil, err
 	}
 
-	owner, err := h.variableOwner(ctx, params.ProjectID, params.EnvironmentName)
+	kind, err := fromAPIVariableKind(params.Kind)
 	if err != nil {
 		return nil, err
 	}
-	if err := h.variableService.DeleteVariable(ctx, owner, string(params.VariableName)); err != nil {
+	if err := h.variableService.DeleteVariable(ctx, variableOwner(params.ProjectID), kind, string(params.VariableName)); err != nil {
 		return nil, err
 	}
 	return &api.DeleteVariableNoContent{}, nil
@@ -126,42 +128,63 @@ func (h *Handler) DeleteVariable(ctx context.Context, params api.DeleteVariableP
 
 /* ---------------- CONVERTERS ---------------- */
 
-// variableOwner turns the addressed scope into the owner storage matches on.
-// The wire names an environment; the table keys on its id, so the name is
-// resolved here -- once per request, at the edge, which is the only place the
-// name is still the environment's address.
-//
-// An unset environment is the project level, an address of its own, and needs
-// no lookup. A name nothing answers to is env.not_found rather than an empty
-// read: with no inheritance to fall back on, a typo would otherwise report the
-// project's variables as absent instead of saying the environment is not there.
-func (h *Handler) variableOwner(ctx context.Context, projectID api.ProjectID, environment api.OptEnvironmentName) (domain.VariableOwner, error) {
-	owner := domain.VariableOwner{ProjectID: string(projectID)}
-	if !environment.Set || environment.Value == "" {
-		return owner, nil
-	}
-
-	env, err := h.environmentService.GetByName(ctx, owner.ProjectID, string(environment.Value))
-	if err != nil {
-		return domain.VariableOwner{}, err
-	}
-	owner.EnvironmentID = env.ID
-	return owner, nil
+// variableOwner is the project the request addresses: variables are owned by
+// the project and nothing else (ADR 068).
+func variableOwner(projectID api.ProjectID) domain.VariableOwner {
+	return domain.VariableOwner{ProjectID: string(projectID)}
 }
 
-// toAPIVariables keys a read by name. The names are already unique -- one read,
-// one owner, and the primary key does the rest -- so no entry here overwrites
-// another.
-func toAPIVariables(variables []*domain.Variable) (api.Variables, error) {
-	out := make(api.Variables, len(variables))
+// fromAPIVariableKind maps the optional kind of a request onto the service's
+// selector: absent is nil, which addresses both kinds. The decoder has
+// validated the enum, so a value with no mapping is a disagreement between
+// the contract and this code, not a bad request.
+func fromAPIVariableKind(kind api.OptVariableKind) (*domain.DeploymentOriginKind, error) {
+	value, ok := kind.Get()
+	if !ok {
+		return nil, nil
+	}
+	switch value {
+	case api.VariableKindPrimary:
+		return new(domain.DeploymentOriginKindPrimary), nil
+	case api.VariableKindPreview:
+		return new(domain.DeploymentOriginKindPreview), nil
+	default:
+		return nil, domain.ErrInternal(nil).WithMessage("variable kind has no store mapping")
+	}
+}
+
+// toAPIVariablesByKind keys a read by name, each name holding the value per
+// kind the read returned. A name entered for one kind alone has the other
+// slot absent: nothing falls back from one kind to the other.
+func toAPIVariablesByKind(variables []*domain.Variable) (api.VariablesByKind, error) {
+	out := make(api.VariablesByKind, len(variables))
 	for _, variable := range variables {
-		value, err := toAPIVariable(variable)
-		if err != nil {
+		byKind := out[variable.Name]
+		if err := setAPIVariableByKind(&byKind, variable); err != nil {
 			return nil, err
 		}
-		out[variable.Name] = value
+		out[variable.Name] = byKind
 	}
 	return out, nil
+}
+
+// setAPIVariableByKind places variable in the slot of its kind.
+func setAPIVariableByKind(byKind *api.VariableByKind, variable *domain.Variable) error {
+	value, err := toAPIVariable(variable)
+	if err != nil {
+		return err
+	}
+	switch variable.Kind {
+	case domain.DeploymentOriginKindPrimary:
+		byKind.Primary = api.NewOptVariable(value)
+	case domain.DeploymentOriginKindPreview:
+		byKind.Preview = api.NewOptVariable(value)
+	default:
+		// Only this server writes these rows, and the column CHECK admits the
+		// two kinds the wire has a slot for.
+		return domain.ErrInternal(nil).WithMessage("stored variable has a kind the wire does not carry")
+	}
+	return nil
 }
 
 // toAPIVariable renders one variable for the wire. A secret is
@@ -252,13 +275,23 @@ func variableErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	case domain.ErrInvalidVariableName().Code,
 		domain.ErrInvalidVariableValue().Code,
 		domain.ErrNoVariableOwnerProjectID().Code,
+		domain.ErrVariableLimitExceeded().Code,
 		domain.ErrSecretNotWholeValue().Code,
 		domain.ErrVariableDocumentTooDeep().Code,
 		domain.ErrVariableExpansionTooLarge().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	default:
-		// var.decryption_failed included: a value this server encrypted and
-		// cannot read back is a server fault, not a bad request.
+		return internalErrorResponse(err)
+	}
+}
+
+// environmentErrorResponse maps the environment error codes the deployment
+// service and its access check answer onto statuses.
+func environmentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
+	switch err.Code {
+	case domain.ErrEnvironmentNotFound().Code, domain.ErrEnvironmentProjectNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	default:
 		return internalErrorResponse(err)
 	}
 }

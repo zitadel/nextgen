@@ -16,6 +16,14 @@
 > envelope gains derived, read-only identity fields (`identifier`,
 > `identifier_property`, `display`, §3a). Builds on
 > [ADR 048](048-wide-events-internal-audit-primitive.md) (audit events).
+>
+> **Note (2026-10-24):** most of this is built: `x-identifier` and
+> `x-display`, user refs with batch resolution (#1090), sessions returning
+> resolved refs (#1085), the derived identity on user responses and console
+> surfaces (#1092), and case-insensitive uniqueness (#970). Not built: the
+> per-property `x-unique: {compare: "exact"}` opt-out (§4a), and §5's check
+> that identifier values stay unique across designations, with its conflict
+> scan on redesignation.
 
 ## Decision
 
@@ -226,7 +234,9 @@ never match; it now resolves as below. Under this ADR:
   a non-unique notification `email` on another schema — would collide with a
   legitimate identifier and break its login. This scoping is what makes the
   flow path fully collision-proof: nothing outside the bound schema's
-  designated property can interfere.
+  designated property can interfere. The schema in scope means every revision
+  of the bound schema's objectType, so users created under an older revision
+  keep signing in (#1507).
 - **Designated identifier values are unique across designations.** Writing a
   value into any designated identifier property requires that no other
   designated identifier property in the same resolution scope holds it —

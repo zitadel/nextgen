@@ -14,7 +14,7 @@ export const litRenderer: RendererSpec = {
   displayName: "Web component (<zitadel-flow>)",
   status: "not-implemented",
   frameworks: ["next", "astro", "remix", "sveltekit", "nuxt", "vanilla"],
-  dependency: { name: "@zitadel/ui-lit", version: "workspace:*" },
+  dependency: { name: "@zitadel/ui-lit" },
   templates: {
     authPage(mode) {
       const purpose = mode === "login" ? "login" : "register";

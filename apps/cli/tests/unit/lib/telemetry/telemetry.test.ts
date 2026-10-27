@@ -45,7 +45,7 @@ const identity: Identity = { distinctId: "did-123", isFirstRun: false };
 function deps(sink: Tracked[], extra: Partial<TelemetryDeps> = {}): TelemetryDeps {
   let counter = 0;
   return {
-    env: {},
+    env: { ZITADEL_TELEMETRY_TOKEN: "tok" },
     initClient: () => fakeClient(sink),
     loadIdentity: () => identity,
     newId: () => `id-${++counter}`,
@@ -88,7 +88,9 @@ describe("Telemetry (generic core)", () => {
   });
 
   it("exposes the first-run flag from identity", () => {
-    const t = Telemetry.create(deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }));
+    const t = Telemetry.create(
+      deps([], { loadIdentity: () => ({ distinctId: "x", isFirstRun: true }) }),
+    );
     expect(t.isFirstRun).toBe(true);
   });
 
@@ -102,9 +104,29 @@ describe("Telemetry (generic core)", () => {
 
   it("is inert when consent is disabled via the environment", () => {
     const sink: Tracked[] = [];
-    const t = Telemetry.create(deps(sink, { env: { DO_NOT_TRACK: "1" } }));
+    const t = Telemetry.create(
+      deps(sink, { env: { DO_NOT_TRACK: "1", ZITADEL_TELEMETRY_TOKEN: "tok" } }),
+    );
     t.track("e", {});
     expect(sink).toHaveLength(0);
+  });
+
+  it("sends Mixpanel nothing without a token, and writes no install id", () => {
+    const sink: Tracked[] = [];
+    let loaded = false;
+    const t = Telemetry.create(
+      deps(sink, {
+        env: {},
+        loadIdentity: () => {
+          loaded = true;
+          return identity;
+        },
+      }),
+    );
+    t.track("e", {});
+    expect(t.enabled).toBe(false);
+    expect(sink).toHaveLength(0);
+    expect(loaded).toBe(false);
   });
 
   it("fails open when the client constructor throws", () => {
@@ -122,7 +144,9 @@ describe("Telemetry (generic core)", () => {
 
   it("swallows a synchronous client.track throw", () => {
     const sink: Tracked[] = [];
-    const t = Telemetry.create(deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }));
+    const t = Telemetry.create(
+      deps(sink, { initClient: () => fakeClient(sink, { throwOnTrack: true }) }),
+    );
     expect(() => t.track("e", {})).not.toThrow();
   });
 

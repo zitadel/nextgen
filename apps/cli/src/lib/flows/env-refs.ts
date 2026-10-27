@@ -4,7 +4,7 @@ import { isObject } from "../json";
  * Collects the environment variables a flows document depends on, sorted and
  * de-duplicated. Recognises two reference styles: inline `${VAR}` interpolations
  * inside string values, and keys ending in `_env` whose value names a single
- * variable. `apply`/`plan` use this to fail before contacting the platform when
+ * variable. `deploy` uses this to fail before contacting the platform when
  * a required variable is absent.
  */
 export function flowEnvRefs(value: unknown): string[] {
@@ -21,7 +21,11 @@ export function flowEnvRefs(value: unknown): string[] {
       node.forEach(visit);
     } else if (isObject(node)) {
       for (const [key, child] of Object.entries(node)) {
-        if (key.endsWith("_env") && typeof child === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)) {
+        if (
+          key.endsWith("_env") &&
+          typeof child === "string" &&
+          /^[A-Za-z_][A-Za-z0-9_]*$/.test(child)
+        ) {
           refs.add(child);
         } else {
           visit(child);

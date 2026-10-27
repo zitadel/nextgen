@@ -1,11 +1,5 @@
 type: object
-description: |
-  Deployments, newest first.
-
-  Filtered to one environment, the first row is that environment's current
-  deployment and the rest is its history. Unfiltered, the list interleaves
-  every environment of the project, so the first row is only the most recent
-  deployment anywhere, not any particular environment's current one.
+description: One page of deployments, ordered as the operation describes.
 required:
   - deployments
 properties:

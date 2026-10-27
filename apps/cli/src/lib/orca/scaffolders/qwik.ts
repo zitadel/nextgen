@@ -2,6 +2,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { CREATE_VITE_NODE_ENGINES, CREATE_VITE_VERSION } from "./node-engines";
 
 /** Qwik 2 version the generated app is migrated to — matches the peer range of
  * `@zitadel/sdk-qwik`, which requires Qwik 2 (`@qwik.dev/core`). */
@@ -23,9 +24,15 @@ const QWIK2_VERSION = "^2.0.0-beta.45";
 export class QwikScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Qwik (Vite)";
   readonly supportedFrameworks: ReadonlyArray<string> = ["qwik"];
+  readonly nodeEngines = CREATE_VITE_NODE_ENGINES;
+  override readonly pinnedPackages: ReadonlyArray<string> = [CREATE_VITE_NODE_ENGINES.spec];
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
-    this.runCommand("npm", ["create", "vite@latest", ".", "--", "--template", "qwik-ts"], cwd);
+  protected async create(cwd: string, _framework: string): Promise<void> {
+    this.runCommand(
+      "npm",
+      ["create", `vite@${CREATE_VITE_VERSION}`, ".", "--", "--template", "qwik-ts"],
+      cwd,
+    );
     await rm(join(cwd, "src/app.tsx"), { force: true });
     await rm(join(cwd, "src/app.css"), { force: true });
     await this.migrateToQwik2(cwd);

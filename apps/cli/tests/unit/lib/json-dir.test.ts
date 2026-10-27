@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { ZitadelError } from "../../../src/lib/errors";
-import { readJsonDir } from "../../../src/lib/json-dir";
+import { readJsonDir, readJsonDirEntries } from "../../../src/lib/json-dir";
 
 let dir: string;
 
@@ -30,12 +30,9 @@ describe("readJsonDir", () => {
   });
 
   it("preserves unknown / forward-compatible keys", async () => {
-    await writeFile(
-      join(dir, "x.json"),
-      JSON.stringify({ id: "x", "x-custom": "${ENV_VAR}" }),
-    );
+    await writeFile(join(dir, "x.json"), JSON.stringify({ id: "x", "x-custom": "${ENV_VAR}" }));
     const result = await readJsonDir(dir);
-    expect(result[0]["x-custom"]).toBe("${ENV_VAR}");
+    expect(result[0]!["x-custom"]!).toBe("${ENV_VAR}");
   });
 
   it("throws on invalid JSON", async () => {
@@ -53,5 +50,20 @@ describe("readJsonDir", () => {
     await writeFile(join(dir, "README.md"), "not json");
     const result = await readJsonDir(dir);
     expect(result).toHaveLength(1);
+  });
+});
+
+describe("readJsonDirEntries", () => {
+  it("keeps each file name with its body, in lexical order", async () => {
+    await writeFile(join(dir, "b.json"), JSON.stringify({ id: "b" }));
+    await writeFile(join(dir, "a.json"), JSON.stringify({ id: "a" }));
+    expect(await readJsonDirEntries(dir)).toEqual([
+      { name: "a.json", body: { id: "a" } },
+      { name: "b.json", body: { id: "b" } },
+    ]);
+  });
+
+  it("returns an empty array when the directory is missing", async () => {
+    expect(await readJsonDirEntries(join(dir, "missing"))).toEqual([]);
   });
 });

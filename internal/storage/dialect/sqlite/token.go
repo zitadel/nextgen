@@ -113,25 +113,26 @@ func (ts tokenStatements) GetTokenByID(ctx context.Context, projectID, tokenID s
 
 // ListTokens implements [service.TokenStatements].
 func (ts tokenStatements) ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error) {
-	var compiler statementCompiler
-	if err := compileRead(&compiler, tokenQuery, filter, tokenSchema); err != nil {
+	tokens, nextCursor, err := pagination.Page(filter.Pagination, tokenSchema, func(limit uint32) ([]*domain.Token, error) {
+		filter := filter.WithLimit(limit)
+		var compiler statementCompiler
+		if err := compileRead(&compiler, tokenQuery, filter, tokenSchema); err != nil {
+			return nil, err
+		}
+		rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		defer rows.Close()
+		tokens, err := collectRows(rows, scanToken)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return tokens, nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	rows, err := ts.client.Query(ctx, compiler.String(), compiler.args...)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	tokens, err := collectRows(rows, scanToken)
-	if err != nil {
-		return nil, wrapError(err)
-	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		tokens,
-		tokenSchema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.Token]{Items: tokens, NextCursor: nextCursor}, nil
 }
 

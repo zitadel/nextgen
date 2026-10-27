@@ -1,7 +1,7 @@
 # Console ADR 0001: Routing
 
 > **Status:** Accepted
-> **Date:** 2026-06-29 (accepted 2026-06-30)
+> **Date:** 2026-06-29 (accepted 2026-06-30; amended 2026-08-11, 2026-09-28, 2026-10-04)
 > **Scope:** `apps/console` only. See [`apps/console/AGENTS.md`](../../AGENTS.md).
 > **Context:** Console shell layout, navigation, and resource list pages
 > (issue [#440](https://github.com/zitadel/nextgen/issues/440)).
@@ -37,7 +37,7 @@ Two product constraints shape the answers:
   Routing must survive a hard refresh on a deep link, and the client basepath
   must line up with that embed prefix.
 - That embed prefix is owned by the Vite `base`
-  ([`vite.config.mts`](../../vite.config.mts): a build/preview prefix, `/` for
+  ([`vite.config.ts`](../../vite.config.ts): a build/preview prefix, `/` for
   the dev server), so the router should take the prefix from there rather than
   declaring its own copy.
 
@@ -47,7 +47,7 @@ Two product constraints shape the answers:
 
 The console uses **TanStack Router file-based routing**. Routes live under
 `src/routes/`; the `@tanstack/router-plugin` (already configured in
-[`vite.config.mts`](../../vite.config.mts) with `autoCodeSplitting: true`)
+[`vite.config.ts`](../../vite.config.ts) with `autoCodeSplitting: true`)
 generates `src/routeTree.gen.ts`.
 
 `src/routeTree.gen.ts` is a **generated file**: it is never hand-edited (per
@@ -83,7 +83,7 @@ Vite injects from its `base` option:
 const basepath = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined;
 ```
 
-This makes the router prefix track [`vite.config.mts`](../../vite.config.mts)
+This makes the router prefix track [`vite.config.ts`](../../vite.config.ts)
 automatically: `BASE_URL` is the deployment prefix for `build`/`preview` and
 `/` for the dev server, so the router and the emitted asset base always agree —
 including under `vite preview` (PROD-built assets served by a "serve" command),
@@ -91,7 +91,7 @@ which is where an `import.meta.env.PROD` check would get the prefix wrong.
 
 The concrete prefix value is **not** something routing should bake in. The
 router stays value-agnostic: it reads whatever `BASE_URL` resolves to, so the
-prefix is owned by exactly one file (`vite.config.mts`) and can be changed — or
+prefix is owned by exactly one file (`vite.config.ts`) and can be changed — or
 dropped — there without touching any routing code. Hardcoding the prefix in the
 router (as legacy code did) is explicitly out.
 
@@ -135,6 +135,9 @@ endpoint.
 > (`_authed/schemas/{index,$schemaId}.tsx`) — and a `teams/` route was never
 > created. Sessions list now speaks `POST /sessions/query` (the `GET /sessions`
 > list endpoint was replaced by #757).
+
+> **Amendment (2026-10-04):** `_authed/teams/{index,$teamId}.tsx` exist, and
+> the tree has no sessions route.
 
 > **Amendment (2026-09-28, #1299):** screens now act on a **selected project**
 > carried as `?project=<id>` on the `_authed` layout, which validates it and
@@ -194,6 +197,18 @@ the sidebar.
 > first and alone until a project is selected; the selected project's screens
 > follow it.
 
+> **Amendment (2026-10-23, design decision D22):** the sidebar lists the scoped
+> routes whether or not a project is selected, as Vercel's does. Opening one
+> without a selection still goes to Projects with `?next=`; Projects is then
+> headed `Continue to <screen>` with that screen's entry marked, and choosing
+> a project goes on to it. `/` without a selection lands on Projects itself
+> rather than by way of Users, since arriving asked for no screen.
+
+> **Amendment (2026-10-26, design decision D24):** Projects is no longer a
+> sidebar entry (`staticData.nav`); it is the console's home, opened by the
+> logo and the project switcher's `All projects`, and the shell draws it
+> without the sidebar. The sidebar holds the selected project's screens only.
+
 ## Consequences
 
 - **One canonical router.** `main.tsx` renders the factory from `router.tsx`;
@@ -221,7 +236,7 @@ the sidebar.
   — the typed client loaders call.
 - [`apps/console/src/router.tsx`](../../src/router.tsx),
   [`apps/console/src/main.tsx`](../../src/main.tsx),
-  [`apps/console/vite.config.mts`](../../vite.config.mts).
+  [`apps/console/vite.config.ts`](../../vite.config.ts).
 - [`internal/staticui/handler.go`](../../../../internal/staticui/handler.go)
   — SPA fallback that makes deep links survive refresh.
 - Root [ADR 055: A Lit-only login surface, with the console on shadcn/ui](../../../../docs/adrs/055-lit-only-login-surface.md)

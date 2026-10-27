@@ -60,7 +60,7 @@ func newTestProjects(t *testing.T, pool *service.DB) (service.ProjectService, se
 	require.NoError(t, err)
 
 	keys := service.NewKeyService(pool, *masterKeys, crypters, signingKeys)
-	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers), keys
+	return service.NewProjectService(pool, testSchemaBase, schemaValidator, keys, hashers, domain.DefaultSharedHosts), keys
 }
 
 // TestEnsureSQLiteIdempotent proves the DB-backed idempotency the issue
@@ -124,16 +124,18 @@ func TestEnsureSQLiteSeedsAUsableProject(t *testing.T) {
 		assert.NoError(t, err, "missing or unusable %s encryption key", purpose)
 	}
 
-	// The user schema registrations validate against, read by the exact URL the
-	// seeded login flow will reference.
-	userSchemaURL := schemas.DefaultHumanUserSchemaURL(testSchemaBase)
-	_, err = pool.Statements().GetJSONSchemaByID(ctx, projectID, userSchemaURL)
-	assert.NoError(t, err, "a project with no user schema cannot register anyone")
+	// The user schema registrations validate against.
+	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, projectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
+	require.NoError(t, err, "a project with no user schema cannot register anyone")
+
+	// The platform variant, not the default (its shape is pinned in
+	// platform_schema_test.go).
+	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 
 	// The login flows the registration walks through. Their ids are minted at
 	// insert, so this counts them against the same defaults the seeding builds
 	// from rather than looking one up by a hand-copied id.
-	wantFlows, err := flow_definitions.DefaultLoginFlowDefinitions(testSchemaBase, projectID, userSchemaURL)
+	wantFlows, err := flow_definitions.DefaultLoginFlowDefinitions(testSchemaBase, projectID)
 	require.NoError(t, err)
 	require.NotEmpty(t, wantFlows, "the defaults themselves must define a login flow")
 

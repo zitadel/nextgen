@@ -80,10 +80,10 @@ func TestToDomainRejectsUnknownKind(t *testing.T) {
 
 	_, err := release.ToDomain(release.Row{
 		ID:       "rel_1",
-		Pointers: []byte(`[{"kind":"idp","handle":"google","revision_id":"idp_1"}]`),
+		Pointers: []byte(`[{"kind":"webhook","handle":"audit","revision_id":"whk_1"}]`),
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "idp")
+	assert.Contains(t, err.Error(), "webhook")
 }
 
 // The metadata document is open-ended by design: a field added by a newer

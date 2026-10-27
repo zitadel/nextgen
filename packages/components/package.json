@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -13,9 +13,11 @@
     "directory": "packages/components"
   },
   "files": [
+    "custom-elements.json",
     "dist"
   ],
   "type": "module",
+  "customElements": "custom-elements.json",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
@@ -24,6 +26,21 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "workerd": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "worker": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
+      "edge-light": {
+        "types": "./dist/server.d.mts",
+        "browser": "./dist/server.mjs",
+        "default": "./dist/index.mjs"
+      },
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
@@ -40,6 +57,15 @@
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
+    "./avatar": {
+      "types": "./dist/avatar.d.mts",
+      "import": "./dist/avatar.mjs"
+    },
+    "./avatar.css": "./dist/avatar.css",
+    "./events": {
+      "types": "./dist/events.d.mts",
+      "import": "./dist/events.mjs"
+    },
     "./tokens": {
       "types": "./dist/tokens/index.d.mts",
       "import": "./dist/tokens/index.mjs"
@@ -50,16 +76,24 @@
     },
     "./jsx": {
       "types": "./dist/jsx.d.ts"
-    }
+    },
+    "./legacy-designs/*": "./dist/legacy-designs/*"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
-    "test": "vitest run --project unit",
+    "build": "tsdown && attw --pack . --profile=esm-only --exclude-entrypoints=./avatar.css",
+    "cem": "cem analyze",
+    "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
+    "lint": "biome check .",
+    "test:unit": "vitest run --project unit",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build && node scripts/check-standalone-artifact.mjs",
+    "install-browsers": "playwright install chromium",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/config": "workspace:*",
@@ -69,19 +103,25 @@
     "lucide": "catalog:"
   },
   "devDependencies": {
+    "@custom-elements-manifest/analyzer": "catalog:",
+    "@edge-runtime/vm": "catalog:",
     "@tsdown/css": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
+    "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/design-tokens": "workspace:*",
     "jsdom": "catalog:",
+    "lightningcss": "catalog:",
     "msw": "catalog:",
     "playwright": "catalog:",
     "ts-lit-plugin": "catalog:",
-    "lightningcss": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
-    "@zitadel/api": "workspace:*",
-    "@zitadel/design-tokens": "workspace:*"
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   }
 }

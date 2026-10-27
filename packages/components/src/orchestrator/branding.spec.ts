@@ -34,7 +34,9 @@ describe("resolveLogoUrl", () => {
 
   it("falls back to the legacy single mark only when neither side names one", () => {
     expect(resolveLogoUrl({ logo_url: LEGACY, theme: { dark: {} } }, "dark")).toBe(LEGACY);
-    expect(resolveLogoUrl({ logo_url: LEGACY, theme: { light: { logo_url: ON_LIGHT } } }, "dark")).toBeUndefined();
+    expect(
+      resolveLogoUrl({ logo_url: LEGACY, theme: { light: { logo_url: ON_LIGHT } } }, "dark"),
+    ).toBeUndefined();
   });
 
   it("returns the legacy mark for a revision with no theme at all", () => {

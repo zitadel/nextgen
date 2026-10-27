@@ -1,15 +1,27 @@
 # ADR 030: Error Model, Mapping, and Reporting
 
-> **Status:** Accepted — 2026-08-11 (originally Proposed 2026-06-26)
+> **Status:** Accepted, 2026-08-11 (originally Proposed 2026-06-26; amended 2026-10-23: request line and error line logging model)
 > **Date:** 2026-06-26
 > **Context:** Cross-cutting error taxonomy, API contract, logging, and operational reporting
-> **Related:** [#367](https://github.com/zitadel/nextgen/issues/367), [#48](https://github.com/zitadel/nextgen/issues/48)
+> **Related:** [#367](https://github.com/zitadel/nextgen/issues/367), [#48](https://github.com/zitadel/nextgen/issues/48), [#1484](https://github.com/zitadel/nextgen/issues/1484), [#1485](https://github.com/zitadel/nextgen/issues/1485)
 >
 > **Amendment (2026-08-11):** substantial parts are shipped — the stable
 > error-code catalog over OAS (#777) and the selective details producers
 > (#799); [`error-details-producers.md`](../design/api/error-details-producers.md)
 > documents the shipped producer contract. The status moves to Implemented
 > once every decision item below is verified against code.
+>
+> **Amended by [ADR 076](076-error-pages-and-unmatched-routes.md):** the
+> router's answers use the envelope too (`req.not_found`,
+> `req.method_not_allowed`), and a browser navigation to a path no operation
+> matches gets an HTML page instead.
+>
+> **Amendment (2026-10-23):** a failing request now logs two lines at the API
+> boundary: one request line and one error line (Decision 5, "Request line and
+> error line"). The Inventory is frozen as the snapshot from proposal time. The
+> follow-up table marks what shipped in #521, #522, #583, #799, #2252 and #2254, and
+> the leak list in Decision 6 keeps only the sites that are still open. The
+> server default for stack capture is off, as Decision 5 says (#1485 item 5).
 
 ## Context
 
@@ -34,7 +46,12 @@ There is no single decision that defines:
 
 Without this, implementations drift: flow handlers construct inline `domain.Error` literals, session codes mix prefix styles, OpenAPI documents a `details` field the API does not populate, and `instrumentation.log.errors.{report_location,stack_trace}` exist but are not wired.
 
-## Inventory: Current Usage and Gaps
+## Inventory at proposal time (2026-06-26)
+
+This section is a snapshot of the code when the ADR was proposed. It is not
+maintained. Most gaps below are closed; the follow-up table lists the tracked ones.
+The logging model that runs today is in Decision 5, "Request line and error
+line".
 
 ### Domain (`domain.Error`)
 
@@ -117,11 +134,11 @@ The downward branch is the **diagnostic channel**, not a fourth runtime layer:
 
 `domain.Error` is the last type that still carries causes (`Parent`), capture metadata (`Origin`: location, stack), and a log-safe shape (`slog.LogValuer`). `api.ErrorDetails` is the client-safe subset (`code`, `message`, optional `details`); it deliberately omits `Parent` and reporting metadata.
 
-**`internal/domain` does not call `slog`.** Layers construct errors; the API/instrumentation boundary emits logs (today: `middleware.WithLogging`; see Inventory → Logging and Decision 5 → Expected client errors). Typical flow:
+**`internal/domain` does not call `slog`.** Layers construct errors; the API/instrumentation boundary emits logs (see Decision 5, "Request line and error line"). Typical flow:
 
 1. Storage/service/domain **return** a `domain.Error` (or an error wrapped as one).
 2. API **maps** it to `api.ErrorDetails` + HTTP status for the response.
-3. Request middleware (or explicit `slog.Any(ErrorAttributeKey, err)` at the boundary) **logs** the `domain.Error` via `LogValue` / GCP interfaces — not the serialized response body.
+3. The API error sink **logs** the `domain.Error` once on the error line (brief or full value by level, Decision 5). The request middleware writes the request line.
 
 Optional call-site logs in the **service** layer may add deliberate, safe context (for example `attribute_key=email` in Decision 6); that is the exception, not the default path.
 
@@ -241,20 +258,24 @@ Capture is centralized in `internal/errreport` and configured by **global atomic
 #### Structured logging
 
 - `domain.Error` implements `slog.LogValuer`. It emits `code`, `message`, and `parent`; when GCP error reporting is active it **omits** location/stack from the log value (the GCP handler adds them from the `ReportLocationError` / `StackTraceError` interfaces) to avoid duplication. Emission stays at the request boundary (Decision 1 → Layer contract); `LogValuer` defines the shape consumed when that boundary logs the error.
-- Outside GCP mode, when logging a `domain.Error` at `Error` level or above, the value additionally includes `reportLocation` and (if present) `stackTrace`.
+- `LogValue` does not know the log level. Outside GCP mode it always includes `reportLocation` and, if present, `stackTrace`; in GCP mode the handler adds them through the interfaces. The API error sink chooses the shape by level: below `Error` it logs the brief value through `Brief()` (`code`, `message`, cause; no location and no stack, in every log format), at `Error` and above the full value. Other call sites that log a `domain.Error` get the full value whatever their level.
 
 #### GCP Error Reporting
 
 - Production JSON logging may use `LogFormatGCPErrorReporting`; the format wires `errreport.GCPReporting(true)`, replacing the commented-out `zerrors.GCPErrorReportingEnabled(true)` stub in `internal/instrumentation/config.go`.
 - Log the root error with `slog.Any(ErrorAttributeKey, err)`; the handler resolves location/stack through the shared interfaces and `Parent` via `Unwrap()`.
 - `context.Cause` continues to surface through `ExtractErrCause`.
-- With `sloggcp` as the log handler, log lines that match the Error Reporting format are **collected automatically** by GCP (parsed from structured output — there is no separate "send to Error Reporting" step). Expected client errors logged at `Info` or `Warn` may therefore appear in Error Reporting; that is acceptable for spotting client-facing hotspots (for example a sudden spike of 403s). **Alerting policy** based on severity or error class is out of scope for this ADR.
+- With `sloggcp` as the log handler, log lines that match the Error Reporting format are **collected automatically** by GCP (parsed from structured output; there is no separate "send to Error Reporting" step). Error lines for 4xx answers are logged at `Info` without stack or location, so whether Error Reporting ingests them depends on the handler; if they appear, that is acceptable for spotting client-facing hotspots (for example a sudden spike of 403s). **Alerting policy** based on severity or error class is out of scope for this ADR.
 
-#### Expected client errors (4xx)
+#### Request line and error line
 
-- Log at `Info` or `Warn` with `error.code` and request correlation attributes.
-- `middleware.WithLogging` (Inventory) currently logs **all** status ≥ 400 at `Error` with the full response body. Align it: log expected 4xx at `Info`/`Warn`, reserve `Error` for `internal`/5xx, and stop logging the raw response body — log the structured `code` plus safe attributes instead (Decision 6).
-- Expected storage signals (for example `NoRowFoundError` → `*.not_found`) should not trigger stack capture in normal operation; capturing stacks for frequently-expected errors is acceptable only while the debug toggle is on.
+A request served through ogen produces at most two log lines at the API boundary.
+
+- **Request line.** `middleware.WithLogging` writes one `Info` line per request, with the message `request served`. It is written when the request ends, from a defer, so a request that panics still gets it. Fields: `method`, `path` (without the query string, for any route), `operation_id` (empty on routes outside ogen), `status`, `response_size` (bytes) and `duration`. `request_id` is on the request logger that `WithLogging` puts on the context, so every line logged through the request context carries it once. The line has no trace or span id yet; the follow-up table tracks this.
+- **Error line.** `OgenErrorHandler` is the API error sink. It is the single point where ogen hands errors to the server, and it logs once every error a handler returns as a Go error, with the message `api error`. Fields: `status`, `operation_id` and the error under the error attribute key. Level: `Error` when the status is 500 or higher, otherwise `Info`. A 5xx is logged at `Warn` instead when the request context is already done and the error is not a server write deadline. The brief or full shape follows the level (Structured logging above), so a stack is only logged at `Error`. Typed error responses that handlers build themselves (for example the flow 404, 409 and 410 responses), the server's own answers for unmatched paths and methods (ADR 076), and routes outside ogen (the IdP callback) do not pass through the sink and get no error line.
+- **Panics.** A handler panic answers 500 with the standard `internal` body and logs an `Error` line with the panic stack, whatever the stack toggle says. A panic after the response has started closes the connection instead.
+- **Expected client errors.** Expected storage signals (for example `NoRowFoundError` → `*.not_found`) answer 4xx and therefore never log a stack. Capturing the stack for them still costs a `debug.Stack()` while the stack toggle is on; the default is off (follow-up table).
+- **Never logged on these lines as fields:** the query string, the request or response body, and `Details`. A decode error logs the kind of decode failure and the rejected field paths as the cause, never ogen's reason text, because that text can quote the rejected value.
 
 ### 6. Redaction and PII policy
 
@@ -315,23 +336,20 @@ This keeps both the value and its hash out of logs without losing debuggability:
 `MaskConfig` (Inventory → Logging) is a **static deny-list of attribute key names** (`password`, `token`, …) applied per slog attribute. It is a backstop, not the mechanism for user/schema-driven data, for two structural reasons:
 
 - **Keys are open-ended.** User attributes are EAV, defined per tenant by JSON Schemas (`api/openapi/endpoints/schemas`). The sensitive key set (`ssn`, `date_of_birth`, custom fields) cannot be enumerated in a global list ahead of time.
-- **Values land in opaque blobs.** Key masking matches attribute *keys*; it cannot reach inside a serialized JSON body. The request-logging middleware logging the full `response` body string is exactly this case.
+- **Values land in opaque blobs.** Key masking matches attribute *keys*; it cannot reach inside a serialized JSON body. The old request-logging middleware, which logged the full response body string, was exactly this case; the request line no longer logs bodies (Decision 5).
 
 Policy:
 
 1. **Default-sensitive: do not log user/schema attribute payloads or raw request/response bodies.** Log the structured domain error (`code` + safe `message` + a few named, safe attributes), never the serialized body. This removes the blob problem at the source.
 2. **Declare sensitivity in the schema, enforce at the boundary.** Sensitivity is a property of the JSON Schema (`writeOnly`, `format: password`, or an `x-zitadel-sensitive` extension), consulted by the attribute-handling code — not guessed by the generic slog layer.
 3. **Keep static key masking as defense-in-depth** for fixed-name credential attributes that appear in structured args.
-4. **URLs are safe-to-log by construction, not by redaction.** Path and query params are already logged everywhere downstream (proxies, load balancers, access logs, browser history, `Referer`), so the rule is the inverse of redaction: **no secret or PII may be carried in a path or query parameter** — those belong in headers or the request body. Logging keeps the URL and omits only the body.
+4. **URLs are safe-to-log by construction, not by redaction.** Path and query params are already logged everywhere downstream (proxies, load balancers, access logs, browser history, `Referer`), so the rule is the inverse of redaction: **no secret or PII may be carried in a path or query parameter**; those belong in headers or the request body. The server's own request line keeps the path and omits the query and the body (Decision 5); the rule stands because systems downstream still log the full URL.
 
 #### Known current leaks to remediate
 
-The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean. With `Error()` trimmed (Decision 4 → Messages), `domain.Error` chains rendered via `Error()` become safe too. These remaining side paths still need call-site fixes because they render **non-domain** errors or rely on raw text:
+The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean. With `Error()` trimmed (Decision 4 → Messages), `domain.Error` chains rendered via `Error()` become safe too. Two files remain:
 
-- `internal/api/project.go`, `Handler.GetProject` — concatenates a `*database.NoRowFoundError` into the `GetProjectNotFound` message: `"project not found: " + notFound.Error()`. A storage error's `Error()` still carries the driver cause. **Hard leak — must fix.**
-- `internal/api/error_handler.go`, `OgenErrorHandler` — sets `d.Message = err.Error()` for ogen security and decode errors (raw framework text). **Must fix / normalize.**
-- `internal/api/flow.go`, `Handler.SubmitFlowStep` — `domain.ErrRequestInvalid().WithMessage(err.Error())` surfaces raw decode/parse error text (non-domain `err`) in the field-decode and origin-validation branches. **Must fix / normalize.**
-- `internal/api/flow.go`, `mapFlowErrorStatus` — `Message: err.Error()` for `invalid_action` / `session_conflict` / `unsupported`. Mitigated by the trimmed `Error()` when `err` is a `domain.Error`, but still migrate to `flow.*` sentinels with fixed messages (Decision 2) rather than relying on `Error()`.
+- `internal/api/flow.go`: three client messages are built from request inputs. In `Handler.SubmitFlowStep`, the origin validation branch composes the message from the request origin and the project's allowed origin patterns, and the two `return_target` branches echo the raw `return_target`, one of them with the text of a non-domain parse error from `httputil.ParseRedirectTarget` (Decision 4 forbids rendering a non-domain `Error()`). `Handler.CreateFlow` echoes an unknown `purpose` the same way. None of it is PII, but the messages should move to fixed sentinel messages, with the field and the allowed patterns in `details` if clients need them.
 - `internal/storage/database/integrity_errors.go` — `IntegrityViolationError.Error()` (and `NoRowFoundError` / `ScanError` / `UnknownError`) render the wrapped `original` driver error with `%v`. For a `23505` the pg dialect stores `*pgconn.PgError` as `original` (the `23505` case in `wrapPgError`), whose `Detail` embeds the offending row — for the unique-attribute schema, `Key (project_id, team_id, key, value_hash)=(…, …, email, \x9f86d0…) already exists.`, exposing the sensitive `value_hash`. This is **log-safe-at-source** work: add a `LogValue` that emits typed fields only and stops carrying the driver `Detail` into logged output. **Log leak — must fix.**
 
 ### 7. Backwards compatibility and migration
@@ -366,17 +384,23 @@ The canonical mapper (`domainErrorDetails` → only `Code` + `Message`) is clean
 
 | Item | Owner surface | Tracking |
 |---|---|---|
-| `internal/errreport` leaf (global toggles + `Capture`/`Origin`) | Instrumentation / shared | #367 |
-| `domain.Error`: add `Unwrap`, trim `Error()` to `Message`, drop `Parent`→`Details` fallback, embed `Origin`, `LogValuer` | Domain | #367 |
-| Remediate API leak sites (`Handler.GetProject`, `OgenErrorHandler`, `Handler.SubmitFlowStep`, `mapFlowErrorStatus`) | API | #367 |
-| `database.*Error`: embed `Origin`, capture in `wrapError`, add log-safe `LogValue` (typed fields; drop driver `Detail`/value) | Storage | #48 / #367 |
-| Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | #367 |
-| Flow error sentinels + OpenAPI schemas | API / domain | #367 |
-| Shared storage error detection helpers | Storage / service | #48 |
-| Selective API `details` population | API | [#585](https://github.com/zitadel/nextgen/issues/585) (was #367) |
-| Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | #367 |
-| Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | #367 |
-| Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | #367 |
+| `internal/errreport` leaf (global toggles + `Capture`/`Origin`) | Instrumentation / shared | Done, #521 |
+| `domain.Error`: add `Unwrap`, trim `Error()` to `Message`, drop `Parent`→`Details` fallback, embed `Origin`, `LogValuer` | Domain | Done, #521 |
+| Remediate the remaining API leak sites (`internal/api/flow.go` origin, `return_target` and `purpose` messages, Decision 6) | API | No open tracker (#367 closed) |
+| `database.*Error`: embed `Origin`, capture in `wrapError` | Storage | Partial, #521: `database.Error` only; the typed errors `wrapError` returns (`NoRowFoundError`, `IntegrityViolationError`, `ScanError`, ...) carry no `Origin`, [#2343](https://github.com/zitadel/nextgen/issues/2343) |
+| `database.*Error`: log-safe `LogValue` (typed fields; drop driver `Detail`/value) | Storage | [#2343](https://github.com/zitadel/nextgen/issues/2343) |
+| Wire `errreport` toggles + `GCPReporting` from `log.errors.*` / format | Instrumentation | Done, #521 |
+| Flow error sentinels + OpenAPI schemas | API / domain | Done, #583 |
+| Shared storage error detection helpers | Storage / service | Dropped: #48 closed; services match the typed errors with `errors.AsType`, no shared helper is needed |
+| Selective API `details` population | API | Done, #799 |
+| Align `WithLogging`: 4xx at `Info`/`Warn`, stop logging raw response bodies | API / instrumentation | Done, #522; superseded by the request line, #2254 |
+| Request line: one `Info` line per request, no body | API / instrumentation | Done, #2254 |
+| Error line: log every API error once in `OgenErrorHandler`, level by status class | API | Done, #2252 |
+| Deduplicate API `code → HTTP status` mapping (helper / manifest in `internal/api`; no `ErrorClass` on domain) | API | [#585](https://github.com/zitadel/nextgen/issues/585) |
+| Schema-declared attribute sensitivity; audit no secret/PII in path/query params | API / domain | [#585](https://github.com/zitadel/nextgen/issues/585) |
+| `errors.Is(err, domain.ErrX())` builds a sentinel per comparison and captures its location and stack (36 sites outside tests) | Domain | [#2344](https://github.com/zitadel/nextgen/issues/2344) |
+| Request line trace id | Instrumentation | #1485 |
+| Stack capture off by default, matching Decision 5 | Instrumentation | Done, #1485 item 5 |
 
 ## References
 

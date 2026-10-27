@@ -25,8 +25,9 @@ const SupportedSchemaVersion = "1.1"
 
 // DefaultHierarchyTypes are the object types a tuple-to-userset may traverse.
 // Bounding traversal to known edges keeps a check's join depth predictable on
-// both PostgreSQL and Spanner.
-var DefaultHierarchyTypes = []string{"app", "app_group", "project", "team", "user"}
+// both PostgreSQL and Spanner. platform is the deployment's one object above
+// every project (ADR 075); the resolver reads its tupleset as implied.
+var DefaultHierarchyTypes = []string{"app", "app_group", "platform", "project", "team", "user"}
 
 // Validator checks a model against the supported profile.
 type Validator struct {

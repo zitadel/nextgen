@@ -27,8 +27,10 @@ description: |
   neither implies the other's permission.
 
   The scope requirements apply to project secrets. A Console session carries
-  no scopes; once it is authorized to list the project's users, it may use
-  both expansions.
+  no scopes; it may use both expansions when it may read the whole project
+  (the `viewer` role or above). A session whose grant covers only part of the
+  project still lists users, but an expansion is refused with
+  `403 user.permission_denied`.
 enum:
   - teams
   - lifecycle_owner_team

@@ -5,6 +5,11 @@ import { join } from "node:path";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { QwikScaffolder } from "../../../../../src/lib/orca/scaffolders/qwik";
+import {
+  SUPPORTED_NODE,
+  describeNodeEngines,
+  scaffoldingCalls,
+} from "../../../../helpers/node-engines";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 vi.mock("node:fs/promises", () => ({ rm: vi.fn(), readFile: vi.fn(), writeFile: vi.fn() }));
@@ -59,18 +64,18 @@ beforeEach(() => {
 
 describe("QwikScaffolder", () => {
   it("runs create-vite and removes the starter demo", async () => {
-    await new QwikScaffolder().scaffold("/tmp/proj", "qwik");
+    await new QwikScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik");
 
-    const [command, args, opts] = mockSpawn.mock.calls[0] ?? [];
+    const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@latest", ".", "--", "--template", "qwik-ts"]);
+    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "qwik-ts"]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.tsx"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/app.css"), { force: true });
   });
 
   it("migrates the generated app to Qwik 2 and never pins vite to v7", async () => {
-    await new QwikScaffolder().scaffold("/tmp/proj", "qwik");
+    await new QwikScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik");
 
     // No `npm pkg` vite pin — Qwik 2 runs on the template's Vite 8.
     for (const call of mockSpawn.mock.calls) {
@@ -87,7 +92,7 @@ describe("QwikScaffolder", () => {
   });
 
   it("repoints the generated Qwik imports at @qwik.dev/core", async () => {
-    await new QwikScaffolder().scaffold("/tmp/proj", "qwik");
+    await new QwikScaffolder(SUPPORTED_NODE).scaffold("/tmp/proj", "qwik");
 
     const viteConfig = writtenFor("vite.config.ts");
     const mainTsx = writtenFor("src/main.tsx");
@@ -100,6 +105,18 @@ describe("QwikScaffolder", () => {
     // jsxImportSource must move too, or `tsc -b && vite build` breaks.
     expect(tsconfigApp).toContain('"jsxImportSource": "@qwik.dev/core"');
     expect(tsconfigApp).not.toContain("@builder.io/qwik");
+  });
+
+  describeNodeEngines({
+    make: (node, platform) => new QwikScaffolder(node, platform),
+    framework: "qwik",
+    label: "create-vite",
+    spec: "create-vite@9.3.1",
+    fallback: "^20.19.0 || >=22.12.0",
+    enforcement: "warn",
+    supported: ["24.15.0", "20.19.0", "22.12.0"],
+    warned: ["21.0.0", "20.18.0"],
+    refused: [],
   });
 
   it("only supports qwik", () => {

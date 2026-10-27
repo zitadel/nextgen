@@ -1,5 +1,21 @@
 # @zitadel/server-linux-x64
 
+## 0.1.0
+
+No changes in this release.
+
+## 1.0.0-alpha.28
+
+## 1.0.0-alpha.27
+
+## 1.0.0-alpha.26
+
+### Patch Changes
+
+- [#1724](https://github.com/zitadel/nextgen/pull/1724) [`9d17bdf`](https://github.com/zitadel/nextgen/commit/9d17bdfeafa334e0d0bff17f50f7590310ebaf01) Thanks [@fforootd](https://github.com/fforootd)! - `zitadel-server migrate` no longer generates a master key. Migrations never use one, so running them, for example as a one-off job before a deployment, no longer leaves a throwaway `master-keys/master-key.pem` in the data directory or logs a warning about it. The server itself still generates a key on its first start when none is configured.
+
+## 1.0.0-alpha.25
+
 ## 1.0.0-alpha.24
 
 ## 1.0.0-alpha.23

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -14,6 +15,7 @@ import (
 	"github.com/ogen-go/ogen/validate"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 )
 
 // FullErrorInResponse attaches the unwrapped cause of an error to the response
@@ -99,10 +101,11 @@ func createFullErrDetailsDetailsMap(err error) any {
 }
 
 func errorResponse(err error) *api.ErrorDetailsStatusCode {
-	var e domain.Error
-	if !errors.As(err, &e) {
-		return internalErrorResponse(err)
+	if domain.IsServerFault(err) {
+		return serverFaultResponse(err)
 	}
+	var e domain.Error
+	errors.As(err, &e)
 	switch {
 	case e.Code == domain.ErrAuthUnauthorized(nil).Code:
 		return errorResponseWithStatusCode(http.StatusUnauthorized, e)
@@ -118,6 +121,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return schemaErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixBranding.ErrorCodePrefix("")):
 		return brandingErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixPolicy.ErrorCodePrefix("")):
+		return policyErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEnvironment.ErrorCodePrefix("")):
 		return environmentErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixRelease.ErrorCodePrefix("")):
@@ -126,6 +131,8 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return idpErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixDeployment.ErrorCodePrefix("")):
 		return deploymentErrorResponse(e)
+	case strings.HasPrefix(e.Code, domain.PrefixOrigin.ErrorCodePrefix("")):
+		return originErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixEvent.ErrorCodePrefix("")):
 		return eventErrorResponse(e)
 	case strings.HasPrefix(e.Code, domain.PrefixVariable.ErrorCodePrefix("")):
@@ -141,14 +148,46 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 	case strings.HasPrefix(e.Code, domain.PrefixClaimChallenge.ErrorCodePrefix("")),
 		strings.HasPrefix(e.Code, domain.PrefixClaim.ErrorCodePrefix("")):
 		return claimErrorResponse(e)
-	case e.Code == domain.ErrNotImplemented().Code:
-		return errorResponseWithStatusCode(http.StatusNotImplemented, e)
-	case e.Code == domain.ErrUnavailable().Code:
-		return errorResponseWithStatusCode(http.StatusServiceUnavailable, e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	case e.Code == domain.ErrRequestNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, e)
+	case e.Code == domain.ErrRequestMethodNotAllowed().Code:
+		return errorResponseWithStatusCode(http.StatusMethodNotAllowed, e)
 	default:
 		return internalErrorResponse(err)
+	}
+}
+
+// serverFaultResponse answers a [domain.IsServerFault] error: 501 for a
+// feature that is not implemented, 503 for a transient failure worth retrying,
+// and 500 for everything else. Only the outermost domain error counts, the
+// one whose code the body carries: an internal error that wraps an
+// unavailable one is a 500.
+func serverFaultResponse(err error) *api.ErrorDetailsStatusCode {
+	var e domain.Error
+	errors.As(err, &e)
+	switch e.Code {
+	case domain.ErrNotImplemented().Code:
+		return errorResponseWithStatusCode(http.StatusNotImplemented, err)
+	case domain.ErrUnavailable().Code:
+		return errorResponseWithStatusCode(http.StatusServiceUnavailable, err)
+	default:
+		return internalErrorResponse(err)
+	}
+}
+
+// genericServerFault is the bare sentinel for the status serverFaultResponse
+// gives fault, so the client learns that status without the message or parent
+// the fault was raised with.
+func genericServerFault(fault domain.Error) domain.Error {
+	switch fault.Code {
+	case domain.ErrNotImplemented().Code:
+		return domain.ErrNotImplemented()
+	case domain.ErrUnavailable().Code:
+		return domain.ErrUnavailable()
+	default:
+		return domain.ErrInternal(nil)
 	}
 }
 
@@ -169,13 +208,32 @@ func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 // OgenErrorHandler is a custom ogen ErrorHandler that maps ogen's structural
 // errors (decode, validate, security) into the ErrorDetails wire format so all
 // error responses are consistent regardless of where the error originates.
-func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request, err error) {
+func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
 	var (
 		status  int
 		details api.ErrorDetails
 	)
 
 	switch {
+	case isSecurityServerFault(err):
+		// The security handler could not decide (CSRF request state missing, or
+		// the token or key store failing while introspecting the credential): a
+		// server fault, not a refused credential. The client gets the status
+		// serverFaultResponse gives the fault (500, 501 or 503) with that
+		// status's generic answer; the cause goes to the log, where a wiring
+		// mistake that makes every cookie request fail has to be findable.
+		// Logged as a domain.Error too, so its parent (the actual cause) is kept.
+		var cause domain.Error
+		_ = errors.As(err, &cause)
+		slog.ErrorContext(ctx, "security handler could not reach a decision", "error", err, "cause", cause)
+		resp := serverFaultResponse(genericServerFault(cause))
+		status = resp.StatusCode
+		details = resp.Response
+
+	case isCSRFError(err):
+		status = http.StatusForbidden
+		details = domainErrorDetails(domain.ErrAuthCSRFInvalid())
+
 	case isSecurityError(err):
 		status = http.StatusUnauthorized
 		details = securityErrorDetails(err)
@@ -183,11 +241,11 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 	case isDecodeError(err):
 		status = http.StatusBadRequest
 		// Use the stable domain message — do not echo ogen/framework
-		// decode text into the client envelope (ADR 030). The field paths
-		// ogen's validation rejected do go into details.
+		// decode text into the client envelope (ADR 030). The parameter or
+		// the field paths ogen rejected do go into details.
 		invalid := domain.ErrRequestInvalid()
-		if fields := validationFieldPaths(err); len(fields) > 0 {
-			invalid = invalid.WithDetails(map[string][]string{"fields": fields})
+		if fields := invalidRequestFields(err); len(fields) > 0 {
+			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
 		}
 		details = domainErrorDetails(invalid)
 
@@ -197,12 +255,69 @@ func OgenErrorHandler(_ context.Context, w http.ResponseWriter, _ *http.Request,
 		details = resp.Response
 	}
 
+	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
+}
+
+// OgenNotFound answers a path no API operation matches (ADR 076). A browser
+// navigation gets the error page, with home as its way on; everything else
+// gets the req.not_found envelope, so a client can tell a path this server
+// lacks from one that is not a Zitadel API at all. The Accept header decides,
+// and Vary says so to caches.
+func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
+		if errorpage.Wants(r) {
+			errorpage.Write(w, r, errorpage.NotFound(home))
+			return
+		}
+		writeErrorResponse(w, errorResponse(domain.ErrRequestNotFound()))
+	}
+}
+
+// OgenMethodNotAllowed answers a path whose operations do not take the
+// request's method with the req.method_not_allowed envelope and the Allow
+// header ogen would have set (ADR 076). A path the API defines answers the
+// envelope even to a browser: it is an API URL. A CORS preflight keeps ogen's
+// own answer, 204 with the Access-Control-Allow-* headers ogen has already
+// set.
+func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Allow", allowed)
+	writeErrorResponse(w, errorResponse(domain.ErrRequestMethodNotAllowed()))
+}
+
+func writeErrorResponse(w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	data, err := details.MarshalJSON()
+	w.WriteHeader(resp.StatusCode)
+	data, err := resp.Response.MarshalJSON()
 	if err == nil {
 		_, _ = w.Write(data)
 	}
+}
+
+// csrfInvalidCode is compared on every error response, so it is read once:
+// building a domain.Error captures its origin.
+var csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
+
+// isCSRFError reports a session-cookie request refused by the CSRF checks. It
+// arrives wrapped in ogen's SecurityError, but it is a refusal of an
+// authenticated caller, not a missing credential: 403, not 401.
+func isCSRFError(err error) bool {
+	var e domain.Error
+	return errors.As(err, &e) && e.Code == csrfInvalidCode
+}
+
+// isSecurityServerFault reports a security handler that failed to reach a
+// decision, as opposed to one that refused the credential: the error it
+// returned carries a domain error whose code is a server fault. An error with
+// no domain code, such as ogenerrors.ErrSecurityRequirementIsNotSatisfied, is
+// a refusal.
+func isSecurityServerFault(err error) bool {
+	var e domain.Error
+	return isSecurityError(err) && errors.As(err, &e) && domain.IsServerFault(e)
 }
 
 func isSecurityError(err error) bool {
@@ -219,6 +334,18 @@ func securityErrorDetails(err error) api.ErrorDetails {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return domainErrorDetails(unauthorized)
+}
+
+// invalidRequestFields names what a request that would not decode got wrong:
+// the parameter (path, query, header or cookie) by its name in the spec, or
+// the body's fields by validationFieldPaths. Without it the req.invalid
+// message would point at details that are not there.
+func invalidRequestFields(err error) []string {
+	var param *ogenerrors.DecodeParamError
+	if errors.As(err, &param) && param.Name != "" {
+		return []string{param.Name}
+	}
+	return validationFieldPaths(err)
 }
 
 // validationFieldPaths returns the dotted paths of the fields ogen's request

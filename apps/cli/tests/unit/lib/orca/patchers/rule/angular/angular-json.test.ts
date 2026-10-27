@@ -31,6 +31,26 @@ describe("angularProxyEdit", () => {
     expect(edit(once)).toBe(once);
   });
 
+  it("moves a serve port still on the port the app is moving off", () => {
+    const move = angularProxyEdit({
+      proxyConfig: "proxy.conf.cjs",
+      port: 4300,
+      previousPort: 4200,
+    });
+    const out = move(ng({ architect: { serve: { options: { port: 4200 } } } }));
+    expect(JSON.parse(out).projects.app.architect.serve.options.port).toBe(4300);
+  });
+
+  it("keeps a serve port the app is not moving off", () => {
+    const move = angularProxyEdit({
+      proxyConfig: "proxy.conf.cjs",
+      port: 4300,
+      previousPort: 4200,
+    });
+    const out = move(ng({ architect: { serve: { options: { port: 5000 } } } }));
+    expect(JSON.parse(out).projects.app.architect.serve.options.port).toBe(5000);
+  });
+
   it("resolves the project named by defaultProject", () => {
     const out = edit(
       JSON.stringify({

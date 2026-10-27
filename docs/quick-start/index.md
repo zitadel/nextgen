@@ -20,9 +20,9 @@ can skip the local runtime entirely by passing `--server <url>` instead of
 mkdir myapp
 cd myapp
 
-npx @zitadel/cli@alpha doctor
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest doctor
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 
 npm run dev
 ```
@@ -40,10 +40,10 @@ register a user -> log out -> log in with the same user -> profile shows Signed 
 ```
 
 For deterministic automated proof from this repository, run
-`corepack pnpm run journey`; it exercises fresh-app setup plus registration,
+`moon run e2e:journey`; it exercises fresh-app setup plus registration,
 logout, and login across the supported frameworks.
 
-The managed local Zitadel server listens on http://localhost:8080 by default.
+The managed local Zitadel server listens on http://localhost:8080 for the first directory you start. Each directory runs its own server, so the next one gets 8081 and so on, and `start` prints the URLs.
 The CLI stores runtime metadata in `.zitadel/local/runtime.json` and keeps the
 server data under `.zitadel/local/` (SQLite by default; the Docker fallback
 mounts `.zitadel/local/nextgen-data` into the container). If you start from a fresh
@@ -52,18 +52,18 @@ which framework and use case) and writes the app into the current directory.
 Stop preserves runtime data:
 
 ```sh
-npx @zitadel/cli@alpha stop
+npx @zitadel/cli@latest stop
 ```
 
 Delete it explicitly:
 
 ```sh
-npx @zitadel/cli@alpha reset --force
+npx @zitadel/cli@latest reset --force
 ```
 
 ## Known Rough Edges
 
-The alpha default registration form may ask for date of birth, and the profile
+The preview's default registration form may ask for date of birth, and the profile
 avatar may show a minimal `?` identity. These come from the current
 server-owned default user schema and profile surface; they are not setup
 failures.
@@ -74,14 +74,16 @@ are hostname-based, so those spellings are not interchangeable.
 
 ## Local Runtime URLs
 
+The table shows port 8080; use the port `zitadel start` printed if your directory got another.
+
 | Surface | URL |
 | ------- | --- |
 | API | http://localhost:8080 |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell (`<zitadel-login>`) | http://localhost:8080/ui/login/ |
-| Health check | http://localhost:8080/healthz |
+| Liveness probe | http://localhost:8080/livez |
+| Readiness probe (checks the database) | http://localhost:8080/readyz |
 
-Sign in with `npx @zitadel/cli@alpha console`; the bare console URL asks for a
+Sign in with `npx @zitadel/cli@latest console`; the bare console URL asks for a
 password that is never printed.
 
 ## Manual Docker Compose

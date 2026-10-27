@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/cli",
-  "version": "1.0.0-alpha.24",
+  "version": "0.1.0",
   "description": "Agent-friendly Zitadel CLI",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/apps/cli#readme",
   "bugs": {
@@ -49,44 +49,83 @@
     ],
     "topics": {
       "users": {
-        "description": "Manage the users of the project."
+        "description": "Create and manage users."
       },
       "teams": {
-        "description": "Manage the teams of the project."
+        "description": "Create and manage teams."
       },
       "sessions": {
-        "description": "Inspect and revoke the sessions of the project."
+        "description": "View and revoke sessions."
       },
       "events": {
-        "description": "Read the audit event stream of the project."
+        "description": "View events."
       },
       "grants": {
-        "description": "Manage collaboration grants on the project."
+        "description": "Manage access grants."
       },
       "projects": {
-        "description": "Inspect and update the projects visible to this credential."
+        "description": "View and update projects."
       },
       "schemas": {
-        "description": "Inspect user-schema revisions."
+        "description": "View user schemas."
       },
       "branding": {
-        "description": "Work with login branding revisions."
+        "description": "Manage the login branding."
       },
-      "sso": {
-        "description": "Manage the identity providers users can sign in with."
+      "auth-method": {
+        "description": "Configure how users sign in."
+      },
+      "auth-method:password": {
+        "description": "Turn password sign-in on or off."
+      },
+      "auth-method:passkey": {
+        "description": "Turn passkey sign-in on or off."
+      },
+      "auth-method:sso": {
+        "description": "Add or remove identity providers."
+      },
+      "origin": {
+        "description": "Manage the project's allowed origins."
+      },
+      "release": {
+        "description": "Build and manage releases."
+      },
+      "deployment": {
+        "description": "Deploy releases and roll them back."
+      },
+      "variable": {
+        "description": "Manage project variables."
+      },
+      "idps": {
+        "description": "Manage identity provider connections."
+      },
+      "flow-definitions": {
+        "description": "View login flows."
+      },
+      "policies": {
+        "description": "View policies."
+      },
+      "env": {
+        "description": "Show and bind environments."
+      },
+      "api": {
+        "description": "Call any operation of the Zitadel API."
       }
     }
   },
   "type": "module",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --build tsconfig.app.json",
+    "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json",
     "pretest": "pnpm run build",
     "test": "vitest run",
     "test:all": "pnpm run test",
+    "check-advisories": "vitest run --config vitest.advisories.config.ts",
     "readme": "oclif readme",
-    "prepack": "tsdown && oclif manifest",
-    "postpack": "rm -f oclif.manifest.json"
+    "prepack": "tsdown && oclif manifest && publint --strict",
+    "postpack": "rm -f oclif.manifest.json",
+    "lint": "biome check .",
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
   },
   "dependencies": {
     "@clack/prompts": "catalog:",
@@ -105,12 +144,13 @@
     "consola": "^3.4.2",
     "magicast": "^0.5.3",
     "mixpanel": "^0.18.1",
+    "picocolors": "^1.1.1",
+    "rosie-skills": "catalog:",
     "safe-stable-stringify": "catalog:",
     "semver": "catalog:",
-    "undici": "^7.24.7",
+    "undici": "^7.29.1",
     "wrap-ansi": "^7.0.0",
-    "zod": "catalog:",
-    "picocolors": "^1.1.1"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
@@ -121,7 +161,10 @@
     "@zitadel/sdk-next": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
-    "tsdown": "^0.21.10",
-    "vitest": "catalog:"
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "catalog:"
   }
 }

@@ -4,7 +4,23 @@ post:
   description: |
     Resolves a flow definition based on purpose + audience context and returns
     the first capability step. Creates a new session implicitly unless
-    `session_id` is provided (for step-up / reauth on an existing session).
+    `session_id` is provided, together with that session's `session_token`
+    (for step-up / reauth on an existing session).
+
+    The browser `Origin` header selects which deployment serves this attempt:
+    the gate admits the origin against the project's origin patterns and live
+    previews, the newest deployment to that exact origin is the target, and
+    that deployment's release supplies flow definitions, user schemas and
+    branding. The resolved deployment is sealed into the `_zflow` cookie so
+    later steps keep the same configuration. An origin that matches no pattern
+    answers `403` with `proj.origin_not_allowed`; one that matches a preview
+    pattern with no live preview answers `403` with `proj.preview_not_live`;
+    nothing deployed to the target answers `409` with `rel.not_deployed`; a
+    revoked release answers `409` with `rel.revoked`. A request with no
+    `Origin` passes the gate and still needs a deployment target. A loopback
+    origin passes it too, and so does the server's own origin, from which its
+    console previews a project's login; a step submitted from the server's
+    own origin is still refused unless the project lists it.
 
     The response contains an `id` field — the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.
@@ -16,6 +32,20 @@ post:
   tags:
     - Flows
   security: []
+  parameters:
+    - name: Origin
+      in: header
+      required: false
+      description: |
+        Standard browser `Origin` header. Selects the deployment that serves
+        this attempt: matched against the project's origin patterns and live
+        previews, then against the newest deployment to that exact origin.
+        Browsers send it automatically; no client action is required. Absent
+        when the caller is not a browser.
+      schema:
+        type: string
+        format: uri
+        example: https://www.acme.com
   requestBody:
     required: true
     content:
@@ -40,5 +70,44 @@ post:
         application/json:
           schema:
             $ref: ../../components/error-details.yaml
+    '403':
+      description: |
+        The `Origin` is not admitted: `proj.origin_not_allowed` when it matches
+        no pattern of the project, or `proj.preview_not_live` when it matches a
+        preview pattern with no live preview for that exact URL.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+          examples:
+            origin_not_allowed:
+              summary: Origin matches no project pattern
+              value:
+                code: proj.origin_not_allowed
+                message: 'https://evil.example is not an origin of this project'
+            preview_not_live:
+              summary: Preview pattern matched but no live preview
+              value:
+                code: proj.preview_not_live
+                message: 'no live preview for https://acme-k3x9v2-acmeinc.vercel.app; run zitadel preview on this branch'
+    '409':
+      description: |
+        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
+        release of that deployment is revoked (`rel.revoked`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+          examples:
+            not_deployed:
+              summary: No deployment for this origin
+              value:
+                code: rel.not_deployed
+                message: 'nothing is deployed to https://www.acme.com'
+            revoked:
+              summary: The release is revoked
+              value:
+                code: rel.revoked
+                message: 'the release this attempt runs on was revoked'
     default:
       $ref: createFlow-error-response.yaml

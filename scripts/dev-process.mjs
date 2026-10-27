@@ -1,6 +1,42 @@
 import { spawn } from "node:child_process";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { accessSync, constants, realpathSync, statSync } from "node:fs";
+import { delimiter, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
+
+/**
+ * `env` with a PATH on which every process a contributor script starts finds
+ * the workspace's tools. The checkout needs only corepack, but package scripts
+ * (`pnpm run build`), the CLI's install in a generated app and moon's tasks
+ * call a bare `pnpm`: without one on PATH, scripts/shims/pnpm stands in and
+ * runs `corepack pnpm`. The workspace's node_modules/.bin goes last, so moon
+ * and turbo resolve when the script runs outside `pnpm run` and a global
+ * install still wins.
+ */
+export function withWorkspaceTools(env, options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const isExecutable = options.isExecutable ?? isExecutableFile;
+  const entries = (env.PATH ?? "").split(delimiter).filter(Boolean);
+  const shimDir = join(repoRoot, "scripts", "shims");
+  const binDir = join(repoRoot, "node_modules", ".bin");
+  const hasPnpm = entries.some((dir) => isExecutable(join(dir, "pnpm")));
+  const path = [
+    ...(hasPnpm || entries.includes(shimDir) ? [] : [shimDir]),
+    ...entries,
+    ...(entries.includes(binDir) ? [] : [binDir]),
+  ];
+  return { ...env, PATH: path.join(delimiter) };
+}
+
+function isExecutableFile(path) {
+  try {
+    accessSync(path, constants.X_OK);
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 export function run(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
@@ -86,6 +122,44 @@ export function runCapture(command, args = [], options = {}) {
   });
 }
 
+// Runs a command on pipes of its own and replays its output once it exits, for
+// commands that run side by side under one task. pnpm 12 is a native binary
+// that fails when a write to stdout would block, and a shared pipe turns
+// non-blocking for all its writers whenever a Node.js process among them
+// touches process.stdout, as every corepack start does (#1786). Settles only
+// once the replay is written: release.mjs exits right after a failure, which
+// would drop whatever the pipe had not taken yet.
+export async function runReplayed(command, args = [], options = {}) {
+  let result;
+  try {
+    result = await runCapture(command, args, options);
+  } catch (error) {
+    if (typeof error.stdout === "string") {
+      await replay(error);
+      // runCapture's message repeats the output that was just replayed.
+      error.message = error.message.split("\n")[0];
+    }
+    throw error;
+  }
+  await replay(result);
+  return result;
+}
+
+function replay({ stdout, stderr }) {
+  return Promise.all([writeAll(process.stdout, stdout), writeAll(process.stderr, stderr)]);
+}
+
+// The callback runs once the stream has handed the text to the OS.
+function writeAll(stream, text) {
+  return new Promise((resolve, reject) => {
+    if (!text) {
+      resolve();
+      return;
+    }
+    stream.write(text, (error) => (error ? reject(error) : resolve()));
+  });
+}
+
 export function formatCommand(command, args = []) {
   return [command, ...args].map(shellQuote).join(" ");
 }
@@ -136,8 +210,19 @@ export function forwardedArgs(args = process.argv.slice(2)) {
   return args[0] === "--" ? args.slice(1) : args;
 }
 
+// Node loads the entry script from its real path: import.meta.url has every
+// symlink resolved, argv[1] keeps the path as given. Compare real paths, or a
+// script started through a symlink (macOS's /tmp links to /private/tmp) skips
+// its main block and exits 0 having done nothing.
 export function isDirectRun(moduleUrl, argv = process.argv) {
-  return Boolean(argv[1] && moduleUrl === pathToFileURL(resolve(argv[1])).href);
+  if (!argv[1]) {
+    return false;
+  }
+  try {
+    return realpathSync(argv[1]) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return false;
+  }
 }
 
 function shellQuote(value) {

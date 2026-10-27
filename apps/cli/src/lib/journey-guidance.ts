@@ -1,7 +1,10 @@
 import { publicCliCommand } from "./public-cli";
+import { type EnvironmentSelector, projectCommand } from "./suggestion";
+import { DEPLOY_ARGS } from "./release";
 
 /**
- * Journey-staged guidance copy shared by `setup` and `status`.
+ * Guidance copy that commands share, so the story doesn't fork; most of it is
+ * the journey-staged copy of `setup` and `status`.
  *
  * The staging exists because of alpha tester feedback (Elina, alpha.15):
  * printing customize/publish steps before the user has logged in once reads
@@ -25,14 +28,43 @@ export function verifyLoginAction(openUrl?: string): string {
   );
 }
 
-/** The customize/publish pair, in Elina's tested wording. */
-export function customizeAndPublishActions(cliVersion: string): string[] {
+/**
+ * Where to look when something fails against the local server, shared by
+ * `start` and `doctor`. A sign-in step only says that a provider or a check
+ * failed, because the login is public; the server logs why.
+ */
+export function serverLogAction(cliVersion: string): string {
+  return (
+    "When a sign-in or a request fails, the server's log says why: run " +
+    `${publicCliCommand("logs --follow", cliVersion)} in another terminal to watch it.`
+  );
+}
+
+/**
+ * Where the list of every command is: the CLI run with no subcommand. Setup,
+ * status and every command's help end with it, after their own next steps, so
+ * the overview can be found without already knowing it exists. The command is on
+ * a line of its own, with nothing around it, so it can be copied as written.
+ */
+export function exploreAllCommands(cliVersion: string): string {
+  return ["Explore all commands:", `  ${publicCliCommand("", cliVersion)}`].join("\n");
+}
+
+/**
+ * The customize/publish pair, in Elina's tested wording. `selector` is the
+ * run's environment selection, so the quoted commands publish to the project
+ * the run was about.
+ */
+export function customizeAndPublishActions(
+  cliVersion: string,
+  selector: EnvironmentSelector,
+): string[] {
   return [
     "Customize what you ask for and how people sign in: edit .zitadel/schemas/ to change " +
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
-    `See your changes before they go live: ${publicCliCommand("plan", cliVersion)} to preview, ` +
-      `then ${publicCliCommand("apply", cliVersion)} to publish.`,
+    `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
   ];
 }
 

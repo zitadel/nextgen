@@ -18,7 +18,7 @@ import {
   ViewChild,
 } from "@angular/core";
 
-import type { ZitadelProject } from "./config";
+import type { ZitadelProject } from "./config.js";
 
 // Registers <zitadel-login> / <zitadel-logout> with the browser.
 import "@zitadel/components";
@@ -31,7 +31,9 @@ import "@zitadel/components";
  * (from `configureZitadel(...)`) is bound as a DOM **property** via `[project]`,
  * as are the discrete `projectId` / `proxyPath` the element reads when no handle
  * is supplied; `purpose` / `post-sign-in-url` are bound as attributes the Lit
- * element reads. The widget's `zitadel-*` events are re-emitted with their
+ * element reads, and `project-id` / `proxy-path` / `url` are bound as attributes
+ * too so a server-rendered page carries them before hydration (the handle wins over the discrete
+ * inputs, as in the element). The widget's `zitadel-*` events are re-emitted with their
  * detail as the `flowStep` / `flowInput` / `flowComplete` / `flowError` outputs.
  *
  * The underlying `<zitadel-login>` custom element is exposed via the
@@ -53,14 +55,20 @@ import "@zitadel/components";
     [project]="project"
     [projectId]="projectId"
     [proxyPath]="proxyPath"
+    [attr.project-id]="project?.projectId ?? projectId ?? null"
+    [attr.proxy-path]="project?.proxyPath ?? proxyPath ?? null"
+    [attr.url]="project?.url ?? null"
     [locales]="locales"
-    [lang]="lang"
+    [attr.lang]="lang ?? null"
     [attr.purpose]="purpose"
     [attr.flow-name]="flowName"
     [attr.post-sign-in-url]="postSignInUrl"
+    [forcePostSignInUrl]="forcePostSignInUrl"
+    [attr.resume-flow-id]="resumeFlowId"
     [attr.variant]="variant ?? null"
     [attr.theme]="theme ?? null"
     [suppressHeader]="suppressHeader"
+    [suppressPasswordToggle]="suppressPasswordToggle"
     (zitadel-flow-step)="onFlowStep($event)"
     (zitadel-flow-input)="onFlowInput($event)"
     (zitadel-flow-complete)="onFlowComplete($event)"
@@ -75,11 +83,14 @@ export class ZitadelLoginComponent {
   @Input() purpose: CreateFlowBodyPurpose = "login";
   @Input() flowName?: string;
   @Input() postSignInUrl?: string;
+  @Input() forcePostSignInUrl?: boolean;
+  @Input() resumeFlowId?: string | null;
   @Input() locales?: Record<string, Partial<Record<string, string>>>;
   @Input() lang?: string;
   @Input() variant?: "widget" | "page";
   @Input() theme?: "light" | "dark" | "auto";
   @Input() suppressHeader?: boolean;
+  @Input() suppressPasswordToggle?: boolean;
   @Output() flowStep = new EventEmitter<ZitadelFlowStepDetail>();
   @Output() flowInput = new EventEmitter<ZitadelFlowInputDetail>();
   @Output() flowComplete = new EventEmitter<ZitadelFlowCompleteDetail>();
@@ -95,22 +106,22 @@ export class ZitadelLoginComponent {
   }
 
   onFlowStep(event: Event): void {
-    this.flowStep.emit((event as CustomEvent<ZitadelFlowStepDetail>).detail);
+    if (event instanceof CustomEvent) this.flowStep.emit(event.detail);
   }
 
   onFlowInput(event: Event): void {
-    this.flowInput.emit((event as CustomEvent<ZitadelFlowInputDetail>).detail);
+    if (event instanceof CustomEvent) this.flowInput.emit(event.detail);
   }
 
   onFlowComplete(event: Event): void {
-    this.flowComplete.emit((event as CustomEvent<ZitadelFlowCompleteDetail>).detail);
+    if (event instanceof CustomEvent) this.flowComplete.emit(event.detail);
   }
 
   onFlowRedirect(event: Event): void {
-    this.flowRedirect.emit((event as CustomEvent<ZitadelFlowRedirectDetail>).detail);
+    if (event instanceof CustomEvent) this.flowRedirect.emit(event.detail);
   }
 
   onFlowError(event: Event): void {
-    this.flowError.emit((event as CustomEvent<ZitadelFlowErrorDetail>).detail);
+    if (event instanceof CustomEvent) this.flowError.emit(event.detail);
   }
 }

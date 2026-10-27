@@ -13,15 +13,20 @@ import {
 } from "@zitadel/api-mock/platform";
 import { http, passthrough } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { text } from "@clack/prompts";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  localContainerName,
   localRuntimePaths,
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
+import Claim from "../../../src/commands/claim";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+import { aBinaryRecord } from "../../helpers/runtime-record";
 
 /**
  * `zitadel claim` against the api-mock, which is the only working claim
@@ -60,17 +65,15 @@ type Project = { id: string; project_secret: string };
  * written. Going through the API rather than poking the store keeps the
  * project secret and the store in agreement, which `claim/init` checks.
  */
-async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
-  cwd: string;
-  project: Project;
-}> {
-  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
-  tempDirs.push(cwd);
-
+/**
+ * Creates a project through the mock's own create endpoint (msw intercepts the
+ * fetch) so its secret and the store agree — `claim/init` checks that.
+ */
+async function createProjectOnMock(): Promise<Project> {
   const response = await fetch(`${SERVER}/projects`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ name: "demo", preview_origins: [] }),
+    body: JSON.stringify({ name: "demo", origins: [] }),
   });
   const project = (await response.json()) as Project;
   // Fail loudly rather than writing `undefined` into the secret: a renamed
@@ -79,12 +82,24 @@ async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
   if (typeof project.project_secret !== "string") {
     throw new Error(`mock POST /projects returned no project_secret: ${JSON.stringify(project)}`);
   }
+  return project;
+}
+
+async function makeProject(overrides: Record<string, unknown> = {}): Promise<{
+  cwd: string;
+  project: Project;
+}> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+  tempDirs.push(cwd);
+
+  const project = await createProjectOnMock();
 
   await mkdir(join(cwd, ".zitadel"), { recursive: true });
   await writeSecret(cwd, {
     project_id: project.id,
     project_secret: project.project_secret,
     preview_secret: "sk_preview_test",
+    primary_origins: [],
     preview_origins: [],
     created_at: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -97,8 +112,10 @@ async function writeSecret(cwd: string, secret: Record<string, unknown>): Promis
 }
 
 async function readSecret(cwd: string): Promise<Record<string, unknown>> {
-  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<string,
-    unknown>;
+  return JSON.parse(await readFile(join(cwd, ".zitadel/secret"), "utf8")) as Record<
+    string,
+    unknown
+  >;
 }
 
 function claim(cwd: string, extra: string[] = []) {
@@ -111,7 +128,9 @@ function claim(cwd: string, extra: string[] = []) {
  * response body to itself — so the store snapshot is how a test learns it.
  */
 async function onChallengeMinted(act: (challengeId: string) => void): Promise<void> {
-  const deadline = Date.now() + 5000;
+  // Generous: the first run in a file loads the CLI cold, which on a loaded
+  // machine can take seconds before the request goes out.
+  const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     const [challengeId] = snapshotPlatformStore().claimChallengeIds;
     if (challengeId) {
@@ -196,6 +215,7 @@ describe("claim", () => {
       project_id: "proj-local",
       project_secret: "sk_proj_local",
       preview_secret: "sk_preview_local",
+      primary_origins: [],
       preview_origins: [],
       created_at: "2026-01-01T00:00:00.000Z",
       claimed_at: "2026-02-02T00:00:00.000Z",
@@ -353,10 +373,92 @@ describe("claim", () => {
     expect((await readSecret(cwd)).team_id).toBeUndefined();
   });
 
+  it("claims the project the resolved environment names, not the fallback secret", async () => {
+    const { cwd, project: fallback } = await makeProject();
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+      { mode: 0o600 },
+    );
+
+    const [res] = await Promise.all([
+      claim(cwd, ["--env", "production"]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
+    // The fallback `.zitadel/secret` describes a different project, so it must
+    // not be marked claimed — that would conflate the two environments.
+    const secret = await readSecret(cwd);
+    expect(secret.project_id).toBe(fallback.id);
+    expect(secret.team_id).toBeUndefined();
+    expect(secret.claimed_at).toBeUndefined();
+  });
+
+  it("asks for a missing project id on a terminal and keeps the answer", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    await writeFile(
+      join(cwd, ".env.production.local"),
+      [`ZITADEL_URL=${SERVER}`, `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`, ""].join(
+        "\n",
+      ),
+      { mode: 0o600 },
+    );
+    vi.mocked(text).mockResolvedValueOnce(envProject.id);
+
+    // The built CLI bundles its own prompts, so a prompt can only be answered
+    // by running the command from source, where `input` is the one module asked.
+    await Promise.all([
+      asTerminal(() => Claim.run(["--cwd", cwd, "--no-open", "--env", "production"])),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(await readFile(join(cwd, ".env.production.local"), "utf8")).toContain(
+      `ZITADEL_PROJECT_ID=${envProject.id}`,
+    );
+  });
+
+  it("claims from an env file with no local secret present", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+    tempDirs.push(cwd);
+    const envProject = await createProjectOnMock();
+    const file = join(cwd, "prod.env");
+    await writeFile(
+      file,
+      [
+        `ZITADEL_URL=${SERVER}`,
+        `ZITADEL_PROJECT_ID=${envProject.id}`,
+        `ZITADEL_PROJECT_SECRET=${envProject.project_secret}`,
+        "",
+      ].join("\n"),
+    );
+
+    const [res] = await Promise.all([
+      runCliForTest(["claim", "--cwd", cwd, "--json", "--no-open", "--env-file", file]),
+      onChallengeMinted((challengeId) => completeClaimChallenge(challengeId, envProject.id)),
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { status: string; data: { project_id: string } };
+    expect(json.status).toBe("ok");
+    expect(json.data.project_id).toBe(envProject.id);
+  });
+
   describe("--server local", () => {
     // These talk to a real socket on an ephemeral port. msw's platform
     // handlers match any origin, so they would otherwise swallow the stub's
-    // claim routes and `onUnhandledRequest: "error"` would reject `/healthz`.
+    // claim routes and `onUnhandledRequest: "error"` would reject `/readyz`.
     beforeEach(() => {
       server.use(http.all(/^http:\/\/localhost:\d+\//, () => passthrough()));
     });
@@ -425,18 +527,16 @@ describe("claim", () => {
 });
 
 /**
- * A minimal stand-in for a local Zitadel server: enough of `/healthz` for
+ * A minimal stand-in for a local Zitadel server: enough of `/readyz` for
  * `resolveLocalServer` to accept it, and a claim pair that completes on the
  * first poll. msw is bypassed here because the request goes to localhost with
  * a port only known at runtime; a real socket is simpler than reshaping the
  * handlers.
  */
-async function startClaimServer(
-  claimUrl = "http://localhost/claim/ch_localstub",
-): Promise<string> {
+async function startClaimServer(claimUrl = "http://localhost/claim/ch_localstub"): Promise<string> {
   const httpServer = createServer((req, res) => {
     const url = req.url ?? "";
-    if (url === "/healthz") {
+    if (url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -472,17 +572,14 @@ async function startClaimServer(
   return `http://localhost:${String(address.port)}`;
 }
 
+/** A runtime record of a server that is running: this process, answering at `serverUrl`. */
 function runtimeFor(cwd: string, serverUrl: string): RuntimeMetadata {
-  return {
-    schema_version: 1,
-    backend: "docker",
-    container_name: localContainerName(cwd),
-    container_id: "container-test-id",
-    image: "ghcr.io/zitadel/nextgen:test",
+  return aBinaryRecord({
+    pid: process.pid,
+    command: process.execPath,
+    log_path: localRuntimePaths(cwd).logFile,
     port: Number(new URL(serverUrl).port),
     server_url: serverUrl,
     data_dir: localRuntimePaths(cwd).dataDir,
-    created_at: "2026-06-09T00:00:00.000Z",
-    cli_version: "0.0.0-test",
-  };
+  });
 }

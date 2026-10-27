@@ -26,6 +26,10 @@ properties:
       - `branding` — always `default`. A project has one branding, so there is
         nothing to distinguish; it is revisioned like everything else, and
         `revision_id` is what varies between releases.
+      - `idp` — the connection's `slug`, so `google` and `github` are
+        separate resources a release pins separately
+      - `policy` — the policy's `operation`, so a project's password policy
+        is one resource however often it is revised
 
       Resources inside a release reference each other by handle rather than by
       revision id, so the same handle names the same resource in every release.

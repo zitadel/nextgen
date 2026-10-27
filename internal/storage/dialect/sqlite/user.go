@@ -10,6 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/dialect/pagination"
 	v2user "github.com/zitadel/nextgen/internal/storage/user"
 )
 
@@ -172,6 +173,47 @@ func (us userStatements) GetUserUniqueAttributeScopes(ctx context.Context, proje
 	return scopes, wrapError(rows.Err())
 }
 
+// GetTakenUniqueAttributeKeys implements [service.UserStatements].
+func (us userStatements) GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []service.UniqueAttributeClaim) ([]domain.AttributeKey, error) {
+	if len(claims) == 0 {
+		return nil, nil
+	}
+	var compiler statementCompiler
+	compiler.WriteString("SELECT key FROM user_unique_attributes WHERE project_id = ")
+	compiler.WriteArg(projectID)
+	compiler.WriteString(" AND user_id <> ")
+	compiler.WriteArg(userID)
+	compiler.WriteString(" AND (")
+	for i, claim := range claims {
+		if i > 0 {
+			compiler.WriteString(" OR ")
+		}
+		compiler.WriteString("(team_id = ")
+		compiler.WriteArg(claim.TeamID)
+		compiler.WriteString(" AND key = ")
+		compiler.WriteArg(claim.Key)
+		compiler.WriteString(" AND value_hash = ")
+		compiler.WriteArg(claim.ValueHash[:])
+		compiler.WriteString(")")
+	}
+	compiler.WriteString(")")
+	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+
+	var keys []domain.AttributeKey
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, domain.AttributeKey(key))
+	}
+	return keys, wrapError(rows.Err())
+}
+
 // PatchUser implements [service.UserStatements] as a full rewrite of the
 // user's attribute and registry rows; a registry insert colliding with
 // another user's claim still surfaces as a UniqueError.
@@ -234,59 +276,69 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 		return nil, err
 	}
 
-	var compiler statementCompiler
-	compiler.WriteString(userQuery)
+	headers, nextCursor, err := pagination.Page(filter.Pagination, v2user.Schema, func(limit uint32) ([]*domain.User, error) {
+		var compiler statementCompiler
+		compiler.WriteString(userQuery)
 
-	hasWhere := false
-	if readFilter != nil {
-		writeConjunct(&compiler, &hasWhere)
-		compileFilter(&compiler, readFilter, v2user.Schema)
-	}
-	for _, a := range opts.Attributes {
-		writeConjunct(&compiler, &hasWhere)
-		if opts.UniqueAttributesOnly {
-			hash, err := domain.UniqueValueHash(a.Value)
-			if err != nil {
-				return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+		hasWhere := false
+		if readFilter != nil {
+			writeConjunct(&compiler, &hasWhere)
+			compileFilter(&compiler, readFilter, v2user.Schema)
+		}
+		for _, a := range opts.Attributes {
+			writeConjunct(&compiler, &hasWhere)
+			if opts.UniqueAttributesOnly {
+				hash, err := domain.UniqueValueHash(a.Value)
+				if err != nil {
+					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+				}
+				compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+				compiler.WriteArg(string(a.Key))
+				compiler.WriteString(" AND ua.value_hash = ")
+				compiler.WriteArg(hash[:])
+				if opts.UniqueTeamID != nil {
+					compiler.WriteString(" AND ua.team_id = ")
+					compiler.WriteArg(*opts.UniqueTeamID)
+				}
+				compiler.WriteString(")")
+				continue
 			}
-			compiler.WriteString("EXISTS (SELECT 1 FROM user_unique_attributes ua WHERE ua.project_id = users.project_id AND ua.user_id = users.id AND ua.key = ")
+			raw, err := json.Marshal(a.Value)
+			if err != nil {
+				return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+			}
+			compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
 			compiler.WriteArg(string(a.Key))
-			compiler.WriteString(" AND ua.value_hash = ")
-			compiler.WriteArg(hash[:])
+			compiler.WriteString(" AND a.value = ")
+			compiler.WriteArg(string(raw))
 			compiler.WriteString(")")
-			continue
 		}
-		raw, err := json.Marshal(a.Value)
+		if opts.MembershipTeamID != nil {
+			writeConjunct(&compiler, &hasWhere)
+			compiler.WriteString("EXISTS (SELECT 1 FROM team_memberships m WHERE m.project_id = users.project_id AND m.user_id = users.id AND m.team_id = ")
+			compiler.WriteArg(*opts.MembershipTeamID)
+			compiler.WriteString(" AND m.status = ")
+			compiler.WriteArg(domain.MembershipStatusActive.String())
+			compiler.WriteString(")")
+		}
+		maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "users", "id")
+
+		compileOrderBy(&compiler, filter.Pagination.OrderBy, v2user.Schema)
+		compileLimit(&compiler, limit)
+
+		rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
 		if err != nil {
-			return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
+			return nil, wrapError(err)
 		}
-		compiler.WriteString("EXISTS (SELECT 1 FROM user_attributes a WHERE a.project_id = users.project_id AND a.user_id = users.id AND a.key = ")
-		compiler.WriteArg(string(a.Key))
-		compiler.WriteString(" AND a.value = ")
-		compiler.WriteArg(string(raw))
-		compiler.WriteString(")")
-	}
-	if opts.MembershipTeamID != nil {
-		writeConjunct(&compiler, &hasWhere)
-		compiler.WriteString("EXISTS (SELECT 1 FROM team_memberships m WHERE m.project_id = users.project_id AND m.user_id = users.id AND m.team_id = ")
-		compiler.WriteArg(*opts.MembershipTeamID)
-		compiler.WriteString(" AND m.status = ")
-		compiler.WriteArg(domain.MembershipStatusActive.String())
-		compiler.WriteString(")")
-	}
-	maybeWriteAuthzListPredicate(ctx, &compiler, &hasWhere, "users", "id")
-
-	compileOrderBy(&compiler, filter.Pagination.OrderBy, v2user.Schema)
-	compileLimit(&compiler, filter.Pagination.Limit)
-
-	rows, err := us.client.Query(ctx, compiler.String(), compiler.args...)
+		defer rows.Close()
+		headers, err := collectRows(rows, scanUserHeader)
+		if err != nil {
+			return nil, wrapError(err)
+		}
+		return headers, nil
+	})
 	if err != nil {
-		return nil, wrapError(err)
-	}
-	defer rows.Close()
-	headers, err := collectRows(rows, scanUserHeader)
-	if err != nil {
-		return nil, wrapError(err)
+		return nil, err
 	}
 	if err := us.hydrateUsers(ctx, headers, opts); err != nil {
 		return nil, err
@@ -294,7 +346,7 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 
 	return &database.ListResult[*domain.User]{
 		Items:      headers,
-		NextCursor: v2user.NextCursor(headers, filter.Pagination),
+		NextCursor: nextCursor,
 	}, nil
 }
 

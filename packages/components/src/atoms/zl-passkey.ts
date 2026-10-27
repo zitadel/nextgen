@@ -2,6 +2,8 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import { bufferToBase64Url, base64UrlToBuffer } from "../internal/base64url.js";
+import { emit } from "../internal/emit.js";
+import { parseJsonAttribute } from "../internal/json-attribute.js";
 import type { AtomManifest } from "../manifest.js";
 
 import "./zl-alert.js";
@@ -92,6 +94,10 @@ const TIMEOUT_GRACE_MS = 1000;
  * straight from the server's challenge response.
  *
  * Spec: ADR 011 — Passkey Action Contract
+ *
+ * @fires {CustomEvent<ZlPasskeyStartedDetail>} zl-passkey-started - The WebAuthn ceremony began.
+ * @fires {CustomEvent<ZlPasskeyResultDetail>} zl-passkey-result - The ceremony produced a credential.
+ * @fires {CustomEvent<ZlPasskeyErrorDetail>} zl-passkey-error - The ceremony failed; carries the error.
  */
 @customElement("zl-passkey")
 export class ZlPasskey extends LitElement {
@@ -120,12 +126,7 @@ export class ZlPasskey extends LitElement {
     attribute: "options",
     converter: {
       fromAttribute(value: string | null) {
-        if (!value) return null;
-        try {
-          return JSON.parse(value) as Record<string, unknown>;
-        } catch {
-          return null;
-        }
+        return (parseJsonAttribute(value) ?? null) as Record<string, unknown> | null;
       },
       toAttribute(value: Record<string, unknown> | null) {
         return value ? JSON.stringify(value) : null;
@@ -138,7 +139,7 @@ export class ZlPasskey extends LitElement {
    * Challenge method echoed back in the result event so the orchestrator
    * can include it in `challenge_response.method`. Defaults to `"passkey"`.
    */
-  @property({ type: String }) accessor method = "passkey";
+  @property() accessor method = "passkey";
 
   /**
    * When true, the ceremony is not started automatically on mount.
@@ -211,9 +212,7 @@ export class ZlPasskey extends LitElement {
 
     try {
       const credential =
-        this.ceremony === "register"
-          ? await this.createCredential()
-          : await this.getCredential();
+        this.ceremony === "register" ? await this.createCredential() : await this.getCredential();
 
       if (!credential) {
         this.emitError("No credential returned by the browser.", false);
@@ -365,9 +364,7 @@ export class ZlPasskey extends LitElement {
    * Serialize a `PublicKeyCredential` to the JSON shape defined in
    * `passkey-proof.yaml`. All `ArrayBuffer` fields are base64url-encoded.
    */
-  private serializeCredential(
-    credential: PublicKeyCredential,
-  ): ZlPasskeyResultDetail["proof"] {
+  private serializeCredential(credential: PublicKeyCredential): ZlPasskeyResultDetail["proof"] {
     const response = credential.response;
 
     const serialized: ZlPasskeyResultDetail["proof"] = {
@@ -382,17 +379,13 @@ export class ZlPasskey extends LitElement {
     // Attestation response (registration)
     if ("attestationObject" in response) {
       const attestation = response as AuthenticatorAttestationResponse;
-      serialized.response.attestationObject = bufferToBase64Url(
-        attestation.attestationObject,
-      );
+      serialized.response.attestationObject = bufferToBase64Url(attestation.attestationObject);
     }
 
     // Assertion response (authentication)
     if ("authenticatorData" in response) {
       const assertion = response as AuthenticatorAssertionResponse;
-      serialized.response.authenticatorData = bufferToBase64Url(
-        assertion.authenticatorData,
-      );
+      serialized.response.authenticatorData = bufferToBase64Url(assertion.authenticatorData);
       serialized.response.signature = bufferToBase64Url(assertion.signature);
       if (assertion.userHandle) {
         serialized.response.userHandle = bufferToBase64Url(assertion.userHandle);
@@ -414,13 +407,8 @@ export class ZlPasskey extends LitElement {
       method: this.method,
       proof,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-result", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    // The WebAuthn proof is a credential, and only the widget consumes it.
+    emit(this, "zl-passkey-result", detail, { composed: false });
   }
 
   private emitError(message: string, aborted: boolean, timedOut = false): void {
@@ -430,13 +418,7 @@ export class ZlPasskey extends LitElement {
       aborted,
       timed_out: timedOut,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-error", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zl-passkey-error", detail);
   }
 
   private emitStarted(): void {
@@ -444,13 +426,7 @@ export class ZlPasskey extends LitElement {
       challenge_id: this.challengeId,
       method: this.method,
     };
-    this.dispatchEvent(
-      new CustomEvent("zl-passkey-started", {
-        bubbles: true,
-        composed: true,
-        detail,
-      }),
-    );
+    emit(this, "zl-passkey-started", detail);
   }
 
   /**

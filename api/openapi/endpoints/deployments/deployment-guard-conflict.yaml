@@ -1,0 +1,26 @@
+title: DeploymentGuardConflict
+type: object
+description: '`expected_deployment_id` is not the deployment this write replaces.'
+required:
+  - code
+  - message
+  - details
+properties:
+  code:
+    type: string
+    const: dep.conflict
+  message:
+    type: string
+    description: Human-readable explanation of the error.
+  details:
+    type: object
+    required:
+      - deployment
+    properties:
+      deployment:
+        description: |
+          The deployment this write replaces, null when there is none. Retry
+          with its id as `expected_deployment_id`.
+        oneOf:
+          - $ref: deployment.yaml
+          - type: 'null'

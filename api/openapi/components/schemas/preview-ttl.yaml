@@ -1,0 +1,8 @@
+title: PreviewTTL
+type: string
+format: duration
+x-ogen-type: github.com/zitadel/nextgen/internal/api/ogenx.ISODuration
+description: |
+  How long a preview stays live after the deployment that writes it, as an
+  ISO-8601 duration. At most 365 days (`P365D`).
+example: P7D

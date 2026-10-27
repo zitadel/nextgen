@@ -13,4 +13,6 @@ enum:
   - schema
   - flow_definition
   - branding
+  - idp
+  - policy
 example: schema

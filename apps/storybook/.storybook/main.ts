@@ -11,7 +11,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // through a package export that would resolve to an unpublished `.ts` file.
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
-import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.js";
+import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const packagesDir = resolve(here, "../../../packages");
@@ -51,19 +51,25 @@ const reloadPollerScript = `<script>
  * See `apps/storybook/README.md`.
  *
  * `@zitadel/api-mock`'s public dir is served statically so MSW finds
- * `mockServiceWorker.js` at `/mockServiceWorker.js` (the orchestrator stories
- * mock the Flow API through `msw-storybook-addon`).
+ * `mockServiceWorker.js` at the site root (the orchestrator stories mock the
+ * Flow API through `msw-storybook-addon`).
  */
 const config: StorybookConfig = {
   framework: "@storybook/web-components-vite",
   stories: ["../src/**/*.stories.ts"],
+  // `msw-storybook-addon` is deliberately NOT registered as an addon: on the
+  // CSF3 path its preview annotations add a `beforeEach` that starts a second
+  // worker with the default setup unless `context.msw` is already set. We use
+  // the CSF3 `mswLoader(startWorker)` in `preview.ts` instead, which owns the
+  // single worker. Listing it here would reintroduce the duplicate-worker race,
+  // guarded only by loaders happening to run before `beforeEach`.
   addons: ["@storybook/addon-a11y", "@storybook/addon-vitest"],
   staticDirs: [{ from: apiMockPublicDir, to: "/" }],
   // Inject the workspace-source reload poller into the preview iframe — but only
   // in `storybook dev`. Its `__zitadel_reload_token` endpoint is served by the
-  // dev server's `configureServer` hook alone, so in a static build (e.g. the
-  // Vercel preview) the poller would fetch a nonexistent path every 500ms
-  // forever. `storybook build` runs with `NODE_ENV=production`, so gate on that.
+  // dev server's `configureServer` hook alone, so in a static build the poller
+  // would fetch a nonexistent path every 500ms forever. `storybook build` runs
+  // with `NODE_ENV=production`, so gate on that.
   previewHead: (head) =>
     process.env.NODE_ENV === "production" ? head : `${head}${reloadPollerScript}`,
   async viteFinal(viteConfig) {
@@ -79,17 +85,36 @@ const config: StorybookConfig = {
     viteConfig.resolve.conditions = ["@zitadel/source", ...(viteConfig.resolve.conditions ?? [])];
     // `@zitadel/components` intentionally does NOT publish a `@zitadel/source`
     // condition: its source imports raw `*.css?inline` and `*.liquid` assets, and
-    // exposing it repo-wide would force every TS consumer (the SDKs, `login-ui`)
-    // to typecheck those un-declared modules and conflict with their composite
+    // exposing it repo-wide would force every TS consumer (the SDKs) to
+    // typecheck those un-declared modules and conflict with their composite
     // `dist` project references. Alias it to source here instead — a Storybook-
     // bundler-only override that keeps the Lit shadow CSS (`?inline`) and atom
     // logic hot, without changing how the rest of the workspace resolves it.
+    //
+    // Known exception to "use a package through its exports": this alias also
+    // applies to `storybook build` and the Vitest stories, not only `dev`.
+    // Caching stays correct because every storybook task depends on
+    // `components:build`, whose hash covers this source. Consuming the built
+    // `dist` instead would drop the alias, the `liquidRaw` path import above
+    // and the watcher below, at the cost of instant hot reload.
     const componentsSrc = resolve(packagesDir, "components/src");
     const componentsAlias = [
-      { find: /^@zitadel\/components\/atoms$/, replacement: resolve(componentsSrc, "atoms/index.ts") },
-      { find: /^@zitadel\/components\/manifests$/, replacement: resolve(componentsSrc, "manifests.ts") },
-      { find: /^@zitadel\/components\/tokens$/, replacement: resolve(componentsSrc, "tokens/index.ts") },
-      { find: /^@zitadel\/components\/orchestrator$/, replacement: resolve(componentsSrc, "orchestrator/index.ts") },
+      {
+        find: /^@zitadel\/components\/atoms$/,
+        replacement: resolve(componentsSrc, "atoms/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/manifests$/,
+        replacement: resolve(componentsSrc, "manifests.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/tokens$/,
+        replacement: resolve(componentsSrc, "tokens/index.ts"),
+      },
+      {
+        find: /^@zitadel\/components\/orchestrator$/,
+        replacement: resolve(componentsSrc, "orchestrator/index.ts"),
+      },
       { find: /^@zitadel\/components$/, replacement: resolve(componentsSrc, "index.ts") },
     ];
     const existingAlias = viteConfig.resolve.alias;

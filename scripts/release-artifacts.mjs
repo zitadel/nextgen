@@ -5,7 +5,7 @@ import { chmod, copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mapWithConcurrency, run } from "./dev-process.mjs";
+import { mapWithConcurrency, run, runReplayed } from "./dev-process.mjs";
 import {
   PUBLIC_PACKAGE_DIRS,
   PUBLIC_RELEASE_PACKAGES,
@@ -161,41 +161,49 @@ export async function createArchives(options = {}) {
   await rm(archivesDir, { recursive: true, force: true });
   await mkdir(archivesDir, { recursive: true });
 
-  const archives = [];
-  for (const platform of SERVER_PLATFORMS) {
-    const name = `nextgen_${version}_${platformName(platform)}`;
-    const sourceDir = platformDir(outDir, platform);
-    if (platform.goos === "windows") {
-      const stagingDir = join(outDir, "archive-staging", name);
-      await rm(stagingDir, { recursive: true, force: true });
-      await mkdir(stagingDir, { recursive: true });
-      await copyFile(join(sourceDir, binaryName(platform.goos)), join(stagingDir, binaryName(platform.goos)));
-      await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
-      await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
-      const archivePath = join(archivesDir, `${name}.zip`);
-      await runFn("zip", ["-qr", archivePath, "."], { cwd: stagingDir, env: process.env });
-      archives.push(archivePath);
-      continue;
-    }
+  // The archives are independent (one platform's binary each, distinct file
+  // names) and gzip and zip use one core each, so compress all platforms at
+  // once. The results keep platform order, so checksums.txt keeps its order.
+  const archives = await mapWithConcurrency(
+    SERVER_PLATFORMS,
+    SERVER_PLATFORMS.length,
+    async (platform) => {
+      const name = `nextgen_${version}_${platformName(platform)}`;
+      const sourceDir = platformDir(outDir, platform);
+      if (platform.goos === "windows") {
+        const stagingDir = join(outDir, "archive-staging", name);
+        await rm(stagingDir, { recursive: true, force: true });
+        await mkdir(stagingDir, { recursive: true });
+        await copyFile(
+          join(sourceDir, binaryName(platform.goos)),
+          join(stagingDir, binaryName(platform.goos)),
+        );
+        await copyFile(join(repoRoot, "LICENSE"), join(stagingDir, "LICENSE"));
+        await copyFile(join(repoRoot, "README.md"), join(stagingDir, "README.md"));
+        const archivePath = join(archivesDir, `${name}.zip`);
+        await runFn("zip", ["-qr", archivePath, "."], { cwd: stagingDir, env: process.env });
+        return archivePath;
+      }
 
-    const archivePath = join(archivesDir, `${name}.tar.gz`);
-    await runFn(
-      "tar",
-      [
-        "-czf",
-        archivePath,
-        "-C",
-        sourceDir,
-        binaryName(platform.goos),
-        "-C",
-        repoRoot,
-        "LICENSE",
-        "README.md",
-      ],
-      { cwd: repoRoot, env: process.env },
-    );
-    archives.push(archivePath);
-  }
+      const archivePath = join(archivesDir, `${name}.tar.gz`);
+      await runFn(
+        "tar",
+        [
+          "-czf",
+          archivePath,
+          "-C",
+          sourceDir,
+          binaryName(platform.goos),
+          "-C",
+          repoRoot,
+          "LICENSE",
+          "README.md",
+        ],
+        { cwd: repoRoot, env: process.env },
+      );
+      return archivePath;
+    },
+  );
 
   const checksumLines = [];
   for (const archive of archives) {
@@ -208,34 +216,31 @@ export async function createArchives(options = {}) {
 
 export async function packPublicPackages(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
-  const version = options.version ?? (await readServerRelease(repoRoot)).version;
-  const outDir = options.outDir ?? releaseDir(repoRoot, version);
-  const runFn = options.run ?? run;
-  const tarballsDir = join(outDir, "npm");
+  // The packs run side by side, so none may write to this process's stdout
+  // (see runReplayed); each pack's output arrives in one piece once it is done.
+  const runFn = options.run ?? runReplayed;
+  const tarballsDir = options.tarballsDir ?? (await defaultTarballsDir(repoRoot, options));
   await rm(tarballsDir, { recursive: true, force: true });
   await mkdir(tarballsDir, { recursive: true });
 
   // Packs are independent (distinct package dirs, distinct tarball names in a
   // shared destination); cap concurrency so the cli prepack rebuild and the
   // larger packages do not stampede the runner.
-  await mapWithConcurrency(PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
+  await mapWithConcurrency(options.dirs ?? PUBLIC_PACKAGE_DIRS, 8, async (dir) => {
     const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
     await assertPublishDirectoryReady({ repoRoot, dir, manifest });
-    // `pnpm pack` runs the package's `prepack`, which for @zitadel/cli rebuilds
-    // the bundle via tsdown. Stamp the production telemetry channel here so the
-    // published tarball routes to the prod Mixpanel project — setting it only on
-    // the earlier release build is not enough, since prepack rebuilds.
-    const env =
-      dir === "apps/cli"
-        ? { ...process.env, ZITADEL_TELEMETRY_BUILD_CHANNEL: "production" }
-        : process.env;
     await runFn("corepack", ["pnpm", "--dir", dir, "pack", "--pack-destination", tarballsDir], {
       cwd: repoRoot,
-      env,
+      env: process.env,
     });
   });
 
   return tarballsDir;
+}
+
+async function defaultTarballsDir(repoRoot, options) {
+  const version = options.version ?? (await readServerRelease(repoRoot)).version;
+  return join(options.outDir ?? releaseDir(repoRoot, version), "npm");
 }
 
 async function assertPublishDirectoryReady({ repoRoot, dir, manifest }) {
@@ -268,17 +273,29 @@ export async function buildContainerImage(options = {}) {
   const runFn = options.run ?? run;
   const platformList = options.platforms ?? CONTAINER_PLATFORMS;
   const contextPlatforms = options.contextPlatforms ?? platformList;
-  const contextDir = options.contextDir ??
+  const contextDir =
+    options.contextDir ??
     (await prepareDockerContext({
       repoRoot,
       outDir,
       version: release.version,
       platforms: contextPlatforms,
     }));
-  const platformArgs = platformList.map((platform) => `${platform.goos}/${platform.goarch}`).join(",");
+  const platformArgs = platformList
+    .map((platform) => `${platform.goos}/${platform.goarch}`)
+    .join(",");
   const image = options.image ?? SERVER_IMAGE;
-  const tags = options.tags ?? containerTags({ image, version: release.version, prerelease: release.prerelease });
-  const args = ["buildx", "build", "--platform", platformArgs, "-f", join(contextDir, "Dockerfile")];
+  const tags =
+    options.tags ??
+    containerTags({ image, version: release.version, prerelease: release.prerelease });
+  const args = [
+    "buildx",
+    "build",
+    "--platform",
+    platformArgs,
+    "-f",
+    join(contextDir, "Dockerfile"),
+  ];
 
   for (const tag of tags) {
     args.push("-t", tag);
@@ -298,21 +315,11 @@ export async function buildContainerImage(options = {}) {
   return { args, contextDir, tags };
 }
 
-// Temporary: while the repo is pre-GA every release is a prerelease, so the
-// rule below ("only stable moves `:latest`") leaves `:latest` pinned to a build
-// that predates the alpha train. Anyone following the documented Docker quick
-// start — `docs/operations/env.example` defaults `NEXTGEN_IMAGE` to `:latest` —
-// gets that stale image rather than the alpha they expect.
-//
-// Until the first stable release, point `:latest` at the alpha train too. Flip
-// this back to `false` when leaving prerelease mode (`changeset pre exit`, see
-// `.changeset/README.md`), so a later alpha can never overwrite a stable
-// `:latest`.
-export const TAG_PRERELEASE_AS_LATEST = true;
-
+// Only a release moves `:latest`, so a prerelease never replaces the image the
+// Docker quick start runs (`docs/operations/env.example`).
 export function containerTags({ image = SERVER_IMAGE, version, prerelease }) {
   const tags = [`${image}:${version}`];
-  if (!prerelease || TAG_PRERELEASE_AS_LATEST) {
+  if (!prerelease) {
     tags.push(`${image}:latest`);
   }
   return tags;
@@ -335,7 +342,11 @@ export async function writeReleaseMetadata(options = {}) {
     shortCommit: info.shortCommit,
     date: info.date,
     image: SERVER_IMAGE,
-    imageTags: containerTags({ image: SERVER_IMAGE, version: release.version, prerelease: release.prerelease }),
+    imageTags: containerTags({
+      image: SERVER_IMAGE,
+      version: release.version,
+      prerelease: release.prerelease,
+    }),
     packages,
   };
   await mkdir(outDir, { recursive: true });
@@ -368,7 +379,9 @@ export function artifactImageRows(metadata) {
 }
 
 export function artifactPackageRows(metadata) {
-  return (metadata.packages ?? []).map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`).join("\n");
+  return (metadata.packages ?? [])
+    .map((pkg) => `| \`${pkg.name}\` | \`${pkg.version}\` |`)
+    .join("\n");
 }
 
 export async function verifyLocalArtifacts(options = {}) {
@@ -378,7 +391,11 @@ export async function verifyLocalArtifacts(options = {}) {
   const missing = [];
   for (const platform of SERVER_PLATFORMS) {
     const extension = platform.goos === "windows" ? "zip" : "tar.gz";
-    const archive = join(outDir, "archives", `nextgen_${release.version}_${platformName(platform)}.${extension}`);
+    const archive = join(
+      outDir,
+      "archives",
+      `nextgen_${release.version}_${platformName(platform)}.${extension}`,
+    );
     if (!(await exists(archive))) {
       missing.push(archive);
     }

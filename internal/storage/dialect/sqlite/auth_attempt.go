@@ -17,13 +17,13 @@ import (
 
 const (
 	authAttemptGetSelect = `SELECT aa.project_id, aa.id, aa.handoff_token, aa.handed_off_at, aa.session_id,` +
-		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal,` +
+		` aa.required_checks, aa.created_at, c.type, aa.time_to_live, aa.internal, aa.deployment_id, aa.release_id,` +
 		` c.id, c.last_challenged_at, c.last_verified_at, c.last_failed_at, c.failure_count, c.challenge_payload, c.factor_payload` +
 		` FROM auth_attempts aa` +
 		` LEFT JOIN checks c ON aa.project_id = c.project_id AND aa.id = c.auth_attempt_id`
 
-	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal)
-VALUES (?, ?, ?, ?, ?, ?, ?)`
+	createAuthAttemptStmt = `INSERT INTO auth_attempts (project_id, id, required_checks, time_to_live, session_id, created_at, internal, deployment_id, release_id)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	createAuthCheckStmt = `INSERT INTO checks (project_id, auth_attempt_id, id, type, last_challenged_at, last_verified_at, challenge_payload, factor_payload, failure_count)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
@@ -75,6 +75,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		` AND factor_payload IS NULL`
 
 	deleteSSOCallbackStmt = `DELETE FROM checks WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
+	// markSSOCallbackCollisionStmt replaces the parked result with the
+	// collision marker alone.
+	markSSOCallbackCollisionStmt = `UPDATE checks SET factor_payload = ?` +
+		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?`
 
 	authAttemptChallengeFailedStmt = `UPDATE checks SET last_failed_at = ?, failure_count = failure_count + 1` +
 		` WHERE project_id = ? AND auth_attempt_id = ? AND type = ? AND id = ?` +
@@ -125,6 +129,7 @@ func (as authAttemptStatements) CreateAuthAttempt(ctx context.Context, attempt *
 	return withTransaction(ctx, as.client, func(ctx context.Context, tx queryExecutor) error {
 		if _, err := tx.Exec(ctx, createAuthAttemptStmt,
 			attempt.ProjectID, attempt.ID, string(req), ttlNanos, sessionID, now.UnixNano(), attempt.Internal,
+			authattempt.EmptyStringArg(attempt.DeploymentID), authattempt.EmptyStringArg(attempt.ReleaseID),
 		); err != nil {
 			return fmt.Errorf("failed to create auth attempt: %w", wrapError(err))
 		}
@@ -221,6 +226,8 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 			requiredChecksJSON sql.NullString
 			checkType          sql.NullInt64
 			timeToLiveNano     sql.NullInt64
+			deploymentIDVal    sql.NullString
+			releaseIDVal       sql.NullString
 			checkID            sql.NullString
 			lastChallengedNano sql.NullInt64
 			verifiedAtNano     sql.NullInt64
@@ -234,6 +241,7 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		if err := rows.Scan(
 			&attempt.ProjectID, &attemptID, &handoffToken, &handedOffAtNano, &sessionIDVal,
 			&requiredChecksJSON, &createdNano, &checkType, &timeToLiveNano, &internalInt,
+			&deploymentIDVal, &releaseIDVal,
 			&checkID, &lastChallengedNano, &verifiedAtNano, &lastFailedAtNano, &failureCount,
 			&challengePayload, &factorPayload,
 		); err != nil {
@@ -242,6 +250,12 @@ func scanAuthAttemptRows(rows *sql.Rows, attempt *domain.AuthAttempt) error {
 		attempt.ID = attemptID
 		attempt.CreatedAt = timeFromUnixNano(createdNano)
 		attempt.Internal = internalInt != 0
+		if deploymentIDVal.Valid {
+			attempt.DeploymentID = deploymentIDVal.String
+		}
+		if releaseIDVal.Valid {
+			attempt.ReleaseID = releaseIDVal.String
+		}
 
 		if attempt.RequiredChecks == nil && requiredChecksJSON.Valid {
 			var reqInts []int64
@@ -563,6 +577,23 @@ func (as authAttemptStatements) DeleteSSOCallback(ctx context.Context, projectID
 		projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
 	if err != nil {
 		return fmt.Errorf("failed to delete sso callback: %w", err)
+	}
+	if n == 0 {
+		return domain.ErrSSOStateInvalid()
+	}
+	return nil
+}
+
+func (as authAttemptStatements) MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error {
+	// The marker replaces the result: the provider's subject and claims go.
+	payload, err := authattempt.MarshalPayloadString(&domain.SSOCallbackResult{CollisionUserID: userID})
+	if err != nil {
+		return fmt.Errorf("failed to marshal sso collision marker: %w", err)
+	}
+	n, err := execAffected(ctx, as.client, markSSOCallbackCollisionStmt,
+		*payload, projectID, authAttemptID, int64(domain.AuthCheckTypeSSOCallback), checkID)
+	if err != nil {
+		return fmt.Errorf("failed to mark sso callback collision: %w", err)
 	}
 	if n == 0 {
 		return domain.ErrSSOStateInvalid()

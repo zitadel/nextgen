@@ -20,12 +20,10 @@ import (
 // (projects/<project>/instances/<instance>). When set, suites provision a
 // uniquely named database on that instance instead of starting the emulator.
 //
-// Nothing sets this today: CI runs the emulator only, because its
-// one-transaction-at-a-time limit is what forces the aborts that keep the
-// abort-retry path honest (#788). This path is kept, unwired, so the real
-// instance can be brought back quickly if the emulator turns out not to hold.
-// Re-wiring is CI-side only (restore the Workload Identity Federation auth step
-// and set this variable); no Go changes needed. Removal is tracked in #793.
+// The spanner workflow sets it to the Spanner Omni instance it starts, with
+// SPANNER_EMULATOR_HOST pointing the clients at Omni's plaintext endpoint. A
+// real Cloud Spanner instance works the same way and authenticates through
+// Application Default Credentials.
 const instanceEnv = "ZITADEL_TEST_SPANNER_INSTANCE"
 
 func provision(ctx context.Context) (string, func(), error) {

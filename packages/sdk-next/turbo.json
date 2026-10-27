@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // the edge tests import this package's built dist.
+    "typecheck": {
+      "dependsOn": ["build"]
+    },
+    // src/components.ts re-exports the sdk-react wrappers, so tsc reads its
+    // built dist; sdk-react's build waits for components and sdk-core.
+    "build": {
+      "dependsOn": ["@zitadel/sdk-react#build"]
+    },
+    "build-release": {
+      "dependsOn": ["@zitadel/sdk-react#build-release"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    }
+  }
+}

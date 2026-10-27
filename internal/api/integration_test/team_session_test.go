@@ -141,14 +141,14 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 	// console project, so the gate answers Forbidden, not the not-found branch
 	// the foreign project takes below: 403 team.permission_denied. Pinned by
 	// status and code, because "not a TeamResponse" is also true of a 500.
-	// getTeam declares no 403 in its spec, hence the generic carrier.
+	// getTeam declares no 403 in its spec, so it arrives as its default error.
 	t.Run("cannot read its own team without a grant", func(t *testing.T) {
 		resp, err := session.GetTeam(t.Context(), api.GetTeamParams{TeamID: api.TeamID(strangerTeamID)})
 		require.NoError(t, err)
-		require.IsType(t, &api.ErrorDetailsStatusCode{}, resp, helpers.MustMarshal(t, resp))
-		denied := resp.(*api.ErrorDetailsStatusCode)
+		require.IsType(t, &api.GetTeamErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.GetTeamErrorResponseStatusCode)
 		assert.Equal(t, 403, denied.StatusCode)
-		assert.Equal(t, api.ErrorCode("team.permission_denied"), denied.Response.Code)
+		assert.True(t, denied.Response.IsTeamPermissionDenied(), helpers.MustMarshal(t, resp))
 	})
 
 	t.Run("cannot read a team in a project it has no foothold in", func(t *testing.T) {

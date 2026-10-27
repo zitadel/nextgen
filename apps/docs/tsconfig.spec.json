@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "next-env.d.ts",
+    "*.config.mts",
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "app/**/*.spec.ts",
+    "app/**/*.spec.tsx",
+    "lib/**/*.spec.ts",
+    "lib/**/*.test.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ],
+  "exclude": []
+}

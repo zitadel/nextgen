@@ -1,10 +1,13 @@
 package audit
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -48,7 +51,7 @@ func (w *statusCapturingWriter) Flush() {
 
 // WithRequestEventMiddleware enqueues Path A request.api events after the
 // handler when project_id is known (authenticated API, public login/flow, or
-// POST /projects after the new id is stamped). Probes (healthz) leave
+// POST /projects after the new id is stamped). Probes (livez, readyz) leave
 // project_id empty and are skipped.
 func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +67,14 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ac, ok := ActorSlotFromContext(r.Context())
 		if !ok || ac == nil || ac.ProjectID == "" {
 			return
+		}
+		// This middleware runs outside the server span, so the enqueue span
+		// starts as its child from the span context the ogen tracer stored in
+		// the holder WithLogging planted, after the server span has ended.
+		if server := middleware.GetServerSpanContext(ctx); server.IsSampled() {
+			var span trace.Span
+			ctx, span = tracer.Start(trace.ContextWithSpanContext(ctx, server), "audit.EnqueueRequestEvent")
+			defer span.End()
 		}
 		status := sw.status
 		if status == 0 {
@@ -90,12 +101,23 @@ func WithRequestEventMiddleware(buf *RequestBuffer, next http.Handler) http.Hand
 		ev.ProjectID = ac.ProjectID
 		ev.Payload = payload
 		if c := clientFromRequest(r); c != nil {
-			if meta, err := events.MarshalPayload(domain.EventMetadata{Client: c}); err == nil {
+			if meta, err := withClient(ev.Metadata, c); err == nil {
 				ev.Metadata = meta
 			}
 		}
-		buf.EnqueueSince(ev, start)
+		buf.EnqueueSince(ctx, ev, start)
 	})
+}
+
+// withClient merges the requestor context into the metadata FromContext wrote,
+// so every metadata field has one writer.
+func withClient(raw json.RawMessage, client *domain.EventClientMetadata) (json.RawMessage, error) {
+	var meta domain.EventMetadata
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return nil, err
+	}
+	meta.Client = client
+	return events.MarshalPayload(meta)
 }
 
 func clientFromRequest(r *http.Request) *domain.EventClientMetadata {

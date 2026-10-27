@@ -74,19 +74,19 @@ func (ss sessionStatements) ListSessions(ctx context.Context, filter *database.L
 	if filter.Pagination.OrderBy.Columns == nil {
 		filter.Pagination.OrderBy.Columns = []database.Column[domain.SessionField]{database.Col(domain.SessionFieldID)}
 	}
-	sessions, err := ss.querySessions(ctx, filter)
+	sessions, nextCursor, err := pagination.Page(filter.Pagination, sessionSchema, func(limit uint32) ([]*domain.Session, error) {
+		sessions, err := ss.querySessions(ctx, filter.WithLimit(limit))
+		if err != nil {
+			return nil, err
+		}
+		if sessions == nil {
+			sessions = []*domain.Session{}
+		}
+		return sessions, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if sessions == nil {
-		sessions = []*domain.Session{}
-	}
-	nextCursor := pagination.MarshalNext(
-		filter.Pagination.OrderBy,
-		sessions,
-		sessionSchema,
-		filter.Pagination.Limit,
-	)
 	return &database.ListResult[*domain.Session]{Items: sessions, NextCursor: nextCursor}, nil
 }
 
@@ -121,6 +121,10 @@ type sessionExchangeStore struct{ sessionStatements }
 
 func (s sessionExchangeStore) GetAuthAttemptByHandoffToken(ctx context.Context, projectID string, handoffTokenHash []byte) (*domain.AuthAttempt, error) {
 	return newAuthAttemptStatements(s.client).GetAuthAttemptByHandoffToken(ctx, projectID, handoffTokenHash)
+}
+
+func (s sessionExchangeStore) GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	return newReleaseStatements(s.client).GetReleaseByID(ctx, projectID, id)
 }
 
 func (s sessionExchangeStore) DeleteAuthAttempt(ctx context.Context, projectID, attemptID string) error {

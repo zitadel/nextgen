@@ -2,6 +2,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 
 import { AbstractCLIScaffolder } from "./cli";
+import { CREATE_VITE_NODE_ENGINES, CREATE_VITE_VERSION } from "./node-engines";
 
 /**
  * Scaffolds a new Vite + Vue (TypeScript) single-page app with `create-vite`,
@@ -11,9 +12,15 @@ import { AbstractCLIScaffolder } from "./cli";
 export class VueScaffolder extends AbstractCLIScaffolder {
   readonly displayName = "Vue (Vite)";
   readonly supportedFrameworks: ReadonlyArray<string> = ["vue"];
+  readonly nodeEngines = CREATE_VITE_NODE_ENGINES;
+  override readonly pinnedPackages: ReadonlyArray<string> = [CREATE_VITE_NODE_ENGINES.spec];
 
-  async scaffold(cwd: string, _framework: string): Promise<void> {
-    this.runCommand("npm", ["create", "vite@latest", ".", "--", "--template", "vue-ts"], cwd);
+  protected async create(cwd: string, _framework: string): Promise<void> {
+    this.runCommand(
+      "npm",
+      ["create", `vite@${CREATE_VITE_VERSION}`, ".", "--", "--template", "vue-ts"],
+      cwd,
+    );
     await rm(join(cwd, "src/App.vue"), { force: true });
     await rm(join(cwd, "src/components/HelloWorld.vue"), { force: true });
   }

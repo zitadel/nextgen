@@ -1,6 +1,6 @@
 /**
  * Reserved auth-method credential prefix of flow field names. Mirrors
- * `AUTH_METHOD_PREFIX` in `@zitadel/config` (`src/validate.ts`), which
+ * `AUTH_METHOD_PREFIX` in `@zitadel/config` (`src/validation/flow.ts`), which
  * owns the wire dialect; components has no dependency on that package,
  * so the literal is repeated here.
  */
@@ -13,7 +13,8 @@ const AUTH_METHOD_PREFIX = "x-auth-methods#";
  * `x-auth-methods#<method>` (e.g. `x-auth-methods#password`), but the
  * documented `data-testid` hooks are method-named
  * (`zitadel-field-password`, `zitadel-input-password` — see
- * packages/components/README.md and apps/cli/SKILLS.md). This helper
+ * packages/components/README.md and
+ * apps/cli/skills/zitadel-cli/references/driving-login-ui.md). This helper
  * feeds both hook construction sites: the bundled template's `testid`
  * Liquid filter and `<zl-field>`'s native-input testid.
  *

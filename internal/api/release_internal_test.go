@@ -2,9 +2,14 @@ package api
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
+	"github.com/go-faster/jx"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
@@ -63,13 +68,150 @@ func TestReleaseAccessRow(t *testing.T) {
 	// pinning too. How that gate narrows a partial view is machinery every
 	// resource shares, and TestRequireProjectListAccess already covers it.
 	t.Run("listing refuses with the same release-flavored codes", func(t *testing.T) {
-		_, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
+		_, _, err := requireProjectListAccess(operator, stmts, "proj_b", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
 
-		_, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		_, _, err = requireProjectListAccess(preview, stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
 
-		_, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
+		_, _, err = requireProjectListAccess(context.Background(), stmts, "proj_a", releaseAccess, domain.ResourceKindRelease)
 		assertDomainCode(t, err, domain.ErrReleaseNotFound().Code)
+	})
+}
+
+// Pins the request contract of POST /releases/build at the decoder: a closed
+// bundle with a single branding. A generator or schema change that loosens it
+// fails here rather than reaching the handler.
+func TestBuildReleaseRequestShape(t *testing.T) {
+	t.Parallel()
+
+	accepted := map[string]string{
+		"branding only": `{"bundle":{"branding":{}}}`,
+		// Every kind is optional, and a kind's array may be empty. An empty
+		// bundle as a whole is the server's to refuse, not the decoder's.
+		"empty kinds": `{"bundle":{"schemas":[],"flow_definitions":[]}}`,
+		"schema url":  `{"bundle":{"schemas":[{"kind":"schema-url","url":"https://acme.example/human.json"}]}}`,
+	}
+	for name, body := range accepted {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := decodeBuildReleaseRequest(body)
+			require.NoError(t, err)
+		})
+	}
+
+	refused := map[string]string{
+		"no bundle":          `{"message":"no content"}`,
+		"pointers":           `{"pointers":[{"kind":"schema","revision_id":"sch_1"}],"bundle":{"branding":{}}}`,
+		"unknown bundle key": `{"bundle":{"flowDefinitions":[{}]}}`,
+		// A project has one branding: an array of them is refused at
+		// decoding, before it can be materialised element by element.
+		"branding as an array": `{"bundle":{"branding":[{},{}]}}`,
+	}
+	for name, body := range refused {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := decodeBuildReleaseRequest(body)
+			assert.Error(t, err)
+		})
+	}
+}
+
+// decodeBuildReleaseRequest runs what the server runs on a request body:
+// decode, then validate.
+func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
+	var req api.BuildReleaseRequest
+	if err := req.Decode(jx.DecodeStr(body)); err != nil {
+		return req, err
+	}
+	return req, req.Validate()
+}
+
+// A revoked release and one still served are both conflicts.
+func TestReleaseErrorResponseConflicts(t *testing.T) {
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
+}
+
+// The 409 names every origin still serving the release, so the caller can
+// deploy elsewhere or roll back before revoking again.
+func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
+	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}}))
+	require.True(t, ok)
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
+	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}, resp.Details.Origins)
+}
+
+// Without the origins the 409 cannot name them, so the generic envelope answers.
+func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
+	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	assert.False(t, ok)
+}
+
+func TestRequireBuildKindScopes(t *testing.T) {
+	t.Parallel()
+
+	bundle := api.ConfigurationBundle{
+		Branding: api.NewOptBranding(api.Branding{
+			Layout: api.NewOptBrandingLayout(api.BrandingLayoutCentered),
+		}),
+		Idps: []api.IdpConnection{{Slug: "google"}},
+	}
+
+	t.Run("project.write covers every kind", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"project.write", "release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, bundle))
+	})
+
+	t.Run("missing branding.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "idp.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "branding.write")
+	})
+
+	t.Run("missing idp.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "branding.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "idp.write")
+	})
+
+	t.Run("missing policy.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		err := requireBuildKindScopes(ctx, api.ConfigurationBundle{
+			Policies: []api.PublishPolicyRequest{api.NewPasswordSetPolicyInputPublishPolicyRequest(api.PasswordSetPolicyInput{
+				Operation: api.PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+			})},
+		})
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "policy.write")
+	})
+
+	t.Run("empty kinds need no extra scope", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, api.ConfigurationBundle{}))
 	})
 }

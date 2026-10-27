@@ -33,14 +33,10 @@ func NewFlowSSORedirectIssuer(connections IDPConnectionService, attempts AuthAtt
 var _ domain.FlowSSORedirectIssuer = (*FlowSSORedirectIssuer)(nil)
 
 func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSSORedirectInput) (domain.FlowSSORedirectOutput, error) {
-	connections, err := i.connections.GetBySlugs(ctx, in.ProjectID, []string{in.ProviderSlug})
+	connection, err := i.connectionForSlug(ctx, in.ProjectID, in.ProviderSlug)
 	if err != nil {
-		return domain.FlowSSORedirectOutput{}, domain.ErrInternal(err).WithMessage("failed to read identity provider connection")
+		return domain.FlowSSORedirectOutput{}, err
 	}
-	if len(connections) == 0 {
-		return domain.FlowSSORedirectOutput{}, domain.ErrIDPConnectionNotFound()
-	}
-	connection := connections[0]
 	// The engine's rejections stay out of err: the error analysis unions
 	// every assignment to a variable, so a later `return err` would put the
 	// engine's codes on the submit endpoint, where unavailable hides them.
@@ -48,24 +44,10 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	if parseErr != nil {
 		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, parseErr)
 	}
-	// A `${{ NAME }}` client_id is filled at the point of use (ADR 062); the
-	// value is a project variable until environments exist. A variable marked
-	// secret is refused rather than decrypted: the value goes into a URL the
-	// browser sees. The client secret is not read here: the authorize
-	// request does not use it.
-	if name, ok := domain.VariableReferenceName(conn.OIDC.ClientID); ok {
-		variables, varErr := i.variables.GetVariables(ctx, domain.VariableOwner{ProjectID: in.ProjectID}, name)
-		if varErr != nil {
-			return domain.FlowSSORedirectOutput{}, varErr
-		}
-		clientID := ""
-		if len(variables) == 1 && !variables[0].IsSecret {
-			clientID, _ = variables[0].Value.(string)
-		}
-		if clientID == "" {
-			return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, fmt.Errorf("client_id variable %q is missing, a secret, or not a string", name))
-		}
-		conn.OIDC.ClientID = clientID
+	// The client secret is not read here: the authorize request does not
+	// use it.
+	if resolveErr := resolveSSOClientID(ctx, i.variables, in.ProjectID, sealedDeploymentID(ctx), &conn); resolveErr != nil {
+		return domain.FlowSSORedirectOutput{}, i.unavailable(ctx, in, resolveErr)
 	}
 	client, clientErr := idp.NewOIDCClient(ctx, conn, in.RedirectURI, i.httpClient)
 	if clientErr != nil {
@@ -102,6 +84,106 @@ func (i *FlowSSORedirectIssuer) Issue(ctx context.Context, in domain.FlowIssueSS
 	return domain.FlowSSORedirectOutput{RedirectURL: redirect.URL, BindingNonce: state.BindingNonce}, nil
 }
 
+// resolveSSOClientID fills a `${{ NAME }}` client_id on conn. A literal
+// client_id is left as it is. A variable marked secret is refused rather than
+// decrypted: the value goes into a URL the browser sees. The redirect issuer
+// and the callback both resolve through this.
+func resolveSSOClientID(ctx context.Context, variables VariableService, projectID, deploymentID string, conn *idp.Connection) error {
+	name, ok := domain.VariableReferenceName(conn.OIDC.ClientID)
+	if !ok {
+		return nil
+	}
+	clientID, err := plainVariable(ctx, variables, projectID, deploymentID, name)
+	if err != nil {
+		return err
+	}
+	if clientID == "" {
+		return fmt.Errorf("client_id variable %q is missing, a secret, or not a string", name)
+	}
+	conn.OIDC.ClientID = clientID
+	return nil
+}
+
+// ssoVariable is the variable name names for this sign-in. A sealed
+// deployment reads the set it froze. No deployment reads the live primary row.
+func ssoVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (*domain.Variable, error) {
+	if deploymentID != "" {
+		set, err := variables.GetDeploymentVariables(ctx, projectID, deploymentID)
+		if err != nil {
+			return nil, err
+		}
+		return set.Variables()[name], nil
+	}
+	vars, err := variables.GetVariables(ctx, domain.VariableOwner{ProjectID: projectID}, new(domain.DeploymentOriginKindPrimary), name)
+	if err != nil {
+		return nil, err
+	}
+	if len(vars) != 1 {
+		return nil, nil
+	}
+	return vars[0], nil
+}
+
+// plainVariable is the string value of name that a browser may see. A
+// secret, a non-string, or a missing name returns an empty value.
+func plainVariable(ctx context.Context, variables VariableService, projectID, deploymentID, name string) (string, error) {
+	variable, err := ssoVariable(ctx, variables, projectID, deploymentID, name)
+	if err != nil || variable == nil || variable.IsSecret {
+		return "", err
+	}
+	value, _ := variable.Value.(string)
+	return value, nil
+}
+
+// secretVariable is the decrypted string of a secret variable. A missing
+// name or a plain value returns an empty string. A decrypt failure is
+// [domain.ErrFailedToDecryptVariable], as [VariableService.GetDecryptedVariables]
+// reports one.
+func secretVariable(ctx context.Context, variables VariableService, decrypter crypto.Decrypter, projectID, deploymentID, name string) (string, error) {
+	variable, err := ssoVariable(ctx, variables, projectID, deploymentID, name)
+	if err != nil || variable == nil || !variable.IsSecret {
+		return "", err
+	}
+	plain, err := variable.GetDecryptedValue(decrypter)
+	if err != nil {
+		return "", domain.ErrFailedToDecryptVariable(err).WithDetails(map[string]any{"name": name})
+	}
+	value, _ := plain.(string)
+	return value, nil
+}
+
+// sealedDeploymentID is the deployment the request sealed, empty when the
+// request resolved to none.
+func sealedDeploymentID(ctx context.Context) string {
+	resolution := RuntimeResolutionFromContext(ctx)
+	if resolution == nil || resolution.Deployment == nil {
+		return ""
+	}
+	return resolution.Deployment.ID
+}
+
+func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
+	if ReleasePinsFlow(ctx) {
+		revisionID, err := pinnedIDPRevision(ctx, slug)
+		if err != nil {
+			return nil, err
+		}
+		connection, err := i.connections.GetRevision(ctx, projectID, revisionID)
+		if err != nil {
+			return nil, pinnedIDPReadError(slug, err)
+		}
+		return connection, nil
+	}
+	connections, err := i.connections.GetBySlugs(ctx, projectID, []string{slug})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connection")
+	}
+	if len(connections) == 0 {
+		return nil, domain.ErrIDPConnectionNotFound()
+	}
+	return connections[0], nil
+}
+
 // unavailable turns an engine rejection of the connection into the step
 // error the user can act on, and logs the cause the user must not see. An
 // internal error is a bug in this process, not the provider, and stays
@@ -112,8 +194,9 @@ func (i *FlowSSORedirectIssuer) unavailable(ctx context.Context, in domain.FlowI
 		return domain.ErrInternal(err)
 	}
 	// A cancelled request fails the discovery fetch too; that is not the
-	// provider's fault, and the client is gone, so no warning.
-	if ctx.Err() == nil {
+	// provider's fault, and the client is gone, so no warning. A deadline is
+	// still logged.
+	if !errors.Is(ctx.Err(), context.Canceled) {
 		getLoggingContext(ctx, "flow").Warn("sso provider unavailable",
 			slog.String("project_id", in.ProjectID),
 			slog.String("slug", in.ProviderSlug),

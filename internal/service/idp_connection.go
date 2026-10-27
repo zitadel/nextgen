@@ -8,6 +8,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/idp"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/idpconnection"
 )
@@ -56,13 +57,16 @@ type idpConnectionService struct {
 	schemas BuiltinSchemaProvider
 }
 
-func NewIDPConnectionService(v2Pool *DB, schemas BuiltinSchemaProvider) IDPConnectionService {
+func NewIDPConnectionService(v2Pool *DB, schemas BuiltinSchemaProvider) *idpConnectionService {
 	return &idpConnectionService{v2Pool: v2Pool, schemas: schemas}
 }
 
 // CreateOrRevise stores document as a new connection when its slug is new in
 // the project, and as a new revision of the existing connection otherwise.
-func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (*CreateIDPConnectionOutput, error) {
+func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID string, document []byte) (_ *CreateIDPConnectionOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.CreateOrRevise")
+	defer end(&err)
+
 	slug, err := s.validate(document)
 	if err != nil {
 		return nil, err
@@ -70,18 +74,21 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 
 	existing, err := s.get(ctx, projectID, domain.IDPConnectionFieldSlug, slug)
 	if err == nil {
-		return s.revise(ctx, projectID, existing.ID, document)
+		return s.reviseByID(ctx, projectID, existing.ID, document)
 	}
 	if !errors.Is(err, domain.ErrIDPConnectionNotFound()) {
 		return nil, err
 	}
 
-	created, err := s.create(ctx, &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document})
+	entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document}
+	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		return s.create(ctx, tx.Statements(), entity)
+	})
 	if err == nil {
-		return &CreateIDPConnectionOutput{Connection: created, Created: true}, nil
+		return &CreateIDPConnectionOutput{Connection: entity, Created: true}, nil
 	}
 	if !errors.Is(err, errIDPSlugTaken) {
-		return nil, err
+		return nil, mapIDPCreateError(err)
 	}
 	// Another caller created the slug between the read and the insert. Its
 	// connection is the one this document now revises.
@@ -89,7 +96,106 @@ func (s *idpConnectionService) CreateOrRevise(ctx context.Context, projectID str
 	if err != nil {
 		return nil, err
 	}
-	return s.revise(ctx, projectID, existing.ID, document)
+	return s.reviseByID(ctx, projectID, existing.ID, document)
+}
+
+// resolveOrCreate writes a validated document on stmts. When a connection with
+// slug already exists and its document matches, that revision is returned
+// without writing. Callers must have validated document already.
+func (s *idpConnectionService) resolveOrCreate(ctx context.Context, stmts AllStatements, projectID, slug string, document []byte) (*CreateIDPConnectionOutput, error) {
+	existing, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
+	if err == nil {
+		return s.resolveExistingIDP(ctx, stmts, existing, document)
+	}
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return nil, domain.ErrInternal(err).WithMessage("failed to look up identity provider connection")
+	}
+	entity := &domain.IDPConnection{ProjectID: projectID, Slug: slug, Document: document}
+	if err := s.create(ctx, stmts, entity); err != nil {
+		if errors.Is(err, errIDPSlugTaken) {
+			// Another caller won the slug; reuse or revise through the same
+			// locked path so content reuse and event deltas stay correct.
+			existing, getErr := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldSlug, slug))
+			if getErr != nil {
+				return nil, getErr
+			}
+			return s.resolveExistingIDP(ctx, stmts, existing, document)
+		}
+		return nil, err
+	}
+	return &CreateIDPConnectionOutput{Connection: entity, Created: true}, nil
+}
+
+// resolveExistingIDP reuses a matching revision of existing when document
+// matches any historical revision (preferring the newest match), otherwise
+// locks and revises. Equality is checked again after the lock so a concurrent
+// winner that already wrote the same document is not revised again.
+func (s *idpConnectionService) resolveExistingIDP(
+	ctx context.Context,
+	stmts AllStatements,
+	existing *domain.IDPConnection,
+	document []byte,
+) (*CreateIDPConnectionOutput, error) {
+	match, err := matchingIDPRevision(ctx, stmts, existing, document)
+	if err != nil {
+		return nil, err
+	}
+	if match != nil {
+		return &CreateIDPConnectionOutput{Connection: match}, nil
+	}
+	if err := stmts.LockIDPConnection(ctx, existing.ProjectID, existing.ID); err != nil {
+		return nil, err
+	}
+	current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(existing.ProjectID, domain.IDPConnectionFieldID, existing.ID))
+	if err != nil {
+		return nil, err
+	}
+	same, err := domain.JSONEqual(current.Document, document)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to compare identity provider documents")
+	}
+	if same {
+		return &CreateIDPConnectionOutput{Connection: current}, nil
+	}
+	entity, err := s.revise(ctx, stmts, current, document)
+	if err != nil {
+		return nil, err
+	}
+	return &CreateIDPConnectionOutput{Connection: entity}, nil
+}
+
+// matchingIDPRevision returns the newest revision of connection whose document
+// equals want, or nil when none match.
+func matchingIDPRevision(
+	ctx context.Context,
+	stmts AllStatements,
+	connection *domain.IDPConnection,
+	want []byte,
+) (*domain.IDPConnection, error) {
+	same, err := domain.JSONEqual(connection.Document, want)
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to compare identity provider documents")
+	}
+	if same {
+		return connection, nil
+	}
+	result, err := stmts.ListIDPConnectionRevisions(WithAuthzListUnrestricted(ctx), connection.ProjectID, connection.ID, database.Page[domain.IDPConnectionField]{
+		Limit:   maxHistoricalRevisions,
+		OrderBy: idpconnection.RevisionsNewestFirst(),
+	})
+	if err != nil {
+		return nil, domain.ErrInternal(err).WithMessage("failed to list identity provider connection revisions")
+	}
+	for _, item := range result.Items {
+		same, eqErr := domain.JSONEqual(item.Document, want)
+		if eqErr != nil {
+			return nil, domain.ErrInternal(eqErr).WithMessage("failed to compare identity provider documents")
+		}
+		if same {
+			return item, nil
+		}
+	}
+	return nil, nil
 }
 
 // errIDPSlugTaken reports that create lost the race for a slug to another
@@ -99,6 +205,12 @@ var errIDPSlugTaken = errors.New("identity provider connection slug taken")
 // validate checks document against the idp-connection.json schema and returns
 // its slug. The request decoder cannot do this alone: its model drops the
 // schema's root allOf, which ties each protocol to its block.
+//
+// The engine's parse then runs on the document, so a connection the engine
+// would refuse at sign-in is refused here, while the author can still fix it:
+// an oidc block that sets an endpoint without the others. The parse's other
+// rules repeat the schema's, which already passed, so any other refusal is
+// reported as req.invalid.
 func (s *idpConnectionService) validate(document []byte) (string, error) {
 	uri, err := s.schemas.LatestSchemaURI(domain.SchemaKindIDPConnection)
 	if err != nil {
@@ -115,36 +227,47 @@ func (s *idpConnectionService) validate(document []byte) (string, error) {
 	if err := schema.Validate(doc); err != nil {
 		return "", domain.ErrRequestInvalid().WithDetails(domain.FlattenValidationErrors(err)).WithParent(err)
 	}
+	if _, err := idp.ParseConnection("", document); err != nil {
+		if de, ok := errors.AsType[domain.Error](err); ok && de.Code == domain.ErrIDPEndpointsPartial(nil).Code {
+			return "", err
+		}
+		return "", domain.ErrRequestInvalid().WithParent(err)
+	}
 	slug, _ := doc["slug"].(string)
 	return slug, nil
 }
 
-func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPConnection) (*domain.IDPConnection, error) {
-	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().CreateIDPConnection(ctx, entity); err != nil {
-			return err
+// create inserts entity and emits its created event on stmts.
+func (s *idpConnectionService) create(ctx context.Context, stmts AllStatements, entity *domain.IDPConnection) error {
+	if err := stmts.CreateIDPConnection(ctx, entity); err != nil {
+		if _, ok := errors.AsType[*database.UniqueError](err); ok {
+			return fmt.Errorf("%w: %w", errIDPSlugTaken, err)
 		}
-		payload, err := domain.IDPConnectionPayloadSnapshot(entity)
-		if err != nil {
-			return err
+		if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
+			return domain.ErrIDPConnectionNotFound().WithParent(err)
 		}
-		return emitIDPConnectionEvent(ctx, tx, domain.EventTypeIDPCreated, entity, payload)
-	})
-	if err == nil {
-		return entity, nil
+		return domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
 	}
+	payload, err := domain.IDPConnectionPayloadSnapshot(entity)
+	if err != nil {
+		return err
+	}
+	return emitIDPConnectionEvent(ctx, stmts, domain.EventTypeIDPCreated, entity, payload)
+}
+
+func mapIDPCreateError(err error) error {
 	// project_id is the only foreign key on a new connection, so a violation
 	// means the project was deleted underneath the call.
 	if _, ok := errors.AsType[*database.ForeignKeyError](err); ok {
-		return nil, domain.ErrIDPConnectionNotFound().WithParent(err)
+		return domain.ErrIDPConnectionNotFound().WithParent(err)
 	}
-	if _, ok := errors.AsType[*database.UniqueError](err); ok {
-		return nil, fmt.Errorf("%w: %w", errIDPSlugTaken, err)
+	if de, ok := errors.AsType[domain.Error](err); ok {
+		return de
 	}
-	return nil, domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
+	return domain.ErrInternal(err).WithMessage("failed to create identity provider connection")
 }
 
-// revise appends document as a new revision of connection id. The newest
+// reviseByID appends document as a new revision of connection id. The newest
 // revision is read inside the transaction, so the immutability check and the
 // event delta compare against the revision this one follows, not a copy read
 // before a concurrent revise landed.
@@ -153,41 +276,22 @@ func (s *idpConnectionService) create(ctx context.Context, entity *domain.IDPCon
 // concurrent revisions could both read the same newest revision (a plain
 // read does not wait at READ COMMITTED), and the later one would compute its
 // delta against a revision that is no longer the one it follows.
-func (s *idpConnectionService) revise(ctx context.Context, projectID, id string, document []byte) (*CreateIDPConnectionOutput, error) {
+func (s *idpConnectionService) reviseByID(ctx context.Context, projectID, id string, document []byte) (*CreateIDPConnectionOutput, error) {
 	var entity *domain.IDPConnection
 	err := s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		if err := tx.Statements().LockIDPConnection(ctx, projectID, id); err != nil {
+		stmts := tx.Statements()
+		if err := stmts.LockIDPConnection(ctx, projectID, id); err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return domain.ErrIDPConnectionNotFound().WithParent(err)
 			}
 			return err
 		}
-		current, err := tx.Statements().GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
+		current, err := stmts.GetIDPConnection(ctx, idpConnectionBy(projectID, domain.IDPConnectionFieldID, id))
 		if err != nil {
 			return err
 		}
-		changed, err := domain.IDPConnectionImmutableFieldsChanged(current.Document, document)
-		if err != nil {
-			return err
-		}
-		if len(changed) > 0 {
-			return domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
-		}
-		entity = &domain.IDPConnection{
-			ProjectID: current.ProjectID,
-			ID:        current.ID,
-			Slug:      current.Slug,
-			Document:  document,
-			CreatedAt: current.CreatedAt,
-		}
-		if err := tx.Statements().ReviseIDPConnection(ctx, entity); err != nil {
-			return err
-		}
-		payload, err := domain.IDPConnectionPayloadDelta(current, entity)
-		if err != nil {
-			return err
-		}
-		return emitIDPConnectionEvent(ctx, tx, domain.EventTypeIDPUpdated, entity, payload)
+		entity, err = s.revise(ctx, stmts, current, document)
+		return err
 	})
 	if err != nil {
 		// Two revisions of one connection on the same instant have no newest,
@@ -203,8 +307,37 @@ func (s *idpConnectionService) revise(ctx context.Context, projectID, id string,
 	return &CreateIDPConnectionOutput{Connection: entity}, nil
 }
 
-func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], eventType domain.EventType, entity *domain.IDPConnection, payload domain.IDPConnectionPayload) error {
-	return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+// revise appends document as a new revision of current on stmts.
+func (s *idpConnectionService) revise(ctx context.Context, stmts AllStatements, current *domain.IDPConnection, document []byte) (*domain.IDPConnection, error) {
+	changed, err := domain.IDPConnectionImmutableFieldsChanged(current.Document, document)
+	if err != nil {
+		return nil, err
+	}
+	if len(changed) > 0 {
+		return nil, domain.ErrIDPConnectionFieldImmutable(map[string][]string{"fields": changed})
+	}
+	entity := &domain.IDPConnection{
+		ProjectID: current.ProjectID,
+		ID:        current.ID,
+		Slug:      current.Slug,
+		Document:  document,
+		CreatedAt: current.CreatedAt,
+	}
+	if err := stmts.ReviseIDPConnection(ctx, entity); err != nil {
+		return nil, err
+	}
+	payload, err := domain.IDPConnectionPayloadDelta(current, entity)
+	if err != nil {
+		return nil, err
+	}
+	if err := emitIDPConnectionEvent(ctx, stmts, domain.EventTypeIDPUpdated, entity, payload); err != nil {
+		return nil, err
+	}
+	return entity, nil
+}
+
+func emitIDPConnectionEvent(ctx context.Context, stmts AllStatements, eventType domain.EventType, entity *domain.IDPConnection, payload domain.IDPConnectionPayload) error {
+	return audit.Emit(ctx, stmts, audit.EmitSpec{
 		Type:       eventType,
 		Category:   domain.EventCategoryAdmin,
 		ProjectID:  entity.ProjectID,
@@ -214,7 +347,10 @@ func emitIDPConnectionEvent(ctx context.Context, tx Statementer[AllStatements], 
 	})
 }
 
-func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*domain.IDPConnection, error) {
+func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (_ *domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.Get")
+	defer end(&err)
+
 	return s.get(ctx, projectID, domain.IDPConnectionFieldID, id)
 }
 
@@ -222,7 +358,10 @@ func (s *idpConnectionService) Get(ctx context.Context, projectID, id string) (*
 // it outside any management request, so the list runs unrestricted, like the
 // flow definition lookup on the same path. A zero limit compiles to no LIMIT,
 // so one page holds every match.
-func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) ([]*domain.IDPConnection, error) {
+func (s *idpConnectionService) GetBySlugs(ctx context.Context, projectID string, slugs []string) (_ []*domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.GetBySlugs")
+	defer end(&err)
+
 	// An empty OR compiles to nothing and leaves a dangling AND in the WHERE.
 	if len(slugs) == 0 {
 		return nil, nil
@@ -251,7 +390,10 @@ func idpConnectionBy(projectID string, field domain.IDPConnectionField, value st
 	)
 }
 
-func (s *idpConnectionService) GetRevision(ctx context.Context, projectID, revisionID string) (*domain.IDPConnection, error) {
+func (s *idpConnectionService) GetRevision(ctx context.Context, projectID, revisionID string) (_ *domain.IDPConnection, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.GetRevision")
+	defer end(&err)
+
 	entity, err := s.v2Pool.Statements().GetIDPConnectionRevision(ctx, projectID, revisionID)
 	return entity, mapIDPConnectionReadError(err)
 }
@@ -267,7 +409,10 @@ func mapIDPConnectionReadError(err error) error {
 }
 
 // List returns each connection of the project once, at its newest revision.
-func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnectionsInput) (*ListIDPConnectionsOutput, error) {
+func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnectionsInput) (_ *ListIDPConnectionsOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.List")
+	defer end(&err)
+
 	filters := make([]database.Filter[domain.IDPConnectionField], 0, len(input.Filters)+1)
 	filters = append(filters, database.Equal(database.Col(domain.IDPConnectionFieldProjectID), input.ProjectID))
 	for _, f := range input.Filters {
@@ -298,7 +443,10 @@ func (s *idpConnectionService) List(ctx context.Context, input ListIDPConnection
 }
 
 // ListRevisions pages one connection's revisions, newest first.
-func (s *idpConnectionService) ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (*ListIDPConnectionsOutput, error) {
+func (s *idpConnectionService) ListRevisions(ctx context.Context, input ListIDPConnectionRevisionsInput) (_ *ListIDPConnectionsOutput, err error) {
+	ctx, end := startSpan(ctx, "IDPConnectionService.ListRevisions")
+	defer end(&err)
+
 	// The revisions statement answers an unknown connection with an empty
 	// page, so the lookup is what tells a miss from a connection's history.
 	if _, err := s.Get(ctx, input.ProjectID, input.ID); err != nil {
