@@ -66990,8 +66990,9 @@ func (s *PasswordFactorPayloadMethod) UnmarshalText(data []byte) error {
 // one hashes with the server default, which is argon2id unless the deployment
 // configured otherwise.
 // This governs hashing only. Passwords already stored keep verifying under the
-// method they were written with, and nothing is rehashed when the policy
-// changes: a password moves to the new method the next time its owner sets one.
+// method they were written with. A policy change rewrites no stored password by
+// itself: a password moves to the new method on its owner's next successful
+// sign-in, or when its owner sets a new one.
 // Ref: #
 type PasswordHashPolicy struct {
 	// The hashing algorithm. Only algorithms that can hash appear here; the

@@ -335,11 +335,20 @@ func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("password hash config invalid: %w", err)
 	}
+	verifiers, verifierPrefixes := f.verifiers, f.verifierPrefix
+	if f.defaultHasher != nil {
+		// Every password stored without a project policy was written by the
+		// default, which need not be a configured verifier. The default was
+		// built before defaultHasher was set, so its Prefixes are its own plus
+		// the configured verifiers'.
+		verifiers = append(slices.Clone(verifiers), f.defaultHasher.verifiers[0])
+		verifierPrefixes = f.defaultHasher.Prefixes
+	}
 	return &PasswapHasher{
-		Swapper:      passwap.NewSwapper(hasher, f.verifiers...),
-		Prefixes:     append(prefixes, f.verifierPrefix...),
+		Swapper:      passwap.NewSwapper(hasher, verifiers...),
+		Prefixes:     append(prefixes, verifierPrefixes...),
 		HexSupported: f.hexSupported,
-		verifiers:    append([]verifier.Verifier{hasher}, f.verifiers...),
+		verifiers:    append([]verifier.Verifier{hasher}, verifiers...),
 	}, nil
 }
 

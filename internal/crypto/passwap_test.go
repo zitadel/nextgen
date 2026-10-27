@@ -517,7 +517,9 @@ func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
 	updated, err = hasher.VerifyAndRehash(outdated, password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(updated, argon2.Prefix), "rehash should be argon2id, got %q", updated)
-	assert.NotEqual(t, outdated, updated)
+	again, err := hasher.VerifyAndRehash(updated, password)
+	require.NoError(t, err)
+	assert.Empty(t, again, "the rehash should be written at the target params")
 }
 
 func TestHasher_ValidateEncodedHash(t *testing.T) {
@@ -1067,6 +1069,22 @@ func TestHasherFactory(t *testing.T) {
 
 		assert.NoError(t, factory.Default().VerifyHash(writtenWithBcrypt, password))
 		assert.NoError(t, bcryptHasher.VerifyHash(writtenWithArgon2, password))
+
+		// The default need not be a configured verifier, and passwords it wrote
+		// still have to verify once a project picks another method.
+		unlisted, err := (&HashConfig{
+			Verifiers: []HashName{HashNameBcrypt},
+			Hasher:    HasherConfig{Algorithm: HashNameArgon2id, Params: map[string]any{"Time": 1, "Memory": 32 * 1024, "Threads": 1}},
+		}).NewHasherFactory()
+		require.NoError(t, err)
+		unlistedBcrypt, err := unlisted.New(HasherConfig{Algorithm: HashNameBcrypt, Params: map[string]any{"Cost": 10}})
+		require.NoError(t, err)
+		fromDefault, err := unlisted.Default().Hash(password)
+		require.NoError(t, err)
+		updated, err := unlistedBcrypt.VerifyAndRehash(fromDefault, password)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(updated, bcrypt.Prefix), "got %q", updated)
+		assert.True(t, unlistedBcrypt.EncodingSupported(fromDefault))
 	})
 
 	// A mismatch is told apart from a hash the verifier cannot read, so a

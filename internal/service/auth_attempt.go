@@ -835,7 +835,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		hasher, resolveErr := s.hashers.HasherForProject(ctx, attempt.ProjectID)
 		var verifier crypto.RehashingVerifier = hasher
 		if resolveErr != nil {
-			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "resolving the project's password hasher failed, verifying without rehash",
+			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "resolving the project's password hasher failed, verifying with the default and not storing a rehash",
 				slog.String("project_id", attempt.ProjectID),
 				slog.Any("error", resolveErr),
 			)
@@ -845,7 +845,12 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		// response generator would count a wrong password as returnable there.
 		_, end := startSpan(ctx, "password.Verify")
 		updated, verifyErr := password.Verify(p.Password, verifier)
-		end(&verifyErr)
+		spanErr := verifyErr
+		if errors.Is(spanErr, crypto.ErrRehashFailed) {
+			// The password matched; the warning below logs the failed rehash.
+			spanErr = nil
+		}
+		end(&spanErr)
 		switch {
 		case errors.Is(verifyErr, crypto.ErrRehashFailed):
 			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "the password matched but could not be rehashed",
@@ -856,7 +861,15 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		case verifyErr != nil:
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
 		case updated != "" && resolveErr == nil:
-			s.storePasswordRehash(ctx, password, updated)
+			// Best-effort: the password already matched, and the next sign-in
+			// rehashes again.
+			if err := s.stmts.Statements().UpdateUserPasswordHash(ctx, password, updated); err != nil {
+				getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "storing the password rehash failed",
+					slog.String("project_id", password.ProjectID),
+					slog.String("user_id", password.UserID),
+					slog.Any("error", err),
+				)
+			}
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 
@@ -1109,18 +1122,6 @@ func (s *authAttemptService) FinishPasskeyEnrollment(ctx context.Context, input 
 		Name:      registrationFactor.Name,
 		CreatedAt: registrationFactor.GetLastVerifiedAt(),
 	}, nil
-}
-
-// storePasswordRehash is best-effort: the password already matched, and the
-// next sign-in rehashes again.
-func (s *authAttemptService) storePasswordRehash(ctx context.Context, password *domain.UserPassword, updated string) {
-	if err := s.stmts.Statements().UpdateUserPasswordHash(ctx, password, updated); err != nil {
-		getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "storing the password rehash failed",
-			slog.String("project_id", password.ProjectID),
-			slog.String("user_id", password.UserID),
-			slog.Any("error", err),
-		)
-	}
 }
 
 // recordPasskeyUsage persists sign count, backup state, and last-used time after a

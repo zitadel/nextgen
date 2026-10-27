@@ -46,9 +46,9 @@ type projectHasherResolver struct {
 // back to the deployment hasher factory's default.
 //
 // Nothing is cached. A resolve is one primary-key read next to a password hash
-// that costs tens of milliseconds by design, so caching would buy a percent or
-// two of a rare operation in exchange for a window where a project keeps
-// hashing with the method its admin just replaced.
+// that costs tens of milliseconds by design, so caching would save a percent or
+// two of each sign-in or password write, in exchange for a window where a
+// project keeps hashing with the method its admin just replaced.
 func NewProjectHasherResolver(pool StatementPool, factory *crypto.HasherFactory) ProjectHasherResolver {
 	return &projectHasherResolver{pool: pool, factory: factory}
 }
@@ -60,10 +60,11 @@ func (r *projectHasherResolver) HasherForProject(ctx context.Context, projectID 
 
 	project, err := r.pool.Statements().GetProjectByID(ctx, projectID)
 	if err != nil {
-		// A project that is not there cannot have chosen a policy, and the write
-		// this hash is for is about to fail on its own foreign key with an error
-		// that names the real problem. Answering with the default keeps that
-		// error the one the caller sees.
+		// A project that is not there cannot have chosen a policy. A password
+		// write for it fails on its own foreign key with an error that names the
+		// real problem, and a sign-in reads the password first, so it fails on
+		// that read. Answering with the default keeps those errors the ones the
+		// caller sees.
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return r.factory.Default(), nil
 		}
@@ -73,14 +74,21 @@ func (r *projectHasherResolver) HasherForProject(ctx context.Context, projectID 
 		return r.factory.Default(), nil
 	}
 
-	hasher, err := r.factory.New(project.PasswordHashPolicy.HasherConfig())
+	// New builds any policy that parses, so Check holds it to the verifiers and
+	// limits the deployment has now.
+	cfg := project.PasswordHashPolicy.HasherConfig()
+	hasher, err := r.factory.New(cfg)
+	if err == nil {
+		err = r.factory.Check(cfg)
+	}
 	if err != nil {
 		// The policy was accepted when it was written, so reaching here means the
 		// deployment changed under it -- an algorithm dropped from the build, a
-		// verifier set narrowed. Refusing is the safe half of that: hashing with
-		// the default instead would quietly write a method the project rejected.
+		// verifier set narrowed, limits moved. Refusing is the safe half of that:
+		// hashing with the default instead would quietly write a method the
+		// project rejected.
 		return nil, domain.ErrInternal(err).
-			WithMessage("the project's password hashing method is no longer available on this deployment")
+			WithMessage("the project's password hashing method is not allowed by this deployment's configuration")
 	}
 	return hasher, nil
 }

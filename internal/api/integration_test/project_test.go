@@ -656,8 +656,8 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	assert.Equal(t, ownHash, hashOf(t, ownMethod.ID, ownUserID),
 		"a sign-in keeps a hash written by the project's method")
 
-	// Handing the project back to the default moves the next password written,
-	// not the one already stored.
+	// Handing the project back to the default does not rewrite the stored hash.
+	// The next sign-in does, and so does the next password written.
 	var cleared *domain.PasswordHashPolicy
 	_, err = harness.EnsureProjectService(t).Update(t.Context(), service.UpdateProjectRequest{
 		ID:                 ownMethod.ID,
