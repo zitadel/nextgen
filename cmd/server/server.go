@@ -319,15 +319,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	releaseService := service.NewReleaseService(
-		serviceDBPool,
-		schemaService,
-		flowDefinitionSvc,
-		brandingService,
-		idpConnectionService,
-		builtinBases,
-	)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
 	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	// Operation policies (ADR 066). Every template is compiled and checked
@@ -340,6 +332,16 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to compile the policy catalog: %w", err)
 	}
 	policyService := service.NewPolicyService(serviceDBPool, policyEngine)
+	// A release build publishes the policies its bundle carries.
+	releaseService := service.NewReleaseService(
+		serviceDBPool,
+		schemaService,
+		flowDefinitionSvc,
+		brandingService,
+		idpConnectionService,
+		policyService,
+		builtinBases,
+	)
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
@@ -701,7 +703,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("service_ping.enabled", false)
 	v.SetDefault("service_ping.vercel_endpoint", serviceping.DefaultVercelEndpoint)
 	v.SetDefault("service_ping.mixpanel_endpoint", serviceping.DefaultMixpanelEndpoint)
-	v.SetDefault("service_ping.mixpanel_token", serviceping.DefaultMixpanelToken)
+	// Empty: Mixpanel is paused, so the ping sends it nothing by default.
+	v.SetDefault("service_ping.mixpanel_token", "")
 	v.SetDefault("service_ping.interval", 24*time.Hour)
 	v.SetDefault("instrumentation.service_name", "Zitadel")
 	v.SetDefault("instrumentation.log.level", zlog.LevelInfo)
@@ -714,8 +717,10 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	})
 	v.SetDefault("instrumentation.log.format", instrumentation.LogFormatText)
 	v.SetDefault("instrumentation.log.add_source", true)
+	// The location is cheap and stays on. A stack is one debug.Stack() per
+	// error, so it is opt-in. See ADR 030.
 	v.SetDefault("instrumentation.log.errors.report_location", true)
-	v.SetDefault("instrumentation.log.errors.stack_trace", true)
+	v.SetDefault("instrumentation.log.errors.stack_trace", false)
 	v.SetDefault("instrumentation.trace.fraction", 1.0)
 	// Off: an incoming traceparent is not used. See ADR 080.
 	v.SetDefault("instrumentation.trace.trust_remote_spans", false)
@@ -880,12 +885,13 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 	// the catch-all API mount below.
 	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 
-	chain := func(h http.Handler, redactQuery ...string) http.Handler {
+	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
 				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
 			},
-			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
+			middleware.WithLogging,
+			api.WithRecover,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
@@ -894,17 +900,15 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiS
 		)
 	}
 	// The same chain: the callback reads its cookie by the request scheme
-	// (WithRequestHostMiddleware). Its code is a credential and its state is
-	// single-use, so the request log hides both: a log line must not be able
-	// to replay a sign-in. Both spellings serve one handler: the prefixed path
-	// arrives when the instance is the browser origin, the stripped one through
-	// a scaffolded app's SDK proxy.
-	callback := chain(idpCallbackHandler, "code", "state")
+	// (WithRequestHostMiddleware). Both spellings serve one handler: the
+	// prefixed path arrives when the instance is the browser origin, the
+	// stripped one through a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 	// The API under /api/v1, the probes at the root, and the root alias for
 	// every other path until 1.0.0 (ADR 077).
-	api.MountAPI(mux, func(h http.Handler) http.Handler { return chain(h) }, apiServers)
+	api.MountAPI(mux, chain, apiServers)
 	return mux, nil
 }
 

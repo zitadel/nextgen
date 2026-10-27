@@ -456,10 +456,9 @@ func TestSSOCallbackLeaksNoSecretIntoResponsesOrLog(t *testing.T) {
 	assert.NotContains(t, string(stored), "the-access-token", "provider tokens are not stored")
 
 	logged := harness.ServerLog()
-	// The positive control: the callback request was logged, with its code and
-	// state redacted. Without it an empty buffer would pass the scans below.
-	assert.Contains(t, logged, "code=redacted")
-	assert.Contains(t, logged, "state=redacted")
+	// The positive control: the callback request was logged. Without it an
+	// empty buffer would pass the scans below.
+	assert.Contains(t, logged, f.returnPath(t))
 	assert.NotContains(t, logged, ssoTestClientSecret, "the client secret must never be logged")
 	assert.NotContains(t, logged, state, "the single-use state must never be logged")
 	assert.NotContains(t, logged, "the-code", "the authorization code must never be logged")

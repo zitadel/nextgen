@@ -29,3 +29,24 @@ function format(value: string, options: Intl.DateTimeFormatOptions): string {
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleString(undefined, options);
 }
+
+/** A day: the window in which a moment reads as "how long ago". */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A moment within the last day as `6h ago` or `12m ago`, and anything older
+ * as {@link formatDateTime}: a deployment made today is read against now, one
+ * made last week against the calendar. The short units are the design's own
+ * rather than the locale's (`6 hr. ago`); the calendar form stays localised.
+ * `now` is a parameter so a test can pin it. A moment up to a minute ahead
+ * is `just now`: the server stamps it, and the browser's clock may trail.
+ */
+export function formatRecent(value: string, now: Date = new Date()): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  const elapsed = now.getTime() - parsed.getTime();
+  if (elapsed < -60_000 || elapsed >= DAY_MS) return formatDateTime(value);
+  const minutes = Math.floor(Math.max(elapsed, 0) / 60_000);
+  if (minutes < 1) return "just now";
+  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+}

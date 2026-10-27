@@ -222,6 +222,13 @@ export const en: Record<string, string> = {
   "error.outcome_unhandled": "This step could not continue. Please try again.",
   "error.sign_in_first": "Please sign in to your account first.",
 
+  // --- Notices: why the flow moved between sign-in and sign-up by itself ---
+  "notice.user_not_found":
+    "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
+  "notice.user_already_exists": "That email already has an account. Sign in to continue.",
+  "notice.sso_user_not_found":
+    "There's no account for this sign-in yet, so you can create one now.",
+
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",

@@ -1660,6 +1660,45 @@ func (c *MockAllStatementsDeleteJSONSchemaByIDCall) DoAndReturn(f func(context.C
 	return c
 }
 
+// DeleteLivePreview mocks base method.
+func (m *MockAllStatements) DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteLivePreview", ctx, projectID, origin, now)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteLivePreview indicates an expected call of DeleteLivePreview.
+func (mr *MockAllStatementsMockRecorder) DeleteLivePreview(ctx, projectID, origin, now any) *MockAllStatementsDeleteLivePreviewCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteLivePreview", reflect.TypeOf((*MockAllStatements)(nil).DeleteLivePreview), ctx, projectID, origin, now)
+	return &MockAllStatementsDeleteLivePreviewCall{Call: call}
+}
+
+// MockAllStatementsDeleteLivePreviewCall wrap *gomock.Call
+type MockAllStatementsDeleteLivePreviewCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteLivePreviewCall) Return(deleted bool, err error) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.Return(deleted, err)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteLivePreviewCall) Do(f func(context.Context, string, string, time.Time) (bool, error)) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteLivePreviewCall) DoAndReturn(f func(context.Context, string, string, time.Time) (bool, error)) *MockAllStatementsDeleteLivePreviewCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // DeleteOriginByPattern mocks base method.
 func (m *MockAllStatements) DeleteOriginByPattern(ctx context.Context, projectID, pattern string) (bool, *domain.Origin, error) {
 	m.ctrl.T.Helper()
@@ -1696,45 +1735,6 @@ func (c *MockAllStatementsDeleteOriginByPatternCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteOriginByPatternCall) DoAndReturn(f func(context.Context, string, string) (bool, *domain.Origin, error)) *MockAllStatementsDeleteOriginByPatternCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// DeletePreview mocks base method.
-func (m *MockAllStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePreview", ctx, projectID, origin)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeletePreview indicates an expected call of DeletePreview.
-func (mr *MockAllStatementsMockRecorder) DeletePreview(ctx, projectID, origin any) *MockAllStatementsDeletePreviewCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePreview", reflect.TypeOf((*MockAllStatements)(nil).DeletePreview), ctx, projectID, origin)
-	return &MockAllStatementsDeletePreviewCall{Call: call}
-}
-
-// MockAllStatementsDeletePreviewCall wrap *gomock.Call
-type MockAllStatementsDeletePreviewCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsDeletePreviewCall) Return(deleted bool, err error) *MockAllStatementsDeletePreviewCall {
-	c.Call = c.Call.Return(deleted, err)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsDeletePreviewCall) Do(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeletePreviewCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsDeletePreviewCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAllStatementsDeletePreviewCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -2196,6 +2196,44 @@ func (c *MockAllStatementsEnsureEventSinkCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// EnsureVariableSet mocks base method.
+func (m *MockAllStatements) EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureVariableSet", ctx, set)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureVariableSet indicates an expected call of EnsureVariableSet.
+func (mr *MockAllStatementsMockRecorder) EnsureVariableSet(ctx, set any) *MockAllStatementsEnsureVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureVariableSet", reflect.TypeOf((*MockAllStatements)(nil).EnsureVariableSet), ctx, set)
+	return &MockAllStatementsEnsureVariableSetCall{Call: call}
+}
+
+// MockAllStatementsEnsureVariableSetCall wrap *gomock.Call
+type MockAllStatementsEnsureVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsEnsureVariableSetCall) Return(arg0 error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsEnsureVariableSetCall) Do(f func(context.Context, *domain.VariableSet) error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsEnsureVariableSetCall) DoAndReturn(f func(context.Context, *domain.VariableSet) error) *MockAllStatementsEnsureVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ExchangeSession mocks base method.
 func (m *MockAllStatements) ExchangeSession(ctx context.Context, projectID, handoffToken string, idempotencyKey *string, ttl time.Duration) (*domain.Session, error) {
 	m.ctrl.T.Helper()
@@ -2270,45 +2308,6 @@ func (c *MockAllStatementsExistsResourceScopeElsewhereCall) Do(f func(context.Co
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsExistsResourceScopeElsewhereCall) DoAndReturn(f func(context.Context, domain.ResourceKind, string, string) (bool, error)) *MockAllStatementsExistsResourceScopeElsewhereCall {
-	c.Call = c.Call.DoAndReturn(f)
-	return c
-}
-
-// FreezeDeploymentVariables mocks base method.
-func (m *MockAllStatements) FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FreezeDeploymentVariables", ctx, projectID, deploymentID)
-	ret0, _ := ret[0].(*domain.VariableSet)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FreezeDeploymentVariables indicates an expected call of FreezeDeploymentVariables.
-func (mr *MockAllStatementsMockRecorder) FreezeDeploymentVariables(ctx, projectID, deploymentID any) *MockAllStatementsFreezeDeploymentVariablesCall {
-	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FreezeDeploymentVariables", reflect.TypeOf((*MockAllStatements)(nil).FreezeDeploymentVariables), ctx, projectID, deploymentID)
-	return &MockAllStatementsFreezeDeploymentVariablesCall{Call: call}
-}
-
-// MockAllStatementsFreezeDeploymentVariablesCall wrap *gomock.Call
-type MockAllStatementsFreezeDeploymentVariablesCall struct {
-	*gomock.Call
-}
-
-// Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) Return(arg0 *domain.VariableSet, arg1 error) *MockAllStatementsFreezeDeploymentVariablesCall {
-	c.Call = c.Call.Return(arg0, arg1)
-	return c
-}
-
-// Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) Do(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
-	c.Call = c.Call.Do(f)
-	return c
-}
-
-// DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsFreezeDeploymentVariablesCall) DoAndReturn(f func(context.Context, string, string) (*domain.VariableSet, error)) *MockAllStatementsFreezeDeploymentVariablesCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -3362,6 +3361,45 @@ func (c *MockAllStatementsGetPreviewCall) Do(f func(context.Context, string, str
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsGetPreviewCall) DoAndReturn(f func(context.Context, string, string) (*domain.Preview, error)) *MockAllStatementsGetPreviewCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetProject mocks base method.
+func (m *MockAllStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProject", ctx, id, opts)
+	ret0, _ := ret[0].(*domain.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProject indicates an expected call of GetProject.
+func (mr *MockAllStatementsMockRecorder) GetProject(ctx, id, opts any) *MockAllStatementsGetProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProject", reflect.TypeOf((*MockAllStatements)(nil).GetProject), ctx, id, opts)
+	return &MockAllStatementsGetProjectCall{Call: call}
+}
+
+// MockAllStatementsGetProjectCall wrap *gomock.Call
+type MockAllStatementsGetProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsGetProjectCall) Return(arg0 *domain.Project, arg1 error) *MockAllStatementsGetProjectCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsGetProjectCall) Do(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockAllStatementsGetProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsGetProjectCall) DoAndReturn(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockAllStatementsGetProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -4496,6 +4534,44 @@ func (c *MockAllStatementsIssueSSOStateCall) DoAndReturn(f func(context.Context,
 	return c
 }
 
+// LinkDeploymentVariableSet mocks base method.
+func (m *MockAllStatements) LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LinkDeploymentVariableSet", ctx, projectID, deploymentID, setHash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// LinkDeploymentVariableSet indicates an expected call of LinkDeploymentVariableSet.
+func (mr *MockAllStatementsMockRecorder) LinkDeploymentVariableSet(ctx, projectID, deploymentID, setHash any) *MockAllStatementsLinkDeploymentVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LinkDeploymentVariableSet", reflect.TypeOf((*MockAllStatements)(nil).LinkDeploymentVariableSet), ctx, projectID, deploymentID, setHash)
+	return &MockAllStatementsLinkDeploymentVariableSetCall{Call: call}
+}
+
+// MockAllStatementsLinkDeploymentVariableSetCall wrap *gomock.Call
+type MockAllStatementsLinkDeploymentVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) Return(arg0 error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) Do(f func(context.Context, string, string, string) error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsLinkDeploymentVariableSetCall) DoAndReturn(f func(context.Context, string, string, string) error) *MockAllStatementsLinkDeploymentVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ListActiveAuthzAssignmentsByRelation mocks base method.
 func (m *MockAllStatements) ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error) {
 	m.ctrl.T.Helper()
@@ -5350,6 +5426,45 @@ func (c *MockAllStatementsListPreviewsCall) Do(f func(context.Context, *database
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsListPreviewsCall) DoAndReturn(f func(context.Context, *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)) *MockAllStatementsListPreviewsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ListProjectAdmins mocks base method.
+func (m *MockAllStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectAdmins", ctx, projectID, viewerUserID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.ProjectAdminRecord])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectAdmins indicates an expected call of ListProjectAdmins.
+func (mr *MockAllStatementsMockRecorder) ListProjectAdmins(ctx, projectID, viewerUserID, page any) *MockAllStatementsListProjectAdminsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdmins", reflect.TypeOf((*MockAllStatements)(nil).ListProjectAdmins), ctx, projectID, viewerUserID, page)
+	return &MockAllStatementsListProjectAdminsCall{Call: call}
+}
+
+// MockAllStatementsListProjectAdminsCall wrap *gomock.Call
+type MockAllStatementsListProjectAdminsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsListProjectAdminsCall) Return(arg0 *database.ListResult[*domain.ProjectAdminRecord], arg1 error) *MockAllStatementsListProjectAdminsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsListProjectAdminsCall) Do(f func(context.Context, string, string, database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)) *MockAllStatementsListProjectAdminsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsListProjectAdminsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)) *MockAllStatementsListProjectAdminsCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -7079,6 +7194,45 @@ func (c *MockProjectStatementsDeleteProjectByIDCall) Do(f func(context.Context, 
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockProjectStatementsDeleteProjectByIDCall) DoAndReturn(f func(context.Context, string) (bool, error)) *MockProjectStatementsDeleteProjectByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// GetProject mocks base method.
+func (m *MockProjectStatements) GetProject(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProject", ctx, id, opts)
+	ret0, _ := ret[0].(*domain.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProject indicates an expected call of GetProject.
+func (mr *MockProjectStatementsMockRecorder) GetProject(ctx, id, opts any) *MockProjectStatementsGetProjectCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProject", reflect.TypeOf((*MockProjectStatements)(nil).GetProject), ctx, id, opts)
+	return &MockProjectStatementsGetProjectCall{Call: call}
+}
+
+// MockProjectStatementsGetProjectCall wrap *gomock.Call
+type MockProjectStatementsGetProjectCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockProjectStatementsGetProjectCall) Return(arg0 *domain.Project, arg1 error) *MockProjectStatementsGetProjectCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockProjectStatementsGetProjectCall) Do(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockProjectStatementsGetProjectCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockProjectStatementsGetProjectCall) DoAndReturn(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockProjectStatementsGetProjectCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -12598,6 +12752,45 @@ func (c *MockAuthzAssignmentStatementsListManagedGrantsCall) DoAndReturn(f func(
 	return c
 }
 
+// ListProjectAdmins mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListProjectAdmins", ctx, projectID, viewerUserID, page)
+	ret0, _ := ret[0].(*database.ListResult[*domain.ProjectAdminRecord])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListProjectAdmins indicates an expected call of ListProjectAdmins.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectAdmins(ctx, projectID, viewerUserID, page any) *MockAuthzAssignmentStatementsListProjectAdminsCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectAdmins", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectAdmins), ctx, projectID, viewerUserID, page)
+	return &MockAuthzAssignmentStatementsListProjectAdminsCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsListProjectAdminsCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectAdminsCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) Return(arg0 *database.ListResult[*domain.ProjectAdminRecord], arg1 error) *MockAuthzAssignmentStatementsListProjectAdminsCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) Do(f func(context.Context, string, string, database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)) *MockAuthzAssignmentStatementsListProjectAdminsCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) DoAndReturn(f func(context.Context, string, string, database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)) *MockAuthzAssignmentStatementsListProjectAdminsCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RevokeAuthzAssignment mocks base method.
 func (m *MockAuthzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	m.ctrl.T.Helper()
@@ -15120,18 +15313,18 @@ func (c *MockProjectServiceDeleteCall) DoAndReturn(f func(context.Context, strin
 }
 
 // Get mocks base method.
-func (m *MockProjectService) Get(ctx context.Context, id string) (*domain.Project, error) {
+func (m *MockProjectService) Get(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", ctx, id)
+	ret := m.ctrl.Call(m, "Get", ctx, id, opts)
 	ret0, _ := ret[0].(*domain.Project)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockProjectServiceMockRecorder) Get(ctx, id any) *MockProjectServiceGetCall {
+func (mr *MockProjectServiceMockRecorder) Get(ctx, id, opts any) *MockProjectServiceGetCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockProjectService)(nil).Get), ctx, id)
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockProjectService)(nil).Get), ctx, id, opts)
 	return &MockProjectServiceGetCall{Call: call}
 }
 
@@ -15147,13 +15340,13 @@ func (c *MockProjectServiceGetCall) Return(arg0 *domain.Project, arg1 error) *Mo
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockProjectServiceGetCall) Do(f func(context.Context, string) (*domain.Project, error)) *MockProjectServiceGetCall {
+func (c *MockProjectServiceGetCall) Do(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockProjectServiceGetCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockProjectServiceGetCall) DoAndReturn(f func(context.Context, string) (*domain.Project, error)) *MockProjectServiceGetCall {
+func (c *MockProjectServiceGetCall) DoAndReturn(f func(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error)) *MockProjectServiceGetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -15541,6 +15734,84 @@ func (c *MockVariableServiceGetVariablesCall) DoAndReturn(f func(context.Context
 	return c
 }
 
+// NewKindVariableSet mocks base method.
+func (m *MockVariableService) NewKindVariableSet(ctx context.Context, stmts service.VariableStatements, projectID string, kind domain.DeploymentOriginKind) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewKindVariableSet", ctx, stmts, projectID, kind)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewKindVariableSet indicates an expected call of NewKindVariableSet.
+func (mr *MockVariableServiceMockRecorder) NewKindVariableSet(ctx, stmts, projectID, kind any) *MockVariableServiceNewKindVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewKindVariableSet", reflect.TypeOf((*MockVariableService)(nil).NewKindVariableSet), ctx, stmts, projectID, kind)
+	return &MockVariableServiceNewKindVariableSetCall{Call: call}
+}
+
+// MockVariableServiceNewKindVariableSetCall wrap *gomock.Call
+type MockVariableServiceNewKindVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceNewKindVariableSetCall) Return(arg0 *domain.VariableSet, arg1 error) *MockVariableServiceNewKindVariableSetCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceNewKindVariableSetCall) Do(f func(context.Context, service.VariableStatements, string, domain.DeploymentOriginKind) (*domain.VariableSet, error)) *MockVariableServiceNewKindVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceNewKindVariableSetCall) DoAndReturn(f func(context.Context, service.VariableStatements, string, domain.DeploymentOriginKind) (*domain.VariableSet, error)) *MockVariableServiceNewKindVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// ReadDeploymentVariableSet mocks base method.
+func (m *MockVariableService) ReadDeploymentVariableSet(ctx context.Context, stmts service.VariableSetStatements, projectID, deploymentID string) (*domain.VariableSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadDeploymentVariableSet", ctx, stmts, projectID, deploymentID)
+	ret0, _ := ret[0].(*domain.VariableSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadDeploymentVariableSet indicates an expected call of ReadDeploymentVariableSet.
+func (mr *MockVariableServiceMockRecorder) ReadDeploymentVariableSet(ctx, stmts, projectID, deploymentID any) *MockVariableServiceReadDeploymentVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadDeploymentVariableSet", reflect.TypeOf((*MockVariableService)(nil).ReadDeploymentVariableSet), ctx, stmts, projectID, deploymentID)
+	return &MockVariableServiceReadDeploymentVariableSetCall{Call: call}
+}
+
+// MockVariableServiceReadDeploymentVariableSetCall wrap *gomock.Call
+type MockVariableServiceReadDeploymentVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceReadDeploymentVariableSetCall) Return(arg0 *domain.VariableSet, arg1 error) *MockVariableServiceReadDeploymentVariableSetCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceReadDeploymentVariableSetCall) Do(f func(context.Context, service.VariableSetStatements, string, string) (*domain.VariableSet, error)) *MockVariableServiceReadDeploymentVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceReadDeploymentVariableSetCall) DoAndReturn(f func(context.Context, service.VariableSetStatements, string, string) (*domain.VariableSet, error)) *MockVariableServiceReadDeploymentVariableSetCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // ReplaceVariablesInPlace mocks base method.
 func (m *MockVariableService) ReplaceVariablesInPlace(ctx context.Context, owner domain.VariableOwner, doc map[string]any) error {
 	m.ctrl.T.Helper()
@@ -15613,6 +15884,44 @@ func (c *MockVariableServiceSetVariablesCall) Do(f func(context.Context, domain.
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockVariableServiceSetVariablesCall) DoAndReturn(f func(context.Context, domain.VariableOwner, *domain.DeploymentOriginKind, []service.VariableToSet) error) *MockVariableServiceSetVariablesCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// StoreDeploymentVariableSet mocks base method.
+func (m *MockVariableService) StoreDeploymentVariableSet(ctx context.Context, stmts service.VariableSetStatements, projectID, deploymentID string, set *domain.VariableSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreDeploymentVariableSet", ctx, stmts, projectID, deploymentID, set)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StoreDeploymentVariableSet indicates an expected call of StoreDeploymentVariableSet.
+func (mr *MockVariableServiceMockRecorder) StoreDeploymentVariableSet(ctx, stmts, projectID, deploymentID, set any) *MockVariableServiceStoreDeploymentVariableSetCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreDeploymentVariableSet", reflect.TypeOf((*MockVariableService)(nil).StoreDeploymentVariableSet), ctx, stmts, projectID, deploymentID, set)
+	return &MockVariableServiceStoreDeploymentVariableSetCall{Call: call}
+}
+
+// MockVariableServiceStoreDeploymentVariableSetCall wrap *gomock.Call
+type MockVariableServiceStoreDeploymentVariableSetCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockVariableServiceStoreDeploymentVariableSetCall) Return(arg0 error) *MockVariableServiceStoreDeploymentVariableSetCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockVariableServiceStoreDeploymentVariableSetCall) Do(f func(context.Context, service.VariableSetStatements, string, string, *domain.VariableSet) error) *MockVariableServiceStoreDeploymentVariableSetCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockVariableServiceStoreDeploymentVariableSetCall) DoAndReturn(f func(context.Context, service.VariableSetStatements, string, string, *domain.VariableSet) error) *MockVariableServiceStoreDeploymentVariableSetCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

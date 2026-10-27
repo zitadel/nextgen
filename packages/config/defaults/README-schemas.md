@@ -123,6 +123,15 @@ Finally, update the login flow if users should be able to enter it.
 
 Remove it from `required`.
 
+## Show a user's name
+
+List the properties a user's name is made of in `x-display`, in order:
+`"x-display": ["givenName", "familyName"]`. Your app reads the result as the
+session's display name; without it, it has only the user's email. Users keep
+the schema revision they signed up under, so the name shows for those who
+sign up after you deploy it. The `consumer` and `business` use cases set it
+for you.
+
 ## Enable passkeys
 
 Set `"passkey": { "enabled": true }` in `x-auth-methods`.

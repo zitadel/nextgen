@@ -8,6 +8,7 @@ import {
   detectProjectFacts,
   formatFrameworkLine,
   relativeDisplayPath,
+  signInSummary,
 } from "../../../../src/commands/setup/summary";
 import { stripAnsi } from "../../../helpers/run-cli";
 
@@ -101,5 +102,62 @@ describe("detectProjectFacts", () => {
     // The separator is dimmed wherever picocolors sees colour support (CI is
     // set and NO_COLOR is not, as in ci-turbo), so compare the plain text.
     expect(stripAnsi(formatFrameworkLine({ ...facts, typescript: false }))).toMatch(/^React · /);
+  });
+});
+
+describe("signInSummary", () => {
+  it("says password-first starts with email and password and enables both methods", () => {
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toBe(
+      [
+        "Sign-in starts with email and password.",
+        "Password and passkey are enabled in the user schema.",
+        "Passwords have no minimum length.",
+        "No external providers will be added.",
+      ].join("\n"),
+    );
+  });
+
+  it("says passkey-first starts with a passkey and falls back to email and password", () => {
+    expect(signInSummary({ preset: "passkey-first", sso: [] })).toContain(
+      "Sign-in starts with a passkey, with email and password as the fallback.",
+    );
+  });
+
+  it("says the minimum password length that was chosen", () => {
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: 15 })).toContain(
+      "Passwords need at least 15 characters.",
+    );
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toContain(
+      "Passwords have no minimum length.",
+    );
+  });
+
+  it("says the recommended minimum when none was given, which setup then writes", () => {
+    expect(signInSummary({ preset: "password-first", sso: [] })).toContain(
+      "Passwords need at least 15 characters.",
+    );
+  });
+
+  it("names the selected providers", () => {
+    const summary = signInSummary({
+      preset: "password-first",
+      sso: [
+        { selection: { kind: "catalog", id: "google" } },
+        {
+          selection: {
+            kind: "custom",
+            connection: {
+              slug: "acme-sso",
+              displayName: "Acme SSO",
+              issuer: "https://sso.acme.example",
+              scopes: "openid",
+            },
+          },
+        },
+      ] as never,
+    });
+
+    expect(summary).toContain("External providers: Google, Acme SSO.");
+    expect(summary).not.toContain("No external providers");
   });
 });

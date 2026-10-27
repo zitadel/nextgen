@@ -171,7 +171,7 @@ func TestProjectSecretIsRevocable(t *testing.T) {
 
 	resp, err := operator.GetProject(t.Context(), api.GetProjectParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)
-	require.IsType(t, &api.ProjectResponse{}, resp, helpers.MustMarshal(t, resp))
+	require.IsType(t, &api.ProjectDetailResponse{}, resp, helpers.MustMarshal(t, resp))
 
 	// The secret carries the id of its record, which is what makes it revocable.
 	parsed, err := harness.EnsureTokenService(t).IntrospectToken(t.Context(), project.ProjectSecret)

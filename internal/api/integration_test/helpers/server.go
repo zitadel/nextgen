@@ -50,7 +50,7 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 			h.EnsureKeyService(t),
 			h.EnsureVariableService(t),
 			h.EnsureHttpClient(t),
-		)), "code", "state")
+		)))
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, then the API's
 		// mounts, under the prefix, the probes and the root alias.
@@ -75,11 +75,11 @@ func (h *Harness) APIBaseURL(t testing.TB) string {
 
 // withServerLog hands every request a logger collecting into the harness, the
 // way the production middleware hands one writing to the process log, and runs
-// the production request logging on top so the buffer holds real log lines.
-// redactQuery is the mount's opt-in, as in production.
-func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.Handler {
+// the production request logging and panic recovery on top so the buffer holds
+// real log lines.
+func (h *Harness) withServerLog(next http.Handler) http.Handler {
 	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
-	logging := middleware.WithLogging(next, redactQuery...)
+	logging := middleware.WithLogging(api.WithRecover(next))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
 	})

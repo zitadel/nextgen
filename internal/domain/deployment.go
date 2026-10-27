@@ -15,8 +15,25 @@ const (
 const MaxDeploymentTargets = 50
 
 // DefaultPreviewTTL is how long a preview stays live after the deployment
-// that writes it.
+// that writes it, when the deployment gives no ttl.
 const DefaultPreviewTTL = 7 * 24 * time.Hour
+
+// MaxPreviewTTL caps the ttl a deployment may give.
+const MaxPreviewTTL = 365 * 24 * time.Hour
+
+// ResolvePreviewTTL picks the lifetime a preview deploy renews.
+// When requested is nil, DefaultPreviewTTL is used. Otherwise requested
+// must be positive and at most MaxPreviewTTL.
+func ResolvePreviewTTL(requested *time.Duration) (time.Duration, error) {
+	if requested == nil {
+		return DefaultPreviewTTL, nil
+	}
+	if *requested <= 0 || *requested > MaxPreviewTTL {
+		return 0, ErrDeploymentInvalid().WithMessage(fmt.Sprintf(
+			"ttl must be positive and at most %d days", MaxPreviewTTL/(24*time.Hour)))
+	}
+	return *requested, nil
+}
 
 // DeploymentReason records why a deployment was created.
 //
@@ -61,6 +78,26 @@ type DeploymentConflictDetails struct {
 // ErrDeploymentConflict reports a failed expected_deployment_id check.
 func ErrDeploymentConflict(details DeploymentConflictDetails) Error {
 	return newError(PrefixDeployment.ErrorCodePrefix("conflict"), "deployment: the deployment it replaces does not match expected_deployment_id", details, nil)
+}
+
+// DeploymentVariablesMissingDetails names the kind whose values the deployment
+// would freeze and every referenced name that kind does not hold.
+type DeploymentVariablesMissingDetails struct {
+	Kind  string   `json:"kind"`
+	Names []string `json:"names"`
+}
+
+// ErrDeploymentVariablesMissing refuses a deploy whose release references
+// names the frozen set lacks. names is sorted so the wire order is stable.
+func ErrDeploymentVariablesMissing(kind DeploymentOriginKind, names []string) Error {
+	sorted := slices.Clone(names)
+	slices.Sort(sorted)
+	return newError(
+		PrefixDeployment.ErrorCodePrefix("variables_missing"),
+		"deployment: the release references variables its kind has no value for",
+		DeploymentVariablesMissingDetails{Kind: kind.String(), Names: sorted},
+		nil,
+	)
 }
 
 // DeploymentMetadata records why the release went live and who did it. A
@@ -126,15 +163,20 @@ func NewestOriginDeployment(deployments []OriginDeployment) *OriginDeployment {
 	return newest
 }
 
-// DeploymentsEqual reports whether candidate repeats current, the project's
-// newest primary deployment: the same release to the same origins, so writing
-// it would change nothing. A deployment to preview URLs never equals one,
-// since writing it renews its previews.
-// TODO(#1781): compare the variable set create resolves too.
-func DeploymentsEqual(candidate, current *Deployment) bool {
+// SamePrimaryRelease reports whether candidate and current are both primary
+// deployments of one release to the same origins. Only then can they be equal.
+func SamePrimaryRelease(candidate, current *Deployment) bool {
 	return candidate.OriginKind == DeploymentOriginKindPrimary && current != nil &&
 		current.OriginKind == DeploymentOriginKindPrimary &&
 		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
+}
+
+// DeploymentsEqual reports whether candidate repeats current, the project's
+// newest primary deployment: the same release, the same origins, and the same
+// frozen variable set, so writing it would change nothing. A deployment to
+// preview URLs never equals one, since writing it renews its previews.
+func DeploymentsEqual(candidate, current *Deployment, candidateSetHash, currentSetHash string) bool {
+	return SamePrimaryRelease(candidate, current) && candidateSetHash == currentSetHash
 }
 
 // CheckExpectedDeployment fails with ErrDeploymentConflict unless expected is

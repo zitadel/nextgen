@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { anApp, aSetUpApp } from "../helpers/project";
+import { anApp, aSetUpApp, PASSWORD_POLICY } from "../helpers/project";
 import { pressCtrlC } from "../helpers/run-cli";
 
 const platform = usePlatformMock();
@@ -131,6 +131,16 @@ describe("resources", () => {
         await app.run(["idps", "create", ...ACME_CONNECTION_FLAGS, "--json"]);
 
         expect((await app.registeredIdps()).map((idp) => idp.slug)).toContain("acme-sso");
+      });
+
+      it("reads a policy by its operation", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        expect(await app.publish()).toSucceed();
+
+        const result = await app.run(["policies", "get", PASSWORD_POLICY, "--json"]);
+
+        expect(app.envelopeOf<{ config: object }>(result).data.config).toEqual({ min_length: 12 });
       });
 
       it("says what can be done to each topic", async () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, type ScaffoldedApp } from "../helpers/project";
+import { aSetUpApp, SETUP_ORIGIN, type ScaffoldedApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -150,6 +150,25 @@ describe("doctor", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toContain("app/login/page.tsx");
+      });
+
+      it("points a project that lacks an editor schema at --fix", async () => {
+        const app = await aSetUpApp();
+        await app.lacksEditorSchema("branding");
+
+        const result = await app.doctor();
+
+        expect(result).toSucceed();
+        expect(result).toSuggest("doctor --fix");
+      });
+
+      it("makes the issuer setup 0.1.0 registered as a preview origin primary", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        await app.doctor(["--fix"]);
+
+        expect(await app.projectOrigins()).toEqual([SETUP_ORIGIN]);
       });
 
       it("removes nothing while repairing", async () => {

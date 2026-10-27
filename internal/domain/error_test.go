@@ -1,6 +1,8 @@
 package domain_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -95,6 +97,32 @@ func TestError_logValue_nonGCPIncludesLocationWhenEnabled(t *testing.T) {
 		}
 	}
 	require.True(t, hasLocation)
+}
+
+// A brief line keeps the root cause of a nested domain error, which its
+// Error() text alone would drop, and no location or stack at any depth.
+func TestError_briefLogValue_keepsNestedCause(t *testing.T) {
+	errreport.EnableLocation(true)
+	errreport.EnableStack(true)
+	t.Cleanup(func() {
+		errreport.EnableLocation(true)
+		errreport.EnableStack(true)
+	})
+
+	err := domain.ErrProjectNotFound().WithParent(
+		domain.ErrInternal(errors.New("pq: connection reset")).WithMessage("failed to load project"))
+	var out bytes.Buffer
+	slog.New(slog.NewJSONHandler(&out, nil)).Info("api error", slog.Attr{Key: "error", Value: err.BriefLogValue()})
+
+	var record map[string]any
+	require.NoError(t, json.Unmarshal(out.Bytes(), &record))
+	parent, ok := record["error"].(map[string]any)["parent"].(map[string]any)
+	require.True(t, ok, "the nested domain error is a group: %v", record["error"])
+	assert.Equal(t, "internal", parent["code"])
+	assert.Equal(t, "failed to load project", parent["message"])
+	assert.Equal(t, "pq: connection reset", parent["parent"])
+	assert.NotContains(t, out.String(), "reportLocation")
+	assert.NotContains(t, out.String(), "stackTrace")
 }
 
 func TestIsServerFault(t *testing.T) {

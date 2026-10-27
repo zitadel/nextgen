@@ -50,8 +50,8 @@ Until 1.0.0 the server also answers the API's root paths, with a
 
 `/telemetry/mixpanel/*` belongs to no service: a rewrite forwards it to
 Mixpanel's EU API, `api-eu.mixpanel.com`. The CLI's usage analytics and
-the server's service ping go there, so released CLIs and servers depend on
-the path: keep it, ahead of the server's catch-all.
+the server's service ping send to Mixpanel through it once Mixpanel is no
+longer paused: keep it, ahead of the server's catch-all.
 
 The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
@@ -289,7 +289,8 @@ Every deployment is tested once Vercel built it, on its own URL
 service's contract suite against the deployment, today the docs'
 ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md)), the console's
 ([`e2e/console/README.md`](../../e2e/console/README.md)) and the built-in
-schemas' ([`e2e/schemas/`](../../e2e/schemas/)), as the turbo tasks
+schemas' ([`e2e/schemas/`](../../e2e/schemas/)), and on a preview the CLI's
+([`e2e/cli/`](../../e2e/cli/)), as the turbo tasks
 `pnpm check:cloud` runs [by hand](#checking-a-deployment-by-hand). The console's
 signs nobody in: it checks how `vercel.json` routes the console's paths, the
 API's prefix and the Mixpanel proxy, and that the signed-out console comes up, down to the login widget's first step,
@@ -297,18 +298,29 @@ which needs the server and its database behind it. The schemas' fetches every
 built-in from `/schemas/v1/` and compares it with the deployed commit's own
 rendering, checks the headers `vercel.json` gives them, and that
 `/api/v1/schemas`, and until 1.0.0 `/schemas`, reach the API; it needs no
-browser.
+browser. The CLI's packs this commit's
+CLI, as `release:pack` does, and drives it with `--non-interactive --json`
+from an empty directory: `setup --server <deployment>` creates a project,
+then `deploy`, `variable set` and `list`, `origin add` and `list`,
+`deployment list` and `rollback` run on it, and a browser signs up on the
+console to finish the `claim` the CLI starts. Each run leaves that project in
+the deployment's database, so only previews run it, and it skips the
+production domain. The CLI never holds the bypass secret: it reaches the
+deployment through a local proxy, as through a company's TLS-inspecting one,
+that adds it ([`bypass-proxy.ts`](../../e2e/cli/support/bypass-proxy.ts)).
 What starts it, and where the result lands, depends on the environment:
 
 - **A preview:** the `deployment_status` event Vercel posts to GitHub. The
   checks land on the pull request: `deployment-checks / docs (Preview)`,
-  `deployment-checks / console (Preview)` and
-  `deployment-checks / schemas (Preview)`.
+  `deployment-checks / console (Preview)`,
+  `deployment-checks / schemas (Preview)` and
+  `deployment-checks / cli (Preview)`.
 - **Production:** [`production-checks.yml`](../../.github/workflows/production-checks.yml),
   on the `vercel.deployment.ready` dispatch Vercel sends once the deployment
   is built, before its Deployment Checks run. It calls the same jobs and sets
   one commit status per suite on the deployed commit, `docs (Production)`,
-  `console (Production)` and `schemas (Production)`. A deployed commit from
+  `console (Production)` and `schemas (Production)`; the CLI's suite does
+  not run. A deployed commit from
   before the schemas service passes the last with nothing to check. A dispatch runs the workflow as it is on `main`: a
   change to it takes effect once merged.
 - The suites reach the protected deployment with the project's Protection
@@ -341,13 +353,16 @@ What starts it, and where the result lands, depends on the environment:
   name the failing contract (the test's title) and list every URL that
   failed; the run's summary names the deployment and the command that
   reproduces the run; a failed browser test's screenshots are the
-  `docs-deployment-screenshots` or `console-deployment-screenshots` artifact
-  (the schemas' suite runs no browser and uploads nothing).
+  `docs-deployment-screenshots`, `console-deployment-screenshots` or
+  `cli-deployment-screenshots` artifact (the schemas' suite runs no browser
+  and uploads nothing). The CLI's annotations quote what the failing command
+  printed.
   A flaky production run is run
   again from that run's page: it reports on the same commit again.
 - `gh workflow run deployment-checks.yml --ref <branch> -f url=https://cloud-….vercel.app`
   runs the workflow without a new deployment; it reports `docs (dispatch)`,
-  `console (dispatch)` and `schemas (dispatch)`, never production's statuses. A change to
+  `console (dispatch)` and `schemas (dispatch)`, never production's statuses,
+  and with `-f cli=true` `cli (dispatch)`: only for a preview's URL. A change to
   `deployment-checks.yml` needs no dispatch: a `deployment_status` run uses
   the file as it is on the deployed commit, so the branch's own preview
   checks it.
@@ -378,10 +393,13 @@ CLOUD_URL=https://cloud-….vercel.app pnpm check:cloud
 ```
 
 `--filter=@zitadel/docs` runs the docs' suite, `--filter=@zitadel/e2e` the
-console's and the schemas'; a red check's summary names the command that runs
-its suite alone. A new suite is a turbo task that
-`check:cloud` lists, a job in `deployment-checks.yml` and a status in
-`production-checks.yml`'s `SUITES`.
+console's, the schemas' and the CLI's; a red check's summary names the command
+that runs its suite alone. The CLI's suite skips the production domain; never
+point it at a production deployment's own URL, where it would leave a project
+in production's database. A new suite is a turbo task that
+`check:cloud` lists, a job in `deployment-checks.yml` and, unless it writes to
+the deployment as the CLI's does, a status in `production-checks.yml`'s
+`SUITES`.
 
 ## Running the cloud locally
 
@@ -493,6 +511,33 @@ project and imports the root admin.
   to `x-vercel-id`), the one an error page and `X-Request-Id` quote: search
   for it. On a protected preview the response's `x-vercel-id` names an outer
   hop that Vercel does not log; search for `X-Request-Id` instead.
+- **Errors:** Vercel tags every line of the Go function `info`, whatever
+  stream it is written to and whatever its `level` field says, Vercel's own
+  crash messages included, so the dashboard's level filter finds no error.
+  Find a failed request by its status instead, then read its lines by its
+  request ID (the `requests` source needs Vercel CLI 64 or newer):
+
+  ```sh
+  npx -y vercel@64.5.0 logs requests --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --environment production --since 24h --query 'httpStatus>=500'
+  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --since 24h --query 'requestId:"<request id>"'
+  ```
+
+  A server that fails to start shows up the same way: the request that
+  started the instance answers 500, and its lines end with the launcher's
+  error and `the user server exited during startup`. An error outside a
+  request, such as a failed event retention run, has no status to find it
+  by: search the messages for the word, which also matches the 4xx
+  `api error` lines, and keep the `ERROR` ones:
+
+  ```sh
+  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --environment production --since 24h --limit 1000 \
+    --query ERROR --json \
+    | jq -r 'select(.type == "log") | .data.message | fromjson? | select(.level == "ERROR") | .msg'
+  ```
+
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only
@@ -500,10 +545,10 @@ project and imports the root admin.
   only a few new ones, not one per request: 40 parallel password checks
   on a preview with at most 16 warm instances started 3, and the warm
   instances' handler time rose from about 0.3 s to a median of 0.7 s.
-  To tell the two apart, compare a request's `handling request` log time
-  with the edge arrival in its Vercel request ID
-  (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold start,
-  a long handler time is sharing.
+  To tell the two apart, take a request's `request served` log time minus
+  its `duration`, and compare it with the edge arrival in its Vercel
+  request ID (`<id>-<unix ms>-<hash>`): a gap of a second or more is a cold
+  start, a long handler time is sharing.
 - **Connections:** four per instance through PlanetScale's PgBouncer, which
   pools per database and role: on `preview` every preview database is a
   pool of its own, so the cluster's `max_connections` bounds how many

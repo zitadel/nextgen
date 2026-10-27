@@ -49,31 +49,31 @@
     ],
     "topics": {
       "users": {
-        "description": "Manage the users of the project."
+        "description": "Create and manage users."
       },
       "teams": {
-        "description": "Manage the teams of the project."
+        "description": "Create and manage teams."
       },
       "sessions": {
-        "description": "Inspect and revoke the sessions of the project."
+        "description": "View and revoke sessions."
       },
       "events": {
-        "description": "Read the audit event stream of the project."
+        "description": "View events."
       },
       "grants": {
-        "description": "Manage collaboration grants on the project."
+        "description": "Manage access grants."
       },
       "projects": {
-        "description": "Inspect and update the projects visible to this credential."
+        "description": "View and update projects."
       },
       "schemas": {
-        "description": "Inspect user-schema revisions."
+        "description": "View user schemas."
       },
       "branding": {
-        "description": "Work with login branding revisions."
+        "description": "Manage the login branding."
       },
       "auth-method": {
-        "description": "Turn sign-in methods on or off for a user schema."
+        "description": "Configure how users sign in."
       },
       "auth-method:password": {
         "description": "Turn password sign-in on or off."
@@ -83,19 +83,33 @@
       },
       "auth-method:sso": {
         "description": "Add or remove identity providers."
-
       },
       "origin": {
-        "description": "Manage the origin patterns the project admits."
+        "description": "Manage the project's allowed origins."
       },
       "release": {
-        "description": "Build and revoke the project's configuration releases."
+        "description": "Build and manage releases."
       },
       "deployment": {
-        "description": "Make releases live and read the deployment history."
+        "description": "Deploy releases and roll them back."
       },
       "variable": {
-        "description": "Manage the project's variables and their preview overrides."
+        "description": "Manage project variables."
+      },
+      "idps": {
+        "description": "Manage identity provider connections."
+      },
+      "flow-definitions": {
+        "description": "View login flows."
+      },
+      "policies": {
+        "description": "View policies."
+      },
+      "env": {
+        "description": "Show and bind environments."
+      },
+      "api": {
+        "description": "Call any operation of the Zitadel API."
       }
     }
   },

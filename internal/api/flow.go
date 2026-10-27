@@ -317,7 +317,7 @@ func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) err
 	if h.runtime == nil {
 		return nil
 	}
-	project, err := h.projectService.Get(ctx, projectID)
+	project, err := h.projectService.Get(ctx, projectID, service.ProjectQueryOptions{})
 	if err != nil {
 		return domain.ErrInternal(err)
 	}
@@ -422,12 +422,16 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	out := api.FlowStep{
 		Name:    step.Name,
 		Texts:   api.NewOptStepTexts(toStepTexts(step.Texts)),
+		Purpose: api.NewOptFlowStepPurpose(api.FlowStepPurpose(step.Purpose.String())),
 		Fields:  toFlowStepFields(step.Fields),
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
 	}
 	if len(step.SSOProviders) > 0 {
 		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
+	}
+	if step.Notice != nil {
+		out.Notice = api.NewOptNilString(*step.Notice)
 	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)

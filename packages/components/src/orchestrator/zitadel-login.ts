@@ -1137,7 +1137,9 @@ export class ZitadelLogin extends ZitadelSurface {
       // preview renders none at all: the atom starts its ceremony on connect.
       challenge: this.loading || this.preview ? null : (step.challenge ?? null),
       identifier: step.identifier ?? null,
-      messages: [],
+      // Why the flow moved between sign-in and sign-up without being asked,
+      // on the step right after the move.
+      messages: step.notice ? [{ level: "info", text_key: step.notice }] : [],
       identity: this.deriveIdentity(),
       errors,
       branding: this.brandingForTemplate(),

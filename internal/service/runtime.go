@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -75,12 +76,17 @@ func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string)
 	)
 	resolution, err := r.resolve(ctx, projectID, origin)
 	if err != nil {
-		attrs := []any{slog.Any("error", err)}
-		var de domain.Error
-		if errors.As(err, &de) {
-			attrs = append(attrs, slog.String("code", de.Code))
+		// The parent carries project and origin to the boundary line, which logs
+		// the refusal once. The Origin captured where the error was made stays.
+		if de, ok := errors.AsType[domain.Error](err); ok {
+			where := fmt.Sprintf("project %s, origin %q", projectID, strings.TrimSpace(origin))
+			if de.Parent == nil {
+				de.Parent = errors.New(where)
+			} else {
+				de.Parent = fmt.Errorf("%s: %w", where, de.Parent)
+			}
+			return nil, de
 		}
-		logger.Warn("runtime resolution refused", attrs...)
 		return nil, err
 	}
 	if resolution == nil {
@@ -266,8 +272,9 @@ func ReleaseFromContext(ctx context.Context) *domain.Release {
 type PinnedRevisions map[string]string
 
 // ReleasePinsFlow reports whether the request's release pins at least one
-// flow definition. Schema, branding and identity providers follow that
-// switch: they read the pinned revisions only then, and the newest otherwise.
+// flow definition. Schema, branding, identity providers and policies follow
+// that switch: they read the pinned revisions only then, and the newest
+// otherwise.
 func ReleasePinsFlow(ctx context.Context) bool {
 	return len(PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)) > 0
 }

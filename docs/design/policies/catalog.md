@@ -17,7 +17,7 @@ Evaluated before a password is stored, whichever path stores it.
 | Rules | `min_length`, `max_length`, `history_depth`, each named after the setting it reads |
 | Context | `candidate.length`: code points of the NFC-normalized candidate; `self_service`: the user sets their own password; `history_matches`: one entry per kept password, current first; the rule reads only the first `history_depth` |
 | Context builder and gate | `service.PasswordPolicy.CheckPassword` |
-| Instance resolution | `service.PolicyService.ResolvePolicy` (a `service.PolicyResolver`): the newest published revision of the project's policy, none when the project published none |
+| Instance resolution | `service.PolicyService.ResolvePolicy` (a `service.PolicyResolver`): for a request whose release pins a flow, the revision that release pins, none when it pins none; for any other request, the newest published revision, none when the project published none |
 | Denial | `user.password_policy_violation` (400) with `{ "violations": {...} }` in `details.details`; a password over the cap is reported as `max_length` with the effective maximum. In a flow (registration, SSO sign-up), field errors on the step that creates the user; a length violation is refused earlier, on the step that collects the password |
 | Flow step bounds | `service.PasswordPolicy.PasswordLengthBounds` (a `domain.FlowPasswordPolicy`): `min_length` and `max_length` on the password field of a step where the user chooses one, the cap when unset |
 | Bounds tied to | `domain.MaxPasswordLength` (length bounds equal it); `domain.UserPasswordHistoryDepth` (history bound at most it plus the current password) |
