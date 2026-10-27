@@ -19,7 +19,7 @@ import { type Parsed, parseClientId } from "@zitadel/config/idp";
 
 import type { ZitadelError } from "../../../src/lib/errors";
 
-import { clackInputImports } from "../../helpers/clack-imports";
+import { clackInputImports } from "../../helpers/drawing-boundary";
 import { sourceFiles } from "../../helpers/source-files";
 import { input } from "../../../src/lib/input";
 import { unscopedCommand } from "../../../src/lib/suggestion";
