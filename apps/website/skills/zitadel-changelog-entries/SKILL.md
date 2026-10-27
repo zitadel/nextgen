@@ -55,10 +55,14 @@ What a user can do now and how, in a paragraph or two, then details as a list.
 ```
 
 - `date` is when it landed, in UTC: its pull request's merge
-  (`gh pr view <number> --json mergedAt`) when it is live on the cloud, the
-  npm publish (`npm view @zitadel/cli time --json`) when it needs a release.
-  The day alone works too; the time orders a day's entries.
-- `cloud: true` when it was live on preview.zitadel.com from `date`.
+  (`gh pr view <number> --json mergedAt`), the last one when it names
+  several, when it is live on the cloud; the npm publish
+  (`npm view @zitadel/cli time --json`) when it needs a release. The day
+  alone works too; the time orders a day's entries.
+- `cloud: true` when it was live on preview.zitadel.com from `date`: its
+  changesets list `@zitadel/server`, which ships the API and the console. A
+  change to the CLI, an SDK or the login components reaches users only with
+  its release.
 - `pulls` lists the pull requests that shipped it. The site shows the release
   that carries all of them, and "Not released yet" until one does, so an
   entry written before its release needs no change after it.
