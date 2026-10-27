@@ -1,81 +1,29 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  fetchRelease,
-  fetchReleases,
-  type GitHubRelease,
-  parseRelease,
-  parseReleases,
-  RELEASE_COUNT,
+  assembleReleases,
+  type Changelog,
+  parsePost,
+  type Post,
+  readChangelogs,
+  readPosts,
+  readReleases,
 } from "./releases";
 
-// One change as @changesets/changelog-github writes it into each package's
-// CHANGELOG.md, after the item's `- `.
-const SESSION_CHANGE = `[#2076](https://github.com/zitadel/nextgen/pull/2076) [\`12b3226\`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+// One changeset's entry as @changesets/changelog-github writes it into the
+// CHANGELOG.md of every package the changeset lists.
+const SESSION_CHANGE = `- [#2076](https://github.com/zitadel/nextgen/pull/2076) [\`12b3226\`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
   app's own project.
 
   The project comes from the new \`projectId\` middleware option.`;
 
-const TYPO_CHANGE =
-  "[#2201](https://github.com/zitadel/nextgen/pull/2201) Thanks [@livio-a](https://github.com/livio-a)! - Fixes a typo in the `zitadel.yaml` schema.";
+const CLI = `# @zitadel/cli
 
-// A body as scripts/release-github.mjs writes it, after GitHub's API has
-// turned its line ends into CRLF: each change once, after its packages, and
-// the line that stands in for the changes that did not fit.
-const BODY =
-  `<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->
-
-<!-- nextgen-release-facts:start -->
-## Generated Release Facts
-
-This section is maintained by release automation. Edit product notes outside this block.
-
-Release commit: \`5983d4b581e6\`
-
-### Container Images
-
-| Image | Reference |
-|---|---|
-| container | \`ghcr.io/zitadel/nextgen:0.2.0\` |
-
-### npm Packages
-
-| Package | Version |
-|---|---|
-| \`@zitadel/cli\` | \`0.2.0\` |
-| \`@zitadel/server\` | \`0.2.0\` |
-| \`@zitadel/config\` | \`0.2.0\` |
-| \`@zitadel/api\` | \`0.2.0\` |
-
-### Package Changes
-
-#### Minor Changes
-
-- \`@zitadel/cli\`: [#2157](https://github.com/zitadel/nextgen/pull/2157) [\`adf6453\`](https://github.com/zitadel/nextgen/commit/adf64530b8a647465ae80888fb52232d05107809) Thanks [@fforootd](https://github.com/fforootd)! - \`zitadel setup --dev-port <port>\` now moves an app that's already set up to another port.
-
-- \`@zitadel/cli\`, \`@zitadel/server\`: ${SESSION_CHANGE}
-
-- \`@zitadel/server\`: [#1386](https://github.com/zitadel/nextgen/pull/1386) [\`6821cc6\`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d2a0bdb7ff1a5d5e) Thanks [@peintnermax](https://github.com/peintnermax), [@fforootd](https://github.com/fforootd)! - \`POST /flows/{flow_id}\` with \`{action: "sso",
-  sso_provider_id}\` on a step that offers \`sso_providers\`
-  pins the connection at its newest revision.
-
-  - \`@zitadel/sdk-core\`: \`NextgenSession\` becomes \`{userId,
-  identifier}\`.
-
-#### Patch Changes
-
-- \`@zitadel/config\`: ${TYPO_CHANGE}
-
-_1 patch change omitted to keep this release body under GitHub's 125000-character limit; see \`packages/api/CHANGELOG.md\` at tag \`v0.2.0\`._
-<!-- nextgen-release-facts:end -->`.replace(/\n/g, "\r\n");
-
-// The same changes as scripts/release-github.mjs wrote them up to 0.1.0, each
-// package's CHANGELOG.md section in turn: rewrapped where a formatter wrapped
-// one, and a pointer where a package's section did not fit.
-const PER_PACKAGE_BODY = `<!-- nextgen-release-facts:start -->
-### Package Changes
-
-#### \`@zitadel/cli\`
+## 0.2.0
 
 ### Minor Changes
 
@@ -83,48 +31,59 @@ const PER_PACKAGE_BODY = `<!-- nextgen-release-facts:start -->
 
 ### Patch Changes
 
-- ${SESSION_CHANGE}
+${SESSION_CHANGE}
+- Updated dependencies [[\`12b3226\`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f)]:
+  - @zitadel/server@0.2.0
 
-#### \`@zitadel/server\`
+## 0.1.0
+
+### Patch Changes
+
+- Updates the help text.
+
+## 1.0.0-alpha.28
+
+### Patch Changes
+
+- A change in an alpha preview.
+`;
+
+const SERVER = `# @zitadel/server
+
+## 0.2.0
 
 ### Minor Changes
 
-- ${SESSION_CHANGE}
+${SESSION_CHANGE}
 
 - [#1386](https://github.com/zitadel/nextgen/pull/1386) [\`6821cc6\`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d2a0bdb7ff1a5d5e) Thanks [@peintnermax](https://github.com/peintnermax), [@fforootd](https://github.com/fforootd)! - \`POST /flows/{flow_id}\` with \`{action: "sso",
 sso_provider_id}\` on a step that offers \`sso_providers\`
   pins the connection at its newest revision.
 
-  - \`@zitadel/sdk-core\`: \`NextgenSession\` becomes \`{userId,
-identifier}\`.
+## 0.1.0
 
-#### \`@zitadel/config\`
+No changes in this release.
+`;
 
-### Patch Changes
+const CHANGELOGS: Changelog[] = [
+  { name: "@zitadel/cli", source: CLI },
+  { name: "@zitadel/server", source: SERVER },
+];
 
-- ${TYPO_CHANGE}
-
-#### \`@zitadel/api\`
-
-_Changelog omitted to keep this release body under GitHub's 125000-character limit; see \`packages/api/CHANGELOG.md\` at tag \`v0.1.0\`._
-<!-- nextgen-release-facts:end -->`.replace(/\n/g, "\r\n");
-
-function release(tag: string, fields: Partial<GitHubRelease> = {}): GitHubRelease {
+function changelog(entries: string[], version = "0.2.0", group = "Minor"): Changelog {
   return {
-    tag_name: tag,
-    html_url: `https://github.com/zitadel/nextgen/releases/tag/${tag}`,
-    published_at: "2026-10-20T20:15:04Z",
-    draft: false,
-    body: "",
-    ...fields,
+    name: "@zitadel/server",
+    source: `# @zitadel/server\n\n## ${version}\n\n### ${group} Changes\n\n${entries.join("\n")}\n`,
   };
 }
 
-describe("parseRelease", () => {
-  it("reads each change with the packages it changes and its bump", () => {
-    const { changes } = parseRelease(release("v0.2.0", { body: BODY }));
+describe("assembleReleases", () => {
+  it("lists a change that ships in several packages once, with each package and its highest bump", () => {
+    const [release] = assembleReleases(CHANGELOGS, new Map());
 
-    expect(changes.map(({ source, bump, packages }) => ({ source, bump, packages }))).toEqual([
+    expect(
+      release?.changes.map(({ source, bump, packages }) => ({ source, bump, packages })),
+    ).toEqual([
       {
         source: { label: "#2157", href: "https://github.com/zitadel/nextgen/pull/2157" },
         bump: "minor",
@@ -140,138 +99,108 @@ describe("parseRelease", () => {
         bump: "minor",
         packages: ["@zitadel/server"],
       },
-      {
-        source: { label: "#2201", href: "https://github.com/zitadel/nextgen/pull/2201" },
-        bump: "patch",
-        packages: ["@zitadel/config"],
-      },
     ]);
   });
 
-  it("keeps a change's summary as Markdown, without its packages, what precedes it or the list's indent", () => {
-    const [, session, sso] = parseRelease(release("v0.2.0", { body: BODY })).changes;
+  it("keeps a change's summary as Markdown, without what precedes it or the list's indent", () => {
+    const [, session, sso] = assembleReleases(CHANGELOGS, new Map())[0]?.changes ?? [];
 
     expect(session?.summary).toBe(
       "The server SDKs now count a session as signed in only when it belongs to the\napp's own project.\n\nThe project comes from the new `projectId` middleware option.",
     );
     expect(session?.authors).toEqual([{ label: "@fforootd", href: "https://github.com/fforootd" }]);
+    // The unindented lines continue their paragraphs, as Markdown reads them.
     expect(sso?.summary).toBe(
-      '`POST /flows/{flow_id}` with `{action: "sso",\nsso_provider_id}` on a step that offers `sso_providers`\npins the connection at its newest revision.\n\n- `@zitadel/sdk-core`: `NextgenSession` becomes `{userId,\nidentifier}`.',
+      '`POST /flows/{flow_id}` with `{action: "sso",\nsso_provider_id}` on a step that offers `sso_providers`\npins the connection at its newest revision.',
     );
     expect(sso?.authors.map(({ label }) => label)).toEqual(["@peintnermax", "@fforootd"]);
   });
 
-  it("keeps the line that stands in for the changes that did not fit, and no placeholder as notes", () => {
-    const parsed = parseRelease(release("v0.2.0", { body: BODY }));
+  it("starts at 0.1.0, leaves out prereleases and lists the highest version first", () => {
+    const releases = assembleReleases(CHANGELOGS, new Map());
 
-    expect(parsed.notices).toEqual([
-      {
-        text: "_1 patch change omitted to keep this release body under GitHub's 125000-character limit; see `packages/api/CHANGELOG.md` at tag `v0.2.0`._",
-      },
-    ]);
-    expect(parsed.notes).toBe("");
-  });
-
-  it("reads a body that repeats each package's changes, up to 0.1.0, into the same changes", () => {
-    const parsed = parseRelease(release("v0.1.0", { body: PER_PACKAGE_BODY }));
-
-    // Each change once, with each of its packages and its highest bump; a
-    // rewrapped line continues its paragraph, as Markdown reads it.
-    expect(parsed.changes).toEqual(parseRelease(release("v0.2.0", { body: BODY })).changes);
-    expect(parsed.notices).toEqual([
-      {
-        package: "@zitadel/api",
-        text: "_Changelog omitted to keep this release body under GitHub's 125000-character limit; see `packages/api/CHANGELOG.md` at tag `v0.1.0`._",
-      },
+    expect(releases.map(({ tag, url }) => ({ tag, url }))).toEqual([
+      { tag: "v0.2.0", url: "https://github.com/zitadel/nextgen/releases/tag/v0.2.0" },
+      { tag: "v0.1.0", url: "https://github.com/zitadel/nextgen/releases/tag/v0.1.0" },
     ]);
   });
 
-  it("reads the maintainers' notes on both sides of the generated block, without the placeholder", () => {
-    const body = [
-      "## Highlights",
-      "",
-      "Sign in with Google.",
-      "",
-      "<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->",
-      "",
-      "<!-- nextgen-release-facts:start -->",
-      "### Package Changes",
-      "",
-      "_No package-specific changelog entries beyond version or dependency updates._",
-      "<!-- nextgen-release-facts:end -->",
-      "",
-      "Thanks to everyone who tried the preview.",
-    ].join("\r\n");
+  it("leaves out dependency updates and a package's section without changes", () => {
+    const releases = assembleReleases(CHANGELOGS, new Map());
 
-    expect(parseRelease(release("v1.0.0-alpha.29", { body }))).toMatchObject({
-      notes: "## Highlights\n\nSign in with Google.\n\nThanks to everyone who tried the preview.",
-      changes: [],
-      notices: [
-        { text: "_No package-specific changelog entries beyond version or dependency updates._" },
-      ],
-    });
+    expect(releases[0]?.changes.some(({ summary }) => summary.includes("Updated"))).toBe(false);
+    expect(releases[1]?.changes.map(({ summary, packages }) => ({ summary, packages }))).toEqual([
+      { summary: "Updates the help text.", packages: ["@zitadel/cli"] },
+    ]);
   });
 
-  it("takes a body without the generated block as notes", () => {
-    expect(parseRelease(release("v1.0.0-alpha.29", { body: "Fixes the login." }))).toMatchObject({
-      notes: "Fixes the login.",
-      changes: [],
-      notices: [],
-    });
+  it("takes a release's day and story from its post, and has neither without one", () => {
+    const posts = new Map<string, Post>([["0.2.0", { date: "2026-10-28", notes: "Highlights." }]]);
+    const releases = assembleReleases(CHANGELOGS, posts);
+
+    expect(releases.map(({ date, notes }) => ({ date, notes }))).toEqual([
+      { date: "2026-10-28", notes: "Highlights." },
+      { date: undefined, notes: "" },
+    ]);
+  });
+
+  it("refuses a post for a version no changelog has, such as one merged before its release", () => {
+    const posts = new Map<string, Post>([["0.3.0", { date: "2026-11-04", notes: "Soon." }]]);
+
+    expect(() => assembleReleases(CHANGELOGS, posts)).toThrow("0.3.0.md");
   });
 
   it("links a change's commit when it has no pull request, and reads one without either", () => {
-    const body = [
-      "<!-- nextgen-release-facts:start -->",
-      "### Package Changes",
-      "",
-      "#### Major Changes",
-      "",
-      "- `@zitadel/cli`: [`abc1234`](https://github.com/zitadel/nextgen/commit/abc1234) Thanks [@livio-a](https://github.com/livio-a)! - Drops the old flag.",
-      "- `@zitadel/cli`, `@zitadel/server`: `zitadel help`: Updates the help text.",
-      "<!-- nextgen-release-facts:end -->",
-    ].join("\n");
+    const [release] = assembleReleases(
+      [
+        changelog(
+          [
+            "- [`abc1234`](https://github.com/zitadel/nextgen/commit/abc1234) Thanks [@livio-a](https://github.com/livio-a)! - Drops the old flag.",
+            "- Updates the help text.",
+          ],
+          "1.0.0",
+          "Major",
+        ),
+      ],
+      new Map(),
+    );
 
-    expect(parseRelease(release("v1.0.0", { body })).changes).toEqual([
+    expect(release?.changes).toEqual([
       {
         summary: "Drops the old flag.",
         bump: "major",
         markedBreaking: false,
-        packages: ["@zitadel/cli"],
+        packages: ["@zitadel/server"],
         source: { label: "abc1234", href: "https://github.com/zitadel/nextgen/commit/abc1234" },
         authors: [{ label: "@livio-a", href: "https://github.com/livio-a" }],
       },
       {
-        summary: "`zitadel help`: Updates the help text.",
+        summary: "Updates the help text.",
         bump: "major",
         markedBreaking: false,
-        packages: ["@zitadel/cli", "@zitadel/server"],
+        packages: ["@zitadel/server"],
         authors: [],
       },
     ]);
   });
 
   it("marks a change with a paragraph that starts with **Breaking:**, first or later", () => {
-    const body = [
-      "<!-- nextgen-release-facts:start -->",
-      "### Package Changes",
-      "",
-      "#### Minor Changes",
-      "",
-      "- `@zitadel/server`: [#2175](https://github.com/zitadel/nextgen/pull/2175) Thanks [@fforootd](https://github.com/fforootd)! - **Breaking:** Drops the old flag.",
-      "- `@zitadel/server`: Signing out now needs the CSRF token.",
-      "",
-      "  **Breaking:** an older `@zitadel/components` cannot sign out.",
-      "",
-      "- `@zitadel/server`: Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
-      "<!-- nextgen-release-facts:end -->",
-    ].join("\n");
+    const [release] = assembleReleases(
+      [
+        changelog([
+          "- [#2175](https://github.com/zitadel/nextgen/pull/2175) Thanks [@fforootd](https://github.com/fforootd)! - **Breaking:** Drops the old flag.",
+          "- Signing out now needs the CSRF token.",
+          "",
+          "  **Breaking:** an older `@zitadel/components` cannot sign out.",
+          "",
+          "- Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
+        ]),
+      ],
+      new Map(),
+    );
 
     expect(
-      parseRelease(release("v0.2.0", { body })).changes.map(({ summary, markedBreaking }) => ({
-        summary,
-        markedBreaking,
-      })),
+      release?.changes.map(({ summary, markedBreaking }) => ({ summary, markedBreaking })),
     ).toEqual([
       { summary: "**Breaking:** Drops the old flag.", markedBreaking: true },
       {
@@ -287,125 +216,78 @@ describe("parseRelease", () => {
   });
 });
 
-describe("parseReleases", () => {
-  it("leaves drafts out and puts the highest version first", () => {
-    const releases = parseReleases([
-      release("v1.0.0-alpha.9"),
-      release("nightly"),
-      release("v1.0.0"),
-      release("v1.0.0-alpha.11", { draft: true, published_at: null }),
-      release("v1.0.0-alpha.10"),
-    ]);
-
-    expect(releases.map(({ tag }) => tag)).toEqual([
-      "v1.0.0",
-      "v1.0.0-alpha.10",
-      "v1.0.0-alpha.9",
-      "nightly",
-    ]);
+describe("parsePost", () => {
+  it("reads the day from the front matter and the story after it", () => {
+    expect(
+      parsePost("0.2.0.md", "---\ndate: 2026-10-28\n---\n\n### What's new\n\nDeploy.\n"),
+    ).toEqual({ date: "2026-10-28", notes: "### What's new\n\nDeploy." });
   });
 
-  it("starts at 0.1.0, leaving the alpha previews before it to GitHub", () => {
-    const releases = parseReleases([
-      release("v0.1.0-alpha.28"),
-      release("v0.1.1"),
-      release("v0.1.0"),
-      release("v0.1.0-alpha.9"),
-    ]);
-
-    expect(releases.map(({ tag }) => tag)).toEqual(["v0.1.1", "v0.1.0"]);
+  it.each([
+    ["no front matter", "### What's new"],
+    ["no date", "---\n---\nDeploy."],
+    ["a field it does not know", "---\ndate: 2026-10-28\ntitle: Deploy\n---\nDeploy."],
+    ["a day that is none", "---\ndate: 2026-13-45\n---\nDeploy."],
+  ])("refuses a post with %s, so the build fails", (_, source) => {
+    expect(() => parsePost("0.2.0.md", source)).toThrow("0.2.0.md");
   });
 
-  it("refuses an answer that is no list of releases", () => {
-    expect(() => parseReleases({ message: "API rate limit exceeded" })).toThrow(
-      "not a list of releases",
-    );
+  it("reads every post in changelog/", () => {
+    const folder = fileURLToPath(new URL("../../changelog", import.meta.url));
+
+    expect(readPosts(folder).get("0.1.0")).toMatchObject({ date: "2026-10-21" });
   });
 });
 
-describe("fetchReleases", () => {
+describe("readReleases", () => {
+  let root: string | undefined;
+
   afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
+    if (root) rmSync(root, { recursive: true, force: true });
+    root = undefined;
   });
 
-  it("asks GitHub for the newest releases with the token, when there is one", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-      Response.json([release("v1.0.0-alpha.28")]),
-    );
-    vi.stubGlobal("fetch", fetch);
-
-    await expect(fetchReleases("test-token")).resolves.toMatchObject([{ tag: "v1.0.0-alpha.28" }]);
-    expect(fetch).toHaveBeenCalledWith(
-      `https://api.github.com/repos/zitadel/nextgen/releases?per_page=${RELEASE_COUNT}`,
-      {
-        // Never Next's data cache: a later build would read it back.
-        cache: "no-store",
-        headers: expect.objectContaining({ authorization: "Bearer test-token" }),
-      },
-    );
-  });
-
-  it("throws when GitHub refuses, so a regeneration keeps the page served last", async () => {
-    vi.stubEnv("WEBSITE_GITHUB_TOKEN", "");
-    const fetch = vi.fn<typeof globalThis.fetch>(
-      async () => new Response("rate limited", { status: 403, statusText: "Forbidden" }),
-    );
-    vi.stubGlobal("fetch", fetch);
-
-    await expect(fetchReleases()).rejects.toThrow("403 Forbidden");
-    expect(fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        headers: expect.not.objectContaining({ authorization: expect.anything() }),
-      }),
-    );
-  });
-});
-
-describe("fetchRelease", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("reads the release a tag names, for its own page", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
-      Response.json(release("v0.2.0", { body: "Highlights." })),
-    );
-    vi.stubGlobal("fetch", fetch);
-
-    await expect(fetchRelease("v0.2.0", "test-token")).resolves.toMatchObject({
-      tag: "v0.2.0",
-      notes: "Highlights.",
-    });
-    expect(fetch).toHaveBeenCalledWith(
-      "https://api.github.com/repos/zitadel/nextgen/releases/tags/v0.2.0",
-      expect.objectContaining({ cache: "no-store" }),
-    );
-  });
-
-  it("reads none for a tag GitHub has no release by, and throws when GitHub refuses", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi
-        .fn<typeof globalThis.fetch>()
-        .mockResolvedValueOnce(new Response("Not Found", { status: 404 }))
-        .mockResolvedValueOnce(
-          new Response("rate limited", { status: 403, statusText: "Forbidden" }),
-        ),
-    );
-
-    await expect(fetchRelease("v9.9.9")).resolves.toBeUndefined();
-    await expect(fetchRelease("v0.2.0")).rejects.toThrow("403 Forbidden");
-  });
-
-  it("reads none, without asking GitHub, for an alpha preview or a tag that is no version", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>();
-    vi.stubGlobal("fetch", fetch);
-
-    for (const tag of ["v0.1.0-alpha.28", "nightly", "feed.xml"]) {
-      await expect(fetchRelease(tag)).resolves.toBeUndefined();
+  function repository(files: Record<string, string>): string {
+    root = mkdtempSync(join(tmpdir(), "changelog-"));
+    for (const [path, content] of Object.entries(files)) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), content);
     }
-    expect(fetch).not.toHaveBeenCalled();
+    return root;
+  }
+
+  it("reads the fixed group's changelogs by their title, without the server's platform packages", () => {
+    const repo = repository({
+      ".changeset/config.json": JSON.stringify({
+        fixed: [
+          ["@zitadel/cli", "@zitadel/server-linux-x64", "@zitadel/sdk-next", "@zitadel/testing"],
+        ],
+      }),
+      "apps/cli/CHANGELOG.md": CLI,
+      "apps/server-linux-x64/CHANGELOG.md":
+        "# @zitadel/server-linux-x64\n\n## 0.2.0\n\n- A binary.\n",
+      "apps/website/CHANGELOG.md": "# @zitadel/website\n\n## 0.2.0\n\n- A private app.\n",
+      "packages/sdk-next/CHANGELOG.md": "# @zitadel/sdk-next\n\n## 0.2.0\n\n- An SDK.\n",
+    });
+
+    expect(readChangelogs(repo).map(({ name }) => name)).toEqual([
+      "@zitadel/cli",
+      "@zitadel/sdk-next",
+    ]);
+  });
+
+  it("puts each release's post above its changes", () => {
+    const repo = repository({
+      ".changeset/config.json": JSON.stringify({ fixed: [["@zitadel/cli"]] }),
+      "apps/cli/CHANGELOG.md": CLI,
+      "packages/.gitkeep": "",
+      "apps/website/changelog/0.2.0.md":
+        "---\ndate: 2026-10-28\n---\n\nDeploy, preview and roll back.\n",
+    });
+
+    expect(readReleases(repo)).toMatchObject([
+      { tag: "v0.2.0", date: "2026-10-28", notes: "Deploy, preview and roll back." },
+      { tag: "v0.1.0", date: undefined, notes: "" },
+    ]);
   });
 });

@@ -3,19 +3,20 @@ import { links } from "../links";
 import og from "../og.jpg";
 import { SiteFooter } from "../site-footer";
 import { SiteHeader } from "../site-header";
-import { load } from "./load";
 import { Markdown } from "./markdown";
 import { OpenLinkedRelease } from "./open-linked-release";
-import { BreakingChanges, changeCount, DATE, LINK, releaseHref } from "./release";
-import { FIRST_RELEASE, fetchReleases, RELEASE_COUNT, type Release } from "./releases";
+import { BreakingChanges, changeCount, DATE, LINK, releasePath } from "./release";
+import { FIRST_RELEASE, type Release, readReleases } from "./releases";
 
-// The page is built with the releases GitHub has then, and built again in the
-// background at most every 15 minutes, when a visit finds it older
-// (Incremental Static Regeneration): GitHub is asked once per regeneration,
-// never per visit. force-static keeps it static although its fetch is
-// uncached (releases.ts).
+// Built from the repository (releases.ts), so a deploy brings a release and
+// its post; nothing is read per visit.
 export const dynamic = "force-static";
-export const revalidate = 900;
+
+/**
+ * How many releases the page shows, newest first; the older ones are links to
+ * their own pages. Each carries its post and breaking changes, folded or not.
+ */
+const SHOWN = 5;
 
 const title = "Changelog — Zitadel preview";
 const description =
@@ -23,7 +24,7 @@ const description =
 
 // The share image is the front page's (layout.tsx): a page's openGraph
 // replaces the layout's whole. GitHub's feed of the releases stands in for
-// one of the page's own, which would need the notes as HTML (markdown.tsx).
+// one of the page's own, which would need the posts as HTML (markdown.tsx).
 export const metadata: Metadata = {
   title,
   description,
@@ -40,8 +41,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title, description, images: [og.src] },
 };
 
-export default async function ChangelogPage() {
-  const releases = await load(fetchReleases, undefined);
+export default function ChangelogPage() {
+  const releases = readReleases();
+  const older = releases.slice(SHOWN);
   const github = (
     <a href={links.releases} className={LINK}>
       GitHub
@@ -56,27 +58,28 @@ export default async function ChangelogPage() {
             Changelog
           </h1>
           <p className="mt-4 text-base text-text-secondary leading-7 md:text-lg md:leading-8">
-            What each release of the preview changes, from its release notes on {github}.
+            What each release of the preview changes.
           </p>
-          {releases && releases.length > 0 ? (
+          {releases.length > 0 ? (
             <>
               <ol className="mt-12 border-border-primary border-b">
-                {releases.map((release, index) => (
+                {releases.slice(0, SHOWN).map((release, index) => (
                   <ReleaseEntry key={release.tag} release={release} open={index === 0} />
                 ))}
               </ol>
+              {older.length > 0 && (
+                <p className="mt-8 flex flex-wrap gap-x-4 gap-y-1 text-sm text-text-secondary leading-6">
+                  Earlier:
+                  {older.map(({ tag }) => (
+                    <a key={tag} href={releasePath(tag)} className={`font-mono ${LINK}`}>
+                      {tag}
+                    </a>
+                  ))}
+                </p>
+              )}
               <p className="mt-8 text-sm text-text-muted leading-6">
-                {releases.length < RELEASE_COUNT ? (
-                  <>
-                    Every release from {FIRST_RELEASE} on; {github} also has the alpha previews
-                    before it.
-                  </>
-                ) : (
-                  <>
-                    The last {RELEASE_COUNT} releases; {github} has every one.
-                  </>
-                )}{" "}
-                Follow new releases with{" "}
+                Every release from {FIRST_RELEASE} on; {github} also has the alpha previews before
+                it. Follow new releases with{" "}
                 <a href={links.releasesFeed} className={LINK}>
                   GitHub's feed
                 </a>
@@ -86,14 +89,8 @@ export default async function ChangelogPage() {
             </>
           ) : (
             <p className="mt-12 rounded-xl border border-window-border bg-window px-5 py-4 text-sm text-text-secondary leading-6">
-              {releases ? (
-                <>
-                  The first release, {FIRST_RELEASE}, is not out yet; {github} has the alpha
-                  previews before it.
-                </>
-              ) : (
-                <>The release notes did not load. Read them on {github}.</>
-              )}
+              The first release, {FIRST_RELEASE}, is not out yet; {github} has the alpha previews
+              before it.
             </p>
           )}
         </div>
@@ -105,8 +102,8 @@ export default async function ChangelogPage() {
 
 /**
  * One release, the newest open and the others folded to their version, date
- * and count: the maintainers' notes first, then the breaking changes in
- * full, and the way to every change on the release's own page.
+ * and count: its post first, then its breaking changes in full, and the way
+ * to every change on the release's own page.
  */
 function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
   const { changes } = release;
@@ -132,31 +129,23 @@ function ReleaseEntry({ release, open }: { release: Release; open: boolean }) {
             <h2 className="font-mono text-sm text-text-primary leading-6 md:text-base">
               {release.tag}
             </h2>
-            {release.publishedAt && (
-              <time dateTime={release.publishedAt} className="text-sm text-text-muted leading-6">
-                {DATE.format(new Date(release.publishedAt))}
+            {release.date && (
+              <time dateTime={release.date} className="text-sm text-text-muted leading-6">
+                {DATE.format(new Date(release.date))}
               </time>
             )}
-            {changes.length > 0 && (
-              <span className="ml-auto font-mono text-text-muted text-xs leading-6">
-                {changeCount(changes)}
-              </span>
-            )}
+            <span className="ml-auto font-mono text-text-muted text-xs leading-6">
+              {changeCount(changes)}
+            </span>
           </div>
         </summary>
         <div className="flex flex-col gap-8 pb-10 sm:pl-7">
           {release.notes && <Markdown under={2}>{release.notes}</Markdown>}
           <BreakingChanges changes={changes} under={2} />
-          {changes.length === 0 &&
-            release.notices.map((notice) => (
-              <Markdown key={notice.text} className="text-sm text-text-muted">
-                {notice.text}
-              </Markdown>
-            ))}
           <p className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
             {changes.length > 0 && (
               <a
-                href={releaseHref(release)}
+                href={releasePath(release.tag)}
                 className="group/all inline-flex h-9 items-center gap-2 rounded-lg border border-window-border bg-tint/[0.03] px-4 font-semibold text-text-primary transition-colors hover:bg-tint/[0.07]"
               >
                 All {changes.length} {changes.length === 1 ? "change" : "changes"}

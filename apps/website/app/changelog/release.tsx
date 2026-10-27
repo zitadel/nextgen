@@ -1,7 +1,7 @@
 import { links } from "../links";
 import { firstParagraph, groupByComponent, isBreaking } from "./changes";
 import { Markdown } from "./markdown";
-import { type Change, fromFirstRelease, type Release } from "./releases";
+import type { Change, Release } from "./releases";
 
 // What both changelog pages show of a release (page.tsx, [tag]/page.tsx): its
 // breaking changes in full, and on its own page every change by component.
@@ -11,11 +11,9 @@ export const DATE = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZon
 export const LINK =
   "text-text-primary underline decoration-border-secondary underline-offset-4 transition-colors hover:decoration-text-primary";
 
-/** A release's own page, or GitHub's when its tag has none. */
-export function releaseHref(release: Pick<Release, "tag" | "url">): string {
-  return fromFirstRelease(release.tag)
-    ? `${links.changelog}/${encodeURIComponent(release.tag)}`
-    : release.url;
+/** A release's own page ([tag]/page.tsx). */
+export function releasePath(tag: string): string {
+  return `${links.changelog}/${encodeURIComponent(tag)}`;
 }
 
 /** How many changes a release has, and how many of them break. */
@@ -90,8 +88,7 @@ export function BreakingChanges({
  * paragraph and links to the whole of it under the breaking changes.
  */
 export function ChangeList({ release }: { release: Release }) {
-  const groups = groupByComponent(release);
-  const releaseNotices = release.notices.filter((notice) => !notice.package);
+  const groups = groupByComponent(release.changes);
   return (
     <section aria-labelledby="changes">
       <h2 id="changes" className="font-heading text-2xl text-text-primary leading-tight">
@@ -111,7 +108,7 @@ export function ChangeList({ release }: { release: Release }) {
           ))}
         </nav>
       )}
-      {groups.map(({ component, changes, notices }) => (
+      {groups.map(({ component, changes }) => (
         <section key={component.id} aria-labelledby={component.id} className="mt-10">
           <h3
             id={component.id}
@@ -125,17 +122,7 @@ export function ChangeList({ release }: { release: Release }) {
               <ChangeLine key={changeKey(change)} change={change} component={component.id} />
             ))}
           </ul>
-          {notices.map((notice) => (
-            <Markdown key={notice.text} className="mt-2 text-sm text-text-muted">
-              {notice.text}
-            </Markdown>
-          ))}
         </section>
-      ))}
-      {releaseNotices.map((notice) => (
-        <Markdown key={notice.text} className="mt-8 text-sm text-text-muted">
-          {notice.text}
-        </Markdown>
       ))}
     </section>
   );

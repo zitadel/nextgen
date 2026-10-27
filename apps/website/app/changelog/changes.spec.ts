@@ -45,11 +45,10 @@ describe("componentOf", () => {
 });
 
 describe("groupByComponent", () => {
-  const groups = (changes: Change[], notices: { package?: string; text: string }[] = []) =>
-    groupByComponent({ changes, notices }).map(({ component, changes, notices }) => ({
+  const groups = (changes: Change[]) =>
+    groupByComponent(changes).map(({ component, changes }) => ({
       component: component.id,
       changes: changes.map(({ summary }) => summary),
-      notices: notices.map(({ text }) => text),
     }));
 
   it("lists each change once, under the first component it touches in the page's order", () => {
@@ -63,33 +62,18 @@ describe("groupByComponent", () => {
         change(["@zitadel/server"], "A console screen."),
       ]),
     ).toEqual([
-      { component: "cli", changes: ["A file setup writes."], notices: [] },
-      { component: "components", changes: ["A login step."], notices: [] },
-      { component: "sdks", changes: ["Two SDKs."], notices: [] },
-      { component: "server", changes: ["An API operation.", "A console screen."], notices: [] },
-      { component: "config", changes: ["A new package."], notices: [] },
-    ]);
-  });
-
-  it("puts a package's left-out changes under its component, and no notice without one", () => {
-    expect(
-      groups(
-        [change(["@zitadel/cli"])],
-        [
-          { package: "@zitadel/api", text: "Changelog omitted." },
-          { text: "No package-specific changelog entries." },
-        ],
-      ),
-    ).toEqual([
-      { component: "cli", changes: ["A change."], notices: [] },
-      { component: "api", changes: [], notices: ["Changelog omitted."] },
+      { component: "cli", changes: ["A file setup writes."] },
+      { component: "components", changes: ["A login step."] },
+      { component: "sdks", changes: ["Two SDKs."] },
+      { component: "server", changes: ["An API operation.", "A console screen."] },
+      { component: "config", changes: ["A new package."] },
     ]);
   });
 
   it("keeps a change without a package, last", () => {
     expect(groups([change([], "Loose."), change(["@zitadel/new-package"], "New.")])).toEqual([
-      { component: "new-package", changes: ["New."], notices: [] },
-      { component: "other", changes: ["Loose."], notices: [] },
+      { component: "new-package", changes: ["New."] },
+      { component: "other", changes: ["Loose."] },
     ]);
   });
 });

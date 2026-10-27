@@ -14,9 +14,16 @@
     },
     // The showcase's login previews (app/showcase/login-preview.tsx) import
     // the atoms of @zitadel/components, which Next resolves to the package's
-    // dist/.
+    // dist/. The changelog reads the published packages and the release notes
+    // Changesets writes into each on every release (app/changelog/releases.ts).
     "build": {
       "dependsOn": ["@zitadel/components#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.changeset/config.json",
+        "$TURBO_ROOT$/apps/*/CHANGELOG.md",
+        "$TURBO_ROOT$/packages/*/CHANGELOG.md"
+      ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "start": {

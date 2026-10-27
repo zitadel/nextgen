@@ -82,22 +82,21 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## The changelog
 
-- Each release leads with its maintainers' notes. The index carries only those
-  and the breaking changes, so it stays small as releases grow; every change
-  is on the release's own page.
-- `app/changelog/releases.ts` reads the GitHub Releases when a page builds and
-  when it regenerates (`revalidate`), never per visit. It parses the body
-  `scripts/release-github.mjs` writes: change the two together, and the
-  fixture in `releases.spec.ts` with them.
-- GitHub failing never fails a build (`app/changelog/load.ts`: the page links
-  to GitHub instead); a regeneration rethrows, so the last page stays up.
+- Each release leads with its post, `changelog/<version>.md`, which an agent
+  drafts after the release with `skills/zitadel-changelog-post`. The index
+  carries only the posts and the breaking changes, so it stays small as
+  releases grow; every change is on the release's own page.
+- `app/changelog/releases.ts` reads the releases when the site builds: their
+  changes from the published packages' `CHANGELOG.md`, which `build` lists as
+  inputs in `moon.yml` and `turbo.json`. A broken post, or one for a version
+  no `CHANGELOG.md` has, fails the build.
 - Render release Markdown only through `app/changelog/markdown.tsx`, as
   elements and never as HTML: this origin also serves the console's session.
 - A release's page groups its changes by `COMPONENTS` in
   `app/changelog/changes.ts`; list a new published package there, or it
   shows under its bare name.
-- `WEBSITE_GITHUB_TOKEN`, a token without permissions, lifts GitHub's
-  rate limit on Vercel's shared addresses ([runbook](../../docs/runbooks/cloud.md)).
+- Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
+  of `npx skills add zitadel/nextgen --full-depth`, the users' install.
 
 ## Routing
 

@@ -2,8 +2,9 @@
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
 and the draft GitHub Release shell for `v<version>`. Changesets owns package
-versioning, changelogs, npm publishing, and public package tags. Product release
-prose is written manually by maintainers.
+versioning, changelogs, npm publishing, and public package tags. A release's
+story is a post on the website's changelog, drafted by an agent in a pull
+request after the release ([Product notes](#product-notes)).
 
 ## Normal release
 
@@ -21,8 +22,9 @@ prose is written manually by maintainers.
    `ghcr.io/zitadel/nextgen:<version>` container image. It also creates or
    updates the draft GitHub Release for `v<version>` with generated artifact and
    package facts.
-7. If a product announcement is needed, add the human-written product notes to
-   the draft GitHub Release and publish it.
+7. Publish the draft GitHub Release as the automation wrote it
+   (`gh release edit v<version> --repo zitadel/nextgen --draft=false`), then add
+   the release's [changelog post](#product-notes).
 
 ## Manual controls
 
@@ -103,31 +105,26 @@ gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 
 ## Product notes
 
-Product release prose is manual. Use the draft GitHub Release's generated facts
-block, the generated Changesets changelogs,
-`dist/release/<version>/artifact-summary.md`, and the merged product PRs as
-inputs. Publish the draft GitHub Release only when the product needs an
-announcement.
+The GitHub Release needs no prose: its generated facts block lists each change
+once. The release's story goes on the website's changelog as a post,
+`apps/website/changelog/<version>.md`, once the version PR has merged:
 
-The website changelog leads each release with everything outside the
-generated facts block (`<!-- nextgen-release-facts:start -->` to
-`<!-- nextgen-release-facts:end -->`) as its notes, and reads the changes, and
-which of them break, only from that block
-([`releases.ts`](../../apps/website/app/changelog/releases.ts)). The changelog
-shows the notes and the breaking changes; the release's own page,
-`/changelog/<tag>`, adds every change.
+1. Have an agent draft it with the `zitadel-changelog-post` skill
+   ([`SKILL.md`](../../apps/website/skills/zitadel-changelog-post/SKILL.md)):
+   point the agent at that file, or install the skill with
+   `npx skills add zitadel/nextgen --skill zitadel-changelog-post`.
+2. Review its pull request like any other, and merge it.
 
-- Leave the generated facts block as it is.
-- Write Markdown only; the website drops HTML.
-- Link pull requests in full, `[#123](https://github.com/zitadel/nextgen/pull/123)`:
-  a bare `#123` links only on GitHub.
-- Refer to "the changes below", never to the generated facts or their tables,
-  which the website does not show.
-- Edit a draft's notes with `gh release edit`. An API `PATCH` without
-  `tag_name` resets the draft's tag to `untagged-…`, and
-  `scripts/release-github.mjs` finds the draft by `tag_name`.
+The changelog reads the releases from the repository when the site builds:
+each release's changes from the packages' `CHANGELOG.md`, with its post above
+them ([`releases.ts`](../../apps/website/app/changelog/releases.ts)). Until the
+post merges, the release shows its changes alone.
 
-`--notes-file` replaces the whole body, so start from the draft's body:
+Notes above the generated facts are optional and show on GitHub only. Leave
+the block as it is, and edit a draft's notes with `gh release edit`: an API
+`PATCH` without `tag_name` resets the draft's tag to `untagged-…`, and
+`scripts/release-github.mjs` finds the draft by `tag_name`. `--notes-file`
+replaces the whole body, so start from the draft's body:
 
 ```sh
 gh release view v<version> --repo zitadel/nextgen --json body -q .body > notes.md

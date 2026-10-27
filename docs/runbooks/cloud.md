@@ -205,7 +205,6 @@ Environment variables (add secrets with
 | `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
 | `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
-| `WEBSITE_GITHUB_TOKEN` | Production, Preview; sensitive | a fine-grained GitHub token with no permissions: the website's changelog reads the GitHub Releases with it, at 5,000 requests an hour instead of the 60 that each of Vercel's shared IP addresses gets without one |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Production; sensitive | production's `admin-user.b64`: the root admin document |
 | `BOOTSTRAP_ADMIN_USER_JSON_B64` | Preview; sensitive | preview's `admin-user.b64` |
 | `NEXTGEN_PLATFORM_OPERATORS` | Production or Preview; optional | the platform operators' user ids, comma-separated; unset means the root admin alone |

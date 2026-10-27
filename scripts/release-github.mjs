@@ -14,12 +14,10 @@ const RELEASE_TITLE_PREFIX = "Zitadel NextGen";
 // `.length` against this limit stays on the safe side.
 export const GITHUB_RELEASE_BODY_MAX_CHARS = 125000;
 
-// The website's changelog parses the body back
-// (apps/website/app/changelog/releases.ts): change its format there too.
 export const GENERATED_BLOCK_START = "<!-- nextgen-release-facts:start -->";
 export const GENERATED_BLOCK_END = "<!-- nextgen-release-facts:end -->";
 export const PRODUCT_NOTES_PLACEHOLDER =
-  "<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->";
+  "<!-- Notes above the generated facts are optional and show on GitHub only: the release's story is its post on the website's changelog, apps/website/changelog/<version>.md. -->";
 
 // A change's bump, the highest first, as the CHANGELOG.md headings name them.
 const BUMPS = ["major", "minor", "patch"];

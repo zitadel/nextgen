@@ -24,6 +24,15 @@ tasks:
     deps:
       # Next resolves @zitadel/components to its dist/.
       - "components:build"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The changelog's releases: the published packages, and the release
+      # notes Changesets writes into each on every release
+      # (app/changelog/releases.ts).
+      - "/.changeset/config.json"
+      - "/apps/*/CHANGELOG.md"
+      - "/packages/*/CHANGELOG.md"
     outputs:
       - ".next/**/*"
     options:

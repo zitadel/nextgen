@@ -1,11 +1,11 @@
-import type { Change, Notice, Release } from "./releases";
+import type { Change } from "./releases";
 
 // What the changelog reads of a change: whether it breaks, and the component
 // it is listed under. A breaking change is a major, or a change with a
 // paragraph that starts with **Breaking:**, the way one ships as a minor before
 // 1.0.0 (docs/adrs/074-preview-releases-on-0x.md). The page names no other
 // kind: a bump is no type (features ship as patches, fixes as minors), so the
-// release notes' Minor / Patch Changes tell a reader nothing.
+// changelogs' Minor / Patch Changes tell a reader nothing.
 
 export function isBreaking(change: Pick<Change, "bump" | "markedBreaking">): boolean {
   return change.bump === "major" || change.markedBreaking;
@@ -49,31 +49,20 @@ function byRank(a: Component, b: Component): number {
   return rank(a) - rank(b) || a.id.localeCompare(b.id);
 }
 
-/** A component's changes in a release, and what the release says of others it left out. */
-export type Group = { component: Component; changes: Change[]; notices: Notice[] };
+/** A component's changes in a release. */
+export type Group = { component: Component; changes: Change[] };
 
 /**
  * A release's changes by component, in the page's order: each change once,
- * under the first component it touches, and a pointer to a package's left-out
- * changes under that package's component. A notice for no package is no
- * group's.
+ * under the first component it touches.
  */
-export function groupByComponent({
-  changes,
-  notices,
-}: Pick<Release, "changes" | "notices">): Group[] {
+export function groupByComponent(changes: Change[]): Group[] {
   const groups = new Map<string, Group>();
-  const groupOf = (component: Component) => {
-    const group = groups.get(component.id) ?? { component, changes: [], notices: [] };
-    groups.set(component.id, group);
-    return group;
-  };
   for (const change of changes) {
     const [first = OTHER] = change.packages.map(componentOf).sort(byRank);
-    groupOf(first).changes.push(change);
-  }
-  for (const notice of notices) {
-    if (notice.package) groupOf(componentOf(notice.package)).notices.push(notice);
+    const group = groups.get(first.id) ?? { component: first, changes: [] };
+    groups.set(first.id, group);
+    group.changes.push(change);
   }
   return [...groups.values()].sort((a, b) => byRank(a.component, b.component));
 }
