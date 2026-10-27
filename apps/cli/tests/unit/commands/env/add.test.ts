@@ -746,6 +746,22 @@ describe("env add asked on a terminal", () => {
       deployment_id: "dep_1",
       origins: ["https://app.acme.com"],
     });
+    expect(vi.mocked(confirm).mock.calls[0]?.[0].message).toBe(
+      "Would you like to deploy .zitadel/ to it now?",
+    );
+  });
+
+  it("asks where the server and the app are, as questions", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(text).mockResolvedValueOnce(SERVER as never);
+    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd]));
+
+    expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
+      "What is the URL of your Zitadel server?",
+      "What URL is your app served from? You can leave this empty to skip it.",
+    ]);
   });
 
   it("deploys nothing when the offer is declined", async () => {

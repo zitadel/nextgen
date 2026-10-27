@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -20,6 +21,7 @@ import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prom
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
+  portInUseWarning,
   retryOptionsFromFlags,
   setupRetryFlags,
   ssoFromFlags,
@@ -27,6 +29,8 @@ import {
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { LOCAL_DATA_DIR, writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { LocalServer } from "../../../src/lib/local-server/server";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
@@ -34,6 +38,7 @@ import { aBinaryRecord } from "../../helpers/runtime-record";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
+const held: Server[] = [];
 const server = setupServer(...setupPlatformHandlers());
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -50,6 +55,21 @@ function setup(cwd: string, extra: string[] = []) {
     ...extra,
   ]);
 }
+
+/** Holds a port the system picks until the test ends, and says which. */
+async function aHeldPort(): Promise<number> {
+  const holder = createServer();
+  held.push(holder);
+  await new Promise<void>((resolve) => holder.listen({ port: 0 }, () => resolve()));
+  return (holder.address() as AddressInfo).port;
+}
+
+/**
+ * `--dev-port` for a run that checks every warning: setup warns when the app's
+ * detected port is taken, and whatever holds 3000 on the machine running the
+ * tests must not decide what it reports.
+ */
+const PINNED_DEV_PORT = ["--dev-port", "3000"];
 
 /** What `zitadel start` records beside the local admin: which server it started. */
 async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
@@ -80,13 +100,17 @@ async function makeNewAppDirectory(): Promise<string> {
 const CANCELLED = Symbol("cancelled");
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
-async function makeNextProject(): Promise<string> {
+async function makeNextProject(devPort?: number): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
     join(cwd, "package.json"),
-    JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { next: "^15" },
+      ...(devPort === undefined ? {} : { scripts: { dev: `next dev -p ${devPort}` } }),
+    }),
   );
   await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
   return cwd;
@@ -175,6 +199,9 @@ const FRAMEWORK_FIXTURES = [
 afterEach(async () => {
   server.resetHandlers();
   resetPlatformStore();
+  for (const holder of held.splice(0)) {
+    await new Promise<void>((resolve) => holder.close(() => resolve()));
+  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -234,6 +261,40 @@ describe("setup command", () => {
     expect(json.data.next_commands[2]).toMatch(
       /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
     );
+  });
+
+  it("warns, with the command that picks a free port, when the detected one is taken", async () => {
+    // The wizard asks for another port then. A run that asks nothing says so.
+    const port = await aHeldPort();
+    const cwd = await makeNextProject(port);
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { warnings: string[] };
+    expect(json.warnings).toEqual([
+      expect.stringContaining(
+        `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
+      ),
+    ]);
+    expect(json.warnings[0]).toMatch(/ setup --dev-port \d+ --cwd \S+$/);
+  });
+
+  it("names only the flag for a taken port when the ports after it are taken too", () => {
+    // A placeholder in a suggested command would be run as a shell redirection.
+    expect(portInUseWarning(3000, undefined, (args) => unscopedCommand(args, "1.2.3"))).toBe(
+      "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
+    );
+  });
+
+  it("does not warn about a taken port that --dev-port chose", async () => {
+    const port = await aHeldPort();
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next", "--dev-port", String(port)]);
+
+    expect(res.exitCode).toBe(0);
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toEqual([]);
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -719,6 +780,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       // The search for local state ends at the home directory; pinning it
       // keeps the developer's own `~/.zitadel/local` out of the test.
@@ -777,6 +839,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       { HOME: cwd, USERPROFILE: cwd },
     );
@@ -1027,6 +1090,11 @@ describe("a retry after a failure before the wizard", () => {
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
       "--password-min-length 0",
     );
+    // The recommended one too: without the flag, a policy file --force keeps
+    // keeps its own minimum.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+      "--password-min-length 15",
+    );
     // A refused value would only be refused again.
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
       "--password-min-length",
@@ -1141,6 +1209,16 @@ describe("setup asked on a terminal", () => {
   const settingUp = (cwd: string, ...extra: string[]) =>
     asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
 
+  // The port question is asked only when the app's port is taken; whether 3000
+  // is free on the machine running the tests must not decide what is asked.
+  let portFree: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
+  });
+  afterEach(() => {
+    portFree.mockRestore();
+  });
+
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
     // --force permits overwriting files here. It must never answer a question.
     const cwd = await makeNextProject();
@@ -1149,7 +1227,9 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({
+        message: "Would you like to set up Zitadel in this Next.js app?",
+      }),
     );
   });
 
@@ -1176,8 +1256,8 @@ describe("setup asked on a terminal", () => {
     vi.mocked(select)
       .mockResolvedValueOnce(record.server_url as never)
       .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
-      .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
-    vi.mocked(text).mockResolvedValueOnce("3000" as never);
+      .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+      .mockResolvedValueOnce(15 as never);
     vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
     await expect(asTerminal(() => Setup.run(["--cwd", cwd]))).rejects.toMatchObject({
@@ -1198,26 +1278,32 @@ describe("setup asked on a terminal", () => {
       vi.unstubAllEnvs();
     });
 
-    /** Picks Next.js to scaffold, then answers every question after it. */
+    /**
+     * Picks Next.js to scaffold, then answers every question after it: the
+     * fields, the sign-in method, the password minimum and the providers. The
+     * port is free, so it is not asked.
+     */
     function answeringEveryQuestion(): void {
       vi.mocked(select)
         .mockResolvedValueOnce("next" as never)
         .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
-        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
-      vi.mocked(text).mockResolvedValueOnce("3000" as never);
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+        .mockResolvedValueOnce(15 as never);
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
     }
 
     it("creates no app when a question after the framework is cancelled", async () => {
       const cwd = await makeNewAppDirectory();
-      vi.mocked(select).mockResolvedValueOnce("next" as never);
-      vi.mocked(text).mockResolvedValueOnce(CANCELLED as never);
+      vi.mocked(select)
+        .mockResolvedValueOnce("next" as never)
+        .mockResolvedValueOnce(CANCELLED as never);
 
-      await expect(settingUp(cwd)).rejects.toThrow();
+      // Exits 130, as Ctrl-C does anywhere.
+      await expect(settingUp(cwd)).rejects.toMatchObject({ oclif: { exit: 130 } });
 
-      expect(text).toHaveBeenCalledWith(
+      expect(select).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining("Which port should your app run on?"),
+          message: expect.stringContaining("Which fields should registration collect?"),
         }),
       );
       expect(await readdir(cwd)).toEqual([]);

@@ -248,6 +248,30 @@ describe("LocalServer", () => {
     });
   });
 
+  describe("a free port in place of a taken one", () => {
+    it("is the first free one after it", async () => {
+      vi.spyOn(LocalServer, "isPortFree").mockImplementation((port) =>
+        Promise.resolve(port === 3003),
+      );
+
+      await expect(LocalServer.nextFreePort(3000)).resolves.toBe(3003);
+    });
+
+    it("is none when the next 20 are taken too", async () => {
+      const free = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+
+      await expect(LocalServer.nextFreePort(3000)).resolves.toBeUndefined();
+      expect(free).toHaveBeenCalledTimes(20);
+    });
+
+    it("never looks past the last port", async () => {
+      const free = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(false);
+
+      await expect(LocalServer.nextFreePort(65530)).resolves.toBeUndefined();
+      expect(free).toHaveBeenLastCalledWith(65535);
+    });
+  });
+
   describe("finding the server of a directory", () => {
     const url = "http://localhost:8099";
 

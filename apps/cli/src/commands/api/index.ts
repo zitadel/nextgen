@@ -15,6 +15,7 @@ import { ZitadelError } from "../../lib/errors";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { readZitadelSecret } from "../../lib/project";
+import { Promptable } from "../../lib/oclif/promptable";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
@@ -29,7 +30,7 @@ const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
  * goes. `--json`'s `data` is the response body as the API reference documents
  * it.
  */
-export default class Api extends BaseCommand {
+export default class Api extends Promptable(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
@@ -167,7 +168,7 @@ export default class Api extends BaseCommand {
     const tag = await this.input({
       kind: "select",
       name: "operation",
-      message: "Which part of the API?",
+      message: "Which part of the API would you like to use?",
       retry,
       options: [...new Set(callable.map((operation) => operation.tag))].map((value) => ({
         value,
@@ -177,7 +178,7 @@ export default class Api extends BaseCommand {
     return this.input({
       kind: "select",
       name: "operation",
-      message: "Which operation?",
+      message: "Which operation would you like to run?",
       retry,
       options: callable
         .filter((operation) => operation.tag === tag)
@@ -201,7 +202,7 @@ export default class Api extends BaseCommand {
       filled[name] = await this.input({
         kind: "text",
         name,
-        message: name,
+        message: `What is the value of ${name}?`,
         retry: this.suggestUnscoped(
           `api ${target.operation.id} ${missing.map((each) => `<${each}>`).join(" ")}`,
         ),
