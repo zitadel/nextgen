@@ -151,14 +151,15 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ),
     });
     const { issuer } = project;
-    // Resolved before anything is asked for: being turned away after typing a
-    // secret would mean typing it again.
-    const { client, projectId, server } = await this.connect({ quiet: true });
     const connections = await readConnectionFiles(cwd);
-    // Before dry-run and before the first question: a Project whose flows all
-    // name another schema, or whose schema or flow was edited by hand where the
-    // editors write, must fail identically whether or not anything was asked.
+    // Before dry-run and before the first question, `connect()`'s included: a
+    // Project whose flows all name another schema, or whose schema or flow was
+    // edited by hand where the editors write, must fail identically whether or
+    // not anything was asked.
     const flows = targetFlows(schema, candidates);
+    // Resolved before anything else is asked for: being turned away after
+    // typing a secret would mean typing it again.
+    const { client, projectId, server } = await this.connect({ quiet: true });
     // The schema and flow edits for a slug, with the refusals they bring (an
     // edit the editors cannot make, or a flow `deploy` would then reject), so
     // the run stops with nothing changed (ADR 070 §3).
@@ -681,7 +682,7 @@ type ProjectContext = {
  * This command's `preflight`: quick checks of the flags, and nothing else.
  *
  * It runs inside `AuthMethodCommand.target`, before the schema is read, so it
- * must neither ask a question nor touch the network or the disk: anything that
+ * must neither ask a question nor use the network or write anything: anything that
  * fails later would otherwise fail after the person had answered. Questions
  * for a custom provider's settings are asked in `run`, after the Project is
  * connected.

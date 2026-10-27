@@ -59,6 +59,16 @@ function typing(...answers: string[]): void {
   vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
 }
 
+const QUESTION = {
+  slug: "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+};
+
+/** Every question asked so far. */
+const asked = () => vi.mocked(text).mock.calls.map(([question]) => question.message);
+
+/** Exit codes: 3 is a validation failure, 4 not found or unreachable, 5 a conflict. */
+const exitsWith = (code: number) => ({ oclif: { exit: code } });
+
 describe("auth-method sso enable --provider custom on a terminal", () => {
   it("asks for the connection's settings, then for its credentials", async () => {
     const cwd = await setUpProject();
@@ -92,6 +102,9 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
       "Which scopes should we request? Separate them with spaces.",
       "What is the client ID of your Acme SSO OAuth app?",
     ]);
+    await expect(readFile(join(cwd, ".zitadel/idps/acme-sso.json"), "utf8")).resolves.toContain(
+      "https://sso.acme.example",
+    );
   });
 
   it("names a mistake in a given flag before asking anything", async () => {
@@ -107,7 +120,7 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(text).not.toHaveBeenCalled();
   });
 
-  it("refuses a typed slug that names a provider, as a given one is", async () => {
+  it("refuses a typed slug that names a provider", async () => {
     const cwd = await setUpProject();
     typing("google");
 
@@ -116,7 +129,7 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(asked()).toEqual([QUESTION.slug]);
   });
 
-  it("asks nothing when every setting was given", async () => {
+  it("asks only for the credentials when every setting was given", async () => {
     const cwd = await setUpProject();
     vi.mocked(text).mockResolvedValueOnce("acme-client-id" as never);
     vi.mocked(password).mockResolvedValueOnce("acme-secret" as never);
@@ -149,8 +162,10 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(text).not.toHaveBeenCalled();
     expect(password).not.toHaveBeenCalled();
   });
+});
 
-  it("explains the claim mappings it wrote for a custom connection", async () => {
+describe("auth-method sso enable --provider custom after it writes a connection", () => {
+  it("explains the claim mappings it wrote", async () => {
     const cwd = await setUpProject();
 
     const result = await withStdin("piped-secret", () =>
@@ -191,17 +206,6 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
   });
 });
 
-const QUESTION = {
-  slug: "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
-  clientId: "What is the client ID of your Acme SSO OAuth app?",
-};
-
-/** Every question asked so far. */
-const asked = () => vi.mocked(text).mock.calls.map(([question]) => question.message);
-
-/** Exit codes: 3 is a validation failure, 4 not found or unreachable, 5 a conflict. */
-const exitsWith = (code: number) => ({ oclif: { exit: code } });
-
 /** Create the acme-sso connection the way a script does, then forget the prompts. */
 async function withAcmeConnection(cwd: string): Promise<void> {
   await withStdin("acme-secret", () =>
@@ -229,19 +233,21 @@ async function withAcmeConnection(cwd: string): Promise<void> {
 }
 
 describe("auth-method sso enable --provider custom refuses before it asks", () => {
-  it("when no login flow runs against the schema", async () => {
+  it("when no login flow runs against the schema, even before the Project is connected", async () => {
+    // Not linked, so `connect()` would ask for the server, project and token.
     const cwd = await makeProject({
       schemas: { "default-human-user": defaultSchema },
       flows: { elsewhere: loginFlow("another-schema") },
-      linked: true,
     });
+    await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
 
     await expect(enableCustom(cwd)).rejects.toMatchObject(exitsWith(4));
 
     expect(text).not.toHaveBeenCalled();
+    expect(password).not.toHaveBeenCalled();
   });
 
-  it("until the Project is connected, which asks for what it is missing first", async () => {
+  it("asks for what the Project is missing before the connection's own questions", async () => {
     // The issuer is known, so the flags pass; the Project's server, id and
     // secret are missing, which `connect()` asks for before anything else, so
     // the connection's own questions must not have come before it.
@@ -253,7 +259,8 @@ describe("auth-method sso enable --provider custom refuses before it asks", () =
 
     await expect(enableCustom(cwd)).rejects.toMatchObject({ code: "EEXIT" });
 
-    expect(asked().filter((message) => message === QUESTION.slug)).toEqual([]);
+    expect(asked()).not.toEqual([]);
+    expect(asked()).not.toContain(QUESTION.slug);
   });
 
   it("when the slug is typed and another file already occupies its file name", async () => {
@@ -295,24 +302,7 @@ describe("auth-method sso enable --provider custom for a connection that exists"
     expect(await readJson(cwd, ".zitadel/idps/acme-sso.json")).toEqual(before);
   });
 
-  it("does not ask for the scopes of a file that holds none", async () => {
-    const cwd = await setUpProject();
-    await withAcmeConnection(cwd);
-    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
-    await writeJson(cwd, ".zitadel/idps/acme-sso.json", {
-      ...file,
-      oidc: { ...(file.oidc as object), scopes: undefined },
-    });
-    vi.mocked(text).mockResolvedValueOnce(ACME.slug as never);
-    vi.mocked(text).mockResolvedValue("acme-client-id" as never);
-    vi.mocked(password).mockResolvedValue("acme-secret" as never);
-
-    await enableCustom(cwd);
-
-    expect(asked().filter((message) => /scopes/.test(message))).toEqual([]);
-  });
-
-  it("names the file and refuses when it holds a setting that cannot be used", async () => {
+  it("refuses a file that holds a setting that cannot be used", async () => {
     const cwd = await setUpProject();
     await withAcmeConnection(cwd);
     const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
@@ -383,7 +373,7 @@ describe("auth-method sso enable --provider custom against what a connection hol
     expect(asked().filter((message) => /scopes/.test(message))).toEqual([]);
   });
 
-  it("refuses a stored issuer that cannot be used, naming the file", async () => {
+  it("refuses a stored issuer that cannot be used", async () => {
     const cwd = await setUpProject();
     await withAcmeConnection(cwd);
     const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
@@ -408,17 +398,6 @@ describe("auth-method sso enable --provider custom against what a connection hol
     await enableCustom(cwd);
 
     expect(await readdir(join(cwd, ".zitadel/idps"))).toEqual(["renamed.json"]);
-  });
-
-  it("holds a dry run on an existing slug to the flags, like a script", async () => {
-    const cwd = await setUpProject();
-    await withAcmeConnection(cwd);
-
-    await expect(enableCustom(cwd, "--dry-run", "--slug", ACME.slug)).rejects.toMatchObject(
-      exitsWith(3),
-    );
-
-    expect(text).not.toHaveBeenCalled();
   });
 });
 

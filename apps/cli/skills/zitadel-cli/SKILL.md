@@ -441,8 +441,8 @@ than one:
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
   In a terminal, a custom provider's settings you leave out are asked for, after
-  every check that can fail; a connection that already has that slug supplies its
-  own. A scripted, `--json`, `--dry-run` or `--non-interactive` run must pass all
+  the checks that need no answer; a connection that already has that slug
+  supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive` run must pass all
   three and gets an error naming the missing ones. After writing a new connection
   the text output prints the claim mappings and names the file to edit them in;
   `--json` does not carry them, so read the connection file.
