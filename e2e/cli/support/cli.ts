@@ -58,8 +58,12 @@ export type Exited = {
 
 /** A CLI process still running. */
 export type Running = {
-  /** Resolves with the first line of stdout that matches `pattern`. */
-  line(pattern: RegExp, timeoutMs?: number): Promise<string>;
+  /**
+   * Resolves with the first text on stdout that matches `pattern`, wherever
+   * it sits in its line: a terminal's run prints a link bare, a CI run's
+   * behind a `[log]` tag.
+   */
+  find(pattern: RegExp, timeoutMs?: number): Promise<string>;
   exited(timeoutMs?: number): Promise<Exited>;
 };
 
@@ -116,15 +120,15 @@ export function start(args: string[], cwd: string): Running {
     `$ zitadel ${args.join(" ")}\n--- stdout\n${stdout}\n--- stderr\n${stderr}`;
 
   return {
-    line: (pattern, timeoutMs = 60_000) =>
+    find: (pattern, timeoutMs = 60_000) =>
       within(
         timeoutMs,
         new Promise((resolve, reject) => {
           const look = () => {
-            const found = stdout.split("\n").find((candidate) => pattern.test(candidate.trim()));
-            if (found !== undefined) {
+            const found = stdout.match(pattern);
+            if (found) {
               child.stdout.off("data", look);
-              resolve(found.trim());
+              resolve(found[0]);
             }
           };
           child.stdout.on("data", look);
@@ -133,7 +137,7 @@ export function start(args: string[], cwd: string): Running {
             reject(new Error(`exited before printing ${pattern}\n${transcript()}`)),
           );
         }),
-        () => `no line matching ${pattern} in ${timeoutMs} ms\n${transcript()}`,
+        () => `nothing matching ${pattern} in ${timeoutMs} ms\n${transcript()}`,
       ),
     exited: async (timeoutMs = 120_000) => {
       const exitCode = await within(timeoutMs, exit, () => {

@@ -123,7 +123,7 @@ test("deployment rollback brings the previous release back live", async () => {
 test("claim links to the console, where signing up claims the project", async ({ page }) => {
   test.setTimeout(240_000);
   const claim = start(["claim", "--non-interactive"], app);
-  const printed = await claim.line(/^https?:\/\/\S+\/console\/claim\?\S+$/);
+  const printed = await claim.find(/https?:\/\/\S+\/console\/claim\?\S+/);
   const link = new URL(printed);
   expect(link.searchParams.get("project_id")).toBe(projectId);
 
@@ -137,11 +137,12 @@ test("claim links to the console, where signing up claims the project", async ({
 
   const claimed = await claim.exited();
   expect(claimed.exitCode, claimed.transcript).toBe(0);
-  const consoleLinks = claimed.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith(`${link.origin}/console/`) && line !== printed);
-  expect(consoleLinks, claimed.transcript).toEqual([expect.stringContaining(projectId)]);
+  const consoleLinks = new Set(
+    (claimed.stdout.match(/https?:\/\/\S+/g) ?? []).filter(
+      (url) => url.startsWith(`${link.origin}/console/`) && url !== printed,
+    ),
+  );
+  expect([...consoleLinks], claimed.transcript).toEqual([expect.stringContaining(projectId)]);
 });
 
 test("claim again reports the project as already claimed", async () => {
