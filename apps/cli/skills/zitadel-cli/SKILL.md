@@ -100,6 +100,11 @@ upgrade, so upgrade the app and rerun rather than retrying.
   An empty list admits every origin, so removing the last one opens the project
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
+  `deploy` lands only on primary origins and fails with `E_VALIDATION` without
+  one; its `next_commands` name the step that gives the project one. `setup`
+  0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
+  which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
+  (`issuer-origin`) and `doctor --fix` makes it primary.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -217,6 +222,20 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `preview` is `deploy` for a pull-request build: it deploys the release to the
+  build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
+  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
+  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  outside a preview or development build it is a no-op — even with an explicit
+  `--origin`, which selects targets but never authorizes a preview deploy. A CI
+  build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
+  skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deployment rollback` emits `data.release_id` (the release live again),
+  `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
+  revisions that release pins; the `schema` one is what new registrations use.
+  Users keep their schema revision and attributes: a rollback does not migrate
+  them back. Without `data.pointers`, a warning says the release could not be
+  read.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -254,8 +273,9 @@ Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx and one that never answered — refused,
 unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
-130: a command waiting on the server stops at once with `E_CANCELLED`, and
-any other command exits within a second, possibly without an envelope. An
+130: a command waiting on the server, or on an answer at a prompt, stops at
+once with `E_CANCELLED`, and any other command exits within a second, possibly
+without an envelope. In human mode a cancel prints no error block. An
 unknown command is handled by the CLI's help layer, not the envelope.
 
 ## Clarify before you configure
@@ -352,9 +372,10 @@ the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
 `setup` also writes and publishes the password policy
-(`.zitadel/policies/auth.factor.password.set.json`) with no rules; pass
-`--password-min-length <n>` only when the user gives a value, never one you
-chose for them.
+(`.zitadel/policies/auth.factor.password.set.json`) with a minimum length of
+15, NIST's minimum for password-only sign-in and the wizard's default. Pass
+`--password-min-length <n>` only when the user asks for another value (`0` sets
+none), and give test users passwords at least that long.
 When setup fails after scaffolding a new app, before its default schema and
 flow are uploaded, it removes the app again and puts back what the directory
 held, so rerunning the same `setup` starts over.
@@ -415,9 +436,10 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (the dev server exits with
-`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
-the app; never change the port in one file by hand. In a directory with a
+To move a set-up app to another dev port (setup's `warnings` say the port is
+already in use, the dev server exits with `EADDRINUSE`, or another app needs
+the port), run `setup --dev-port <port>` in the app; never change the port in
+one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.
 It allows the new origin on the server first, and a refusal changes nothing.
@@ -500,6 +522,23 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+
+## Claiming a project
+
+A project on a hosted server stays temporary until a person claims it, within
+14 days of `setup`. Claiming signs that person in with their own Zitadel
+account in a browser, so it is their step: hand them the link, and never open
+it yourself. Plain `claim` waits for the browser step and prints nothing on
+stdout until it ends, so run `claim --no-wait --non-interactive --json`
+instead. It returns at once with `data.claim_url`, the link to give the person
+verbatim, and `data.expires_at`, when it stops working (about 10 minutes).
+Then run the `claim --challenge-id …` command in `data.next_commands`: it
+waits for the person to finish, returns `data.dashboard_url`, and records the
+owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
+names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
+new `--no-wait` link. A project that already has a team is `skipped` with
+`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
+and no `next_commands`, since a new link cannot reopen it.
 
 ## Reference files
 

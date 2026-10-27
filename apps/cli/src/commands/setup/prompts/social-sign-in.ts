@@ -1,8 +1,9 @@
-import { note } from "@clack/prompts";
+import { log, note } from "@clack/prompts";
 
 import {
   credentialVariables,
   CUSTOM_PROVIDER,
+  type ClientId,
   type CustomOidcInput,
   DEFAULT_SCOPES,
   idpProvider,
@@ -16,6 +17,7 @@ import {
   parseDisplayName,
   parseIssuer,
   parseScopes,
+  type Parsed,
   type ProviderName,
   type ProviderSelection,
   providerOf,
@@ -28,6 +30,7 @@ import {
   callbackUriFor,
   type CustomFlagValues,
   loopbackIssuerWarning,
+  ssoEnableArgs,
 } from "../../../lib/idp";
 import { reportWarning } from "../../../lib/warnings";
 import type { Asker } from "../../../lib/input";
@@ -83,9 +86,10 @@ export async function askCustomSettings(
 }
 
 /**
- * "Would you like to add external sign-in providers?" — the one onboarding question that needs
- * something from outside the terminal, so it asks last of the configuration
- * questions and takes "not now" as a first-class answer (#1081).
+ * "Which external sign-in providers would you like to add?" — the one
+ * onboarding question that needs something from outside the terminal, so it
+ * asks last of the configuration questions and takes "not now" as a
+ * first-class answer (#1081).
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
@@ -93,11 +97,15 @@ export async function askCustomSettings(
  * performs exactly this journey on an existing Project, which is why this
  * prompt collects answers rather than doing any work — the scaffolding step
  * writes the connection, the schema and the flow in one place for both paths.
+ * "Not now" stays an answer after a provider is ticked, too: the redirect URI
+ * only shows once it is, and a developer who then finds they have no OAuth
+ * application yet leaves the client id empty to drop that provider, rather
+ * than cancelling setup and losing every answer.
  *
  * `--sso` skips only the parts it answers. A flagged run that could not
  * supply the secret — it is never a flag, and only a scripted run pipes it in
  * — is still asked for it here, the way `--preset` skips its own question and
- * no other.
+ * no other. A flagged provider cannot be dropped: the command line asked for it.
  */
 export class SocialSignInPrompt implements SetupPrompt {
   async ask(answers: SetupAnswers, ctx: PromptContext): Promise<SetupAnswers> {
@@ -145,10 +153,24 @@ export class SocialSignInPrompt implements SetupPrompt {
       const clientId = await ctx.input({
         kind: "text",
         name: "client id",
-        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
-        parse: parseClientId,
+        // "To skip", not "to add it later": the line after it names the command
+        // that adds it, and the shorter question fits an 80-column terminal.
+        message:
+          flagged === undefined
+            ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to skip.`
+            : `What is the client ID of your ${entry.displayName} OAuth app?`,
+        parse: flagged === undefined ? clientIdOrSkip : parseClientId,
         given: flagged?.credentials.clientId,
       });
+      if (clientId === undefined) {
+        log.info(
+          [
+            `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
+            ctx.suggest(ssoEnableArgs(selection)),
+          ].join("\n"),
+        );
+        continue;
+      }
       const secret = await ctx.input({
         kind: "secret",
         name: "client secret",
@@ -173,8 +195,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     return ask({
       kind: "multiselect",
       name: "external sign-in providers",
-      message:
-        "Would you like to add external sign-in providers? This is optional: select any you want, or press Enter to skip.",
+      message: "Which external sign-in providers would you like to add? Press Enter to skip.",
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
@@ -230,4 +251,13 @@ export class SocialSignInPrompt implements SetupPrompt {
       scopes: validated(parseScopes(values.scopes)),
     };
   }
+}
+
+/**
+ * A client id typed into the wizard, or `undefined` for an empty answer, which
+ * drops the provider. A blank id is never a credential: the provider is
+ * either configured with both values or not at all.
+ */
+function clientIdOrSkip(value: string): Parsed<ClientId | undefined> {
+  return value.trim() === "" ? { ok: true, value: undefined } : parseClientId(value);
 }

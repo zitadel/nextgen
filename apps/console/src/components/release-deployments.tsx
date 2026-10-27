@@ -16,7 +16,7 @@ import { type Deployment, KIND_LABEL } from "@/lib/deployment";
  */
 export function ReleaseDeployments({ deployments }: { deployments: Deployment[] }) {
   return (
-    <DetailSection title="Deployment of this release" titleStyle="heading">
+    <DetailSection title="Deployment of this release">
       {deployments.length === 0 ? (
         <p className="text-sm text-muted-foreground">This release has not been deployed.</p>
       ) : (

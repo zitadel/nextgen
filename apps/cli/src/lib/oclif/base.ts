@@ -404,7 +404,10 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
-    } else {
+    } else if (zitadelError.code !== "E_CANCELLED") {
+      // Ctrl-C is the person's own decision, and the terminal already shows it
+      // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
+      // block. The exit code still says the command did not finish.
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);

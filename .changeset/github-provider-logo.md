@@ -3,4 +3,4 @@
 "@zitadel/server": minor
 ---
 
-When a login flow offers GitHub as a sign-in provider, its button now shows the GitHub logo. The monochrome mark follows the button's text colour in light and dark mode. Google's existing multicolour logo is unchanged, and providers without a supported brand icon, such as custom OIDC connections, remain text-only. This change does not enable additional sign-in methods.
+A GitHub sign-in button in the login now shows the GitHub logo, in the button's text colour in light and dark mode; Google's logo is unchanged, and providers without a brand icon, such as custom OIDC connections, stay text-only.

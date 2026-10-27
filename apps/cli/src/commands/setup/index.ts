@@ -45,7 +45,6 @@ import {
   customExample,
   customFlagValues,
   flagText,
-  ENABLE_FLAG_NAMES,
   givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
@@ -56,6 +55,7 @@ import {
   republishCommands,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  ssoEnableArgs,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -241,7 +241,7 @@ export default class Setup extends Promptable(BaseCommand) {
     design: nonBlankString({ hidden: true }),
     "password-min-length": nonBlankString({
       description:
-        "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+        "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
     }),
     [SETUP_FLAG_KEYS.provider]: Flags.string({
       description:
@@ -357,7 +357,7 @@ export default class Setup extends Promptable(BaseCommand) {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
       consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
@@ -396,7 +396,8 @@ export default class Setup extends Promptable(BaseCommand) {
       use_case: flags["use-case"] ?? DEFAULT_SETUP_USE_CASE,
       sso: flags.sso ?? "none",
       // Read from the raw flag: it is parsed below, so a bad value fails after
-      // this step is recorded, like the other flags'. 0 sets none.
+      // this step is recorded, like the other flags'. 0 sets none, and no
+      // flag the recommended minimum.
       password_policy: setsMinLength(flags["password-min-length"]) ? "set" : "empty",
       step: "framework_resolved",
     });
@@ -429,7 +430,9 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       const promptCtx = {
         input: wizardInput,
-        framework: { id: app.framework },
+        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+        suggest: (args: string) =>
+          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,
@@ -445,6 +448,18 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       note(signInSummary(answers), "Sign-in");
       outro("Configuration captured");
+    } else if (
+      flags["dev-port"] === undefined &&
+      !(await LocalServer.isPortFree(answers.devPort))
+    ) {
+      // The wizard asks for another port when the detected one is taken. A run
+      // that asks nothing still pins the dev script to it, so it says so, with
+      // the command that puts the app on a free one.
+      reportWarning(
+        portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
+          this.suggestUnscoped(args),
+        ),
+      );
     }
 
     // The interactive prompts can override the flag/default preset and use
@@ -465,8 +480,10 @@ export default class Setup extends Promptable(BaseCommand) {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
-      // Whether a minimum went into the password policy, never the value.
-      password_policy: typeof answers.passwordMinLength === "number" ? "set" : "empty",
+      // Whether a minimum goes into the password policy, never the value. None
+      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // keeps a policy file: `files_patched` records what was published.
+      password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
 
     const issuer = issuerFromPort(answers.devPort);
@@ -605,7 +622,7 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       try {
         resourceResult = dryRun
-          ? { filesWritten: [] }
+          ? { filesWritten: [], passwordMinLengthSet: false }
           : await materializeSetupResources({
               cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
@@ -686,6 +703,14 @@ export default class Setup extends Promptable(BaseCommand) {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    if (!dryRun) {
+      // What was published, which a policy file `--force` keeps decides as much
+      // as the answers recorded before. A dry run publishes nothing and keeps
+      // those.
+      this.recordTelemetry({
+        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+      });
+    }
 
     // After the connection exists, not before: a credential published under a
     // name nothing references yet is an orphan in the project's variables, and
@@ -1425,6 +1450,8 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
+  // Even the recommended one, unlike the defaults above: without the flag, a
+  // policy file `--force` keeps keeps its own minimum.
   if (opts.passwordMinLength !== undefined) {
     parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
@@ -1621,15 +1648,7 @@ function ssoRecovery(
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      projectCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-        localRecoverySelector(retry.cwd),
-        cliVersion,
-      ),
+      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
     ),
   };
 }
@@ -1816,12 +1835,28 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
 }
 
 /**
- * Whether `--password-min-length` asks for a minimum, rather than none,
- * nothing, or a value the parser refuses (setup fails on that just after).
+ * What a run that cannot ask says about a taken app port, with the command
+ * that moves the app to `free`. With no free port among the next ones it names
+ * only the flag: a placeholder in a suggested command is a shell redirection.
+ */
+export function portInUseWarning(
+  port: number,
+  free: number | undefined,
+  suggest: (args: string) => SuggestedCommand,
+): string {
+  return free === undefined
+    ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
+}
+
+/**
+ * Whether `--password-min-length` leaves a minimum in the policy: a value, or
+ * no flag, which means the recommended one; not none, or a value the parser
+ * refuses (setup fails on that just after).
  */
 function setsMinLength(value: string | undefined): boolean {
   if (value === undefined) {
-    return false;
+    return true;
   }
   const parsed = parsePasswordMinLength(value);
   return parsed.ok && typeof parsed.value === "number";

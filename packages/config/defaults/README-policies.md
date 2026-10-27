@@ -5,20 +5,22 @@ before an operation runs. One file per operation, named after it.
 
 `auth.factor.password.set.json` is the password policy, checked whenever a
 password is set: at sign-up, through the API, and by a user changing their own.
+`zitadel setup` writes it with a minimum length of 15 characters, unless you
+chose another minimum or none:
 
 ``` json
 {
   "$schema": "../meta/policy.json",
   "operation": "auth.factor.password.set",
-  "config": {}
+  "config": { "min_length": 15 }
 }
 ```
 
 ## Settings
 
 Every setting is optional. A setting left out is off, and `"config": {}`
-switches every rule off, so the file above enforces nothing. Zitadel has no
-default: what this file sets is what applies.
+switches every rule off. Zitadel has no default: what this file sets is what
+applies.
 
 | Setting | What it does | Bounds |
 | --- | --- | --- |
@@ -27,8 +29,9 @@ default: what this file sets is what applies.
 | `history_depth` | How many of the user's passwords, the current one included, a new one may not repeat. Checked only when users set their own password. | 1 to 4 |
 
 `min_length` may not be above `max_length`. The bounds are technical limits,
-not recommendations. Common minimums range from 8 to 15 characters, and run
-longer when the password is the only factor.
+not recommendations. NIST SP 800-63B asks for at least 15 characters when the
+password is the only factor, and at least 8 when it is always used with a
+second one.
 
 ## Publishing
 

@@ -6,7 +6,7 @@ import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
-import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
+import { SECTION_HEADING, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -99,10 +99,10 @@ function FlowDefinitionDetail() {
 
         <Separator />
 
-        {/* No inset: `STEPS` lines up with the icon tile. (The schema detail
+        {/* No inset: "Steps" lines up with the icon tile. (The schema detail
             insets its equivalent to clear a tab strip; there are none here.) */}
         <section className="flex flex-col gap-3">
-          <h2 className={EYEBROW}>Steps</h2>
+          <h2 className={SECTION_HEADING}>Steps</h2>
           {/* `table-fixed`: equal thirds, not redistributed by content. */}
           <Table className="table-fixed">
             <TableHeader>

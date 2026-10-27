@@ -50,6 +50,7 @@ Authentication
 
 Configuration and releases
   deploy            Apply your local configuration to Zitadel
+  preview           Deploy and manage pull-request preview URLs
   pull              Rebuild your .zitadel/ files from a release
   branding          Manage the login branding
   deployment        Deploy releases and roll them back

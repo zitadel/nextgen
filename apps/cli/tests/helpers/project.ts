@@ -14,6 +14,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { parseEnv } from "node:util";
 
 import { expect } from "vitest";
 
@@ -646,6 +647,13 @@ export class ScaffoldedApp {
     return this.envelopeOf<DeployResult>(result).data;
   }
 
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
@@ -756,6 +764,23 @@ export class ScaffoldedApp {
     for (const { pattern } of await this.projectOrigins()) {
       expect(await this.removeOrigin(pattern), `removing ${pattern}`).toSucceed();
     }
+  }
+
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
+      ".zitadel/secret",
+      (secret) => {
+        secret.primary_origins = [];
+        secret.preview_origins = [SETUP_ORIGIN.pattern];
+      },
+    );
   }
 
   /** The origin patterns the project admits, read back through `origin list`. */
@@ -1048,6 +1073,28 @@ export class ScaffoldedApp {
         created_at: "2026-01-01T00:00:00.000Z",
       }),
     );
+  }
+
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
+      project_id: string;
+      project_secret: string;
+      preview_secret: string;
+    };
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
   }
 
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */

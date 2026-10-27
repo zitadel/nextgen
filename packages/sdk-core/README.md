@@ -45,7 +45,11 @@ middleware runs (`verifyJwt`):
 
 Opaque (non-JWT) session tokens are validated against the backend's
 `GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`
-(`checkOpaqueSessionToken`).
+(`checkOpaqueSessionToken`). That is a call to the server, so a middleware
+whose render layer checks the session itself can skip it where it decides
+nothing: with `checkOpaqueSession: false`, `resolveSession` hands the token on
+unchecked and touches no cookie. The Next.js middleware does so off its
+protected routes, where `auth()` checks the session.
 
 A session belongs to one project, while a browser sends the session cookie
 to every app on the same host, including the Console of a local server. So a
