@@ -258,8 +258,7 @@ func TestResolve_NoReleaseIsNotDeployed(t *testing.T) {
 
 func TestResolve_ResolveByName_ExactVersion(t *testing.T) {
 	want := newDef("login", "1.2.3", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	other := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{other, want})
+	repo := stubGetFlowDefinition(t, want)
 
 	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, want), service.ResolveFlowRequest{
 		ProjectID:     "proj",
@@ -291,21 +290,6 @@ func TestResolve_ResolveByName_LoadsThePinnedRevision(t *testing.T) {
 	assert.Same(t, def, got)
 }
 
-func TestResolve_ResolveByName_NilVersionServesThePin(t *testing.T) {
-	v1 := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	v2 := newDef("login", "2.4.1", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	v15 := newDef("login", "1.5.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{v1, v2, v15})
-
-	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, v2), service.ResolveFlowRequest{
-		ProjectID: "proj",
-		Purpose:   domain.FlowDefinitionPurposeLogin,
-		Name:      new("login"),
-	})
-	require.NoError(t, err)
-	assert.Same(t, v2, got, "want the revision the release pins, not the highest version")
-}
-
 // A newer revision of the same name is not a candidate. The release names the one that serves.
 func TestResolve_ResolveByName_ServesThePinnedRevision(t *testing.T) {
 	older := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
@@ -315,7 +299,7 @@ func TestResolve_ResolveByName_ServesThePinnedRevision(t *testing.T) {
 	newer.ID = "flowdef_newer"
 	newer.CreatedAt = time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
 
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{newer, older})
+	repo := stubGetFlowDefinition(t, older, newer)
 	got, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, older), service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
@@ -326,9 +310,16 @@ func TestResolve_ResolveByName_ServesThePinnedRevision(t *testing.T) {
 }
 
 func TestResolve_ResolveByName_NotFound(t *testing.T) {
-	repo := stubListFlowDefinitions(t, nil)
+	repo := stubGetFlowDefinition(t)
+	ctx := service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{
+		Release: &domain.Release{Pointers: []domain.ReleasePointer{{
+			Kind:       domain.ReleasePointerKindFlowDefinition,
+			Handle:     "missing",
+			RevisionID: "flowdef_missing",
+		}}},
+	})
 
-	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t), service.ResolveFlowRequest{
+	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(ctx, service.ResolveFlowRequest{
 		ProjectID: "proj",
 		Purpose:   domain.FlowDefinitionPurposeLogin,
 		Name:      new("missing"),
@@ -336,9 +327,21 @@ func TestResolve_ResolveByName_NotFound(t *testing.T) {
 	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
 }
 
+func TestResolve_ResolveByAudience_NoPinsIsNotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	pool.EXPECT().Statements().Return(servicemocks.NewMockAllStatements(ctrl)).AnyTimes()
+
+	_, err := service.NewFlowService(service.NewPool(pool), nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t), service.ResolveFlowRequest{
+		ProjectID: "proj",
+		Purpose:   domain.FlowDefinitionPurposeLogin,
+	})
+	assert.ErrorIs(t, err, domain.ErrFlowDefinitionNotFound())
+}
+
 func TestResolve_ResolveByName_PurposeMismatch(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
-	repo := stubListFlowDefinitions(t, []*domain.FlowDefinition{def})
+	repo := stubGetFlowDefinition(t, def)
 
 	_, err := service.NewFlowService(repo, nil, domain.BuiltinSchemaBases{}).Resolve(pinnedDefs(t, def), service.ResolveFlowRequest{
 		ProjectID: "proj",
@@ -571,20 +574,23 @@ func (s *stubIDGen) New(prefix string) (string, error) {
 	return prefix + "_" + strconv.Itoa(s.calls), nil
 }
 
-// stubGetFlowDefinition returns def for any GetFlowDefinitionByID call.
-func stubGetFlowDefinition(t *testing.T, def *domain.FlowDefinition) *service.DB {
+// stubGetFlowDefinition answers GetFlowDefinitionByID from defs and nothing else.
+// A name lookup that lists instead of loading the pin fails the test.
+func stubGetFlowDefinition(t *testing.T, defs ...*domain.FlowDefinition) *service.DB {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().GetFlowDefinitionByID(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
 		func(_ context.Context, projectID, id string) (*domain.FlowDefinition, error) {
-			if def == nil || def.ProjectID != projectID || def.ID != id {
-				return nil, database.NewNoRowFoundError(nil)
+			for _, def := range defs {
+				if def != nil && def.ProjectID == projectID && def.ID == id {
+					return def, nil
+				}
 			}
-			return def, nil
+			return nil, database.NewNoRowFoundError(nil)
 		},
-	).Times(1)
+	).AnyTimes()
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	return service.NewPool(pool)
 }

@@ -318,6 +318,17 @@ func ReleaseFromContext(ctx context.Context) *domain.Release {
 // PinnedRevisions is handle → revision id for one release pointer kind.
 type PinnedRevisions map[string]string
 
+// runtimePins is the revision set a serving request may read. A request with
+// no release is not deployed; PinsFor stays the pure map for a release the
+// caller already holds.
+func runtimePins(ctx context.Context, kind domain.ReleasePointerKind) (PinnedRevisions, error) {
+	release := ReleaseFromContext(ctx)
+	if release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
+	}
+	return PinsFor(release, kind), nil
+}
+
 // PinsFor returns the revision ids a release pins for one kind, keyed by handle.
 func PinsFor(release *domain.Release, kind domain.ReleasePointerKind) PinnedRevisions {
 	pinned := make(PinnedRevisions)

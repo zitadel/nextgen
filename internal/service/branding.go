@@ -184,11 +184,11 @@ type flowBrandingReader interface {
 // nil when it pins none. A request with no release is not deployed. The
 // caller serves the built-in default for a nil revision or a failed read.
 func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) (*domain.Branding, error) {
-	release := ReleaseFromContext(ctx)
-	if release == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindBranding)
+	if err != nil {
+		return nil, err
 	}
-	id, ok := PinsFor(release, domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
+	id, ok := pins[domain.ReleaseBrandingHandle]
 	if !ok {
 		return nil, nil
 	}

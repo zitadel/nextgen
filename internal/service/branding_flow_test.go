@@ -13,11 +13,9 @@ import (
 )
 
 type fakeBrandingReader struct {
-	byID      map[string]*domain.Branding
-	latest    *domain.Branding
-	gotGetID  string
-	gotLatest bool
-	getErr    error
+	byID     map[string]*domain.Branding
+	gotGetID string
+	getErr   error
 }
 
 func (f *fakeBrandingReader) Get(_ context.Context, _, id string) (*domain.Branding, error) {
@@ -28,33 +26,25 @@ func (f *fakeBrandingReader) Get(_ context.Context, _, id string) (*domain.Brand
 	return f.byID[id], nil
 }
 
-func (f *fakeBrandingReader) GetLatest(context.Context, string) (*domain.Branding, error) {
-	f.gotLatest = true
-	return f.latest, nil
-}
-
 func TestResolveFlowBranding(t *testing.T) {
 	v1 := &domain.Branding{ID: "brnd_v1", Layout: domain.BrandingLayoutSplit}
-	v2 := &domain.Branding{ID: "brnd_v2", Layout: domain.BrandingLayoutCentered}
 	flow := domain.ReleasePointer{Kind: domain.ReleasePointerKindFlowDefinition, Handle: "login", RevisionID: "flow_1"}
 	brandingV1 := domain.ReleasePointer{Kind: domain.ReleasePointerKindBranding, Handle: domain.ReleaseBrandingHandle, RevisionID: v1.ID}
 
 	t.Run("a release that pins a flow serves the pinned revision", func(t *testing.T) {
-		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}, latest: v2}
+		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}}
 		got, err := service.ResolveFlowBranding(brandingContext(t, flow, brandingV1), reader, "proj")
 		require.NoError(t, err)
 		assert.Equal(t, v1, got)
 		assert.Equal(t, v1.ID, reader.gotGetID)
-		assert.False(t, reader.gotLatest)
 	})
 
 	t.Run("a release that pins a flow and no branding returns nil", func(t *testing.T) {
-		reader := &fakeBrandingReader{latest: v2}
+		reader := &fakeBrandingReader{}
 		got, err := service.ResolveFlowBranding(brandingContext(t, flow), reader, "proj")
 		require.NoError(t, err)
 		assert.Nil(t, got)
 		assert.Empty(t, reader.gotGetID)
-		assert.False(t, reader.gotLatest)
 	})
 
 	t.Run("a failed read of a pinned revision is returned", func(t *testing.T) {
@@ -63,25 +53,22 @@ func TestResolveFlowBranding(t *testing.T) {
 		require.EqualError(t, err, "db down")
 		assert.Nil(t, got)
 		assert.Equal(t, v1.ID, reader.gotGetID)
-		assert.False(t, reader.gotLatest)
 	})
 
 	t.Run("no release is not deployed", func(t *testing.T) {
-		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}, latest: v2}
+		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}}
 		got, err := service.ResolveFlowBranding(t.Context(), reader, "proj")
 		require.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
 		assert.Nil(t, got)
-		assert.False(t, reader.gotLatest)
 		assert.Empty(t, reader.gotGetID)
 	})
 
 	t.Run("a release that pins no flow serves the branding it pins", func(t *testing.T) {
-		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}, latest: v2}
+		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}}
 		got, err := service.ResolveFlowBranding(brandingContext(t, brandingV1), reader, "proj")
 		require.NoError(t, err)
 		assert.Equal(t, v1, got)
 		assert.Equal(t, v1.ID, reader.gotGetID)
-		assert.False(t, reader.gotLatest)
 	})
 }
 

@@ -28,14 +28,15 @@ type userSchemaStatements interface {
 // handle. A handle that release does not pin is an internal error. A request
 // with no release is not deployed.
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindSchema)
+	if err != nil {
+		return nil, err
+	}
 	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
 	if err != nil {
 		return nil, err
 	}
-	if ReleaseFromContext(ctx) == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
-	}
-	return pinnedUserSchema(ctx, stmts, projectID, handle)
+	return pinnedUserSchema(ctx, stmts, projectID, pins, handle)
 }
 
 func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (string, error) {
@@ -69,8 +70,8 @@ func newestUserSchema(ctx context.Context, stmts userSchemaStatements, bases dom
 	return result.Items[0], nil
 }
 
-func pinnedUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, handle string) (*domain.JSONSchema, error) {
-	revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindSchema)[handle]
+func pinnedUserSchema(ctx context.Context, stmts userSchemaStatements, projectID string, pins PinnedRevisions, handle string) (*domain.JSONSchema, error) {
+	revisionID, ok := pins[handle]
 	if !ok {
 		return nil, domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin user schema %q", handle))
 	}

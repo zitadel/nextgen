@@ -157,9 +157,6 @@ func sealedDeploymentID(ctx context.Context) string {
 }
 
 func (i *FlowSSORedirectIssuer) connectionForSlug(ctx context.Context, projectID, slug string) (*domain.IDPConnection, error) {
-	if ReleaseFromContext(ctx) == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
-	}
 	revisionID, err := pinnedIDPRevision(ctx, slug)
 	if err != nil {
 		return nil, err

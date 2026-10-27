@@ -23,8 +23,8 @@ func NewFlowSSOProviderResolver(connections IDPConnectionService) *FlowSSOProvid
 var _ domain.FlowSSOProviderResolver = (*FlowSSOProviderResolver)(nil)
 
 func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, _ string, slugs []string) ([]domain.FlowSSOProvider, error) {
-	if ReleaseFromContext(ctx) == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
+	if _, err := runtimePins(ctx, domain.ReleasePointerKindIDP); err != nil {
+		return nil, err
 	}
 	return r.resolvePinned(ctx, projectID, slugs)
 }
@@ -51,7 +51,11 @@ func (r *FlowSSOProviderResolver) resolvePinned(ctx context.Context, projectID s
 
 // pinnedIDPRevision is the revision the request's release pins for slug.
 func pinnedIDPRevision(ctx context.Context, slug string) (string, error) {
-	revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindIDP)[slug]
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindIDP)
+	if err != nil {
+		return "", err
+	}
+	revisionID, ok := pins[slug]
 	if !ok {
 		return "", domain.ErrInternal(nil).WithMessage(fmt.Sprintf("release does not pin identity provider %q", slug))
 	}

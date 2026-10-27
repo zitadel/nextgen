@@ -104,14 +104,10 @@ func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *d
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)
 
-	release := ReleaseFromContext(ctx)
-	if release == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
+	pinned, err := runtimePins(ctx, domain.ReleasePointerKindFlowDefinition)
+	if err != nil {
+		return nil, err
 	}
-	return s.resolvePinned(ctx, req, PinsFor(release, domain.ReleasePointerKindFlowDefinition))
-}
-
-func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned PinnedRevisions) (*domain.FlowDefinition, error) {
 	if req.Name != nil {
 		revisionID, ok := pinned[*req.Name]
 		if !ok {
@@ -133,6 +129,9 @@ func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest,
 		return def, nil
 	}
 
+	if len(pinned) == 0 {
+		return nil, domain.ErrFlowDefinitionNotFound()
+	}
 	revisionIDs := make([]string, 0, len(pinned))
 	for _, revisionID := range pinned {
 		revisionIDs = append(revisionIDs, revisionID)

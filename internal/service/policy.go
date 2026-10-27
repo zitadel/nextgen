@@ -376,11 +376,11 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	ctx, end := startSpan(ctx, "PolicyService.ResolvePolicy")
 	defer end(&err)
 
-	release := ReleaseFromContext(ctx)
-	if release == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil)
+	pins, err := runtimePins(ctx, domain.ReleasePointerKindPolicy)
+	if err != nil {
+		return nil, err
 	}
-	revisionID, ok := PinsFor(release, domain.ReleasePointerKindPolicy)[operation]
+	revisionID, ok := pins[operation]
 	if !ok {
 		return nil, nil
 	}
