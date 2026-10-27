@@ -86,7 +86,34 @@ export type GitHubRelease = {
  * permission, raises that to 5,000.
  */
 export async function fetchReleases(token = process.env.WEBSITE_GITHUB_TOKEN): Promise<Release[]> {
-  const url = `https://api.github.com/repos/${REPOSITORY}/releases?per_page=${RELEASE_COUNT}`;
+  const response = await askGitHub(`releases?per_page=${RELEASE_COUNT}`, token);
+  return parseReleases(await response.json());
+}
+
+/**
+ * The published release a tag names, for its own page, or none when GitHub
+ * has none by that tag. A tag that is no version from FIRST_RELEASE on has
+ * none either, without asking GitHub. Throws when GitHub does not answer.
+ */
+export async function fetchRelease(
+  tag: string,
+  token = process.env.WEBSITE_GITHUB_TOKEN,
+): Promise<Release | undefined> {
+  if (!fromFirstRelease(tag)) return undefined;
+  const response = await askGitHub(`releases/tags/${encodeURIComponent(tag)}`, token, [404]);
+  return response.status === 404 ? undefined : parseReleases([await response.json()])[0];
+}
+
+/** Whether a tag is a version from FIRST_RELEASE on: a release with a page of its own. */
+export function fromFirstRelease(tag: string): boolean {
+  const version = valid(tag);
+  return version !== null && !lt(version, FIRST_RELEASE);
+}
+
+// GitHub's answer to a path of the repository's API; a status not in
+// `accepted` that is no success throws.
+async function askGitHub(path: string, token?: string, accepted: number[] = []) {
+  const url = `https://api.github.com/repos/${REPOSITORY}/${path}`;
   const response = await fetch(url, {
     // The page is the cache. Next would otherwise keep the answer a build
     // fetched in .next/cache, which Vercel's build cache hands the next build.
@@ -97,10 +124,10 @@ export async function fetchReleases(token = process.env.WEBSITE_GITHUB_TOKEN): P
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
   });
-  if (!response.ok) {
+  if (!response.ok && !accepted.includes(response.status)) {
     throw new Error(`GitHub answered ${url} with ${response.status} ${response.statusText}`);
   }
-  return parseReleases(await response.json());
+  return response;
 }
 
 /** The published releases of GitHub's answer from FIRST_RELEASE on, the highest version first. */

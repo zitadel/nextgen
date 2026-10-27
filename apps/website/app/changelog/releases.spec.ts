@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  fetchRelease,
   fetchReleases,
   type GitHubRelease,
   parseRelease,
@@ -307,5 +308,52 @@ describe("fetchReleases", () => {
         headers: expect.not.objectContaining({ authorization: expect.anything() }),
       }),
     );
+  });
+});
+
+describe("fetchRelease", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads the release a tag names, for its own page", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () =>
+      Response.json(release("v0.2.0", { body: "Highlights." })),
+    );
+    vi.stubGlobal("fetch", fetch);
+
+    await expect(fetchRelease("v0.2.0", "test-token")).resolves.toMatchObject({
+      tag: "v0.2.0",
+      notes: "Highlights.",
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "https://api.github.com/repos/zitadel/nextgen/releases/tags/v0.2.0",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("reads none for a tag GitHub has no release by, and throws when GitHub refuses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(new Response("Not Found", { status: 404 }))
+        .mockResolvedValueOnce(
+          new Response("rate limited", { status: 403, statusText: "Forbidden" }),
+        ),
+    );
+
+    await expect(fetchRelease("v9.9.9")).resolves.toBeUndefined();
+    await expect(fetchRelease("v0.2.0")).rejects.toThrow("403 Forbidden");
+  });
+
+  it("reads none, without asking GitHub, for an alpha preview or a tag that is no version", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal("fetch", fetch);
+
+    for (const tag of ["v0.1.0-alpha.28", "nightly", "feed.xml"]) {
+      await expect(fetchRelease(tag)).resolves.toBeUndefined();
+    }
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

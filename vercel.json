@@ -139,6 +139,12 @@
       }
     },
     {
+      "source": "/changelog/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/_next/(.*)",
       "destination": {
         "service": "website"

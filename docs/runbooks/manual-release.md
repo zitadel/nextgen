@@ -109,11 +109,13 @@ block, the generated Changesets changelogs,
 inputs. Publish the draft GitHub Release only when the product needs an
 announcement.
 
-The website changelog shows everything outside the generated facts block
-(`<!-- nextgen-release-facts:start -->` to `<!-- nextgen-release-facts:end -->`)
-as the release's notes, above its changes, and reads the changes and the
-Breaking filter only from that block
-([`releases.ts`](../../apps/website/app/changelog/releases.ts)).
+The website changelog leads each release with everything outside the
+generated facts block (`<!-- nextgen-release-facts:start -->` to
+`<!-- nextgen-release-facts:end -->`) as its notes, and reads the changes, and
+which of them break, only from that block
+([`releases.ts`](../../apps/website/app/changelog/releases.ts)). The changelog
+shows the notes and the breaking changes; the release's own page,
+`/changelog/<tag>`, adds every change.
 
 - Leave the generated facts block as it is.
 - Write Markdown only; the website drops HTML.

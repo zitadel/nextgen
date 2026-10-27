@@ -390,9 +390,13 @@
     color: var(--color-text-muted);
   }
 
-  .release-notes :where(strong, h4, h5, h6) {
+  .release-notes :where(strong, h2, h3, h4, h5, h6) {
     color: var(--color-text-primary);
     font-weight: 600;
+  }
+
+  .release-notes > * + :where(h2, h3, h4, h5, h6) {
+    margin-top: 1.75rem;
   }
 
   .release-notes a {
@@ -460,6 +464,19 @@
 
   .release-notes hr {
     border-color: var(--color-border-primary);
+  }
+
+  /* A change in a release's list (changelog/release.tsx): a summary of one
+     paragraph runs on into its pull request and authors, so a summary of one
+     short sentence takes one line. */
+  .change-line {
+    font-size: 0.9375rem;
+    line-height: 1.625rem;
+  }
+
+  .change-line > .release-notes,
+  .change-line > .release-notes > p:only-child {
+    display: inline;
   }
 }
 
