@@ -101,6 +101,8 @@ async function pathExists(path: string): Promise<boolean> {
 export default class Eject extends Promptable(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
+
+  static override heading = "Ejecting Zitadel from this app";
   static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {

@@ -962,8 +962,6 @@ describe("setup summary", () => {
     projectFacts: { framework: "next", typescript: true, packageManager: "npm" },
     writtenRel: [],
     depsAdded: [],
-    project: { id: "proj_test" } as SummaryInput["project"],
-    server: "http://localhost:8080",
     issuer: "http://localhost:3000",
     sso: [],
   };

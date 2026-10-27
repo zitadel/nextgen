@@ -20,6 +20,8 @@ import { Promptable } from "../../lib/oclif/promptable";
 export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Rolling back a deployment";
   static override examples = [
     "<%= config.bin %> deployment rollback",
     "<%= config.bin %> deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",

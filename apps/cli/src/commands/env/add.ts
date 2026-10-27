@@ -66,6 +66,8 @@ type DeployedRelease = {
 export default class EnvAdd extends Promptable(BaseCommand) {
   static override description = "Bind an environment to a project, creating the project if needed.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Adding an environment";
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
@@ -368,7 +370,9 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         ]),
       },
       pretty: [
-        `Wrote ${file} with ${Object.keys(values).join(", ")}`,
+        `Wrote ${file}`,
+        "",
+        `It holds ${Object.keys(values).join(", ")}.`,
         "",
         // Quoted like the machine command, and only offered when it can run:
         // without the project secret in the file it would fail to authenticate.

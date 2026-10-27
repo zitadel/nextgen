@@ -115,7 +115,6 @@ import {
   detectProjectFacts,
   fileNameOf,
   formatFrameworkLine,
-  id as styleId,
   path as stylePath,
   relativeDisplayPath as relativeDisplay,
   renderSummary,
@@ -200,6 +199,8 @@ function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
 export default class Setup extends Promptable(BaseCommand) {
   static override description =
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
+
+  static override heading = "Setting up Zitadel";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [
@@ -927,8 +928,6 @@ export default class Setup extends Promptable(BaseCommand) {
         projectFacts,
         writtenRel,
         depsAdded: result.depsAdded,
-        project,
-        server: answers.server,
         issuer,
         scaffoldedFramework,
         scaffoldedBesideFiles,
@@ -941,6 +940,7 @@ export default class Setup extends Promptable(BaseCommand) {
       ];
       if (this.ui.interactive) {
         // The ending of the chain: the headline, the report, then what to run next.
+        this.ui.ranAgainst(project.id, answers.server.replace(/^https?:\/\//, ""));
         summary = {
           title: "Zitadel is ready",
           sections: [],
@@ -1951,15 +1951,12 @@ export function buildSummary(opts: {
   projectFacts: Awaited<ReturnType<typeof detectProjectFacts>>;
   writtenRel: string[];
   depsAdded: ReadonlyArray<string>;
-  project: CreateProject201;
-  server: string;
   issuer: string;
   scaffoldedFramework: boolean;
   scaffoldedBesideFiles: boolean;
   sso: readonly SsoDraft[];
 }): Section[] {
-  const { projectFacts, writtenRel, depsAdded, project, server, issuer, scaffoldedFramework, sso } =
-    opts;
+  const { projectFacts, writtenRel, depsAdded, issuer, scaffoldedFramework, sso } = opts;
   const packageJsonHit = pickWrittenFile(writtenRel, "package.json");
 
   const detected: Row[] = [{ label: "Framework", value: formatFrameworkLine(projectFacts) }];
@@ -2045,11 +2042,9 @@ export function buildSummary(opts: {
     });
   }
 
-  const projectRows: Row[] = [
-    { label: "Project id", value: styleId(project.id) },
-    { label: "Server", value: styleUrl(server) },
-    { label: "App will run", value: styleUrl(issuer) },
-  ];
+  // The project and the server are said once, by the summary's closing line
+  // (`Using project … on your Zitadel server at …`), as in every other command.
+  const projectRows: Row[] = [{ label: "App will run", value: styleUrl(issuer) }];
 
   return [
     { title: "Detected", rows: detected },

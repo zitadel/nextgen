@@ -5,7 +5,7 @@ import pc from "picocolors";
 import { ZitadelError } from "../errors";
 import { input } from "../input";
 import type { Audience } from "./audience";
-import { indent, reflow, renderBox, sectionLines, trimBlank, WIDTH } from "./layout";
+import { Facts, Frame, indent, Prose, trimBlank, WIDTH } from "./layout";
 import type {
   ConfirmQuestion,
   MultiselectQuestion,
@@ -14,6 +14,7 @@ import type {
   TextQuestion,
 } from "./questions";
 import type { Summary } from "./summary";
+import { Where } from "./where";
 import { beginStep, type Drawing, runTask } from "./progress";
 import type { Report, Step, Wizard } from "./wizard";
 
@@ -44,7 +45,8 @@ export class Chain implements Wizard {
   private opened = false;
   private ended = false;
   private title = "zitadel";
-  private context: string | undefined;
+  private project: string | undefined;
+  private server: string | undefined;
   /** Whether a prompt or a box was the last thing drawn, so the next line needs a blank guide line. */
   private gap = false;
   private readonly audience: Audience;
@@ -59,9 +61,14 @@ export class Chain implements Wizard {
     this.forcing = audience.force;
   }
 
-  describe(title: string | undefined, context?: string): void {
-    this.title = title ?? this.title;
-    this.context = context ?? this.context;
+  describe(title: string): void {
+    this.title = title;
+  }
+
+  /** Where this command runs, which its summary opens with. */
+  ranAgainst(project: string | undefined, server: string | undefined): void {
+    this.project = project ?? this.project;
+    this.server = server ?? this.server;
   }
 
   honorForce(honor: boolean): void {
@@ -96,7 +103,7 @@ export class Chain implements Wizard {
   open(): void {
     if (this.audience.interactive && !this.opened) {
       this.opened = true;
-      intro(this.context === undefined ? this.title : `${this.title} ${pc.dim(this.context)}`);
+      intro(this.title);
     }
   }
 
@@ -112,21 +119,25 @@ export class Chain implements Wizard {
     }
     this.ended = true;
     const steps = summary.next ?? [];
+    const where = new Where(this.project, this.server ?? summary.ran);
     const body = trimBlank([
-      ...summary.sections.flatMap((section) => sectionLines(section)),
+      ...(summary.sections.length === 0 ? [] : [new Facts(summary.sections).render(), ""]),
       ...(summary.lines ?? []),
     ]);
-    const boxed = summary.boxed === true || steps.length > 0;
+    const boxed = summary.boxed === true || steps.length > 0 || where.known;
 
-    outro(
-      summary.failed === true
-        ? pc.red(summary.title)
-        : summary.title.replace(/\(server: [^)]+\)$/, (server) => pc.dim(server)),
-    );
+    outro(summary.failed === true ? pc.red(summary.title) : summary.title);
     if (boxed) {
       // The report and the steps share one frame: what the command produced and
       // what to do about it belong together.
-      process.stdout.write(`\n${renderBox(summary.boxTitle ?? "Next steps", body, steps)}\n`);
+      process.stdout.write(
+        `\n${new Frame(
+          summary.boxTitle ?? "Summary",
+          body,
+          steps,
+          where.known ? where.render() : undefined,
+        ).render()}\n`,
+      );
     } else if (body.length > 0) {
       process.stdout.write(`${indent(body.join("\n"))}\n`);
     }
@@ -174,7 +185,7 @@ export class Chain implements Wizard {
     if (this.audience.interactive) {
       this.open();
       // A box is never wider than 80 columns, so its lines are wrapped to fit.
-      note(reflow(lines.join("\n"), 72), title);
+      note(new Prose(lines.join("\n"), WIDTH - 8).render(), title);
       this.gap = true;
       return;
     }

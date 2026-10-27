@@ -128,33 +128,23 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
   }
   // `(server: host)` says where the command ran. It closes the headline, not a line of its own.
   const serverAt = lines.findIndex((line) => /^\(server: .+\)$/.test(line.trim()));
-  const server = serverAt < 0 ? "" : ` ${lines.splice(serverAt, 1)[0]?.trim()}`;
+  const ran =
+    serverAt < 0
+      ? undefined
+      : /^\(server: (.+)\)$/.exec(lines.splice(serverAt, 1)[0]?.trim() ?? "")?.[1];
   if (title === "Zitadel command completed.") {
     title = "Done";
   }
   title = sentence(id, title.replace(/\.$/, ""));
 
-  // One line: its first sentence, or the part before " with ", else "Done" with the rest below.
+  // A title that is still too long to read as one line is replaced by a plain
+  // one and said in full underneath; a command should not produce one.
   const overflow: string[] = [];
-  if (!failed) {
-    const first = /^(.+?[.!?])\s+(.+)$/.exec(title);
-    if (first !== null) {
-      title = (first[1] ?? title).replace(/\.$/, "");
-      overflow.push(first[2] ?? "");
-    }
-    if (title.length + server.length > HEADLINE_WIDTH) {
-      const cut = title.indexOf(" with ");
-      if (cut > 0) {
-        overflow.unshift(`It holds ${title.slice(cut + 6)}.`);
-        title = title.slice(0, cut);
-      }
-    }
-    if (title.length + server.length > HEADLINE_WIDTH) {
-      overflow.unshift(title);
-      title = "Done";
-    }
+  if (!failed && title.length > HEADLINE_WIDTH) {
+    overflow.push(title);
+    title = "Done";
   }
-  const headline = `${title}${failed ? "" : server}`;
+  const headline = title;
 
   const nextAt = lines.findIndex((line) => line.trim() === "Next:");
   if ((boxed || nextAt >= 0) && !failed) {
@@ -167,6 +157,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
       lines: [...overflow, ...(nextAt < 0 ? [] : before)],
       next: nextSteps(nextAt < 0 ? lines : lines.slice(nextAt + 1)),
       boxed: true,
+      ...(ran === undefined ? {} : { ran }),
     };
   }
   while (lines[0]?.trim() === "") {
@@ -177,5 +168,6 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
     sections: [],
     lines: [...overflow, ...(overflow.length > 0 && lines.length > 0 ? [""] : []), ...lines],
     ...(failed ? { failed } : {}),
+    ...(ran === undefined ? {} : { ran }),
   };
 }

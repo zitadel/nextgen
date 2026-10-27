@@ -52,9 +52,13 @@ export class Ui {
     this.chain.describe(title);
   }
 
-  /** Where the command runs, for the chain's title. Replaces the `ℹ Project / ℹ Server` lines. */
-  context(context: string): void {
-    this.chain.describe(undefined, context);
+  /**
+   * Where this command runs. Its summary opens with it, in place of the
+   * `ℹ Project` / `ℹ Server` lines a command used to print before its first
+   * question.
+   */
+  ranAgainst(project: string | undefined, server: string | undefined): void {
+    this.chain.ranAgainst(project, server);
   }
 
   /**

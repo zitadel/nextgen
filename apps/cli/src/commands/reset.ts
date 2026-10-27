@@ -14,6 +14,8 @@ import { Promptable } from "../lib/oclif/promptable";
 export default class Reset extends Promptable(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
+
+  static override heading = "Resetting the local Zitadel server";
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({

@@ -50,6 +50,8 @@ import { DEPLOY_ARGS } from "../lib/release";
 export default class Status extends EnvironmentCommand {
   static override description = "Summarize the local Zitadel server and project state.";
   static override group = CommandGroups.gettingStarted;
+
+  static override heading = "Checking the status";
   static override groupOrder = 3;
 
   async run(): Promise<JsonEnvelope> {

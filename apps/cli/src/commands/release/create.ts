@@ -25,6 +25,8 @@ import { ZitadelError } from "../../lib/errors";
 export default class ReleaseCreate extends EnvironmentCommand {
   static override description = "Build a release from .zitadel/ without deploying it.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Creating a release";
   static override examples = [
     "<%= config.bin %> release create",
     "<%= config.bin %> release create -m 'add phone_number to human-user'",

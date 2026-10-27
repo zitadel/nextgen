@@ -28,6 +28,8 @@ const INVENTORY_COLUMNS = ["name", "value", "preview"] as const;
 export default class VariableList extends EnvironmentCommand {
   static override description = "List the variables entered on the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Listing variables";
   static override examples = [
     "<%= config.bin %> variable list",
     "<%= config.bin %> variable list --preview",

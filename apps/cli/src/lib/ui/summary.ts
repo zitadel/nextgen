@@ -30,8 +30,8 @@ export const section = (heading: string | undefined, ...facts: Fact[]): Section 
 export type Summary = {
   /**
    * The one line that closes the chain: what happened, as a sentence, with no
-   * full stop and with the server in parentheses when the command ran against
-   * one. It is a single line; anything longer belongs in {@link lines}.
+   * full stop. It is a single line; anything longer belongs in {@link lines}.
+   * Where it ran is {@link ran}, not part of this.
    */
   title: string;
   /** Facts worth stating, such as the project and the file that was written. */
@@ -44,8 +44,14 @@ export type Summary = {
   failed?: boolean;
   /** Draw the box even with no steps, for a command whose body is instructions. */
   boxed?: boolean;
-  /** The box's own title. Defaults to "Next steps". */
+  /** The box's own title. Defaults to "Summary". */
   boxTitle?: string;
+  /**
+   * Where the command ran, as the box's first line: the project and the server
+   * it spoke to. Every command that reaches a server states it, in one place,
+   * rather than printing it before the first question.
+   */
+  ran?: string;
 };
 
 /**

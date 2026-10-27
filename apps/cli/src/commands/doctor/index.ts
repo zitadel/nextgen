@@ -76,6 +76,8 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
   static override group = CommandGroups.diagnostics;
+
+  static override heading = "Checking the setup";
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),

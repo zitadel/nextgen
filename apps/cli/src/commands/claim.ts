@@ -77,6 +77,8 @@ export function claimDeadline(input: {
 export default class Claim extends EnvironmentCommand {
   static override description =
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
+
+  static override heading = "Claiming the project";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
 

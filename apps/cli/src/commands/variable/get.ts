@@ -21,6 +21,8 @@ import {
 export default class VariableGet extends EnvironmentCommand {
   static override description = "Get one variable from the project.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Reading a variable";
   static override examples = [
     "<%= config.bin %> variable get GOOGLE_CLIENT_ID",
     "<%= config.bin %> variable get API_URL --preview",

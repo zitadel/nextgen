@@ -31,6 +31,7 @@ import { loopbackReach } from "../../../lib/local-server/runtime";
 import { refuseBrokenFlows, refuseUneditable } from "../../../lib/auth-methods";
 import { isDevelopmentBuild } from "../../../lib/build-channel";
 import { ZitadelError } from "../../../lib/errors";
+import { DEPLOY_ARGS } from "../../../lib/release";
 import { stableStringify } from "../../../lib/json";
 import {
   applySsoToFlow,
@@ -96,6 +97,8 @@ import { reportWarning } from "../../../lib/warnings";
 export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override description = "Add an identity provider to a user schema.";
   static override group = CommandGroups.authentication;
+
+  static override heading = "Enabling single sign-on";
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -487,7 +490,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const unpublished = !reusing || written.length > 0;
     const credentialsStored =
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
-    const stored = credentialsStored ? ["Its credentials are stored in your project."] : [];
+    const stored = credentialsStored ? ["and its credentials are stored in your project"] : [];
     const name = entry.displayName;
 
     return this.emit({
@@ -497,12 +500,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
         title: unpublished
-          ? [`${name} sign-in is configured locally.`, ...stored].join(" ")
-          : `${name} sign-in is already configured locally.`,
+          ? [`${name} sign-in is configured locally`, ...stored].join(" ")
+          : `${name} sign-in is already configured locally`,
         ...(unpublished
           ? {
               next_actions: [
-                `Deploy the configuration to make ${name} sign-in available in your app, then reload your app and test ${name} sign-in.`,
+                `Deploy it to make ${name} sign-in available in your app, then reload the app and test it: ${this.suggest(DEPLOY_ARGS)}`,
               ],
             }
           : {}),

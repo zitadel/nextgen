@@ -37,6 +37,8 @@ import { nextCommandsData } from "../lib/oclif/envelope";
 export default class Deploy extends EnvironmentCommand {
   static override description =
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
+
+  static override heading = "Deploying the configuration";
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [

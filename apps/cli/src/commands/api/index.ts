@@ -33,6 +33,8 @@ export default class Api extends Promptable(BaseCommand) {
   static override group = CommandGroups.diagnostics;
   static override description =
     "Call any operation of the Zitadel API, with this project's server and project secret.";
+
+  static override heading = "Calling the Zitadel API";
   static override examples = [
     "<%= config.bin %> api queryUsers -F limit=5",
     "<%= config.bin %> api GetUserByID user_01JZ8Y3V4Q0K7N2M5P6R8S9T0W",

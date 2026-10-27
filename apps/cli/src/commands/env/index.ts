@@ -23,6 +23,8 @@ const REDACTED = "••••••••";
 export default class Env extends EnvironmentCommand {
   static override description =
     "Show which server and project resolve, and where each value came from.";
+
+  static override heading = "Showing the environment";
   static override group = CommandGroups.configuration;
   static override examples = [
     "<%= config.bin %> env",

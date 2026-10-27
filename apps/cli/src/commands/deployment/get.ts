@@ -7,6 +7,8 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 export default class DeploymentGet extends EnvironmentCommand {
   static override description = "Read one deployment by id.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Reading a deployment";
   static override examples = ["<%= config.bin %> deployment get dep_01KX5N7C9D2E7F0N9WD3P2E4YM6"];
   static override args = {
     deployment_id: nonBlankArg({ required: true, description: "The deployment to read." }),

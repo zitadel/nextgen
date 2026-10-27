@@ -15,6 +15,8 @@ import { nextCommandsData } from "../../lib/oclif/envelope";
 export default class DeploymentCreate extends EnvironmentCommand {
   static override description = "Deploy an existing release to the project's origins.";
   static override group = CommandGroups.configuration;
+
+  static override heading = "Creating a deployment";
   static override examples = [
     "<%= config.bin %> deployment create --release rel_01KX3RG8A7F0N9WD3P2E4YM5C1",
   ];

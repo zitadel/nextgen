@@ -16,11 +16,12 @@
  * - {@link Outcome} — what the command returns: the `--json` payload and the
  *   {@link Summary} the chain closes on.
  *
- * Layout ({@link reflow}, {@link renderBox}, {@link WIDTH}) is pure string work
- * and is unit-tested without a terminal.
+ * Layout ({@link Prose}, {@link Facts}, {@link Frame}) is pure string work: each
+ * piece renders itself, so the output is unit-tested without a terminal.
  */
 export type { Audience } from "./audience";
-export { WIDTH, reflow, renderBox } from "./layout";
+export { Facts, Frame, Prose, type Renderable, WIDTH } from "./layout";
+export { Where } from "./where";
 export { GUIDE, MARK } from "./marks";
 export type {
   Choice,
