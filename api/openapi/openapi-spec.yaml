@@ -172,6 +172,8 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/admins:
+    $ref: endpoints/projects/by_id/admins/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
@@ -320,6 +322,8 @@ webhooks:
     $ref: endpoints/events/webhooks/policy-created.yaml
   policy.updated:
     $ref: endpoints/events/webhooks/policy-updated.yaml
+  preview.removed:
+    $ref: endpoints/events/webhooks/preview-removed.yaml
   project.created:
     $ref: endpoints/events/webhooks/project-created.yaml
   project.deleted:

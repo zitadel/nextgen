@@ -96,11 +96,12 @@ export default class Preview extends PreviewCommand {
     // Checked before anything that can skip the run, so a bad value fails every
     // build rather than only the trusted ones that reach the deploy.
     const ttl = flags.ttl === undefined ? undefined : parseTtl(flags.ttl);
-    // A preview lives a minute at least and thirty days at most — the product
-    // rule, applied here rather than in the generic TTL parser.
-    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 30 * 24 * 60 * 60 * 1000)) {
+    // A preview lives a minute at least and 365 days at most — the server's
+    // fixed limit (preview-ttl.yaml), applied here rather than in the generic
+    // TTL parser so a bad value fails before a release is built.
+    if (ttl !== undefined && (ttl.ms < 60 * 1000 || ttl.ms > 365 * 24 * 60 * 60 * 1000)) {
       throw new ZitadelError("E_VALIDATION", `${flags.ttl} is outside the allowed range`, {
-        hint: "A preview lives between 60s and 30d.",
+        hint: "A preview lives between 60s and 365d.",
       });
     }
 
@@ -176,7 +177,7 @@ export default class Preview extends PreviewCommand {
       });
     }
 
-    const { bundle, brandingSources, idpFiles } = await buildBundle(cwd);
+    const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(cwd);
     const ctx: StepContext = {
       cwd,
       client,
@@ -189,6 +190,7 @@ export default class Preview extends PreviewCommand {
       bundle,
       brandingSources,
       idpFiles,
+      policyFiles,
       suggest: (args) => this.suggest(args),
     };
 
@@ -221,7 +223,9 @@ export default class Preview extends PreviewCommand {
     const deployment = await createDeployment(client, projectId, {
       releaseId: release.id,
       targets: urls,
-      ...(ttl === undefined ? {} : { ttl: ttl.canonical }),
+      // The wire takes an ISO-8601 duration; `--ttl` keeps the `7d`/`12h`
+      // spelling a person writes (create-deployment-request.yaml).
+      ...(ttl === undefined ? {} : { ttl: ttl.iso }),
     });
 
     const previews = deployment.targets.map((target) => ({

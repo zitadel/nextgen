@@ -7,105 +7,72 @@ import { describe, expect, it } from "vitest";
 
 import { COMMAND_GROUPS } from "../../../src/lib/oclif/groups";
 import { cliPackageRoot } from "../../helpers/oclif-build";
-import { parseJson, runCliForTest, stripAnsi } from "../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../helpers/run-cli";
 
 /**
- * The root screen, byte for byte. Issue #1248 specified the shape; the
- * resource commands (ADR 062) fill the configuration and resource groups.
+ * The root screen, byte for byte. Issue #1248 specified the shape, and #2263 the
+ * groups: named for what a developer is doing, one row per family of commands.
  */
 const ROOT_HELP = `Manage your Zitadel project and local identity server from the command line.
 
 Usage
   zitadel <command> [flags]
 
-Project commands
-  setup:                        Create a Zitadel project and scaffold local auth
-  claim:                        Claim this project to make it permanent
-  doctor:                       Verify local runtime and project state
-  eject:                        Remove managed files and local Zitadel state
-  env:                          Show which server and project resolve, and where each value came from
-  env list:                     List the environments bound in this directory's .env files
-  env add:                      Bind an environment to a project, creating the project if needed
+Run a command below. Use \`zitadel <command> --help\` to see its options.
 
-Local server commands
-  start:                        Start a local Zitadel server
-  stop:                         Stop the local Zitadel server
-  status:                       Summarize the local Zitadel server and project state
-  logs:                         Show local Zitadel server logs
-  reset:                        Delete the local Zitadel server runtime and data
-  console:                      Open the local console, signed in as the local admin created by \`zitadel start\`
+Getting started
+  setup             Create a Zitadel project and scaffold local auth
+  start             Start a local Zitadel server
+  status            Summarize the local Zitadel server and project state
+  claim             Claim this project to make it permanent
 
-Configuration commands
-  deploy:                       Build a release from .zitadel/ and deploy it to the project
-  preview:                      Deploy a release from .zitadel/ to a pull-request build's preview URLs
-  branding eject:               Take ownership of the login template
-  auth-method passkey disable:  Disable passkey sign-in for a user schema
-  auth-method passkey enable:   Enable passkey sign-in for a user schema
-  auth-method password disable: Disable password sign-in for a user schema
-  auth-method password enable:  Enable password sign-in for a user schema
-  auth-method sso disable:      Remove an identity provider from a user schema
-  auth-method sso enable:       Add an identity provider to a user schema
-  branding get:                 Get one branding revision by id
-  branding list:                List branding
-  deployment create:            Deploy an existing release to the project's origins
-  deployment get:               Read one deployment by id
-  deployment list:              List the project's deployments, newest first
-  deployment rollback:          Roll back to an earlier deployment
-  flow-definitions get:         Get one flow definition by id
-  flow-definitions list:        List flow-definitions
-  origin add:                   Add an origin pattern to the project
-  origin list:                  List the origin patterns on the project
-  origin rm:                    Remove an origin pattern from the project
-  preview list:                 List the project's live previews, newest first
-  preview rm:                   Remove a live preview from the project
-  release create:               Build a release from .zitadel/ without deploying it
-  release get:                  Get one release by id
-  release list:                 List release
-  release revoke:               Revoke a release so its content is never served again
-  schemas get:                  Get one schema by id
-  schemas list:                 List schemas
-  variable get:                 Get one variable from the project
-  variable list:                List the variables entered on the project
-  variable resolve:             Show the variables the live deployment froze for a target
-  variable rm:                  Remove one variable from the project
-  variable set:                 Set one variable on the project
+Local development
+  console           Open the local console, signed in as the local admin
+  logs              Show local Zitadel server logs
+  stop              Stop the local Zitadel server
+  reset             Delete the local Zitadel server runtime and data
+  eject             Remove managed files and local Zitadel state
 
-Resource commands
-  resources:                    List the resources this CLI manages and what can be done to each
-  api:                          Call any operation of the Zitadel API, with this project's server and project secret
-  api ls:                       List the operations of the Zitadel API that \`zitadel api\` calls
-  events get:                   Get one event by id
-  events list:                  List events
-  grants create:                Create a grant
-  grants delete:                Delete a grant by id
-  grants get:                   Get one grant by id
-  grants list:                  List grants
-  idps create:                  Create an identity provider connection
-  idps get:                     Get one identity provider connection by id
-  idps list:                    List idps
-  projects get:                 Get one project by id
-  projects list:                List projects
-  projects update:              Update a project by id
-  sessions get:                 Get one session by id
-  sessions list:                List sessions
-  sessions revoke:              Revoke a session by id
-  teams create:                 Create a team
-  teams deactivate:             Deactivate a team by id
-  teams get:                    Get one team by id
-  teams list:                   List teams
-  teams update:                 Update a team by id
-  users create:                 Create a user
-  users delete:                 Delete a user by id
-  users get:                    Get one user by id
-  users list:                   List users
-  users update:                 Update a user by id
+Users and teams
+  users             Create and manage users
+  teams             Create and manage teams
+  grants            Manage access grants
 
-Additional commands
-  autocomplete:                 Display autocomplete installation instructions
-  commands:                     List all zitadel commands
-  search:                       Search for a command
-  version:                      Show the CLI version
-  which:                        Show which plugin a command is in
+Authentication
+  auth-method       Configure how users sign in
+  idps              Manage identity provider connections
+  sessions          View and revoke sessions
+
+Configuration and releases
+  deploy            Apply your local configuration to Zitadel
+  preview           Deploy and manage pull-request preview URLs
+  pull              Rebuild your .zitadel/ files from a release
+  branding          Manage the login branding
+  deployment        Deploy releases and roll them back
+  env               Show and bind environments
+  flow-definitions  View login flows
+  origin            Manage the project's allowed origins
+  policies          View policies
+  projects          View and update projects
+  release           Build and manage releases
+  schemas           View user schemas
+  variable          Manage project variables
+
+Diagnostics and utilities
+  doctor            Verify local runtime and project state
+  api               Call any operation of the Zitadel API
+  autocomplete      Display autocomplete installation instructions
+  commands          List all zitadel commands
+  events            View events
+  resources         List the resources this CLI manages
+  search            Search for a command
+  version           Show the CLI version
+  which             Show which plugin a command is in
 
 Flags
   --help      Show help for command
@@ -115,9 +82,6 @@ Examples
   $ zitadel setup --framework next
   $ zitadel start
   $ zitadel doctor
-
-Learn more
-  Use \`zitadel <command> --help\` for more information about a command.
 `;
 
 /**
@@ -177,6 +141,46 @@ describe("root help", () => {
     expect(stripAnsi(stdout)).toContain("schemas list");
   });
 
+  it.each([
+    { label: "a command", argv: ["claim", "--help"] },
+    { label: "a family of commands", argv: ["users", "--help"] },
+  ])("ends the help for $label with where to find every command", async ({ argv }) => {
+    const { exitCode, stdout } = await runCliForTest(argv);
+
+    expect(exitCode).toBe(0);
+    expect(stripAnsi(stdout).trimEnd().split("\n").slice(-2)).toEqual([
+      "Explore all commands:",
+      `  ${expectedPublicCliCommand("")}`,
+    ]);
+  });
+
+  it("keeps each family of commands in one group, and describes it with a topic", async () => {
+    const { stdout } = await runCliForTest(["commands", "--json"]);
+    const commands = (
+      parseJson(stdout) as Array<{
+        id: string;
+        aliases: string[];
+        pluginName?: string;
+        group?: string;
+      }>
+    )
+      .filter((command) => command.pluginName === "@zitadel/cli")
+      .filter((command) => !command.aliases.includes(command.id));
+    const groupsOf = new Map<string, Set<string | undefined>>();
+    for (const command of commands.filter((candidate) => candidate.id.includes(":"))) {
+      const [family = command.id] = command.id.split(":");
+      groupsOf.set(family, (groupsOf.get(family) ?? new Set()).add(command.group));
+    }
+    const { oclif } = JSON.parse(await readFile(join(cliPackageRoot, "package.json"), "utf8")) as {
+      oclif: { topics: Record<string, { description?: string }> };
+    };
+
+    expect([...groupsOf].filter(([, groups]) => groups.size > 1).map(([family]) => family)).toEqual(
+      [],
+    );
+    expect([...groupsOf.keys()].filter((family) => !oclif.topics[family]?.description)).toEqual([]);
+  });
+
   it("requires every product command to declare a group", async () => {
     const { exitCode, stdout } = await runCliForTest(["commands", "--json"]);
     expect(exitCode).toBe(0);
@@ -214,7 +218,7 @@ describe("root help from the published manifest", () => {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
       commands: Record<string, { group?: string; groupOrder?: number }>;
     };
-    expect(manifest.commands.setup).toMatchObject({ group: "Project commands", groupOrder: 1 });
+    expect(manifest.commands.setup).toMatchObject({ group: "Getting started", groupOrder: 1 });
     // A manifest that lost the statics is what a regression would ship; the
     // screen must visibly change, proving the manifest is what was rendered.
     delete manifest!.commands.setup!.group;
@@ -224,7 +228,7 @@ describe("root help from the published manifest", () => {
     const { stdout } = await runCliForTest(["--help"], {}, root);
 
     const text = stripAnsi(stdout);
-    expect(text).not.toContain("Project commands\n  setup:");
-    expect(text).toMatch(/Additional commands\n(?:.*\n)* {2}setup: /);
+    expect(text).not.toContain("Getting started\n  setup ");
+    expect(text).toMatch(/Diagnostics and utilities\n(?:.*\n)* {2}setup {2}/);
   });
 });

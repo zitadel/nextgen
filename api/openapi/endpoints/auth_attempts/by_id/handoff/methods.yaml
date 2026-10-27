@@ -13,8 +13,7 @@ post:
     - Audience-bound (requires matching project key for exchange)
     - Idempotency-safe within a 5-minute window (see conventions)
 
-    Reuses the deployment sealed when the attempt was created. If that release
-    was revoked since, the response is `409` with `rel.revoked`.
+    Revoke refusal for a sealed release happens at handoff exchange, not here.
   tags:
     - Authentication Attempts
   security:
@@ -36,16 +35,16 @@ post:
             $ref: handoff-response.yaml
     '409':
       description: |
-        The sealed release was revoked (`rel.revoked`).
+        The attempt is not complete (`att.not_completed`).
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
           examples:
-            revoked:
-              summary: The sealed release was revoked
+            not_completed:
+              summary: The attempt is not complete
               value:
-                code: rel.revoked
-                message: 'the release this attempt runs on was revoked'
+                code: att.not_completed
+                message: 'authentication attempt is not completed'
     default:
       $ref: createHandoff-error-response.yaml

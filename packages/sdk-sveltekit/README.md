@@ -10,7 +10,7 @@ pnpm add @zitadel/sdk-sveltekit@latest
 
 ## Requirements
 
-Peer dependencies: `@sveltejs/kit ^2.0.0 || ^3.0.0` and `svelte ^5.0.0`.
+Peer dependencies: `@sveltejs/kit ^3.0.0` and `svelte ^5.0.0`.
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
@@ -18,25 +18,39 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ### 1. Server hook
 
-Create (or extend) `src/hooks.server.ts`:
+Declare the three server-only settings in `src/env.ts`, so SvelteKit 3 serves
+them from `$app/env/private`: from `.env.local` in dev, and from the platform's
+environment in production. A missing one fails each request with an error naming it, and SvelteKit never
+bundles them for the browser. An app that already has `src/env.ts` adds the
+three entries to its own `defineEnvVars` call:
 
 ```ts
+import { defineEnvVars } from '@sveltejs/kit/env';
+
+export const variables = defineEnvVars({
+  ZITADEL_URL: {},
+  ZITADEL_PROJECT_SECRET: {},
+  ZITADEL_PROJECT_ID: {},
+});
+```
+
+Then create (or extend) `src/hooks.server.ts`:
+
+```ts
+import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
 import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
 
 export const handle = createNextgenHandle({
-  url: process.env.ZITADEL_URL,
-  projectSecret: process.env.ZITADEL_PROJECT_SECRET,
+  url: ZITADEL_URL,
+  projectSecret: ZITADEL_PROJECT_SECRET,
+  projectId: ZITADEL_PROJECT_ID,
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
 ```
 
-Read the config from `process.env` rather than SvelteKit's `$env` modules: the
-public/private env import paths moved between SvelteKit 2 and 3
-(`$env/dynamic/private` → `$app/env/private`), so `process.env` is the one
-version-independent source. In dev, load `.env.local` first with
-`process.loadEnvFile?.('.env.local')` (SvelteKit does not surface `.env` on
-`process.env`); in production the platform provides the variables.
+Left out, `url`, `projectSecret` and `projectId` default to the same names on
+`process.env`, which SvelteKit never fills from `.env` files.
 
 The hook runs on every request and does three things in one pass:
 
@@ -141,12 +155,12 @@ pnpm add @zitadel/sdk-svelte@latest
 
 The widget mounts on the client only: its config is set as element properties,
 which server-rendered markup cannot carry, so it is created in the browser with
-its config in place. `onMount` never runs during SSR, and works
-on SvelteKit 2 and 3 alike (`$app/environment` is deprecated in SvelteKit 3).
+its config in place. `onMount` never runs during SSR, unlike the deprecated
+`$app/environment` check, which warns on every dev render.
 
 To read the project id from the environment, use Vite's
-`import.meta.env.VITE_ZITADEL_PROJECT_ID`, which both SvelteKit majors expose to
-the browser (`zitadel setup` seeds it in `.env.local`).
+`import.meta.env.VITE_ZITADEL_PROJECT_ID`, which SvelteKit exposes to the
+browser (`zitadel setup` seeds it in `.env.local`).
 
 `ZitadelSession` renders the signed-in "signed in as" card with a sign-out
 button, and `ZitadelLogout` a sign-out control on its own. Mount them the same

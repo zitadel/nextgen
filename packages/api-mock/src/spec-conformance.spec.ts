@@ -1938,6 +1938,86 @@ describe("api-mock releases and deployments", () => {
     expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
   });
 
+  test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
+    const project = await newProject("release-build-policies");
+    const policy = (min_length: number) => ({
+      operation: "auth.factor.password.set",
+      config: { min_length },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    const listed = async () =>
+      (
+        (await (
+          await fetch(`${BASE}/policies?project_id=${project.id}`, {
+            headers: { authorization: `Bearer ${project.secret}` },
+          })
+        ).json()) as { policies: { id: string; revision_id: string; config: object }[] }
+      ).policies;
+
+    const first = await build({ bundle: { policies: [policy(12)] } });
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(
+      expect.objectContaining({ kind: "policy", handle: "auth.factor.password.set" }),
+    );
+    const [published] = await listed();
+    expect(published?.config).toEqual({ min_length: 12 });
+
+    await build({ bundle: { policies: [policy(14)] } });
+    const [revised] = await listed();
+    expect(revised?.id).toBe(published?.id);
+    expect(revised?.revision_id).not.toBe(published?.revision_id);
+    expect(revised?.config).toEqual({ min_length: 14 });
+
+    // Going back adds a revision, as the service does, so the earlier config
+    // applies again and the build is a new release rather than the first one.
+    const back = await build({ bundle: { policies: [policy(12)] } });
+    expect(back.status).toBe(201);
+    const [again] = await listed();
+    expect(again?.config).toEqual({ min_length: 12 });
+    expect(again?.revision_id).not.toBe(published?.revision_id);
+  });
+
+  test("refuses a bundle whose policy breaks its template's rule, or carries one twice", async () => {
+    const project = await newProject("release-build-policy-invalid");
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const contradicting = await build({
+      bundle: {
+        policies: [
+          { operation: "auth.factor.password.set", config: { min_length: 20, max_length: 10 } },
+        ],
+      },
+    });
+    expect(contradicting.status).toBe(400);
+    const refused = (await contradicting.json()) as {
+      code: string;
+      details: { resources: { kind: string; code: string }[] };
+    };
+    expect(refused.code).toBe("rel.invalid");
+    expect(refused.details.resources).toEqual([
+      expect.objectContaining({ kind: "policy", code: "pol.invalid" }),
+    ]);
+
+    const once = { operation: "auth.factor.password.set", config: {} };
+    const twice = await build({ bundle: { policies: [once, once] } });
+    expect(twice.status).toBe(400);
+    expect(
+      ((await twice.json()) as { details: { resources: unknown[] } }).details.resources,
+    ).toHaveLength(2);
+  });
+
   test("creates a release and dedupes a resubmission on content", async () => {
     const project = await newProject("release-create");
 
@@ -2125,10 +2205,10 @@ describe("api-mock releases and deployments", () => {
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
       id: string;
     };
-    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "PT1H" };
     await createDeployment(project.id, project.secret, body);
 
-    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "P30D" });
 
     expect(renewed.status).toBe(201);
   });
@@ -2267,7 +2347,7 @@ describe("api-mock releases and deployments", () => {
     const mixed = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: ["https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"],
-      ttl: "168h",
+      ttl: "PT168H",
     });
     expect(mixed.status).toBe(400);
     expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2285,7 +2365,7 @@ describe("api-mock releases and deployments", () => {
     const withTtl = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: ["primary"],
-      ttl: "168h",
+      ttl: "PT168H",
     });
     expect(withTtl.status).toBe(400);
     expect(((await withTtl.json()) as { code: string }).code).toBe("dep.invalid");
@@ -2301,7 +2381,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "168h",
+      ttl: "PT168H",
     });
 
     const removePreview = () =>
@@ -2331,7 +2411,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "168h",
+      ttl: "PT168H",
     });
     await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
       method: "POST",
@@ -2358,7 +2438,7 @@ describe("api-mock releases and deployments", () => {
     const first = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "60m",
+      ttl: "PT60M",
     });
     expect(first.status).toBe(201);
     const expiresFirst = (
@@ -2372,7 +2452,7 @@ describe("api-mock releases and deployments", () => {
     const again = await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: [url],
-      ttl: "168h",
+      ttl: "PT168H",
     });
     expect(again.status).toBe(201);
     const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
@@ -2400,7 +2480,7 @@ describe("api-mock releases and deployments", () => {
     await createDeployment(project.id, project.secret, {
       release_id: release.id,
       targets: urls,
-      ttl: "168h",
+      ttl: "PT168H",
     });
 
     const first = (await (
@@ -2436,7 +2516,7 @@ describe("api-mock releases and deployments", () => {
       await createDeployment(project.id, project.secret, {
         release_id: release.id,
         targets: [url],
-        ttl: "168h",
+        ttl: "PT168H",
       })
     ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
     const historyBefore = (await (

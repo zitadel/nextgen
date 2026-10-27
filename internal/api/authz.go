@@ -58,7 +58,8 @@ type resourceAccess struct {
 	// kind is the expected resource_scope_index.resource_kind for path-id ops.
 	// Empty means no kind check (project-scoped create/list only).
 	kind domain.ResourceKind
-	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold;
+	// readMiss / writeMiss are anti-oracle answers when Check finds no foothold
+	// (for a by-id Check, none that covers the target);
 	// writeMiss also covers nonexistent projects on create/list.
 	readMiss  func() domain.Error
 	writeMiss func() domain.Error
@@ -348,7 +349,8 @@ func requireResourceAccessAmong(ctx context.Context, stmts resourceAccessStmts, 
 
 // requireProjectAccess gates a management operation via resolver.Check when
 // project_id is already known (create, project by-id, or after RSI).
-// Management lists use requireProjectListAccess, not this gate.
+// Management lists use requireProjectListAccess, unless their statement has
+// no resource-scope predicate (previews): those use this gate project-wide.
 // DecisionNotFound → resource not-found / invalid-project shapes (404).
 // DecisionForbidden → permission_denied (403).
 func (h *Handler) requireProjectAccess(ctx context.Context, projectID string, res resourceAccess, op accessOp) error {
@@ -366,6 +368,16 @@ func requireProjectAccess(ctx context.Context, stmts service.AuthzResolverStatem
 // RSI hit: DecisionNotFound always uses readMiss (not writeMiss) so PATCH routes
 // do not leak existence via mismatched codes. Team-/resource-scoped grants may
 // Allow when RSI.team_id / path id match the grant (authz.md scoped Allow).
+// requireTargetAccess is requireProjectAccessAfterRSI for an id that has no
+// RSI row (a miss on a by-id read): the Check names it as the target, so the
+// foothold that turns a denial into 403 must cover it, as for a real row.
+func (h *Handler) requireTargetAccess(ctx context.Context, projectID, resourceID string, res resourceAccess, op accessOp) error {
+	if h == nil || h.pool == nil {
+		return domain.ErrInternal(errors.New("authz statements not configured"))
+	}
+	return requireProjectAccessAfterRSI(ctx, h.pool.Statements(), domain.NewResourceScope(res.kind, projectID, resourceID), res, op)
+}
+
 func requireProjectAccessAfterRSI(ctx context.Context, stmts service.AuthzResolverStatements, rsi *domain.ResourceScope, res resourceAccess, op accessOp) error {
 	return requireProjectAccessMapped(ctx, stmts, rsi.ProjectID, res, op, rsi)
 }

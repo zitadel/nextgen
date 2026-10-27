@@ -11,7 +11,7 @@
     "cloud": "node scripts/run-cloud.mjs",
     "docs": "moon run docs:dev",
     "check": "node scripts/check.mjs",
-    "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment --continue",
+    "check:cloud": "turbo run e2e-deployment console-deployment schemas-deployment cli-deployment --continue",
     "test": "node scripts/assert-file.mjs scripts/ci-mode.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs && vitest run scripts/ci-mode.test.mjs scripts/dev-process.test.mjs scripts/release-github.test.mjs scripts/generate-meta-schemas.test.ts scripts/render-builtin-schemas.test.mjs",
     "test:all": "pnpm run test",
     "release:snapshot": "moon run release:snapshot",

@@ -61,9 +61,11 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
       schemas: [],
       flow_definitions: [],
       idps: connections.map((entry) => entry.body),
+      policies: [],
     },
     brandingSources: [],
     idpFiles: connections.map((entry) => entry.name),
+    policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...rest,
   };

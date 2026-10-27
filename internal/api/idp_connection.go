@@ -72,9 +72,11 @@ func (h *Handler) GetIdpRevisionById(ctx context.Context, params api.GetIdpRevis
 	projectID := string(params.ProjectID)
 	entity, err := h.idpConnectionService.GetRevision(ctx, projectID, params.RevisionID)
 	if err != nil {
-		// A miss answers as the project check would first, so a caller the
-		// project does not admit learns nothing from the id.
-		if accessErr := h.requireProjectAccess(ctx, projectID, idpAccess, opRead); accessErr != nil {
+		// A miss answers as a revision of a connection outside the caller's
+		// scope does: checked against the revision id as the target, so a
+		// caller whose grants cover other connections cannot tell an unknown
+		// id from a hidden one (#2112).
+		if accessErr := h.requireTargetAccess(ctx, projectID, params.RevisionID, idpAccess, opRead); accessErr != nil {
 			return nil, accessErr
 		}
 		return nil, err

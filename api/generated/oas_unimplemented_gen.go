@@ -48,7 +48,9 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 // allocates nothing, however long ago it was built. Otherwise every resource is compared against the
 // project's newest revision of the same handle: unchanged content reuses
 // that revision, changed content allocates a new one, and the request
-// answers `201` with the new release. Metadata is excluded from the
+// answers `201` with the new release. A policy whose config matches only an
+// older revision allocates a new one too, so a request that resolves no
+// release, which reads the newest revision, applies it as well. Metadata is excluded from the
 // comparison, so the same content under a different `message` is the same
 // release.
 // A structurally malformed request is refused while decoding with
@@ -60,8 +62,9 @@ func (UnimplementedHandler) BeginUserPasskeyRegistration(ctx context.Context, re
 // `rel.unresolved_reference`, naming the pointer and the handle.
 // Building writes revisions, so besides `release.write` it needs the write
 // scope of every kind the bundle carries a resource of: `schema.write`,
-// `flow_definition.write`, `branding.write` and `idp.write`, as the
-// per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
+// `flow_definition.write`, `branding.write`, `idp.write` and
+// `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.
+// permission_denied`,
 // naming the kind. An empty kind needs no scope.
 // Building a release does not deploy it. A release is not tied to an
 // origin, and the same release can later be deployed to any number of
@@ -92,10 +95,10 @@ func (UnimplementedHandler) CompleteClaim(ctx context.Context, req *CompleteClai
 // Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
 // also include session_id and that session's session_token to add factors to an existing session.
 // The project comes from the project secret. A body `project_id` that disagrees
-// answers `403` with `proj.mismatch`. The attempt resolves a deployment the
-// same way as other runtime operations and seals it; with no browser `Origin`
-// and nothing deployed to the resolved target the response is `409` with
-// `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
+// answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
+// filled only when create runs with a runtime resolution already on the
+// context (the flow create path); this HTTP entry point does not resolve
+// Origin or refuse a revoked release itself.
 //
 // POST /auth_attempts
 func (UnimplementedHandler) CreateAuthAttempt(ctx context.Context, req *CreateAuthAttemptRequest) (r CreateAuthAttemptRes, _ error) {
@@ -135,7 +138,7 @@ func (UnimplementedHandler) CreateBranding(ctx context.Context, req *Branding, p
 // - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
 // a primary origin named exactly; `primary` mixed with preview URLs;
 // `primary` on a project with no primary origin; `ttl` with `primary`;
-// `ttl` above the project's maximum.
+// `ttl` above 365 days (`P365D`).
 // - `400 dep.variables_missing`: a referenced variable has no value for
 // the kind; `details` names the kind and every missing variable.
 // - `403 proj.origin_not_allowed`: a preview URL matches no preview
@@ -235,8 +238,7 @@ func (UnimplementedHandler) CreateGrant(ctx context.Context, req *CreateGrantReq
 // - Single-use (atomic exchange, no retry)
 // - Audience-bound (requires matching project key for exchange)
 // - Idempotency-safe within a 5-minute window (see conventions)
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
+// Revoke refusal for a sealed release happens at handoff exchange, not here.
 //
 // POST /auth_attempts/{attempt_id}/handoff
 func (UnimplementedHandler) CreateHandoff(ctx context.Context, params CreateHandoffParams) (r CreateHandoffRes, _ error) {
@@ -483,8 +485,6 @@ func (UnimplementedHandler) FinishUserPasskeyRegistration(ctx context.Context, r
 // challenges issued so far, and any errors preventing progress.
 // Use this for polling during long-running factor verifications (e.g., waiting for
 // a federated IdP callback or a device flow).
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // GET /auth_attempts/{attempt_id}
 func (UnimplementedHandler) GetAuthAttempt(ctx context.Context, params GetAuthAttemptParams) (r GetAuthAttemptRes, _ error) {
@@ -879,8 +879,6 @@ func (UnimplementedHandler) InitClaim(ctx context.Context, params InitClaimParam
 // (password, passkey, TOTP, OTP via SMS, etc.). The server responds with challenge details
 // including method, metadata, and any UI hints. The client then verifies the proof
 // by calling POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify.
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges
 func (UnimplementedHandler) IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (r IssueChallengeRes, _ error) {
@@ -1050,6 +1048,37 @@ func (UnimplementedHandler) ListPolicyRevisions(ctx context.Context, params List
 //
 // GET /projects/{project_id}/previews
 func (UnimplementedHandler) ListPreviews(ctx context.Context, params ListPreviewsParams) (r ListPreviewsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// ListProjectAdmins implements listProjectAdmins operation.
+//
+// Lists the people who can administer the project, and how each of them
+// gets that access. A person appears once, with one entry in `sources` per
+// way they hold it:
+// - `owning_team`: an active member of the team that owns the project
+// (ADR 054 §2). Removing a grant does not remove this access; it ends
+// only when the person leaves the team or the project changes owner.
+// - `grant`: an unexpired `admin` grant on the project, either to the
+// person (`grant_id` only) or to a team they are an active member of
+// (`grant_id` and `team`). Revoking that grant removes this source.
+// The list follows the authorization check: team membership is read from
+// the same membership projection the check expands, so a person who left a
+// team, or whose team or user was deactivated, is not listed through it.
+// Grants that expired or carry a lower role are left out. A person whose
+// only access is a `viewer` or `editor` grant is not an admin and is not
+// listed. Like the check, the list does not look at a person's user status
+// beyond that, so a direct grant to a suspended person is listed.
+// A person whose access comes only through teams the caller is not a
+// member of is left out, and a team the caller is not in is named by
+// `team_id` only. The grant to such a team still shows in the project's
+// grants.
+// Ordered by `user_id` and paginated with `page_token`.
+// Accepts either a project secret (`oauth2`) or a user-bound Console
+// session cookie (`nextgenSession`) that can read the project.
+//
+// GET /projects/{project_id}/admins
+func (UnimplementedHandler) ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (r ListProjectAdminsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1460,8 +1489,6 @@ func (UnimplementedHandler) UpdateVariables(ctx context.Context, req UpdateVaria
 // - `recovery_code` method: { recovery_code: "…" }
 // On successful verification, the factor is written to the auth attempt.
 // The attempt moves to the next pending challenge or completes if all required factors are verified.
-// Reuses the deployment sealed when the attempt was created. If that release
-// was revoked since, the response is `409` with `rel.revoked`.
 //
 // POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
 func (UnimplementedHandler) VerifyChallengeProof(ctx context.Context, req *VerifyChallengeRequest, params VerifyChallengeProofParams) (r VerifyChallengeProofRes, _ error) {

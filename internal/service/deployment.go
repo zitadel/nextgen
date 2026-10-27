@@ -37,8 +37,9 @@ type CreateDeploymentOutput struct {
 
 // DeployInput carries the targets as the request gives them.
 type DeployInput struct {
-	// HasTTL reports a ttl in the request, which only a preview deploy takes.
-	HasTTL               bool
+	// TTL is the request's ttl, which only a preview deploy takes; nil uses
+	// domain.DefaultPreviewTTL.
+	TTL                  *time.Duration
 	ProjectID            string
 	ReleaseID            string
 	Targets              []string
@@ -79,11 +80,12 @@ type ListDeploymentsOutput struct {
 }
 
 type DeploymentService struct {
-	v2Pool *DB
+	v2Pool    *DB
+	variables VariableService
 }
 
-func NewDeploymentService(v2Pool *DB) *DeploymentService {
-	return &DeploymentService{v2Pool: v2Pool}
+func NewDeploymentService(v2Pool *DB, variables VariableService) *DeploymentService {
+	return &DeploymentService{v2Pool: v2Pool, variables: variables}
 }
 
 // maxDeployAttempts bounds how often an unguarded deploy retries after losing
@@ -109,8 +111,10 @@ func (s *DeploymentService) Create(ctx context.Context, input CreateDeploymentIn
 	if err != nil {
 		return nil, err
 	}
-	if entity.OriginKind == domain.DeploymentOriginKindPreview && input.PreviewTTL <= 0 {
-		return nil, domain.ErrDeploymentInvalid().WithMessage("a deployment to preview URLs needs a ttl")
+	if entity.OriginKind == domain.DeploymentOriginKindPreview {
+		if _, err = domain.ResolvePreviewTTL(&input.PreviewTTL); err != nil {
+			return nil, err
+		}
 	}
 
 	for attempt := 1; ; attempt++ {
@@ -145,13 +149,14 @@ func (s *DeploymentService) Deploy(ctx context.Context, input DeployInput) (_ *C
 	if err != nil {
 		return nil, err
 	}
-	if input.HasTTL && kind == domain.DeploymentOriginKindPrimary {
-		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
-	}
 	var ttl time.Duration
-	// TODO(#2210): take the request's ttl instead of the default.
 	if kind == domain.DeploymentOriginKindPreview {
-		ttl = domain.DefaultPreviewTTL
+		ttl, err = domain.ResolvePreviewTTL(input.TTL)
+		if err != nil {
+			return nil, err
+		}
+	} else if input.TTL != nil {
+		return nil, domain.ErrDeploymentInvalid().WithMessage("ttl is only valid for preview URLs")
 	}
 	return s.Create(ctx, CreateDeploymentInput{
 		ProjectID:            input.ProjectID,
@@ -249,14 +254,27 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
+		set, err := resolveDeploymentVariableSet(ctx, s.variables, stmts, entity, release)
+		if err != nil {
+			return err
+		}
 		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {
 			return err
 		}
+		// The hash can change the answer only when the kind, release, and
+		// origins already match. Anything else is a new deployment.
+		var currentHash string
+		if domain.SamePrimaryRelease(entity, current) {
+			currentHash, err = deploymentSetHash(ctx, s.variables, stmts, current)
+			if err != nil {
+				return err
+			}
+		}
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if domain.DeploymentsEqual(entity, current) {
+		if domain.DeploymentsEqual(entity, current, set.Hash, currentHash) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
@@ -271,8 +289,9 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): resolve the variable set before DeploymentsEqual, from
-		// RollbackTo's frozen set or else the current values, and link it here.
+		if err := s.variables.StoreDeploymentVariableSet(ctx, stmts, written.ProjectID, written.ID, set); err != nil {
+			return err
+		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {
 			if err := stmts.UpsertPreviews(ctx, written.ProjectID, written.Origins(),
 				written.DeployedAt.Add(input.PreviewTTL), written.DeployedAt); err != nil {

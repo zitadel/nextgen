@@ -109,7 +109,7 @@ Canonical examples:
 | Nav chrome | `Sidebar` (`collapsible="icon"`; mobile = persistent icon rail) |
 | Org/project picker | `Popover` + `Badge` |
 | Users filters | `Tabs` |
-| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button` |
+| Users table | `Table`, `Avatar`, `Badge`, `DropdownMenu`, `Button`; `HoverCard` (identity), `Popover` (attributes) |
 | Panel around a screen's content | `Card` |
 | Attribute chip / CLI command in prose | `InlineCode` |
 | Any searchable picker | `Combobox` (`src/components/ui/combobox.tsx`) |
@@ -120,10 +120,25 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 
-Shared text styles (`PAGE_TITLE`, `OVERLINE`, `EYEBROW`, the panel table cells)
-live in `src/components/typography.ts`. A mutation's pending and error state
-comes from `useSubmit` (`src/hooks/use-submit.ts`), and cursor paging from
-`useLoadMore` (`src/hooks/use-load-more.ts`) with the `LoadMore` button.
+Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
+`OVERLINE`, `EYEBROW`, the panel table cells) live in
+`src/components/typography.ts`.
+
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
+  and section title, the project page's Project Detail, Origins and Variables
+  and Secrets cards included. `DetailSection` renders it as an `h2`; so do
+  Field definitions, Steps, Release content and the settings sections.
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
+  inside a card body, such as Sign-in methods on a schema.
+- The overline is for meta labels, table heads and drill-down breadcrumbs,
+  never a section title.
+
+The Figma style names are not the `heading-*` tokens in the exported
+`4. Custom` collection, which are the larger marketing headings.
+
+A mutation's pending and error state comes from `useSubmit`
+(`src/hooks/use-submit.ts`), and cursor paging from `useLoadMore`
+(`src/hooks/use-load-more.ts`) with the `LoadMore` button.
 
 ## Page wrapper — one top for every screen
 
@@ -139,6 +154,10 @@ own. Do not add a per-screen wrapper with its own padding.
 | Page bottom | 32px |
 | Title row | 36px, title centred — `PAGE_TITLE_ROW` in `typography.ts`, used by lists, details, settings and System |
 | Fill | `fill`: at `lg`, exactly the height under the 56px top bar, as a column; the part that should take the rest uses `flex-1 min-h-0` (Branding's preview). Never a `100vh` offset |
+
+Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
+inside `Page`: capped and centred, so the table does not stretch across the
+window.
 
 `inset="panel"` is for the configuration-panel screens (User schemas, Login
 flows, Identity providers), whose single card the design insets by 24px on the
@@ -173,9 +192,12 @@ Two things are deliberately **not** shared, because the designs genuinely differ
 
 - **Column widths.** Teams sits on a fixed 248px grid. Users and Projects
   clamp their name cell and let their ID column (`ResourceIdCell`) absorb the
-  slack and truncate (D20, D21). The Users table is schema-driven, so it has
-  no fixed grid to share: the default schema fits 1024px, and a schema with
-  more columns scrolls.
+  slack and truncate (D20, D21). The Users table takes the properties a viewer
+  pins, so it has no fixed grid to share, and bounds its width (D23): the
+  unpinned attributes share one 280px Attributes column, so the default
+  columns fit 1024px. Pinning enough columns scrolls the table under its
+  sticky row-menu column, and from 640px its sticky User column
+  (`RESOURCE_STICKY_END` / `RESOURCE_STICKY_START` with `useScrollEdges`).
 - **The header block above the table.** Each frame places its own toolbar, so
   the table's top margin stays with the screen.
 
@@ -198,7 +220,7 @@ Detail screens come in three compositions, and each has one shell:
   `src/components/detail-page.tsx`, then put the body under `DETAIL_BODY`. A
   body card with a titled section is a `DetailSection`; a single name field with
   its Save button is a `RenameCard` (`src/components/rename-card.tsx`). A body
-  card the design titles by name rather than an eyebrow (Users: the profile,
+  card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
   `h1`.
 - **Configuration panel** (User schemas, Login flows): the whole screen is one

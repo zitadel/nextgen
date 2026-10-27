@@ -165,21 +165,25 @@ function expectCopied(headers: Headers, token: string): void {
 }
 
 /**
- * Answers the proxy's calls: the proxied sign-out, and a session check with
- * `check`. Records each call's method and the session cookie it sent.
+ * Answers the proxy's calls: the proxied sign-out, the session's CSRF token,
+ * and a session check with `check`. Records each call's method and the
+ * session cookie it sent.
  */
 function signOutBackend(check: () => Response): { method: string; cookie: string | null }[] {
   const calls: { method: string; cookie: string | null }[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init?: RequestInit) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
       const method = init?.method ?? "GET";
       calls.push({ method, cookie: new Headers(init?.headers).get("cookie") });
-      return method === "DELETE"
-        ? new Response(null, {
-            status: 204,
-            headers: { "set-cookie": `${SHARED}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` },
-          })
+      if (method === "DELETE") {
+        return new Response(null, {
+          status: 204,
+          headers: { "set-cookie": `${SHARED}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax` },
+        });
+      }
+      return new URL(url).pathname === "/sessions/me/csrf"
+        ? Response.json({ csrf_token: "csrf" })
         : check();
     }),
   );
@@ -876,7 +880,7 @@ describe("server middleware", () => {
     expect(served.status).toBe(302);
   });
 
-  it("clears a dead session cookie on a public page", async () => {
+  it("reads a dead session cookie as signed out on a public page", async () => {
     sessionsMe(new Response(null, { status: 401 }));
 
     const served = await serve(
@@ -885,6 +889,7 @@ describe("server middleware", () => {
       OPTIONS,
     );
 
+    expect(served.auth).toEqual({ isAuthenticated: false, session: null });
     expect(served.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION}=;`));
     expect(served.headers.get("set-cookie")).toMatch(/Max-Age=0|expires=.*1970/i);
   });

@@ -1,12 +1,19 @@
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
+
+import { confirm, text } from "@clack/prompts";
+
+import EnvAdd from "../../../../src/commands/env/add";
 import { parseJson, runCliForTest, stripAnsi } from "../../../helpers/run-cli";
+import { asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
@@ -152,6 +159,68 @@ describe("env add", () => {
       const out = await addRendered(cwd, "--project", "proj_existing");
 
       expect(out).toContain("origin add '<your-app-url>' --kind primary");
+    });
+
+    it("offers the deploy that makes the new environment serve .zitadel/", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd, "--app-url", "https://app.acme.com");
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(true);
+    });
+
+    it("offers no deploy when the project has no origin for one to land on", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+    });
+
+    it("tells a person to give the environment an origin before deploying to it", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out).toContain(
+        "Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file .env.production.local",
+      );
+    });
+
+    it("reports no deployment when it made none", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await add(cwd);
+
+      expect((envelope.data as unknown as { deployment: unknown }).deployment).toBeNull();
+    });
+
+    it("offers no deploy for a project it only bound", async () => {
+      const cwd = await makeProject("next");
+
+      const { envelope } = await addBound(cwd);
+
+      expect(suggested(envelope).some((command) => command.includes("deploy -m"))).toBe(false);
+    });
+
+    it("says what the environment serves until something is deployed to it", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd));
+
+      expect(out).toContain(
+        "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
+      );
+    });
+
+    it("names the deploy a person should run, against the new environment", async () => {
+      const cwd = await makeProject("next");
+
+      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+
+      expect(out).toContain(
+        "Deploy to it: zitadel deploy -m '<what changed>' --env-file .env.production.local",
+      );
     });
 
     it("offers no origin add without an app URL to add", async () => {
@@ -561,5 +630,164 @@ describe("env add", () => {
 
       expect((parseJson(result.stdout) as { code: string }).code).toBe("E_VALIDATION");
     });
+  });
+});
+
+/**
+ * The deploy `env add` offers runs only when a person is there to accept it,
+ * so it is driven the way `branding eject`'s prompt is: the command from
+ * source, with clack doubled and the streams pretending to be a terminal.
+ */
+describe("env add asked on a terminal", () => {
+  /** A project holding resources that validate, so a deploy can be built from it. */
+  async function makeDeployableProject(): Promise<string> {
+    const cwd = await makeProject("next");
+    const defaults = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../../../../../../packages/config/defaults",
+    );
+    const resolve = async (name: string): Promise<string> =>
+      (await readFile(join(defaults, name), "utf8"))
+        .replaceAll("${SERVER_URL}", SERVER)
+        .replaceAll("${USER_SCHEMA_URL}", `${SERVER}/schemas/human-user.json`);
+    await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
+    await mkdir(join(cwd, ".zitadel", "flows"), { recursive: true });
+    await writeFile(
+      join(cwd, ".zitadel", "schemas", "human-user.json"),
+      await resolve("default-human-user.json"),
+    );
+    await writeFile(
+      join(cwd, ".zitadel", "flows", "default-login.json"),
+      await resolve("default-login.json"),
+    );
+    return cwd;
+  }
+
+  /** The platform accepts the release and the deployment. */
+  function platformDeploys(): void {
+    server.use(
+      http.post(`${SERVER}/releases/build`, () =>
+        HttpResponse.json({ id: "rel_1", content_hash: "sha256:abc" }, { status: 201 }),
+      ),
+      http.post(`${SERVER}/deployments`, () =>
+        HttpResponse.json(
+          { id: "dep_1", targets: [{ origin: "https://app.acme.com", expires_at: null }] },
+          { status: 201 },
+        ),
+      ),
+    );
+  }
+
+  /** The platform refuses to build the release. */
+  function platformRefusesTheRelease(): void {
+    server.use(
+      http.post(`${SERVER}/releases/build`, () =>
+        HttpResponse.json({ code: "rel.invalid", message: "no" }, { status: 400 }),
+      ),
+    );
+  }
+
+  const adding = (cwd: string, ...extra: string[]) =>
+    asTerminal(() =>
+      EnvAdd.run([
+        "staging",
+        "--cwd",
+        cwd,
+        "--server",
+        SERVER,
+        "--app-url",
+        "https://app.acme.com",
+        ...extra,
+      ]),
+    );
+
+  afterEach(() => {
+    vi.mocked(confirm).mockReset();
+  });
+
+  it("deploys the project when the offer is accepted", async () => {
+    const cwd = await makeDeployableProject();
+    platformDeploys();
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
+
+    expect(envelope.data.deployment).toMatchObject({
+      release_id: "rel_1",
+      deployment_id: "dep_1",
+      origins: ["https://app.acme.com"],
+    });
+    expect(vi.mocked(confirm).mock.calls[0]?.[0].message).toBe(
+      "Would you like to deploy .zitadel/ to it now?",
+    );
+  });
+
+  it("asks where the server and the app are, as questions", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(text).mockResolvedValueOnce(SERVER as never);
+    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd]));
+
+    expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
+      "What is the URL of your Zitadel server?",
+      "What URL is your app served from? You can leave this empty to skip it.",
+    ]);
+  });
+
+  it("deploys nothing when the offer is declined", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = (await adding(cwd)) as { data: { deployment: unknown } };
+
+    expect(envelope.data.deployment).toBeNull();
+  });
+
+  it("still names the deploy after the offer is declined", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(confirm).mockResolvedValueOnce(false as never);
+
+    const envelope = (await adding(cwd)) as { data: { next_commands: string[] } };
+
+    expect(envelope.data.next_commands.some((command) => command.includes("deploy -m"))).toBe(true);
+  });
+
+  it("binds the environment even when the deploy fails", async () => {
+    const cwd = await makeDeployableProject();
+    platformRefusesTheRelease();
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    const envelope = (await adding(cwd)) as { status: string; data: { deployment: unknown } };
+
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data.deployment).toBeNull();
+  });
+
+  it("warns, naming the deploy to re-run, when the deploy fails", async () => {
+    const cwd = await makeDeployableProject();
+    platformRefusesTheRelease();
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+
+    const envelope = (await adding(cwd)) as { warnings: string[] };
+
+    expect(envelope.warnings.join("\n")).toContain("deploy -m");
+  });
+
+  it("never asks for a project it only bound", async () => {
+    const cwd = await makeDeployableProject();
+
+    await adding(cwd, "--project", "proj_existing");
+
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it("never asks when the environment has no origin for a deploy to land on", async () => {
+    const cwd = await makeDeployableProject();
+    vi.mocked(text).mockResolvedValueOnce("" as never);
+
+    await asTerminal(() => EnvAdd.run(["staging", "--cwd", cwd, "--server", SERVER]));
+
+    expect(confirm).not.toHaveBeenCalled();
   });
 });

@@ -28,6 +28,7 @@ import OriginRm from "./commands/origin/rm";
 import Preview from "./commands/preview/index";
 import PreviewList from "./commands/preview/list";
 import PreviewRm from "./commands/preview/rm";
+import Pull from "./commands/pull";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
@@ -62,6 +63,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   env: Env,
   logs: Logs,
   preview: Preview,
+  pull: Pull,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,

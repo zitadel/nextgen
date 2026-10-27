@@ -5,10 +5,10 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rosie = vi.hoisted(() => ({ agents: vi.fn() }));
-const box = vi.hoisted(() => vi.fn());
+const log = vi.hoisted(() => vi.fn());
 
 vi.mock("rosie-skills", () => rosie);
-vi.mock("consola", () => ({ default: { box } }));
+vi.mock("consola", () => ({ default: { log } }));
 
 import { showSkillsHint } from "../../../src/lib/skills-hint";
 
@@ -30,19 +30,41 @@ afterEach(() => {
 const shownFile = () => join(config, "zitadel", "cli", "skills-hint.json");
 
 describe("showSkillsHint", () => {
-  it("names the detected agents and the command to run, without running anything", async () => {
+  it("names the command to run and that it is optional, without running anything", async () => {
     await showSkillsHint({ env, interactive: true });
 
-    const message = box.mock.calls[0]?.[0].message as string;
-    expect(message).toContain("Claude Code");
+    const message = log.mock.calls[0]?.[0] as string;
+    expect(message).toContain("Using an AI coding agent?");
     expect(message).toContain("npx skills add zitadel/nextgen --full-depth");
+    expect(message).toContain("Optional. You can continue without installing skills.");
+  });
+
+  it("does not name the agents it detected or mention the opt-out variable", async () => {
+    await showSkillsHint({ env, interactive: true });
+
+    const message = log.mock.calls[0]?.[0] as string;
+    expect(message).not.toContain("Claude Code");
+    expect(message).not.toContain("detected");
+    expect(message).not.toContain("NO_SKILLS_PROMPT");
+  });
+
+  it("is not counted as shown when showing it fails", async () => {
+    log.mockImplementationOnce(() => {
+      throw new Error("closed stream");
+    });
+
+    await showSkillsHint({ env, interactive: true });
+    await showSkillsHint({ env, interactive: true });
+
+    expect(log).toHaveBeenCalledTimes(2);
+    expect(existsSync(shownFile())).toBe(true);
   });
 
   it("shows once", async () => {
     await showSkillsHint({ env, interactive: true });
     await showSkillsHint({ env, interactive: true });
 
-    expect(box).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -54,7 +76,7 @@ describe("showSkillsHint", () => {
     async (_name, { interactive, extra }: { interactive: boolean; extra?: NodeJS.ProcessEnv }) => {
       await showSkillsHint({ env: { ...env, ...extra }, interactive });
 
-      expect(box).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
       expect(existsSync(shownFile())).toBe(false);
     },
   );
@@ -64,7 +86,7 @@ describe("showSkillsHint", () => {
 
     await showSkillsHint({ env, interactive: true });
 
-    expect(box).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
   });
 
   it("shows once even when two first runs race for the marker", async () => {
@@ -72,7 +94,7 @@ describe("showSkillsHint", () => {
     const second = showSkillsHint({ env, interactive: true });
     await Promise.all([first, second]);
 
-    expect(box).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(1);
   });
 
   it("never throws into the command", async () => {

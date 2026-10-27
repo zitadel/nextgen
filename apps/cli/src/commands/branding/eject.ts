@@ -12,11 +12,7 @@ import {
   brandingReadmeContent,
   getDefaultBrandingConfig,
 } from "@zitadel/config/defaults";
-import {
-  BRANDING_FILE_SCHEMA_REF,
-  META_SCHEMA_DIR,
-  metaSchemaFiles,
-} from "@zitadel/config/meta-schemas";
+import { BRANDING_FILE_SCHEMA_REF, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
 
 import { BRANDING_DIR } from "../../lib/branding";
 import { BRANDING_DESIGN_INFO, resolveBrandingDesign } from "../../lib/branding/designs";
@@ -24,26 +20,28 @@ import { ZitadelError } from "../../lib/errors";
 import { stableStringify } from "../../lib/json";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { hasZitadelConfig } from "../../lib/project";
-import { normalizePublicCliJson, normalizePublicCliProse } from "../../lib/public-cli";
+import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
+import { normalizePublicCliProse } from "../../lib/public-cli";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS } from "../../lib/release";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * The `branding eject` command — take ownership of the login template.
  *
  * Scaffolds `.zitadel/branding/` from a shipped design: the `branding.json`
  * descriptor, the `login.liquid` template it references, a README, and the
- * branding dialect meta-schema (for projects set up before it existed).
+ * branding dialect meta-schema when the project's copy is missing or
+ * outdated (set up before the dialect existed or changed).
  * Purely local — nothing is uploaded; the first `zitadel deploy` publishes
  * revision 1. Ejecting the template is the last rung of the branding
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends BaseCommand {
+export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.configuration;
-  static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({ char: "f", description: "Overwrite an existing branding file." }),
     // No oclif `options`: the retired designs (#1039) must reach
@@ -98,20 +96,24 @@ export default class BrandingEject extends BaseCommand {
     );
     await write(DEFAULT_BRANDING_TEMPLATE_PATH, template, force);
 
-    // Never overwrite a hand-edited README; setups from before the branding
-    // dialect also miss the meta-schema, so materialize it when absent.
+    // Never overwrite a hand-edited README.
     await write(
       join(BRANDING_DIR, "README.md"),
       normalizePublicCliProse(brandingReadmeContent(), this.meta.cliVersion),
       false,
     ).catch(swallowConflict);
-    const brandingMeta = metaSchemaFiles().find((f) => f.name === "branding.json");
+    // The descriptor's `$schema` must resolve to the dialect it was written
+    // in, so the CLI-owned meta-schema is written when missing or outdated,
+    // as `doctor --fix` does; one that cannot be read, or sits behind a
+    // symlink, is doctor's to report.
+    const brandingMeta = projectMetaSchemas(this.meta.cliVersion).find(
+      (file) => file.path === `${META_SCHEMA_DIR}/branding.json`,
+    );
     if (brandingMeta) {
-      await write(
-        join(META_SCHEMA_DIR, brandingMeta.name),
-        `${stableStringify(normalizePublicCliJson(brandingMeta.body, this.meta.cliVersion))}\n`,
-        false,
-      ).catch(swallowConflict);
+      const state = await metaSchemaState(cwd, brandingMeta).catch(() => "current" as const);
+      if (state === "missing" || state === "outdated") {
+        await write(brandingMeta.path, brandingMeta.contents, true);
+      }
     }
 
     for (const file of filesWritten) {
@@ -145,7 +147,7 @@ export default class BrandingEject extends BaseCommand {
     return this.input({
       kind: "select",
       name: "design",
-      message: "Which design do you want to start from?",
+      message: "Which design would you like to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
         value: design as string,

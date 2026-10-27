@@ -5,6 +5,7 @@ import { collectPages } from "../../lib/oclif/crud/paging";
 import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel preview rm <url>` — end a live preview before it expires.
@@ -13,7 +14,7 @@ import { shellArg } from "../../lib/shell";
  * history. Idempotent on the server, but destructive from the caller's point of
  * view, so it takes the same `--force`-or-confirm gate the resource deletes use.
  */
-export default class PreviewRm extends PreviewCommand {
+export default class PreviewRm extends Promptable(PreviewCommand) {
   static override description = "Remove a live preview from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [

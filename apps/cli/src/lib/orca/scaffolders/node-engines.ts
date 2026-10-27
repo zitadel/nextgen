@@ -130,13 +130,22 @@ export function nodeEnginesRange(
 }
 
 /**
- * What every scaffolder that runs `create-vite` (React, Vue, Solid, Svelte and
- * Qwik) declares. `create-vite` never checks the Node itself, so setup only
- * warns.
+ * The `create-vite` release every Vite scaffolder (React, Vue, Solid, Svelte
+ * and Qwik) runs, pinned exactly. 9.3.2 was published without its templates:
+ * it fails to scaffold yet exits 0, so setup went on to report an empty
+ * directory as an undetectable framework. Bump it by hand once a release
+ * ships its templates again. The templates write `^` ranges, so a fresh app
+ * still picks up framework and Vite patch releases.
+ */
+export const CREATE_VITE_VERSION = "9.3.1";
+
+/**
+ * What every scaffolder that runs `create-vite` declares. `create-vite` never
+ * checks the Node itself, so setup only warns.
  */
 export const CREATE_VITE_NODE_ENGINES: NodeEngines = {
   label: "create-vite",
-  spec: "create-vite@latest",
+  spec: `create-vite@${CREATE_VITE_VERSION}`,
   fallback: "^20.19.0 || >=22.12.0",
   enforcement: "warn",
 };
