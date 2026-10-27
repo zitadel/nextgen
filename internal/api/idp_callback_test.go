@@ -12,23 +12,43 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/zitadel/nextgen/internal/api"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 	"github.com/zitadel/nextgen/internal/service"
 )
+
+// spanExporter sets the global provider once, when the test binary starts:
+// the package tracer delegates to the first provider set in the process.
+var spanExporter = func() *tracetest.InMemoryExporter {
+	exporter := tracetest.NewInMemoryExporter()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exporter),
+		sdktrace.WithSampler(zotel.NewSampler(1.0)),
+	))
+	return exporter
+}()
 
 type stubSSOCallback struct {
 	calls int
 	in    service.FlowSSOCallbackInput
 	out   service.FlowSSOCallbackOutput
 	err   error
+	// serverSpan is the server span context Process found in the holder.
+	serverSpan trace.SpanContext
 }
 
-func (s *stubSSOCallback) Process(_ context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
+func (s *stubSSOCallback) Process(ctx context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
 	s.calls++
 	s.in = in
+	s.serverSpan = middleware.GetServerSpanContext(ctx)
 	return s.out, s.err
 }
 
@@ -263,4 +283,29 @@ func TestIDPCallbackHandler_SetsTheOperationID(t *testing.T) {
 
 	operationID, _ := middleware.GetOperationIDContext(ctx)
 	assert.Equal(t, "idpCallback", operationID)
+}
+
+// The route is not an ogen operation, so it starts its own server span: the
+// service and storage spans below it are sampled with it, and the request
+// line reads its IDs from the holder.
+func TestIDPCallbackHandler_StartsAServerSpan(t *testing.T) {
+	t.Parallel()
+	ctx := middleware.WithOperationIDContext(t.Context(), "")
+	stub := &stubSSOCallback{out: service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}}
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, api.IDPCallbackPath("google")+"?state=proj-1.rand&code=the-code", nil)
+	callbackMux(t, api.NewIDPCallbackHandler(stub)).ServeHTTP(httptest.NewRecorder(), req)
+
+	require.True(t, stub.serverSpan.IsValid())
+	// Other tests in this package run the handler in parallel, so only the
+	// spans of this request's trace are looked at.
+	var spans []tracetest.SpanStub
+	for _, s := range spanExporter.GetSpans() {
+		if s.SpanContext.TraceID() == stub.serverSpan.TraceID() {
+			spans = append(spans, s)
+		}
+	}
+	require.Len(t, spans, 1)
+	assert.Equal(t, "idpCallback", spans[0].Name)
+	assert.Equal(t, trace.SpanKindServer, spans[0].SpanKind)
+	assert.Equal(t, stub.serverSpan, spans[0].SpanContext)
 }
