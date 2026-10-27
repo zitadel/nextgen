@@ -206,7 +206,7 @@ export const it: Locale = {
 
   // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione ---
   "notice.user_not_found":
-    "Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Torna indietro per correggerlo.",
+    "Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.",
   "notice.user_already_exists":
     "Esiste già un account per questo indirizzo e-mail. Accedi per continuare.",
   "notice.sso_user_not_found":

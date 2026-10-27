@@ -213,7 +213,7 @@ export const de: Locale = {
 
   // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt ---
   "notice.user_not_found":
-    "Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Geh zurück und korrigiere sie.",
+    "Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie im E-Mail-Feld unten.",
   "notice.user_already_exists":
     "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich an, um fortzufahren.",
   "notice.sso_user_not_found":
