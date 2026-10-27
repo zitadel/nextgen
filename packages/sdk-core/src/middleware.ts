@@ -583,16 +583,51 @@ async function retiresSharedSession(
     return false;
   }
   if (signsOut) {
-    // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
-    // cross-site request. A failed revoke still clears the cookie: the
-    // browser no longer holds the session.
-    await fetch(joinURL(upstream.url, "/sessions/me"), {
-      method: "DELETE",
-      headers: { cookie },
-      signal: AbortSignal.timeout(upstream.timeoutMs),
-    }).catch(() => undefined);
+    // A failed revoke still clears the cookie: the browser no longer holds the
+    // session.
+    await revokeSession(cookie, projectId, upstream);
   }
   return true;
+}
+
+/** The header the session's CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
+
+/**
+ * Ends the session `cookie` carries, as `@zitadel/components` ends its own.
+ * Sign-out is a write, so it carries the session's CSRF token (ADR 053 §5),
+ * read first from `GET /sessions/me/csrf` in this project: a call without an
+ * Origin passes the server's cross-site check, but not its token check.
+ * Without a token it sends no revoke, which the server would refuse.
+ */
+async function revokeSession(
+  cookie: string,
+  projectId: string,
+  upstream: ProxyUpstream,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `${joinURL(upstream.url, "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie },
+        signal: AbortSignal.timeout(upstream.timeoutMs),
+      },
+    );
+    const answer = res.ok
+      ? (parsedJson(await res.text()) as { csrf_token?: unknown } | undefined)
+      : undefined;
+    if (typeof answer?.csrf_token !== "string") {
+      return;
+    }
+    await fetch(joinURL(upstream.url, "/sessions/me"), {
+      method: "DELETE",
+      headers: { cookie, [CSRF_HEADER]: answer.csrf_token },
+      signal: AbortSignal.timeout(upstream.timeoutMs),
+    });
+  } catch {
+    // No answer: the caller clears the cookie all the same.
+  }
 }
 
 /** `text` as JSON, or `undefined` when it is not JSON. */
