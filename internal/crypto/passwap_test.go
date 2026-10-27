@@ -54,7 +54,7 @@ func TestPasswordHasher_EncodingSupported(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &PasswapHasher{
-				Prefixes: []string{bcrypt.Prefix, argon2.Prefix},
+				prefixes: []string{bcrypt.Prefix, argon2.Prefix},
 			}
 			got := h.EncodingSupported(tt.encodedHash)
 			assert.Equal(t, tt.want, got)
@@ -452,7 +452,7 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 			require.NoError(t, err)
 			if tt.wantPrefixes != nil {
 				require.NotNil(t, got)
-				assert.Equal(t, tt.wantPrefixes, got.Prefixes)
+				assert.Equal(t, tt.wantPrefixes, got.prefixes)
 				encoded, err := got.Hash("password")
 				require.NoError(t, err)
 				assert.NotEmpty(t, encoded)

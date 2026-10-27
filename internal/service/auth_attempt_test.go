@@ -117,7 +117,7 @@ func newAuthAttemptSvcWithHashers(
 	sessions service.SessionResolver,
 	users service.UserLookup,
 	hashers service.ProjectHasherResolver,
-	defaultVerifier crypto.RehashingVerifier,
+	defaultVerifier crypto.HashVerifier,
 ) service.AuthAttemptService {
 	pool := mocks.NewMockPool(ctrl)
 	statementer := mocks.NewMockStatementer[service.AllStatements](ctrl)
@@ -872,11 +872,11 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		})
 	}
 
-	// No UpdateUserPasswordHash expectation: a rehash from the default hasher
-	// is the wrong method for the project, so it is not stored.
+	// No UpdateUserPasswordHash expectation: the default's method is the wrong
+	// one for the project, so it computes no rehash and nothing is stored.
 	t.Run("an unresolvable hasher verifies with the default and stores nothing", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		defaultVerifier := cryptomock.NewMockRehashingVerifier(ctrl)
+		defaultVerifier := cryptomock.NewMockHashVerifier(ctrl)
 		hashers := mocks.NewMockProjectHasherResolver(ctrl)
 		var succeededFactor domain.AuthFactor
 		stmts := mocks.NewMockAllStatements(ctrl)
@@ -885,7 +885,7 @@ func TestAuthAttemptService_VerifyProof_Password(t *testing.T) {
 		})
 		stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
 		hashers.EXPECT().HasherForProject(gomock.Any(), "proj").Return(nil, errors.New("policy unavailable"))
-		defaultVerifier.EXPECT().VerifyAndRehash("encoded", "secret").Return("rehashed", nil)
+		defaultVerifier.EXPECT().VerifyHash("encoded", "secret").Return(nil)
 		stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, _, _ string, factor domain.AuthFactor, _ string) error {
 			succeededFactor = factor
 			return nil

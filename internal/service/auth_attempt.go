@@ -329,7 +329,15 @@ type authAttemptService struct {
 	users    UserLookup
 	hashers  ProjectHasherResolver
 	// defaultVerifier verifies when a project's hasher cannot be resolved.
-	defaultVerifier crypto.RehashingVerifier
+	defaultVerifier crypto.HashVerifier
+}
+
+// verifyOnly checks a password without computing a new hash, for a verifier
+// whose rehash would not be stored.
+type verifyOnly struct{ crypto.HashVerifier }
+
+func (v verifyOnly) VerifyAndRehash(encoded, target string) (string, error) {
+	return "", v.VerifyHash(encoded, target)
 }
 
 func NewAuthAttemptService(
@@ -337,7 +345,7 @@ func NewAuthAttemptService(
 	sessions SessionResolver,
 	users UserLookup,
 	hashers ProjectHasherResolver,
-	defaultVerifier crypto.RehashingVerifier,
+	defaultVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
 		stmts:           stmts,
@@ -829,9 +837,11 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
 		// Verifying with the project's hasher moves an outdated hash to the
-		// project's method. A policy this server can no longer build must not
-		// lock the project's users out, so the default verifies instead and
-		// nothing is stored.
+		// project's method. When the policy no longer resolves, the default
+		// verifies instead. Verifiers ignore the limits, so users of a policy
+		// refused for its cost can still sign in. A hash whose algorithm was
+		// removed from the verifiers stays unreadable, as it is for any project.
+		// The default's method is not the project's, so it computes no rehash.
 		hasher, resolveErr := s.hashers.HasherForProject(ctx, attempt.ProjectID)
 		var verifier crypto.RehashingVerifier = hasher
 		if resolveErr != nil {
@@ -839,7 +849,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 				slog.String("project_id", attempt.ProjectID),
 				slog.Any("error", resolveErr),
 			)
-			verifier = s.defaultVerifier
+			verifier = verifyOnly{s.defaultVerifier}
 		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
@@ -860,7 +870,7 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 			)
 		case verifyErr != nil:
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
-		case updated != "" && resolveErr == nil:
+		case updated != "":
 			// Best-effort: the password already matched, and the next sign-in
 			// rehashes again.
 			if err := s.stmts.Statements().UpdateUserPasswordHash(ctx, password, updated); err != nil {

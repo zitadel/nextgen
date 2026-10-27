@@ -40,16 +40,18 @@ var (
 )
 
 type PasswapHasher struct {
-	*passwap.Swapper
-	Prefixes     []string
-	HexSupported bool
-	// verifiers is the Swapper's list, hasher first: Swapper keeps its own
+	// swapper is not embedded: its Verify hashes again on every outdated match
+	// and reports a failed rehash as a failed verify.
+	swapper      *passwap.Swapper
+	prefixes     []string
+	hexSupported bool
+	// verifiers is the swapper's list, hasher first: Swapper keeps its own
 	// unexported, and VerifyHash walks it without hashing.
 	verifiers []verifier.Verifier
 }
 
 func (h *PasswapHasher) Hash(password string) (string, error) {
-	encoded, err := h.Swapper.Hash(password)
+	encoded, err := h.swapper.Hash(password)
 	if errors.Is(err, xbcrypt.ErrPasswordTooLong) {
 		return "", fmt.Errorf("%w: %w", ErrPasswordTooLong, err)
 	}
@@ -115,7 +117,7 @@ func (h *PasswapHasher) ValidateHash(encoded string) error {
 	if encoded == "" {
 		return nil
 	}
-	err := h.Validate(encoded)
+	err := h.swapper.Validate(encoded)
 	if err == nil {
 		return nil
 	}
@@ -129,12 +131,12 @@ func (h *PasswapHasher) ValidateHash(encoded string) error {
 }
 
 func (h *PasswapHasher) EncodingSupported(encodedHash string) bool {
-	for _, prefix := range h.Prefixes {
+	for _, prefix := range h.prefixes {
 		if strings.HasPrefix(encodedHash, prefix) {
 			return true
 		}
 	}
-	if h.HexSupported {
+	if h.hexSupported {
 		_, err := hex.DecodeString(encodedHash)
 		if err == nil {
 			return true
@@ -339,15 +341,15 @@ func (f *HasherFactory) New(cfg HasherConfig) (*PasswapHasher, error) {
 	if f.defaultHasher != nil {
 		// Every password stored without a project policy was written by the
 		// default, which need not be a configured verifier. The default was
-		// built before defaultHasher was set, so its Prefixes are its own plus
+		// built before defaultHasher was set, so its prefixes are its own plus
 		// the configured verifiers'.
 		verifiers = append(slices.Clone(verifiers), f.defaultHasher.verifiers[0])
-		verifierPrefixes = f.defaultHasher.Prefixes
+		verifierPrefixes = f.defaultHasher.prefixes
 	}
 	return &PasswapHasher{
-		Swapper:      passwap.NewSwapper(hasher, verifiers...),
-		Prefixes:     append(prefixes, verifierPrefixes...),
-		HexSupported: f.hexSupported,
+		swapper:      passwap.NewSwapper(hasher, verifiers...),
+		prefixes:     append(prefixes, verifierPrefixes...),
+		hexSupported: f.hexSupported,
 		verifiers:    append([]verifier.Verifier{hasher}, verifiers...),
 	}, nil
 }
