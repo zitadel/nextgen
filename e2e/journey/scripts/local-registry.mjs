@@ -20,8 +20,7 @@ export const packageDirs = [...PUBLIC_PACKAGE_DIRS];
 // ask npmjs nothing; a fresh local store only skips repeat checks within a run.
 //
 // Longer is not better: npmjs releases reach the journey up to `maxage` late
-// (`npm create vite@latest`, `nuxi@latest` and `@angular/cli@latest` resolve
-// `latest` here), and `nuxi init` downloads its starter template from GitHub,
+// (`nuxi@latest` and `@angular/cli@latest` resolve `latest` here), and `nuxi init` downloads its starter template from GitHub,
 // which has adopted a new nuxt release as soon as two hours after it was
 // published. A packument cached past that point lacks the version the
 // template asks for, and the nuxt install fails until the entry expires.

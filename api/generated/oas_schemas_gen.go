@@ -27316,6 +27316,20 @@ type FlowStep struct {
 	// Step name from the flow definition.
 	Name  string       `json:"name"`
 	Texts OptStepTexts `json:"texts"`
+	// What the flow does on this step. A login moves between `login` and
+	// `register` by itself: an identifier with no account continues as a
+	// sign-up, and one with an account continues a sign-up as a sign-in.
+	// A page that titles the login itself follows this value rather than
+	// the step's `name`, which the flow definition chooses.
+	Purpose OptFlowStepPurpose `json:"purpose"`
+	// Localisation key that tells the user why the flow moved to this
+	// step's `purpose` without being asked: `notice.user_not_found` (an
+	// identifier with no account, now signing up),
+	// `notice.user_already_exists` (an identifier that has an account, now
+	// signing in) or `notice.sso_user_not_found` (a provider's sign-in
+	// with no account, now signing up). Present only on the step right
+	// after the move, not when the user chose it.
+	Notice OptNilString `json:"notice"`
 	// Error from a previous failed submission. Field-validation failures
 	// carry localisation text keys: `error.<field>_<rule>` per violation
 	// (e.g. `error.email_required`; the `format` rule is spelled
@@ -27396,6 +27410,16 @@ func (s *FlowStep) GetTexts() OptStepTexts {
 	return s.Texts
 }
 
+// GetPurpose returns the value of Purpose.
+func (s *FlowStep) GetPurpose() OptFlowStepPurpose {
+	return s.Purpose
+}
+
+// GetNotice returns the value of Notice.
+func (s *FlowStep) GetNotice() OptNilString {
+	return s.Notice
+}
+
 // GetError returns the value of Error.
 func (s *FlowStep) GetError() OptNilString {
 	return s.Error
@@ -27449,6 +27473,16 @@ func (s *FlowStep) SetName(val string) {
 // SetTexts sets the value of Texts.
 func (s *FlowStep) SetTexts(val OptStepTexts) {
 	s.Texts = val
+}
+
+// SetPurpose sets the value of Purpose.
+func (s *FlowStep) SetPurpose(val OptFlowStepPurpose) {
+	s.Purpose = val
+}
+
+// SetNotice sets the value of Notice.
+func (s *FlowStep) SetNotice(val OptNilString) {
+	s.Notice = val
 }
 
 // SetError sets the value of Error.
@@ -27851,6 +27885,80 @@ func (s *FlowStepIdentifier) SetValue(val string) {
 // SetAutocomplete sets the value of Autocomplete.
 func (s *FlowStepIdentifier) SetAutocomplete(val string) {
 	s.Autocomplete = val
+}
+
+// What the flow does on this step. A login moves between `login` and
+// `register` by itself: an identifier with no account continues as a
+// sign-up, and one with an account continues a sign-up as a sign-in.
+// A page that titles the login itself follows this value rather than
+// the step's `name`, which the flow definition chooses.
+type FlowStepPurpose string
+
+const (
+	FlowStepPurposeLogin       FlowStepPurpose = "login"
+	FlowStepPurposeRegister    FlowStepPurpose = "register"
+	FlowStepPurposeRecovery    FlowStepPurpose = "recovery"
+	FlowStepPurposeProfiling   FlowStepPurpose = "profiling"
+	FlowStepPurposeReauth      FlowStepPurpose = "reauth"
+	FlowStepPurposeLinkAccount FlowStepPurpose = "link_account"
+)
+
+// AllValues returns all FlowStepPurpose values.
+func (FlowStepPurpose) AllValues() []FlowStepPurpose {
+	return []FlowStepPurpose{
+		FlowStepPurposeLogin,
+		FlowStepPurposeRegister,
+		FlowStepPurposeRecovery,
+		FlowStepPurposeProfiling,
+		FlowStepPurposeReauth,
+		FlowStepPurposeLinkAccount,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s FlowStepPurpose) MarshalText() ([]byte, error) {
+	switch s {
+	case FlowStepPurposeLogin:
+		return []byte(s), nil
+	case FlowStepPurposeRegister:
+		return []byte(s), nil
+	case FlowStepPurposeRecovery:
+		return []byte(s), nil
+	case FlowStepPurposeProfiling:
+		return []byte(s), nil
+	case FlowStepPurposeReauth:
+		return []byte(s), nil
+	case FlowStepPurposeLinkAccount:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *FlowStepPurpose) UnmarshalText(data []byte) error {
+	switch FlowStepPurpose(data) {
+	case FlowStepPurposeLogin:
+		*s = FlowStepPurposeLogin
+		return nil
+	case FlowStepPurposeRegister:
+		*s = FlowStepPurposeRegister
+		return nil
+	case FlowStepPurposeRecovery:
+		*s = FlowStepPurposeRecovery
+		return nil
+	case FlowStepPurposeProfiling:
+		*s = FlowStepPurposeProfiling
+		return nil
+	case FlowStepPurposeReauth:
+		*s = FlowStepPurposeReauth
+		return nil
+	case FlowStepPurposeLinkAccount:
+		*s = FlowStepPurposeLinkAccount
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
 }
 
 // Ref: #
@@ -52529,6 +52637,52 @@ func (o OptFlowStepIdentifier) Get() (v FlowStepIdentifier, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptFlowStepIdentifier) Or(d FlowStepIdentifier) FlowStepIdentifier {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptFlowStepPurpose returns new OptFlowStepPurpose with value set to v.
+func NewOptFlowStepPurpose(v FlowStepPurpose) OptFlowStepPurpose {
+	return OptFlowStepPurpose{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptFlowStepPurpose is optional FlowStepPurpose.
+type OptFlowStepPurpose struct {
+	Value FlowStepPurpose
+	Set   bool
+}
+
+// IsSet returns true if OptFlowStepPurpose was set.
+func (o OptFlowStepPurpose) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptFlowStepPurpose) Reset() {
+	var v FlowStepPurpose
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptFlowStepPurpose) SetTo(v FlowStepPurpose) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptFlowStepPurpose) Get() (v FlowStepPurpose, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptFlowStepPurpose) Or(d FlowStepPurpose) FlowStepPurpose {
 	if v, ok := o.Get(); ok {
 		return v
 	}
