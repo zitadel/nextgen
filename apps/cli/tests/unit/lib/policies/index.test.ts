@@ -30,13 +30,16 @@ describe("parsePasswordMinLength", () => {
 });
 
 describe("passwordPolicyFile", () => {
-  it("enforces nothing without a minimum, or with an explicit none", () => {
-    expect(passwordPolicyFile(null).config).toEqual({});
+  it("sets the recommended minimum when none was given", () => {
     expect(passwordPolicyFile()).toEqual({
       $schema: "../meta/policy.json",
       operation: "auth.factor.password.set",
-      config: {},
+      config: { min_length: 15 },
     });
+  });
+
+  it("enforces nothing for an explicit none", () => {
+    expect(passwordPolicyFile(null).config).toEqual({});
   });
 
   it("sets the minimum it is given", () => {

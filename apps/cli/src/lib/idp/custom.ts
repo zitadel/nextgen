@@ -11,6 +11,7 @@ import {
   parseScopes,
   type Parsed,
   type ProviderSelection,
+  selectionName,
 } from "@zitadel/config/idp";
 
 import { ZitadelError } from "../errors";
@@ -257,6 +258,17 @@ export function customFlagText(custom: CustomOidcInput, flag: CustomFlagNames): 
     },
     flag,
   );
+}
+
+/**
+ * The `auth-method sso enable` arguments that add `selection` to a project:
+ * the provider, and for a custom connection the settings that describe it. A
+ * suggestion builder wraps them with the selector its command needs.
+ */
+export function ssoEnableArgs(selection: ProviderSelection): string {
+  return `auth-method sso enable --provider ${selectionName(selection)}${
+    selection.kind === "custom" ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}` : ""
+  }`;
 }
 
 /** The same for whichever settings were given, each as one shell word. */

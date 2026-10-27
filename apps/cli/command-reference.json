@@ -182,7 +182,7 @@
         },
         {
           "name": "password-min-length",
-          "description": "Minimum password length for the project's password policy, for example 15; 0 sets none. Without it, setup writes the policy with no rules; change it in .zitadel/policies/ later.",
+          "description": "Minimum password length for the project's password policy, for example 12; 0 sets none. Without it, setup sets 15, the NIST minimum for password-only sign-in; change it in .zitadel/policies/ later.",
           "type": "option"
         },
         {
