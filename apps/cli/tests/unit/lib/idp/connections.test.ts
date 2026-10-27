@@ -12,7 +12,8 @@ import {
   type ConnectionFile,
   IDPS_DIR,
   credentialVariablesOf,
-  existingCustomSettings,
+  checkCustomSlug,
+  storedCustomSettings,
   planConnection,
   readConnectionFiles,
 } from "../../../../src/lib/idp";
@@ -97,33 +98,64 @@ describe("credentialVariablesOf", () => {
   });
 });
 
-describe("existingCustomSettings", () => {
-  const file = (body: Record<string, unknown>): ConnectionFile => ({
-    name: `${String(body.slug)}.json`,
-    path: `${IDPS_DIR}/${String(body.slug)}.json`,
-    body,
-  });
-  const acme = file({
-    slug: "acme-sso",
-    display_name: "Acme SSO",
-    oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
+const aFile = (body: Record<string, unknown>): ConnectionFile => ({
+  name: `${String(body.fileName ?? body.slug)}.json`,
+  path: `${IDPS_DIR}/${String(body.fileName ?? body.slug)}.json`,
+  body: Object.fromEntries(Object.entries(body).filter(([key]) => key !== "fileName")),
+});
+const acmeFile = aFile({
+  slug: "acme-sso",
+  display_name: "Acme SSO",
+  oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
+});
+
+describe("checkCustomSlug", () => {
+  const check = (files: readonly ConnectionFile[], given = "acme-sso") =>
+    checkCustomSlug(files, slug(given), "--slug");
+
+  it("returns the single file that declares the slug", () => {
+    expect(check([acmeFile])).toBe(acmeFile);
   });
 
-  it("reads the display name, issuer and scopes of the connection the slug names", () => {
-    expect(existingCustomSettings([acme], { slug: "acme-sso" })).toEqual({
-      slug: "acme-sso",
+  it("returns nothing for a slug that is free", () => {
+    expect(check([acmeFile], "other-sso")).toBeUndefined();
+  });
+
+  it("refuses two files that declare the same slug", () => {
+    const twin = aFile({ ...acmeFile.body, fileName: "acme-sso-copy" });
+
+    expect(() => check([acmeFile, twin])).toThrow(/More than one connection is named acme-sso/);
+  });
+
+  it("refuses a slug whose file name holds another connection", () => {
+    const squatter = aFile({ fileName: "acme-sso", slug: "something-else" });
+
+    expect(() => check([squatter])).toThrow(/already exists and is not the acme-sso connection/);
+  });
+});
+
+describe("storedCustomSettings", () => {
+  it("reads the display name, issuer and scopes as the file holds them", () => {
+    expect(storedCustomSettings(acmeFile)).toEqual({
       displayName: "Acme SSO",
       issuer: "https://sso.acme.example",
       scopes: "openid email",
     });
   });
 
-  it.each([
-    ["no slug was given", [acme], {}],
-    ["no connection has that slug", [acme], { slug: "other" }],
-    ["two connections have that slug", [acme, file({ ...acme.body })], { slug: "acme-sso" }],
-  ] as const)("knows nothing when %s", (_name, files, given) => {
-    expect(existingCustomSettings(files, given)).toBeUndefined();
+  it("reads only what the file has", () => {
+    expect(storedCustomSettings(aFile({ slug: "acme-sso" }))).toEqual({});
+    expect(
+      storedCustomSettings(aFile({ slug: "acme-sso", oidc: { issuer: 3, scopes: "x" } })),
+    ).toEqual({});
+  });
+
+  it("joins an empty scope list to an empty string, leaving the decision to the caller", () => {
+    expect(
+      storedCustomSettings(
+        aFile({ slug: "acme-sso", oidc: { issuer: "https://a.example", scopes: [] } }),
+      ).scopes,
+    ).toBe("");
   });
 });
 

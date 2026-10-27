@@ -432,19 +432,24 @@ function refuseDifferentClientId(match: ConnectionFile, clientId: ClientId | und
  * a connection to somewhere else is somebody else's, and replacing it would
  * repoint every schema and flow that names it.
  */
-function planCustomConnection(options: {
-  readonly input: CustomOidcInput;
-  readonly files: readonly ConnectionFile[];
-  readonly clientId?: ClientId;
-  /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
-  readonly scopesGiven?: boolean;
-  /** How the calling command spells the slug flag, for the hints. */
-  readonly slugFlag: string;
-}): ConnectionPlan {
-  const { slug, issuer } = options.input;
+/**
+ * What a custom connection's slug alone decides: the file it already names, or
+ * a refusal. More than one file with the slug, or a file name the slug would
+ * take that holds another connection, or variable names a new connection would
+ * collide on, are all knowable before anything else about the connection is, so
+ * a command can raise them as soon as it has the slug.
+ *
+ * @returns The single file that declares the slug, or `undefined` when the
+ *   slug is free and a new connection can be created.
+ */
+export function checkCustomSlug(
+  files: readonly ConnectionFile[],
+  slug: ConnectionSlug,
+  slugFlag: string,
+): ConnectionFile | undefined {
   const name = `${slug}.json`;
   const path = `${IDPS_DIR}/${name}`;
-  const holders = options.files.filter((file) => String(file.body.slug ?? "").trim() === slug);
+  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === slug);
 
   if (holders.length > 1) {
     throw new ZitadelError(
@@ -458,19 +463,38 @@ function planCustomConnection(options: {
   }
 
   const [match] = holders;
+  if (match !== undefined) {
+    return match;
+  }
+  // Nothing declares the slug, but the file name is where this one would go.
+  if (files.some((file) => file.name === name)) {
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `${path} already exists and is not the ${slug} connection`,
+      {
+        hint: `Rename or remove that file, or choose another ${slugFlag}, then run the command again.`,
+        details: { file: path, slug },
+      },
+    );
+  }
+  refuseCollidingVariables(credentialVariables(slug), slug, files);
+  return undefined;
+}
+
+function planCustomConnection(options: {
+  readonly input: CustomOidcInput;
+  readonly files: readonly ConnectionFile[];
+  readonly clientId?: ClientId;
+  /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
+  readonly scopesGiven?: boolean;
+  /** How the calling command spells the slug flag, for the hints. */
+  readonly slugFlag: string;
+}): ConnectionPlan {
+  const { slug, issuer } = options.input;
+  const name = `${slug}.json`;
+  const path = `${IDPS_DIR}/${name}`;
+  const match = checkCustomSlug(options.files, slug, options.slugFlag);
   if (match === undefined) {
-    // Nothing declares the slug, but the file name is where this one would go.
-    if (options.files.some((file) => file.name === name)) {
-      throw new ZitadelError(
-        "E_CONFLICT",
-        `${path} already exists and is not the ${slug} connection`,
-        {
-          hint: `Rename or remove that file, or choose another ${options.slugFlag}, then run the command again.`,
-          details: { file: path, slug },
-        },
-      );
-    }
-    refuseCollidingVariables(credentialVariables(slug), slug, options.files);
     return { action: "create", name, path, slug };
   }
 
@@ -502,28 +526,17 @@ function planCustomConnection(options: {
 }
 
 /**
- * The settings of the custom connection a slug names, as its file holds them,
- * or `undefined` when no single file does. Used to ask only for what a rerun
- * on a connection that already exists does not already know.
+ * The settings a custom connection's file holds, as written, for the ones it
+ * has. Nothing is checked here: a hand-edited file may hold anything.
  */
-export function existingCustomSettings(
-  files: readonly ConnectionFile[],
-  given: { readonly slug?: string },
-): { slug: string; displayName?: string; issuer?: string; scopes?: string } | undefined {
-  if (given.slug === undefined) {
-    return undefined;
-  }
-  const holders = files.filter((file) => String(file.body.slug ?? "").trim() === given.slug);
-  const [match] = holders;
-  if (holders.length !== 1 || match === undefined) {
-    return undefined;
-  }
-  const oidc = match.body.oidc;
+export function storedCustomSettings(file: ConnectionFile): {
+  displayName?: string;
+  issuer?: string;
+  scopes?: string;
+} {
+  const oidc = file.body.oidc;
   return {
-    slug: given.slug,
-    ...(typeof match.body.display_name === "string"
-      ? { displayName: match.body.display_name }
-      : {}),
+    ...(typeof file.body.display_name === "string" ? { displayName: file.body.display_name } : {}),
     ...(isObject(oidc) && typeof oidc.issuer === "string" ? { issuer: oidc.issuer } : {}),
     ...(isObject(oidc) && Array.isArray(oidc.scopes) ? { scopes: oidc.scopes.join(" ") } : {}),
   };
