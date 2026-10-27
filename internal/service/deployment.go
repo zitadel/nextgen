@@ -240,17 +240,14 @@ func (s *DeploymentService) conflict(ctx context.Context, entity *domain.Deploym
 }
 
 // servedBy reads what entity's origins hold, for the optimistic lock, and the
-// deployment entity replaces: the project's newest primary deployment, or the
-// newest deployment to its preview URLs. nil when there is none.
+// deployment those origins serve now. nil when none of them is served. A
+// default-only row is not what a web origin serves, and a web row is not what
+// the default target serves, because the read is exactly entity's origins.
 // TODO(#1572): lock primary deploys per project.
 func servedBy(ctx context.Context, stmts AllStatements, entity *domain.Deployment) ([]domain.OriginDeployment, *domain.Deployment, error) {
 	read, err := stmts.GetNewestPerOrigin(ctx, entity.ProjectID, entity.Origins())
 	if err != nil {
 		return nil, nil, err
-	}
-	if entity.OriginKind == domain.DeploymentOriginKindPrimary {
-		current, err := newestPrimary(ctx, stmts, entity.ProjectID)
-		return read, current, err
 	}
 	newest := domain.NewestOriginDeployment(read)
 	if newest == nil {
@@ -483,14 +480,4 @@ func (s *DeploymentService) liveIDs(ctx context.Context, projectID string, items
 		live[entity.ID] = true
 	}
 	return live, nil
-}
-
-// newestPrimary is the project's newest primary deployment, nil when none.
-// It is a lookup, not the caller's list, so it reads unfiltered.
-func newestPrimary(ctx context.Context, stmts DeploymentStatements, projectID string) (*domain.Deployment, error) {
-	result, err := stmts.ListDeployments(WithAuthzListUnrestricted(ctx), deployment.NewestOfKindOptions(projectID, domain.DeploymentOriginKindPrimary))
-	if err != nil || len(result.Items) == 0 {
-		return nil, err
-	}
-	return result.Items[0], nil
 }

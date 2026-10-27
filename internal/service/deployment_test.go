@@ -55,9 +55,9 @@ func deploymentInput() service.CreateDeploymentInput {
 	}
 }
 
-// expectServing sets up the reads of one primary attempt: the release, what
-// appOrigin last received (nothing when serving is nil), and the project's
-// newest primary deployment. It returns what was read for the lock.
+// expectServing sets up the reads of one attempt: the release, and what
+// appOrigin last received (nothing when serving is nil). It returns what was
+// read for the lock.
 func expectServing(statements *servicemocks.MockAllStatements, serving *domain.Deployment) []domain.OriginDeployment {
 	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
 	var read []domain.OriginDeployment
@@ -68,11 +68,9 @@ func expectServing(statements *servicemocks.MockAllStatements, serving *domain.D
 		}}
 	}
 	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return(read, nil)
-	newest := &database.ListResult[*domain.Deployment]{}
-	if serving != nil && serving.OriginKind == domain.DeploymentOriginKindPrimary {
-		newest.Items = []*domain.Deployment{serving}
+	if serving != nil {
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", serving.ID).Return(serving, nil)
 	}
-	statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).Return(newest, nil)
 	return read
 }
 
@@ -162,8 +160,7 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 8,
 		}}, nil)
-		statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{winner}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
 
 		input := deploymentInput()
 		input.ExpectedDeploymentID = new("dep_before")
@@ -182,13 +179,38 @@ func TestDeploymentServiceCreateRetriesALostLock(t *testing.T) {
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{appOrigin}).Return([]domain.OriginDeployment{{
 			Origin: appOrigin, DeploymentID: winner.ID, DeployedAt: winner.DeployedAt, Seq: 9,
 		}}, nil)
-		statements.EXPECT().ListDeployments(unrestricted, gomock.Any()).
-			Return(&database.ListResult[*domain.Deployment]{Items: []*domain.Deployment{winner}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", winner.ID).Return(winner, nil)
 
 		_, err := svc.Create(t.Context(), deploymentInput())
 		de := assertServiceDomainCode(t, err, domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code)
 		assert.Equal(t, domain.DeploymentConflictDetails{Deployment: winner}, de.Details)
 	})
+}
+
+// A default-only deploy locks the empty origin it writes. A later default-only
+// row is not the lock for a web origin, and this deploy never asks for one.
+func TestDeploymentServiceCreateDefaultOnlyLocksTheEmptyOrigin(t *testing.T) {
+	svc, statements := newMockedDeploymentService(t)
+	statements.EXPECT().GetReleaseByID(gomock.Any(), "proj_1", "rel_1").Return(&domain.Release{ID: "rel_1"}, nil)
+	current := &domain.Deployment{
+		ProjectID: "proj_1", ID: "dep_default", ReleaseID: "rel_1",
+		OriginKind: domain.DeploymentOriginKindPrimary,
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+		DeployedAt: deployedAt.Add(-time.Hour),
+	}
+	statements.EXPECT().GetNewestPerOrigin(gomock.Any(), "proj_1", []string{domain.DefaultTargetOrigin}).
+		Return([]domain.OriginDeployment{{
+			Origin: domain.DefaultTargetOrigin, DeploymentID: current.ID, ReleaseID: current.ReleaseID,
+			Kind: current.OriginKind, DeployedAt: current.DeployedAt, Seq: 3,
+		}}, nil)
+	statements.EXPECT().GetDeploymentByID(gomock.Any(), "proj_1", current.ID).Return(current, nil)
+
+	input := deploymentInput()
+	input.Origins = []string{domain.DefaultTargetOrigin}
+	result, err := svc.Create(t.Context(), input)
+	require.NoError(t, err)
+	assert.False(t, result.Created)
+	assert.Same(t, current, result.Deployment)
 }
 
 // Deploying the release the newest primary deployment has, to the same
