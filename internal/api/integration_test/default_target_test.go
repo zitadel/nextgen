@@ -16,7 +16,7 @@ import (
 // its identity providers, its newest branding, and its policies. A flow opened
 // with no origin, and a management call, then serve those revisions. Call it
 // again after publishing something the next request should serve.
-func deployDefaultTarget(t *testing.T, projectID string, extra ...service.CreateReleasePointer) {
+func deployDefaultTarget(t *testing.T, projectID string) {
 	t.Helper()
 	ctx := service.WithAuthzListUnrestricted(t.Context())
 
@@ -82,7 +82,6 @@ func deployDefaultTarget(t *testing.T, projectID string, extra ...service.Create
 			RevisionID: policy.RevisionID,
 		})
 	}
-	pointers = append(pointers, extra...)
 
 	created, err := harness.EnsureReleaseService(t).Create(t.Context(), service.CreateReleaseInput{
 		ProjectID: projectID,
