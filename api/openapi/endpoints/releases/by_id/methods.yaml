@@ -1,6 +1,6 @@
 get:
   operationId: getReleaseById
-  x-zitadel-cli: releases get
+  x-zitadel-cli: release get
   summary: Get a release by id
   description: |
     Reads one release: its digest, its metadata, whether it was revoked, and
@@ -21,6 +21,7 @@ get:
   security:
     - oauth2:
         - release.read
+    - nextgenSession: []
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/release-id.yaml

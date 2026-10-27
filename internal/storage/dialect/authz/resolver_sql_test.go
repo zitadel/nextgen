@@ -256,6 +256,36 @@ func TestWriteCheckAuthzDistinctHomeSplit(t *testing.T) {
 	assertFootholdHomeSplit(t, w.b.String(), w.args, "proj_customer", "proj_platform")
 }
 
+// A targeted Check narrows the foothold to the target (#2112) and keeps the
+// home split: assignments on the protected project, team expansion in home,
+// the local membership on the protected project.
+func TestWriteCheckAuthzTargetFoothold(t *testing.T) {
+	t.Parallel()
+	params := domain.AuthzCheckParams{
+		CatalogID:              "cat_sys_1",
+		ProjectID:              "proj_customer",
+		PrincipalHomeProjectID: "proj_platform",
+		PrincipalType:          domain.AuthzPrincipalTypeUser,
+		PrincipalID:            "user_a",
+		ObjectType:             "project",
+		Relation:               "viewer",
+		ResourceID:             "team_1",
+		ResourceTeamID:         "team_1",
+	}
+	var w recordingWriter
+	authz.WriteCheckAuthz(&w, testEnv(&w), params)
+	sql := w.b.String()
+	assertFootholdHomeSplit(t, sql, w.args, "proj_customer", "proj_platform")
+	assert.Equal(t, "team_1", bindAtFragment(t, sql, w.args, "OR (a.scope_kind = 'team' AND a.scope_team_id = ?"))
+	assert.Equal(t, "team_1", bindAtFragment(t, sql, w.args, "AND (e.set_id = ?"))
+
+	untargeted := params
+	untargeted.ResourceID, untargeted.ResourceTeamID = "", ""
+	var u recordingWriter
+	authz.WriteCheckAuthz(&u, testEnv(&u), untargeted)
+	assert.NotContains(t, u.b.String(), "AND (e.set_id =", "no target keeps the project-wide foothold")
+}
+
 func TestWriteCheckAuthzEmptyHomeCoalesces(t *testing.T) {
 	t.Parallel()
 	params := domain.AuthzCheckParams{

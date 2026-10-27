@@ -252,10 +252,14 @@ export class Orca {
     return this.detectors.map((detector) => detector.framework);
   }
 
+  /** A framework's name as people write it ("Next.js" for `next`), or its id when it has none. */
+  displayName(id: string): string {
+    return this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+  }
+
   /** `cwd` holds a `detected` app, and setup was asked to set up a `requested` one. */
   private frameworkMismatch(requested: string, detected: string): ZitadelError {
-    const name = (id: string) =>
-      this.availableFrameworks().find((framework) => framework.id === id)?.displayName ?? id;
+    const name = (id: string) => this.displayName(id);
     return new ZitadelError(
       "E_CONFLICT",
       `Setup detects ${name(detected)} here, not ${name(requested)}`,

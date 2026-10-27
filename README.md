@@ -60,6 +60,11 @@ skill, and the per-framework SDK and component skills. Without it, only the
 top-level router skill is installed. The CLI skill also ships inside the
 `@zitadel/cli` package.
 
+After a successful interactive `setup`, the CLI suggests this command once if it
+finds a coding agent on your machine. "Once" is per machine, not per project: the
+CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
+see it.
+
 ## Customer quick start
 
 ```sh
@@ -81,8 +86,9 @@ npm run dev
 ```
 
 `start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+`admin@zitadel.localhost`. It ends by telling you to run `setup`. Once `setup`
+has created your project it offers `zitadel console`; before that the console has
+nothing to show.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
@@ -91,7 +97,7 @@ reports it as already owned. If that attempt fails, setup prints a warning and
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
-Any time you need the console again, print a fresh link:
+Once your project exists, print a sign-in link for the console. The link works once:
 
 ```sh
 npx @zitadel/cli@latest console
@@ -109,6 +115,16 @@ case) and writes the app into the current directory; pass `--skip-install` if
 you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
+
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
 
 ### Zitadel Cloud
 
@@ -146,8 +162,8 @@ docker compose up -d
 | Surface            | URL                               |
 | ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell      | http://localhost:8080/ui/login/   |
-| Health             | http://localhost:8080/healthz     |
+| Liveness probe     | http://localhost:8080/livez       |
+| Readiness probe    | http://localhost:8080/readyz      |
 
 A fresh Compose server has no project and no user yet, so this console shows
 its setup prompt until you seed one (see
@@ -174,7 +190,7 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 ## Current status
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
-surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
+surface and embeds the console at `/ui/console/`; the login lives in your app.
 Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
 release can carry a breaking change
 ([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).

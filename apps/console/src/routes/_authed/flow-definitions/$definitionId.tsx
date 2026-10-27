@@ -29,7 +29,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "login flow" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
@@ -90,7 +90,7 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />

@@ -7,12 +7,12 @@ import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
-import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
 import { normalizePublicCliCommand, normalizePublicCliCommands } from "../public-cli";
 import { DEFAULT_SERVER, resolveServer, SERVER_VARIABLE } from "../server";
+import { type SuggestedCommand, unscopedCommand } from "../suggestion";
 import { type Properties, Telemetry, type TelemetryDeps } from "../telemetry";
 import { DO_NOT_TRACK, ZITADEL_TELEMETRY } from "../telemetry/consent";
 import { buildUserAgent, installUserAgent, processUserAgentFacts } from "../user-agent";
@@ -24,6 +24,7 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
+  VERCEL_EVENT_KEYS,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import type {
@@ -35,6 +36,7 @@ import type {
   JsonEnvelope,
   SkippedEnvelope,
 } from "./types";
+import { shellOption } from "../shell";
 
 /**
  * The colour variables, which `bin/run.js` sets from `--color`/`--no-color`
@@ -146,6 +148,9 @@ export abstract class BaseCommand extends Command {
    */
   protected telemetryProps: Readonly<Properties> = Object.freeze({});
 
+  /** `--cwd` as typed, carried into the unscoped follow-ups this run suggests. */
+  private typedCwd: string | undefined;
+
   /** Correlates the started/completed pair; minted at instance construction. */
   private readonly telemetryInvocationId = randomUUID();
 
@@ -177,14 +182,20 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Asks for a value, a choice or a confirmation: the one way a command takes
-   * input. It is {@link askInput} with this invocation's interactivity
-   * (`--non-interactive`, `--json`, no terminal) and `--force` filled in, so a
-   * command states only the question. See {@link askInput} for the order the
-   * answer is looked for in and what is thrown when there is none.
+   * A `zitadel` command that does not target a project, in the public `npx`
+   * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
+   * to a project suggests through `EnvironmentCommand.suggest` instead, which
+   * keeps the run's environment selector; reaching for this one is the
+   * deliberate opt-out.
    */
-  protected readonly input: Asker = (question) =>
-    askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
+  protected suggestUnscoped(args: string): SuggestedCommand {
+    // A follow-up run from the shell's directory would act on whatever project
+    // is there, so the directory this run addressed goes with it.
+    return unscopedCommand(
+      this.typedCwd === undefined ? args : `${args} ${shellOption("--cwd", this.typedCwd)}`,
+      this.meta.cliVersion,
+    );
+  }
 
   /**
    * Merge command-specific dimensions into {@link telemetryProps} immutably: a
@@ -196,20 +207,24 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Builds {@link GlobalOptions} from parsed flags, resolving the server
-   * `source` by the documented precedence and storing the result on
-   * `this.meta` so the error handler can render a complete envelope.
+   * Builds {@link GlobalOptions} from parsed flags and stores the result on
+   * `this.meta` so the error handler can render a complete envelope. The server
+   * `source` is `--server` or the cloud default, which is `setup`'s rule; a
+   * command that takes its server from the environment extends
+   * `EnvironmentCommand`, and one that never talks to a server passes
+   * `resolveServer: false`.
    */
   protected async toMeta(
     flags: Record<string, unknown>,
     options: { resolveServer?: boolean; source?: string } = {},
   ): Promise<GlobalOptions> {
     const cwd = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
+    this.typedCwd = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const serverFlag = typeof flags.server === "string" ? flags.server : undefined;
     const source =
       options.resolveServer === false
         ? { value: options.source ?? "", origin: "default" as const }
-        : await resolveServer({ cwd, env: process.env, serverFlag });
+        : await resolveServer({ cwd, serverFlag });
     const json = this.jsonEnabled();
     const isTTY = Boolean(process.stdout.isTTY && process.stdin.isTTY);
     const verbose = Boolean(flags.verbose);
@@ -259,8 +274,8 @@ export abstract class BaseCommand extends Command {
    * current {@link meta}. Guarded so a command that resolves meta more than once
    * does not double-count. Also called from {@link catch} so a failure thrown
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run. Returns early for an inert (opted-out / no-token /
-   * test-runner) instance so a disabled run never builds the property bags —
+   * records the run. Returns early for an inert (opted-out / test-runner /
+   * nowhere to send) instance so a disabled run never builds the property bags —
    * no timezone→country resolution or URL parsing for users who opted out. The
    * anonymous device profile is install-level and stable, so it is written only
    * on first run rather than paying a `people.set` request on every command.
@@ -287,7 +302,12 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry) {
       return;
     }
-    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetry = this.createTelemetry({
+      env: process.env,
+      flag,
+      debug: this.meta.debug,
+      vercelKeys: VERCEL_EVENT_KEYS,
+    });
     if (!this.telemetry.enabled) {
       return;
     }
@@ -346,6 +366,9 @@ export abstract class BaseCommand extends Command {
     if (rendered !== "") {
       this.log(rendered);
     }
+    if (normalized.status === "ok" && normalized.footer !== undefined) {
+      this.log(`\n${normalized.footer}`);
+    }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
@@ -381,7 +404,10 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
-    } else {
+    } else if (zitadelError.code !== "E_CANCELLED") {
+      // Ctrl-C is the person's own decision, and the terminal already shows it
+      // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
+      // block. The exit code still says the command did not finish.
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);
@@ -518,7 +544,7 @@ function toErrorEnvelope(error: ZitadelError, meta: GlobalOptions): ErrorEnvelop
 
 /**
  * Renders a {@link CommandResult} as human-facing text for non-JSON mode. A
- * command may supply a bespoke `pretty` string (e.g. the `apply` plan diff);
+ * command may supply a bespoke `pretty` string (e.g. `deploy`'s summary);
  * otherwise success payloads are summarised by {@link formatData} and skips are
  * shown with their reason and follow-up commands.
  */

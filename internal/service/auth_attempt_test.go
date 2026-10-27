@@ -157,6 +157,54 @@ func TestAuthAttemptService_Create(t *testing.T) {
 		assert.Same(t, got, created, "Create must persist and return the same attempt instance")
 	})
 
+	t.Run("seals deployment and release from input", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		var created *domain.AuthAttempt
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, a *domain.AuthAttempt) error {
+			created = a
+			return nil
+		})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, mocks.NewMockSessionResolver(ctrl), nil)
+		got, err := svc.Create(t.Context(), service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+			DeploymentID:   "dep_1",
+			ReleaseID:      "rel_1",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "dep_1", got.DeploymentID)
+		require.Equal(t, "rel_1", got.ReleaseID)
+		require.Equal(t, "dep_1", created.DeploymentID)
+		require.Equal(t, "rel_1", created.ReleaseID)
+	})
+
+	t.Run("seals deployment and release from runtime context", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		var created *domain.AuthAttempt
+		stmts := mocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().CreateAuthAttempt(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, a *domain.AuthAttempt) error {
+			created = a
+			return nil
+		})
+
+		svc := newAuthAttemptSvc(ctrl, stmts, mocks.NewMockSessionResolver(ctrl), nil)
+		ctx := service.WithRuntimeResolution(t.Context(), &service.RuntimeResolution{
+			Deployment: &domain.Deployment{ID: "dep_ctx"},
+			Release:    &domain.Release{ID: "rel_ctx"},
+		})
+		got, err := svc.Create(ctx, service.CreateAuthAttemptInput{
+			ProjectID:      "proj",
+			RequiredChecks: []domain.AuthCheckType{domain.AuthCheckTypeUser},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "dep_ctx", got.DeploymentID)
+		require.Equal(t, "rel_ctx", got.ReleaseID)
+		require.Equal(t, "dep_ctx", created.DeploymentID)
+		require.Equal(t, "rel_ctx", created.ReleaseID)
+	})
+
 	t.Run("copies flow_id from actor slot onto the event", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		stmts := mocks.NewMockAllStatements(ctrl)

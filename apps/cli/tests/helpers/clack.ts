@@ -20,6 +20,6 @@ export function clackDouble() {
     outro: vi.fn(),
     note: vi.fn(),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn(), message: vi.fn() },
-    spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn(), message: vi.fn() })),
+    spinner: vi.fn(() => ({ start: vi.fn(), stop: vi.fn(), clear: vi.fn(), message: vi.fn() })),
   };
 }

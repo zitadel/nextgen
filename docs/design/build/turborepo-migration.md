@@ -188,8 +188,6 @@ as they were.
 | docs | `dev`, `start` | same | existing |
 | docs | `e2e` (dep build), `e2e-deployment` (its own Playwright config, which requires `CLOUD_URL`) | same | **new** scripts; the root's `check:cloud` runs `e2e-deployment` with the e2e package's `console-deployment` |
 | console | `build` env inputs `$CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
-| login-ui | `build`, `build-release` (outputs staticui) | same | **new** `build-release`: `vite build` |
-| login-ui | `dev`, `preview` | same | existing |
 | storybook | `test` (mutex, retry) | `#test` | guarded script |
 | storybook | `dev` | `#dev` | existing |
 | website | `lint`, `typecheck`, `build`, `dev`, `start` | same | **new** `lint` script; `typecheck` depends on `build` (`next typegen` and `next build` both write `.next/types`), and so does moon's since it dropped its `website-next` mutex, which held only while a command ran, not while a cache hit restored `.next`; `build` outputs `.next/**` without its cache |

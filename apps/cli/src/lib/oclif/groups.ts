@@ -1,16 +1,18 @@
 /**
- * The groups the root help lists commands under, declared in print order: the
- * journey runs from setting up a project, to running the local server, to
- * managing its configuration, to acting on the resources inside it. Every command declares its own group
- * (`static group` on the class) so nothing has to be registered centrally; a
- * command without one lands in the trailing {@link ADDITIONAL_COMMANDS_GROUP}
- * with oclif's own utilities.
+ * The groups the root help lists commands under, declared in print order and
+ * named for what a developer is trying to do: get going, work against a local
+ * server, manage who can sign in and how, change the project's configuration,
+ * or check on it. Every command declares its own group (`static group` on the
+ * class) so nothing has to be registered centrally; oclif's own utilities
+ * (`autocomplete`, `search`, …) declare none and are listed with the last group.
  */
 export const CommandGroups = {
-  project: "Project commands",
-  localServer: "Local server commands",
-  configuration: "Configuration commands",
-  resources: "Resource commands",
+  gettingStarted: "Getting started",
+  localDevelopment: "Local development",
+  usersAndTeams: "Users and teams",
+  authentication: "Authentication",
+  configuration: "Configuration and releases",
+  diagnostics: "Diagnostics and utilities",
 } as const;
 
 export type CommandGroup = (typeof CommandGroups)[keyof typeof CommandGroups];
@@ -30,6 +32,3 @@ export function compareInGroup(
     a.id.localeCompare(b.id)
   );
 }
-
-/** Where ungrouped commands (oclif's `autocomplete`, `search`, …) are listed. */
-export const ADDITIONAL_COMMANDS_GROUP = "Additional commands";

@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { fetchAllSchemas } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/authentication/idps/$idpId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "identity provider" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const projectId = requireProjectScope(deps.project);
@@ -53,7 +53,7 @@ function IdpDetail() {
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <PanelTitle icon={Shield} title={idp.definition.display_name} />
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Connection ID" value={idp.id} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(idp.created_at)} />

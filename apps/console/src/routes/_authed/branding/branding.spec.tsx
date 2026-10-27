@@ -20,15 +20,17 @@ vi.mock("@/components/branding/login-preview", () => ({
   LoginPreview: ({
     journey,
     flowName,
+    theme,
     state,
     onStates,
   }: {
     journey: string;
     flowName: string;
+    theme: string;
     state: string;
     onStates?: (states: string[]) => void;
   }) => (
-    <div data-testid="preview" data-flow={flowName} data-state={state}>
+    <div data-testid="preview" data-flow={flowName} data-theme={theme} data-state={state}>
       {journey}
       {/* Stands in for the served step arriving with no required field. */}
       <button
@@ -230,6 +232,38 @@ describe("branding screen", () => {
       expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),
     );
     expect(screen.getByTestId("preview")).toHaveAttribute("data-flow", "default-login");
+  });
+
+  it("names the previewed theme and switches it", async () => {
+    serveRevision({ ...PUBLISHED, theme: { mode: "auto", light: {}, dark: {} } });
+    await renderAt("/branding");
+
+    expect(await screen.findByTestId("preview")).toHaveAttribute("data-theme", "revision");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    // Both sides published under `auto`: the operator's operating system picks.
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent(
+      "System",
+    );
+    await userEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
+
+    expect(screen.getByTestId("preview")).toHaveAttribute("data-theme", "light");
+    expect(screen.getByRole("button", { name: "Previewed theme: Light" })).toBeInTheDocument();
+  });
+
+  it("does not offer a side the revision does not publish", async () => {
+    // Dark only: the element paints dark whatever it is asked for.
+    serveRevision();
+    await renderAt("/branding");
+
+    await screen.findByTestId("preview");
+    await userEvent.click(screen.getByRole("button", { name: "Previewed theme: From branding" }));
+    expect(screen.getByRole("menuitemradio", { name: /From branding/ })).toHaveTextContent("Dark");
+    const light = screen.getByRole("menuitemradio", { name: /Light/ });
+    expect(light).toHaveAttribute("aria-disabled", "true");
+    expect(light).toHaveTextContent("Not published");
+    expect(screen.getByRole("menuitemradio", { name: "Dark" })).not.toHaveAttribute(
+      "aria-disabled",
+    );
   });
 
   it("switches the previewed state", async () => {

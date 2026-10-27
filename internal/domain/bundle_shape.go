@@ -25,11 +25,18 @@ type BundleShapeIDP struct {
 	Document []byte
 }
 
+// BundleShapePolicy is one policies[] entry for shape validation.
+type BundleShapePolicy struct {
+	Index     int
+	Operation string
+}
+
 // BundleShapeInput is the author-facing bundle shape ValidateBundleShape checks.
 type BundleShapeInput struct {
 	Schemas     []BundleShapeSchema
 	Flows       []BundleShapeFlow
 	IDPs        []BundleShapeIDP
+	Policies    []BundleShapePolicy
 	HasBranding bool
 }
 
@@ -46,7 +53,7 @@ type BundleShapeFailure struct {
 // failure is returned so Build can report them together. An empty bundle is
 // not a resource failure — callers refuse it with ErrReleaseInvalid.
 func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
-	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs)
+	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Policies)
 	if input.HasBranding {
 		total++
 	}
@@ -151,6 +158,22 @@ func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
 		seenIDP[slug] = idp.Index
 	}
 
+	// The operation is the policy's handle: a project has one policy per
+	// operation, so a release cannot pin two. The decoder already holds it to
+	// a catalogued operation.
+	seenPolicy := map[string]int{}
+	for _, policy := range input.Policies {
+		if prev, ok := seenPolicy[policy.Operation]; ok {
+			msg := fmt.Sprintf("policy %q appears twice (indices %d and %d)", policy.Operation, prev, policy.Index)
+			failures = append(failures,
+				BundleShapeFailure{Kind: ReleasePointerKindPolicy, Index: prev, Handle: policy.Operation, Err: ErrReleaseInvalid(msg, nil)},
+				BundleShapeFailure{Kind: ReleasePointerKindPolicy, Index: policy.Index, Handle: policy.Operation, Err: ErrReleaseInvalid(msg, nil)},
+			)
+			continue
+		}
+		seenPolicy[policy.Operation] = policy.Index
+	}
+
 	return failures
 }
 
@@ -188,5 +211,5 @@ func IDPDocumentSlug(document []byte) (string, error) {
 
 // BundleEmpty reports whether the bundle carries no resources.
 func BundleEmpty(input BundleShapeInput) bool {
-	return len(input.Schemas)+len(input.Flows)+len(input.IDPs) == 0 && !input.HasBranding
+	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Policies) == 0 && !input.HasBranding
 }

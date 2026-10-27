@@ -3,6 +3,7 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"sync/atomic"
 
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -15,6 +16,10 @@ type contextKey struct{}
 // ctx while net/http middleware still reads the parent. Collapsing to one key
 // would drop that copy unless AuthGate reused the parent ctx.
 type actorSlotKey struct{}
+
+// authorizationKey carries the request's authorization mark: a context value
+// of its own, beside the actor slot and for the same reason (MarkAuthorization).
+type authorizationKey struct{}
 
 // ActorContext holds server-authoritative WHO/HOW dimensions for event emission (ADR 048 §5).
 type ActorContext struct {
@@ -34,13 +39,29 @@ type ActorContext struct {
 	Authenticated  bool
 }
 
+// authorizationMark holds the path that authorized a request when it was not
+// a grant on the protected project (ADR 053 §8, ADR 075 §5).
+type authorizationMark struct {
+	metadata atomic.Pointer[domain.EventAuthorizationMetadata]
+}
+
 // WithActorSlot plants a mutable actor slot on ctx so net/http middleware can
-// observe AuthGate enrichment that happens inside ogen on a child context.
+// observe AuthGate enrichment that happens inside ogen on a child context. The
+// request's authorization mark goes beside it, for the same reason.
 func WithActorSlot(ctx context.Context) context.Context {
 	if _, ok := ctx.Value(actorSlotKey{}).(*ActorContext); ok {
 		return ctx
 	}
-	return context.WithValue(ctx, actorSlotKey{}, &ActorContext{})
+	return context.WithValue(withAuthorizationMark(ctx), actorSlotKey{}, &ActorContext{})
+}
+
+// withAuthorizationMark plants the request's authorization mark, unless ctx
+// already carries one.
+func withAuthorizationMark(ctx context.Context) context.Context {
+	if _, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
+		return ctx
+	}
+	return context.WithValue(ctx, authorizationKey{}, &authorizationMark{})
 }
 
 func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
@@ -49,7 +70,7 @@ func ActorSlotFromContext(ctx context.Context) (*ActorContext, bool) {
 }
 
 // BindPublicRequest stamps project/flow/session onto the actor slot so Path A
-// can emit request.api without a token (hosted login/flow). No-op when
+// can emit request.api without a token (the login flow). No-op when
 // projectID is empty or there is no slot. Does not set Authenticated.
 func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string) {
 	if projectID == "" {
@@ -75,12 +96,34 @@ func BindPublicRequest(ctx context.Context, projectID, flowID, sessionID string)
 	}
 }
 
-// WithActorContext stores ActorContext on ctx and updates any actor slot.
+// MarkAuthorization records which path authorized the request, after the
+// security handler stamped its actor. Every event the request emits from then
+// on, Path A and Path B alike, carries it. Outside a request no mark is
+// planted, and there is nothing to mark.
+func MarkAuthorization(ctx context.Context, authorization domain.EventAuthorizationMetadata) {
+	if mark, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
+		mark.metadata.Store(&authorization)
+	}
+}
+
+// AuthorizationFromContext is the path that authorized the request, or nil
+// when nothing marked it: an ordinary grant, or no authorization at all.
+func AuthorizationFromContext(ctx context.Context) *domain.EventAuthorizationMetadata {
+	if mark, ok := ctx.Value(authorizationKey{}).(*authorizationMark); ok {
+		return mark.metadata.Load()
+	}
+	return nil
+}
+
+// WithActorContext stores ActorContext on ctx and updates any actor slot. A
+// server without the request event middleware has planted no slot, and so no
+// authorization mark: stamping the actor plants one, so the authz gate can
+// still mark the request.
 func WithActorContext(ctx context.Context, ac ActorContext) context.Context {
 	if slot, ok := ActorSlotFromContext(ctx); ok {
 		*slot = ac
 	}
-	return context.WithValue(ctx, contextKey{}, ac)
+	return context.WithValue(withAuthorizationMark(ctx), contextKey{}, ac)
 }
 
 func ActorFromContext(ctx context.Context) (ActorContext, bool) {
@@ -132,6 +175,11 @@ func FromContext(ctx context.Context, eventType domain.EventType, category domai
 	ev.SessionID = ac.SessionID
 	ev.FlowID = ac.FlowID
 	ev.RequestID = ac.RequestID
+	if authorization := AuthorizationFromContext(ctx); authorization != nil {
+		if meta, err := events.MarshalPayload(domain.EventMetadata{Authorization: authorization}); err == nil {
+			ev.Metadata = meta
+		}
+	}
 	return ev
 }
 
@@ -152,12 +200,4 @@ func WithPayload(ev *domain.Event, payload any) (*domain.Event, error) {
 	}
 	ev.Payload = raw
 	return ev, nil
-}
-
-// WithProjectID sets ProjectID when the actor context did not supply one.
-func WithProjectID(ev *domain.Event, projectID string) *domain.Event {
-	if ev != nil && ev.ProjectID == "" {
-		ev.ProjectID = projectID
-	}
-	return ev
 }

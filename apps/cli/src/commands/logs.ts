@@ -6,13 +6,12 @@ import { LocalServer } from "../lib/local-server/server";
 import { LOG_LEVELS, type LogLine, logText, renderLogLine } from "../lib/local-server/server-log";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
 
 export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 4;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %> --follow",
@@ -46,7 +45,7 @@ export default class Logs extends BaseCommand {
     if (!nearest) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [publicCliCommand("start", this.meta.cliVersion)],
+        nextCommands: [this.suggestUnscoped("start")],
       });
     }
 

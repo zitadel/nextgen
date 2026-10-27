@@ -46,6 +46,9 @@ type Handler struct {
 	// `$id` under whichever base the project stores it (see
 	// WithBuiltinSchemaBases); the zero value resolves ids as written.
 	builtinBases domain.BuiltinSchemaBases
+	// readiness is the database /readyz pings (see WithReadinessCheck); nil
+	// answers every readiness probe with 503.
+	readiness Pinger
 }
 
 func NewHandler(

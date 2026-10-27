@@ -24,8 +24,8 @@ import {
  *     not have.
  *
  * This config boots the built binary and nothing else: it embeds the console
- * and the hosted login shell (`internal/staticui/*`), serves the ogen API at
- * the origin root, and the browser visits that one origin. That makes it the
+ * (`internal/staticui/console`), serves the ogen API at the origin root, and
+ * the browser visits that one origin. That makes it the
  * only lane where the console's API base and the mux's routing table have to
  * agree — the disagreement that shipped as "POST /api/flow returned 404".
  *

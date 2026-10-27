@@ -160,6 +160,9 @@ describe("user detail", () => {
     const link = await panel.findByRole("link", { name: "Business sch_business" });
     // The `_authed` layout retains the selected project across navigation.
     expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+    // The schema's name sits beside the link, outside it.
+    expect(panel.getByText("Business")).toBeVisible();
+    expect(link).not.toHaveTextContent("Business");
   });
 
   it("shows a URI schema id verbatim and links to it encoded", async () => {
@@ -196,7 +199,9 @@ describe("user detail", () => {
     await renderDetail();
 
     const panel = within(await screen.findByRole("tabpanel"));
-    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+    expect(await panel.findByRole("link", { name: "sch_business" })).toBeVisible();
+    // The id is the name, so it is not printed again beside the link.
+    expect(panel.getAllByText("sch_business")).toHaveLength(1);
   });
 
   it("renders no revision link when the schema cannot be read", async () => {
@@ -238,8 +243,8 @@ describe("user detail", () => {
   });
 
   it("titles the profile card as the user's schema", async () => {
-    // The design names the card "User schema"; the schema's own name is the
-    // revision link beside it. The detail header owns the `h1`.
+    // The design names the card "User schema"; the schema's own name sits
+    // beside it, before the revision link. The detail header owns the `h1`.
     stub();
     await renderDetail();
 
@@ -850,5 +855,41 @@ describe("user detail", () => {
     await waitFor(() => expect(deleted).toBe(true));
     // The record the screen is about is gone, so staying on it would 404.
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+  });
+
+  it("names a user that does not exist, and leads back to Users in the same project", async () => {
+    // The loader error is expected: silence the error boundary's dump and the
+    // router's route-match warning.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(`${USERS_URL}/${USER_ID}`, () =>
+          HttpResponse.json(
+            { code: "user.not_found", message: "user not found" },
+            { status: 404, headers: { "x-request-id": "req_01TEST" } },
+          ),
+        ),
+        http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
+      );
+      const router = await renderDetail();
+
+      expect(await screen.findByRole("heading", { name: "User not found" })).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "There is no user with this ID. It may have been deleted, or the link may be broken.",
+        ),
+      ).toBeInTheDocument();
+      // The server's message would only repeat the title.
+      expect(screen.queryByText("user not found")).not.toBeInTheDocument();
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("link", { name: "Back to Users" }));
+      await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/users"));
+      expect(router.state.resolvedLocation?.search).toMatchObject({ project: TEST_PROJECT_ID });
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });

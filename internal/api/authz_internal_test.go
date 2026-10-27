@@ -25,6 +25,10 @@ type stubAuthzStmts struct {
 	kinds map[string]domain.ResourceKind
 	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
 	elsewhere map[string]bool
+	// operator answers CheckPlatformOperator (ADR 075); false by default.
+	operator bool
+	// operatorAsked, when set, records each CheckPlatformOperator question.
+	operatorAsked *[]domain.AuthzPlatformCheckParams
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -49,6 +53,13 @@ func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheck
 		return *s.allowCheck, foothold, nil
 	}
 	return params.PrincipalID == params.ProjectID, foothold, nil
+}
+
+func (s stubAuthzStmts) CheckPlatformOperator(_ context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
+	if s.operatorAsked != nil {
+		*s.operatorAsked = append(*s.operatorAsked, params)
+	}
+	return s.operator, nil
 }
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
