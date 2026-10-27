@@ -14,6 +14,9 @@ import type { Section } from "./summary";
 /** The widest anything the CLI draws may be, however wide the terminal is. */
 export const WIDTH = 80;
 
+/** What the chain's own gutter (`│  `) costs a line drawn inside it. */
+export const GUTTER = 3;
+
 /**
  * How wide a line looks on screen. Colour is invisible but not weightless:
  * a styled line is a dozen characters longer than it reads, so every width

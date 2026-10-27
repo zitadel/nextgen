@@ -1,6 +1,7 @@
 import { log } from "@clack/prompts";
 import { consola } from "consola";
 
+import { GUTTER, Prose, WIDTH } from "./layout";
 import { GUIDE, MARK } from "./marks";
 import { DrawnSpinner } from "./spinner";
 import type { Report, Step } from "./wizard";
@@ -73,12 +74,12 @@ export class Progress {
       progress.clear();
       this.drawing.closeGap();
       // The spinner already drew the blank guide line above the title.
-      log.message(done?.(result) ?? label, { symbol: MARK.done, spacing: 0 });
+      Progress.line(MARK.done, done?.(result) ?? label);
       Progress.draw(lines);
       return result;
     } catch (error) {
       progress.clear();
-      log.message(`${label} failed`, { symbol: MARK.failed, spacing: 0 });
+      Progress.line(MARK.failed, `${label} failed`);
       throw error;
     }
   }
@@ -119,7 +120,7 @@ export class Progress {
       ended = true;
       progress.clear();
       this.drawing.closeGap();
-      log.message(text, { symbol, spacing: 0 });
+      Progress.line(symbol, text);
       for (const line of details) {
         Progress.detail(line);
       }
@@ -149,6 +150,16 @@ export class Progress {
 
   /** Writes one line under a result, in the chain's gutter. */
   private static detail(text: string): void {
-    log.message(text, { symbol: GUIDE, spacing: 0 });
+    Progress.line(GUIDE, text);
+  }
+
+  /**
+   * One line in the chain, wrapped to what the gutter leaves of the terminal.
+   * A step names whatever it did — a sentence and a path, say — so without
+   * this a long one runs past the chain instead of folding under it. A line
+   * already laid out in columns is left whole by {@link Prose}.
+   */
+  private static line(symbol: string, text: string): void {
+    log.message(new Prose(text, WIDTH - GUTTER).render(), { symbol, spacing: 0 });
   }
 }
