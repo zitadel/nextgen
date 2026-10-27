@@ -767,15 +767,13 @@ func buildErrorMapping(domainPath string) map[string]errorInfo {
 						if ident, ok := callExpr.Fun.(*ast.Ident); ok && ident.Name == "newError" {
 							if len(callExpr.Args) >= 2 {
 								code := extractCodeArgument(callExpr.Args[0], prefixes)
-								message := ""
-								if msgLit, ok := callExpr.Args[1].(*ast.BasicLit); ok {
-									message = strings.Trim(msgLit.Value, `"`)
+								msgLit, ok := callExpr.Args[1].(*ast.BasicLit)
+								if !ok || code == "" {
+									continue
 								}
-								if code != "" {
-									mapping["domain."+funcDecl.Name.Name] = errorInfo{
-										code:    code,
-										message: message,
-									}
+								mapping["domain."+funcDecl.Name.Name] = errorInfo{
+									code:    code,
+									message: strings.Trim(msgLit.Value, `"`),
 								}
 							}
 						}
