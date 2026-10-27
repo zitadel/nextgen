@@ -75,15 +75,10 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
    *   for a later `deploy`.
-   * @param options.preflight - Quick checks of the flags that must answer before
-   *   the schema is read, with whatever they read handed back as `preflight`.
-   *   It runs in the middle of this method, before the schema is selected and
-   *   before the server is connected, so it must only look at the flags and the
-   *   resolved environment: it must not ask a question, use the network or write
-   *   anything. A person who is asked something here answers it, and is then
-   *   refused for a schema or server problem they had no part in. Ask in the
-   *   command's own `run`, after `connect()`. Only `auth-method sso enable` uses
-   *   it today.
+   * @param options.preflight - Checks of the flags that must answer before the
+   *   schema is read, with what they read handed back as `preflight`. It must
+   *   not ask a question, use the network or write anything: ask in the
+   *   command's own `run`, after `connect()`.
    */
   protected async target<T = undefined>(
     flags: { schema?: string; cwd?: string },

@@ -11,12 +11,12 @@ import { clientId, displayName, googleSelection, issuer, slug } from "../../../h
 import {
   type ConnectionFile,
   IDPS_DIR,
-  credentialVariablesOf,
   checkCustomSlug,
-  refuseChangedIssuer,
-  storedCustomSettings,
+  credentialVariablesOf,
   planConnection,
   readConnectionFiles,
+  refuseChangedIssuer,
+  storedCustomSettings,
 } from "../../../../src/lib/idp";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -99,12 +99,7 @@ describe("credentialVariablesOf", () => {
   });
 });
 
-const aFile = (body: Record<string, unknown>): ConnectionFile => ({
-  name: `${String(body.fileName ?? body.slug)}.json`,
-  path: `${IDPS_DIR}/${String(body.fileName ?? body.slug)}.json`,
-  body: Object.fromEntries(Object.entries(body).filter(([key]) => key !== "fileName")),
-});
-const acmeFile = aFile({
+const acmeFile = file("acme-sso.json", {
   slug: "acme-sso",
   display_name: "Acme SSO",
   oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
@@ -123,13 +118,13 @@ describe("checkCustomSlug", () => {
   });
 
   it("refuses two files that declare the same slug", () => {
-    const twin = aFile({ ...acmeFile.body, fileName: "acme-sso-copy" });
+    const twin = file("acme-sso-copy.json", acmeFile.body);
 
     expect(() => check([acmeFile, twin])).toThrow(/More than one connection is named acme-sso/);
   });
 
   it("refuses a slug whose file name holds another connection", () => {
-    const squatter = aFile({ fileName: "acme-sso", slug: "something-else" });
+    const squatter = file("acme-sso.json", { slug: "something-else" });
 
     expect(() => check([squatter])).toThrow(/already exists and is not the acme-sso connection/);
   });
@@ -144,8 +139,10 @@ describe("storedCustomSettings", () => {
   });
 
   it("reads only what the file has", () => {
-    expect(storedCustomSettings(aFile({ slug: "acme-sso" }))).toEqual({});
-    expect(storedCustomSettings(aFile({ slug: "acme-sso", oidc: { issuer: 3 } }))).toEqual({});
+    expect(storedCustomSettings(file("acme-sso.json", { slug: "acme-sso" }))).toEqual({});
+    expect(
+      storedCustomSettings(file("acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } })),
+    ).toEqual({});
   });
 });
 
@@ -166,7 +163,7 @@ describe("refuseChangedIssuer", () => {
   it("refuses a file that has no issuer at all", () => {
     expect(() =>
       refuseChangedIssuer(
-        aFile({ slug: "acme-sso" }),
+        file("acme-sso.json", { slug: "acme-sso" }),
         slug("acme-sso"),
         "https://a.example",
         "--slug",
