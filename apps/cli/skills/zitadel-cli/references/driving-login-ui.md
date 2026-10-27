@@ -98,7 +98,9 @@ newest revision, which only `"config": {}` switches off. `policies list` and
 in `<operation>.test.json` (`.zitadel/meta/policy-test.json`): each names an
 `input` in the operation's terms (`{"password": "…"}`), optional `facts` the
 operation would look up (`self_service`, `history_matches`), and the expected
-decision (`allowed`, optionally `code` and exactly the `violations`).
+decision (`allowed`, optionally `code` and exactly the `violations`). The
+decision and rules hold in the login too; `code` is the API's answer, and a
+flow shows each rule as `error.x-auth-methods#password_<rule>` instead.
 `policies test [operation]` evaluates every case on the server against the
 sibling policy file, or with `--release <id>` against the revision that
 release pins; a missing policy is tested as none. It fails with `E_VALIDATION`

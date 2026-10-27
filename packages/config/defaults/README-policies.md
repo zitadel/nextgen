@@ -89,6 +89,9 @@ reports the ones that do not hold. Your editor validates the file against
   previous password is refused.
 - `expect` takes `allowed`, and optionally the `code` the operation answers
   with (such as `user.password_empty`) and exactly the `violations` it reports.
+  The decision and the rules hold wherever a password is set; the `code` is
+  what an API call answers, while your app's sign-up shows the same rules as
+  errors on the password field.
 
 `zitadel policies test --release <id>` runs the same cases against the policy a
 built release pins, before you deploy it. Without a policy, the cases run
