@@ -35,6 +35,7 @@ export {
 export {
   applySsoToFlow,
   applySsoToSchema,
+  schemaProviders,
   removeSsoFromFlow,
   removeSsoFromSchema,
   ssoEditRefusal,
@@ -98,4 +99,7 @@ export {
   readMappings,
   statusLine,
   stillToConfigure,
+  unmappedAttributes,
+  unmappedLines,
+  usedByLines,
 } from "./mappings";

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { mappingLines, readMappings, statusLine, stillToConfigure } from "../../../../src/lib/idp";
+import {
+  mappingLines,
+  readMappings,
+  statusLine,
+  stillToConfigure,
+  unmappedAttributes,
+  unmappedLines,
+  usedByLines,
+} from "../../../../src/lib/idp";
 
 const CONNECTION = {
   claim_mapping: { email: "mail", givenName: "given_name" },
@@ -62,6 +70,49 @@ describe("a connection's mapping as lines", () => {
 
   it("names the file to edit when there is no mapping", () => {
     expect(mappingLines({}, ".zitadel/idps/acme.json")[0]).toContain(".zitadel/idps/acme.json");
+  });
+});
+
+describe("the attributes a connection does not map", () => {
+  it("keeps only the defined attributes that no claim fills, sorted", () => {
+    expect(
+      unmappedAttributes(CONNECTION, ["email", "givenName", "familyName", "companyName"]),
+    ).toEqual(["companyName", "familyName"]);
+  });
+
+  it("counts an attribute whose claim is not a string as unmapped", () => {
+    expect(unmappedAttributes({ claim_mapping: { email: 5 } }, ["email"])).toEqual(["email"]);
+  });
+
+  it("de-duplicates the attributes it is given", () => {
+    expect(unmappedAttributes({}, ["companyName", "companyName"])).toEqual(["companyName"]);
+  });
+
+  it("reports nothing for a connection no schema defines attributes for", () => {
+    expect(unmappedAttributes(CONNECTION, [])).toEqual([]);
+  });
+});
+
+describe("the unmapped-attributes block", () => {
+  it("names each unmapped attribute and the file to add it to", () => {
+    const lines = unmappedLines(["companyName"], ".zitadel/idps/acme.json");
+
+    expect(lines).toContain("  companyName");
+    expect(lines.at(-1)).toContain(".zitadel/idps/acme.json");
+  });
+
+  it("is empty when everything is mapped", () => {
+    expect(unmappedLines([], ".zitadel/idps/acme.json")).toEqual([]);
+  });
+});
+
+describe("the used-by block", () => {
+  it("names the schemas that sign in through the connection", () => {
+    expect(usedByLines(["customers", "employees"]).join("\n")).toContain("customers, employees");
+  });
+
+  it("says when no schema uses the connection", () => {
+    expect(usedByLines([]).join("\n")).toContain("No user schema");
   });
 });
 

@@ -85,6 +85,51 @@ export function mappingLines(connection: object, file: string): string[] {
 }
 
 /**
+ * The attributes a connection has no claim for, out of the ones the schemas
+ * that sign in through it define. A claim the file holds as something other
+ * than a string reads as absent, so it counts as unmapped here too. Sorted and
+ * de-duplicated; a connection no schema uses is passed no attributes and so
+ * reports none.
+ */
+export function unmappedAttributes(connection: object, attributes: Iterable<string>): string[] {
+  const mapped = new Set(readMappings(connection).mapping.map((row) => row.attribute));
+  return [...new Set(attributes)].filter((attribute) => !mapped.has(attribute)).sort();
+}
+
+/**
+ * The block naming the attributes still without a claim and the file to add
+ * them to, so a developer sees what a sign-in will leave empty rather than
+ * discovering it at the first login. Empty when every attribute the signing-in
+ * schemas define is already mapped, so a finished connection shows nothing.
+ *
+ * @param file - The connection file, named so the person knows where to edit.
+ */
+export function unmappedLines(unmapped: readonly string[], file: string): string[] {
+  if (unmapped.length === 0) {
+    return [];
+  }
+  return [
+    "",
+    "Not mapped yet (no claim fills these):",
+    ...unmapped.map((attribute) => `  ${attribute}`),
+    `Add them to claim_mapping in ${file}.`,
+  ];
+}
+
+/**
+ * The block naming the schemas that sign in through this connection, so a
+ * change to its mapping shows who it affects. A connection no schema references
+ * yet is called out the other way: nothing signs in through it, so changing it
+ * changes nothing today.
+ */
+export function usedByLines(schemas: readonly string[]): string[] {
+  if (schemas.length === 0) {
+    return ["", "No user schema signs in through this connection yet."];
+  }
+  return ["", `Used by: ${schemas.join(", ")}`];
+}
+
+/**
  * Where a connection stands, so "saved", "applied" and "tested" are not
  * confused. `present` is a connection file that was already there: whether it
  * reached the server is not known here.
