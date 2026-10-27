@@ -16,13 +16,7 @@ import { shellArg } from "../../lib/shell";
  * so one deployment and a page of them name the same things in the same
  * words.
  */
-export const DEPLOYMENT_FIELDS = [
-  "id",
-  "release_id",
-  "reason",
-  "origins",
-  "deployed_at",
-] as const;
+export const DEPLOYMENT_FIELDS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
 
 /** A deployment as the endpoints return it, narrowed to what the table reads. */
 export type DeploymentRecord = {
