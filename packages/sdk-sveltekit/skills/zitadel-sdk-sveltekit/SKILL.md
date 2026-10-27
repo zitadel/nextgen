@@ -50,8 +50,10 @@ export const handle = createNextgenHandle({
 
 `url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
 from `process.env`, not SvelteKit's `$env` modules — their import paths moved
-between SvelteKit 2 and 3. The hook loads `.env.local` into `process.env`
-first (a variable already set wins), so do not load it yourself. Compose with other hooks via
+between SvelteKit 2 and 3. In dev, the `zitadel()` plugin from
+`@zitadel/sdk-sveltekit/vite` in `vite.config.ts` puts the `ZITADEL_*` variables
+from the env files there (a variable already set wins), so do not load them
+yourself. Compose with other hooks via
 `sequence()` from `@sveltejs/kit/hooks`. Sessions count only in the app's own
 project: `projectId`, else `ZITADEL_PROJECT_ID`, else
 `VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in.

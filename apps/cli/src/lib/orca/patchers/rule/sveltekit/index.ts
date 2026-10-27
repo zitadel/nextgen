@@ -13,6 +13,8 @@ import {
   profilePageTemplate,
   registerPageTemplate,
 } from "./templates";
+import { svelteKitViteConfigEdit } from "./vite-config";
+import { VITE_CONFIG_PATHS } from "../vite-support";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-sveltekit";
 /**
@@ -29,9 +31,9 @@ const COMPONENT_DEPENDENCY = "@zitadel/sdk-svelte";
  * here the `@zitadel/sdk-sveltekit` `handle` hook in `src/hooks.server.ts`.
  * Contributes the layout + landing/login/register/profile file-based routes (the
  * idiomatic `<ZitadelLogin>`/`<ZitadelSession>` Svelte components from
- * `@zitadel/sdk-svelte`), the public project-id env var, and both deps. No config
- * edit is needed — the hook is a plain file, so (like Next) every managed file
- * carries the marker.
+ * `@zitadel/sdk-svelte`), the public project-id env var, both deps, and the
+ * dev-only `zitadel()` Vite plugin that puts the `.env.local` settings on
+ * `process.env` for the hook.
  */
 export class SvelteKitPatcher extends AbstractRulePatcher {
   canPatch(framework: string): boolean {
@@ -76,6 +78,14 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       // Pin the dev script to the origin setup registered; --strictPort makes
       // Vite exit instead of drifting to a port the project does not allow.
       devScriptPortOp(ctx.issuer, { strictPort: true }),
+      {
+        kind: "edit",
+        path: [...VITE_CONFIG_PATHS],
+        edit: svelteKitViteConfigEdit(),
+        // Without the plugin the hook misses ZITADEL_URL in dev and proxies to
+        // the wrong server, so the doctor fails while it is missing.
+        wiring: "infrastructure",
+      },
       { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
       {
         kind: "merge-env",
@@ -127,16 +137,16 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
   }
 
   protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    // The dev script's port is pinned in place by an `edit` op eject can't
-    // revert, so it is listed as a manual cleanup step.
-    return ["package.json"];
+    // The dev script's port and the Vite plugin are edits eject can't revert,
+    // so they are listed as manual cleanup steps.
+    return ["package.json", "vite.config.*"];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle) plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle) plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte, and added the zitadel() plugin to vite.config.*.",
     };
   }
 }

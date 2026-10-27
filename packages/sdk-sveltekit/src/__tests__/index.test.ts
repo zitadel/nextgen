@@ -35,6 +35,7 @@ describe("package manifest", () => {
     expect(manifest.peerDependencies).toEqual({
       "@sveltejs/kit": "^2.0.0 || ^3.0.0",
       svelte: "^5.0.0",
+      vite: "^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0",
     });
   });
 });

@@ -22,13 +22,14 @@ from `@zitadel/sdk-svelte`, which is written with runes); older versions are ref
   `ZITADEL_ENVIRONMENT`)
 - `package.json` — adds `@zitadel/sdk-sveltekit` and `@zitadel/sdk-svelte`, and pins the
   dev script to the registered port with `--strictPort` (an edit eject cannot revert)
-
-No config file is edited: the hook is a plain file, so every managed file carries the marker.
+- `vite.config.*` — adds the `zitadel()` plugin from `@zitadel/sdk-sveltekit/vite` after
+  `sveltekit()` (infrastructure; an edit eject cannot revert)
 
 ## How the proxy works
 
 The hook passes only the route policy: `@zitadel/sdk-sveltekit` reads `ZITADEL_URL` and
-`ZITADEL_PROJECT_SECRET` from `process.env`, loading `.env.local` into it first (SvelteKit's
-`$env` modules differ across major versions). The generated file names no Node global, so
-the app type-checks without `@types/node`. There is no dev-only proxy, so it works the same
-in production.
+`ZITADEL_PROJECT_SECRET` from `process.env` (SvelteKit's `$env` modules differ across major
+versions). SvelteKit never puts env files on `process.env`, so in dev the `zitadel()` Vite
+plugin does, as Next.js and Nitro do on their own; in production the platform sets them. The
+generated hook names no Node global, so the app type-checks without `@types/node`. There is no
+dev-only proxy, so it works the same in production.

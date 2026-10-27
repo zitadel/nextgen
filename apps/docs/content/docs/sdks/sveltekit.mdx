@@ -49,13 +49,26 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
       <File name="src/routes/profile/+page.svelte" />
       <File name=".env.local" />
       <File name=".env.example" />
+      <File name="vite.config.ts" />
       <File name="package.json" />
     </Files>
 
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/hooks.server.ts`. The hook reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3, and loads `.env.local` into it first, since SvelteKit does not. A variable already set wins, so the platform's variables apply in production:
+    Add the `zitadel()` plugin to `vite.config.ts`. SvelteKit does not put `.env` files on `process.env`, so while `vite dev` runs the plugin puts the `ZITADEL_*` variables from them there. A variable already set wins, and builds are left alone, so the platform's variables apply in production:
+
+    ```ts
+    import { sveltekit } from "@sveltejs/kit/vite";
+    import { zitadel } from "@zitadel/sdk-sveltekit/vite";
+    import { defineConfig } from "vite";
+
+    export default defineConfig({
+      plugins: [sveltekit(), zitadel()],
+    });
+    ```
+
+    Create `src/hooks.server.ts`. The hook reads `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET` from `process.env` rather than SvelteKit's `$env` modules, whose import paths moved between SvelteKit 2 and 3:
 
     ```ts
     import { createNextgenHandle } from "@zitadel/sdk-sveltekit/server";
