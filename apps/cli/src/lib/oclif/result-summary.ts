@@ -108,7 +108,13 @@ export function nextSteps(lines: readonly string[]): BoxAction[] {
  * happened (`Set X on the project`), with the server it ran against in
  * parentheses. A longer one is cut at its first sentence, and the rest goes under it.
  */
-export function summaryOfText(text: string, failed = false, boxed = false, id?: string): Summary {
+export function summaryOfText(
+  text: string,
+  failed = false,
+  boxed = false,
+  id?: string,
+  given: readonly string[] = [],
+): Summary {
   const lines = text.split("\n").map((line) => line.replace(/\s+$/, ""));
   while (lines[0]?.trim() === "") {
     lines.shift();
@@ -123,7 +129,16 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
   // A table with nothing that says what happened: the closing line is plain, the table stays.
   const noHeadline = at < 0 && !failed && columns(lines[0]);
   let title = "Done";
+  let trailing: string[] = [];
   if (!noHeadline) {
+    // What a listing prints after its count — `Resolved now: …` and the like —
+    // belongs in the footer beside the count, not as another line of the body.
+    if (!boxed && at >= 0 && lines.slice(at + 1).every((line) => !columns(line))) {
+      trailing = lines
+        .splice(at + 1)
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+    }
     [title = "Done"] = lines.splice(at < 0 ? 0 : at, 1);
   }
   // `(server: host)` says where the command ran. It closes the headline, not a line of its own.
@@ -132,6 +147,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
     serverAt < 0
       ? undefined
       : /^\(server: (.+)\)$/.exec(lines.splice(serverAt, 1)[0]?.trim() ?? "")?.[1];
+  const extras = [...given, ...trailing];
   if (title === "Zitadel command completed.") {
     title = "Done";
   }
@@ -157,6 +173,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
       lines: [...overflow, ...(nextAt < 0 ? [] : before)],
       next: nextSteps(nextAt < 0 ? lines : lines.slice(nextAt + 1)),
       boxed: true,
+      ...(extras.length === 0 ? {} : { extras }),
       ...(failed ? { failed } : {}),
       ...(ran === undefined ? {} : { ran }),
     };
@@ -168,6 +185,7 @@ export function summaryOfText(text: string, failed = false, boxed = false, id?: 
     title: headline,
     sections: [],
     lines: [...overflow, ...(overflow.length > 0 && lines.length > 0 ? [""] : []), ...lines],
+    ...(extras.length === 0 ? {} : { extras }),
     ...(failed ? { failed } : {}),
     ...(ran === undefined ? {} : { ran }),
   };

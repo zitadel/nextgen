@@ -43,6 +43,8 @@ export type Summary = {
   readonly sections: readonly Section[];
   /** Anything the command renders itself, such as a table, under the facts. */
   readonly lines?: readonly string[];
+  /** What the command adds after its rendering, such as `Resolved now: …`. */
+  readonly extras?: readonly string[];
   /** What to do next, each step a sentence and the commands it asks for. */
   readonly next?: readonly BoxAction[];
   /** The headline is a failure, so it closes the chain in red. */

@@ -53,7 +53,8 @@ describe("Chain", () => {
 
   it("closes once, however many times it is asked to", () => {
     const chain = watching();
-    chain.describe("Listing origins");
+    chain.describe("Removing an origin");
+    chain.narrate("i", "asked something");
     chain.finish({ title: "Found 1 origin", sections: [] });
     chain.finish({ title: "Found 2 origins", sections: [] });
 

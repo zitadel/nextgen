@@ -107,12 +107,19 @@ export class Chain implements Wizard, Drawing, Narratable {
    * next, one box of steps. Nothing is wider than {@link WIDTH} columns.
    */
   finish(summary: Summary): void {
-    this.open();
-    if (!this.opened || this.ended) {
+    if (this.ended || !this.audience.interactive) {
       return;
     }
+    const ending = new Ending(summary, this.where(summary.ran), this.opened);
+    // A command that answered without asking anything draws no chain: its
+    // answer stands on its own, with a footer rather than a closing line.
+    if (ending.standalone) {
+      this.ended = true;
+      process.stdout.write(ending.renderStandalone());
+      return;
+    }
+    this.open();
     this.ended = true;
-    const ending = new Ending(summary, this.where(summary.ran));
     outro(ending.line);
     const below = ending.render();
     if (below !== undefined) {

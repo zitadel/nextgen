@@ -46,10 +46,20 @@ describe("Ui", () => {
     });
 
     it("closes the chain on the summary the command returned", async () => {
+      await watched().wizard("Enabling single sign-on", async (w) => {
+        w.say("configuring it");
+        return done(null, "Enabled it");
+      });
+
+      expect(intro).toHaveBeenCalledWith("Enabling single sign-on");
+      expect(outro).toHaveBeenCalledWith("Enabled it");
+    });
+
+    it("draws no chain for a command that answered without asking anything", async () => {
       await watched().wizard("Listing origins", async () => done(null, "Found 1 origin"));
 
-      expect(intro).toHaveBeenCalledWith("Listing origins");
-      expect(outro).toHaveBeenCalledWith("Found 1 origin");
+      expect(intro).not.toHaveBeenCalled();
+      expect(outro).not.toHaveBeenCalled();
     });
 
     it("draws nothing at all when nobody is watching", async () => {

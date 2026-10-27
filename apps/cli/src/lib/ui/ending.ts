@@ -19,10 +19,37 @@ import type { Where } from "./where";
 export class Ending {
   private readonly summary: Summary;
   private readonly where: Where;
+  private readonly inChain: boolean;
 
-  constructor(summary: Summary, where: Where) {
+  constructor(summary: Summary, where: Where, inChain = true) {
     this.summary = summary;
     this.where = where;
+    this.inChain = inChain;
+  }
+
+  /**
+   * A command that only answers something, and asked nothing on the way, draws
+   * no chain at all: its answer starts at the left margin, with one dim footer
+   * line under it saying what the answer amounts to and where it came from.
+   */
+  get standalone(): boolean {
+    return !this.inChain && !this.boxed();
+  }
+
+  /** The answer and its footer, for a command that drew no chain. */
+  renderStandalone(): string {
+    const said = this.summary.title === "Done" ? [] : [this.summary.title];
+    const place = this.where.known ? [this.where.plain] : [];
+    const footer = [...said, ...(this.summary.extras ?? []), ...place]
+      .map((part) => part.trim())
+      .filter((part) => part !== "")
+      .join(" · ");
+    const body = this.body();
+    return [
+      ...(body.length === 0 ? [] : [body.join("\n"), ""]),
+      ...(footer === "" ? [] : [pc.dim(footer)]),
+      "",
+    ].join("\n");
   }
 
   /** The one line that closes the chain, red when the headline is a failure. */

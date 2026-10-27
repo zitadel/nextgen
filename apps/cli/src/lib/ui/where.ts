@@ -19,6 +19,12 @@ export class Where {
     return this.project !== undefined || this.server !== undefined;
   }
 
+  /** Just the place, for a footer that already has its own wording. */
+  get plain(): string {
+    const target = this.project === undefined ? "" : `project ${this.project} on `;
+    return `${target}${this.describeServer().replace(/^your (local )?Zitadel server at /, "")}`;
+  }
+
   /** The same sentence every time, as the last line of the summary. */
   render(): string {
     const target = this.project === undefined ? "" : ` project ${this.project} on`;

@@ -420,10 +420,13 @@ export abstract class BaseCommand extends Command {
         this.ui.finish(
           this.withOverview(
             summaryOfText(
-              footer === undefined ? rendered : `${rendered}\n\n${footer}`,
+              this.summarises() && footer !== undefined ? `${rendered}\n\n${footer}` : rendered,
               false,
               this.summarises(),
               this.id,
+              // A command that answers keeps its own trailing line for the
+              // footer, rather than letting it become another body line.
+              this.summarises() || footer === undefined ? [] : footer.split("\n"),
             ),
           ),
         );
