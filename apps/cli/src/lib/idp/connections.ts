@@ -432,6 +432,50 @@ function refuseDifferentClientId(match: ConnectionFile, clientId: ClientId | und
  * a connection to somewhere else is somebody else's, and replacing it would
  * repoint every schema and flow that names it.
  */
+function planCustomConnection(options: {
+  readonly input: CustomOidcInput;
+  readonly files: readonly ConnectionFile[];
+  readonly clientId?: ClientId;
+  /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
+  readonly scopesGiven?: boolean;
+  /** How the calling command spells the slug flag, for the hints. */
+  readonly slugFlag: string;
+}): ConnectionPlan {
+  const { slug, issuer } = options.input;
+  const name = `${slug}.json`;
+  const path = `${IDPS_DIR}/${name}`;
+  const match = checkCustomSlug(options.files, slug, options.slugFlag);
+  if (match === undefined) {
+    return { action: "create", name, path, slug };
+  }
+
+  const oidc = match.body.oidc;
+  const existingIssuer =
+    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
+  if (existingIssuer !== issuer) {
+    throw new ZitadelError(
+      "E_CONFLICT",
+      existingIssuer === undefined
+        ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
+        : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
+      {
+        hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${options.slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
+        details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
+      },
+    );
+  }
+  refuseDifferentClientId(match, options.clientId);
+  refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
+  const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
+  const notApplied = [
+    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
+    ...(options.scopesGiven !== true || storedScopes === options.input.scopes.join(" ")
+      ? []
+      : (["scopes"] as const)),
+  ];
+  return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
+}
+
 /**
  * What a custom connection's slug alone decides: the file it already names, or
  * a refusal. More than one file with the slug, or a file name the slug would
@@ -479,50 +523,6 @@ export function checkCustomSlug(
   }
   refuseCollidingVariables(credentialVariables(slug), slug, files);
   return undefined;
-}
-
-function planCustomConnection(options: {
-  readonly input: CustomOidcInput;
-  readonly files: readonly ConnectionFile[];
-  readonly clientId?: ClientId;
-  /** Whether `--scopes` was passed: a default nobody asked for has not been contradicted. */
-  readonly scopesGiven?: boolean;
-  /** How the calling command spells the slug flag, for the hints. */
-  readonly slugFlag: string;
-}): ConnectionPlan {
-  const { slug, issuer } = options.input;
-  const name = `${slug}.json`;
-  const path = `${IDPS_DIR}/${name}`;
-  const match = checkCustomSlug(options.files, slug, options.slugFlag);
-  if (match === undefined) {
-    return { action: "create", name, path, slug };
-  }
-
-  const oidc = match.body.oidc;
-  const existingIssuer =
-    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
-  if (existingIssuer !== issuer) {
-    throw new ZitadelError(
-      "E_CONFLICT",
-      existingIssuer === undefined
-        ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
-        : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
-      {
-        hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${options.slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
-        details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
-      },
-    );
-  }
-  refuseDifferentClientId(match, options.clientId);
-  refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
-  const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
-  const notApplied = [
-    ...(match.body.display_name === options.input.displayName ? [] : (["display name"] as const)),
-    ...(options.scopesGiven !== true || storedScopes === options.input.scopes.join(" ")
-      ? []
-      : (["scopes"] as const)),
-  ];
-  return { action: "reuse", file: match, slug, ...(notApplied.length > 0 ? { notApplied } : {}) };
 }
 
 /**
