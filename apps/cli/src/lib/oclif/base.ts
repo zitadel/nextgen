@@ -274,8 +274,8 @@ export abstract class BaseCommand extends Command {
    * current {@link meta}. Guarded so a command that resolves meta more than once
    * does not double-count. Also called from {@link catch} so a failure thrown
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run. Returns early for an inert (opted-out / no-token /
-   * test-runner) instance so a disabled run never builds the property bags —
+   * records the run. Returns early for an inert (opted-out / test-runner /
+   * nowhere to send) instance so a disabled run never builds the property bags —
    * no timezone→country resolution or URL parsing for users who opted out. The
    * anonymous device profile is install-level and stable, so it is written only
    * on first run rather than paying a `people.set` request on every command.

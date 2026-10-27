@@ -3,9 +3,8 @@ import type { Properties } from "mixpanel";
 import { CLOUD_HOST, resolveChannel } from "./config";
 
 /**
- * Proof of concept: a copy of each event for Vercel Web Analytics, posted the
- * way `@vercel/analytics/server` posts a custom event. Names carry a `poc_`
- * prefix so proof traffic never mixes with a released event's name.
+ * A copy of each event for Vercel Web Analytics, under the event's own name,
+ * posted the way `@vercel/analytics/server` posts a custom event.
  */
 
 /** The cloud project's Web Analytics intake. */
@@ -17,9 +16,6 @@ export const VERCEL_MAX_PROPERTIES = 8;
 /** The intake's limit on an event name or value. */
 const MAX_LENGTH = 255;
 
-/** What the copy's event names start with. */
-export const VERCEL_EVENT_PREFIX = "poc_";
-
 /** Where the copy goes, and which properties it keeps, in priority order. */
 export type VercelSink = {
   readonly endpoint: string;
@@ -28,8 +24,7 @@ export type VercelSink = {
 
 /**
  * Where the copy goes, or `undefined` for no copy. A run on the development
- * channel, the one whose Mixpanel events go to the dev project (CI included),
- * sends none: the cloud's intake has no dev counterpart.
+ * channel (CI included) sends none: the cloud's intake has no dev counterpart.
  * `ZITADEL_TELEMETRY_VERCEL_ENDPOINT` names an intake for any run.
  */
 export function resolveVercelEndpoint(env: NodeJS.ProcessEnv): string | undefined {
@@ -70,7 +65,7 @@ export function vercelEventBody(
     sdkn: "zitadel-cli",
     sdkv: typeof version === "string" ? version : "",
     r: "",
-    en: `${VERCEL_EVENT_PREFIX}${event}`.slice(0, MAX_LENGTH),
+    en: event.slice(0, MAX_LENGTH),
     ed: data,
   });
 }
