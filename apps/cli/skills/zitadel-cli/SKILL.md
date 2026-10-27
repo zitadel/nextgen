@@ -222,6 +222,14 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `preview` is `deploy` for a pull-request build: it deploys the release to the
+  build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
+  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
+  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  outside a preview or development build it is a no-op — even with an explicit
+  `--origin`, which selects targets but never authorizes a preview deploy. A CI
+  build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
+  skipped too. `preview list` and `preview rm <url>` read and end live previews.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
