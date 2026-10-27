@@ -174,7 +174,9 @@ tracked below.
 **Non-events:** pure reads; RSI upserts as create side-effects; crypto/catalog
 internals without a product mutate API; signal category deferred until ADR 019
 writers exist; issuing a challenge or an sso state record (`IssueChallenge`,
-`IssueSSOState`), which mints the `check_id` the outcome event then carries.
+`IssueSSOState`), which mints the `check_id` the outcome event then carries;
+storing the rehash of an outdated password hash on sign-in, which rewrites the
+existing password row in place.
 
 ## Retired
 

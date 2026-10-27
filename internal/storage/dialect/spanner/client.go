@@ -3,10 +3,10 @@ package spanner
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -94,7 +94,7 @@ func runBounded(ctx context.Context, fn func(context.Context) error) error {
 	start := time.Now()
 	err := fn(ctx)
 	if err != nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		slog.WarnContext(ctx, "spanner transaction hit its deadline while retrying",
+		zlog.Warn(ctx, "spanner transaction hit its deadline while retrying",
 			"elapsed", time.Since(start), "error", err)
 	}
 	return err

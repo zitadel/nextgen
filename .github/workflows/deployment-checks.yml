@@ -18,10 +18,12 @@ name: deployment-checks
 # deployment instead of a local server (`@zitadel/docs#e2e-deployment`); the
 # console's, which has no local counterpart, signed out
 # (`@zitadel/e2e#console-deployment`); the built-in schemas', over HTTP alone
-# (`@zitadel/e2e#schemas-deployment`). They are the tasks `pnpm check:cloud`
-# runs from a checkout, so the command in the run's summary is the one a
-# person types. What is checked is the artifact Vercel built, routed by the
-# repo-root vercel.json, behind Vercel's protection.
+# (`@zitadel/e2e#schemas-deployment`); and, on previews alone, this commit's
+# packed CLI driving a project it sets up there (`@zitadel/e2e#cli-deployment`).
+# They are the tasks `pnpm check:cloud` runs from a checkout, so the command in
+# the run's summary is the one a person types. What is checked is the artifact
+# Vercel built, routed by the repo-root vercel.json, behind Vercel's
+# protection.
 #
 # What broke is read in this order: the check's name says the service and the
 # environment; the annotations on it name the failing contract (the test's
@@ -36,6 +38,11 @@ on:
         description: "The deployment to test, e.g. https://cloud-abc1234de-zitadel.vercel.app"
         required: true
         type: string
+      cli:
+        description: "Run the CLI's suite too. It leaves a project behind in the deployment's database: a preview's only"
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       url:
@@ -398,3 +405,95 @@ jobs:
       - name: Record the pass
         id: passed
         run: echo "result=success" >> "$GITHUB_OUTPUT"
+
+  # This commit's packed CLI against a preview, step for step as the console
+  # job above: setup from an empty directory creates a project on the
+  # deployment, then deploy, variables, origins, deployment list and rollback
+  # run on it, and a browser finishes the claim the CLI starts. Each run leaves
+  # that project in the deployment's database, so only previews run it, whose
+  # database is their branch's own: production-checks.yml's call skips it
+  # (which is why it reports no result), and a run by hand only when asked.
+  # So it needs no lookup for its suite, as the jobs above have for
+  # production: a preview's run and a dispatch take this file from the commit
+  # they check out, which therefore has the suite.
+  # The CLI reaches the protected deployment through a local proxy that adds
+  # the bypass secret (e2e/cli/support/bypass-proxy.ts) and never holds it.
+  cli:
+    name: cli (${{ (github.event_name == 'deployment_status' && 'Preview') || 'dispatch' }})
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.cli) ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.creator.login == 'vercel[bot]' &&
+       startsWith(github.event.deployment.environment, 'Preview') &&
+       startsWith(github.event.deployment_status.environment_url, 'https://cloud-'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CLOUD_URL: ${{ inputs.url || github.event.deployment_status.environment_url }}
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      DO_NOT_TRACK: "1"
+      # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
+      # warns on every process that also sees NO_COLOR. Blank it so only the
+      # test output is left in the log.
+      NO_COLOR: ""
+    steps:
+      - name: Name the deployment in the run's summary
+        env:
+          ENVIRONMENT: ${{ github.event.deployment.environment || 'dispatch' }}
+          COMMIT: ${{ github.event.deployment.sha || github.sha }}
+        run: |
+          {
+            echo "- Deployment: $CLOUD_URL ($ENVIRONMENT, commit ${COMMIT:0:8})"
+            echo "- Reproduce: \`CLOUD_URL=$CLOUD_URL VERCEL_AUTOMATION_BYPASS_SECRET=… pnpm exec turbo run cli-deployment\` (\`pnpm check:cloud\` runs every suite)"
+            echo "- On a failure the annotations name the step and what the CLI printed; a failed claim's screenshot is the \`cli-deployment-screenshots\` artifact."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.deployment.sha || github.ref }}
+
+      - uses: pnpm/action-setup@v5
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Put workspace binaries on PATH
+        run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm --filter @zitadel/e2e exec playwright install chromium
+
+      - name: Check the bypass secret is set
+        run: |
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] || {
+            echo "::error::Set the repository secret VERCEL_AUTOMATION_BYPASS_SECRET (docs/runbooks/cloud.md, Deployment checks)"
+            exit 1
+          }
+
+      # Builds the CLI and the test kit first, then packs and installs the CLI.
+      - name: Run the CLI suite against the deployment
+        run: turbo run cli-deployment --filter=@zitadel/e2e
+
+      # The screenshots and nothing else, for the reasons the docs job gives.
+      - name: Upload the screenshots
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-deployment-screenshots
+          path: e2e/cli/test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7

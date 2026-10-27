@@ -2,8 +2,9 @@
 
 This repo uses Moon for CI/build orchestration, server artifacts, containers,
 and the draft GitHub Release shell for `v<version>`. Changesets owns package
-versioning, changelogs, npm publishing, and public package tags. Product release
-prose is written manually by maintainers.
+versioning, changelogs, npm publishing, and public package tags. Notable
+changes get entries on the website's changelog, which an agent drafts in a
+pull request ([Product notes](#product-notes)).
 
 ## Normal release
 
@@ -21,8 +22,9 @@ prose is written manually by maintainers.
    `ghcr.io/zitadel/nextgen:<version>` container image. It also creates or
    updates the draft GitHub Release for `v<version>` with generated artifact and
    package facts.
-7. If a product announcement is needed, add the human-written product notes to
-   the draft GitHub Release and publish it.
+7. Publish the draft GitHub Release as the automation wrote it
+   (`gh release edit v<version> --repo zitadel/nextgen --draft=false`), then add
+   [changelog entries](#product-notes) for the release's notable changes.
 
 ## Manual controls
 
@@ -103,40 +105,42 @@ gh release view v0.1.0-alpha.8 --repo zitadel/nextgen
 
 ## Product notes
 
-Product release prose is manual. Use the draft GitHub Release's generated facts
-block, the generated Changesets changelogs,
-`dist/release/<version>/artifact-summary.md`, and the merged product PRs as
-inputs. Publish the draft GitHub Release only when the product needs an
-announcement.
+The GitHub Release needs no prose: its generated facts block lists each change
+once. The website's changelog tells the notable changes instead, an entry
+each, `apps/website/changelog/<slug>.md`, saying when it landed on the cloud
+and which release ships it:
 
-The website changelog shows everything outside the generated facts block
-(`<!-- nextgen-release-facts:start -->` to `<!-- nextgen-release-facts:end -->`)
-as the release's notes, above its changes, and reads the changes and the
-Breaking filter only from that block
-([`releases.ts`](../../apps/website/app/changelog/releases.ts)).
+1. After a release, or once something notable has landed on the cloud, have an
+   agent draft the entries with the `zitadel-changelog-entries` skill
+   ([`SKILL.md`](../../apps/website/skills/zitadel-changelog-entries/SKILL.md)):
+   point the agent at that file, or install the skill with
+   `npx skills add zitadel/nextgen --skill zitadel-changelog-entries`.
+2. Review the pull request like any other, and merge it.
 
-- Leave the generated facts block as it is.
-- Write Markdown only; the website drops HTML.
-- Link pull requests in full, `[#123](https://github.com/zitadel/nextgen/pull/123)`:
-  a bare `#123` links only on GitHub.
-- Refer to "the changes below", never to the generated facts or their tables,
-  which the website does not show.
-- Edit a draft's notes with `gh release edit`. An API `PATCH` without
-  `tag_name` resets the draft's tag to `untagged-…`, and
-  `scripts/release-github.mjs` finds the draft by `tag_name`.
+An entry names its pull requests, and the site finds the release that ships
+them in the packages' `CHANGELOG.md` when it builds
+([`entries.ts`](../../apps/website/app/changelog/entries.ts)), so an entry
+written before its release shows it once it ships.
 
-`--notes-file` replaces the whole body, so start from the draft's body:
+Notes above the generated facts are optional and show on GitHub only. Leave
+the block as it is, and edit a draft's notes with `gh release edit`: an API
+`PATCH` without `tag_name` resets the draft's tag to `untagged-…`, and
+`scripts/release-github.mjs` finds the draft by `tag_name`. `--notes-file`
+replaces the whole body, so start from the draft's body:
 
 ```sh
 gh release view v<version> --repo zitadel/nextgen --json body -q .body > notes.md
 gh release edit v<version> --repo zitadel/nextgen --notes-file notes.md
 ```
 
-GitHub rejects release bodies over 125000 characters, so the generated facts
-block replaces its largest package changelog sections with pointers to the
-per-package `CHANGELOG.md` when the body would not fit. If the human-written
-product notes alone push past the limit, the facts update fails loudly instead
-of truncating maintainer prose — shorten the notes and rerun.
+The block lists each change once, after the packages it changes. GitHub
+rejects release bodies over 125000 characters, so when the body would not fit,
+the block omits patch changes, then minor ones, and names the `CHANGELOG.md`
+files that hold them; it never omits a breaking change
+([`release-github.mjs`](../../scripts/release-github.mjs)). If the
+human-written product notes and the breaking changes alone push past the
+limit, the facts update fails loudly instead of truncating maintainer prose —
+shorten the notes and rerun.
 
 ## Local checks
 

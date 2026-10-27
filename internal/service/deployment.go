@@ -80,11 +80,12 @@ type ListDeploymentsOutput struct {
 }
 
 type DeploymentService struct {
-	v2Pool *DB
+	v2Pool    *DB
+	variables VariableService
 }
 
-func NewDeploymentService(v2Pool *DB) *DeploymentService {
-	return &DeploymentService{v2Pool: v2Pool}
+func NewDeploymentService(v2Pool *DB, variables VariableService) *DeploymentService {
+	return &DeploymentService{v2Pool: v2Pool, variables: variables}
 }
 
 // maxDeployAttempts bounds how often an unguarded deploy retries after losing
@@ -253,14 +254,27 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 		if release.Revoked() {
 			return domain.ErrReleaseRevoked()
 		}
+		set, err := resolveDeploymentVariableSet(ctx, s.variables, stmts, entity, release)
+		if err != nil {
+			return err
+		}
 		read, current, err := servedBy(ctx, stmts, entity)
 		if err != nil {
 			return err
 		}
+		// The hash can change the answer only when the kind, release, and
+		// origins already match. Anything else is a new deployment.
+		var currentHash string
+		if domain.SamePrimaryRelease(entity, current) {
+			currentHash, err = deploymentSetHash(ctx, s.variables, stmts, current)
+			if err != nil {
+				return err
+			}
+		}
 		if err := domain.CheckExpectedDeployment(current, input.ExpectedDeploymentID); err != nil {
 			return err
 		}
-		if domain.DeploymentsEqual(entity, current) {
+		if domain.DeploymentsEqual(entity, current, set.Hash, currentHash) {
 			output = &CreateDeploymentOutput{Deployment: current}
 			return nil
 		}
@@ -275,9 +289,7 @@ func (s *DeploymentService) create(ctx context.Context, entity *domain.Deploymen
 			}
 			return err
 		}
-		// TODO(#1781): resolve the set before DeploymentsEqual, from RollbackTo's
-		// frozen set. This copies the current values.
-		if _, err := stmts.FreezeDeploymentVariables(ctx, written.ProjectID, written.ID); err != nil {
+		if err := s.variables.StoreDeploymentVariableSet(ctx, stmts, written.ProjectID, written.ID, set); err != nil {
 			return err
 		}
 		if written.OriginKind == domain.DeploymentOriginKindPreview {

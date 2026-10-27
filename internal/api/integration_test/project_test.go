@@ -606,6 +606,24 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 		return userID, hashOf(t, projectID, userID)
 	}
 
+	signIn := func(t *testing.T, project *domain.Project, userID string) {
+		t.Helper()
+		user, err := harness.EnsureUserFixture(t).GetByID(t.Context(), project.ID, userID)
+		require.NoError(t, err)
+		attributes, err := user.Attributes.ToMap()
+		require.NoError(t, err)
+		email, ok := attributes["email"].(string)
+		require.True(t, ok, "the user has an email to sign in with")
+
+		client := attemptClient(t, project)
+		attemptID := newAttempt(t, client, project)
+		verifyAttemptProof(t, client, attemptID, api.ChallengeMethodIdentifier, identifierProof(email))
+		passworded := verifyAttemptProof(t, client, attemptID, api.ChallengeMethodPassword, &api.VerifyChallengeRequest{
+			OneOf: api.NewPasswordProofVerifyChallengeRequestSum(api.PasswordProof{Password: password}),
+		})
+		require.Contains(t, completedMethods(passworded), api.FactorMethodPassword)
+	}
+
 	deploymentDefault, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	ownMethod, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -636,8 +654,14 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 	assert.NoError(t, verifier.VerifyHash(defaultHash, password))
 	assert.NoError(t, verifier.VerifyHash(ownHash, password))
 
-	// Handing the project back to the default moves the next password written,
-	// not the one already stored.
+	// The deployment default is bcrypt, so this proves the sign-in verifies
+	// with the project's hasher.
+	signIn(t, ownMethod, ownUserID)
+	assert.Equal(t, ownHash, hashOf(t, ownMethod.ID, ownUserID),
+		"a sign-in keeps a hash written by the project's method")
+
+	// Handing the project back to the default does not rewrite the stored hash.
+	// The next sign-in does, and so does the next password written.
 	var cleared *domain.PasswordHashPolicy
 	_, err = harness.EnsureProjectService(t).Update(t.Context(), service.UpdateProjectRequest{
 		ID:                 ownMethod.ID,
@@ -647,6 +671,13 @@ func TestProjectPasswordHashPolicyGovernsHashing(t *testing.T) {
 
 	assert.True(t, strings.HasPrefix(hashOf(t, ownMethod.ID, ownUserID), argon2.Prefix),
 		"the stored hash is not rewritten by a policy change")
+	signIn(t, ownMethod, ownUserID)
+	migrated := hashOf(t, ownMethod.ID, ownUserID)
+	assert.True(t, strings.HasPrefix(migrated, bcrypt.Prefix),
+		"the next sign-in moves the stored hash to the deployment default: %q", migrated)
+	signIn(t, ownMethod, ownUserID)
+	assert.Equal(t, migrated, hashOf(t, ownMethod.ID, ownUserID),
+		"a sign-in with a current hash does not rewrite it")
 	_, afterClearing := setPassword(t, ownMethod.ID)
 	assert.True(t, strings.HasPrefix(afterClearing, bcrypt.Prefix),
 		"the next password written goes back to the deployment default")

@@ -3,6 +3,4 @@
 "@zitadel/api": patch
 ---
 
-The console's error screens now show the failed request's ID, the same ID the server logs the request under, so a support request can quote it. They no longer show the error code, which only repeated the message. `ApiError` from `@zitadel/api` carries it as `requestId`, read from the response's `X-Request-Id` header.
-
-Their button now goes to Projects without the selected project, so it gets you out of a screen that fails for that project, such as a mistyped `?project=` in the address. It used to lead back to the same failing screen.
+The console's error screens now show the failed request's ID instead of the error code, so a support request can quote it, and `ApiError` from `@zitadel/api` carries it as `requestId`. A not-found screen names what is missing, such as "User not found", and leads back to its list; the others lead to Projects without the selected project.

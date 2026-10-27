@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"strings"
 	"time"
@@ -331,23 +332,35 @@ type UserLookup interface {
 // ---- Implementation ----------------------------------------------------------
 
 type authAttemptService struct {
-	stmts            StatementPool
-	sessions         SessionResolver
-	users            UserLookup
-	passwordVerifier crypto.HashVerifier
+	stmts    StatementPool
+	sessions SessionResolver
+	users    UserLookup
+	hashers  ProjectHasherResolver
+	// defaultVerifier verifies when a project's hasher cannot be resolved.
+	defaultVerifier crypto.HashVerifier
+}
+
+// verifyOnly checks a password without computing a new hash, for a verifier
+// whose rehash would not be stored.
+type verifyOnly struct{ crypto.HashVerifier }
+
+func (v verifyOnly) VerifyAndRehash(encoded, target string) (string, error) {
+	return "", v.VerifyHash(encoded, target)
 }
 
 func NewAuthAttemptService(
 	stmts StatementPool,
 	sessions SessionResolver,
 	users UserLookup,
-	passwordVerifier crypto.HashVerifier,
+	hashers ProjectHasherResolver,
+	defaultVerifier crypto.HashVerifier,
 ) AuthAttemptService {
 	return &authAttemptService{
-		stmts:            stmts,
-		sessions:         sessions,
-		users:            users,
-		passwordVerifier: passwordVerifier,
+		stmts:           stmts,
+		sessions:        sessions,
+		users:           users,
+		hashers:         hashers,
+		defaultVerifier: defaultVerifier,
 	}
 }
 
@@ -871,13 +884,50 @@ func (s *authAttemptService) verify(ctx context.Context, attempt *domain.AuthAtt
 		if err != nil {
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(err)
 		}
+		// Verifying with the project's hasher moves an outdated hash to the
+		// project's method. When the policy no longer resolves, the default
+		// verifies instead. Verifiers ignore the limits, so users of a policy
+		// refused for its cost can still sign in. A hash whose algorithm was
+		// removed from the verifiers stays unreadable, as it is for any project.
+		// The default's method is not the project's, so it computes no rehash.
+		hasher, resolveErr := s.hashers.HasherForProject(ctx, attempt.ProjectID)
+		var verifier crypto.RehashingVerifier = hasher
+		if resolveErr != nil {
+			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "resolving the project's password hasher failed, verifying with the default and not storing a rehash",
+				slog.String("project_id", attempt.ProjectID),
+				slog.Any("error", resolveErr),
+			)
+			verifier = verifyOnly{s.defaultVerifier}
+		}
 		// A variable of its own: err is returned as is above, and the error
 		// response generator would count a wrong password as returnable there.
 		_, end := startSpan(ctx, "password.Verify")
-		verifyErr := password.Verify(p.Password, s.passwordVerifier)
-		end(&verifyErr)
-		if verifyErr != nil {
+		updated, verifyErr := password.Verify(p.Password, verifier)
+		spanErr := verifyErr
+		if errors.Is(spanErr, crypto.ErrRehashFailed) {
+			// The password matched; the warning below logs the failed rehash.
+			spanErr = nil
+		}
+		end(&spanErr)
+		switch {
+		case errors.Is(verifyErr, crypto.ErrRehashFailed):
+			getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "the password matched but could not be rehashed",
+				slog.String("project_id", attempt.ProjectID),
+				slog.String("user_id", userFactor.UserID),
+				slog.Any("error", verifyErr),
+			)
+		case verifyErr != nil:
 			return passwordChallenge, nil, nil, domain.ErrAuthAttemptProofRejected(verifyErr)
+		case updated != "":
+			// Best-effort: the password already matched, and the next sign-in
+			// rehashes again.
+			if err := s.stmts.Statements().UpdateUserPasswordHash(ctx, password, updated); err != nil {
+				getLoggingContext(ctx, "auth_attempt").WarnContext(ctx, "storing the password rehash failed",
+					slog.String("project_id", password.ProjectID),
+					slog.String("user_id", password.UserID),
+					slog.Any("error", err),
+				)
+			}
 		}
 		return passwordChallenge, attempt.SetPasswordFactor(), nil, nil
 

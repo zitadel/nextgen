@@ -224,7 +224,7 @@ export const en: Record<string, string> = {
 
   // --- Notices: why the flow moved between sign-in and sign-up by itself ---
   "notice.user_not_found":
-    "We couldn't find an account for that email, so you can create one now. Mistyped it? Go back to fix it.",
+    "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
   "notice.user_already_exists": "That email already has an account. Sign in to continue.",
   "notice.sso_user_not_found":
     "There's no account for this sign-in yet, so you can create one now.",

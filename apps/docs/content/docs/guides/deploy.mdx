@@ -69,7 +69,8 @@ Without `flowName`, the platform serves the newest active flow that has no `audi
 
 - A **release** is an immutable snapshot of `.zitadel/`, identified by a `rel_` id and a content digest. Build one without deploying it with `release create`, and stop a release from ever being served again with `release revoke`.
 - A **deployment** makes a release live on a set of origins. `deploy` creates one to every primary origin; `deployment create --release <id>` deploys an existing release. Primary origins are never named one by one.
-- `deployment list` shows the history (newest first), `deployment get <id>` reads one, and `deployment rollback` re-applies an earlier deployment — bare, it undoes the last deploy.
+- `deployment list` shows the history (newest first), `deployment get <id>` reads one, and `deployment rollback` re-applies an earlier deployment — bare, it undoes the last deploy. It prints the revisions the restored release pins, including the schema revision new registrations use.
+- A rollback restores configuration, not user data. Users keep the schema revision and attributes they have, including users you migrated to a newer revision.
 
 Add the origins a project serves with `origin add` before the first deploy; `deploy` needs at least one primary origin.
 

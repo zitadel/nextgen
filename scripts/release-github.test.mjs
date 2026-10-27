@@ -9,11 +9,11 @@ import {
   GENERATED_BLOCK_START,
   GITHUB_RELEASE_BODY_MAX_CHARS,
   PRODUCT_NOTES_PLACEHOLDER,
-  collectPackageChangeSections,
+  collectReleaseChanges,
   createInitialReleaseBody,
   extractVersionSection,
   fitGeneratedReleaseFacts,
-  normalizeChangelogSection,
+  parseChangelogEntries,
   renderGeneratedReleaseFacts,
   upsertGeneratedBlock,
   upsertProductGithubRelease,
@@ -32,12 +32,21 @@ function fakeMetadata(packages) {
   };
 }
 
-function fakeSection(name, contentLength) {
+// A change of the package named `@x/<short>`, its text `length` long.
+function fakeChange(short, bump, length, prefix = "") {
   return {
-    name,
-    path: `packages/${name.split("/").pop()}`,
-    content: "x".repeat(contentLength),
+    text: `${prefix}${short[0].repeat(length - prefix.length)}`,
+    bump,
+    packages: [`@x/${short}`],
   };
+}
+
+function fakePackages(...shorts) {
+  return shorts.map((short) => ({
+    name: `@x/${short}`,
+    version: "9.9.9-alpha.1",
+    path: `packages/${short}`,
+  }));
 }
 
 async function writeChangelogFixture(packages) {
@@ -47,7 +56,7 @@ async function writeChangelogFixture(packages) {
     await mkdir(dir, { recursive: true });
     await writeFile(
       join(dir, "CHANGELOG.md"),
-      `# ${pkg.name}\n\n## ${pkg.version}\n\n### Patch Changes\n\n- ${pkg.entry}\n`,
+      `# ${pkg.name}\n\n## ${pkg.version}\n\n### ${pkg.group ?? "Patch Changes"}\n\n- ${pkg.entry}\n`,
     );
   }
   return repoRoot;
@@ -69,7 +78,7 @@ const GITHUB_ENV = {
   GITHUB_SHA: "deadbeef",
 };
 
-test("collectPackageChangeSections extracts one version and skips dependency-only or platform package noise", async () => {
+test("collectReleaseChanges lists each change once, with its packages and highest bump, without dependency-only or platform package noise", async () => {
   const repoRoot = await mkdtemp(join(tmpdir(), "release-github-test-"));
   const write = async (path, source) => {
     await mkdir(join(repoRoot, path), { recursive: true });
@@ -88,6 +97,9 @@ test("collectPackageChangeSections extracts one version and skips dependency-onl
 
 ### Patch Changes
 
+- [#322](https://github.com/zitadel/nextgen/pull/322) - Sessions now belong to the
+  app's own project.
+
 - Updated dependencies []:
   - @zitadel/api@0.1.0-alpha.9
 
@@ -96,6 +108,19 @@ test("collectPackageChangeSections extracts one version and skips dependency-onl
 ### Patch Changes
 
 - Older entry.
+`,
+  );
+  // The same change, rewrapped, and a minor in this package.
+  await write(
+    "apps/server",
+    `# @zitadel/server
+
+## 0.1.0-alpha.9
+
+### Minor Changes
+
+- [#322](https://github.com/zitadel/nextgen/pull/322) - Sessions now belong to
+  the app's own project.
 `,
   );
   await write(
@@ -122,10 +147,11 @@ test("collectPackageChangeSections extracts one version and skips dependency-onl
 `,
   );
 
-  const sections = await collectPackageChangeSections({
+  const changes = await collectReleaseChanges({
     repoRoot,
     metadata: fakeMetadata([
       { name: "@zitadel/cli", version: "0.1.0-alpha.9", path: "apps/cli" },
+      { name: "@zitadel/server", version: "0.1.0-alpha.9", path: "apps/server" },
       {
         name: "@zitadel/server-linux-x64",
         version: "0.1.0-alpha.9",
@@ -135,11 +161,18 @@ test("collectPackageChangeSections extracts one version and skips dependency-onl
     ]),
   });
 
-  assert.equal(sections.length, 1);
-  assert.equal(sections[0].name, "@zitadel/cli");
-  assert.ok(sections[0].content.includes("Add product release drafts"));
-  assert.ok(!sections[0].content.includes("Updated dependencies"));
-  assert.ok(!sections[0].content.includes("Older entry"));
+  assert.deepEqual(changes, [
+    {
+      text: "[#321](https://github.com/zitadel/nextgen/pull/321) - Add product release drafts.",
+      bump: "minor",
+      packages: ["@zitadel/cli"],
+    },
+    {
+      text: "[#322](https://github.com/zitadel/nextgen/pull/322) - Sessions now belong to the\napp's own project.",
+      bump: "minor",
+      packages: ["@zitadel/cli", "@zitadel/server"],
+    },
+  ]);
 });
 
 test("extractVersionSection returns only the requested version's lines", () => {
@@ -149,19 +182,36 @@ test("extractVersionSection returns only the requested version's lines", () => {
   assert.ok(!section.includes("Old entry"));
 });
 
-test("normalizeChangelogSection keeps only meaningful change groups", () => {
-  assert.equal(
-    normalizeChangelogSection(
-      "### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n",
-    ),
+test("parseChangelogEntries reads each item under its bump, without its marker and indent", () => {
+  const section = [
+    "No changes in this release.",
     "",
-  );
-  assert.equal(
-    normalizeChangelogSection(
-      "### Minor Changes\n\n- Add a useful product change.\n\n### Patch Changes\n\n- Updated dependencies []:\n  - @zitadel/api@0.1.0-alpha.9\n",
-    ),
-    "### Minor Changes\n\n- Add a useful product change.",
-  );
+    "### Major Changes",
+    "",
+    "- Drops the old flag.",
+    "  ",
+    "  **Breaking:** scripts that pass it fail.",
+    "",
+    "  - `--old` is gone.",
+    "",
+    "### Patch Changes",
+    "",
+    "- A line a formatter wrapped",
+    "without an indent.",
+    "- A tight item.",
+    "",
+    "A paragraph outside any item.",
+  ].join("\n");
+
+  assert.deepEqual(parseChangelogEntries(section), [
+    {
+      text: "Drops the old flag.\n\n**Breaking:** scripts that pass it fail.\n\n- `--old` is gone.",
+      bump: "major",
+    },
+    { text: "A line a formatter wrapped\nwithout an indent.", bump: "patch" },
+    { text: "A tight item.", bump: "patch" },
+    { text: "A paragraph outside any item.", bump: "patch" },
+  ]);
 });
 
 test("upsertGeneratedBlock replaces only the managed block and preserves human prose", () => {
@@ -184,62 +234,75 @@ test("upsertGeneratedBlock appends a block when an existing body has none", () =
   );
 });
 
-test("fitGeneratedReleaseFacts keeps every section when the block fits", () => {
-  const metadata = fakeMetadata([]);
-  const sections = [fakeSection("@zitadel/server", 500), fakeSection("@zitadel/cli", 300)];
+test("fitGeneratedReleaseFacts keeps every change when the block fits", () => {
+  const metadata = fakeMetadata(fakePackages("server", "cli"));
+  const changes = [fakeChange("server", "minor", 500), fakeChange("cli", "patch", 300)];
 
   const result = fitGeneratedReleaseFacts({
     metadata,
-    sections,
+    changes,
     fits: (block) => block.length <= GITHUB_RELEASE_BODY_MAX_CHARS,
   });
 
   assert.equal(result.fits, true);
   assert.deepEqual(result.omitted, []);
-  assert.ok(result.block.includes("x".repeat(500)));
-  assert.ok(result.block.includes("x".repeat(300)));
+  assert.ok(result.block.includes(`#### Minor Changes\n\n- \`@x/server\`: ${changes[0].text}`));
+  assert.ok(result.block.includes(`#### Patch Changes\n\n- \`@x/cli\`: ${changes[1].text}`));
 });
 
-test("fitGeneratedReleaseFacts stubs the largest section first", () => {
-  const metadata = fakeMetadata([]);
-  const sections = [
-    fakeSection("@zitadel/cli", 5000),
-    fakeSection("@zitadel/server", 130000),
-    fakeSection("@zitadel/sdk-core", 100),
+test("fitGeneratedReleaseFacts omits patch changes before minor ones, the longest first, and never a breaking one", () => {
+  const metadata = fakeMetadata(fakePackages("api", "cli", "server", "testing", "web"));
+  const [breaking, major, minor, longPatch, shortPatch] = [
+    fakeChange("server", "minor", 60000, "**Breaking:** "),
+    fakeChange("api", "major", 10000),
+    fakeChange("cli", "minor", 30000),
+    fakeChange("web", "patch", 40000),
+    fakeChange("testing", "patch", 1000),
   ];
+  const changes = [shortPatch, breaking, longPatch, major, minor];
 
   const result = fitGeneratedReleaseFacts({
     metadata,
-    sections,
-    fits: (block) => createInitialReleaseBody(block).length <= GITHUB_RELEASE_BODY_MAX_CHARS,
+    changes,
+    fits: (block) => createInitialReleaseBody(block).length <= 100000,
   });
 
   assert.equal(result.fits, true);
-  assert.deepEqual(result.omitted, ["@zitadel/server"]);
-  assert.ok(createInitialReleaseBody(result.block).length <= GITHUB_RELEASE_BODY_MAX_CHARS);
-  assert.ok(result.block.includes("#### `@zitadel/server`"));
-  assert.ok(result.block.includes("packages/server/CHANGELOG.md"));
-  assert.ok(result.block.includes(`at tag \`${TAG}\``));
-  assert.ok(!result.block.includes("x".repeat(130000)));
-  assert.ok(result.block.includes("x".repeat(5000)));
-  assert.ok(result.block.includes("x".repeat(100)));
+  assert.deepEqual(result.omitted, [longPatch, shortPatch, minor]);
+  for (const kept of [breaking, major]) {
+    assert.ok(result.block.includes(kept.text));
+  }
+  for (const omitted of result.omitted) {
+    assert.ok(!result.block.includes(omitted.text));
+  }
+  assert.ok(
+    result.block.includes(
+      `#### Minor Changes\n\n- \`@x/server\`: ${breaking.text}\n\n_1 minor change omitted to keep this release body under GitHub's ${GITHUB_RELEASE_BODY_MAX_CHARS}-character limit; see \`packages/cli/CHANGELOG.md\` at tag \`${TAG}\`._`,
+    ),
+  );
+  assert.ok(
+    result.block.includes(
+      `#### Patch Changes\n\n_2 patch changes omitted to keep this release body under GitHub's ${GITHUB_RELEASE_BODY_MAX_CHARS}-character limit; see \`packages/testing/CHANGELOG.md\` and \`packages/web/CHANGELOG.md\` at tag \`${TAG}\`._`,
+    ),
+  );
   assert.ok(result.block.startsWith(GENERATED_BLOCK_START));
   assert.ok(result.block.endsWith(GENERATED_BLOCK_END));
 });
 
-test("fitGeneratedReleaseFacts reports failure when stubbing cannot help", () => {
-  const metadata = fakeMetadata([]);
-  const sections = [fakeSection("@zitadel/cli", 10)];
+test("fitGeneratedReleaseFacts reports failure when only breaking changes are left", () => {
+  const metadata = fakeMetadata(fakePackages("cli", "server"));
+  const breaking = fakeChange("server", "minor", 200, "**Breaking:** ");
+  const patch = fakeChange("cli", "patch", 100);
 
   const result = fitGeneratedReleaseFacts({
     metadata,
-    sections,
+    changes: [breaking, patch],
     fits: () => false,
   });
 
   assert.equal(result.fits, false);
-  // The only section is smaller than its stub, so nothing is omitted.
-  assert.deepEqual(result.omitted, []);
+  assert.deepEqual(result.omitted, [patch]);
+  assert.ok(result.block.includes(breaking.text));
 });
 
 test("dry run caps the created release body at the GitHub limit", async () => {
@@ -260,11 +323,35 @@ test("dry run caps the created release body at the GitHub limit", async () => {
   });
 
   assert.equal(result.action, "dry-run");
-  assert.deepEqual(result.omittedPackages, ["@x/huge"]);
+  assert.deepEqual(
+    result.omittedChanges.map(({ packages }) => packages),
+    [["@x/huge"]],
+  );
   assert.ok(result.body.length <= GITHUB_RELEASE_BODY_MAX_CHARS);
   assert.ok(result.body.startsWith(PRODUCT_NOTES_PLACEHOLDER));
   assert.ok(result.body.includes("packages/huge/CHANGELOG.md"));
-  assert.ok(result.body.includes("a small fix"));
+  assert.ok(result.body.includes("- `@x/tiny`: a small fix"));
+});
+
+test("a breaking change too long for the body fails the release instead of being omitted", async () => {
+  const packages = [
+    {
+      name: "@x/huge",
+      path: "packages/huge",
+      version: "9.9.9-alpha.1",
+      group: "Minor Changes",
+      entry: `Drops a flag.\n\n  **Breaking:** ${"y".repeat(130000)}`,
+    },
+  ];
+  const repoRoot = await writeChangelogFixture(packages);
+  const metadata = fakeMetadata(
+    packages.map(({ name, path, version }) => ({ name, path, version })),
+  );
+
+  await assert.rejects(
+    upsertProductGithubRelease({ repoRoot, metadata, dryRun: true, log: () => {} }),
+    /even with every change but the breaking ones omitted/,
+  );
 });
 
 test("update path preserves product notes and fits the body around them", async () => {
@@ -299,7 +386,10 @@ test("update path preserves product notes and fits the body around them", async 
   });
 
   assert.equal(result.action, "update");
-  assert.deepEqual(result.omittedPackages, ["@x/huge"]);
+  assert.deepEqual(
+    result.omittedChanges.map(({ packages }) => packages),
+    [["@x/huge"]],
+  );
 
   const patch = calls.find((call) => call.init.method === "PATCH");
   assert.ok(patch, "expected a PATCH call");
@@ -339,7 +429,7 @@ test("update path fails loudly when product notes alone exceed the limit", async
 
   await assert.rejects(
     upsertProductGithubRelease({ repoRoot, metadata, env: GITHUB_ENV, fetchImpl, log: () => {} }),
-    /even with every package changelog omitted/,
+    /even with every change but the breaking ones omitted/,
   );
 });
 
@@ -482,8 +572,9 @@ test("renderGeneratedReleaseFacts still renders the untruncated block", async ()
 
   const block = await renderGeneratedReleaseFacts({ repoRoot, metadata });
 
-  assert.ok(block.includes("#### `@x/tiny`"));
-  assert.ok(block.includes("a small fix"));
+  assert.ok(
+    block.includes("### Package Changes\n\n#### Patch Changes\n\n- `@x/tiny`: a small fix"),
+  );
   const roundTripped = upsertGeneratedBlock(`notes\n\n${block}`, block);
   assert.ok(roundTripped.startsWith("notes"));
 });

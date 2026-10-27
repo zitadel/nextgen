@@ -61,6 +61,9 @@ export interface PlatformMock {
    */
   isUnavailable(): void;
 
+  /** Refuses every project read with 403, as a server does a token without that grant. */
+  refusesProjectReads(): void;
+
   /**
    * Makes every request fail before any response arrives, as a closed port or
    * an unresolvable host would. The CLI maps that to `E_NETWORK` too.
@@ -155,6 +158,14 @@ export function usePlatformMock(): PlatformMock {
 
     isNotZitadel() {
       server.use(http.all("*", () => HttpResponse.text("<html>not here</html>", { status: 404 })));
+    },
+
+    refusesProjectReads() {
+      server.use(
+        http.get("*/projects/:id", () =>
+          HttpResponse.json({ code: "auth.forbidden", message: "forbidden" }, { status: 403 }),
+        ),
+      );
     },
 
     isUnavailable() {
