@@ -229,14 +229,15 @@ export const wrapCommand = (command: string, width: number, lead = ""): string[]
       .filter((at) => at > 0 && at <= room)
       .at(-1);
     if (cut === undefined) {
-      lines.push(`${indent}${rest.slice(0, room + 1)}\\`);
-      rest = rest.slice(room + 1);
-      indent = "";
-    } else {
-      lines.push(`${indent}${rest.slice(0, cut)} \\`);
-      rest = rest.slice(cut + 1);
-      indent = lead;
+      // Nothing to break at, so this is one long token: a URL, a digest, a
+      // path. It is left whole and the box widens for it. A `\` inside a
+      // token does not survive being copied — a split URL stops being
+      // clickable, and `claim` prints one the journey reads back out.
+      break;
     }
+    lines.push(`${indent}${rest.slice(0, cut)} \\`);
+    rest = rest.slice(cut + 1);
+    indent = lead;
   }
   return [...lines, indent + rest];
 };

@@ -157,18 +157,21 @@ describe("wrapCommand", () => {
     expect(lines.every((line) => !/'<what$|^changed>'/.test(line))).toBe(true);
   });
 
-  it("breaks an argument too long for a line of its own where it must", () => {
-    const lines = wrapCommand(`zitadel deploy ${"-".repeat(90)}`, 40);
+  // A `\` inside a token does not survive being copied: a split URL stops
+  // being clickable, and `claim` prints one a person is meant to open.
+  it("leaves an argument too long for a line of its own whole", () => {
+    const url = `https://example.com/console/${"a".repeat(90)}`;
 
-    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(40);
+    expect(wrapCommand(`open ${url}`, 40).join("\n")).toContain(url);
   });
 
-  // The shell removes `\`-newline and nothing else, so an indent on the
-  // continuation of a broken argument would land inside the argument.
-  it("continues a broken argument at the margin, so the argument rejoins exactly", () => {
-    const lines = wrapCommand(`zitadel deploy ${"-".repeat(90)}`, 40, "  ");
+  it("breaks at the arguments it can before giving up on the long one", () => {
+    const url = `https://example.com/${"a".repeat(90)}`;
 
-    expect(lines.slice(2).every((line) => !line.startsWith(" "))).toBe(true);
+    const lines = wrapCommand(`zitadel deploy ${url}`, 40);
+
+    expect(lines[0]).toBe("zitadel deploy \\");
+    expect(lines.at(-1)).toBe(url);
   });
 
   it("keeps the lead on a line it began at an argument boundary", () => {
@@ -278,12 +281,14 @@ describe("Frame", () => {
     expect(widest(new Frame("Summary", [], [{ text: "Run next:", command }]).render())).toBe(WIDTH);
   });
 
-  it("never widens for a command that is one unbreakable argument", () => {
-    const command = `zitadel deploy ${"-".repeat(200)}`;
+  // The one thing allowed to widen the box: a token with nowhere to break is
+  // worth more whole and over the width than split and unusable.
+  it("widens only for a command that is one unbreakable argument", () => {
+    const url = `https://example.com/${"a".repeat(200)}`;
+    const box = new Frame("Next steps", [], [{ text: "Run next:", command: url }]).render();
 
-    expect(widest(new Frame("Next steps", [], [{ text: "Run next:", command }]).render())).toBe(
-      WIDTH,
-    );
+    expect(widest(box)).toBeGreaterThan(WIDTH);
+    expect(box).toContain(url);
   });
 
   it("writes a command too long to fit as the one command it is", () => {
