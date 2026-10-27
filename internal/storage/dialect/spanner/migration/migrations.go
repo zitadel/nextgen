@@ -93,7 +93,7 @@ func Migrate(ctx context.Context, db *sql.DB) (err error) {
 }
 
 // newProvider builds the goose provider over the embedded migrations. Shared
-// with the round-trip smoke test, which walks the Down direction too.
+// with the round-trip test, which walks the Down direction too.
 func newProvider(db *sql.DB) (*goose.Provider, error) {
 	sqlFS, err := fs.Sub(sqlFiles, "sql")
 	if err != nil {
