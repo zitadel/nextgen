@@ -27,7 +27,10 @@ export class Where {
       // as a second, different place.
       return target;
     }
-    return `${target === "" ? "" : `${target} on `}${this.server}`;
+    // A command that resolves no project — `stop`, `doctor`, `setup` — still
+    // says where it ran as a phrase rather than a bare host, so the footer
+    // reads the same either way: `… · on localhost:8080`.
+    return `${target === "" ? "on " : `${target} on `}${this.server}`;
   }
 
   /** The same sentence every time, as the last line of the summary. */

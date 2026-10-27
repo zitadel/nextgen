@@ -35,8 +35,10 @@ describe("Where", () => {
       );
     });
 
-    it("names the server alone when no project was resolved", () => {
-      expect(new Where(undefined, "api.zitadel.cloud").plain).toBe("api.zitadel.cloud");
+    // `stop` and `doctor` resolve no project, and a bare host after the `·`
+    // reads as a column rather than as where the command ran.
+    it("still says where it ran when no project was resolved", () => {
+      expect(new Where(undefined, "api.zitadel.cloud").plain).toBe("on api.zitadel.cloud");
     });
 
     // "project proj-1 on your Zitadel project" reads as two different places.
