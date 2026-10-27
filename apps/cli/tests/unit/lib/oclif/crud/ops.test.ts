@@ -7,7 +7,7 @@ import { z } from "zod";
 
 vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
 import { asTerminalTyping } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
@@ -498,12 +498,5 @@ describe("delete confirmation", () => {
     await expect(
       asTerminalTyping([], () => deleting("delete").run(["team_1"])),
     ).rejects.toThrowError(expect.objectContaining({ oclif: { exit: EXIT_CODES.E_CANCELLED } }));
-  });
-
-  // Clack's `└  Cancelled.` closes a chain, and a normal command never opened one.
-  it("closes no chain when the person walks away", async () => {
-    await asTerminalTyping([], () => deleting("delete").run(["team_1"])).catch(() => undefined);
-
-    expect(cancel).not.toHaveBeenCalled();
   });
 });

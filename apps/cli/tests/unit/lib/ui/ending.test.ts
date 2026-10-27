@@ -226,14 +226,16 @@ describe("the answer of a normal command, which draws no chain", () => {
     expect(Math.max(...shown.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 
-  it("still leaves a table's rows whole", () => {
+  it("still leaves a table's rows whole, however wide they are", () => {
     const rows = [
-      "name         source                  resolved",
-      "development  .env.development.local  yes      ",
+      "name         source                  server                    project_id         resolved",
+      "development  .env.development.local  http://mock.zitadel.test  proj-1c9eb9159f55  yes     ",
     ];
 
     const shown = plain(answering({ lines: rows }).renderStandalone());
 
-    expect(shown).toContain(rows[0] as string);
+    for (const row of rows) {
+      expect(shown).toContain(row);
+    }
   });
 });

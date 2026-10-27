@@ -44,6 +44,39 @@ const STILL_DRAWING_THEMSELVES = [
   "lib/warnings.ts: imports consola",
 ].sort();
 
+/**
+ * The commands that walk a person through something, and so draw a chain and
+ * a box. Pinned because the set is the rule: a command that quietly takes the
+ * marker, or quietly loses it, changes how it looks on every run, and nothing
+ * else in the suite would notice.
+ */
+const WIZARDS = [
+  "auth-method/sso/enable.ts",
+  "branding/eject.ts",
+  "claim.ts",
+  "deploy.ts",
+  "doctor/index.ts",
+  "eject.ts",
+  "env/add.ts",
+  "pull.ts",
+  "setup/index.ts",
+  "status.ts",
+].sort();
+
+describe("which shape a command draws", () => {
+  it("is declared by the ten commands that walk a person through something", async () => {
+    const declared: string[] = [];
+    for (const file of await sourceFiles(join(SRC, "commands"))) {
+      const source = await readFile(file, "utf8");
+      if (/static override wizard = true/.test(source)) {
+        declared.push(relative(join(SRC, "commands"), file).split(sep).join("/"));
+      }
+    }
+
+    expect(declared.sort()).toEqual(WIZARDS);
+  });
+});
+
 describe("the UI package", () => {
   it("hands out the ways to draw, and nothing it draws with", async () => {
     expect(Object.keys(ui).sort()).toEqual(["Ui", "outcome", "section"]);

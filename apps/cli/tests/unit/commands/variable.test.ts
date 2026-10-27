@@ -12,7 +12,7 @@ import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/pla
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
 import VariableRm from "../../../src/commands/variable/rm";
 import VariableSet from "../../../src/commands/variable/set";
@@ -1009,7 +1009,6 @@ describe("variable rm asked on a terminal", () => {
 
     await expect(removing(cwd)).rejects.toThrow();
 
-    expect(cancel).not.toHaveBeenCalled();
     expect(seen.deleted).toBe(false);
   });
 });

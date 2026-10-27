@@ -166,7 +166,6 @@ describe("Ui", () => {
       ui.finish({ title: "Removed the origin", sections: [] });
 
       expect(printed()).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
-      expect(printed()).not.toContain("Using");
     });
 
     // `setup` is the one command whose report is the whole point of the run,

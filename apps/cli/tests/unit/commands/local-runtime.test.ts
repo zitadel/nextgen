@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-import { cancel, confirm, isCancel } from "@clack/prompts";
+import { confirm, isCancel } from "@clack/prompts";
 
 import {
   CONTAINER_DATA_DIR,
@@ -994,13 +994,6 @@ describe("local runtime commands", () => {
 
       expect(outcome).toHaveProperty("error");
       expect(kept).toBe(true);
-    });
-
-    // Clack's `└  Cancelled.` closes a chain, and a normal command has none.
-    it("closes no chain on the way out", async () => {
-      await resetting();
-
-      expect(cancel).not.toHaveBeenCalled();
     });
   });
 

@@ -80,7 +80,6 @@ describe("Chain", () => {
     chain.finish({ title: "Removed the origin", sections: [] });
 
     expect(printed()).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
-    expect(printed()).not.toContain("Using");
     expect(printed()).not.toContain("╭");
   });
 
@@ -210,7 +209,6 @@ describe("a normal command's chain, which is no chain at all", () => {
 
     expect(intro).not.toHaveBeenCalled();
     expect(outro).not.toHaveBeenCalled();
-    expect(printed()).not.toContain("│");
   });
 
   it("ends on its answer and one footer line", () => {

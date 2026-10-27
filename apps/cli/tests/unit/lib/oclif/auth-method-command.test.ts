@@ -116,7 +116,7 @@ describe("auth-method passkey disable confirmation", () => {
     const { shown } = await disablePasskey(["n"], cwd);
 
     expect(confirm).not.toHaveBeenCalled();
-    expect(shown).not.toContain("│");
+    expect(shown).toContain("? ");
   });
 
   it("ends as skipped and writes nothing when declined", async () => {
@@ -148,15 +148,6 @@ describe("auth-method passkey disable left unanswered", () => {
     const cwd = await passkeyOnlyProject();
 
     await expect(disablePasskey([], cwd)).rejects.toThrow();
-  });
-
-  // Clack's `└  Cancelled.` closes a chain, and a normal command has none.
-  it("closes no chain on the way out", async () => {
-    const cwd = await passkeyOnlyProject();
-
-    await disablePasskey([], cwd).catch(() => undefined);
-
-    expect(cancel).not.toHaveBeenCalled();
   });
 
   it("writes nothing", async () => {

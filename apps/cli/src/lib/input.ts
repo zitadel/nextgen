@@ -316,8 +316,12 @@ class PlainPrompter implements Prompter {
 /**
  * The output of a masked question: the question goes through once, and every
  * keystroke the line editor would echo after it goes nowhere.
+ *
+ * Exported for its own test: what it does cannot be seen from outside, since
+ * a line editor fed programmatically echoes nothing to begin with, so a test
+ * driving a whole question could not tell masking from its absence.
  */
-class Swallowing extends Writable {
+export class Swallowing extends Writable {
   private readonly target: NodeJS.WritableStream;
   private readonly query: string;
   private asked = false;

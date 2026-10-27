@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +22,7 @@ import type { ZitadelError } from "../../../src/lib/errors";
 import { clackInputImports } from "../../helpers/drawing-boundary";
 import { typing } from "../../helpers/terminal";
 import { sourceFiles } from "../../helpers/source-files";
-import { asker, plainAsker, type Session } from "../../../src/lib/input";
+import { asker, plainAsker, type Session, Swallowing } from "../../../src/lib/input";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
@@ -755,7 +755,7 @@ describe("plainAsker", () => {
   });
 
   describe("a secret", () => {
-    it("is asked on one line and never echoed", async () => {
+    it("is asked on one line and answers with what was typed", async () => {
       const talk = typing("hunter2");
 
       const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).secret(
@@ -763,7 +763,73 @@ describe("plainAsker", () => {
       );
 
       expect(answer).toBe("hunter2");
-      expect(talk.shown()).not.toContain("hunter2");
+    });
+
+    // Asserting the secret is absent from the output proves nothing: a line
+    // editor fed programmatically echoes nothing either way. What masking
+    // does show is that the question is written and the line is closed by
+    // hand, so the whole output is the question and a newline.
+    it("writes the question and nothing else", async () => {
+      const talk = typing("hunter2");
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).secret(
+        typed("client secret"),
+      );
+
+      expect(talk.shown()).toBe("Client ID \n");
+    });
+
+    it("says what is wrong and asks again, as the other questions do", async () => {
+      const talk = typing("short", "longenough");
+
+      const answer = await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).secret({
+        ...typed("client secret"),
+        parse: (value: string) =>
+          value.length < 8
+            ? ({ ok: false, problem: "A client secret is at least 8 characters" } as const)
+            : ({ ok: true, value } as const),
+      });
+
+      expect(answer).toBe("longenough");
+      expect(talk.shown()).toContain("A client secret is at least 8 characters");
+    });
+  });
+
+  // The one part of a masked question that is its own behaviour rather than
+  // the line editor's, and the only part a driven question cannot show.
+  describe("the output a masked question is read through", () => {
+    const captured = () => {
+      const chunks: string[] = [];
+      return {
+        chunks,
+        target: new Writable({
+          write(chunk: unknown, _encoding: unknown, done: () => void) {
+            chunks.push(String(chunk));
+            done();
+          },
+        }),
+      };
+    };
+
+    it("lets the question through once", () => {
+      const { chunks, target } = captured();
+      const out = new Swallowing(target, "Secret? ");
+
+      out.write("Secret? ");
+      out.write("Secret? ");
+
+      expect(chunks).toEqual(["Secret? "]);
+    });
+
+    it("swallows everything the line editor would echo after it", () => {
+      const { chunks, target } = captured();
+      const out = new Swallowing(target, "Secret? ");
+
+      out.write("Secret? ");
+      out.write("h");
+      out.write("u");
+
+      expect(chunks.join("")).toBe("Secret? ");
     });
   });
 
@@ -776,15 +842,17 @@ describe("plainAsker", () => {
       ).rejects.toMatchObject({ code: "E_CANCELLED", exitCode: 130 });
     });
 
-    // Clack's `└  Cancelled.` closes a chain, and a normal command has none.
-    it("closes no chain on the way out", async () => {
+    // Clack's `└  Cancelled.` closes a chain and a normal command has none,
+    // so nothing follows the question. Asserting clack's `cancel` was not
+    // called would pass however this is drawn: the double never calls it.
+    it("writes nothing after the question it was asked", async () => {
       const talk = typing();
 
       await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout })
         .text(typed())
         .catch(() => undefined);
 
-      expect(cancel).not.toHaveBeenCalled();
+      expect(talk.shown()).toBe("Client ID ");
     });
   });
 
