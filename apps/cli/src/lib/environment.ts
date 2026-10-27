@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
-import { input } from "./input";
+import { asker } from "./input";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
@@ -364,23 +364,23 @@ export async function requireValueInteractive(
     return requireValue(environment, key);
   }
   const name = environment.name.value;
-  const value = await input(
-    {
-      kind: SECRET_KEYS.has(key) ? "secret" : "text",
-      name: key,
-      message: `What is the value of ${key} for the ${name} environment?`,
-      // Persist (and return) the normalized form, matching how the resolver
-      // stores a server value, so the file and this run agree with every later run.
-      parse: (answer: string) => {
-        const typed = answer.trim();
-        if (typed === "") {
-          return { ok: false, problem: `${key} cannot be empty` } as const;
-        }
-        return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
-      },
+  const question = {
+    name: key,
+    message: `What is the value of ${key} for the ${name} environment?`,
+    // Persist (and return) the normalized form, matching how the resolver
+    // stores a server value, so the file and this run agree with every later run.
+    parse: (answer: string) => {
+      const typed = answer.trim();
+      if (typed === "") {
+        return { ok: false, problem: `${key} cannot be empty` } as const;
+      }
+      return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
     },
-    { interactive: true, force: false },
-  );
+  };
+  const ask = asker({ interactive: true, force: false });
+  // A credential is never echoed, so which method asks it is the question's
+  // own property rather than a flag passed to one method.
+  const value = SECRET_KEYS.has(key) ? await ask.secret(question) : await ask.text(question);
   if (environment.envFile === undefined) {
     await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
   }
