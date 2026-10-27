@@ -13,6 +13,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/ogenx"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/oidc/v3/pkg/op"
 )
@@ -78,7 +79,7 @@ func (h Handler) ExchangeHandoff(ctx context.Context, req *api.ExchangeRequest, 
 	// transaction only writes the grant and never creates a team or membership.
 	if h.personalTeams != nil && session.UserID != nil {
 		if err := h.personalTeams.EnsurePersonalTeam(ctx, session.ProjectID, *session.UserID); err != nil {
-			slog.WarnContext(ctx, "personal team ensure failed on session exchange",
+			zlog.Warn(ctx, "personal team ensure failed on session exchange",
 				slog.String("project_id", session.ProjectID),
 				slog.String("user_id", *session.UserID),
 				slog.Any("error", err))

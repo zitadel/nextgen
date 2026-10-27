@@ -661,12 +661,12 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says which provider it enabled, and for which schema", async () => {
+      it("says the provider is configured locally and not yet live", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Enabled Google for default-human-user");
+        expect(result).toPrint("Google sign-in is configured locally.");
       });
 
       it("renders text rather than a json envelope", async () => {

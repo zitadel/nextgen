@@ -3,4 +3,4 @@
 "@zitadel/sdk-nuxt": patch
 ---
 
-The `@zitadel/sdk-next` README and the type documentation your editor shows for `getSession()`, `useAuth()`, `auth()` and `NextgenProvider` now describe the session identity as `userId`, `identifier`, `identifierProperty` and `display`, the fields these return, instead of `userId`, `email` and `name`. The README also places `proxy.ts` next to the `app` directory. Its npm description no longer mentions a mock auth UI, and the `@zitadel/sdk-nuxt` README names the product Zitadel.
+The `@zitadel/sdk-next` README and the editor docs for `getSession()`, `useAuth()`, `auth()` and `NextgenProvider` now describe the session as `userId`, `identifier`, `identifierProperty` and `display`, the fields they return, and the README places `proxy.ts` next to the `app` directory; the `@zitadel/sdk-nuxt` README names the product Zitadel.

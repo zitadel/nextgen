@@ -8,4 +8,4 @@
 "@zitadel/sdk-vue": patch
 ---
 
-The published TypeScript types now resolve under strict Node ESM resolution (`node16` and `nodenext`): the React, Vue, Solid, Svelte, Qwik and Angular SDKs spell out explicit file extensions in their declarations. The Qwik SDK no longer ships a test-only declaration file. `@zitadel/components` exports `defaultTemplate` and `layoutChromeCss` as plain `string` values, so its declarations no longer import a compiled chunk that has no types.
+The React, Vue, Solid, Svelte, Qwik and Angular SDKs' published types now resolve under strict Node ESM resolution (`node16` and `nodenext`), and `@zitadel/components` exports `defaultTemplate` and `layoutChromeCss` as plain strings, so its declarations import no chunk without types.

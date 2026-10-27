@@ -105,6 +105,154 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
 	})
 
+	t.Run("releases", func(t *testing.T) {
+		t.Parallel()
+		// Releases are built with the secret only; the session reads them.
+		// There is no release delete, so the release lives in a project of
+		// this test's own and goes with it.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		created := seedRelease(t, secret, owned.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
+
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: ownedID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+
+		// The session deploys too: the Deploy release drawer posts with it.
+		_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), owned.ID,
+			domain.Origin{Pattern: "https://console-session.example.com", Kind: domain.OriginKindPrimary})
+		require.NoError(t, err)
+		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(created.ID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
+
+		// The directory embeds each deployment's release to know whether it is
+		// revoked: the session's project-wide read stands in for release.read.
+		history, err := session.ListDeployments(t.Context(), api.ListDeploymentsParams{
+			ProjectID: ownedID, Expand: []api.DeploymentExpand{api.DeploymentExpandRelease},
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListDeploymentsResponse{}, history, helpers.MustMarshal(t, history))
+		require.NotEmpty(t, history.(*api.ListDeploymentsResponse).Deployments)
+		assert.Equal(t, created.ID, history.(*api.ListDeploymentsResponse).Deployments[0].Release.Value.ID)
+
+		// And rolls back: to the deployment that is live, which changes
+		// nothing and answers 200.
+		rolledBack, err := session.RollbackDeployment(t.Context(), api.OptRollbackDeploymentRequest{},
+			api.RollbackDeploymentParams{ProjectID: ownedID, DeploymentID: deployed.(*api.CreateDeploymentCreated).ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RollbackDeploymentOK{}, rolledBack, helpers.MustMarshal(t, rolledBack))
+
+		// And revokes: the origin just deployed to still serves the release,
+		// so the answer is the typed refusal, past the authentication.
+		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: ownedID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RevokeReleaseConflict{}, revoked, helpers.MustMarshal(t, revoked))
+	})
+
+	t.Run("policies", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page reads the password policy and the release
+		// detail a pinned revision with the session; publishing stays with the
+		// secret. A policy is project state, so the project is this test's own.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		published := passwordSetPolicy(t, publishPolicy(t, secret, owned.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		listed, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{
+			ProjectID: ownedID, Operation: api.NewOptPolicyOperation(passwordSetOperation),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Len(t, listed.(*api.ListPoliciesResponse).Policies, 1)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, &listed.(*api.ListPoliciesResponse).Policies[0]).ID)
+
+		got, err := session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID)
+
+		revisions, err := session.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: ownedID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, revision).ID)
+	})
+
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page adds and removes origins and reads the
+		// variables with the session (#2320). Variables are written with the
+		// secret only. The project is this test's own: origins and variables
+		// are project state, and the platform project is shared.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+
+		origin := api.ProjectOrigin{Pattern: "https://console-session-origin.example.com", Kind: api.ProjectOriginKindPrimary}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		project, err := session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ProjectDetailResponse{}, project, helpers.MustMarshal(t, project))
+		require.Contains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+		project, err = session.GetProject(t.Context(), api.GetProjectParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.NotContains(t, project.(*api.ProjectDetailResponse).Origins, origin)
+
+		written, err := secret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"SESSION_PLAIN": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("shown")),
+			"SESSION_SECRET": api.NewSecretVariableInputVariableInput(api.SecretVariableInput{
+				Value: api.NewStringVariableScalar("never-shown"), Secret: true,
+			}),
+		}, api.UpdateVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+
+		// The session reads every name with its value per kind, the secret held.
+		held := api.NewSecretVariableVariable(api.SecretVariable{Secret: true})
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: ownedID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		variables := *listed.(*api.VariablesByKind)
+		assert.Equal(t, api.NewVariableScalarVariable(api.NewStringVariableScalar("shown")), variables["SESSION_PLAIN"].Primary.Value)
+		assert.Equal(t, held, variables["SESSION_SECRET"].Primary.Value)
+		assert.NotContains(t, helpers.MustMarshal(t, listed), "never-shown")
+
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: ownedID, VariableName: "SESSION_SECRET"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
+		assert.Equal(t, api.VariableByKind{Primary: api.NewOptVariable(held)}, *one.(*api.VariableByKind))
+	})
+
 	t.Run("teams", func(t *testing.T) {
 		t.Parallel()
 		created, err := session.CreateTeam(t.Context(), &api.CreateTeamRequest{Name: helpers.TeamName()},
@@ -308,6 +456,64 @@ func TestConsoleManagementSessionWithoutAccess(t *testing.T) {
 		got := stranger.get(t, connection.ID)
 		require.IsType(t, &api.GetIdpByIdNotFound{}, got, helpers.MustMarshal(t, got))
 		assert.Equal(t, notFound, got.(*api.GetIdpByIdNotFound).Code)
+	})
+
+	t.Run("cannot list or read another project's releases", func(t *testing.T) {
+		created := seedRelease(t, otherSecret, other.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: otherID})
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, listed)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, listed))
+		assert.Equal(t, http.StatusNotFound, status)
+		// Both reads are filtered by the caller's projects and answer as an
+		// unknown release does: no existence oracle on the project either.
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: otherID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		status, code, _, ok = errorResponseParts(t, got)
+		require.True(t, ok, "unexpected response shape: %s", helpers.MustMarshal(t, got))
+		assert.Equal(t, http.StatusNotFound, status)
+		assert.Equal(t, domain.ErrReleaseNotFound().Code, code)
+
+		// Nor deploy there: the write stops at the project, as not found.
+		deployed, err := session.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(created.ID),
+			Targets:   api.DeploymentTargetsRequest{"primary"},
+		}, api.CreateDeploymentParams{ProjectID: otherID})
+		require.NoError(t, err)
+		require.IsType(t, &api.CreateDeploymentNotFound{}, deployed, helpers.MustMarshal(t, deployed))
+		assert.Equal(t, api.ErrorCode(domain.ErrEnvironmentProjectNotFound().Code), deployed.(*api.CreateDeploymentNotFound).Code)
+
+		// Nor roll back or revoke there.
+		rolledBack, err := session.RollbackDeployment(t.Context(), api.OptRollbackDeploymentRequest{},
+			api.RollbackDeploymentParams{ProjectID: otherID, DeploymentID: "dep_01KX4SB9C8E1F0N9WD3P2E4YM5"})
+		require.NoError(t, err)
+		assertAuthzError(t, rolledBack, domain.ErrEnvironmentProjectNotFound().Code)
+		revoked, err := session.RevokeRelease(t.Context(), api.RevokeReleaseParams{ProjectID: otherID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		assertAuthzError(t, revoked, domain.ErrReleaseProjectNotFound().Code)
+	})
+
+	t.Run("cannot add or remove another project's origins, nor read its variables", func(t *testing.T) {
+		// Every op is project-scoped: the miss is the resource's own not
+		// found, which says nothing about the project.
+		added, err := session.AddOrigin(t.Context(), &api.ProjectOrigin{
+			Pattern: "https://stranger.example.com", Kind: api.ProjectOriginKindPrimary,
+		}, api.AddOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, added, domain.ErrOriginNotFound().Code)
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: "https://stranger.example.com"}, api.RemoveOriginParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, removed, domain.ErrOriginNotFound().Code)
+
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: otherID})
+		require.NoError(t, err)
+		assertAuthzError(t, listed, domain.ErrVariableNotFound().Code)
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: otherID, VariableName: "ANY"})
+		require.NoError(t, err)
+		assertAuthzError(t, one, domain.ErrVariableNotFound().Code)
 	})
 
 	t.Run("cannot read another project's schema", func(t *testing.T) {
@@ -581,6 +787,43 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		revision, err := session.GetIdpRevisionById(t.Context(), api.GetIdpRevisionByIdParams{ProjectID: api.ProjectID(customer.ID), RevisionID: created.RevisionID})
 		require.NoError(t, err)
 		require.IsType(t, &api.IdpResponse{}, revision, helpers.MustMarshal(t, revision))
+	})
+
+	t.Run("release", func(t *testing.T) {
+		t.Parallel()
+		created := seedRelease(t, customerSecret, customer.ID)
+
+		listed, err := session.ListReleases(t.Context(), api.ListReleasesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListReleasesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, releaseIDs(listed.(*api.ListReleasesResponse).Releases), created.ID)
+		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: customerProjectID, ReleaseID: created.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+	})
+
+	t.Run("origins and variables", func(t *testing.T) {
+		t.Parallel()
+		origin := api.ProjectOrigin{Pattern: "https://granted-origin.example.com", Kind: api.ProjectOriginKindPreview}
+		added, err := session.AddOrigin(t.Context(), &origin, api.AddOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.AddOriginResponse{}, added, helpers.MustMarshal(t, added))
+		removed, err := session.RemoveOrigin(t.Context(), &api.RemoveOriginReq{Pattern: origin.Pattern}, api.RemoveOriginParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.RemoveOriginNoContent{}, removed, helpers.MustMarshal(t, removed))
+
+		written, err := customerSecret.UpdateVariables(t.Context(), api.UpdateVariablesRequest{
+			"GRANTED_READ": api.NewVariableScalarVariableInput(api.NewStringVariableScalar("granted")),
+		}, api.UpdateVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, written, helpers.MustMarshal(t, written))
+		listed, err := session.GetVariables(t.Context(), api.GetVariablesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariablesByKind{}, listed, helpers.MustMarshal(t, listed))
+		require.Contains(t, *listed.(*api.VariablesByKind), "GRANTED_READ")
+		one, err := session.GetVariable(t.Context(), api.GetVariableParams{ProjectID: customerProjectID, VariableName: "GRANTED_READ"})
+		require.NoError(t, err)
+		require.IsType(t, &api.VariableByKind{}, one, helpers.MustMarshal(t, one))
 	})
 
 	t.Run("without a grant the resource is not found", func(t *testing.T) {
@@ -990,4 +1233,38 @@ func TestPersonalTeamOwnerRenamesTheirTeam(t *testing.T) {
 			assert.Equal(t, api.ErrorCode(tc.code), helpers.MustUnmarshal[api.ErrorDetails](t, []byte(body)).Code)
 		})
 	}
+}
+
+// seedRelease builds a release pinning the project's seeded flow definition
+// and the user schema it names (a release must resolve its own references),
+// through the project secret: that is the only principal the build accepts.
+func seedRelease(t *testing.T, secret *helpers.ApiClient, projectID string) api.Release {
+	t.Helper()
+	flows, err := secret.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.FlowDefinitionListResponse{}, flows, helpers.MustMarshal(t, flows))
+	definitions := flows.(*api.FlowDefinitionListResponse).FlowDefinitions
+	require.NotEmpty(t, definitions)
+	schemas, err := secret.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.ListSchemasResponse{}, schemas, helpers.MustMarshal(t, schemas))
+	pointers := []api.CreateReleasePointer{{Kind: api.ReleasePointerKindFlowDefinition, RevisionID: definitions[0].ID}}
+	for _, schema := range schemas.(*api.ListSchemasResponse).Schemas {
+		pointers = append(pointers, api.CreateReleasePointer{Kind: api.ReleasePointerKindSchema, RevisionID: schema.ID})
+	}
+
+	resp, err := secret.CreateRelease(t.Context(), &api.CreateReleaseRequest{
+		Pointers: pointers,
+	}, api.CreateReleaseParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	require.IsType(t, &api.CreateReleaseCreated{}, resp, helpers.MustMarshal(t, resp))
+	return api.Release(*resp.(*api.CreateReleaseCreated))
+}
+
+func releaseIDs(releases []api.ReleaseSummary) []api.ReleaseID {
+	ids := make([]api.ReleaseID, 0, len(releases))
+	for _, release := range releases {
+		ids = append(ids, release.ID)
+	}
+	return ids
 }

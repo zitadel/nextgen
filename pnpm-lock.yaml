@@ -1195,6 +1195,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../packages/api-mock
+      '@zitadel/config':
+        specifier: workspace:*
+        version: link:../packages/config
       '@zitadel/sdk-nuxt':
         specifier: workspace:*
         version: link:../packages/sdk-nuxt

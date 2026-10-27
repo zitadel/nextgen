@@ -1,5 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Monitor, Paintbrush, Smartphone, Sun, Workflow } from "lucide-react";
+import { publishedSides } from "@zitadel/components";
+import {
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Paintbrush,
+  Smartphone,
+  Sun,
+  SunMoon,
+  Workflow,
+} from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -12,6 +22,14 @@ import { SettingsPanel } from "@/components/branding/settings-panel";
 import { ResourceTitle } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -104,10 +122,38 @@ const STATE_LABELS: Record<PreviewState, string> = {
 
 /**
  * Which side the preview paints: a fixed side, or `revision` to leave it to
- * the revision's own `theme.mode` — what a visitor gets. A pinned side still
- * cannot reach one the revision does not publish.
+ * the revision's own `theme.mode` — what a visitor gets.
  */
 type PreviewTheme = "light" | "dark" | "revision";
+
+// The menu's order, with the user menu's icons, so the trigger shows the side
+// on screen. Keyed like `STATE_LABELS`, so a new side has to be labelled here.
+const THEMES: Record<PreviewTheme, { label: string; icon: LucideIcon }> = {
+  revision: { label: "From branding", icon: SunMoon },
+  light: { label: "Light", icon: Sun },
+  dark: { label: "Dark", icon: Moon },
+};
+
+/**
+ * The side a revision that publishes only the other one cannot paint. The
+ * element then paints the published side whatever it is asked for
+ * (`publishedSides`); with both or neither published, either side paints.
+ */
+function unpublishedSide(revision: BrandingRevision): PreviewTheme | undefined {
+  const [only, second] = publishedSides(revision);
+  if (!only || second) return undefined;
+  return only === "light" ? "dark" : "light";
+}
+
+/** What "From branding" paints, resolved as the element does it. */
+function revisionSide(revision: BrandingRevision): string {
+  const [only, second] = publishedSides(revision);
+  if (only && !second) return THEMES[only].label;
+  const mode = revision.theme?.mode;
+  // `auto`, and an unset mode, which a widget treats as `auto`, follow the
+  // operator's operating system, not the console's own theme.
+  return mode === "light" || mode === "dark" ? THEMES[mode].label : "System";
+}
 
 function BrandingScreen() {
   const { revision, flows } = Route.useLoaderData();
@@ -148,8 +194,11 @@ function BrandingScreen() {
   // Derived like `activeJourney`: a pick this step cannot show previews the
   // default, and comes back when a step that can show it is served.
   const activeState = states && !states.includes(state) ? "default" : state;
-  // Unset, a widget follows the visitor: the panel shows `auto` for it too.
-  const revisionMode = revision.theme?.mode ?? "auto";
+  // Derived like `activeState`: a side this revision does not publish is not
+  // offered, and a pick of it previews the revision's own until one does.
+  const unpublished = unpublishedSide(revision);
+  const activeTheme = theme === unpublished ? "revision" : theme;
+  const ActiveThemeIcon = THEMES[activeTheme].icon;
 
   return (
     <Page fill>
@@ -228,19 +277,40 @@ function BrandingScreen() {
             >
               {narrow ? <Smartphone /> : <Monitor />}
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Switch the previewed theme"
-              onClick={() => setTheme(nextTheme(theme))}
-              title={
-                theme === "revision"
-                  ? `Theme: ${revisionMode} (from the branding in use)`
-                  : `Theme: ${theme}`
-              }
-            >
-              <Sun />
-            </Button>
+            {/* A menu rather than a cycling button: three sides behind one
+                glyph left the operator guessing which one was on screen. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={`Previewed theme: ${THEMES[activeTheme].label}`}
+                  title={`Theme: ${THEMES[activeTheme].label}`}
+                >
+                  <ActiveThemeIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Previewed theme</DropdownMenuLabel>
+                <DropdownMenuRadioGroup
+                  value={activeTheme}
+                  onValueChange={(value) => setTheme(value as PreviewTheme)}
+                >
+                  {Object.entries(THEMES).map(([id, entry]) => (
+                    <DropdownMenuRadioItem key={id} value={id} disabled={id === unpublished}>
+                      <entry.icon aria-hidden />
+                      {entry.label}
+                      {/* What a visitor gets, and why a side is not offered. */}
+                      {(id === "revision" || id === unpublished) && (
+                        <span className="ml-auto pl-4 text-xs text-muted-foreground">
+                          {id === "revision" ? revisionSide(revision) : "Not published"}
+                        </span>
+                      )}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -264,7 +334,7 @@ function BrandingScreen() {
               <LoginPreview
                 journey={activeJourney}
                 flowName={activeFlowName}
-                theme={theme}
+                theme={activeTheme}
                 state={activeState}
                 successStep={selected?.successStep}
                 onStates={(next) => setServed({ preview, states: next })}
@@ -280,9 +350,4 @@ function BrandingScreen() {
       </div>
     </Page>
   );
-}
-
-function nextTheme(current: PreviewTheme): PreviewTheme {
-  if (current === "revision") return "light";
-  return current === "light" ? "dark" : "revision";
 }

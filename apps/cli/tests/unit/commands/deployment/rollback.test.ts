@@ -118,4 +118,73 @@ describe("deployment rollback", () => {
 
     expect(guards).toEqual([undone]);
   });
+
+  it("reports the revisions the restored release pins", async () => {
+    const { cwd } = await twoDeploys();
+
+    const { stdout } = await runCliForTest([
+      "deployment",
+      "rollback",
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    const envelope = JSON.parse(stdout) as { data: { pointers: unknown[] } };
+    expect(envelope.data.pointers).toEqual([
+      expect.objectContaining({ kind: "schema", revision_id: "sch_a" }),
+    ]);
+  });
+
+  it("tells a terminal that users keep their revisions", async () => {
+    const { cwd } = await twoDeploys();
+
+    const { stdout } = await runCliForTest([
+      "deployment",
+      "rollback",
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+    ]);
+
+    expect(stdout).toContain("sch_a");
+    expect(stdout).toContain(
+      "Users keep the schema revision and attributes they have: a rollback does not migrate them back.",
+    );
+  });
+
+  it("warns rather than fails when the restored release cannot be read", async () => {
+    const { cwd } = await twoDeploys();
+    server.use(
+      http.get(`${SERVER}/releases/:id`, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const { exitCode, stdout } = await runCliForTest([
+      "deployment",
+      "rollback",
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    const envelope = JSON.parse(stdout) as {
+      status: string;
+      data: Record<string, unknown>;
+      warnings: string[];
+    };
+    expect(exitCode).toBe(0);
+    expect(envelope.status).toBe("ok");
+    expect(envelope.data).not.toHaveProperty("pointers");
+    expect(envelope.warnings).toEqual([expect.stringContaining("could not be read")]);
+  });
 });

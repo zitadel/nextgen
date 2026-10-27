@@ -159,6 +159,8 @@ it stays here deliberately rather than by oversight.
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
   Never retry on that. A listener held for the whole test may bind port 0.
+- `runCliForTest` runs the built CLI, out of reach of any spy on `src/`: pin
+  the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
 - A unit test answers the platform with

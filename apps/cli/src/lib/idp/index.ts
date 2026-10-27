@@ -21,6 +21,9 @@ export {
   type ConnectionFile,
   type ConnectionPlan,
   credentialVariablesOf,
+  checkCustomSlug,
+  refuseChangedIssuer,
+  storedCustomSettings,
   type StoredVariables,
   planConnection,
   refuseResolvedSecret,
@@ -54,6 +57,7 @@ export {
   ENABLE_FLAG_NAMES,
   givenCustomFlags,
   SETUP_FLAG_NAMES,
+  ssoEnableArgs,
   type CustomFlagValues,
 } from "./custom";
 

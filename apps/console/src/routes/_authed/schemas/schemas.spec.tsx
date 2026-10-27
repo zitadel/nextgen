@@ -336,6 +336,30 @@ describe("user schema detail", () => {
     expect(await table().findByRole("cell", { name: "email" })).toBeInTheDocument();
   });
 
+  it("badges the x-identifier and x-display properties, nested ones by their path", async () => {
+    const designated = {
+      ...BUSINESS,
+      "x-identifier": "email",
+      "x-display": ["address.city"],
+    };
+    serveBusiness();
+    server.use(
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", designated)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    const table = () => within(screen.getByRole("table"));
+    expect(table().getByRole("cell", { name: "email x-identifier" })).toBeInTheDocument();
+    expect(table().queryByText("x-display")).not.toBeInTheDocument();
+
+    await userEvent.click(table().getByRole("button", { name: "address" }));
+    expect(await table().findByRole("cell", { name: "city x-display" })).toBeInTheDocument();
+    expect(table().getByRole("cell", { name: "street" })).toBeInTheDocument();
+  });
+
   it("carries the schema id and created date in the header card", async () => {
     // The same card as Login flows: the id, copyable, beside the created date.
     serveBusiness();

@@ -183,6 +183,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * commands have no file to carry a `static group`, so the table says it.
    */
   group?: CommandGroup;
+  /** Position of the resource's row within its group on the root help, lowest first. */
+  groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**

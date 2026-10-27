@@ -194,6 +194,7 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.GetMyPasswordStateOperation:  true,
 	api.GetProjectOperation:          true,
 	api.PatchProjectOperation:        true,
+	api.ListProjectAdminsOperation:   true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
 	api.CreateUserOperation:            true,
@@ -215,6 +216,28 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.QueryIdpsOperation:             true,
 	api.GetIdpByIdOperation:            true,
 	api.GetIdpRevisionByIdOperation:    true,
+	// The Releases screens read a project's releases and where each went,
+	// deploy one, roll a deployment back and revoke a release.
+	api.ListReleasesOperation:       true,
+	api.GetReleaseByIdOperation:     true,
+	api.ListDeploymentsOperation:    true,
+	api.GetDeploymentByIdOperation:  true,
+	api.CreateDeploymentOperation:   true,
+	api.RollbackDeploymentOperation: true,
+	api.RevokeReleaseOperation:      true,
+	// The Project settings page adds and removes origins and reads variables
+	// (#2320). Variable writes stay with the project secret.
+	api.AddOriginOperation:    true,
+	api.RemoveOriginOperation: true,
+	api.GetVariablesOperation: true,
+	api.GetVariableOperation:  true,
+	// The Project settings page shows the password policy and the release
+	// detail a pinned policy revision. Publishing stays with the project
+	// secret.
+	api.ListPoliciesOperation:        true,
+	api.GetPolicyOperation:           true,
+	api.ListPolicyRevisionsOperation: true,
+	api.GetPolicyRevisionOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the

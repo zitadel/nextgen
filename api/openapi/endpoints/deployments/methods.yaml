@@ -38,6 +38,7 @@ post:
   security:
     - oauth2:
         - deployment.write
+    - nextgenSession: []
   requestBody:
     required: true
     content:
@@ -160,7 +161,7 @@ post:
                 Set each missing variable for the kind, then deploy again.
               value:
                 code: dep.variables_missing
-                message: 'deployment: variables have no preview value: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET'
+                message: 'deployment: the release references variables its kind has no value for'
                 details:
                   kind: preview
                   names:
@@ -291,6 +292,7 @@ get:
   security:
     - oauth2:
         - deployment.read
+    - nextgenSession: []
   responses:
     '200':
       description: The deployments were listed successfully.

@@ -1060,7 +1060,7 @@ describe("server SDK test titles", () => {
     "keeps an anonymous session's cookie, since its sign-in may still complete",
     "treats a 200 session without a user as anonymous on a public route",
     "redirects a session whose answer has a null user id to login on a protected route",
-    "clears a dead session cookie on a public page",
+    "reads a dead session cookie as signed out on a public page",
     "clears a dead session cookie and redirects on a protected route",
     "clears the cookie of a session that is gone",
     "when the session check gets %s",
