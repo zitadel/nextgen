@@ -285,7 +285,7 @@ describe("materializeSetupResources password policy", () => {
   it("publishes and writes the recommended minimum when none was given", async () => {
     const platform = client();
 
-    await materializeSetupResources({
+    const result = await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
       client: platform,
@@ -303,12 +303,13 @@ describe("materializeSetupResources password policy", () => {
       operation: "auth.factor.password.set",
       config: { min_length: 15 },
     });
+    expect(result.passwordMinLengthSet).toBe(true);
   });
 
   it("publishes and writes an empty policy for an explicit none", async () => {
     const platform = client();
 
-    await materializeSetupResources({
+    const result = await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
       client: platform,
@@ -325,6 +326,27 @@ describe("materializeSetupResources password policy", () => {
       config: object;
     };
     expect(written.config).toEqual({});
+    expect(result.passwordMinLengthSet).toBe(false);
+  });
+
+  it("says no minimum was published when a kept policy file has none", async () => {
+    // Telemetry reports what was published: a kept file without a minimum
+    // stays without one when none was given, whatever the default.
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"history_depth":2}}\n`,
+    );
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(result.passwordMinLengthSet).toBe(false);
   });
 
   it("puts the given minimum into the published policy and its file", async () => {
@@ -559,6 +581,7 @@ describe("materializeSetupResources password policy", () => {
     ) as ZitadelState;
     expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
     expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
+    expect(result.passwordMinLengthSet).toBe(false);
   });
 
   it("still fails on a policy the server refuses", async () => {

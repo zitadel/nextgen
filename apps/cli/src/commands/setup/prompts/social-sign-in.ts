@@ -28,10 +28,9 @@ import {
 import {
   askConnectionEndpoints,
   callbackUriFor,
-  customFlagText,
   type CustomFlagValues,
-  ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
+  ssoEnableArgs,
 } from "../../../lib/idp";
 import { reportWarning } from "../../../lib/warnings";
 import type { Asker } from "../../../lib/input";
@@ -167,13 +166,7 @@ export class SocialSignInPrompt implements SetupPrompt {
         log.info(
           [
             `Skipped ${entry.displayName}. Once its OAuth application exists, add it with:`,
-            ctx.suggest(
-              `auth-method sso enable --provider ${selectionName(selection)}${
-                selection.kind === "custom"
-                  ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-                  : ""
-              }`,
-            ),
+            ctx.suggest(ssoEnableArgs(selection)),
           ].join("\n"),
         );
         continue;

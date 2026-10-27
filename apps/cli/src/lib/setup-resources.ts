@@ -27,7 +27,6 @@ import {
   type ConnectionSlug,
   type ProviderSelection,
   providerOf,
-  selectionName,
 } from "@zitadel/config/idp";
 import {
   normalizeFlowBody,
@@ -51,12 +50,11 @@ import {
   applySsoToSchema,
   authMethods,
   CONNECTION_SCHEMA_REF,
-  customFlagText,
-  ENABLE_FLAG_NAMES,
   SETUP_FLAG_NAMES,
   IDPS_DIR,
   planConnection,
   readConnectionFiles,
+  ssoEnableArgs,
 } from "./idp";
 import { stableStringify } from "./json";
 import { normalizePublicCliProse } from "./public-cli";
@@ -69,6 +67,13 @@ import { reportWarning } from "./warnings";
 
 export type MaterializeSetupResourcesResult = {
   filesWritten: string[];
+  /**
+   * Whether the password policy setup published has a minimum length. A kept
+   * policy file decides that as much as the answers do: one without
+   * `min_length` keeps none when none was given. `false` when nothing was
+   * published.
+   */
+  passwordMinLengthSet: boolean;
 };
 
 /**
@@ -308,7 +313,10 @@ export async function materializeSetupResources(opts: {
     filesWritten.push(join(opts.cwd, policiesReadme));
   }
 
-  return { filesWritten };
+  return {
+    filesWritten,
+    passwordMinLengthSet: published !== undefined && policy.config.min_length !== undefined,
+  };
 }
 
 /**
@@ -512,15 +520,7 @@ function connectionExists(selection: ProviderSelection): {
       "provider afterwards to reuse it.",
     // Setup stopped before it created a project, so there is no environment
     // to carry: the retry is for after the developer reruns setup.
-    nextCommands: [
-      unscopedCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-      ),
-    ],
+    nextCommands: [unscopedCommand(ssoEnableArgs(selection))],
   };
 }
 

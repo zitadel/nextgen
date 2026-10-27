@@ -45,7 +45,6 @@ import {
   customExample,
   customFlagValues,
   flagText,
-  ENABLE_FLAG_NAMES,
   givenCustomFlags,
   loopbackIssuerWarning,
   publishClientId,
@@ -56,6 +55,7 @@ import {
   republishCommands,
   SETUP_FLAG_KEYS,
   SETUP_FLAG_NAMES,
+  ssoEnableArgs,
   storeClientSecret,
   type SecretOutcome,
   type SecretPublisher,
@@ -93,7 +93,6 @@ import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
   type PasswordMinLength,
-  RECOMMENDED_PASSWORD_MIN_LENGTH,
   parsePasswordMinLength,
 } from "../../lib/policies";
 import { derivePosture } from "../../lib/orca/patchers/posture";
@@ -456,9 +455,10 @@ export default class Setup extends Promptable(BaseCommand) {
       // The wizard asks for another port when the detected one is taken. A run
       // that asks nothing still pins the dev script to it, so it says so, with
       // the command that puts the app on a free one.
-      const free = await LocalServer.nextFreePort(answers.devPort);
       reportWarning(
-        `Port ${answers.devPort} is already in use. If that is not this app's dev server, run setup with a free port: ${this.suggestUnscoped(`setup --dev-port ${free ?? "<port>"}`)}`,
+        portInUseWarning(answers.devPort, await LocalServer.nextFreePort(answers.devPort), (args) =>
+          this.suggestUnscoped(args),
+        ),
       );
     }
 
@@ -480,8 +480,9 @@ export default class Setup extends Promptable(BaseCommand) {
               ? selectionName(answers.sso[0].selection)
               : "none"
             : "multiple",
-      // Whether a minimum went into the password policy, never the value. None
-      // given is the recommended one (`passwordPolicyFile`).
+      // Whether a minimum goes into the password policy, never the value. None
+      // given is the recommended one (`passwordPolicyFile`), unless `--force`
+      // keeps a policy file: `files_patched` records what was published.
       password_policy: answers.passwordMinLength === null ? "empty" : "set",
     });
 
@@ -621,7 +622,7 @@ export default class Setup extends Promptable(BaseCommand) {
       }
       try {
         resourceResult = dryRun
-          ? { filesWritten: [] }
+          ? { filesWritten: [], passwordMinLengthSet: false }
           : await materializeSetupResources({
               cwd,
               // Verbatim: what setup reads back is stored in state, never printed.
@@ -702,6 +703,14 @@ export default class Setup extends Promptable(BaseCommand) {
       step: "files_patched",
       files_written_count: allFilesWritten.length,
     });
+    if (!dryRun) {
+      // What was published, which a policy file `--force` keeps decides as much
+      // as the answers recorded before. A dry run publishes nothing and keeps
+      // those.
+      this.recordTelemetry({
+        password_policy: resourceResult.passwordMinLengthSet ? "set" : "empty",
+      });
+    }
 
     // After the connection exists, not before: a credential published under a
     // name nothing references yet is an orphan in the project's variables, and
@@ -1441,10 +1450,9 @@ export function setupRetryFlags(opts: SetupRetryOptions): string {
   if (opts.devPort !== undefined) {
     parts.push(`--dev-port ${opts.devPort}`);
   }
-  if (
-    opts.passwordMinLength !== undefined &&
-    opts.passwordMinLength !== RECOMMENDED_PASSWORD_MIN_LENGTH
-  ) {
+  // Even the recommended one, unlike the defaults above: without the flag, a
+  // policy file `--force` keeps keeps its own minimum.
+  if (opts.passwordMinLength !== undefined) {
     parts.push(`--password-min-length ${opts.passwordMinLength ?? 0}`);
   }
   // Only the first: `--sso` takes one provider, and a scripted rerun can pipe
@@ -1640,15 +1648,7 @@ function ssoRecovery(
     // process environment (unlike `--env`), so it is the one that forces the
     // generated development credential the local project actually expects.
     commands: remaining.map((selection) =>
-      projectCommand(
-        `auth-method sso enable --provider ${selectionName(selection)}${
-          selection.kind === "custom"
-            ? ` ${customFlagText(selection.connection, ENABLE_FLAG_NAMES)}`
-            : ""
-        }`,
-        localRecoverySelector(retry.cwd),
-        cliVersion,
-      ),
+      projectCommand(ssoEnableArgs(selection), localRecoverySelector(retry.cwd), cliVersion),
     ),
   };
 }
@@ -1832,6 +1832,21 @@ function describeWrittenFile(relPath: string, dryRun: boolean): string | null {
     return `${verb} ${sentence.subject} (${stylePath(relPath)})`;
   }
   return `${verb} ${stylePath(relPath)}`;
+}
+
+/**
+ * What a run that cannot ask says about a taken app port, with the command
+ * that moves the app to `free`. With no free port among the next ones it names
+ * only the flag: a placeholder in a suggested command is a shell redirection.
+ */
+export function portInUseWarning(
+  port: number,
+  free: number | undefined,
+  suggest: (args: string) => SuggestedCommand,
+): string {
+  return free === undefined
+    ? `Port ${port} and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.`
+    : `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: ${suggest(`setup --dev-port ${free}`)}`;
 }
 
 /**

@@ -21,6 +21,7 @@ import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prom
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
+  portInUseWarning,
   retryOptionsFromFlags,
   setupRetryFlags,
   ssoFromFlags,
@@ -29,6 +30,7 @@ import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { LocalServer } from "../../../src/lib/local-server/server";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
@@ -275,6 +277,13 @@ describe("setup command", () => {
       ),
     ]);
     expect(json.warnings[0]).toMatch(/ setup --dev-port \d+ --cwd \S+$/);
+  });
+
+  it("names only the flag for a taken port when the ports after it are taken too", () => {
+    // A placeholder in a suggested command would be run as a shell redirection.
+    expect(portInUseWarning(3000, undefined, (args) => unscopedCommand(args, "1.2.3"))).toBe(
+      "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
+    );
   });
 
   it("does not warn about a taken port that --dev-port chose", async () => {
@@ -1080,9 +1089,10 @@ describe("a retry after a failure before the wizard", () => {
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
       "--password-min-length 0",
     );
-    // The recommended minimum is what a run without the flag gets anyway.
-    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).not.toContain(
-      "--password-min-length",
+    // The recommended one too: without the flag, a policy file --force keeps
+    // keeps its own minimum.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+      "--password-min-length 15",
     );
     // A refused value would only be refused again.
     expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
