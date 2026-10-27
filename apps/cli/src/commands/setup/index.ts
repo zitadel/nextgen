@@ -59,6 +59,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
+import type { BoxAction } from "../../lib/box";
 import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
@@ -965,13 +966,14 @@ export default class Setup extends Promptable(BaseCommand) {
         consola.box({
           title: "Zitadel is ready",
           message: wrapForBox(
-            [renderSummary(sections), "", renderBoxActions(nextActions)].join("\n"),
+            [
+              renderSummary(sections),
+              "",
+              renderBoxActions([...nextActions, ...exploreAction(this.meta.cliVersion)]),
+            ].join("\n"),
           ),
           style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
         });
-        // After the steps that start the app and test sign-in, outside the box so
-        // the command can be copied without its border.
-        consola.log(`\n${exploreAllCommands(this.meta.cliVersion)}`);
       }
     }
 
@@ -2056,4 +2058,12 @@ export function buildSummary(opts: {
     { title: "Customize", rows: customizeRows },
     { title: "Project", rows: projectRows },
   ];
+}
+
+/** The command overview, as the last step of the summary, wherever it is drawn. */
+function exploreAction(cliVersion: string): BoxAction[] {
+  const [text = "", command] = exploreAllCommands(cliVersion)
+    .split("\n")
+    .map((line) => line.trim());
+  return command === undefined ? [] : [{ text, command }];
 }
