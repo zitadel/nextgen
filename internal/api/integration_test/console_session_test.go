@@ -163,6 +163,41 @@ func TestConsoleManagementAcceptsSession(t *testing.T) {
 		require.IsType(t, &api.RevokeReleaseConflict{}, revoked, helpers.MustMarshal(t, revoked))
 	})
 
+	t.Run("policies", func(t *testing.T) {
+		t.Parallel()
+		// The Project settings page reads the password policy and the release
+		// detail a pinned revision with the session; publishing stays with the
+		// secret. A policy is project state, so the project is this test's own.
+		owned, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+		require.NoError(t, err)
+		harness.SeedProjectAdmin(t, owned.ID, claimerID)
+		ownedID := api.ProjectID(owned.ID)
+		secret, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		harness.SetProjectSecretOnApiClient(t, secret, owned)
+		published := passwordSetPolicy(t, publishPolicy(t, secret, owned.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		listed, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{
+			ProjectID: ownedID, Operation: api.NewOptPolicyOperation(passwordSetOperation),
+		})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, listed, helpers.MustMarshal(t, listed))
+		require.Len(t, listed.(*api.ListPoliciesResponse).Policies, 1)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, &listed.(*api.ListPoliciesResponse).Policies[0]).ID)
+
+		got, err := session.GetPolicy(t.Context(), api.GetPolicyParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		assert.Equal(t, published.RevisionID, passwordSetPolicy(t, got).RevisionID)
+
+		revisions, err := session.ListPolicyRevisions(t.Context(), api.ListPolicyRevisionsParams{ProjectID: ownedID, PolicyID: published.ID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPolicyRevisionsResponse{}, revisions, helpers.MustMarshal(t, revisions))
+
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: ownedID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, revision).ID)
+	})
+
 	t.Run("origins and variables", func(t *testing.T) {
 		t.Parallel()
 		// The Project settings page adds and removes origins and reads the
@@ -765,6 +800,18 @@ func TestConsoleSessionReadsTargetProjectByID(t *testing.T) {
 		got, err := session.GetReleaseById(t.Context(), api.GetReleaseByIdParams{ProjectID: customerProjectID, ReleaseID: created.ID})
 		require.NoError(t, err)
 		require.IsType(t, &api.Release{}, got, helpers.MustMarshal(t, got))
+	})
+
+	t.Run("policy", func(t *testing.T) {
+		t.Parallel()
+		published := passwordSetPolicy(t, publishPolicy(t, customerSecret, customer.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+
+		listed, err := session.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: customerProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, listed, helpers.MustMarshal(t, listed))
+		revision, err := session.GetPolicyRevision(t.Context(), api.GetPolicyRevisionParams{ProjectID: customerProjectID, RevisionID: published.RevisionID})
+		require.NoError(t, err)
+		assert.Equal(t, published.ID, passwordSetPolicy(t, revision).ID)
 	})
 
 	t.Run("origins and variables", func(t *testing.T) {
