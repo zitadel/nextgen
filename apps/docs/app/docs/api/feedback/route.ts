@@ -11,6 +11,8 @@ export async function POST(request: Request) {
 
   // The deployment URL track() posts to is protected; it sends
   // VERCEL_AUTOMATION_BYPASS_SECRET, which the project's automation bypass sets.
+  // It reports this route's URL as the event's page, so Web Analytics' Pages
+  // shows /docs/api/feedback; the rated page is the `page` property.
   await track(feedbackEvent, feedback.data, { request });
   return new Response(null, { status: 204 });
 }
