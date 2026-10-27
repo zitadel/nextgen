@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
+import { expectedPublicCliCommand } from "../helpers/run-cli";
 import { anApp, aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
@@ -90,7 +91,7 @@ describe("origin rm", () => {
 
         const result = await app.removeOrigin("https://app.acme.com");
 
-        expect(result).toSay("zitadel origin add <url> --kind primary");
+        expect(result).toSay(expectedPublicCliCommand("origin add <url> --kind primary"));
       });
 
       it("does not warn while other origins remain", async () => {
