@@ -120,13 +120,21 @@ Canonical examples:
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 
-Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`, `OVERLINE`,
-`EYEBROW`, the panel table cells) live in `src/components/typography.ts`. A
-section's primary title is `SECTION_HEADING` (Figma `zitadel/section-heading`, 16/20),
-including `Field definitions` in user schemas and `Steps` in login flows. All primary card titles, including Project Detail, Origins and Variables and Secrets, use 16/20. A
-subordinate heading in a card body uses `SUBSECTION_HEADING` (`zitadel/subsection-heading`,
-14/20). The overline is for meta labels, table heads and drill-down breadcrumbs,
-never a section title.
+Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
+`OVERLINE`, `EYEBROW`, the panel table cells) live in
+`src/components/typography.ts`.
+
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/heading-md`): every primary card
+  and section title, the project page's Project Detail, Origins and Variables
+  and Secrets cards included. `DetailSection` renders it as an `h2`; so do
+  Field definitions, Steps, Release content and the settings sections.
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/heading-sm`): a subordinate heading
+  inside a card body, such as Sign-in methods on a schema.
+- The overline is for meta labels, table heads and drill-down breadcrumbs,
+  never a section title.
+
+The Figma style names are not the `heading-*` tokens in the exported
+`4. Custom` collection, which are the larger marketing headings.
 
 A mutation's pending and error state comes from `useSubmit`
 (`src/hooks/use-submit.ts`), and cursor paging from `useLoadMore`

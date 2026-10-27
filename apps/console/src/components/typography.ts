@@ -4,10 +4,19 @@ export const PAGE_TITLE = "text-foreground font-serif text-2xl leading-6 trackin
 /** The row every screen's title sits in (`docs/styling.md`, "Page wrapper"). */
 export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
 
-/** A card's section heading: `zitadel/section-heading`, the 16/20 display face. */
+/**
+ * A card's or section's primary title: the 16/20 display face (Figma text
+ * style `zitadel/heading-md` in the detail panel components, not the larger
+ * `heading-md` token in the exported `4. Custom` collection). Every
+ * `DetailSection` title and every top-level section on a detail or settings
+ * screen uses it.
+ */
 export const SECTION_HEADING = "text-foreground font-serif text-base leading-5";
 
-/** A heading inside a card's body, under its section heading: `zitadel/subsection-heading`, the 14/20 display face. */
+/**
+ * A subordinate heading inside a card's body, under its section title: the
+ * 14/20 display face (Figma text style `zitadel/heading-sm`).
+ */
 export const SUBSECTION_HEADING = "text-foreground font-serif text-sm leading-5";
 
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */

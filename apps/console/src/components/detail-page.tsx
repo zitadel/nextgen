@@ -34,7 +34,7 @@ export const ICON_PLATE =
 export const DETAIL_CARD = "gap-0 py-0";
 
 /**
- * A body card with a titled section: the title (`zitadel/section-heading`), an
+ * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
  * optional action beside it, an optional note under them, a rule, then
  * `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
