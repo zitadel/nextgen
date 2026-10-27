@@ -177,15 +177,16 @@ export function checkGivenCustomFlags(values: CustomFlagValues, flag: CustomFlag
 }
 
 /**
- * The provider a command line names, checked before anything else happens.
+ * The provider a command line names, with its settings checked as a whole.
  *
  * A catalog provider is just its name. A custom one is described by the
  * settings that follow it, each checked against the contract the server
- * enforces on apply. Every complaint is raised here, before a Project is read
- * or a secret asked for: being turned away after typing a credential would
- * mean typing it again. The settings are flags on purpose — a name, issuer and
- * scopes are what a script or an agent supplies, and what a person can read
- * back from their shell history.
+ * enforces on apply. Every complaint is raised here, so a caller that wants a
+ * mistake named before a secret is asked for calls it before asking: being
+ * turned away after typing a credential would mean typing it again. The
+ * settings are flags on purpose — a name, issuer and scopes are what a script
+ * or an agent supplies, and what a person can read back from their shell
+ * history.
  */
 export function selectionFromFlags(
   provider: string,

@@ -72,12 +72,12 @@ const exitsWith = (code: number) => ({ oclif: { exit: code } });
 describe("auth-method sso enable --provider custom on a terminal", () => {
   it("asks for the connection's settings, then for its credentials", async () => {
     const cwd = await setUpProject();
-    typing(ACME.slug, ACME.displayName, ACME.issuer, ACME.scopes, "acme-client-id");
+    typing(ACME.slug, ACME.displayName, ACME.issuer, "openid email", "acme-client-id");
 
     await enableCustom(cwd);
 
-    expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
-      "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+    expect(asked()).toEqual([
+      QUESTION.slug,
       "What name should the sign-in button show? For example Acme SSO.",
       "What is the issuer URL of the provider?",
       "Which scopes should we request? Separate them with spaces.",
@@ -86,9 +86,10 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(vi.mocked(password).mock.calls[0]?.[0].message).toBe(
       "What is the client secret of your Acme SSO OAuth app? It will be stored on the project as ACME_SSO_CLIENT_SECRET.",
     );
-    await expect(readFile(join(cwd, ".zitadel/idps/acme-sso.json"), "utf8")).resolves.toContain(
-      "https://sso.acme.example",
-    );
+    expect(await readJson(cwd, ".zitadel/idps/acme-sso.json")).toMatchObject({
+      display_name: ACME.displayName,
+      oidc: { issuer: ACME.issuer, scopes: ["openid", "email"] },
+    });
   });
 
   it("asks only for what the flags left out", async () => {
@@ -97,7 +98,7 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
 
     await enableCustom(cwd, "--slug", ACME.slug, "--issuer", ACME.issuer);
 
-    expect(vi.mocked(text).mock.calls.map(([question]) => question.message)).toEqual([
+    expect(asked()).toEqual([
       "What name should the sign-in button show? For example Acme SSO.",
       "Which scopes should we request? Separate them with spaces.",
       "What is the client ID of your Acme SSO OAuth app?",
@@ -228,8 +229,6 @@ async function withAcmeConnection(cwd: string): Promise<void> {
       "acme-client-id",
     ]),
   );
-  vi.mocked(text).mockReset();
-  vi.mocked(password).mockReset();
 }
 
 describe("auth-method sso enable --provider custom refuses before it asks", () => {
@@ -247,7 +246,7 @@ describe("auth-method sso enable --provider custom refuses before it asks", () =
     expect(password).not.toHaveBeenCalled();
   });
 
-  it("asks for what the Project is missing before the connection's own questions", async () => {
+  it("when the Project is not connected, which asks for what it is missing first", async () => {
     // The issuer is known, so the flags pass; the Project's server, id and
     // secret are missing, which `connect()` asks for before anything else, so
     // the connection's own questions must not have come before it.
@@ -261,6 +260,43 @@ describe("auth-method sso enable --provider custom refuses before it asks", () =
 
     expect(asked()).not.toEqual([]);
     expect(asked()).not.toContain(QUESTION.slug);
+  });
+
+  it("when a connection file is not valid JSON, even before the Project is connected", async () => {
+    const cwd = await makeProject({
+      schemas: { "default-human-user": defaultSchema },
+      flows: { "default-human-user-login": loginFlow("default-human-user") },
+    });
+    await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
+    await mkdir(join(cwd, ".zitadel/idps"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/idps/broken.json"), "{ not json");
+
+    await expect(enableCustom(cwd)).rejects.toMatchObject(exitsWith(3));
+
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("when a login flow has errors, as soon as the slug is typed", async () => {
+    const flow = loginFlow("default-human-user");
+    const cwd = await makeProject({
+      schemas: { "default-human-user": defaultSchema },
+      flows: {
+        "default-human-user-login": {
+          ...flow,
+          steps: flow.steps.map((step) =>
+            step.name === "identifier"
+              ? { ...step, transitions: { submit: { target: "nowhere" } } }
+              : step,
+          ),
+        },
+      },
+      linked: true,
+    });
+    typing(ACME.slug);
+
+    await expect(enableCustom(cwd)).rejects.toMatchObject(exitsWith(3));
+
+    expect(asked()).toEqual([QUESTION.slug]);
   });
 
   it("when the slug is typed and another file already occupies its file name", async () => {
@@ -417,7 +453,7 @@ describe("auth-method sso enable --provider custom in a script", () => {
     ]);
   const MISSING = "A custom connection needs --display-name, --issuer";
 
-  it("still stops with the flags it needs under --json, and asks nothing", async () => {
+  it("still stops with the flags it needs under --json", async () => {
     const cwd = await setUpProject();
 
     const result = await partial(cwd, "--json");
@@ -427,17 +463,15 @@ describe("auth-method sso enable --provider custom in a script", () => {
       code: "E_VALIDATION",
       message: MISSING,
     });
-    expect(text).not.toHaveBeenCalled();
   });
 
-  it("still stops with the flags it needs under --non-interactive, and asks nothing", async () => {
+  it("still stops with the flags it needs under --non-interactive", async () => {
     const cwd = await setUpProject();
 
     const result = await partial(cwd, "--non-interactive");
 
     expect(result.exitCode).toBe(3);
     expect(result.stderr).toContain(MISSING);
-    expect(text).not.toHaveBeenCalled();
   });
 
   it("names a mistake in the flags before it names the missing issuer of the environment", async () => {

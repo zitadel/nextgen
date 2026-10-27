@@ -152,10 +152,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     });
     const { issuer } = project;
     const connections = await readConnectionFiles(cwd);
-    // Before dry-run and before the first question, `connect()`'s included: a
-    // Project whose flows all name another schema, or whose schema or flow was
-    // edited by hand where the editors write, must fail identically whether or
-    // not anything was asked.
+    // Before dry-run and before the first question, including the ones
+    // `connect()` asks: a Project whose flows all name another schema, or whose
+    // schema or flow was edited by hand where the editors write, must fail
+    // identically whether or not anything was asked.
     const flows = targetFlows(schema, candidates);
     // Resolved before anything else is asked for: being turned away after
     // typing a secret would mean typing it again.
@@ -175,9 +175,9 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       );
       return edits;
     };
-    // A custom provider's settings are asked here, so every check that can fail
-    // has passed except the ones that need an answer, and those run the moment
-    // the answer that decides them is given (see `askCustomSettings`).
+    // A custom provider's settings are asked here, after the checks on the
+    // Project; the ones that need an answer run the moment the answer that
+    // decides them is given (see `askCustomSettings`).
     const selection =
       project.selection ??
       selectionFromFlags(
@@ -562,7 +562,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * given, in the order that lets each answer decide what comes next. The slug
    * comes first because it decides the most: it names the file the connection
    * is kept in, so everything that depends on the slug alone is checked the
-   * moment it is typed (`beforeAsking`), and a connection that already exists
+   * moment it is typed (`checkCustomSlug`, then `beforeAsking`), and a connection that already exists
    * answers the rest from its file. A given value goes through the same parser
    * as a typed one, and the ones given on the command line were checked under
    * their flag before this ran (`checkGivenCustomFlags`).
