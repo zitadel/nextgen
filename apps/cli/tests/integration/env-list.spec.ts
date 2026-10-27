@@ -96,13 +96,13 @@ describe("env list", () => {
         expect(result).toPrint("Resolved now: development");
       });
 
-      it("points at env add when nothing is bound", async () => {
+      it("resolves nothing to report when nothing is bound", async () => {
         const app = await aSetUpApp();
         await app.deleteProjectFile(".env.development.local");
 
         const result = await onATerminal(() => app.run(["env", "list"]));
 
-        expect(result).toPrint("zitadel env add");
+        expect(result).not.toPrint("Resolved now");
       });
     });
   });

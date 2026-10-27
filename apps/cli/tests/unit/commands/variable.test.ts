@@ -223,7 +223,18 @@ describe("variable list", () => {
 
     const res = await asTerminal(() => runCliForTest(["variable", "list", ...plainArgs(cwd)]));
 
-    expect(res.stdout).toContain("No variables on the project.");
+    expect(res.stdout).toContain("No variables found");
+  });
+
+  it("says nothing was found in the same words when --preview holds none", async () => {
+    const cwd = await makeProject();
+    server.use(http.get("*/variables", () => HttpResponse.json({})));
+
+    const res = await asTerminal(() =>
+      runCliForTest(["variable", "list", "--preview", ...plainArgs(cwd)]),
+    );
+
+    expect(res.stdout).toContain("No variables found");
   });
 
   it("refuses to guess a server when nothing names one", async () => {

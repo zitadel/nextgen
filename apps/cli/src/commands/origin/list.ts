@@ -48,7 +48,6 @@ export default class OriginList extends EnvironmentCommand {
       pretty: renderList(COLUMNS, origins, {
         plain,
         singular: "origin",
-        empty: "No origins on the project.",
       }),
     });
   }

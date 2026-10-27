@@ -181,8 +181,8 @@ describe("asker", () => {
       const validate = vi.mocked(text).mock.calls[0]?.[0]?.validate as
         | ((value: string | undefined) => string | undefined)
         | undefined;
-      expect(validate?.("")).toBe("Enter the client id.");
-      expect(validate?.(undefined)).toBe("Enter the client id.");
+      expect(validate?.("")).toBe("The client id is empty.");
+      expect(validate?.(undefined)).toBe("The client id is empty.");
       expect(validate?.("x")).toBeUndefined();
     });
 

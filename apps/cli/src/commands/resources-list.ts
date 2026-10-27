@@ -63,7 +63,6 @@ export default class ResourcesList extends BaseCommand {
       pretty: renderList(COLUMNS, rows, {
         plain,
         singular: "resource",
-        empty: "No resources.",
         footer: [`Run \`${this.config.bin} <resource> <verb> --help\` for a command's flags.`],
       }),
     });

@@ -227,7 +227,6 @@ describe("the CLI names itself once in human output", () => {
     "commands/api/ls.ts",
     "commands/deployment/rollback.ts",
     "commands/env/index.ts",
-    "commands/env/list.ts",
     "commands/logs.ts",
     "commands/release/create.ts",
     "commands/reset.ts",

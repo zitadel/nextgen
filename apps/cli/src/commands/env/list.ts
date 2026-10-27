@@ -67,7 +67,6 @@ export default class EnvList extends EnvironmentCommand {
         {
           plain,
           singular: "environment",
-          empty: "No environments are bound here. Run `zitadel env add <name>` to bind one.",
           footer: [`Resolved now: ${name.value} (from ${name.source})`],
         },
       ),
