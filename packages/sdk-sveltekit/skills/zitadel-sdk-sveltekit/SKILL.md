@@ -3,7 +3,7 @@ name: zitadel-sdk-sveltekit
 description: >-
   Integrate Zitadel authentication into an existing or custom SvelteKit app with
   @zitadel/sdk-sveltekit. Use when the user wants login, logout, session
-  handling, or protected routes in a SvelteKit 2 or 3 app and is wiring the SDK
+  handling, or protected routes in a SvelteKit 3 app and is wiring the SDK
   by hand rather than letting the CLI scaffold a fresh project — adding the
   `handle` hook, reading auth state in a load function, or rendering the
   `ZitadelLogin` / `ZitadelSession` widgets.
@@ -39,7 +39,8 @@ Peer deps: `@sveltejs/kit ^3.0.0`, `svelte ^5.0.0`.
 
 **1. Server hook.** Declare the settings in `src/env.ts` (SvelteKit 3), so
 SvelteKit serves them from the server-only `$app/env/private` — from
-`.env.local` in dev, from the platform in production:
+`.env.local` in dev, from the platform in production. An app that already
+has `src/env.ts` adds the three entries to its own `defineEnvVars` call:
 
 ```ts
 import { defineEnvVars } from '@sveltejs/kit/env';

@@ -8,31 +8,11 @@ import { PROXY_PATH } from "../proxy";
 const WIDGET_WRAP = "position:fixed;inset:0;overflow:auto;background:#0f0f11;color-scheme:dark";
 
 /**
- * `src/env.ts` — declares the three server-only settings the hook passes to
- * `createNextgenHandle`, so SvelteKit 3 serves them from `$app/env/private`:
- * from `.env.local` in dev and from the platform's environment in production.
- * A missing one fails each request with an error naming it, rather than the hook
- * falling back to a default backend, and SvelteKit refuses to bundle them for
- * the browser.
- */
-export function envTemplate(): string {
-  return `${MANAGED_MARKER}
-import { defineEnvVars } from "@sveltejs/kit/env";
-
-export const variables = defineEnvVars({
-  ZITADEL_URL: { description: "The Zitadel server the hook proxies /__nextgen to." },
-  ZITADEL_PROJECT_SECRET: { description: "The project's service key, sent on the session exchange only." },
-  ZITADEL_PROJECT_ID: { description: "The project whose sessions count as signed in." },
-});
-`;
-}
-
-/**
  * `src/hooks.server.ts` — the SvelteKit server hook. `createNextgenHandle`
  * proxies `/__nextgen/*` to the auth backend (attaching the project service-key
  * from `ZITADEL_PROJECT_SECRET`), verifies the session JWT, and redirects
  * unauthenticated requests away from protected routes. The settings come from
- * `$app/env/private`, which `src/env.ts` declares, so the hook names no Node
+ * `$app/env/private`, declared in `src/env.ts` (see `envVarsEdit`), so the hook names no Node
  * global an app without `@types/node` cannot type-check. The managed marker
  * sits in a JS comment.
  */
@@ -103,11 +83,8 @@ export function indexPageTemplate(): string {
  * project handle.
  *
  * The public project id comes from `VITE_ZITADEL_PROJECT_ID` through Vite's
- * `import.meta.env`, which SvelteKit 2 and 3 both expose to the browser, rather
- * than from an `$env` module: those moved between the majors
- * (`$env/static/public` is deprecated in SvelteKit 3 for `$app/env/public`), so a
- * single template could not import them on both. Setup seeds the variable in
- * `.env.local`, as it does for the other Vite-based frameworks.
+ * `import.meta.env`, which SvelteKit exposes to the browser. Setup seeds the
+ * variable in `.env.local`, as it does for the other Vite-based frameworks.
  *
  * Projects set up with the business use case additionally pass the SDK's
  * `businessLocales` overlay to the widget, restoring work-email copy on top of

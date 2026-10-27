@@ -11,8 +11,11 @@ from `@zitadel/sdk-svelte`, which is written with runes); older versions are ref
 
 - `src/hooks.server.ts` — the server hook (infrastructure): proxies `/__nextgen/*`,
   verifies the session, and redirects unauthenticated requests for `/profile` to `/login`
-- `src/env.ts` — declares `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET` and `ZITADEL_PROJECT_ID`
-  for `$app/env/private` (infrastructure: the hook cannot read its settings without it)
+- `src/env.ts` (or an existing `src/env.js`) — declares `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`
+  and `ZITADEL_PROJECT_ID` for `$app/env/private`: written where the app has none, and
+  merged into the app's own `defineEnvVars({ ... })` call otherwise. Unmarked, since the
+  app declares its own variables there too; doctor checks the three entries as
+  infrastructure wiring, and eject lists them as a manual cleanup step
 - `src/routes/+layout.svelte` — dark surface for every page
 - `src/routes/+page.svelte`, `src/routes/login/+page.svelte`,
   `src/routes/register/+page.svelte`, `src/routes/profile/+page.svelte` — landing and

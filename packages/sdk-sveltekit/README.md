@@ -21,7 +21,8 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 Declare the three server-only settings in `src/env.ts`, so SvelteKit 3 serves
 them from `$app/env/private`: from `.env.local` in dev, and from the platform's
 environment in production. A missing one fails each request with an error naming it, and SvelteKit never
-bundles them for the browser:
+bundles them for the browser. An app that already has `src/env.ts` adds the
+three entries to its own `defineEnvVars` call:
 
 ```ts
 import { defineEnvVars } from '@sveltejs/kit/env';
@@ -154,12 +155,12 @@ pnpm add @zitadel/sdk-svelte@latest
 
 The widget mounts on the client only: its config is set as element properties,
 which server-rendered markup cannot carry, so it is created in the browser with
-its config in place. `onMount` never runs during SSR, and works
-on SvelteKit 2 and 3 alike (`$app/environment` is deprecated in SvelteKit 3).
+its config in place. `onMount` never runs during SSR, unlike the deprecated
+`$app/environment` check, which warns on every dev render.
 
 To read the project id from the environment, use Vite's
-`import.meta.env.VITE_ZITADEL_PROJECT_ID`, which both SvelteKit majors expose to
-the browser (`zitadel setup` seeds it in `.env.local`).
+`import.meta.env.VITE_ZITADEL_PROJECT_ID`, which SvelteKit exposes to the
+browser (`zitadel setup` seeds it in `.env.local`).
 
 `ZitadelSession` renders the signed-in "signed in as" card with a sign-out
 button, and `ZitadelLogout` a sign-out control on its own. Mount them the same

@@ -11,7 +11,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the server. The login and logout widgets come from the [Svelte SDK](/docs/sdks/svelte).
 
 <Callout title="Generated setup" type="info">
-  The CLI writes `src/hooks.server.ts`, `src/env.ts` and the auth pages, and writes the backend URL, the project secret, and the project id to `.env.local`. It needs SvelteKit 3.
+  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project id to `.env.local`. It needs SvelteKit 3.
 </Callout>
 
 ## Install
@@ -56,7 +56,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Declare the hook's settings in `src/env.ts`, so SvelteKit serves them from the server-only `$app/env/private`: from `.env.local` in development and from the platform's environment in production. A missing one fails each request with an error naming it, and SvelteKit never bundles them for the browser:
+    Declare the hook's settings in `src/env.ts`, so SvelteKit serves them from the server-only `$app/env/private`: from `.env.local` in development and from the platform's environment in production. A missing one fails each request with an error naming it, and SvelteKit never bundles them for the browser. If the app already has `src/env.ts`, add the three entries to its `defineEnvVars` call:
 
     ```ts
     import { defineEnvVars } from "@sveltejs/kit/env";

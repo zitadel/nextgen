@@ -41,7 +41,13 @@ describe("SvelteKitPatcher.plan", () => {
     expect(writeContents(plan, "src/hooks.server.ts")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("@zitadel/sdk-sveltekit/server");
     expect(writeContents(plan, "src/hooks.server.ts")).toContain("createNextgenHandle");
-    expect(writeContents(plan, "src/env.ts")).toContain("defineEnvVars");
+    const envEdit = plan.ops.find(
+      (op): op is Extract<FileOp, { kind: "edit" }> =>
+        op.kind === "edit" && Array.isArray(op.path) && op.path[0] === "src/env.ts",
+    );
+    expect(envEdit?.path).toEqual(["src/env.ts", "src/env.js"]);
+    expect(envEdit?.wiring).toBe("infrastructure");
+    expect(envEdit?.edit(undefined)).toContain("defineEnvVars");
 
     expect(writeContents(plan, "src/routes/+layout.svelte")).toContain(MANAGED_MARKER);
     expect(writeContents(plan, "src/routes/+page.svelte")).toContain(MANAGED_MARKER);
@@ -73,8 +79,8 @@ describe("SvelteKitPatcher.plan", () => {
     "src/routes/profile/+page.svelte",
   ];
 
-  // The widget must mount on the client only. onMount works on SvelteKit 2 and
-  // 3, where `$app/environment` is deprecated and warns on every dev render.
+  // The widget must mount on the client only. onMount does, unlike
+  // `$app/environment`, which is deprecated and warns on every dev render.
   it.each(widgetPages)("mounts the widget in %s only after onMount", (path) => {
     expect(writeContents(new SvelteKitPatcher().plan(ctx()), path)).toMatch(
       /let mounted = \$state\(false\);\s+onMount\(\(\) => \{\s+mounted = true;\s+\}\);[\s\S]*\{#if mounted\}/,
@@ -87,7 +93,7 @@ describe("SvelteKitPatcher.plan", () => {
     );
   });
 
-  it("seeds the public project id and edits no config but the dev script", () => {
+  it("seeds the public project id and edits no config but the env declarations and the dev script", () => {
     const plan = new SvelteKitPatcher().plan(ctx());
     const envOp = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
@@ -97,7 +103,7 @@ describe("SvelteKitPatcher.plan", () => {
     );
     expect(envOp?.entries).toMatchObject({ VITE_ZITADEL_PROJECT_ID: "proj-1" });
     // baseOps adds AGENTS.md/README.md guidance edits to every plan; beyond
-    // those the only config edit is the dev script's port.
+    // those the config edits are the env declarations and the dev script's port.
     expect(
       plan.ops
         .filter(
@@ -105,7 +111,7 @@ describe("SvelteKitPatcher.plan", () => {
             op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
         )
         .map((op) => op.path),
-    ).toEqual(["package.json"]);
+    ).toEqual([["src/env.ts", "src/env.js"], "package.json"]);
   });
 
   it("adds the server SDK + the Svelte component lib at the CLI's exact version", () => {
@@ -174,16 +180,18 @@ describe("SvelteKitPatcher.plan", () => {
 });
 
 describe("SvelteKitPatcher.artifacts", () => {
-  it("lists the routes + hook as managed, the SDK as a dependency, no config edits", () => {
+  it("lists the routes + hook as managed, the SDK as a dependency, the env declarations as a config edit", () => {
     const artifacts = new SvelteKitPatcher().artifacts({
       framework: { id: "sveltekit", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
       rendererId: "svelte",
     });
     expect(artifacts.markedFiles).toContain("src/hooks.server.ts");
-    expect(artifacts.fileClasses?.["src/env.ts"]).toBe("infrastructure");
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
+    // The app declares its own env variables in src/env.ts too, so eject
+    // must not delete it.
+    expect(artifacts.markedFiles).not.toContain("src/env.ts");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
-    expect(artifacts.configEdits).toEqual(["package.json"]);
+    expect(artifacts.configEdits).toEqual(["package.json", "src/env.*"]);
   });
 
   it("declares the app shell and landing page as conditionally scaffolded", () => {
