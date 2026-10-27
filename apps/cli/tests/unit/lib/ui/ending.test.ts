@@ -146,11 +146,26 @@ describe("what a long failure looks like under its closing line", () => {
     expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 
-  it("still leaves a table's rows whole", () => {
-    const row = "development  .env.development.local  http://mock.zitadel.test  proj-1  yes";
+  // Outside a frame nothing is widened by a wide line, so a table the command
+  // was asked for keeps its columns however wide they are.
+  it("still leaves a table's rows whole, past the width prose obeys", () => {
+    const rows = [
+      "name         source                  server                    project_id  resolved",
+      "development  .env.development.local  http://mock.zitadel.test  proj-1      yes",
+    ];
 
-    const below = plain(ending({ lines: [row] }).render());
+    const below = plain(ending({ lines: rows }).render());
 
-    expect(below).toContain(row);
+    for (const row of rows) {
+      expect(below).toContain(row);
+    }
+  });
+
+  it("folds a sentence that holds a double space, which no table is aligned to", () => {
+    const sentence = `Project proj-1  lifecycle=configured  issuer=https://${"sub.".repeat(10)}example.com`;
+
+    const below = plain(ending({ lines: [sentence] }).render());
+
+    expect(Math.max(...below.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 });

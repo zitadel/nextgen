@@ -163,22 +163,28 @@ export class Progress {
   private static draw(lines: readonly Line[]): void {
     const width = Math.max(0, ...lines.map((entry) => entry.verb.length));
     for (const { mark, verb, subject } of lines) {
-      Progress.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`);
+      Progress.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`, true);
     }
   }
 
-  /** Writes one line under a result, in the chain's gutter. */
-  private static detail(text: string): void {
-    Progress.line(GUIDE, text);
+  /**
+   * Writes one line under a result, in the chain's gutter. {@link draw} draws
+   * its rows one at a time and says so, since a row on its own has nothing to
+   * line up with; what a caller reported through {@link Step.detail} is a
+   * sentence and folds like one.
+   */
+  private static detail(text: string, columns = false): void {
+    Progress.line(GUIDE, text, columns);
   }
 
   /**
    * One line in the chain, wrapped to what the gutter leaves of the terminal.
    * A step names whatever it did — a sentence and a path, say — so without
-   * this a long one runs past the chain instead of folding under it. A line
-   * already laid out in columns is left whole by {@link Prose}.
+   * this a long one runs past the chain instead of folding under it. A caller
+   * drawing a row of a column layout passes `columns`, and {@link Prose}
+   * leaves it whole.
    */
-  private static line(symbol: string, text: string): void {
-    log.message(new Prose(text, WIDTH - GUTTER).render(), { symbol, spacing: 0 });
+  private static line(symbol: string, text: string, columns = false): void {
+    log.message(new Prose(text, WIDTH - GUTTER, columns).render(), { symbol, spacing: 0 });
   }
 }

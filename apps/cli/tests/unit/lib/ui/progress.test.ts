@@ -78,6 +78,19 @@ describe("Progress", () => {
       ]);
     });
 
+    // Reported rows are a column layout this builds itself, so a long subject
+    // keeps its row whole rather than folding the verb out of its column.
+    it("leaves a reported row whole, however long its subject", async () => {
+      const subject =
+        ".zitadel/schemas/default-human-user.json and .zitadel/flows/default-login.json";
+
+      await new Progress(chain(true)).run("Writing", async (report) => {
+        report.done("Wrote", subject);
+      });
+
+      expect(drawn().slice(1)).toEqual([`│   Wrote  ${subject}`]);
+    });
+
     it("says the step failed and lets the error through", async () => {
       const boom = new Error("boom");
 
@@ -151,18 +164,6 @@ describe("Progress", () => {
 
       expect(drawn()).toEqual([
         "✔ Moved the app from http://localhost:3000 to http://localhost:4000, and told\nthe project about it",
-      ]);
-    });
-
-    it("leaves a line already laid out in columns whole", () => {
-      const step = new Progress(chain(true)).begin("Writing");
-      step.detail(
-        "Wrote    .zitadel/schemas/default-human-user.json and .zitadel/flows/default-login.json",
-      );
-      step.done("Wrote 2 files");
-
-      expect(drawn().slice(1)).toEqual([
-        "│ Wrote    .zitadel/schemas/default-human-user.json and .zitadel/flows/default-login.json",
       ]);
     });
 

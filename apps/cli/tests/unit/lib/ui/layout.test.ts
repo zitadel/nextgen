@@ -34,9 +34,43 @@ describe("Prose", () => {
     expect(rest.every((line) => line.startsWith("  ") && line.trim() !== "")).toBe(true);
   });
 
-  it("leaves a line laid out in columns whole, however long", () => {
-    const row = "users             list, get, create, update, delete      created_at, id, schema";
-    expect(new Prose(row, 20).render()).toBe(row);
+  it("leaves a table's rows whole, however long, because their gaps line up", () => {
+    const table = [
+      "topic   verbs                              filters",
+      "users   list, get, create, update, delete   created_at, id, schema",
+      "teams   list, get, create, update           created_at, name, status",
+    ].join("\n");
+
+    expect(new Prose(table, 20).render()).toBe(table);
+  });
+
+  // The whole bug: a label and three `key=value` pairs joined by two spaces is
+  // not a table, and nothing was aligned to it, so it ran off the screen as
+  // one unbroken line. A stray double space after a full stop did the same.
+  it("wraps a sentence that happens to hold a double space", () => {
+    const sentence = "Project proj-1  lifecycle=configured  issuer=https://auth.example.com";
+
+    expect(new Prose(sentence, 30).render().split("\n").length).toBeGreaterThan(1);
+  });
+
+  it("wraps a line that lines up with nothing above or below it", () => {
+    const text = ["Done.  Everything that was asked for has been written.", "And then some."].join(
+      "\n",
+    );
+
+    expect(new Prose(text, 30).render().split("\n").length).toBeGreaterThan(2);
+  });
+
+  it("leaves a row whole when the caller says it is building columns", () => {
+    const row = "Wrote    .zitadel/schemas/default-human-user.json and .zitadel/flows/login.json";
+
+    expect(new Prose(row, 20, true).render()).toBe(row);
+  });
+
+  it("folds even an aligned table when the caller says there are no columns", () => {
+    const table = ["a   one of the values", "b   another of the values"].join("\n");
+
+    expect(new Prose(table, 10, false).render()).not.toBe(table);
   });
 });
 
@@ -93,6 +127,36 @@ describe("Frame", () => {
     ).render();
 
     expect(widest(box)).toBeLessThanOrEqual(WIDTH);
+  });
+
+  // A frame sizes itself to its content, so anything left unwrapped inside one
+  // widens it. `zitadel status` drew a 93-column box this way, out of one line
+  // that held two spaces.
+  it("never widens for a table it is handed", () => {
+    const box = new Frame(
+      "Summary",
+      [
+        "name         source                  server                       resolved",
+        "development  .env.development.local  https://api.zitadel.cloud    yes",
+      ],
+      [],
+    ).render();
+
+    expect(widest(box)).toBe(WIDTH);
+  });
+
+  it("never widens for a step whose sentence holds a double space", () => {
+    const box = new Frame(
+      "Summary",
+      [],
+      [
+        {
+          text: `Project proj-1  lifecycle=configured  issuer=https://${"sub.".repeat(8)}example.com`,
+        },
+      ],
+    ).render();
+
+    expect(widest(box)).toBe(WIDTH);
   });
 
   it("keeps a command longer than the box whole, so it can still be copied", () => {

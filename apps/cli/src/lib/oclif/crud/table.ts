@@ -1,4 +1,12 @@
 import { isObject } from "../../json";
+import { COLUMN_GAP } from "../../ui/layout";
+
+/**
+ * What separates two cells. Taken from the layout rather than written here, so
+ * a row this builds is a row the layout recognises as columns and leaves whole
+ * instead of folding it like a sentence.
+ */
+const GAP = " ".repeat(COLUMN_GAP);
 
 /**
  * The machine form of a list: one record per line, fields separated by tabs,
@@ -33,7 +41,7 @@ export const renderTable = (columns: readonly string[], items: readonly unknown[
   const line = (cells: readonly string[]): string =>
     cells
       .map((cell, i) => cell.padEnd(widths[i] ?? 0))
-      .join("  ")
+      .join(GAP)
       .trimEnd();
   return [line(headers), line(widths.map((width) => "-".repeat(width))), ...rows.map(line)].join(
     "\n",
@@ -95,6 +103,6 @@ export const renderDetail = (
     .map((field) => [field.split(".").at(-1) ?? field, readCell(field, item)] as const)
     .filter(([, value]) => value !== "");
   const width = Math.max(0, ...rows.map(([label]) => label.length));
-  const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`);
+  const body = rows.map(([label, value]) => `${label.padEnd(width)}${GAP}${value}`);
   return [...(heading ? [heading, ""] : []), ...body].join("\n");
 };
