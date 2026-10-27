@@ -120,9 +120,7 @@ describe("Ending", () => {
     });
 
     it("drops the blank lines a command's own rendering left at either end", () => {
-      const below = plain(ending({ lines: ["", "a table", ""] }).render());
-
-      expect(below).not.toMatch(/╮\n[^\n]*\n\s*│\s*\n/);
+      expect(plain(ending({ lines: ["", "a table", ""] }).render())).toBe("   a table\n");
     });
 
     it("titles the box as the command asked", () => {

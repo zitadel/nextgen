@@ -158,12 +158,16 @@ describe("Ui", () => {
       );
     });
 
-    it("keeps it out of a command that has no summary to put it in", () => {
+    // A command that only answers says the same fact in the footer's own
+    // words. Grepping for the box's wording here asserts nothing: only the
+    // boxed renderer ever writes "Using".
+    it("says it in the footer's words for a command that drew no box", () => {
       const ui = watched();
       ui.ranAgainst("proj-1", "api.zitadel.cloud");
       ui.finish({ title: "Removed the origin", sections: [] });
 
-      expect(printed()).not.toContain("Using project proj-1");
+      expect(printed()).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
+      expect(printed()).not.toContain("Using");
     });
 
     it("hands out a spinner that draws nothing when nobody is watching", () => {

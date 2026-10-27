@@ -102,7 +102,7 @@ describe("zitadel api for an operation that needs no credential", () => {
 });
 
 describe("zitadel api, rendered for a terminal", () => {
-  it("keeps where it ran out of output that is only the response", async () => {
+  it("answers with the response and one footer, drawing no box", async () => {
     const cwd = await makeProject({ linked: true });
     const drawn: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
@@ -117,8 +117,12 @@ describe("zitadel api, rendered for a terminal", () => {
       config,
     );
 
-    // Where a command ran belongs to its summary, and a call that answers with
-    // a response has no summary to put it in.
-    expect(stripAnsi(drawn.join(""))).not.toContain("Using project");
+    // A call that answers is drawn like every other answer: the response at
+    // the margin and one footer line, with no chain and no box around it.
+    // Asserting on the box's wording here would pass however it is drawn.
+    const shown = stripAnsi(drawn.join(""));
+    expect(shown).not.toContain("╭");
+    expect(shown).not.toContain("┌");
+    expect(shown).toContain("project proj_01TEST");
   });
 });

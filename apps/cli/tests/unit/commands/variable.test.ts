@@ -263,9 +263,12 @@ describe("variable list", () => {
 
     expect(piped.exitCode).toBe(0);
     expect(piped.stdout.trim()).toBe("A\tb\t-");
-    // A listing is the answer: no summary, so nothing about where it ran.
+    // A listing is the answer: the table at the margin, then one footer
+    // line. No chain and no box, but the footer does name where it ran.
     expect(terminal.stdout).toContain("A");
-    expect(terminal.stdout).not.toContain("Using project");
+    expect(terminal.stdout).not.toContain("╭");
+    expect(terminal.stdout).not.toContain("┌");
+    expect(terminal.stdout).toMatch(/Found 1 variable · project /);
   });
 
   it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {

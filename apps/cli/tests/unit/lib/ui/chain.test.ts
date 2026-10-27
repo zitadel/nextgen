@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@clack/prompts", async () => (await import("../../../helpers/clack")).clackDouble());
 
-import { intro, note, outro } from "@clack/prompts";
+import { intro, log, note, outro } from "@clack/prompts";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
@@ -71,13 +71,14 @@ describe("Chain", () => {
     expect(printed()).not.toContain("╭");
   });
 
-  it("keeps where it ran out of a command that has no summary to put it in", () => {
+  it("names where it ran in the footer's words when it drew no box", () => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.ranAgainst("proj-1", "api.zitadel.cloud");
     chain.finish({ title: "Removed the origin", sections: [] });
 
-    expect(printed()).not.toContain("Using project proj-1");
+    expect(printed()).toContain("Removed the origin · project proj-1 on api.zitadel.cloud");
+    expect(printed()).not.toContain("Using");
     expect(printed()).not.toContain("╭");
   });
 
@@ -103,7 +104,8 @@ describe("Chain", () => {
     chain.describe("Enabling single sign-on");
     chain.note("Register an app", ["x ".repeat(120).trim()]);
 
-    const [body] = vi.mocked(note).mock.calls[0] ?? [];
+    expect(note).toHaveBeenCalledOnce();
+    const [body] = vi.mocked(note).mock.calls[0] ?? [""];
     expect(
       Math.max(
         ...String(body)
@@ -154,18 +156,31 @@ describe("Chain", () => {
     expect(outro).not.toHaveBeenCalled();
   });
 
+  // Read off `log.message`, not stdout: the clack double writes nothing, so
+  // asserting on what was written passes however wide the line is.
   it("wraps a bridged line, which obeys no width of its own", () => {
     const chain = watching();
     chain.describe("Listing variables");
 
     chain.narrate("!", `a warning ${"that keeps going ".repeat(12)}`);
 
+    expect(log.message).toHaveBeenCalledOnce();
+    const [drawn] = vi.mocked(log.message).mock.calls[0] ?? [""];
     expect(
       Math.max(
-        ...printed()
+        ...String(drawn)
           .split("\n")
           .map((line) => line.length),
       ),
-    ).toBeLessThanOrEqual(80);
+    ).toBeLessThanOrEqual(80 - 3);
+  });
+
+  it("leaves a bridged line that already fits on one line", () => {
+    const chain = watching();
+    chain.describe("Listing variables");
+
+    chain.narrate("!", "a short warning");
+
+    expect(vi.mocked(log.message).mock.calls[0]?.[0]).toBe("a short warning");
   });
 });
