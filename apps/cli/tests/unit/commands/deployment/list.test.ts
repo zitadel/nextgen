@@ -73,7 +73,7 @@ describe("deployment list", () => {
     const res = await listed(cwd);
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("No deployments found.");
+    expect(res.stdout).toContain("No deployments found ·");
   });
 
   it("counts what it found in the same words every other list counts in", async () => {

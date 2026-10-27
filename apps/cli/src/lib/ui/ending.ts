@@ -50,7 +50,7 @@ export class Ending {
    * A failure says so in red above what it has to say, rather than in the
    * footer: the footer is dim and unmarked, which is right for an answer and
    * wrong for an error — it would make `Error E_NOT_FOUND: …` read exactly
-   * like `No variables on the project`. It is folded to the same width as
+   * like `No variables found`. It is folded to the same width as
    * everything else, which a server message pasted into it needs most of all,
    * and it keeps the dim place footer: which project, on which server, is
    * what a run that failed against the wrong one is read for.

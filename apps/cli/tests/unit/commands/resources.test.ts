@@ -352,9 +352,11 @@ describe("users list", () => {
         runCliForTest([...argv, "--cwd", cwd, "--server", SERVER, "--non-interactive"]),
       );
 
-    expect((await bare(["users", "list"])).stdout).toContain("No users found.");
+    // The sentence closes the run, so it is a clause beside the place it ran
+    // in — `No users found · project proj_test on …` — and carries no stop.
+    expect((await bare(["users", "list"])).stdout).toContain("No users found ·");
     expect((await bare(["idps", "list"])).stdout).toContain(
-      "No identity provider connections found.",
+      "No identity provider connections found ·",
     );
   });
 

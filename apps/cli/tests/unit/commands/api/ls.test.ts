@@ -12,7 +12,8 @@ describe("zitadel api ls", () => {
     const res = await listed("sessions");
 
     expect(res.exitCode).toBe(0);
-    expect(stripAnsi(res.stdout)).toMatch(/^\d+ operations$/m);
+    // The count closes the run, so it is the clause the ending makes of it.
+    expect(stripAnsi(res.stdout)).toMatch(/^Found \d+ operations$/m);
   });
 
   it("ends on one short line rather than a paragraph of its own", async () => {
@@ -32,7 +33,7 @@ describe("zitadel api ls", () => {
 
     expect(res.exitCode).toBe(0);
     const shown = stripAnsi(res.stdout);
-    expect(shown).toContain("No operations found.");
+    expect(shown).toContain("No operations found");
     expect(shown).not.toMatch(/^id {2,}method/m);
   });
 

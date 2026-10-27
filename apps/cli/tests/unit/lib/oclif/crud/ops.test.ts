@@ -345,7 +345,7 @@ describe("list rendering", () => {
   it("says the one derived sentence when a generated list finds nothing", async () => {
     const none: ListSpec<Ctx> = { items: "rows", call: async () => ({ rows: [] }) };
 
-    expect(await printed(none, "flow-definitions")).toContain("No flow definitions found.");
+    expect(await printed(none, "flow-definitions")).toContain("No flow definitions found");
   });
 });
 

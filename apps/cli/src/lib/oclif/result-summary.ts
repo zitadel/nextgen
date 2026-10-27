@@ -15,6 +15,8 @@ const RUN_NEXT = "Run next:";
 /**
  * Turns the label-like headlines commands print into the sentence the chain
  * closes on. `1 variable` is a count, `GREETING` the name of what was read.
+ * The `id` is the command's, which is what tells a bare identifier from a
+ * heading that already says something.
  */
 function sentence(id: string | undefined, title: string): string {
   const count = /^(\d+) (.+)$/.exec(title);
@@ -38,7 +40,13 @@ function sentence(id: string | undefined, title: string): string {
   if (cancelled !== null) {
     return CANCELLED;
   }
-  if (id === "variable:get" && /^[A-Za-z0-9_.-]+$/.test(title)) {
+  // Every `get` heads its record with whatever identifies it, which is a name
+  // or an id and not a clause. Left as it was, the line a `get` closes on read
+  // as two identifiers and a host with no verb — `dep_04056e61f213 · project
+  // proj-250… on localhost` — so each one says what it did, in the same word.
+  // The guard keeps it off anything already shaped like a sentence; an email
+  // heads `users get` and is an identifier, so it is let through.
+  if (id?.endsWith(":get") === true && /^[A-Za-z0-9_.@-]+$/.test(title)) {
     return `Read ${title}`;
   }
   return title;

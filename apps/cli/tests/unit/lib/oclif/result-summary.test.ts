@@ -15,6 +15,26 @@ describe("summaryOfText", () => {
     );
   });
 
+  // A `get` heads its record with whatever identifies it, so without this the
+  // line it closes on is two identifiers and a host with no verb.
+  it.each([
+    ["variable:get", "GREETING"],
+    ["deployment:get", "dep_04056e61f213"],
+    ["users:get", "ada@example.com"],
+  ])("says what %s did, rather than naming what it read and nothing more", (id, heading) => {
+    expect(summaryOfText(heading, false, false, id).title).toBe(`Read ${heading}`);
+  });
+
+  it("leaves a get's heading alone when it is already a sentence", () => {
+    expect(summaryOfText("Set GREETING on the project", false, false, "variable:get").title).toBe(
+      "Set GREETING on the project",
+    );
+  });
+
+  it("says nothing of the kind for a command that is not a get", () => {
+    expect(summaryOfText("GREETING", false, false, "variable:set").title).toBe("GREETING");
+  });
+
   it("turns a bare count into a sentence", () => {
     expect(summaryOfText("1 variable").title).toBe("Found 1 variable");
   });
