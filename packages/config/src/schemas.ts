@@ -38,6 +38,13 @@ export const policyConfigSchema = z.strictObject({
   config: z.strictObject(PublishPolicyBody.shape.config.shape),
 });
 
+/**
+ * The minimum password length NIST SP 800-63B-4 sets for a password that is
+ * the only factor. `setup` writes it when given none, and the console warns
+ * on a policy under it.
+ */
+export const RECOMMENDED_PASSWORD_MIN_LENGTH = 15;
+
 /** The wire shape of a branding revision (`POST /branding` request body). */
 export const brandingWireSchema = CreateBrandingBody;
 

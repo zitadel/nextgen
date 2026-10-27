@@ -18,7 +18,7 @@ import {
   publishPolicyBodyOneConfigMinLengthMax,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import type { PublishPolicyBody } from "@zitadel/api/generated/model";
-import { policyConfigSchema } from "@zitadel/config/schemas";
+import { policyConfigSchema, RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import type { Parsed } from "@zitadel/config/idp";
 import { POLICY_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
@@ -76,12 +76,12 @@ export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_P
 
 /**
  * The minimum password length `setup` recommends, and writes when it is given
- * none: NIST SP 800-63B-4's minimum for a password that is the only factor (8
- * is its minimum for one only ever used with a second factor). The wizard
- * preselects it and a run with nobody to ask gets it, so a project starts with
- * the same policy whoever set it up.
+ * none (8 is NIST's minimum for one only ever used with a second factor). The
+ * wizard preselects it and a run with nobody to ask gets it, so a project
+ * starts with the same policy whoever set it up. Shared with the console,
+ * which warns on a policy under it.
  */
-export const RECOMMENDED_PASSWORD_MIN_LENGTH = 15;
+export { RECOMMENDED_PASSWORD_MIN_LENGTH };
 
 /**
  * A minimum password length as `setup` was given it: a number, or `null` for

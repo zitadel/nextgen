@@ -8,6 +8,7 @@ import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { Page } from "@/components/layout";
 import { AddAdminButton, ProjectAdmins } from "@/components/project-admins";
 import { ProjectOrigins } from "@/components/project-origins";
+import { type PasswordPolicyRead, ProjectPolicies } from "@/components/project-policies";
 import { ProjectVariables } from "@/components/project-variables";
 import { RenameCard } from "@/components/rename-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,12 +33,13 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
  * more `MetaValue` when the field lands.
  *
  * Two tabs, as the team's page. Overview holds the project's name, its
- * origins and its variables and secrets; Admins holds the grants (#1238), with
+ * origins, its variables and secrets and its policies; Admins holds the grants (#1238), with
  * the Add button on the tab row. All of it is project-level data, so it lives
  * here rather than under account settings, and the id every request carries
  * is this route's. The origins ride on the project; the grants and the
  * variables are loaded with it, since all three reads are the same viewer
- * check on the same project and succeed or fail as one.
+ * check on the same project and succeed or fail as one. The password policy
+ * is read beside them but fails on its own: its card only shows it.
  */
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
@@ -48,7 +50,7 @@ export const Route = createFileRoute("/_authed/project/")({
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    const [project, grants, variables] = await Promise.all([
+    const [project, grants, variables, policies] = await Promise.all([
       api.getProject(projectId),
       // One page: a project's admins are a handful. Add paging with the first
       // project that needs it.
@@ -56,8 +58,17 @@ export const Route = createFileRoute("/_authed/project/")({
       // No kind: every name with its value per kind, which is what the table
       // shows side by side.
       api.getVariables({ project_id: projectId }),
+      // The password policy as its newest revision; a project that never
+      // published one answers an empty list. Read-only, so a failed read
+      // costs the card its row, not the page its editable sections.
+      api
+        .listPolicies({ project_id: projectId, operation: "auth.factor.password.set", limit: 1 })
+        .then(
+          (page): PasswordPolicyRead => ({ config: page.policies[0]?.config }),
+          (): PasswordPolicyRead => undefined,
+        ),
     ]);
-    return { project, grants: grants.grants, variables };
+    return { project, grants: grants.grants, variables, passwordPolicy: policies };
   },
   component: ProjectDetail,
 });
@@ -65,7 +76,7 @@ export const Route = createFileRoute("/_authed/project/")({
 type Tab = "overview" | "admins";
 
 function ProjectDetail() {
-  const { project, grants, variables } = Route.useLoaderData();
+  const { project, grants, variables, passwordPolicy } = Route.useLoaderData();
   const { session } = Route.useRouteContext();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("overview");
@@ -114,6 +125,7 @@ function ProjectDetail() {
           />
           <ProjectOrigins projectId={project.id} origins={project.origins} onChanged={reload} />
           <ProjectVariables variables={variables} />
+          <ProjectPolicies password={passwordPolicy} />
         </TabsContent>
 
         <TabsContent value="admins" className="mt-2">
