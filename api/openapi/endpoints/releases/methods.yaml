@@ -145,7 +145,7 @@ post:
 
 get:
   operationId: listReleases
-  x-zitadel-cli: releases list
+  x-zitadel-cli: release list
   summary: List releases
   description: |
     Lists the project's releases, newest first.
@@ -169,6 +169,7 @@ get:
   security:
     - oauth2:
         - release.read
+    - nextgenSession: []
   responses:
     '200':
       description: The releases were retrieved successfully.

@@ -1,11 +1,12 @@
 import { pbkdf2Sync, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { defaultHumanUserSchemaUrl } from "@zitadel/config";
 
 import { ZitadelError } from "../errors";
+import { enforceMode } from "../fs-safe";
 import { isObject } from "../json";
 import {
   findUpward,
@@ -14,6 +15,7 @@ import {
   readRuntimeMetadata,
   sameLocalServer,
 } from "./runtime";
+import { shellCommand, unscopedCommand } from "../suggestion";
 
 /**
  * The local admin's two files under `.zitadel/local/` (gitignored):
@@ -118,7 +120,11 @@ function isLocalAdmin(value: unknown): value is LocalAdmin {
 function malformedAdminFile(cause?: unknown): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_ADMIN_FILE} is malformed`, {
     hint: `Delete ${LOCAL_ADMIN_FILE} and run \`zitadel reset --force\`, then \`zitadel start\`. Both are needed: reset keeps ${LOCAL_ADMIN_FILE}, and deleting it alone leaves the server holding the old password.`,
-    nextCommands: [`rm ${LOCAL_ADMIN_FILE}`, "zitadel reset --force", "zitadel start"],
+    nextCommands: [
+      shellCommand(`rm ${LOCAL_ADMIN_FILE}`),
+      unscopedCommand("reset --force"),
+      unscopedCommand("start"),
+    ],
     ...(cause
       ? { details: { cause: cause instanceof Error ? cause.message : String(cause) } }
       : {}),
@@ -163,7 +169,7 @@ export async function ensureLocalAdmin(
       mode: 0o644,
     },
   );
-  await chmod(staging, 0o644).catch(() => undefined);
+  await enforceMode(staging, 0o644);
   await rename(staging, userFile);
 
   return { admin, userFile };
@@ -197,7 +203,7 @@ async function writePrivateIfAbsent(path: string, content: string): Promise<bool
     if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
     throw error;
   }
-  await chmod(path, 0o600).catch(() => undefined);
+  await enforceMode(path, 0o600);
   return true;
 }
 

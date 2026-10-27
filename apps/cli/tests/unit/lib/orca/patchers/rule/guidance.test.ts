@@ -107,13 +107,13 @@ describe("guidance content", () => {
     expect(readmeGuidanceSection(ctx)).toContain("http://localhost:3000/login");
   });
 
-  it("points agents at the dialect meta-schemas and the plan/apply loop", () => {
+  it("points agents at the dialect meta-schemas and the deploy loop", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('"$schema": "./.zitadel/meta/project.json"');
     expect(agents).toContain('"$schema": "../meta/flow-definition.json"');
     expect(agents).toContain(".zitadel/meta/user-schema.json");
-    expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 plan");
-    expect(agents).toContain("--non-interactive --json");
+    expect(agents).toContain("npx @zitadel/cli@0.1.0-alpha.15 deploy --dry-run");
+    expect(agents).toContain("Leave `--json` off the dry run to see that diff");
     expect(agents).toContain("Never edit `.zitadel/state.json`");
   });
 
@@ -121,7 +121,7 @@ describe("guidance content", () => {
     const readme = readmeGuidanceSection(ctx);
     expect(readme).toContain("from a second terminal in this directory");
     expect(readme).toContain("register a user, sign out, and sign in again");
-    expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 apply");
+    expect(readme).toContain("npx @zitadel/cli@0.1.0-alpha.15 deploy");
   });
 
   it("tells agents how to verify a passkey-first flow they cannot complete", () => {
@@ -142,10 +142,10 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth() with its matcher precondition.
+    // auth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
-    expect(agents).toContain("`matcher`");
+    expect(agents).toContain("`matcher` covers every route");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
     expect(agents).toContain("403/sess.project_mismatch");
@@ -194,6 +194,34 @@ describe("guidance content", () => {
     // The theme knob and (on Next) the JSX-types pointer survive both ways.
     expect(widget).toContain("(`light` | `dark` | `auto`)");
     expect(widget).toContain("@zitadel/sdk-next/jsx");
+  });
+
+  it("leaves the generated files to the app, as doctor does (ADR 042)", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("The app files setup generated are yours to change");
+    expect(agents).toContain("as `edited`, or as `adopted`");
+    expect(agents).toContain("`doctor --fix` restores only a missing file, never one you changed");
+    expect(agents).not.toContain("never change auth behavior");
+  });
+
+  it("points theming at the stable tokens and the forwarded parts, not a copy of them", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("the stable `--zl-*` design tokens");
+    expect(agents).toContain("`zitadel-login::part(<atom>-<part>)`");
+    expect(agents).toContain(
+      "https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app",
+    );
+    expect(agents).not.toContain("`--zl-font-family-heading`");
+  });
+
+  it("has a heading that replaces the widget's follow the login's steps", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("moves between sign-in and sign-up by itself");
+    expect(agents).toContain("must follow its `zitadel-flow-step` event");
+    expect(agents).toContain("`step.purpose` is `login` while it signs in");
   });
 
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {

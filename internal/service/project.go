@@ -40,9 +40,9 @@ type ProjectService interface {
 	// Create when the id is taken.
 	CreateWithID(ctx context.Context, id, name string, origins []domain.Origin, seedDefaults bool) (*domain.Project, error)
 
-	// Get retrieves a project by ID.
+	// Get retrieves a project by ID, with what opts asks for besides.
 	// Returns [database.NoRowFoundError] when no project with the given ID exists.
-	Get(ctx context.Context, id string) (*domain.Project, error)
+	Get(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 
 	// DefaultProject resolves the transitional standalone default retained by
 	// Console ADR 0004 §2's bootstrap cutover rule: the configured project when
@@ -75,6 +75,12 @@ type ProjectService interface {
 	// refused even if their session outlives the deactivation (#553).
 	// Returns domain.ErrSessionTokenInvalid when either id is missing.
 	ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
+
+	// ListEveryProject lists every project of the deployment for a session
+	// user the caller has established is a platform operator (ADR 075 §6),
+	// who can act on all of them. The session-user refusal, order and paging
+	// are ListAuthorized's, so a page token from one continues the other.
+	ListEveryProject(ctx context.Context, req ListAuthorizedProjectsRequest) (*ListProjectsResponse, error)
 
 	// Delete hard-deletes a project, cascading to its child resources through the
 	// storage delete. Deleting a project that does not exist is a no-op.
@@ -321,13 +327,12 @@ func emitFlowdefCreated(ctx context.Context, stmts EventStatements, flowDef *dom
 	})
 }
 
-func (s *projectService) Get(ctx context.Context, id string) (_ *domain.Project, err error) {
+func (s *projectService) Get(ctx context.Context, id string, opts ProjectQueryOptions) (_ *domain.Project, err error) {
 	ctx, end := startSpan(ctx, "ProjectService.Get")
 	defer end(&err)
-
 	logger := getLoggingContext(ctx, "project")
 	logger.Info("getting project", slog.String("project_id", id))
-	project, err := s.v2Pool.Statements().GetProjectByID(ctx, id)
+	project, err := s.v2Pool.Statements().GetProject(ctx, id, opts)
 	return project, mapStorageError(err)
 }
 
@@ -336,7 +341,7 @@ func (s *projectService) DefaultProject(ctx context.Context, cfgProjectID string
 	defer end(&err)
 
 	if cfgProjectID != "" {
-		project, err := s.Get(ctx, cfgProjectID)
+		project, err := s.Get(ctx, cfgProjectID, ProjectQueryOptions{})
 		if err != nil {
 			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 				return nil, domain.ErrProjectNotFound().
@@ -444,29 +449,23 @@ func (s *projectService) Update(ctx context.Context, req UpdateProjectRequest) (
 				return err
 			}
 		}
-		// The name write reads the whole row back, so it runs second and lands
-		// the policy just written on the returned project. Without a rename the
-		// row is read instead, for the same reason: the caller is answered with
-		// the project as it now stands.
 		if req.Name != nil {
 			project.Name = *req.Name
 			if err := tx.Statements().UpdateProject(ctx, project); err != nil {
 				return err
 			}
-		} else {
-			updated, err := tx.Statements().GetProjectByID(ctx, req.ID)
-			if err != nil {
-				return err
-			}
-			*project = *updated
 		}
+
+		updated, err := tx.Statements().GetProject(ctx, req.ID, ProjectQueryOptions{OwningTeam: true})
+		if err != nil {
+			return err
+		}
+		*project = *updated
 		return emitProjectUpdated(ctx, tx.Statements(), project.ID, updateProjectPayload(req))
 	})
-
 	if err != nil {
 		return nil, s.mapUpdateError(err)
 	}
-
 	return project, nil
 }
 
@@ -585,15 +584,39 @@ type ListAuthorizedProjectsRequest struct {
 	// there (ADR 053 §3). Required.
 	HomeProjectID string
 	// UserID is the human the session is bound to. Required.
-	UserID    string
-	Limit     int
-	PageToken string
+	UserID string
+	// NameContains narrows the listing to the projects whose name contains
+	// it, ignoring case. The storage statement applies it together with the
+	// authorization, so a search reaches every project the user can act on.
+	// Empty lists them all.
+	NameContains string
+	Limit        int
+	PageToken    string
 }
 
 func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
 	ctx, end := startSpan(ctx, "ProjectService.ListAuthorized")
 	defer end(&err)
 
+	return s.listForSessionUser(ctx, req, func(opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, opts)
+	})
+}
+
+func (s *projectService) ListEveryProject(ctx context.Context, req ListAuthorizedProjectsRequest) (_ *ListProjectsResponse, err error) {
+	ctx, end := startSpan(ctx, "ProjectService.ListEveryProject")
+	defer end(&err)
+
+	return s.listForSessionUser(ctx, req, func(opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+		return s.v2Pool.Statements().ListProjects(ctx, opts)
+	})
+}
+
+// listForSessionUser is what ListAuthorized and ListEveryProject share: it
+// refuses a session whose user is missing or inactive, then pages list by
+// project id, narrowed by the name search when there is one. The two differ
+// only in which projects list reads.
+func (s *projectService) listForSessionUser(ctx context.Context, req ListAuthorizedProjectsRequest, list func(*database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)) (*ListProjectsResponse, error) {
 	// Fail closed: an empty id would bind an empty string into the grant
 	// predicate instead of narrowing it, so there is no safe default here.
 	if req.UserID == "" || req.HomeProjectID == "" {
@@ -607,14 +630,20 @@ func (s *projectService) ListAuthorized(ctx context.Context, req ListAuthorizedP
 		return nil, err
 	}
 
-	result, err := s.v2Pool.Statements().ListAuthorizedProjects(ctx, req.HomeProjectID, req.UserID, database.Page[domain.ProjectField]{
-		Limit: uint32(normalizeLimit(req.Limit)),
-		OrderBy: database.OrderBy[domain.ProjectField]{
-			Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
-			Direction: database.OrderAsc,
+	opts := &database.ListOptions[domain.ProjectField]{
+		Pagination: database.Page[domain.ProjectField]{
+			Limit: uint32(normalizeLimit(req.Limit)),
+			OrderBy: database.OrderBy[domain.ProjectField]{
+				Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldID)},
+				Direction: database.OrderAsc,
+			},
+			Cursor: []byte(req.PageToken),
 		},
-		Cursor: []byte(req.PageToken),
-	})
+	}
+	if req.NameContains != "" {
+		opts.Filter = database.StringContainsFold(database.Col(domain.ProjectFieldName), req.NameContains)
+	}
+	result, err := list(opts)
 	if err != nil {
 		return nil, mapListError(err, "failed to list authorized projects")
 	}

@@ -186,6 +186,21 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, "middleware.ts")).toBeUndefined();
   });
 
+  it("runs the request boundary on every route but Next's build files", () => {
+    // Next.js runs the boundary only where its matcher says: a matcher listing
+    // routes would leave a route later added to protectedRoutes public.
+    const boundary = writeContents(new NextPatcher().plan(ctxFor("app", 16)), "proxy.ts") ?? "";
+    const [, pattern] = /matcher: \["([^"]+)"\]/.exec(boundary) ?? [];
+    const matched = (path: string) => new RegExp(`^${pattern}$`).test(path);
+
+    for (const path of ["/", "/profile", "/orders/42", "/files/a.pdf", "/api/x", "/__nextgen/x"]) {
+      expect(matched(path), path).toBe(true);
+    }
+    for (const path of ["/_next/static/chunks/main.js", "/_next/image", "/favicon.ico"]) {
+      expect(matched(path), path).toBe(false);
+    }
+  });
+
   it("uses the CLI prerelease tag for the SDK dependency", () => {
     const plan = new NextPatcher().plan(ctxFor("app"));
     const dep = plan.ops.find(
@@ -211,24 +226,27 @@ describe("NextPatcher.plan", () => {
     expect(writeContents(plan, ".zitadel/flows/default.json")).toBeUndefined();
   });
 
-  it("writes preview issuer_pattern from preview origins only, not a doubled scheme", () => {
-    const base = ctxFor("app");
-    const ctx = {
-      ...base,
-      project: {
-        ...base.project,
-        origins: [
-          { pattern: "https://app.example.com", kind: "primary" as const },
-          { pattern: "https://nextgen.dev.mrida.ng", kind: "preview" as const },
-        ],
-      },
-    };
+  it("records no environments in zitadel.json", () => {
     const zitadelJson = JSON.parse(
-      writeContents(new NextPatcher().plan(ctx), "zitadel.json") ?? "{}",
+      writeContents(new NextPatcher().plan(ctxFor("app")), "zitadel.json") ?? "{}",
     );
-    expect(zitadelJson.environments.preview.issuer_pattern).toEqual([
-      "https://nextgen.dev.mrida.ng",
-    ]);
+    expect(zitadelJson).not.toHaveProperty("environments");
+  });
+
+  it("writes the values the CLI reads to a private .env.development.local", () => {
+    const plan = new NextPatcher().plan(ctxFor("app"));
+    const op = plan.ops.find(
+      (candidate): candidate is Extract<FileOp, { kind: "merge-env" }> =>
+        candidate.kind === "merge-env" && candidate.path === ".env.development.local",
+    );
+    expect(op?.mode).toBe(0o600);
+    expect(op?.entries).toEqual({
+      ZITADEL_URL: "https://api.zitadel.cloud",
+      ZITADEL_PROJECT_ID: "proj-1",
+      ZITADEL_PROJECT_SECRET: "sk_proj_full",
+      ZITADEL_PREVIEW_TOKEN: "sk_proj_preview",
+      ZITADEL_ISSUER: "http://localhost:3000",
+    });
   });
 
   it("honors the src/app directory", () => {
@@ -253,7 +271,7 @@ describe("NextPatcher.artifacts", () => {
     ]);
     expect(artifacts.rootConfigFiles).toEqual(["zitadel.json"]);
     expect(artifacts.directories).toEqual([".zitadel"]);
-    expect(artifacts.envBackups).toEqual([".env.local"]);
+    expect(artifacts.envBackups).toEqual([".env.local", ".env.development.local"]);
     // The react renderer's SDK package — `eject` surfaces this as
     // `npm uninstall <name>` in next_commands.
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-next"]);

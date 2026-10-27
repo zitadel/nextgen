@@ -64,32 +64,86 @@ describe("auth-method sso enable", () => {
 });
 ```
 
-- **Two top-level groups, in that order.** The invalid-server group states
-  what the command does against a server that is not a Zitadel API and one
-  that is down, including when it carries on regardless. The `--json` and
-  rendered groups never interleave; drop the second if nothing is rendered.
-- **Arrange with flags, act on your own command.** Reach the starting state
-  through other commands, non-interactively and unasserted. `setup.spec.ts`
-  alone has the wizard as its subject.
-- **Observe by running a command** (`idps list`, `plan`, …, through helpers
-  like `app.registeredIdps()`), never by reading `.zitadel/state.json` or the
-  mock's store.
-- Read a committed file (`app.committed`) only where its content is the
-  behaviour: a credential is a `${{ VARIABLE }}` reference, never a literal.
-- **One journey and one claim per test**: arrange, blank line, one command,
-  blank line, assertions. Use `it.each` for what varies by framework, preset
-  or resource.
-- **No paths**: edit and arrange through `app.edit*`, `app.addFlow`,
-  `app.writeConfig`, `app.writeLocalSecret`.
-- **No HTTP**: arrange the platform in its own terms (`platform.recovers()`,
-  …); msw stays in `helpers/platform.ts`.
-- **Only the matchers in `helpers/matchers.ts`**, never a bare `exitCode`
-  compare. Assert rendered output with `toPrint` (stdout alone), not `toSay`,
-  which spans both channels.
-- **No comments** (one exception below): a step that needs one becomes a
-  named helper with TSDoc.
-- `cli.spec.ts` alone may read `src/**`: it checks the commands the CLI
-  suggests against the command list the built CLI reports.
+Three rules make that shape hold:
+
+1. **Arrange with flags, act on your own command.** A spec may run other
+   commands to reach its starting state, but only non-interactively and without
+   asserting on them. `setup.spec.ts` is the only place the setup wizard is the
+   subject.
+2. **Observe by running a command.** A spec's subject is how the CLI behaves,
+   not how it stores things, so what a command did is checked by running
+   another one: `idps list`, `schemas list`, `flow-definitions list`,
+   `variable list`, `deployment list`. Never `.zitadel/state.json` and
+   never the mock's own store — a corrupt file matters only insofar as a later
+   command surfaces it, and that surfacing is the assertion.
+
+   A committed file may be read where its content *is* the behaviour, through
+   `app.committed`: chiefly that a credential is a `${{ VARIABLE }}` reference
+   and never a literal, because a secret in version control cannot be scrubbed
+   later. Nothing else — not prose copy, key ordering, generated file contents
+   or marker files, all of which a unit test reaches faster.
+3. **One journey per test.** A test that runs setup, then doctor, then deploy, then
+   rollback, then reruns is not a spec; it is five specs sharing a temp directory.
+   Split it and let each command's spec own its own leg.
+
+Use `it.each` for anything that varies by framework, preset or resource. A spec
+suite is a table plus a journey, not a sequence of hand-written near-duplicates.
+
+A spec body contains a fixture call, a command, and matchers — nothing else:
+
+- **No paths.** Edit through `app.editUserSchema`, `app.editLoginFlow`,
+  `app.editPackageJson`, `app.addFlow`; arrange through `app.writeConfig` and
+  `app.writeLocalSecret`. A `.zitadel/...` string in a spec is only ever a
+  value the CLI reported back.
+- **No HTTP.** The platform is arranged in its own terms —
+  `platform.rejectsSchemaUploads()`, `platform.recovers()`,
+  `platform.capturesBrandingPublishes()`. msw stays in `helpers/platform.ts`.
+- **One assertion vocabulary**, from `tests/helpers/matchers.ts`: `toSucceed`,
+  `toFail`, `toFailWith`, `toExitWith`, `toBeSkipped`, `toExplain`, `toHintAt`,
+  `toSuggest`, `toPrint`, `toPrintNoJson`, `toSay`, `toReportNothingToDo`.
+  Never a bare `exitCode` compare. Rendered output is asserted with `toPrint`,
+  which reads stdout alone — `toSay` spans stdout and stderr, so it cannot tell
+  a summary printed to the wrong channel from one printed to the right one.
+- **No comments.** A step that needs explaining needs a named helper with a
+  line of TSDoc instead.
+- **One shape**: arrange, blank line, a single command under test, blank line,
+  assertions. One claim per test — split rather than assert two things.
+- **One skeleton.** Every suite is two top-level groups, in this order:
+
+  ```ts
+  describe("<command>", () => {
+    describe("against an invalid server", () => {
+      describe("that is not a zitadel api", () => { ... });
+      describe("that is down", () => { ... });
+    });
+
+    describe("against a valid server", () => {
+      describe("--json", () => { ... });
+      describe("rendered for a terminal", () => { ... });
+    });
+  });
+  ```
+
+  The first group says what the command does when the server it is pointed at
+  cannot serve the request: one that answers but is not a Zitadel API, and one
+  that is down. Most fail. Some carry on deliberately, for one of two reasons:
+  they never needed the server — `resources` describes the command surface,
+  `stop`, `reset` and `eject` act on the machine — or they reach it and
+  tolerate the failure, as `auth-method sso enable` does for publishing the
+  credentials, and `doctor` and `status` for their probes. Either way it is
+  worth stating rather than leaving to be discovered, and each spec's own first
+  group is the record, not this sentence. The `--json` and rendered groups
+  never interleave, and a command with no human-rendered output has no second
+  one.
+
+Formatting is Biome's, per the repo's `biome.json`, so nothing is
+hand-wrapped.
+
+One exception, in `cli.spec.ts`: it scans `src/**` for the commands the CLI
+suggests, and checks each one against the command list the built CLI reports.
+Reading source from a spec is otherwise forbidden, but the assertion is the
+cross-check between the two sides — split it and each half proves nothing, so
+it stays here deliberately rather than by oversight.
 
 ## Prohibited in specs
 
@@ -105,6 +159,8 @@ describe("auth-method sso enable", () => {
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
   Never retry on that. A listener held for the whole test may bind port 0.
+- `runCliForTest` runs the built CLI, out of reach of any spy on `src/`: pin
+  the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
 - A unit test answers the platform with

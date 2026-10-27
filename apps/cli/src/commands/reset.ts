@@ -8,12 +8,13 @@ import {
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
+import { nextCommandsData } from "../lib/oclif/envelope";
+import { Promptable } from "../lib/oclif/promptable";
 
-export default class Reset extends BaseCommand {
+export default class Reset extends Promptable(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 5;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({
       char: "f",
@@ -44,7 +45,7 @@ export default class Reset extends BaseCommand {
               : { container_name: containerName }),
             data_deleted: true,
           },
-          next_commands: [publicCliCommand("reset --force", this.meta.cliVersion)],
+          ...nextCommandsData([this.suggestUnscoped("reset --force")]),
         },
       });
     }
@@ -53,7 +54,7 @@ export default class Reset extends BaseCommand {
       kind: "confirm",
       name: "delete the local runtime and its data",
       message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
-      retry: publicCliCommand("reset --force", this.meta.cliVersion),
+      retry: this.suggestUnscoped("reset --force"),
     });
     if (!confirmed) {
       return this.emit({ status: "skipped", reason: "reset-cancelled" });

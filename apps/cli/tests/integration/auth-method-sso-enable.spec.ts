@@ -52,21 +52,27 @@ const PROVIDERS: readonly Provider[] = [
   },
 ];
 
-/** A set-up project with the provider enabled but not yet applied. */
+/** A set-up project with the provider enabled but not yet deployed. */
 async function anAppWith(provider: Provider): Promise<ScaffoldedApp> {
   const app = await aSetUpApp();
   await provider.enable(app);
   return app;
 }
 
-/** The same, with the edit published. */
+/** Put the project's files live: a primary origin to land on, then a deploy. */
+async function publish(app: ScaffoldedApp): Promise<void> {
+  await app.addPrimaryOrigin();
+  expect(await app.deploy()).toSucceed();
+}
+
+/** The same, with the edit deployed. */
 async function anAppServing(provider: Provider): Promise<ScaffoldedApp> {
   const app = await anAppWith(provider);
-  await app.apply();
+  await publish(app);
   return app;
 }
 
-/** A set-up project with a custom connection enabled, not applied, for specs that only plan. */
+/** A set-up project with a custom connection enabled, not deployed, for specs that only dry-run. */
 const anAppWithAcme = () => anAppWith(PROVIDERS[1] as Provider);
 
 /** A set-up project serving a custom connection. */
@@ -203,15 +209,7 @@ describe("auth-method sso enable", () => {
           expect(await app.filesContaining(provider.credentials.clientId)).toEqual([]);
         });
 
-        it("leaves the provider for apply to publish", async () => {
-          const app = await anAppWith(provider);
-
-          const result = await app.plan();
-
-          expect(result.total).toBeGreaterThan(0);
-        });
-
-        it("registers nothing with the platform until apply", async () => {
+        it("registers nothing with the platform until a deploy", async () => {
           const app = await anAppWith(provider);
 
           expect(await app.registeredIdps()).toEqual([]);
@@ -239,7 +237,7 @@ describe("auth-method sso enable", () => {
 
           await provider.enable(app);
 
-          expect(await app.plan()).toReportNothingToDo();
+          expect(await app.deployDryRun()).toSucceed();
         });
 
         it("republishes nothing when enabled again", async () => {
@@ -251,7 +249,7 @@ describe("auth-method sso enable", () => {
           expect(await app.projectVariables()).toEqual(before);
         });
 
-        describe("once applied", () => {
+        describe("once deployed", () => {
           it("registers the provider with the platform", async () => {
             const app = await anAppServing(provider);
 
@@ -300,7 +298,7 @@ describe("auth-method sso enable", () => {
           it("leaves nothing to reconcile", async () => {
             const app = await anAppServing(provider);
 
-            expect(await app.plan()).toReportNothingToDo();
+            expect(await app.deployDryRun()).toSucceed();
           });
         });
       });
@@ -315,7 +313,7 @@ describe("auth-method sso enable", () => {
             await app.editPasswordStep(edit);
           }
           await app.enableSso(GOOGLE, CREDENTIALS);
-          await app.apply();
+          await publish(app);
           return app;
         }
 
@@ -330,10 +328,10 @@ describe("auth-method sso enable", () => {
         it("leaves nothing to reconcile", async () => {
           const app = await aPresetAppServingGoogle();
 
-          expect(await app.plan()).toReportNothingToDo();
+          expect(await app.deployDryRun()).toSucceed();
         });
 
-        it("reports no step as edited when enabled again after apply", async () => {
+        it("reports no step as edited when enabled again after a deploy", async () => {
           const app = await aPresetAppServingGoogle();
 
           const result = await app.enableSso(GOOGLE, CREDENTIALS);
@@ -353,7 +351,7 @@ describe("auth-method sso enable", () => {
             );
           });
           await app.enableSso(GOOGLE, CREDENTIALS);
-          await app.apply();
+          await publish(app);
 
           const offering = await app.stepsOfferingSso();
 
@@ -369,12 +367,12 @@ describe("auth-method sso enable", () => {
           }
         };
 
-        /** A set-up project whose password step says something of its own, with Google enabled and applied. */
+        /** A set-up project whose password step says something of its own, with Google enabled and deployed. */
         async function anAppServingGoogleWithAnEditedPasswordStep(): Promise<ScaffoldedApp> {
           const app = await aSetUpApp();
           await app.editPasswordStep(copy);
           await app.enableSso(GOOGLE, CREDENTIALS);
-          await app.apply();
+          await publish(app);
           return app;
         }
 
@@ -418,11 +416,11 @@ describe("auth-method sso enable", () => {
         const staff = { ...ACME, slug: "acme-staff", displayName: "Acme staff" };
         const staffCredentials = { clientId: "staff-client-id", secret: "staff-client-secret" };
 
-        /** Two custom connections to one issuer, both applied. */
+        /** Two custom connections to one issuer, both deployed. */
         async function anAppServingBoth(): Promise<ScaffoldedApp> {
           const app = await anAppServingAcme();
           await app.enableCustomSso(staff, staffCredentials);
-          await app.apply();
+          await publish(app);
           return app;
         }
 
@@ -463,11 +461,11 @@ describe("auth-method sso enable", () => {
       });
 
       describe("a custom connection beside Google", () => {
-        /** Google and a custom connection, both applied. */
+        /** Google and a custom connection, both deployed. */
         async function anAppServingBothKinds(): Promise<ScaffoldedApp> {
           const app = await anAppServing(PROVIDERS[0] as Provider);
           await app.enableCustomSso(ACME, ACME_CREDENTIALS);
-          await app.apply();
+          await publish(app);
           return app;
         }
 
@@ -484,7 +482,7 @@ describe("auth-method sso enable", () => {
           const corp = { ...ACME, slug: "corp", issuer: "https://accounts.google.com" };
           await app.enableCustomSso(corp, ACME_CREDENTIALS);
           await app.enableSso(GOOGLE, CREDENTIALS);
-          await app.apply();
+          await publish(app);
 
           const registered = await app.registeredIdps();
 
@@ -663,12 +661,12 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says which provider it enabled, and for which schema", async () => {
+      it("says the provider is configured locally and not yet live", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Enabled Google for default-human-user");
+        expect(result).toPrint("Google sign-in is configured locally.");
       });
 
       it("renders text rather than a json envelope", async () => {

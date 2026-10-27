@@ -40,6 +40,35 @@ export const renderTable = (columns: readonly string[], items: readonly unknown[
   );
 };
 
+/**
+ * The whole terminal rendering of a list, so no command re-derives the
+ * plain/TTY/empty/footer logic (and so none forgets `--plain`): a pipe (or
+ * `--plain`) gets tab-separated rows with no header and nothing when empty, so
+ * `cut`/`awk`/`wc -l` work; a terminal gets the aligned table, a blank line, a
+ * `${n} ${singular|plural}` count, and any `footer` lines. Pair it with
+ * `listData()` for the JSON envelope.
+ */
+export const renderList = (
+  columns: readonly string[],
+  rows: readonly unknown[],
+  opts: {
+    plain: boolean;
+    singular: string;
+    plural?: string;
+    empty: string;
+    footer?: readonly string[];
+  },
+): string => {
+  if (opts.plain) {
+    return renderRows(columns, rows);
+  }
+  if (rows.length === 0) {
+    return opts.empty;
+  }
+  const count = `${rows.length} ${rows.length === 1 ? opts.singular : (opts.plural ?? `${opts.singular}s`)}`;
+  return [renderTable(columns, rows), "", count, ...(opts.footer ?? [])].join("\n");
+};
+
 /** One cell: a dot-path resolved through objects, rendered as text. */
 const readCell = (column: string, item: unknown): string => {
   const value = column

@@ -17,6 +17,7 @@ import (
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/errorpage"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 )
 
@@ -152,6 +153,10 @@ func errorResponse(err error) *api.ErrorDetailsStatusCode {
 		return claimErrorResponse(e)
 	case e.Code == domain.ErrRequestInvalid().Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, e)
+	case e.Code == domain.ErrRequestNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, e)
+	case e.Code == domain.ErrRequestMethodNotAllowed().Code:
+		return errorResponseWithStatusCode(http.StatusMethodNotAllowed, e)
 	default:
 		return internalErrorResponse(err)
 	}
@@ -207,57 +212,7 @@ func internalErrorResponse(err error) *api.ErrorDetailsStatusCode {
 // errors (decode, validate, security) into the ErrorDetails wire format so all
 // error responses are consistent regardless of where the error originates.
 func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Request, err error) {
-	var (
-		status  int
-		details api.ErrorDetails
-		// logged is the error the log line carries.
-		logged domain.Error
-	)
-
-	switch {
-	case isSecurityServerFault(err):
-		// The security handler could not decide (CSRF request state missing, or
-		// the token or key store failing while introspecting the credential): a
-		// server fault, not a refused credential. The client gets the status
-		// serverFaultResponse gives the fault (500, 501 or 503) with that
-		// status's generic answer; the cause goes to the log, where a wiring
-		// mistake that makes every cookie request fail has to be findable.
-		_ = errors.As(err, &logged)
-		resp := serverFaultResponse(genericServerFault(logged))
-		status = resp.StatusCode
-		details = resp.Response
-
-	case isCSRFError(err):
-		status = http.StatusForbidden
-		_ = errors.As(err, &logged)
-		details = domainErrorDetails(logged)
-
-	case isSecurityError(err):
-		status = http.StatusUnauthorized
-		logged = securityError(err)
-		details = domainErrorDetails(logged)
-
-	case isDecodeError(err):
-		status = http.StatusBadRequest
-		// Use the stable domain message — do not echo ogen/framework
-		// decode text into the client envelope (ADR 030). The field paths
-		// ogen's validation rejected do go into details.
-		invalid := domain.ErrRequestInvalid()
-		if fields := validationFieldPaths(err); len(fields) > 0 {
-			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
-		}
-		details = domainErrorDetails(invalid)
-		// The log keeps ogen's decode reason.
-		logged = invalid.WithParent(err)
-
-	default:
-		if !errors.As(err, &logged) {
-			logged = domain.ErrInternal(err)
-		}
-		resp := errorResponse(logged)
-		status = resp.StatusCode
-		details = resp.Response
-	}
+	status, logged, details := apiError(err)
 
 	// Decode and security fail before ogen's middleware names the operation.
 	// Their errors carry it, and filling the holder lets the access line and
@@ -269,7 +224,70 @@ func OgenErrorHandler(ctx context.Context, w http.ResponseWriter, _ *http.Reques
 		}
 	}
 	logAPIError(ctx, status, logged)
-	writeErrorDetails(w, status, details)
+	writeErrorResponse(w, &api.ErrorDetailsStatusCode{StatusCode: status, Response: details})
+}
+
+// apiError maps an error to the status it answers, the error the log line carries
+// and the response envelope.
+func apiError(err error) (status int, logged domain.Error, details api.ErrorDetails) {
+	hasDomain := errors.As(err, &logged)
+	isSecurity := isSecurityError(err)
+
+	// The security handler failed before it could say yes or no: the CSRF
+	// request state was missing, or the token store or key store failed while
+	// checking the credential. That is our fault, not a bad credential, so the
+	// client gets a 500, 501 or 503 with the generic body for that status. The
+	// cause goes to the log only, so a wiring mistake that breaks every cookie
+	// request can be found there. An error without a domain code, such as
+	// ogenerrors.ErrSecurityRequirementIsNotSatisfied, is a plain refusal and
+	// falls through to the 401 below.
+	if isSecurity && hasDomain && domain.IsServerFault(logged) {
+		resp := serverFaultResponse(genericServerFault(logged))
+		return resp.StatusCode, logged, resp.Response
+	}
+
+	// A session cookie request that failed the CSRF check comes wrapped in
+	// ogen's SecurityError, but the caller is signed in and was refused. That
+	// is a 403, not a 401.
+	if hasDomain && logged.Code == csrfInvalidCode {
+		return http.StatusForbidden, logged, domainErrorDetails(logged)
+	}
+
+	// Every other security failure is a missing or bad credential: 401.
+	if isSecurity {
+		logged = securityError(err)
+		return http.StatusUnauthorized, logged, domainErrorDetails(logged)
+	}
+
+	if isDecodeError(err) {
+		// The client gets the fixed domain message, never ogen's decode text
+		// (ADR 030). The parameter name or the field paths ogen rejected go
+		// into details, so the client still learns what to fix.
+		invalid := domain.ErrRequestInvalid()
+		fields := invalidRequestFields(err)
+		if len(fields) > 0 {
+			invalid = invalid.WithDetails(domain.InvalidFieldPathsDetails{Fields: fields})
+		}
+		// ogen's decode text can quote the rejected value, and a request body
+		// can hold a secret. The log gets the kind of failure and the field
+		// paths only, never the ogen error itself.
+		reason := "decode body"
+		if _, ok := errors.Into[*ogenerrors.DecodeParamsError](err); ok {
+			reason = "decode params"
+		}
+		if len(fields) > 0 {
+			reason += ": fields " + strings.Join(fields, ", ")
+		}
+		return http.StatusBadRequest, invalid.WithParent(errors.New(reason)), domainErrorDetails(invalid)
+	}
+
+	// Anything else is a domain error a handler returned, or an unknown error
+	// we treat as an internal fault.
+	if !hasDomain {
+		logged = domain.ErrInternal(err)
+	}
+	resp := errorResponse(logged)
+	return resp.StatusCode, logged, resp.Response
 }
 
 // logAPIError writes the one log line a returned error gets (ADR 030).
@@ -295,10 +313,41 @@ func logAPIError(ctx context.Context, status int, err domain.Error) {
 	)
 }
 
-func writeErrorDetails(w http.ResponseWriter, status int, details api.ErrorDetails) {
+// OgenNotFound answers a path no API operation matches (ADR 076). A browser
+// navigation gets the error page, with home as its way on; everything else
+// gets the req.not_found envelope, so a client can tell a path this server
+// lacks from one that is not a Zitadel API at all. The Accept header decides,
+// and Vary says so to caches.
+func OgenNotFound(home *errorpage.Link) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept")
+		if errorpage.Wants(r) {
+			errorpage.Write(w, r, errorpage.NotFound(home))
+			return
+		}
+		writeErrorResponse(w, errorResponse(domain.ErrRequestNotFound()))
+	}
+}
+
+// OgenMethodNotAllowed answers a path whose operations do not take the
+// request's method with the req.method_not_allowed envelope and the Allow
+// header ogen would have set (ADR 076). A path the API defines answers the
+// envelope even to a browser: it is an API URL. A CORS preflight keeps ogen's
+// own answer, 204 with the Access-Control-Allow-* headers ogen has already
+// set.
+func OgenMethodNotAllowed(w http.ResponseWriter, r *http.Request, allowed string) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	w.Header().Set("Allow", allowed)
+	writeErrorResponse(w, errorResponse(domain.ErrRequestMethodNotAllowed()))
+}
+
+func writeErrorResponse(w http.ResponseWriter, resp *api.ErrorDetailsStatusCode) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	data, err := details.MarshalJSON()
+	w.WriteHeader(resp.StatusCode)
+	data, err := resp.Response.MarshalJSON()
 	if err == nil {
 		_, _ = w.Write(data)
 	}
@@ -307,24 +356,6 @@ func writeErrorDetails(w http.ResponseWriter, status int, details api.ErrorDetai
 // csrfInvalidCode is compared on every error response, so it is read once:
 // building a domain.Error captures its origin.
 var csrfInvalidCode = domain.ErrAuthCSRFInvalid().Code
-
-// isCSRFError reports a session-cookie request refused by the CSRF checks. It
-// arrives wrapped in ogen's SecurityError, but it is a refusal of an
-// authenticated caller, not a missing credential: 403, not 401.
-func isCSRFError(err error) bool {
-	var e domain.Error
-	return errors.As(err, &e) && e.Code == csrfInvalidCode
-}
-
-// isSecurityServerFault reports a security handler that failed to reach a
-// decision, as opposed to one that refused the credential: the error it
-// returned carries a domain error whose code is a server fault. An error with
-// no domain code, such as ogenerrors.ErrSecurityRequirementIsNotSatisfied, is
-// a refusal.
-func isSecurityServerFault(err error) bool {
-	var e domain.Error
-	return isSecurityError(err) && errors.As(err, &e) && domain.IsServerFault(e)
-}
 
 func isSecurityError(err error) bool {
 	var target *ogenerrors.SecurityError
@@ -340,6 +371,18 @@ func securityError(err error) domain.Error {
 		unauthorized = unauthorized.WithMessage(sessionUnauthorizedMessage)
 	}
 	return unauthorized
+}
+
+// invalidRequestFields names what a request that would not decode got wrong:
+// the parameter (path, query, header or cookie) by its name in the spec, or
+// the body's fields by validationFieldPaths. Without it the req.invalid
+// message would point at details that are not there.
+func invalidRequestFields(err error) []string {
+	var param *ogenerrors.DecodeParamError
+	if errors.As(err, &param) && param.Name != "" {
+		return []string{param.Name}
+	}
+	return validationFieldPaths(err)
 }
 
 // validationFieldPaths returns the dotted paths of the fields ogen's request

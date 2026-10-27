@@ -69,6 +69,11 @@ describe("zitadel api without an operation, at a terminal", () => {
       status: "ok",
       data: { operation: "revokeSession", url: "http://localhost:8080/sessions/sess_1" },
     });
+    expect(vi.mocked(select).mock.calls.map(([question]) => question.message)).toEqual([
+      "Which part of the API would you like to use?",
+      "Which operation would you like to run?",
+    ]);
+    expect(vi.mocked(text).mock.calls[0]?.[0].message).toBe("What is the value of session_id?");
   });
 
   it("offers only what the CLI can call", async () => {
@@ -86,11 +91,11 @@ describe("zitadel api without an operation, at a terminal", () => {
 
 describe("zitadel api for an operation that needs no credential", () => {
   it("runs where no project was set up", async () => {
-    const envelope = await apiIn(await makeProject(), "getHealth", "--dry-run");
+    const envelope = await apiIn(await makeProject(), "getLive", "--dry-run");
 
     expect(envelope).toMatchObject({
       status: "ok",
-      data: { url: "http://localhost:8080/healthz" },
+      data: { url: "http://localhost:8080/livez" },
     });
   });
 });

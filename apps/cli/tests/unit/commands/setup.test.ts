@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { type AddressInfo, createServer, type Server } from "node:net";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -20,6 +21,7 @@ import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prom
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
   localServerHostsPlatform,
+  portInUseWarning,
   retryOptionsFromFlags,
   setupRetryFlags,
   ssoFromFlags,
@@ -27,12 +29,15 @@ import {
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { LocalServer } from "../../../src/lib/local-server/server";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
 import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
+const held: Server[] = [];
 const server = setupServer(...setupPlatformHandlers());
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
@@ -49,6 +54,21 @@ function setup(cwd: string, extra: string[] = []) {
     ...extra,
   ]);
 }
+
+/** Holds a port the system picks until the test ends, and says which. */
+async function aHeldPort(): Promise<number> {
+  const holder = createServer();
+  held.push(holder);
+  await new Promise<void>((resolve) => holder.listen({ port: 0 }, () => resolve()));
+  return (holder.address() as AddressInfo).port;
+}
+
+/**
+ * `--dev-port` for a run that checks every warning: setup warns when the app's
+ * detected port is taken, and whatever holds 3000 on the machine running the
+ * tests must not decide what it reports.
+ */
+const PINNED_DEV_PORT = ["--dev-port", "3000"];
 
 /** What `zitadel start` records beside the local admin: which server it started. */
 async function recordStartedServer(dir: string, serverUrl: string): Promise<void> {
@@ -79,13 +99,17 @@ async function makeNewAppDirectory(): Promise<string> {
 const CANCELLED = Symbol("cancelled");
 
 /** A minimal detectable Next.js App Router project (no Zitadel files yet). */
-async function makeNextProject(): Promise<string> {
+async function makeNextProject(devPort?: number): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-setup-"));
   tempDirs.push(cwd);
   await mkdir(join(cwd, "app"), { recursive: true });
   await writeFile(
     join(cwd, "package.json"),
-    JSON.stringify({ name: "demo", dependencies: { next: "^15" } }),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { next: "^15" },
+      ...(devPort === undefined ? {} : { scripts: { dev: `next dev -p ${devPort}` } }),
+    }),
   );
   await writeFile(join(cwd, "app/layout.tsx"), "export default function L() {}\n");
   return cwd;
@@ -174,6 +198,9 @@ const FRAMEWORK_FIXTURES = [
 afterEach(async () => {
   server.resetHandlers();
   resetPlatformStore();
+  for (const holder of held.splice(0)) {
+    await new Promise<void>((resolve) => holder.close(() => resolve()));
+  }
   while (tempDirs.length > 0) {
     const dir = tempDirs.pop();
     if (dir) {
@@ -230,7 +257,43 @@ describe("setup command", () => {
       command: "npm install",
     });
     expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-    expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+    expect(json.data.next_commands[2]).toMatch(
+      /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+    );
+  });
+
+  it("warns, with the command that picks a free port, when the detected one is taken", async () => {
+    // The wizard asks for another port then. A run that asks nothing says so.
+    const port = await aHeldPort();
+    const cwd = await makeNextProject(port);
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next"]);
+
+    expect(res.exitCode).toBe(0);
+    const json = parseJson(res.stdout) as { warnings: string[] };
+    expect(json.warnings).toEqual([
+      expect.stringContaining(
+        `Port ${port} is already in use. If that is not this app's dev server, run setup with a free port: npx @zitadel/cli@`,
+      ),
+    ]);
+    expect(json.warnings[0]).toMatch(/ setup --dev-port \d+ --cwd \S+$/);
+  });
+
+  it("names only the flag for a taken port when the ports after it are taken too", () => {
+    // A placeholder in a suggested command would be run as a shell redirection.
+    expect(portInUseWarning(3000, undefined, (args) => unscopedCommand(args, "1.2.3"))).toBe(
+      "Port 3000 and the ports after it are already in use. If that is not this app's dev server, run setup with --dev-port and a free port.",
+    );
+  });
+
+  it("does not warn about a taken port that --dev-port chose", async () => {
+    const port = await aHeldPort();
+    const cwd = await makeNextProject();
+
+    const res = await setup(cwd, ["--dry-run", "--framework", "next", "--dev-port", String(port)]);
+
+    expect(res.exitCode).toBe(0);
+    expect((parseJson(res.stdout) as { warnings: string[] }).warnings).toEqual([]);
   });
 
   // `data.sso` is a list, one entry per provider, because setup can enable
@@ -300,6 +363,26 @@ describe("setup command", () => {
     const output = `${res.stdout}${res.stderr}`;
     expect(output).toContain("Redirect URI");
     expect(output).toMatch(/http:\/\/localhost:\d+\/__nextgen\/idp\/google\/callback/);
+  });
+
+  it("ends its summary with where to find every command", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      "setup",
+      "--cwd",
+      cwd,
+      "--server",
+      "https://api.zitadel.cloud",
+      "--non-interactive",
+      "--dry-run",
+      "--skip-install",
+      "--framework",
+      "next",
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(`Explore all commands:\n  ${expectedPublicCliCommand("")}`);
   });
 
   describe("a custom provider", () => {
@@ -443,7 +526,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   // A bootstrapped local server hosts its own platform project and claim
@@ -469,7 +554,9 @@ describe("setup command", () => {
       data: { next_actions: string[]; next_commands: string[] };
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   // The probe behind the real-run local nudge: only a runtime document
@@ -544,7 +631,9 @@ describe("setup command", () => {
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
       expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-      expect(json.data.next_commands[2]).toMatch(/^npx @zitadel\/cli@\S+ plan$/);
+      expect(json.data.next_commands[2]).toMatch(
+        /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+      );
     },
   );
 
@@ -588,7 +677,7 @@ describe("setup command", () => {
             name: "demo",
             project_secret: "sk_proj_test_full",
             preview_secret: "sk_proj_test_preview",
-            origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+            origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
             created_at: "2026-04-21T14:03:11.000Z",
           },
           { status: 201 },
@@ -601,7 +690,7 @@ describe("setup command", () => {
     expect(res.exitCode).toBe(0);
     expect(createProjectBody).toMatchObject({
       name: expect.any(String),
-      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "preview" }]),
+      origins: expect.arrayContaining([{ pattern: "http://localhost:3000", kind: "primary" }]),
       seed_defaults: false,
     });
     const projectName = (createProjectBody as { name?: unknown }).name;
@@ -661,7 +750,9 @@ describe("setup command", () => {
       team_id?: string;
     };
     expect(secret.team_id).toBeUndefined();
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ claim$/);
+    expect(json.data.next_commands.at(-1)).toMatch(
+      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+    );
   });
 
   it("says the project went unattached when a local platform server has no local admin here", async () => {
@@ -688,6 +779,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       // The search for local state ends at the home directory; pinning it
       // keeps the developer's own `~/.zitadel/local` out of the test.
@@ -746,6 +838,7 @@ describe("setup command", () => {
         "--skip-install",
         "--framework",
         "next",
+        ...PINNED_DEV_PORT,
       ],
       { HOME: cwd, USERPROFILE: cwd },
     );
@@ -897,6 +990,28 @@ describe("setup command", () => {
     expect(res.stdout).toContain("--use-case business");
   });
 
+  it("reproduces --password-min-length in the retry guidance when project creation fails", async () => {
+    const cwd = await makeNextProject();
+    server.use(
+      http.post("*/projects", () =>
+        HttpResponse.json({ code: "E_INTERNAL", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await setup(cwd, [
+      "--non-interactive",
+      "--skip-install",
+      "--framework",
+      "next",
+      "--password-min-length",
+      "12",
+    ]);
+
+    expect(res.exitCode).not.toBe(0);
+    // Without it, following the suggested retry would publish an empty policy.
+    expect(res.stdout).toContain("--password-min-length 12");
+  });
+
   describe("when the default resources of a new app cannot be uploaded", () => {
     const failingUpload = async () => {
       const cwd = await makeNewAppDirectory();
@@ -965,6 +1080,24 @@ describe("a retry after a failure before the wizard", () => {
     });
 
     expect(setupRetryFlags(retry)).not.toContain("--non-interactive");
+  });
+
+  it("carries the minimum password length, and an explicit none as 0", () => {
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "12" }))).toContain(
+      "--password-min-length 12",
+    );
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "0" }))).toContain(
+      "--password-min-length 0",
+    );
+    // The recommended one too: without the flag, a policy file --force keeps
+    // keeps its own minimum.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "15" }))).toContain(
+      "--password-min-length 15",
+    );
+    // A refused value would only be refused again.
+    expect(setupRetryFlags(retryOptionsFromFlags({ "password-min-length": "65" }))).not.toContain(
+      "--password-min-length",
+    );
   });
 
   it("does not carry a provider this CLI does not offer", () => {
@@ -1075,6 +1208,16 @@ describe("setup asked on a terminal", () => {
   const settingUp = (cwd: string, ...extra: string[]) =>
     asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
 
+  // The port question is asked only when the app's port is taken; whether 3000
+  // is free on the machine running the tests must not decide what is asked.
+  let portFree: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
+  });
+  afterEach(() => {
+    portFree.mockRestore();
+  });
+
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
     // --force permits overwriting files here. It must never answer a question.
     const cwd = await makeNextProject();
@@ -1083,7 +1226,9 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({
+        message: "Would you like to set up Zitadel in this Next.js app?",
+      }),
     );
   });
 
@@ -1107,24 +1252,34 @@ describe("setup asked on a terminal", () => {
       vi.unstubAllEnvs();
     });
 
-    /** Picks Next.js to scaffold, then answers every question after it. */
+    /**
+     * Picks Next.js to scaffold, then answers every question after it: the
+     * fields, the sign-in method, the password minimum and the providers. The
+     * port is free, so it is not asked.
+     */
     function answeringEveryQuestion(): void {
       vi.mocked(select)
         .mockResolvedValueOnce("next" as never)
         .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
-        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
-      vi.mocked(text).mockResolvedValueOnce("3000" as never);
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+        .mockResolvedValueOnce(15 as never);
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
     }
 
     it("creates no app when a question after the framework is cancelled", async () => {
       const cwd = await makeNewAppDirectory();
-      vi.mocked(select).mockResolvedValueOnce("next" as never);
-      vi.mocked(text).mockResolvedValueOnce(CANCELLED as never);
+      vi.mocked(select)
+        .mockResolvedValueOnce("next" as never)
+        .mockResolvedValueOnce(CANCELLED as never);
 
-      await expect(settingUp(cwd)).rejects.toThrow();
+      // Exits 130, as Ctrl-C does anywhere.
+      await expect(settingUp(cwd)).rejects.toMatchObject({ oclif: { exit: 130 } });
 
-      expect(text).toHaveBeenCalledWith(expect.objectContaining({ message: "Dev server port" }));
+      expect(select).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining("Which fields should registration collect?"),
+        }),
+      );
       expect(await readdir(cwd)).toEqual([]);
     });
 
@@ -1169,6 +1324,7 @@ describe("setup --dev-port on an app already set up", () => {
   type MovedFile = {
     scripts?: { dev?: string };
     environments?: unknown;
+    primary_origins?: unknown;
     preview_origins?: unknown;
     project_id?: string;
   };
@@ -1202,14 +1358,13 @@ describe("setup --dev-port on an app already set up", () => {
     );
     expect((await readJsonFile(cwd, "zitadel.json")).environments).toEqual({
       development: { issuer: "http://localhost:3101" },
-      preview: { issuer_pattern: ["http://localhost:3101"] },
     });
-    expect((await readJsonFile(cwd, ".zitadel/secret")).preview_origins).toEqual([
+    expect((await readJsonFile(cwd, ".zitadel/secret")).primary_origins).toEqual([
       "http://localhost:3101",
     ]);
     expect(await readFile(join(cwd, "README.md"), "utf8")).toContain("http://localhost:3101/login");
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3101", kind: "preview" },
+      { pattern: "http://localhost:3101", kind: "primary" },
     ]);
   });
 
@@ -1239,7 +1394,7 @@ describe("setup --dev-port on an app already set up", () => {
     const json = parseJson(res.stdout) as { data: { moved: boolean; files_written: string[] } };
     expect(json.data.moved).toBe(false);
     expect(await projectOrigins(cwd)).toEqual([
-      { pattern: "http://localhost:3000", kind: "preview" },
+      { pattern: "http://localhost:3000", kind: "primary" },
     ]);
   });
 

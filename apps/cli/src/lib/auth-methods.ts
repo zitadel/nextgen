@@ -167,7 +167,7 @@ export function refuseUneditable(path: string, region: string | undefined): void
 
 /**
  * Refuse when a flow running against the schema would stop validating once
- * the schema and the flows are changed, or cannot be checked at all. `plan`
+ * the schema and the flows are changed, or cannot be checked at all. `deploy`
  * would reject either, so the change is refused before it is written.
  *
  * @param schema - The schema being changed.
@@ -202,7 +202,7 @@ export function refuseBrokenFlows(
       schema.path,
       unchecked,
       "A login flow has errors, so it cannot be checked against the changed schema:",
-      "Fix those errors first (`zitadel plan` reports them too), then run the command again.",
+      "Fix those errors first (`zitadel deploy --dry-run` reports them too), then run the command again.",
     );
   }
   if (added.length > 0) {

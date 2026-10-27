@@ -28,6 +28,7 @@ oneOf:
   - $ref: types/origin-removed-event.yaml
   - $ref: types/policy-created-event.yaml
   - $ref: types/policy-updated-event.yaml
+  - $ref: types/preview-removed-event.yaml
   - $ref: types/project-created-event.yaml
   - $ref: types/project-deleted-event.yaml
   - $ref: types/project-updated-event.yaml
@@ -74,6 +75,7 @@ discriminator:
     origin.removed: types/origin-removed-event.yaml
     policy.created: types/policy-created-event.yaml
     policy.updated: types/policy-updated-event.yaml
+    preview.removed: types/preview-removed-event.yaml
     project.created: types/project-created-event.yaml
     project.deleted: types/project-deleted-event.yaml
     project.updated: types/project-updated-event.yaml

@@ -17,7 +17,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "user schema" },
   loaderDeps: projectScopeDeps,
   // Schema ids are unique per project only (the seeded default carries the same
   // `$id` everywhere), and an ambiguous id resolves in the caller's own project
@@ -42,7 +42,7 @@ function SchemaDetail() {
           <PanelTitle icon={Braces} title={name} />
           {/* The same header card as Login flows. The design draws a third
               value, `EXPIRES AT`; nothing on the schema resource backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Schema ID" value={schemaId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />

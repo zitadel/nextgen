@@ -1,6 +1,6 @@
 # @zitadel/sdk-next
 
-Next.js middleware and helpers for Nextgen Auth.
+Next.js middleware, helpers and components for Zitadel.
 
 ## Installation
 
@@ -40,7 +40,9 @@ because it accepts the token-bearing `auth()` result — see section 3.
 
 ### 1. Middleware
 
-Create `src/proxy.ts` at the root of your Next.js app:
+Create `proxy.ts` next to your `app` directory (at the project root, or in
+`src/` when you use `src/app`). On Next.js 15, name the file `middleware.ts`
+and the function `middleware`:
 
 ```ts
 import { nextgenMiddleware } from '@zitadel/sdk-next/middleware';
@@ -55,14 +57,19 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/__nextgen/:path*', '/admin', '/login'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 ```
+
+This `matcher` covers every route but Next.js's build files, so
+`protectedRoutes` alone decides which routes need a sign-in. Next.js runs the
+middleware only on the routes its `matcher` covers: a protected route that a
+narrower `matcher` leaves out is never redirected, and stays public.
 
 The middleware runs on every matched route and does three things in one pass:
 
 1. **Proxies** `/__nextgen/*` requests to the auth backend
-2. **Verifies** the session JWT via JWKS using the Web Crypto API
+2. **Checks** the session on protected routes: an opaque session token against the backend's `GET /sessions/me`, a JWT via JWKS using the Web Crypto API. On other routes it checks only a JWT, which takes no call to the backend, and hands an opaque token to `auth()`, so a page that never reads the session costs no call
 3. **Redirects** unauthenticated requests to `loginPath` for protected routes, with the requested path and query string in `?next=`, where `<zitadel-login>` returns after sign-in
 
 ### 2. Reading auth in a Server Component
@@ -137,8 +144,9 @@ async function AuthProvider({ children }) {
 
 `NextgenProvider` converts the `auth()` result to the client-safe shape
 **before** it crosses the server→client boundary: client components receive
-`userId` / `email` / `name`, and the raw session token never enters the RSC
-flight payload, where any script on the page could read it.
+`userId`, `identifier`, `identifierProperty` and `display`, and the raw session
+token never enters the RSC flight payload, where any script on the page could
+read it.
 
 That strip only protects you while it runs on the server, which is why
 `NextgenProvider` is server-only and **must not be re-exported through a
@@ -170,11 +178,11 @@ routes the middleware `matcher` covers.
 
 ### 4. Session state for your own UI (any page)
 
-`auth()` only sees a session on routes the middleware `matcher` covers, and the
-scaffolded matcher covers just the proxy path and the protected routes — so a
-header on a public page would always look signed out. For your app's own chrome
-(header navigation, account menus), read the session client-side with
-`getSession()` from `@zitadel/sdk-next/session`. It fetches the same-origin
+`auth()` only sees a session on routes the middleware `matcher` covers, so with
+a `matcher` that lists routes, a header on a public page would always look
+signed out. For your app's own chrome in client components (header navigation,
+account menus), read the session client-side with `getSession()` from
+`@zitadel/sdk-next/session`. It fetches the same-origin
 `{proxyPath}/sessions/me?project_id=…` — the same read the `<zitadel-session>`
 card performs — so it works on every page and the answer is the server's. The
 project is the `projectId` option, else the project of `configureZitadel()`,
@@ -206,7 +214,8 @@ A rejected `getSession()` means the state is *unknown* (broken proxy, network,
 5xx) — render a neutral or error state, never the signed-out CTAs.
 
 A `200` with a non-empty `user_id` resolves to
-`{ isAuthenticated: true, session: { userId, email, name } }` (client-safe —
+`{ isAuthenticated: true, session: { userId, identifier, identifierProperty, display } }`
+(client-safe —
 no token); the canonical `401/auth.unauthorized`, `403/sess.project_mismatch`
 (a session of another project on the same host), `404/sess.not_found`, and
 anonymous sessions resolve to signed out. The request

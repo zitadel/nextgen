@@ -1,7 +1,7 @@
 import type { Interfaces } from "@oclif/core";
 
 import type { CommandGroup } from "../groups";
-import type { GlobalOptions } from "../types";
+import type { Connection } from "../environment-command";
 import type { References } from "./secrets";
 
 /**
@@ -183,6 +183,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * commands have no file to carry a `static group`, so the table says it.
    */
   group?: CommandGroup;
+  /** Position of the resource's row within its group on the root help, lowest first. */
+  groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**
@@ -196,6 +198,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * What the positional accepts, for `--help`. Defaults to
    * `<singular> <idArg>`, which reads well when the argument is an `id` or a
    * `name` but not when a resource takes more than one kind of reference.
+   * `get` also reads it into its summary, "Get one <singular> by …", so word
+   * it as a noun phrase that follows "by".
    */
   idDescription?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */
@@ -245,8 +249,11 @@ export type QueryParts = Readonly<{
 }>;
 
 export type ResourceCommandOptions<Ctx> = Readonly<{
-  /** Opens the platform connection every verb calls through; runs after flag parsing. */
-  connect: (meta: GlobalOptions) => Promise<Ctx>;
+  /**
+   * Shapes the platform connection every verb calls through. It receives the
+   * command's own `connect`, so nothing connects until a verb needs it.
+   */
+  connect: (open: () => Promise<Connection>) => Promise<Ctx>;
   /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
   operations: readonly string[];
   /** Extra flags added to every generated command. */

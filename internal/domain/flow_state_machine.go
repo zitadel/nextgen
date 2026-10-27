@@ -107,6 +107,29 @@ func UnwiredOutcomeError(outcome string) string {
 	return FlowStepErrorOutcomeUnhandled
 }
 
+// Step notice text keys: why the engine moved the flow to another purpose
+// without the user asking, carried on the step it lands on. Like step
+// errors, they are `notice.*` catalog keys the client localizes.
+const (
+	// FlowStepNoticeUserNotFound tells a user whose identifier has no
+	// account that the sign-in continues as a sign-up.
+	FlowStepNoticeUserNotFound = "notice.user_not_found"
+	// FlowStepNoticeUserAlreadyExists tells a user signing up with an
+	// identifier that has an account that the flow continues as a sign-in.
+	FlowStepNoticeUserAlreadyExists = "notice.user_already_exists"
+	// FlowStepNoticeSSOUserNotFound tells a user whose provider sign-in has
+	// no account that the sign-in continues as a sign-up.
+	FlowStepNoticeSSOUserNotFound = "notice.sso_user_not_found"
+)
+
+// purposeChangeNotices maps an implicit outcome that can move the flow to
+// another purpose to the notice the step it lands on carries.
+var purposeChangeNotices = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      FlowStepNoticeUserNotFound,
+	FlowImplicitOutcomeUserAlreadyExists: FlowStepNoticeUserAlreadyExists,
+	FlowImplicitOutcomeSSOUserNotFound:   FlowStepNoticeSSOUserNotFound,
+}
+
 // FlowStateMachine drives a flow definition forward in response to
 // client submissions. The handler owns cookie I/O; the state machine
 // never touches cookies.
@@ -204,8 +227,15 @@ type FlowStepResult struct {
 // FlowStep is the capability payload the API surfaces to the client.
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
-	Name         string
-	Texts        FlowStepTexts
+	Name  string
+	Texts FlowStepTexts
+	// Purpose is what the flow does on this step, the state's
+	// CurrentPurpose: a client tells a sign-in from a sign-up by it, since
+	// step names are the definition's to choose.
+	Purpose FlowDefinitionPurpose
+	// Notice is a `notice.*` key saying why an implicit outcome moved the
+	// flow to Purpose. Set only on the step that move renders.
+	Notice       *string
 	Error        *string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
@@ -1178,6 +1208,7 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 		Step: &FlowStep{
 			Name:        FlowStepNameSSORedirect,
 			Texts:       FlowStepTexts{TitleKey: flowSSORedirectTitleKey},
+			Purpose:     pc.state.CurrentPurpose,
 			RedirectURL: &out.RedirectURL,
 		},
 		SSOBindingNonce: out.BindingNonce,
@@ -1371,6 +1402,12 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	step, err := r.renderStep(pc.ctx, pc.def, pc.state)
 	if err != nil {
 		return FlowStepResult{}, err
+	}
+	// The user asked to sign in or to sign up; an outcome that changed which
+	// one says why, or a typo silently becomes a new account. The notice is
+	// not kept in the state, so a later render of the step goes without it.
+	if notice, ok := purposeChangeNotices[outcome]; ok && pc.state.CurrentPurpose != prevPurpose {
+		step.Notice = &notice
 	}
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
@@ -2518,6 +2555,7 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 	return &FlowStep{
 		Name:         step.Name,
 		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: descriptionKey},
+		Purpose:      state.CurrentPurpose,
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,

@@ -49,13 +49,15 @@ describe("auth-method password enable", () => {
 
       it("leaves nothing to publish when password is already on", async () => {
         const app = await aSetUpApp();
+        const before = await app.publishData();
 
         expect(await app.enableMethod("password")).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        const after = await app.deployData();
+        expect(after.content_hash).toBe(before.content_hash);
       });
 
-      describe("once applied", () => {
+      describe("once deployed", () => {
         it("publishes password as on after it was switched off by hand", async () => {
           const app = await aSetUpApp();
           await app.editUserSchema((schema) => {
@@ -65,7 +67,7 @@ describe("auth-method password enable", () => {
             };
           });
           expect(await app.enableMethod("password")).toSucceed();
-          expect(await app.apply()).toSucceed();
+          expect(await app.publish()).toSucceed();
 
           const { schema } = await app.publishedSchema();
 

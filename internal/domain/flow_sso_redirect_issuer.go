@@ -3,9 +3,10 @@ package domain
 import "context"
 
 // FlowSSORedirectIssuer issues the redirect that begins an external sign-in
-// on an auth attempt: it pins the connection the slug names at its newest
-// revision, issues the single-use state record and builds the authorize
-// URL the browser is sent to.
+// on an auth attempt: it pins the connection the slug names (the release's
+// revision when the request's release pins a flow, otherwise the newest),
+// issues the single-use state record and builds the authorize URL the
+// browser is sent to.
 //
 // errors: [ErrIDPConnectionNotFound] when no connection in the project has
 // the slug; [ErrFlowSSOUnavailable] when the connection cannot be served,

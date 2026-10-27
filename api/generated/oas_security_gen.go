@@ -48,12 +48,14 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
 	CompleteClaimOperation:         []string{},
+	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
 	DeleteUserByIDOperation:        []string{},
 	GetBrandingByIdOperation:       []string{},
+	GetDeploymentByIdOperation:     []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
@@ -66,11 +68,13 @@ var operationRolesNextgenSession = map[string][]string{
 	GetPolicyOperation:             []string{},
 	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
+	GetReleaseByIdOperation:        []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
 	GetUserPasswordStateOperation:  []string{},
 	ListBrandingOperation:          []string{},
+	ListDeploymentsOperation:       []string{},
 	ListFlowDefinitionsOperation:   []string{},
 	ListMyIdentityLinksOperation:   []string{},
 	ListMyPasskeysOperation:        []string{},
@@ -78,6 +82,8 @@ var operationRolesNextgenSession = map[string][]string{
 	ListMyTeamsOperation:           []string{},
 	ListPoliciesOperation:          []string{},
 	ListPolicyRevisionsOperation:   []string{},
+	ListProjectAdminsOperation:     []string{},
+	ListReleasesOperation:          []string{},
 	ListSchemasOperation:           []string{},
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
@@ -90,6 +96,8 @@ var operationRolesNextgenSession = map[string][]string{
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RevokeMySessionOperation:       []string{},
+	RevokeReleaseOperation:         []string{},
+	RollbackDeploymentOperation:    []string{},
 	UpdateTeamOperation:            []string{},
 }
 
@@ -272,6 +280,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	ListPreviewsOperation: []string{
 		"deployment.read",
+	},
+	ListProjectAdminsOperation: []string{
+		"project.write",
 	},
 	ListReleasesOperation: []string{
 		"release.read",

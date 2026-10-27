@@ -8,12 +8,12 @@ import {
 import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
-import { publicCliCommand } from "../lib/public-cli";
+import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",
@@ -48,7 +48,7 @@ export default class Stop extends BaseCommand {
             data_preserved: true,
             data_dir: runtime?.data_dir,
           },
-          next_commands: [publicCliCommand("stop", this.meta.cliVersion)],
+          ...nextCommandsData([this.suggestUnscoped("stop")]),
         },
       });
     }

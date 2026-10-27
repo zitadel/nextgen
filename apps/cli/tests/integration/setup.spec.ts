@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aNewAppDirectory, anApp, type ScaffoldedApp } from "../helpers/project";
+import { aNewAppDirectory, anApp, type ScaffoldedApp, PASSWORD_POLICY } from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -112,6 +112,44 @@ describe("setup", () => {
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
       });
 
+      it("publishes a password policy with the recommended minimum length", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+        ]);
+      });
+
+      it("puts a given minimum password length into the policy", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "12"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("reads a minimum password length of 0 as none", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "0"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+        ]);
+      });
+
+      it("refuses a minimum password length outside the bounds before creating anything", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--password-min-length", "65"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
       it("creates a new app in the directory start ran in", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
@@ -197,7 +235,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("installs the dependencies it added", async () => {
@@ -256,7 +294,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toBeSkipped();
 
-        expect((await app.plan()).total).toBeGreaterThan(0);
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("does not claim to be configured after a failed run", async () => {
@@ -268,6 +306,18 @@ describe("setup", () => {
         expect(await app.hasBeenConfigured()).toBe(false);
       });
 
+      it("rolls back the credential env file a failed run created", async () => {
+        const app = await anApp();
+        platform.rejectsSchemaUploads();
+
+        expect(await app.setup()).toFail();
+
+        // setup created `.env.development.local` with the project it had to
+        // abandon; the rollback removes it so a rerun does not inherit the
+        // abandoned project's id (`merge-env` only adds missing keys).
+        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
+      });
+
       it("lets a rerun finish what a failed run started", async () => {
         const app = await anApp();
         platform.rejectsSchemaUploads();
@@ -276,7 +326,7 @@ describe("setup", () => {
 
         expect(await app.setup(["--force"])).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it.each([
@@ -440,7 +490,7 @@ describe("setup", () => {
           const app = await anApp();
           expect(await provider.setUp(app)).toSucceed();
 
-          expect(await app.plan()).toReportNothingToDo();
+          expect(await app.deployDryRun()).toSucceed();
         });
       });
 

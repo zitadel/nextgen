@@ -1,9 +1,6 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-
 import { ZitadelError } from "./errors";
 import { LocalServer } from "./local-server/server";
-import { parseJsonObject } from "./json";
+import type { Parsed } from "@zitadel/config/idp";
 import type { FlagVariable } from "./oclif/types";
 import { DEFAULT_SERVER } from "@zitadel/config/server";
 
@@ -25,85 +22,82 @@ export const SERVER_VARIABLE: FlagVariable = {
 /**
  * The resolved target server plus the source it came from. `origin` is
  * retained (not just the value) so callers can report *why* a server was
- * chosen and so the precedence order stays auditable.
+ * chosen.
  */
 export type ResolvedServer = {
   value: string;
-  origin: "flag" | "env" | "config-top" | "default" | "local";
+  origin: "flag" | "default" | "local";
 };
 
 /**
- * Inputs to {@link resolveServer}. Passed explicitly (cwd, env) rather
- * than read from globals so resolution is pure and testable. `serverFlag`
- * comes from the parsed CLI invocation.
+ * Inputs to {@link resolveServer}. Passed explicitly (cwd) rather than read
+ * from globals so resolution is pure and testable. `serverFlag` comes from the
+ * parsed CLI invocation.
  */
 export type ResolveServerInput = {
   cwd: string;
-  env: NodeJS.ProcessEnv;
   serverFlag?: string;
 };
 
 /**
- * Resolves which server the CLI should target, applying a fixed
- * precedence: explicit `--server` flag, then `ZITADEL_API_BASE`, then the
- * `server` in `zitadel.json`, falling back to {@link DEFAULT_SERVER}. Every
- * candidate is validated to a normalised origin; an invalid URL throws a
+ * Resolves which server `setup` should create its project on: the `--server`
+ * flag, else {@link DEFAULT_SERVER}. Every other command takes its server from
+ * `ZITADEL_URL` (see `resolveEnvironment`), because a project belongs to the
+ * server that created it and the default says nothing about that. A flag
+ * value is validated to a normalised origin; an invalid URL throws a
  * `ZitadelError` rather than silently falling through.
  */
 export async function resolveServer(input: ResolveServerInput): Promise<ResolvedServer> {
-  if (input.serverFlag) {
-    return validate(input.cwd, { value: input.serverFlag, origin: "flag" });
+  if (!input.serverFlag) {
+    return { value: DEFAULT_SERVER, origin: "default" };
   }
-  const envValue = input.env[SERVER_VARIABLE.name];
-  if (envValue) {
-    return validate(input.cwd, { value: envValue, origin: "env" });
+  if (input.serverFlag === "local") {
+    return { value: await LocalServer.resolveUrl(input.cwd), origin: "local" };
   }
-
-  const config = await readConfig(input.cwd);
-  if (typeof config?.server === "string") {
-    return validate(input.cwd, { value: config.server, origin: "config-top" });
-  }
-
-  return { value: DEFAULT_SERVER, origin: "default" };
+  return { value: serverOrigin(input.serverFlag), origin: "flag" };
 }
 
-async function validate(cwd: string, resolved: ResolvedServer): Promise<ResolvedServer> {
-  if (resolved.value === "local") {
-    return { value: await LocalServer.resolveUrl(cwd), origin: "local" };
+/**
+ * A typed or flagged server as its origin, or the problem with it: the `parse`
+ * an input question takes, so a prompt re-asks instead of throwing out of it.
+ */
+export function parseServer(value: string): Parsed<string> {
+  const typed = value.trim();
+  if (typed === "") {
+    return { ok: false, problem: "Enter the server URL." };
   }
-
   try {
-    const url = new URL(resolved.value);
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${resolved.value}`, {
-        hint: `Set "server" in zitadel.json to a URL like ${DEFAULT_SERVER}.`,
-      });
-    }
-    return { value: url.origin, origin: resolved.origin };
+    return { ok: true, value: serverOrigin(typed) };
   } catch (error) {
-    if (error instanceof ZitadelError) {
-      throw error;
-    }
-    throw new ZitadelError("E_VALIDATION", `Invalid server "${resolved.value}"`, {
+    return { ok: false, problem: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/** Normalises a server URL to its origin, or throws `E_VALIDATION` when it is not an http(s) URL. */
+export function serverOrigin(value: string): string {
+  if (!URL.canParse(value)) {
+    throw new ZitadelError("E_VALIDATION", `Invalid server "${value}"`, {
       hint: `Use a URL like ${DEFAULT_SERVER}.`,
-      details: { origin: resolved.origin },
     });
   }
+  const url = new URL(value);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new ZitadelError("E_VALIDATION", `Server URL must use http(s): ${value}`, {
+      hint: `Use a URL like ${DEFAULT_SERVER}.`,
+    });
+  }
+  return url.origin;
 }
 
-async function readConfig(cwd: string): Promise<Record<string, unknown> | undefined> {
+/**
+ * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
+ * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+export function isLoopbackUrl(value: string): boolean {
   try {
-    const contents = await readFile(join(cwd, "zitadel.json"), "utf8");
-    return parseJsonObject(contents, "zitadel.json");
-  } catch (error) {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "code" in error &&
-      (error as { code?: string }).code === "ENOENT"
-    ) {
-      return undefined;
-    }
-    throw error;
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+  } catch {
+    return false;
   }
 }

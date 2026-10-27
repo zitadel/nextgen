@@ -18,6 +18,7 @@ const (
 		` ON CONFLICT (project_id, origin) DO UPDATE SET expires_at = excluded.expires_at`
 	previewQuery             = `SELECT project_id, origin, expires_at, created_at FROM previews`
 	deletePreviewStmt        = `DELETE FROM previews WHERE project_id = ? AND origin = ?`
+	deleteLivePreviewStmt    = deletePreviewStmt + ` AND expires_at > ?`
 	deleteExpiredPreviewStmt = deletePreviewStmt + ` AND expires_at <= ?`
 )
 
@@ -84,9 +85,9 @@ func (ps previewStatements) ListPreviews(ctx context.Context, filter *database.L
 	return &database.ListResult[*domain.Preview]{Items: items, NextCursor: nextCursor}, nil
 }
 
-// DeletePreview implements [service.PreviewStatements].
-func (ps previewStatements) DeletePreview(ctx context.Context, projectID, origin string) (bool, error) {
-	n, err := execAffected(ctx, ps.client, deletePreviewStmt, projectID, origin)
+// DeleteLivePreview implements [service.PreviewStatements].
+func (ps previewStatements) DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (bool, error) {
+	n, err := execAffected(ctx, ps.client, deleteLivePreviewStmt, projectID, origin, now.UnixNano())
 	return n > 0, err
 }
 

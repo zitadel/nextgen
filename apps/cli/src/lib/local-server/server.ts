@@ -3,7 +3,7 @@ import { join } from "node:path";
 import consola from "consola";
 
 import { ZitadelError } from "../errors";
-import { publicCliCommand } from "../public-cli";
+import { unscopedCommand } from "../suggestion";
 import type { ResolvedEnv } from "./env-vars";
 import { assertDockerAvailable, startFailure } from "./internal/failures";
 import { BinaryLauncher, type StopBinaryRuntimeResult } from "./internal/binary-launcher";
@@ -202,6 +202,29 @@ export class LocalServer {
     } catch {
       return undefined;
     }
+  }
+
+  /**
+   * Whether nothing on this machine holds `port`, decided the way `start`
+   * decides it for a server (connect and bind, never `lsof`). For setup, which
+   * asks for an app port, or warns when it cannot ask, only when the detected
+   * one is taken.
+   */
+  static isPortFree(port: number): Promise<boolean> {
+    return new TcpPorts().isFree(port);
+  }
+
+  /**
+   * The first free port among the 20 after `port`, for setup to suggest in
+   * place of a taken one, or `undefined` when they are all taken too.
+   */
+  static async nextFreePort(port: number): Promise<number | undefined> {
+    for (let next = port + 1; next <= Math.min(port + 20, 65535); next += 1) {
+      if (await LocalServer.isPortFree(next)) {
+        return next;
+      }
+    }
+    return undefined;
   }
 
   /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
@@ -478,7 +501,7 @@ export class LocalServer {
     if (!runtime) {
       throw new ZitadelError("E_VALIDATION", "Local Zitadel runtime has not been started", {
         hint: "Run `zitadel start` first.",
-        nextCommands: [publicCliCommand("start", this.cliVersion)],
+        nextCommands: [unscopedCommand("start", this.cliVersion)],
       });
     }
     return runtime;

@@ -3,7 +3,9 @@
 package stmttest
 
 import (
+	"crypto/rand"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -42,9 +44,15 @@ func seedAuthorizedUser(t *testing.T, stmts service.AllStatements) authorizedUse
 
 func listAuthorizedProjectIDs(t *testing.T, stmts service.AllStatements, u authorizedUser) []string {
 	t.Helper()
-	result, err := stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, database.Page[domain.ProjectField]{
-		Limit:   100,
-		OrderBy: authorizedProjectsOrderAsc,
+	return searchAuthorizedProjectIDs(t, stmts, u, nil)
+}
+
+// searchAuthorizedProjectIDs lists the user's projects that also match filter.
+func searchAuthorizedProjectIDs(t *testing.T, stmts service.AllStatements, u authorizedUser, filter database.Filter[domain.ProjectField]) []string {
+	t.Helper()
+	result, err := stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+		Filter:     filter,
+		Pagination: database.Page[domain.ProjectField]{Limit: 100, OrderBy: authorizedProjectsOrderAsc},
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -244,29 +252,53 @@ func TestListAuthorizedProjects(t *testing.T) {
 			}
 			slices.Sort(want)
 
-			first, err := d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, database.Page[domain.ProjectField]{
-				Limit: 2, OrderBy: authorizedProjectsOrderAsc,
+			first, err := d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+				Pagination: database.Page[domain.ProjectField]{Limit: 2, OrderBy: authorizedProjectsOrderAsc},
 			})
 			require.NoError(t, err)
 			assert.Equal(t, want[:2], projectIDs(first.Items))
 			require.NotEmpty(t, first.NextCursor)
 
-			second, err := d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, database.Page[domain.ProjectField]{
-				Limit: 2, OrderBy: authorizedProjectsOrderAsc, Cursor: first.NextCursor,
+			second, err := d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+				Pagination: database.Page[domain.ProjectField]{Limit: 2, OrderBy: authorizedProjectsOrderAsc, Cursor: first.NextCursor},
 			})
 			require.NoError(t, err)
 			assert.Equal(t, want[2:], projectIDs(second.Items))
 			assert.Empty(t, second.NextCursor)
 
-			_, err = d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, database.Page[domain.ProjectField]{
-				Limit: 2,
-				OrderBy: database.OrderBy[domain.ProjectField]{
-					Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldName)},
-					Direction: database.OrderAsc,
+			_, err = d.stmts.ListAuthorizedProjects(t.Context(), u.platform, u.userID, &database.ListOptions[domain.ProjectField]{
+				Pagination: database.Page[domain.ProjectField]{
+					Limit: 2,
+					OrderBy: database.OrderBy[domain.ProjectField]{
+						Columns:   []database.Column[domain.ProjectField]{database.Col(domain.ProjectFieldName)},
+						Direction: database.OrderAsc,
+					},
+					Cursor: first.NextCursor,
 				},
-				Cursor: first.NextCursor,
 			})
 			assertDatabaseErrorCode(t, err, "db.cursor_order_mismatch")
+		})
+
+		// ADR 053 §6: search composes with the authorization predicate in the
+		// same statement. A match the user cannot act on stays out, as does a
+		// reachable project whose name does not match, and the match ignores
+		// case on whichever arm reaches the project.
+		t.Run("name search", func(t *testing.T) {
+			u := seedAuthorizedUser(t, d.stmts)
+			needle := strings.ToLower(rand.Text())
+			viaTeam := ensureNamedProject(t, d.stmts, "Acme "+strings.ToUpper(needle))
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(viaTeam, u.teamID)))
+			direct := ensureNamedProject(t, d.stmts, "the "+needle+" shop")
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+				newTestAssignment(direct, "", domain.AuthzPrincipalTypeUser, u.userID, "project", "viewer", domain.NewProjectAssignmentScope())))
+			other := ensureNamedProject(t, d.stmts, "Other")
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), domain.NewClaimTeamAssignment(other, u.teamID)))
+			ensureNamedProject(t, d.stmts, "Unreachable "+needle)
+
+			want := []string{viaTeam, direct}
+			slices.Sort(want)
+			assert.Equal(t, want, searchAuthorizedProjectIDs(t, d.stmts, u,
+				database.StringContainsFold(database.Col(domain.ProjectFieldName), needle)))
 		})
 	})
 }

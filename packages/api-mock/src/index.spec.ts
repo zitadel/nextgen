@@ -95,6 +95,29 @@ describe("setupMockHandlers", () => {
     expect(done.handoff_token).toBeTruthy();
   });
 
+  test("reports each step's purpose, and switches it only when asked", async () => {
+    const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
+    expect(start.step.purpose).toBe("login");
+
+    const register = await submitFlowStep(start.id, {
+      session_token: start.session_token,
+      action: "register",
+      fields: {},
+    });
+    expect(register.step.name).toBe("register");
+    expect(register.step.purpose).toBe("register");
+    // The visitor chose to sign up: nothing to explain.
+    expect(register.step.notice).toBeUndefined();
+
+    const password = await submitFlowStep(start.id, {
+      session_token: register.session_token,
+      action: "submit",
+      fields: { email: "new@acme.com" },
+    });
+    expect(password.step.name).toBe("register-password");
+    expect(password.step.purpose).toBe("register");
+  });
+
   test("captures every request body for assertions", async () => {
     const start = await createFlow({ purpose: "login", project_id: PROJECT_ID });
     await submitFlowStep(start.id, {

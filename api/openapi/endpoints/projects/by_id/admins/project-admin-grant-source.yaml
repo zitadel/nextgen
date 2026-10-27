@@ -1,0 +1,21 @@
+title: ProjectAdminGrantSource
+description: |
+  Admin access through an `admin` grant on the project, to the person or to a
+  team they are an active member of.
+type: object
+required:
+  - type
+  - grant_id
+properties:
+  type:
+    type: string
+    enum:
+      - grant
+  grant_id:
+    type: string
+    description: The grant (`asgn_<opaque>`), as served by `GET /grants/{id}`.
+  team:
+    description: |
+      The team the grant is to, absent for a grant to the person directly. Its
+      `name` is present only when the caller is a member of it.
+    $ref: ../../../../components/schemas/team-ref.yaml

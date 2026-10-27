@@ -33,10 +33,11 @@ func (h *Handler) CreateFlow(ctx context.Context, req *api.CreateFlowRequest, pa
 		return nil, domain.ErrFlowInvalidPurpose().WithMessage(fmt.Sprintf("unknown purpose %q", req.Purpose))
 	}
 
-	// Which release serves the attempt is decided here, once, from the origin
-	// the request arrived on; the answer is sealed into the flow state so
-	// later steps read the same configuration.
-	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), params)
+	origin := ""
+	if o, ok := params.Origin.Get(); ok {
+		origin = o.String()
+	}
+	ctx, err = h.resolveRuntime(ctx, string(req.ProjectID), origin)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +115,27 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 	if state.ID != params.ID {
 		return nil, domain.ErrFlowNotFound()
 	}
+	// Admit Origin before reading the sealed release: a project that refuses
+	// the Origin should answer 403 without a release lookup (and without 409
+	// when that release has since been revoked). Sealing still pins which
+	// release serves the attempt after admission.
+	// Any origin the request carries is held to the project's, an opaque one
+	// (`null`) included; only the passkey params need it to have a host.
+	originStr := ""
+	if origin, ok := params.Origin.Get(); ok {
+		originStr = origin.String()
+	} else if host, ok := requestOriginFromContext(ctx); ok {
+		originStr = host
+	}
+	if originStr != "" {
+		if err := h.admitOrigin(ctx, state.ProjectID, originStr); err != nil {
+			return nil, err
+		}
+	}
+	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
+	if err != nil {
+		return nil, err
+	}
 
 	submitReq := service.SubmitFlowRequest{
 		State:  state,
@@ -154,32 +176,12 @@ func (h *Handler) SubmitFlowStep(ctx context.Context, req *api.FlowSubmitRequest
 			Proof:       proof,
 		}
 	}
-	// The browser Origin header drives the WebAuthn relying-party params when a
-	// step issues or verifies a passkey challenge. Same-origin browser fetches may
-	// not include Origin; fall back to the effective request host injected by the
-	// WithRequestHostMiddleware (X-Forwarded-Host or r.Host).
-	originStr := ""
-	if origin, ok := params.Origin.Get(); ok {
-		originStr = origin.String()
-	} else if h, ok := requestOriginFromContext(ctx); ok {
-		originStr = h
-	}
+	// Origin also drives WebAuthn RP params and SSO return-target binding.
 	requestOrigin := ""
 	if originStr != "" {
-		originURL, err := url.Parse(originStr)
-		if err == nil {
+		if originURL, err := url.Parse(originStr); err == nil {
 			if rp := passkeyRPFromOrigin(*originURL); rp != nil {
 				requestOrigin = originURL.Scheme + "://" + originURL.Host
-				project, err := h.projectService.Get(ctx, state.ProjectID)
-				if err != nil {
-					// A project lookup failing mid-submit is a server-side
-					// fault, not client input: keep it a 500 rather than
-					// letting proj.not_found surface as a 404 here.
-					return nil, domain.ErrInternal(err)
-				}
-				if err := validateOriginAgainstProject(originStr, project); err != nil {
-					return nil, domain.ErrRequestInvalid().WithMessage(err.Error())
-				}
 				submitReq.PasskeyRP = rp
 			}
 		}
@@ -269,6 +271,10 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	if state.ID != params.ID {
 		return mapFlowGetError(domain.ErrFlowNotFound())
 	}
+	ctx, err = h.withSealedRuntime(ctx, state.ProjectID, state.DeploymentID, state.ReleaseID)
+	if err != nil {
+		return mapFlowGetError(err)
+	}
 
 	result, err := h.flowService.GetStep(ctx, service.GetFlowStepRequest{State: state})
 	if err != nil {
@@ -304,30 +310,19 @@ func (h *Handler) GetFlowStep(ctx context.Context, params api.GetFlowStepParams)
 	}, nil
 }
 
-// resolveRuntime decides which release serves the attempt from the browser
-// Origin header and puts the answer on the context. A request with no Origin,
-// or an open admission (empty allowlist / loopback) with nothing deployed yet,
-// keeps the pre-resolution newest-revision path until the project default
-// target lands; a present Origin that resolves to a deployment is sealed.
-func (h *Handler) resolveRuntime(ctx context.Context, projectID string, params api.CreateFlowParams) (context.Context, error) {
+// admitOrigin refuses a request Origin the project does not admit. When the
+// runtime resolver is unwired (unit tests), skip — same soft-skip as
+// resolveRuntime. Production always wires WithRuntimeResolver.
+func (h *Handler) admitOrigin(ctx context.Context, projectID, origin string) error {
 	if h.runtime == nil {
-		return ctx, nil
+		return nil
 	}
-	origin := ""
-	if o, ok := params.Origin.Get(); ok {
-		origin = o.String()
-	}
-	if origin == "" {
-		return ctx, nil
-	}
-	resolution, err := h.runtime.Resolve(ctx, projectID, origin)
+	project, err := h.projectService.Get(ctx, projectID, service.ProjectQueryOptions{})
 	if err != nil {
-		return ctx, err
+		return domain.ErrInternal(err)
 	}
-	if resolution == nil {
-		return ctx, nil
-	}
-	return service.WithRuntimeResolution(ctx, resolution), nil
+	_, err = h.runtime.Gate(ctx, project, origin)
+	return err
 }
 
 func (h *Handler) openState(ctx context.Context, raw string) (*domain.FlowState, error) {
@@ -427,12 +422,16 @@ func toFlowStep(step *domain.FlowStep) api.FlowStep {
 	out := api.FlowStep{
 		Name:    step.Name,
 		Texts:   api.NewOptStepTexts(toStepTexts(step.Texts)),
+		Purpose: api.NewOptFlowStepPurpose(api.FlowStepPurpose(step.Purpose.String())),
 		Fields:  toFlowStepFields(step.Fields),
 		Actions: toFlowStepActions(step.Actions),
 		Gates:   api.FlowStepGates{},
 	}
 	if len(step.SSOProviders) > 0 {
 		out.SSOProviders = toFlowStepSSOProviders(step.SSOProviders)
+	}
+	if step.Notice != nil {
+		out.Notice = api.NewOptNilString(*step.Notice)
 	}
 	if step.Error != nil {
 		out.Error = api.NewOptNilString(*step.Error)
@@ -480,37 +479,6 @@ func toFlowStepChallenge(c domain.FlowStepChallenge) api.FlowStepChallenge {
 		}
 	}
 	return out
-}
-
-// validateOriginAgainstProject returns an error if the origin is not admitted
-// for the project. An empty allowlist means allow all (development/test mode).
-// Loopback hosts are admitted without a stored pattern. Only primary patterns
-// admit requests; preview patterns bound which URLs a preview deploy may
-// register and do not authorize Origin headers by themselves.
-//
-// Primary matching is exact — no aliasing between localhost, 127.0.0.1, and
-// [::1] for stored patterns. The WebAuthn RP ID derives from the origin
-// hostname (passkeyRPFromOrigin), so a passkey registered under one loopback
-// spelling can never assert under another.
-func validateOriginAgainstProject(originStr string, project *domain.Project) error {
-	if len(project.Origins) == 0 {
-		return nil
-	}
-	if u, err := url.Parse(originStr); err == nil && isLoopbackHost(u.Hostname()) {
-		return nil
-	}
-	patterns := make([]string, 0, len(project.Origins))
-	for _, allowed := range project.Origins {
-		if allowed.Kind != domain.OriginKindPrimary {
-			continue
-		}
-		if allowed.Pattern == originStr {
-			return nil
-		}
-		patterns = append(patterns, allowed.Pattern)
-	}
-	return fmt.Errorf("origin %q is not allowed for this project (allowed: %s)",
-		originStr, strings.Join(patterns, ", "))
 }
 
 // passkeyRPFromOrigin derives the WebAuthn relying-party id (the origin host,
@@ -754,6 +722,9 @@ func mapFlowGetError(err error) (api.GetFlowStepRes, error) {
 		return &gone, nil
 	case errors.Is(err, domain.ErrFlowRestartRequired()):
 		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrFlowRestartRequired()))
+		return &conflict, nil
+	case errors.Is(err, domain.ErrReleaseRevoked()):
+		conflict := api.GetFlowStepConflict(domainErrorDetails(domain.ErrReleaseRevoked()))
 		return &conflict, nil
 	}
 	return nil, err

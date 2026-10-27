@@ -51,10 +51,7 @@ func log(ctx context.Context, logger *slog.Logger, level slog.Level, msg string,
 		return
 	}
 	var pcs [1]uintptr
-	if IsAddSourceEnabled() {
-		runtime.Callers(skip+2, pcs[:])
-
-	}
+	runtime.Callers(skip+2, pcs[:])
 	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
 	r.Add(args...)
 	_ = logger.Handler().Handle(ctx, r)

@@ -1,5 +1,6 @@
 post:
   operationId: revokeRelease
+  x-zitadel-cli: release revoke
   summary: Revoke a release
   description: |
     Marks the release revoked, so that its content is never served again.
@@ -26,6 +27,7 @@ post:
   security:
     - oauth2:
         - release.write
+    - nextgenSession: []
   parameters:
     - $ref: ../../../../components/parameters/project-id.yaml
     - $ref: ../../../../components/parameters/release-id.yaml

@@ -26,7 +26,8 @@ test("a platform operator reaches every management screen without an error", asy
   await page.goto("/ui/console/");
   await registerWithPassword(page, operator);
   await page.waitForURL((url) => !url.pathname.endsWith("/login"));
-  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  // The account menu, which both the home and a project's screens draw.
+  await expect(page.getByRole("button", { name: /^Account:/ })).toBeVisible();
 
   // Admin on the customer project, by email: the operator lives in the
   // platform project, which is where a grant resolves an identifier (#1192).
