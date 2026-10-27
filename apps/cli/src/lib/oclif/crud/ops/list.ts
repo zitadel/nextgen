@@ -10,7 +10,7 @@ import { parseOrThrow } from "../shared";
 import { chosenColumns } from "../columns";
 import { shellOption } from "../../../shell";
 import { fieldPaths, itemSchemaOf } from "../paths";
-import { renderRows, renderTable } from "../table";
+import { renderList } from "../table";
 import type { Json, ListSpec } from "../types";
 import {
   type OperationDefinition,
@@ -236,16 +236,15 @@ export class ListOperation<Ctx> extends ResourceCommand<Ctx, ListSpec<Ctx>> {
         [wire.nextPageToken]: next,
         ...(nextCommands.length > 0 ? nextCommandsData(nextCommands) : {}),
       },
-      pretty: plain
-        ? renderRows(columns, items)
-        : items.length === 0
-          ? `No ${resource.plural ?? topic} found.`
-          : [
-              renderTable(columns, items),
-              "",
-              `${items.length} ${items.length === 1 ? resource.singular : (resource.plural ?? topic)}`,
-              ...(next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : []),
-            ].join("\n"),
+      // Every list — generated or hand-written — counts and reports emptiness
+      // through the same renderer, so the words come from the resource's own
+      // nouns rather than from whoever wrote the command.
+      pretty: renderList(columns, items, {
+        plain,
+        singular: resource.singular,
+        plural: resource.plural ?? topic,
+        footer: next ? [`More available: ${shellOption("--page-token", next)} (or --all)`] : [],
+      }),
     };
   }
 }

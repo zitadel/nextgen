@@ -227,7 +227,7 @@ describe("branding eject asked on a terminal", () => {
 
     await expect(ejecting(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(cancel).toHaveBeenCalledWith("Cancelled");
     await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

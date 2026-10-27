@@ -4,6 +4,7 @@ import type { ListDeployments200DeploymentsItem } from "@zitadel/api/generated/m
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { collectPages } from "../../lib/oclif/crud/paging";
+import { renderCount } from "../../lib/oclif/crud/table";
 import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
@@ -128,7 +129,8 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
         rolled_back_to: deployment.metadata.rollback_to,
         origins,
       },
-      pretty: `Rolled back to ${deployment.release_id} on ${origins.join(", ")}`,
+      // Counted, not spelled out, for the reason `deployment create` gives.
+      pretty: `Rolled back to ${deployment.release_id} on ${renderCount(origins.length, { singular: "origin" })}`,
     });
   }
 }

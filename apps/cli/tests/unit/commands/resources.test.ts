@@ -15,6 +15,7 @@ import {
   parseSort,
   type ResourceDescriptor,
 } from "../../../src/lib/oclif/crud";
+import { onATerminal } from "../../helpers/project";
 import { parseJson, runCliForTest } from "../../helpers/run-cli";
 
 const SERVER = "https://api.zitadel.cloud";
@@ -338,6 +339,48 @@ describe("users list", () => {
     // No header, no footer, no hint: the aligned table is for a terminal.
     expect(res.stdout).not.toContain("created_at");
     expect(res.stdout).not.toContain("2 users");
+  });
+
+  it("says the same sentence for an empty list whatever the resource is called", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.post(`${SERVER}/users/query`, () => HttpResponse.json({ users: [] })),
+      http.post(`${SERVER}/idps/query`, () => HttpResponse.json({ idps: [] })),
+    );
+    const bare = (argv: string[]) =>
+      onATerminal(() =>
+        runCliForTest([...argv, "--cwd", cwd, "--server", SERVER, "--non-interactive"]),
+      );
+
+    expect((await bare(["users", "list"])).stdout).toContain("No users found.");
+    expect((await bare(["idps", "list"])).stdout).toContain(
+      "No identity provider connections found.",
+    );
+  });
+
+  it("heads a camelCase column the way the wire spells every other field", async () => {
+    const cwd = await makeProject();
+    server.use(
+      http.get(`${SERVER}/schemas`, () =>
+        HttpResponse.json({
+          schemas: [
+            {
+              id: "sch_1",
+              schema: { objectType: "human-user", kind: "user-schema" },
+              metadata: { created_at: "2026-01-01T00:00:00Z" },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const res = await onATerminal(() =>
+      runCliForTest(["schemas", "list", "--cwd", cwd, "--server", SERVER, "--non-interactive"]),
+    );
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("object_type");
+    expect(res.stdout).not.toContain("objectType");
   });
 
   it("takes --plain to force the machine form", async () => {

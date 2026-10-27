@@ -298,6 +298,57 @@ describe("wire conventions", () => {
   });
 });
 
+describe("list rendering", () => {
+  /** What a run wrote to a terminal, which is where the table and count go. */
+  const printed = async (spec: ListSpec<Ctx>, topic: string): Promise<string> => {
+    const tty = process.stdout.isTTY;
+    const write = process.stdout.write.bind(process.stdout);
+    const log = console.log;
+    let out = "";
+    Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      out += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString();
+      return true;
+    }) as typeof process.stdout.write;
+    console.log = (...args: unknown[]) => {
+      out += `${args.join(" ")}\n`;
+    };
+    try {
+      const command = bindOperation(ListOperation as OperationClass<Ctx, ListSpec<Ctx>>, {
+        ...definition(spec),
+        topic,
+        resource: {
+          ...resource,
+          singular: "flow definition",
+          plural: "flow definitions",
+          list: spec,
+        },
+      });
+      await (command as unknown as { run(argv: string[]): Promise<unknown> }).run([]);
+    } finally {
+      Object.defineProperty(process.stdout, "isTTY", { value: tty, configurable: true });
+      process.stdout.write = write;
+      console.log = log;
+    }
+    return out;
+  };
+
+  it("counts in the resource's own plural rather than the topic key", async () => {
+    const two: ListSpec<Ctx> = {
+      items: "rows",
+      call: async () => ({ rows: [{ id: "a" }, { id: "b" }] }),
+    };
+
+    expect(await printed(two, "flow-definitions")).toContain("2 flow definitions");
+  });
+
+  it("says the one derived sentence when a generated list finds nothing", async () => {
+    const none: ListSpec<Ctx> = { items: "rows", call: async () => ({ rows: [] }) };
+
+    expect(await printed(none, "flow-definitions")).toContain("No flow definitions found.");
+  });
+});
+
 describe("write results", () => {
   it("carries data in the envelope when the server answers without a body", async () => {
     // `grants create` by identifier answers 202 with no body.

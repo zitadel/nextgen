@@ -477,13 +477,15 @@ describe("asker", () => {
       });
     });
 
+    // The one cancellation word the whole CLI says: this was the only one
+    // with a full stop, and the only one clack draws.
     it.each(prompts)("says so on the terminal from %s", async (_kind, prompt, question) => {
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
       await question().catch(() => undefined);
 
-      expect(cancel).toHaveBeenCalledWith("Cancelled.");
+      expect(cancel).toHaveBeenCalledWith("Cancelled");
     });
   });
 });

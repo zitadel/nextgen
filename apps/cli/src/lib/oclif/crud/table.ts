@@ -25,12 +25,23 @@ export const renderRows = (columns: readonly string[], items: readonly unknown[]
     .join("\n");
 
 /**
+ * What a dot-path is called when it is shown to a person: its last segment,
+ * spelled the way the wire spells a field. A document the API carries
+ * verbatim can hold a camelCase property (`schema.objectType`), and a header
+ * reading `objectType` beside `created_at` says the two came from different
+ * contracts when they did not. The path itself is untouched, so `--fields`
+ * and `--json` still name the field exactly as the API does.
+ */
+export const headerOf = (column: string): string =>
+  (column.split(".").at(-1) ?? column).replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+
+/**
  * Render `items` as an aligned text table, one column per dot-path in
  * `columns`, headed by each path's last segment. Nested paths resolve
  * through objects; missing values render empty; non-strings render as JSON.
  */
 export const renderTable = (columns: readonly string[], items: readonly unknown[]): string => {
-  const headers = columns.map((column) => column.split(".").at(-1) ?? column);
+  const headers = columns.map(headerOf);
   const rows = items.map((item) => columns.map((column) => readCell(column, item)));
   // Folded rather than spread into `Math.max`: a wide `--all` can return more
   // rows than the engine accepts as arguments in one call.
@@ -48,13 +59,34 @@ export const renderTable = (columns: readonly string[], items: readonly unknown[
   );
 };
 
+/** What a list calls the thing it holds, in the plural. */
+const pluralOf = (opts: { singular: string; plural?: string }): string =>
+  opts.plural ?? `${opts.singular}s`;
+
+/**
+ * How many a list found, as the line its footer is built from: `1 schema`,
+ * `12 resources`. It is derived from the resource's own nouns rather than
+ * written per command, so every list counts in the same words.
+ */
+export const renderCount = (count: number, opts: { singular: string; plural?: string }): string =>
+  `${count} ${count === 1 ? opts.singular : pluralOf(opts)}`;
+
+/**
+ * What a list says when it found nothing. One sentence for every list,
+ * derived from the same nouns as the count: a command that wrote its own
+ * ("No deployments yet", "No variables on the project") told the reader the
+ * same thing in a different voice and made two lists look like two tools.
+ */
+export const renderEmpty = (opts: { singular: string; plural?: string }): string =>
+  `No ${pluralOf(opts)} found.`;
+
 /**
  * The whole terminal rendering of a list, so no command re-derives the
  * plain/TTY/empty/footer logic (and so none forgets `--plain`): a pipe (or
  * `--plain`) gets tab-separated rows with no header and nothing when empty, so
  * `cut`/`awk`/`wc -l` work; a terminal gets the aligned table, a blank line, a
- * `${n} ${singular|plural}` count, and any `footer` lines. Pair it with
- * `listData()` for the JSON envelope.
+ * {@link renderCount} count, and any `footer` lines. An empty one gets
+ * {@link renderEmpty}. Pair it with `listData()` for the JSON envelope.
  */
 export const renderList = (
   columns: readonly string[],
@@ -63,7 +95,13 @@ export const renderList = (
     plain: boolean;
     singular: string;
     plural?: string;
-    empty: string;
+    /**
+     * A sentence of this list's own, in place of {@link renderEmpty}. Nothing
+     * should need one: a list that words "found nothing" for itself is the
+     * drift this derives away. It is here only so the lists that still carry
+     * one keep compiling until each is deleted.
+     */
+    empty?: string;
     footer?: readonly string[];
   },
 ): string => {
@@ -71,10 +109,14 @@ export const renderList = (
     return renderRows(columns, rows);
   }
   if (rows.length === 0) {
-    return opts.empty;
+    return opts.empty ?? renderEmpty(opts);
   }
-  const count = `${rows.length} ${rows.length === 1 ? opts.singular : (opts.plural ?? `${opts.singular}s`)}`;
-  return [renderTable(columns, rows), "", count, ...(opts.footer ?? [])].join("\n");
+  return [
+    renderTable(columns, rows),
+    "",
+    renderCount(rows.length, opts),
+    ...(opts.footer ?? []),
+  ].join("\n");
 };
 
 /** One cell: a dot-path resolved through objects, rendered as text. */
@@ -100,7 +142,7 @@ export const renderDetail = (
   // Width is measured over the fields that survive, so an omitted one cannot
   // pad every other label out of alignment.
   const rows = fields
-    .map((field) => [field.split(".").at(-1) ?? field, readCell(field, item)] as const)
+    .map((field) => [headerOf(field), readCell(field, item)] as const)
     .filter(([, value]) => value !== "");
   const width = Math.max(0, ...rows.map(([label]) => label.length));
   const body = rows.map(([label, value]) => `${label.padEnd(width)}${GAP}${value}`);

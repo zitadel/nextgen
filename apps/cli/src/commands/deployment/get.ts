@@ -1,4 +1,6 @@
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import { renderDetail } from "../../lib/oclif/crud/table";
+import { DEPLOYMENT_FIELDS, deploymentRow } from "./list";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
@@ -23,17 +25,17 @@ export default class DeploymentGet extends EnvironmentCommand {
       project_id: projectId,
     });
 
-    const origins = deployment.targets.map((target) => target.origin);
+    // One record reads the same here as it does from any other `get`: the
+    // identifier, then a labelled line per field, at the left margin and
+    // named as the wire names them. A pipe gets the object itself, because a
+    // script wants the record rather than a view of it.
+    const row = deploymentRow(deployment);
     return this.emit({
       status: "ok",
       data: deployment,
-      pretty: [
-        `${deployment.id}`,
-        `  release   ${deployment.release_id}`,
-        `  reason    ${deployment.metadata.reason ?? "deploy"}`,
-        `  deployed  ${deployment.deployed_at}`,
-        `  origins   ${origins.join(", ")}`,
-      ].join("\n"),
+      pretty: process.stdout.isTTY
+        ? renderDetail(deployment.id, DEPLOYMENT_FIELDS, row)
+        : JSON.stringify(deployment, null, 2),
     });
   }
 }

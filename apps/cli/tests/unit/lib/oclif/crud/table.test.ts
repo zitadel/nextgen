@@ -1,6 +1,87 @@
 import { describe, expect, it } from "vitest";
 
-import { renderDetail, renderRows, renderTable } from "../../../../../src/lib/oclif/crud";
+import {
+  headerOf,
+  renderCount,
+  renderDetail,
+  renderEmpty,
+  renderList,
+  renderRows,
+  renderTable,
+} from "../../../../../src/lib/oclif/crud";
+
+describe("headerOf", () => {
+  it("takes the path's last segment", () => {
+    expect(headerOf("metadata.created_at")).toBe("created_at");
+  });
+
+  it("spells a camelCase field the way the wire spells every other one", () => {
+    expect(headerOf("schema.objectType")).toBe("object_type");
+  });
+
+  it("leaves a field that is already snake_case alone", () => {
+    expect(headerOf("release_id")).toBe("release_id");
+  });
+});
+
+describe("renderCount", () => {
+  it("uses the singular for one", () => {
+    expect(renderCount(1, { singular: "schema" })).toBe("1 schema");
+  });
+
+  it("adds an s when the resource names no plural", () => {
+    expect(renderCount(12, { singular: "resource" })).toBe("12 resources");
+  });
+
+  it("uses the resource's own plural when it has one", () => {
+    expect(renderCount(2, { singular: "flow definition", plural: "flow definitions" })).toBe(
+      "2 flow definitions",
+    );
+  });
+
+  it("counts none in the plural", () => {
+    expect(renderCount(0, { singular: "operation" })).toBe("0 operations");
+  });
+});
+
+describe("renderEmpty", () => {
+  it("says the same sentence for every resource, in that resource's plural", () => {
+    expect(renderEmpty({ singular: "deployment" })).toBe("No deployments found.");
+    expect(renderEmpty({ singular: "user" })).toBe("No users found.");
+    expect(
+      renderEmpty({
+        singular: "identity provider connection",
+        plural: "identity provider connections",
+      }),
+    ).toBe("No identity provider connections found.");
+  });
+});
+
+describe("renderList", () => {
+  const rows = [{ id: "dep_1" }, { id: "dep_2" }];
+
+  it("ends a table on the count derived from the resource", () => {
+    expect(renderList(["id"], rows, { plain: false, singular: "deployment" })).toBe(
+      ["id", "-----", "dep_1", "dep_2", "", "2 deployments"].join("\n"),
+    );
+  });
+
+  it("says the derived sentence when it found nothing", () => {
+    expect(renderList(["id"], [], { plain: false, singular: "deployment" })).toBe(
+      "No deployments found.",
+    );
+  });
+
+  it("puts a footer line under the count", () => {
+    expect(
+      renderList(["id"], [rows[0]], { plain: false, singular: "deployment", footer: ["More: x"] }),
+    ).toBe(["id", "-----", "dep_1", "", "1 deployment", "More: x"].join("\n"));
+  });
+
+  it("emits nothing at all for an empty plain list, so `wc -l` reports 0", () => {
+    expect(renderList(["id"], [], { plain: true, singular: "deployment" })).toBe("");
+  });
+});
 
 describe("renderTable", () => {
   it("aligns columns, heads them by the path's last segment, and resolves nested paths", () => {
@@ -17,6 +98,12 @@ describe("renderTable", () => {
       "user_1   active     2026-01-01T00:00:00Z",
       "user_22  suspended",
     ]);
+  });
+
+  it("heads a camelCase field as the wire spells every other one", () => {
+    expect(renderTable(["schema.objectType"], [{ schema: { objectType: "human-user" } }])).toBe(
+      ["object_type", "-----------", "human-user"].join("\n"),
+    );
   });
 
   it("renders missing values empty and non-strings as JSON", () => {
@@ -74,6 +161,12 @@ describe("renderDetail", () => {
         "created_at  2026-01-01T00:00:00Z",
       ].join("\n"),
     );
+  });
+
+  it("labels a camelCase field as the wire spells every other one", () => {
+    expect(
+      renderDetail(undefined, ["schema.objectType"], { schema: { objectType: "human" } }),
+    ).toBe("object_type  human");
   });
 
   it("omits fields the record does not carry, rather than printing blanks", () => {

@@ -1,6 +1,7 @@
 import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../../lib/oclif";
+import { renderCount } from "../../lib/oclif/crud/table";
 import { createDeployment } from "../../lib/release";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 
@@ -60,10 +61,13 @@ export default class DeploymentCreate extends EnvironmentCommand {
         origins,
         ...nextCommandsData([this.suggest("deployment list")]),
       },
-      pretty: [
-        `Deployed ${deployment.release_id} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
-        ...origins.map((origin) => `  - ${origin}`),
-      ].join("\n"),
+      // One clause and nothing else. The bulleted list under it was folded
+      // into the footer beside the clause, which put a list bullet in the
+      // middle of a sentence; spelling the origins out instead would make
+      // the clause as long as the project has origins, and a clause too long
+      // to read is replaced by "Done". `--json` and `deployment get` name
+      // them.
+      pretty: `Deployed ${deployment.release_id} to ${renderCount(origins.length, { singular: "origin" })}`,
     });
   }
 }

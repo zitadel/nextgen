@@ -400,7 +400,7 @@ describe("eject asked on a terminal", () => {
 
     await expect(ejecting(cwd)).rejects.toThrow();
 
-    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    expect(cancel).toHaveBeenCalledWith("Cancelled");
     expect(await exists(join(cwd, "app/login/page.tsx"))).toBe(true);
   });
 });

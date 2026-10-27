@@ -1,7 +1,7 @@
 import { Args, Flags } from "@oclif/core";
 
 import { type ApiOperation, findOperations, uncallable } from "../../lib/api/operations";
-import { renderRows, renderTable } from "../../lib/oclif/crud/table";
+import { renderList } from "../../lib/oclif/crud/table";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../../lib/oclif";
 
 /** One operation as `api ls` lists it. */
@@ -52,17 +52,17 @@ export default class ApiLs extends BaseCommand {
     await this.toMeta(flags, { resolveServer: false });
     const operations = findOperations({ filter: args.filter, tag: flags.tag }).map(entryOf);
 
-    const columns = ["id", "method", "path", "summary"];
+    // Rendered as every other list is, so it counts in the same words, says
+    // the same thing when it matches nothing, and ends on one dim footer
+    // line instead of a paragraph of its own. What to do with an operation is
+    // what `--help` and the examples are for, not a sentence under the table.
     return this.emit({
       status: "ok",
       data: { operations, count: operations.length },
-      pretty: process.stdout.isTTY
-        ? [
-            renderTable(columns, operations),
-            "",
-            `${operations.length} operations. Call one with \`${this.config.bin} api <id>\`; --json has each one's parameters.`,
-          ].join("\n")
-        : renderRows(columns, operations),
+      pretty: renderList(["id", "method", "path", "summary"], operations, {
+        plain: !process.stdout.isTTY,
+        singular: "operation",
+      }),
     });
   }
 }

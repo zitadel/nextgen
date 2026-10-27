@@ -5,7 +5,7 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 
 import type { Parsed } from "@zitadel/config/idp";
 
-import { ZitadelError } from "./errors";
+import { ZitadelError, CANCELLED } from "./errors";
 import type {
   Choice,
   ConfirmQuestion,
@@ -140,7 +140,7 @@ class DrawnPrompter implements Prompter {
   /** A cancelled prompt closes the chain itself, which is all a person is shown. */
   private chosen<T>(answer: T | symbol): T {
     if (isCancel(answer)) {
-      cancel("Cancelled.");
+      cancel(CANCELLED);
       throw cancelledByUser();
     }
     return answer as T;

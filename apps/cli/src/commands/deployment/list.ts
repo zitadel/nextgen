@@ -11,17 +11,36 @@ import { renderList } from "../../lib/oclif/crud/table";
 import { listData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 
-/** The columns `list` renders, in order. */
-const COLUMNS = ["id", "release_id", "reason", "origins", "deployed_at"] as const;
+/**
+ * The fields a deployment is shown by, in order. `get` reads the same ones,
+ * so one deployment and a page of them name the same things in the same
+ * words.
+ */
+export const DEPLOYMENT_FIELDS = [
+  "id",
+  "release_id",
+  "reason",
+  "origins",
+  "deployed_at",
+] as const;
 
-/** A deployment as the list endpoint returns it, narrowed to what the table reads. */
-type DeploymentRow = {
-  id: string;
-  release_id: string;
-  metadata: { reason?: string };
-  targets: { origin: string }[];
-  deployed_at: string;
+/** A deployment as the endpoints return it, narrowed to what the table reads. */
+export type DeploymentRecord = {
+  readonly id: string;
+  readonly release_id: string;
+  readonly metadata: { readonly reason?: string };
+  readonly targets: readonly { readonly origin: string }[];
+  readonly deployed_at: string;
 };
+
+/** One deployment flattened to the cells {@link DEPLOYMENT_FIELDS} names. */
+export const deploymentRow = (deployment: DeploymentRecord) => ({
+  id: deployment.id,
+  release_id: deployment.release_id,
+  reason: deployment.metadata.reason ?? "deploy",
+  origins: deployment.targets.map((target) => target.origin).join(", "),
+  deployed_at: deployment.deployed_at,
+});
 
 /**
  * `zitadel deployment list` — show the project's deployment history.
@@ -85,16 +104,10 @@ export default class DeploymentList extends EnvironmentCommand {
       token: flags["page-token"],
       nextPageToken: "next_page_token",
     });
-    const deployments = items as DeploymentRow[];
+    const deployments = items as DeploymentRecord[];
 
     // Flatten each deployment's targets to one `origins` cell for the table.
-    const rows = deployments.map((deployment) => ({
-      id: deployment.id,
-      release_id: deployment.release_id,
-      reason: deployment.metadata.reason ?? "deploy",
-      origins: deployment.targets.map((target) => target.origin).join(", "),
-      deployed_at: deployment.deployed_at,
-    }));
+    const rows = deployments.map(deploymentRow);
 
     // A page token is only valid alongside the flags that issued it, so the
     // suggested next page repeats the whole invocation rather than a bare
@@ -123,10 +136,9 @@ export default class DeploymentList extends EnvironmentCommand {
         nextPageToken: next,
         nextCommands: nextCommand === undefined ? undefined : [nextCommand],
       }),
-      pretty: renderList(COLUMNS, rows, {
+      pretty: renderList(DEPLOYMENT_FIELDS, rows, {
         plain,
         singular: "deployment",
-        empty: "No deployments yet.",
         footer: next ? [`More available: --page-token ${shellArg(next)} (or --all)`] : [],
       }),
     });
