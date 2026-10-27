@@ -11,6 +11,7 @@ import { readRendererId, readZitadelConfig } from "../lib/project";
 import { shellArg } from "../lib/shell";
 import { shellCommand, type SuggestedCommand } from "../lib/suggestion";
 import { nextCommandsData } from "../lib/oclif/envelope";
+import { Promptable } from "../lib/oclif/promptable";
 
 /**
  * Asks the framework patcher which artifacts it owns. Falls back to the
@@ -97,7 +98,7 @@ async function pathExists(path: string): Promise<boolean> {
  * `--dry-run` reports without touching the filesystem; non-interactive runs
  * require `--force`.
  */
-export default class Eject extends BaseCommand {
+export default class Eject extends Promptable(BaseCommand) {
   static override description = "Remove managed files and local Zitadel state.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 5;

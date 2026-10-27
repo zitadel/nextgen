@@ -2,9 +2,9 @@ import { ZitadelError } from "../../../lib/errors";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**
- * "Set up Zitadel in this `<framework>` app?" — the wizard's first question in
- * an app setup found, asked before anything in it changes. Accepting leaves
- * answers unchanged.
+ * "Would you like to set up Zitadel in this `<framework>` app?" — the
+ * wizard's first question in an app setup found, asked before anything in it
+ * changes. Accepting leaves answers unchanged.
  *
  * Declining throws `E_UNSUPPORTED_PROJECT_SHAPE`, and the hint points at the
  * one way to a different app: running setup in its directory. `--framework`
@@ -23,7 +23,7 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     const ack = await ctx.input({
       kind: "confirm",
       name: "confirm the framework",
-      message: `Set up Zitadel in this ${ctx.framework.displayName} app?`,
+      message: `Would you like to set up Zitadel in this ${ctx.framework.displayName} app?`,
       initialValue: true,
     });
     if (ack === false) {

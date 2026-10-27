@@ -26,6 +26,7 @@ import { environmentFlags } from "./environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
+import { Promptable } from "./promptable";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
@@ -50,7 +51,7 @@ type Target = {
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends EnvironmentCommand {
+export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.

@@ -1159,7 +1159,9 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Set up Zitadel in this Next.js app?" }),
+      expect.objectContaining({
+        message: "Would you like to set up Zitadel in this Next.js app?",
+      }),
     );
   });
 

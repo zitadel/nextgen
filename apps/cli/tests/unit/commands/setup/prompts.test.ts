@@ -119,7 +119,9 @@ describe("FrameworkConfirmPrompt", () => {
 
     expect(out).toEqual(baseAnswers());
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Set up Zitadel in this Next.js app?" }),
+      expect.objectContaining({
+        message: "Would you like to set up Zitadel in this Next.js app?",
+      }),
     );
   });
 
@@ -348,6 +350,9 @@ describe("PickFrameworkPrompt", () => {
     const id = await new PickFrameworkPrompt().ask([{ id: "next", displayName: "Next.js" }], ask);
 
     expect(id).toBe("next");
+    expect(vi.mocked(select).mock.calls[0]?.[0].message).toBe(
+      "Which framework would you like to scaffold?",
+    );
   });
 
   it("throws E_CANCELLED on Ctrl-C", async () => {
@@ -503,7 +508,7 @@ describe("SocialSignInPrompt", () => {
 
     const question = vi.mocked(multiselect).mock.calls[0]?.[0];
     expect(question?.message).toBe(
-      "Add external sign-in providers? Optional: press Enter to skip.",
+      "Would you like to add external sign-in providers? Press Enter to skip.",
     );
     expect(question?.options.map((option) => option.label)).toEqual([
       "Google — requires a Google OAuth app",
@@ -546,7 +551,7 @@ describe("SocialSignInPrompt", () => {
     expect(answers.sso).toEqual([]);
     expect(password).not.toHaveBeenCalled();
     expect(vi.mocked(text).mock.calls[0]?.[0]?.message).toBe(
-      "Client ID (Google), or leave empty to add it later",
+      "What is the client ID of your Google OAuth app? Leave it empty to add it later.",
     );
     expect(log.info).toHaveBeenCalledWith(
       [
@@ -564,7 +569,7 @@ describe("SocialSignInPrompt", () => {
     await new SocialSignInPrompt().ask(baseAnswers(), ctx);
 
     expect(vi.mocked(password).mock.calls[0]?.[0]?.message).toBe(
-      "Client secret (saved as the project variable GOOGLE_CLIENT_SECRET)",
+      "What is the client secret of your Google OAuth app? It will be stored on the project as GOOGLE_CLIENT_SECRET.",
     );
   });
 
@@ -840,7 +845,7 @@ describe("SocialSignInPrompt", () => {
       message: string;
       validate: (value: string) => string | undefined;
     };
-    expect(question.message).toBe("Client ID (Google)");
+    expect(question.message).toBe("What is the client ID of your Google OAuth app?");
     expect(question.validate("")).toBeTruthy();
   });
 
@@ -908,10 +913,10 @@ describe("askCustomSettings", () => {
     scopes: "openid",
   };
   const QUESTIONS = {
-    slug: "Name for this connection",
-    displayName: "Name shown on the sign-in button",
-    issuer: "Issuer URL of the provider",
-    scopes: "Scopes to request",
+    slug: "What would you like to call this connection?",
+    displayName: "What name should the sign-in button show?",
+    issuer: "What is the issuer URL of the provider?",
+    scopes: "Which scopes should we request?",
   };
 
   it.each([

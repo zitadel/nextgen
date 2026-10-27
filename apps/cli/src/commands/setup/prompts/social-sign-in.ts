@@ -55,28 +55,29 @@ export async function askCustomSettings(
   const slug = await ask({
     kind: "text",
     name: "connection name",
-    message: "Name for this connection (used in your configuration, e.g. acme-sso)",
+    message:
+      "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
     parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
     given: given.slug,
   });
   const displayName = await ask({
     kind: "text",
     name: "display name",
-    message: "Name shown on the sign-in button (e.g. Acme SSO)",
+    message: "What name should the sign-in button show? For example Acme SSO.",
     parse: parseDisplayName,
     given: given.displayName,
   });
   const issuer = await ask({
     kind: "text",
     name: "issuer",
-    message: "Issuer URL of the provider",
+    message: "What is the issuer URL of the provider?",
     parse: parseIssuer,
     given: given.issuer,
   });
   const scopes = await ask({
     kind: "text",
     name: "scopes",
-    message: "Scopes to request",
+    message: "Which scopes should we request? Separate them with spaces.",
     parse: parseScopes,
     given: given.scopes,
     initialValue: DEFAULT_SCOPES.join(" "),
@@ -86,9 +87,10 @@ export async function askCustomSettings(
 }
 
 /**
- * "Add external sign-in providers?" — the one onboarding question that needs
- * something from outside the terminal, so it asks last of the configuration
- * questions and takes "not now" as a first-class answer (#1081).
+ * "Would you like to add external sign-in providers?" — the one onboarding
+ * question that needs something from outside the terminal, so it asks last of
+ * the configuration questions and takes "not now" as a first-class answer
+ * (#1081).
  *
  * Registering the OAuth application is the developer's to do and cannot be
  * automated, so the question announces what to register and where before
@@ -154,8 +156,8 @@ export class SocialSignInPrompt implements SetupPrompt {
         name: "client id",
         message:
           flagged === undefined
-            ? `Client ID (${entry.displayName}), or leave empty to add it later`
-            : `Client ID (${entry.displayName})`,
+            ? `What is the client ID of your ${entry.displayName} OAuth app? Leave it empty to add it later.`
+            : `What is the client ID of your ${entry.displayName} OAuth app?`,
         parse: flagged === undefined ? clientIdOrSkip : parseClientId,
         given: flagged?.credentials.clientId,
       });
@@ -177,7 +179,7 @@ export class SocialSignInPrompt implements SetupPrompt {
       const secret = await ctx.input({
         kind: "secret",
         name: "client secret",
-        message: `Client secret (saved as the project variable ${credentialVariables(providerOf(selection).slug).clientSecret})`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${credentialVariables(providerOf(selection).slug).clientSecret}.`,
         parse: parseClientSecret,
         given: flagged?.credentials.secret,
       });
@@ -198,7 +200,7 @@ export class SocialSignInPrompt implements SetupPrompt {
     return ask({
       kind: "multiselect",
       name: "external sign-in providers",
-      message: "Add external sign-in providers? Optional: press Enter to skip.",
+      message: "Would you like to add external sign-in providers? Press Enter to skip.",
       // Nothing preselected, and declining costs nothing:
       // `auth-method sso enable` performs this journey on an existing Project
       // later.
