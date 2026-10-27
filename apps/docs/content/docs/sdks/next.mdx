@@ -113,7 +113,7 @@ export function proxy(req: NextRequest) {
 
 A `protectedRoutes` entry with a trailing `*` matches every path that starts with it.
 
-The `matcher` setup writes covers every route but Next.js's build files, so `protectedRoutes` alone decides. Next.js runs the middleware only on routes the `matcher` covers: if you narrow it to a list of routes, a protected route it leaves out is never redirected and stays public.
+The `matcher` that setup writes covers every route but Next.js's build files, so `protectedRoutes` alone decides. Next.js runs the middleware only on routes the `matcher` covers: if you narrow it to a list of routes, a protected route it leaves out is never redirected and stays public.
 
 ## Usage
 
@@ -142,7 +142,7 @@ async function Greeting() {
 
 `auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
 
-`auth()` sees a session only on routes the middleware's `matcher` covers. The `matcher` setup writes covers every page; a narrower one has to include the page's route, for example `"/dashboard/:path*"`.
+`auth()` sees a session only on routes the middleware's `matcher` covers. The `matcher` that setup writes covers every page; a narrower one has to include the page's route, for example `"/dashboard/:path*"`.
 
 ## Widget events
 
