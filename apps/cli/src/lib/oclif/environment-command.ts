@@ -158,6 +158,7 @@ export abstract class EnvironmentCommand extends BaseCommand {
     const ask = {
       cwd: this.meta.cwd,
       interactive: !this.meta.nonInteractive && !this.meta.dryRun && options.prompt !== false,
+      ask: this.ui.questions(),
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);

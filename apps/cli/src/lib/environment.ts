@@ -3,7 +3,7 @@ import { join, resolve } from "node:path";
 import { parseEnv } from "node:util";
 
 import { ZitadelError } from "./errors";
-import { asker } from "./input";
+import type { Questions } from "./ui";
 import { hasZitadelSecret, readZitadelSecret } from "./project";
 import { appendManagedEnvValue } from "./fs-safe";
 import { parseServer, resolveServer, serverOrigin } from "./server";
@@ -353,7 +353,7 @@ const SECRET_KEYS: ReadonlySet<EnvironmentKey> = new Set([
 export async function requireValueInteractive(
   environment: Environment,
   key: EnvironmentKey,
-  options: { cwd: string; interactive: boolean },
+  options: { cwd: string; interactive: boolean; ask: Questions },
 ): Promise<string> {
   const resolved = environment.values[key];
   if (resolved) {
@@ -377,10 +377,14 @@ export async function requireValueInteractive(
       return key === "ZITADEL_URL" ? parseServer(typed) : ({ ok: true, value: typed } as const);
     },
   };
-  const ask = asker({ interactive: true, force: false });
-  // A credential is never echoed, so which method asks it is the question's
-  // own property rather than a flag passed to one method.
-  const value = SECRET_KEYS.has(key) ? await ask.secret(question) : await ask.text(question);
+  // The command's own asker, so the question is drawn the way that command
+  // draws everything: a plain line for a normal command, a prompt inside the
+  // chain for a wizard. Minting one here drew a gutter for a chain that was
+  // never opened. A credential is never echoed, so which method asks it is
+  // the question's own property rather than a flag passed to one method.
+  const value = SECRET_KEYS.has(key)
+    ? await options.ask.secret(question)
+    : await options.ask.text(question);
   if (environment.envFile === undefined) {
     await persistEnvValue(join(options.cwd, `.env.${name}.local`), key, value);
   }
