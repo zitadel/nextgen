@@ -10,8 +10,8 @@ import { resolveCwd } from "../lib/paths";
 export default class Logs extends BaseCommand {
   static override description =
     "Show local Zitadel server logs.\n\nOn a terminal, warnings are yellow and errors red. Run it in the directory `zitadel start` ran in, or one inside it: the server is found from the nearest `.zitadel/local/` on the way up.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 4;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 2;
 
   static override examples = [
     "<%= config.bin %> <%= command.id %> --follow",

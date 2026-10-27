@@ -322,7 +322,7 @@ function indexMarkdown(cliReference: CliReference) {
     "A command that succeeds, or skips because there is nothing to do, exits `0`. One that fails exits with the code of the error its envelope names in `code`.",
     exitCodeTable(cliReference.exitCodes),
     ...groups,
-    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Additional commands.`,
+    `\`${cli} --help\` also lists oclif's own commands, such as \`help\` and \`version\`, under Diagnostics and utilities.`,
   ].join("\n\n");
 }
 

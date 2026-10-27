@@ -5,13 +5,14 @@ import { Fragment, type ReactNode, useState } from "react";
 import { api } from "@/api/zitadel";
 import { DeploySheet } from "@/components/deploy-sheet";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { CARD_HEADING, DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
+import { DetailPanel, DetailSection, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { ReleaseDeployments } from "@/components/release-deployments";
 import { ReleaseStatusBadge } from "@/components/release-status-badge";
 import { RevokeReleaseDialog } from "@/components/revoke-release-dialog";
 import { RollbackSheet } from "@/components/rollback-sheet";
+import { SECTION_HEADING } from "@/components/typography";
 import {
   Accordion,
   AccordionContent,
@@ -116,7 +117,7 @@ function ReleaseDetail() {
           <Separator />
 
           {/* The section's own heading, ruled off from the groups it heads. */}
-          <h2 className={CARD_HEADING}>Release content</h2>
+          <h2 className={SECTION_HEADING}>Release content</h2>
           <Separator />
 
           {groups.map((group) => (
@@ -303,7 +304,7 @@ function PolicySettingsRows({ settings }: { settings: PolicySetting[] }) {
 function ReleaseMetadata({ release }: { release: Release }) {
   const { message, git_sha, git_dirty, created_by } = release.metadata;
   return (
-    <DetailSection title="Metadata" titleStyle="heading">
+    <DetailSection title="Metadata">
       <div className="flex flex-col gap-4.5">
         <MetadataRow label="Message">{message || "—"}</MetadataRow>
         <Separator />

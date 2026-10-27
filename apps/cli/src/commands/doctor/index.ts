@@ -15,9 +15,11 @@ import {
 import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
+  LOCAL_RUNTIME_FILE,
   assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
+  findUpward,
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
@@ -36,6 +38,7 @@ import {
   readZitadelSecret,
 } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
+import { isLoopbackUrl } from "../../lib/server";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import {
   type EnvironmentSelector,
@@ -72,8 +75,8 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 3;
+  static override group = CommandGroups.diagnostics;
+  static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: nonBlankString({ description: "Container image to check." }),
@@ -98,7 +101,11 @@ export default class Doctor extends BaseCommand {
     const startDir = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const hint = await readNearestRuntimeMetadata(startDir).catch(() => undefined);
     const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
-    await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
+    const hostedServer = await hostedServerWithoutLocalRuntime(startDir, flags);
+    await this.toMeta(flags, {
+      resolveServer: false,
+      source: hostedServer ?? localServerUrl(port),
+    });
     const { cwd, dryRun } = this.meta;
     const nearest = await readNearestRuntimeMetadata(cwd);
     const existingRuntime = nearest?.runtime;
@@ -112,14 +119,17 @@ export default class Doctor extends BaseCommand {
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.meta.cliVersion);
-    const runtimeChecks = await runLocalRuntimeChecks(
-      nearest?.dir ?? cwd,
-      existingRuntime,
-      runtimeBackend,
-      image,
-      port,
-      this.localServers(),
-    );
+    const runtimeChecks =
+      hostedServer === undefined
+        ? await runLocalRuntimeChecks(
+            nearest?.dir ?? cwd,
+            existingRuntime,
+            runtimeBackend,
+            image,
+            port,
+            this.localServers(),
+          )
+        : [];
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
@@ -227,9 +237,9 @@ export default class Doctor extends BaseCommand {
             ? "Zitadel doctor passed with warnings."
             : "Zitadel doctor passed.",
       ok: failed.length === 0,
-      runtime: runtimeBackend,
-      ...(runtimeBackend === "docker" ? { image } : {}),
-      port,
+      ...(hostedServer === undefined
+        ? { runtime: runtimeBackend, ...(runtimeBackend === "docker" ? { image } : {}), port }
+        : {}),
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
@@ -529,6 +539,28 @@ async function runEnvironmentChecks(input: {
       return `${server} is reachable and project ${projectId} matches`;
     }),
   ];
+}
+
+/**
+ * The server of a project set up against a hosted server, for which doctor
+ * checks no local runtime: no local server runs for it, so the runtime says
+ * nothing about it, and a port another app holds would fail it. `undefined`
+ * (check the runtime) before setup, for a project on a local server or with a
+ * `zitadel.json` that does not parse, where a server was started in the
+ * directory or a parent, and when a flag asks about the runtime.
+ */
+async function hostedServerWithoutLocalRuntime(
+  cwd: string,
+  flags: { port?: number; runtime?: string; image?: string },
+): Promise<string | undefined> {
+  if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
+    return undefined;
+  }
+  if ((await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined || !(await hasZitadelConfig(cwd))) {
+    return undefined;
+  }
+  const server = await readZitadelConfig(cwd).then(readProjectServer, () => undefined);
+  return server === undefined || isLoopbackUrl(server) ? undefined : server;
 }
 
 /**

@@ -112,13 +112,13 @@ describe("setup", () => {
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
       });
 
-      it("publishes a password policy that enforces nothing", async () => {
+      it("publishes a password policy with the recommended minimum length", async () => {
         const app = await anApp();
 
         await app.setup();
 
         expect(await app.publishedPolicies()).toEqual([
-          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
         ]);
       });
 

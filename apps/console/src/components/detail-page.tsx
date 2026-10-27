@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { MetaCard } from "./detail-meta";
-import { EYEBROW, PAGE_TITLE } from "./typography";
+import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource detail screens (Users, Teams,
@@ -33,19 +33,14 @@ export const ICON_PLATE =
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
-/** The sentence-case card title some cards carry instead of the eyebrow: the 14/20 display face. */
-export const CARD_HEADING = "text-foreground font-serif text-sm leading-5";
-
 /**
- * A body card with a titled section: the title, an optional action beside it,
- * an optional note under them, a rule, then `children`. Inset 24px, 20px top
- * and bottom, 16px between parts. The title is the muted eyebrow unless the
- * card's design draws it as a heading.
+ * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
+ * optional action beside it, an optional note under them, a rule, then
+ * `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
 export function DetailSection({
   title,
   titleId,
-  titleStyle = "eyebrow",
   action,
   note,
   className,
@@ -55,16 +50,14 @@ export function DetailSection({
   title: string;
   /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
-  /** `heading`: sentence case in the display face, as the release cards draw it. */
-  titleStyle?: "eyebrow" | "heading";
   action?: ReactNode;
   /** A line between the header and the rule. */
   note?: ReactNode;
 }) {
   const heading = (
-    <span id={titleId} className={titleStyle === "heading" ? CARD_HEADING : EYEBROW}>
+    <h2 id={titleId} className={SECTION_HEADING}>
       {title}
-    </span>
+    </h2>
   );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>
