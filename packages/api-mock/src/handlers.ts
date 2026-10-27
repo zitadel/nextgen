@@ -23,6 +23,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
+  CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
   ExchangeHandoffBody,
@@ -108,6 +109,18 @@ export type MockHandle = {
 };
 
 const FLOW_ID = "flow_mock";
+
+/** The purpose a step of the default flow serves, where the step decides it. */
+const STEP_PURPOSES: Partial<Record<FlowStepName, CreateFlow201StepPurpose>> = {
+  identifier: "login",
+  password: "login",
+  "passkey-login": "login",
+  "sso-conflict": "login",
+  register: "register",
+  "register-password": "register",
+  "register-sso": "register",
+  recover: "recovery",
+};
 
 /**
  * The engine's one answer to a callback it cannot place (`idp_callback.go`):
@@ -318,7 +331,21 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * response even though project enablement has not changed.
    */
   function withOverlays(step: CreateFlow201): CreateFlow201 {
-    return withPasskey(withSsoProviders(step));
+    return withPurpose(withPasskey(withSsoProviders(step)));
+  }
+
+  /**
+   * `step.purpose`, as the server reports it: the default flow fixes it on the
+   * steps that sign in or sign up, and the others keep the purpose the flow
+   * started with. The mock never switches between them by itself, so no step
+   * carries a `notice`.
+   */
+  function withPurpose(response: CreateFlow201): CreateFlow201 {
+    const purpose =
+      STEP_PURPOSES[response.step.name as FlowStepName] ??
+      actor.getSnapshot().context.purpose ??
+      "login";
+    return { ...response, step: { ...response.step, purpose } };
   }
 
   /**

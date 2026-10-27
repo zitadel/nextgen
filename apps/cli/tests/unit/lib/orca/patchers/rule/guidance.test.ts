@@ -221,6 +221,7 @@ describe("guidance content", () => {
 
     expect(agents).toContain("moves between sign-in and sign-up by itself");
     expect(agents).toContain("must follow its `zitadel-flow-step` event");
+    expect(agents).toContain("`step.purpose` is `login` while it signs in");
   });
 
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
