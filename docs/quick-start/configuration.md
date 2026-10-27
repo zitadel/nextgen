@@ -111,13 +111,14 @@ session:
 
 ## Logging
 
-| YAML key                                     | Environment                                          | Default                                       | Description                                    |
-| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ---------------------------------------------- |
-| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                              |
-| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                            |
-| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                  |
-| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created            |
-| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `false`                                       | Capture a stack trace when an error is created |
+| YAML key                                     | Environment                                          | Default                                       | Description                                                 |
+| -------------------------------------------- | ---------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| `instrumentation.log.level`                  | `NEXTGEN_INSTRUMENTATION_LOG_LEVEL`                  | `info`                                        | Minimum log level                                           |
+| `instrumentation.log.format`                 | `NEXTGEN_INSTRUMENTATION_LOG_FORMAT`                 | `text`                                        | Log output encoding                                         |
+| `instrumentation.log.streams`                | `NEXTGEN_INSTRUMENTATION_LOG_STREAMS`                | `[runtime, ready, request, service, storage]` | Which log streams are enabled                               |
+| `instrumentation.log.add_source`             | `NEXTGEN_INSTRUMENTATION_LOG_ADD_SOURCE`             | `true`                                        | Record the file and line that wrote each log line on stderr |
+| `instrumentation.log.errors.report_location` | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_REPORT_LOCATION` | `true`                                        | Record where each error was created                         |
+| `instrumentation.log.errors.stack_trace`     | `NEXTGEN_INSTRUMENTATION_LOG_ERRORS_STACK_TRACE`     | `false`                                       | Capture a stack trace when an error is created              |
 
 `level`, `format`, and each entry of `streams` accept either their documented
 string name (below) or the underlying numeric value; string values are

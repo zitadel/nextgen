@@ -655,7 +655,7 @@ describe("DependencyCheck", () => {
     ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
     [
       "sveltekit",
-      { "@sveltejs/kit": "^2", svelte: "^5" },
+      { "@sveltejs/kit": "^3", svelte: "^5" },
       "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
     ],
     [

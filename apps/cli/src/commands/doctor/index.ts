@@ -408,8 +408,8 @@ export function failureAdvice(
 
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review, a dependency remedy and the meta-schema
- * refresh.
+ * nudge, the managed-runtime review, a dependency remedy, the primary issuer
+ * origin and the meta-schema refresh.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -470,6 +470,13 @@ export function advisoryForWarnings(
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
     );
     nextCommands.push(dependencyRemedy);
+  }
+
+  if (warnings.some((check) => check.name === "issuer-origin")) {
+    nextActions.push(
+      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+    );
+    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {

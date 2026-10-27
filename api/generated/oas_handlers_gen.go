@@ -132,11 +132,29 @@ func (s *Server) handleAddOriginRequest(args [1]string, argsEscaped bool, w http
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, AddOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10589,11 +10607,29 @@ func (s *Server) handleGetVariableRequest(args [1]string, argsEscaped bool, w ht
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, GetVariableOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -10787,11 +10823,29 @@ func (s *Server) handleGetVariablesRequest(args [0]string, argsEscaped bool, w h
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, GetVariablesOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -17453,11 +17507,29 @@ func (s *Server) handleRemoveOriginRequest(args [1]string, argsEscaped bool, w h
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityNextgenSession(ctx, RemoveOriginOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "NextgenSession",
+					Err:              err,
+				}
+				defer recordError("Security:NextgenSession", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

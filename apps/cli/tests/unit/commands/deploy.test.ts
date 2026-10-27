@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { abbreviate, deployed, liveOn } from "../../../src/commands/deploy";
+import { abbreviate, deployed, liveOn, noPrimaryOriginError } from "../../../src/commands/deploy";
+import { environmentSelectorSuffix } from "../../../src/lib/oclif/environment-flags";
+import { cliVersion, expectedPublicCliCommand } from "../../helpers/run-cli";
 
 const HASH = `sha256:${"a".repeat(64)}`;
 
@@ -65,5 +67,90 @@ describe("abbreviate", () => {
 
   it("cuts a bare digest that names no algorithm", () => {
     expect(abbreviate("a".repeat(64))).toBe("aaaaaaaaaaaa");
+  });
+});
+
+const ISSUER = "http://localhost:3000";
+const PREVIEW_ISSUER = [{ pattern: ISSUER, kind: "preview" }];
+
+function errorFor(
+  input: Partial<Parameters<typeof noPrimaryOriginError>[0]>,
+): ReturnType<typeof noPrimaryOriginError> {
+  return noPrimaryOriginError({
+    origins: [],
+    issuer: ISSUER,
+    setupProject: true,
+    selector: environmentSelectorSuffix({}),
+    cliVersion: cliVersion.version,
+    ...input,
+  });
+}
+
+describe("noPrimaryOriginError", () => {
+  it("is a validation error", () => {
+    expect(errorFor({}).code).toBe("E_VALIDATION");
+  });
+
+  it("suggests doctor --fix for setup's project holding its issuer as a preview origin", () => {
+    const error = errorFor({
+      origins: PREVIEW_ISSUER,
+      selector: environmentSelectorSuffix({ cwd: "web" }),
+    });
+
+    expect(error.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd web")]);
+  });
+
+  it("says why adding the preview issuer as primary does not work", () => {
+    const error = errorFor({ origins: PREVIEW_ISSUER });
+
+    expect(error.hint).toContain(`holds its issuer ${ISSUER} as a preview origin`);
+  });
+
+  it("suggests removing and re-adding the issuer for a project doctor does not repair", () => {
+    const error = errorFor({
+      origins: PREVIEW_ISSUER,
+      setupProject: false,
+      selector: environmentSelectorSuffix({ envName: "staging" }),
+    });
+
+    expect(error.nextCommands).toEqual([
+      expectedPublicCliCommand(`origin rm ${ISSUER} --force --env staging`),
+      expectedPublicCliCommand(`origin add ${ISSUER} --kind primary --env staging`),
+    ]);
+  });
+
+  it("suggests adding the issuer as primary when the project does not hold it", () => {
+    const error = errorFor({
+      origins: [{ pattern: "https://*-acme.vercel.app", kind: "preview" }],
+    });
+
+    expect(error.nextCommands).toEqual([
+      expectedPublicCliCommand(`origin add ${ISSUER} --kind primary`),
+    ]);
+  });
+
+  it("adds the issuer as its origin, without a trailing slash", () => {
+    const error = errorFor({ issuer: `${ISSUER}/` });
+
+    expect(error.nextCommands).toEqual([
+      expectedPublicCliCommand(`origin add ${ISSUER} --kind primary`),
+    ]);
+  });
+
+  it("names origin add with a URL to fill in when no issuer resolves", () => {
+    const error = errorFor({
+      issuer: undefined,
+      selector: environmentSelectorSuffix({ envName: "prod" }),
+    });
+
+    expect(error.hint).toContain(
+      expectedPublicCliCommand("origin add <url> --kind primary --env prod"),
+    );
+  });
+
+  it("suggests origin list when no issuer resolves", () => {
+    const error = errorFor({ issuer: undefined });
+
+    expect(error.nextCommands).toEqual([expectedPublicCliCommand("origin list")]);
   });
 });

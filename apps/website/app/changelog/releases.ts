@@ -3,9 +3,10 @@ import { lt, rcompare, valid } from "semver";
 // The changelog's data: the repository's GitHub Releases, read back from the
 // body the release automation writes (scripts/release-github.mjs). A body
 // holds the maintainers' notes, then a generated block whose "Package Changes"
-// repeat each package's CHANGELOG.md section, so a change that ships in ten
-// packages is listed ten times. Each release here lists it once, with every
-// package it changes.
+// list each change once, with every package it changes. Up to 0.1.0 they
+// repeated each package's CHANGELOG.md section instead, so a change that
+// ships in ten packages is listed ten times there; each release here lists it
+// once.
 
 const REPOSITORY = "zitadel/nextgen";
 
@@ -64,7 +65,7 @@ export type Release = {
   /** What the maintainers wrote around the generated block, Markdown. */
   notes: string;
   changes: Change[];
-  /** A package whose changes were left out, or a release without any. */
+  /** Changes left out of the release body, or a release without any. */
   notices: Notice[];
 };
 
@@ -144,13 +145,18 @@ export function parseRelease(release: GitHubRelease): Release {
 }
 
 /**
- * The block's "Package Changes": a `#### \`@zitadel/x\`` heading per
- * package, a `### Minor Changes` heading per bump, and under it one list item
- * per change. An item's first line is `- ` and the changeset's first line;
- * its further lines are indented by two spaces, except where a CHANGELOG.md
- * was rewrapped: a line that continues a paragraph needs no indent in
- * Markdown (a lazy continuation line), so only one after a blank line ends
- * the item.
+ * The block's "Package Changes": a `#### Minor Changes` heading per bump, and
+ * under it one list item per change. An item's first line is `- `, the
+ * packages it changes and a colon, then the changeset's first line:
+ * "- `@zitadel/cli`, `@zitadel/server`: [#123](…) … - Summary". Its further
+ * lines are indented by two spaces.
+ *
+ * Up to 0.1.0 a `#### \`@zitadel/x\`` heading per package names the packages
+ * instead, each with a `### Minor Changes` heading per bump and its own copy
+ * of the item; a change keeps every package and its highest bump. There, a
+ * line may lack the indent where a CHANGELOG.md was rewrapped: a line that
+ * continues a paragraph needs none in Markdown (a lazy continuation line), so
+ * only one after a blank line ends the item.
  */
 function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"> {
   const lines = block.split("\n");
@@ -160,7 +166,7 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
   const notices: Notice[] = [];
   let pkg: string | undefined;
   let bump: Bump = "patch";
-  let item: { change: boolean; lines: string[] } | undefined;
+  let item: { change: boolean; packages: string[]; lines: string[] } | undefined;
   let afterBlank = false;
 
   const finish = () => {
@@ -168,10 +174,12 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
     if (text && item?.change) {
       const known = changes.get(text);
       if (known) {
-        if (pkg && !known.packages.includes(pkg)) known.packages.push(pkg);
+        for (const name of item.packages) {
+          if (!known.packages.includes(name)) known.packages.push(name);
+        }
         if (BUMPS.indexOf(bump) < BUMPS.indexOf(known.bump)) known.bump = bump;
       } else {
-        changes.set(text, { ...parseChange(text), bump, packages: pkg ? [pkg] : [] });
+        changes.set(text, { ...parseChange(text), bump, packages: item.packages });
       }
     } else if (text) {
       notices.push({ package: pkg, text });
@@ -181,7 +189,7 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
 
   for (const line of from === -1 ? [] : lines.slice(from + 1)) {
     const heading = /^#### `([^`]+)`\s*$/.exec(line)?.[1];
-    const group = /^### (Major|Minor|Patch) Changes\s*$/.exec(line)?.[1];
+    const group = /^####? (Major|Minor|Patch) Changes\s*$/.exec(line)?.[1];
     const blank = line.trim() === "";
     if (heading || group) {
       finish();
@@ -189,16 +197,22 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
       if (group) bump = group.toLowerCase() as Bump;
     } else if (line.startsWith("- ")) {
       finish();
-      item = { change: true, lines: [line.slice(2)] };
+      // An item under a package's heading names no packages of its own.
+      const named = pkg ? null : PACKAGES.exec(line.slice(2));
+      item = {
+        change: true,
+        packages: named?.[1] ? named[1].slice(1, -1).split("`, `") : pkg ? [pkg] : [],
+        lines: [line.slice(2 + (named?.[0].length ?? 0))],
+      };
     } else if (item?.change && (blank || line.startsWith("  ") || !afterBlank)) {
       item.lines.push(line.startsWith("  ") ? line.slice(2) : line);
     } else if (blank) {
       finish();
     } else {
-      // Text outside any item, such as the pointer that stands in for a
-      // package's changes when they did not fit the release body.
+      // Text outside any item, such as the line that stands in for changes
+      // that did not fit the release body.
       if (item?.change) finish();
-      item ??= { change: false, lines: [] };
+      item ??= { change: false, packages: [], lines: [] };
       item.lines.push(line);
     }
     afterBlank = blank;
@@ -207,6 +221,9 @@ function parsePackageChanges(block: string): Pick<Release, "changes" | "notices"
 
   return { changes: [...changes.values()], notices };
 }
+
+// The packages before an item's colon, "`@zitadel/cli`, `@zitadel/server`: ".
+const PACKAGES = /^((?:`[^`\s]+`, )*`[^`\s]+`): /;
 
 // What @changesets/changelog-github writes before a changeset's summary: its
 // pull request, its commit and its authors, each when known, then " - ".

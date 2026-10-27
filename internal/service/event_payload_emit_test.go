@@ -245,7 +245,7 @@ func TestAuthAttempt_CheckPayloadIncludesAttemptID(t *testing.T) {
 	expectListUserPasskeys(stmts, []*domain.UserPasskey{f.passkey})
 	stmts.EXPECT().UpdateUserPasskey(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
-	svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+	svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil, nil)
 	_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
 		ProjectID:   "proj",
 		AttemptID:   "att-1",
@@ -294,7 +294,7 @@ func TestAuthAttempt_HandoffEmptyPayloadKeepsSessionColumn(t *testing.T) {
 	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), "proj", "att-1").Return(attempt, nil)
 	stmts.EXPECT().HandoffAuthAttempt(gomock.Any(), gomock.Any()).Return(nil)
 
-	svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil)
+	svc := service.NewAuthAttemptService(service.NewPool(pool), nil, nil, nil, nil)
 	_, err := svc.Handoff(t.Context(), service.HandoffInput{ProjectID: "proj", AttemptID: "att-1"})
 	require.NoError(t, err)
 	require.NotNil(t, gotEvent)
@@ -433,7 +433,7 @@ func TestPatchUserAction_EventPayloadAttributeKeys(t *testing.T) {
 func TestSetPasswordAction_UsesPasswordRowID(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
-	hasher := cryptomock.NewMockHasher(ctrl)
+	hasher := cryptomock.NewMockPasswordHasher(ctrl)
 	hasher.EXPECT().Hash("s3cret").Return("hash", nil)
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{

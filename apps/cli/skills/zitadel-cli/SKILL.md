@@ -100,6 +100,11 @@ upgrade, so upgrade the app and rerun rather than retrying.
   An empty list admits every origin, so removing the last one opens the project
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
+  `deploy` lands only on primary origins and fails with `E_VALIDATION` without
+  one; its `next_commands` name the step that gives the project one. `setup`
+  0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
+  which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
+  (`issuer-origin`) and `doctor --fix` makes it primary.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
@@ -220,6 +225,12 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `deployment rollback` emits `data.release_id` (the release live again),
+  `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
+  revisions that release pins; the `schema` one is what new registrations use.
+  Users keep their schema revision and attributes: a rollback does not migrate
+  them back. Without `data.pointers`, a warning says the release could not be
+  read.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -495,6 +506,23 @@ missing or outdated (after an upgrade that changed a dialect), and
 `doctor --fix` writes the current ones, unless the project pins a newer
 `@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
 the path; `deploy --dry-run` validates without them either way.
+
+## Claiming a project
+
+A project on a hosted server stays temporary until a person claims it, within
+14 days of `setup`. Claiming signs that person in with their own Zitadel
+account in a browser, so it is their step: hand them the link, and never open
+it yourself. Plain `claim` waits for the browser step and prints nothing on
+stdout until it ends, so run `claim --no-wait --non-interactive --json`
+instead. It returns at once with `data.claim_url`, the link to give the person
+verbatim, and `data.expires_at`, when it stops working (about 10 minutes).
+Then run the `claim --challenge-id …` command in `data.next_commands`: it
+waits for the person to finish, returns `data.dashboard_url`, and records the
+owning team in `.zitadel/secret`. When the link expires, or `--challenge-id`
+names one the platform does not know (`E_NOT_FOUND`), `next_commands` starts a
+new `--no-wait` link. A project that already has a team is `skipped` with
+`reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
+and no `next_commands`, since a new link cannot reopen it.
 
 ## Reference files
 

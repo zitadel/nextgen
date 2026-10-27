@@ -728,6 +728,23 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
+      ".zitadel/secret",
+      (secret) => {
+        secret.primary_origins = [];
+        secret.preview_origins = [SETUP_ORIGIN.pattern];
+      },
+    );
+  }
+
   /** The origin patterns the project admits, read back through `origin list`. */
   async projectOrigins(): Promise<ProjectOrigin[]> {
     const result = await this.cli(["origin", "list", "--json"]);

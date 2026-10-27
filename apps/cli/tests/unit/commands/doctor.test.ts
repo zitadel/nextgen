@@ -1053,6 +1053,24 @@ describe("advisoryForWarnings", () => {
 
     expect(advice).toBeUndefined();
   });
+
+  it("suggests doctor --fix for an issuer held as a preview origin, in the directory doctor checked", () => {
+    const issuerWarning = {
+      name: "issuer-origin",
+      status: "warn" as const,
+      message: "preview",
+      details: { pattern: "http://localhost:3000", server: "https://api.zitadel.cloud" },
+    };
+
+    const advice = advisoryForWarnings(
+      [issuerWarning],
+      cliVersion.version,
+      undefined,
+      environmentSelectorSuffix({ cwd: "apps/web" }),
+    );
+
+    expect(advice?.nextCommands).toEqual([expectedPublicCliCommand("doctor --fix --cwd apps/web")]);
+  });
 });
 
 describe("failureAdvice for a runtime found in a parent directory", () => {
