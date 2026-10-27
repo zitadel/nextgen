@@ -57,9 +57,14 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/__nextgen/:path*', '/admin', '/login'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
 ```
+
+This `matcher` covers every route but Next.js's build files, so
+`protectedRoutes` alone decides which routes need a sign-in. Next.js runs the
+middleware only on the routes its `matcher` covers: a protected route that a
+narrower `matcher` leaves out is never redirected, and stays public.
 
 The middleware runs on every matched route and does three things in one pass:
 
@@ -173,11 +178,11 @@ routes the middleware `matcher` covers.
 
 ### 4. Session state for your own UI (any page)
 
-`auth()` only sees a session on routes the middleware `matcher` covers, and the
-scaffolded matcher covers just the proxy path and the protected routes — so a
-header on a public page would always look signed out. For your app's own chrome
-(header navigation, account menus), read the session client-side with
-`getSession()` from `@zitadel/sdk-next/session`. It fetches the same-origin
+`auth()` only sees a session on routes the middleware `matcher` covers, so with
+a `matcher` that lists routes, a header on a public page would always look
+signed out. For your app's own chrome in client components (header navigation,
+account menus), read the session client-side with `getSession()` from
+`@zitadel/sdk-next/session`. It fetches the same-origin
 `{proxyPath}/sessions/me?project_id=…` — the same read the `<zitadel-session>`
 card performs — so it works on every page and the answer is the server's. The
 project is the `projectId` option, else the project of `configureZitadel()`,

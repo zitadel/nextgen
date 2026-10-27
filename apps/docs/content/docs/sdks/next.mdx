@@ -69,7 +69,7 @@ The Next.js SDK wires App Router applications through one server-side middleware
     }
 
     export const config = {
-      matcher: ["/__nextgen/:path*", "/profile/:path*"],
+      matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
     };
     ```
 
@@ -99,7 +99,7 @@ Don't change the port in only one of these places. Starting the app with `PORT=3
 
 ## Protect a route
 
-Next.js runs the middleware only on routes the `matcher` covers, so a route needs sign-in only when it is in both `protectedRoutes` and the `matcher`. To protect another route, add it to both in `proxy.ts`:
+To protect another route, add it to `protectedRoutes` in `proxy.ts`:
 
 ```ts
 export function proxy(req: NextRequest) {
@@ -109,13 +109,11 @@ export function proxy(req: NextRequest) {
     loginPath: "/login",
   });
 }
-
-export const config = {
-  matcher: ["/__nextgen/:path*", "/profile/:path*", "/orders/:path*"],
-};
 ```
 
 A `protectedRoutes` entry with a trailing `*` matches every path that starts with it.
+
+The `matcher` setup writes covers every route but Next.js's build files, so `protectedRoutes` alone decides. Next.js runs the middleware only on routes the `matcher` covers: if you narrow it to a list of routes, a protected route it leaves out is never redirected and stays public.
 
 ## Usage
 
@@ -144,7 +142,7 @@ async function Greeting() {
 
 `auth()` reads the request, so the component that calls it renders inside `<Suspense>`: with Cache Components on, which `create-next-app` enables, Next.js refuses request data outside it.
 
-`auth()` sees a session only on routes the middleware's `matcher` covers. Add the page's route to the `matcher` in `proxy.ts`, for example `"/dashboard/:path*"`.
+`auth()` sees a session only on routes the middleware's `matcher` covers. The `matcher` setup writes covers every page; a narrower one has to include the page's route, for example `"/dashboard/:path*"`.
 
 ## Widget events
 

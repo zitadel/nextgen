@@ -70,8 +70,10 @@ function tunnelHeaders(req: NextRequest, extra: Readonly<Record<string, string>>
  * A session counts only in the app's own project: `projectId`, else
  * `ZITADEL_PROJECT_ID`, else `NEXT_PUBLIC_ZITADEL_PROJECT_ID`.
  *
+ * // Every route but Next.js's build files: a protected route the matcher
+ * // leaves out never reaches the middleware, and stays public.
  * export const config = {
- *   matcher: ["/__nextgen/:path*", "/profile/:path*"],
+ *   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
  * };
  * ```
  *
