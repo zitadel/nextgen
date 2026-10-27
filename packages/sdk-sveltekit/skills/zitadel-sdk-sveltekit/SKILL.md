@@ -20,7 +20,7 @@ routes. The package is server-only; the widgets come from `@zitadel/sdk-svelte`.
 ## When to use
 
 The `zitadel` CLI (`zitadel setup --framework sveltekit`) scaffolds the hook,
-login/register/profile routes, and `.env.local` into a fresh or detected
+login/register/profile routes, `src/env.ts` and `.env.local` into a fresh or detected
 SvelteKit project — prefer it for greenfield work. Reach for **this skill** when
 you are adding auth to an **existing or custom** SvelteKit app by hand, or
 adjusting a scaffolded wiring.
@@ -33,27 +33,41 @@ pnpm add @zitadel/sdk-sveltekit@latest
 pnpm add @zitadel/sdk-svelte@latest
 ```
 
-Peer deps: `@sveltejs/kit ^2.0.0 || ^3.0.0`, `svelte ^5.0.0`.
+Peer deps: `@sveltejs/kit ^3.0.0`, `svelte ^5.0.0`.
 
 ## Integrate
 
-**1. Server hook.** Create or extend `src/hooks.server.ts`:
+**1. Server hook.** Declare the settings in `src/env.ts` (SvelteKit 3), so
+SvelteKit serves them from the server-only `$app/env/private` — from
+`.env.local` in dev, from the platform in production:
 
 ```ts
+import { defineEnvVars } from '@sveltejs/kit/env';
+
+export const variables = defineEnvVars({
+  ZITADEL_URL: {},
+  ZITADEL_PROJECT_SECRET: {},
+  ZITADEL_PROJECT_ID: {},
+});
+```
+
+Then create or extend `src/hooks.server.ts`:
+
+```ts
+import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
 import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
 
 export const handle = createNextgenHandle({
+  url: ZITADEL_URL,
+  projectSecret: ZITADEL_PROJECT_SECRET,
+  projectId: ZITADEL_PROJECT_ID,
   protectedRoutes: ['/admin', '/dashboard*'], // trailing * matches sub-paths
   loginPath: '/login',
 });
 ```
 
-`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
-from `process.env`, not SvelteKit's `$env` modules — their import paths moved
-between SvelteKit 2 and 3. In dev, the `zitadel()` plugin from
-`@zitadel/sdk-sveltekit/vite` in `vite.config.ts` puts the `ZITADEL_*` variables
-from the env files there (a variable already set wins), so do not load them
-yourself. Compose with other hooks via
+Do not read them from `process.env`: SvelteKit never puts `.env` files there.
+Compose with other hooks via
 `sequence()` from `@sveltejs/kit/hooks`. Sessions count only in the app's own
 project: `projectId`, else `ZITADEL_PROJECT_ID`, else
 `VITE_ZITADEL_PROJECT_ID`. With none set, nobody is signed in.

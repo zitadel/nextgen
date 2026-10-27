@@ -10,7 +10,7 @@ pnpm add @zitadel/sdk-sveltekit@latest
 
 ## Requirements
 
-Peer dependencies: `@sveltejs/kit ^2.0.0 || ^3.0.0`, `svelte ^5.0.0` and `vite ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0`.
+Peer dependencies: `@sveltejs/kit ^3.0.0` and `svelte ^5.0.0`.
 
 TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes](https://github.com/zitadel/nextgen/blob/main/packages/AGENTS.md).
 
@@ -18,34 +18,38 @@ TypeScript ≥ 5.0, the floor shared by every SDK; see the [compatibility notes]
 
 ### 1. Server hook
 
-Create (or extend) `src/hooks.server.ts`:
+Declare the three server-only settings in `src/env.ts`, so SvelteKit 3 serves
+them from `$app/env/private`: from `.env.local` in dev, and from the platform's
+environment in production. A missing one fails each request with an error naming it, and SvelteKit never
+bundles them for the browser:
 
 ```ts
+import { defineEnvVars } from '@sveltejs/kit/env';
+
+export const variables = defineEnvVars({
+  ZITADEL_URL: {},
+  ZITADEL_PROJECT_SECRET: {},
+  ZITADEL_PROJECT_ID: {},
+});
+```
+
+Then create (or extend) `src/hooks.server.ts`:
+
+```ts
+import { ZITADEL_PROJECT_ID, ZITADEL_PROJECT_SECRET, ZITADEL_URL } from '$app/env/private';
 import { createNextgenHandle } from '@zitadel/sdk-sveltekit/server';
 
 export const handle = createNextgenHandle({
+  url: ZITADEL_URL,
+  projectSecret: ZITADEL_PROJECT_SECRET,
+  projectId: ZITADEL_PROJECT_ID,
   protectedRoutes: ['/admin', '/dashboard*'],
   loginPath: '/login',
 });
 ```
 
-`url` and `projectSecret` default to `ZITADEL_URL` and `ZITADEL_PROJECT_SECRET`
-from `process.env` rather than SvelteKit's `$env` modules, whose import paths
-moved between SvelteKit 2 and 3 (`$env/dynamic/private` → `$app/env/private`).
-SvelteKit does not put `.env` files on `process.env`, so add the `zitadel()`
-plugin to `vite.config.ts`. While `vite dev` runs it puts the `ZITADEL_*`
-variables from your env files there (a variable already set wins); builds are
-left alone, since in production the platform provides the variables:
-
-```ts
-import { sveltekit } from '@sveltejs/kit/vite';
-import { zitadel } from '@zitadel/sdk-sveltekit/vite';
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-  plugins: [sveltekit(), zitadel()],
-});
-```
+Left out, `url`, `projectSecret` and `projectId` default to the same names on
+`process.env`, which SvelteKit never fills from `.env` files.
 
 The hook runs on every request and does three things in one pass:
 

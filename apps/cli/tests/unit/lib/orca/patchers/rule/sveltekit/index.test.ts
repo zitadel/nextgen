@@ -86,7 +86,7 @@ describe("SvelteKitPatcher.plan", () => {
     );
   });
 
-  it("seeds the public project id and edits only the dev script and the Vite config", () => {
+  it("seeds the public project id and edits no config but the dev script", () => {
     const plan = new SvelteKitPatcher().plan(ctx());
     const envOp = plan.ops.find(
       (op): op is Extract<FileOp, { kind: "merge-env" }> =>
@@ -96,7 +96,7 @@ describe("SvelteKitPatcher.plan", () => {
     );
     expect(envOp?.entries).toMatchObject({ VITE_ZITADEL_PROJECT_ID: "proj-1" });
     // baseOps adds AGENTS.md/README.md guidance edits to every plan; beyond
-    // those the config edits are the dev script's port and the Vite plugin.
+    // those the only config edit is the dev script's port.
     expect(
       plan.ops
         .filter(
@@ -104,7 +104,7 @@ describe("SvelteKitPatcher.plan", () => {
             op.kind === "edit" && !["AGENTS.md", "README.md"].includes(String(op.path)),
         )
         .map((op) => op.path),
-    ).toEqual(["package.json", expect.arrayContaining(["vite.config.ts"])]);
+    ).toEqual(["package.json"]);
   });
 
   it("adds the server SDK + the Svelte component lib at the CLI's exact version", () => {
@@ -173,7 +173,7 @@ describe("SvelteKitPatcher.plan", () => {
 });
 
 describe("SvelteKitPatcher.artifacts", () => {
-  it("lists the routes + hook as managed, the SDK as a dependency, and its config edits", () => {
+  it("lists the routes + hook as managed, the SDK as a dependency, no config edits", () => {
     const artifacts = new SvelteKitPatcher().artifacts({
       framework: { id: "sveltekit", appDir: "src", devPort: 5173, url: "http://localhost:5173" },
       rendererId: "svelte",
@@ -181,7 +181,7 @@ describe("SvelteKitPatcher.artifacts", () => {
     expect(artifacts.markedFiles).toContain("src/hooks.server.ts");
     expect(artifacts.markedFiles).toContain("src/routes/login/+page.svelte");
     expect(artifacts.dependencies).toEqual(["@zitadel/sdk-sveltekit", "@zitadel/sdk-svelte"]);
-    expect(artifacts.configEdits).toEqual(["package.json", "vite.config.*"]);
+    expect(artifacts.configEdits).toEqual(["package.json"]);
   });
 
   it("declares the app shell and landing page as conditionally scaffolded", () => {
