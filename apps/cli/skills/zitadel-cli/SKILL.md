@@ -100,6 +100,11 @@ upgrade, so upgrade the app and rerun rather than retrying.
   An empty list admits every origin, so removing the last one opens the project
   up; `origin rm` asks first and needs `--force` when non-interactive. Removing
   a preview pattern leaves its live previews served until they expire.
+  `deploy` lands only on primary origins and fails with `E_VALIDATION` without
+  one; its `next_commands` name the step that gives the project one. `setup`
+  0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
+  which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
+  (`issuer-origin`) and `doctor --fix` makes it primary.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
