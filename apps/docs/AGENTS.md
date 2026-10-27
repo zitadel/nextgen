@@ -72,7 +72,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
   client component the whole OpenAPI document.
 - `llms-full.txt` leaves out operations and webhooks, and its test fails on a
-  Markdown link to one: link prose to the section's page.
+  Markdown link to one: link prose to the section's page. Of the CLI's release
+  notes it carries the newest version only.
 - An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
   its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
   (`components/api-page.tsx`); its Markdown repeats all three for the default
