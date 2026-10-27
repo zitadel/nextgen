@@ -9,6 +9,7 @@ import semver from "semver";
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
+import type { PasswordMinLength } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the
@@ -170,14 +171,16 @@ export function fileNameOf(p: string): string {
 
 /**
  * The sign-in configuration the wizard's answers add up to, said once so the
- * preset and the providers need not be pieced together. It describes what will
- * be configured, not that sign-in works: an enabled method is not a credential
- * a user has registered. Both presets enable password and passkey in the
- * schema and differ in which the login flow starts with.
+ * preset, the password policy and the providers need not be pieced together.
+ * It describes what will be configured, not that sign-in works: an enabled
+ * method is not a credential a user has registered. Both presets enable
+ * password and passkey in the schema and differ in which the login flow starts
+ * with.
  */
 export function signInSummary(answers: {
   preset: SetupPreset;
   sso: ReadonlyArray<{ selection: ProviderSelection }>;
+  passwordMinLength?: PasswordMinLength;
 }): string {
   const providers = answers.sso.map((draft) => providerOf(draft.selection).displayName);
   return [
@@ -185,6 +188,9 @@ export function signInSummary(answers: {
       ? "Sign-in starts with a passkey, with email and password as the fallback."
       : "Sign-in starts with email and password.",
     "Password and passkey are enabled in the user schema.",
+    typeof answers.passwordMinLength === "number"
+      ? `Passwords need at least ${answers.passwordMinLength} characters.`
+      : "Passwords have no minimum length.",
     providers.length === 0
       ? "No external providers selected."
       : `External providers: ${providers.join(", ")}.`,

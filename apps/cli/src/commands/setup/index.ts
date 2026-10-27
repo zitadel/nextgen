@@ -356,7 +356,7 @@ export default class Setup extends BaseCommand {
       detected = await orca.detect(cwd, flags.framework);
       app = { framework: detected.id, devPort: detected.devPort };
       consola.success(
-        `Detected ${detected.id}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
+        `Detected ${orca.displayName(detected.id)}${detected.devPort ? ` (dev port ${detected.devPort})` : ""}`,
       );
     } catch (error) {
       if (error instanceof ZitadelError && error.code === "E_FRAMEWORK_NOT_DETECTED") {
@@ -428,7 +428,9 @@ export default class Setup extends BaseCommand {
       }
       const promptCtx = {
         input: wizardInput,
-        framework: { id: app.framework },
+        framework: { id: app.framework, displayName: orca.displayName(app.framework) },
+        suggest: (args: string) =>
+          projectCommand(args, recoverySelector(flags.cwd), this.meta.cliVersion),
         cwd,
         frameworkChosen: scaffoldedFramework || flags.framework !== undefined,
         serverFlag: this.meta.serverFlag,

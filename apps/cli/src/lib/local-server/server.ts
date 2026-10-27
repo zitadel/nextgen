@@ -204,6 +204,15 @@ export class LocalServer {
     }
   }
 
+  /**
+   * Whether nothing on this machine holds `port`, decided the way `start`
+   * decides it for a server (connect and bind, never `lsof`). For the setup
+   * wizard, which asks for an app port only when the detected one is taken.
+   */
+  static isPortFree(port: number): Promise<boolean> {
+    return new TcpPorts().isFree(port);
+  }
+
   /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
   private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
     const alive =

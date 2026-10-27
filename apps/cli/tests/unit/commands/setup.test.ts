@@ -27,6 +27,7 @@ import {
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
+import { LocalServer } from "../../../src/lib/local-server/server";
 import Setup from "../../../src/commands/setup";
 import { aFakeAppGeneratorPath } from "../../helpers/app-generator";
 import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
@@ -1140,6 +1141,16 @@ describe("setup asked on a terminal", () => {
   const settingUp = (cwd: string, ...extra: string[]) =>
     asTerminal(() => Setup.run(["--cwd", cwd, "--server", "https://api.zitadel.cloud", ...extra]));
 
+  // The port question is asked only when the app's port is taken; whether 3000
+  // is free on the machine running the tests must not decide what is asked.
+  let portFree: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
+  });
+  afterEach(() => {
+    portFree.mockRestore();
+  });
+
   it("still asks whether to proceed with the detected framework when --force is given", async () => {
     // --force permits overwriting files here. It must never answer a question.
     const cwd = await makeNextProject();
@@ -1148,7 +1159,7 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({ message: "Set up Zitadel in this Next.js app?" }),
     );
   });
 
@@ -1172,26 +1183,32 @@ describe("setup asked on a terminal", () => {
       vi.unstubAllEnvs();
     });
 
-    /** Picks Next.js to scaffold, then answers every question after it. */
+    /**
+     * Picks Next.js to scaffold, then answers every question after it: the
+     * fields, the sign-in method, the password minimum and the providers. The
+     * port is free, so it is not asked.
+     */
     function answeringEveryQuestion(): void {
       vi.mocked(select)
         .mockResolvedValueOnce("next" as never)
         .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
-        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never);
-      vi.mocked(text).mockResolvedValueOnce("3000" as never);
+        .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+        .mockResolvedValueOnce(15 as never);
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
     }
 
     it("creates no app when a question after the framework is cancelled", async () => {
       const cwd = await makeNewAppDirectory();
-      vi.mocked(select).mockResolvedValueOnce("next" as never);
-      vi.mocked(text).mockResolvedValueOnce(CANCELLED as never);
+      vi.mocked(select)
+        .mockResolvedValueOnce("next" as never)
+        .mockResolvedValueOnce(CANCELLED as never);
 
-      await expect(settingUp(cwd)).rejects.toThrow();
+      // Exits 130, as Ctrl-C does anywhere.
+      await expect(settingUp(cwd)).rejects.toMatchObject({ oclif: { exit: 130 } });
 
-      expect(text).toHaveBeenCalledWith(
+      expect(select).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining("Which port should your app run on?"),
+          message: expect.stringContaining("Which fields should registration collect?"),
         }),
       );
       expect(await readdir(cwd)).toEqual([]);

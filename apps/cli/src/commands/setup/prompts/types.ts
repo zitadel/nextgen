@@ -8,7 +8,8 @@ import {
 } from "@zitadel/config/idp";
 
 import type { Asker } from "../../../lib/input";
-import type { FrameworkFacts } from "../../../lib/orca";
+import type { FrameworkChoice } from "../../../lib/orca";
+import type { SuggestedCommand } from "../../../lib/suggestion";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -112,11 +113,18 @@ export type PromptContext = {
    */
   readonly input: Asker;
   /**
-   * The framework of the app setup integrates. Only its id: a new app does not
-   * exist while the wizard asks, because setup creates it once it has every
-   * answer.
+   * The framework of the app setup integrates: its id and the name a question
+   * shows ("Next.js"). Nothing more: a new app does not exist while the wizard
+   * asks, because setup creates it once it has every answer.
    */
-  readonly framework: Pick<FrameworkFacts, "id">;
+  readonly framework: FrameworkChoice;
+  /**
+   * A command for this app's project, for a question that names what to run
+   * once setup is done, such as adding a skipped provider. It carries the
+   * selector setup's own recovery commands carry, so it reaches the project
+   * setup creates and not one the shell's environment names.
+   */
+  readonly suggest: (args: string) => SuggestedCommand;
   /**
    * The app directory setup runs in. {@link import("./server").ServerPrompt}
    * reads the local runtime metadata (`.zitadel/local/runtime.json`) under it

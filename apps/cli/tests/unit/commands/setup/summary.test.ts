@@ -111,6 +111,7 @@ describe("signInSummary", () => {
       [
         "Sign-in starts with email and password.",
         "Password and passkey are enabled in the user schema.",
+        "Passwords have no minimum length.",
         "No external providers selected.",
       ].join("\n"),
     );
@@ -119,6 +120,15 @@ describe("signInSummary", () => {
   it("says passkey-first starts with a passkey and falls back to email and password", () => {
     expect(signInSummary({ preset: "passkey-first", sso: [] })).toContain(
       "Sign-in starts with a passkey, with email and password as the fallback.",
+    );
+  });
+
+  it("says the minimum password length that was chosen", () => {
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: 15 })).toContain(
+      "Passwords need at least 15 characters.",
+    );
+    expect(signInSummary({ preset: "password-first", sso: [], passwordMinLength: null })).toContain(
+      "Passwords have no minimum length.",
     );
   });
 

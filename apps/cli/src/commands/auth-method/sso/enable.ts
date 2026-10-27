@@ -343,7 +343,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const secretValue = await this.input({
         kind: "secret",
         name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        message: `Client secret (saved as the project variable ${scaffolded.clientSecret})`,
         parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),
