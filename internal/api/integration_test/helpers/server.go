@@ -64,11 +64,11 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 
 // withServerLog hands every request a logger collecting into the harness, the
 // way the production middleware hands one writing to the process log, and runs
-// the production request logging on top so the buffer holds real log lines.
-// redactQuery is the mount's opt-in, as in production.
+// the production request logging and panic recovery on top so the buffer holds
+// real log lines. redactQuery is the mount's opt-in, as in production.
 func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.Handler {
 	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
-	logging := middleware.WithLogging(next, redactQuery...)
+	logging := middleware.WithLogging(api.WithRecover(next), redactQuery...)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
 	})
