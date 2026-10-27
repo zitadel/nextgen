@@ -308,6 +308,17 @@ func TestHandleNextgenSession(t *testing.T) {
 			api.GetProjectOperation,
 			api.PatchProjectOperation,
 			api.ListProjectAdminsOperation,
+			// #2320: the project settings page's origin writes and variable
+			// reads, and the policy reads, which a session without a user
+			// answered with the resource's not found before they were listed.
+			api.AddOriginOperation,
+			api.RemoveOriginOperation,
+			api.GetVariablesOperation,
+			api.GetVariableOperation,
+			api.ListPoliciesOperation,
+			api.GetPolicyOperation,
+			api.ListPolicyRevisionsOperation,
+			api.GetPolicyRevisionOperation,
 		} {
 			t.Run(string(op), func(t *testing.T) {
 				t.Parallel()
