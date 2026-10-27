@@ -124,11 +124,11 @@ Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
 `OVERLINE`, `EYEBROW`, the panel table cells) live in
 `src/components/typography.ts`.
 
-- `SECTION_HEADING`, 16/20 (Figma `zitadel/heading-md`): every primary card
+- `SECTION_HEADING`, 16/20 (Figma `zitadel/section-heading`): every primary card
   and section title, the project page's Project Detail, Origins and Variables
   and Secrets cards included. `DetailSection` renders it as an `h2`; so do
   Field definitions, Steps, Release content and the settings sections.
-- `SUBSECTION_HEADING`, 14/20 (`zitadel/heading-sm`): a subordinate heading
+- `SUBSECTION_HEADING`, 14/20 (`zitadel/subsection-heading`): a subordinate heading
   inside a card body, such as Sign-in methods on a schema.
 - The overline is for meta labels, table heads and drill-down breadcrumbs,
   never a section title.
