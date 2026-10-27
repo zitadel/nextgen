@@ -25,7 +25,7 @@ export { FrameworkConfirmPrompt } from "./framework-confirm";
 export { PasswordPolicyPrompt } from "./password-policy";
 export { ServerPrompt } from "./server";
 export { SignInPresetPrompt } from "./sign-in-preset";
-export { SocialSignInPrompt } from "./social-sign-in";
+export { askCustomSettings, SocialSignInPrompt } from "./social-sign-in";
 export { UseCasePrompt } from "./use-case";
 export { PickFrameworkPrompt } from "./pick-framework";
 

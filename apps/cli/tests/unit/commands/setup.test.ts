@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
 
-vi.mock("../../../src/lib/idp/ask-custom", async (importOriginal) => ({
+vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   askCustomSettings: vi.fn(),
 }));
@@ -24,7 +24,7 @@ import {
   setupRetryFlags,
   ssoFromFlags,
 } from "../../../src/commands/setup";
-import { askCustomSettings } from "../../../src/lib/idp/ask-custom";
+import { askCustomSettings } from "../../../src/commands/setup/prompts";
 import type { Asker } from "../../../src/lib/input";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import Setup from "../../../src/commands/setup";

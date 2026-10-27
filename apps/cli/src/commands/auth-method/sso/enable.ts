@@ -17,6 +17,12 @@ import {
   providerOf,
   selectionName,
   validated,
+  DEFAULT_SCOPES,
+  parseConnectionSlug,
+  parseDisplayName,
+  parseIssuer,
+  parseScopes,
+  RESERVED_SLUGS,
 } from "@zitadel/config/idp";
 
 import type { ZitadelClient } from "../../../lib/api-client";
@@ -35,7 +41,6 @@ import {
   type ConnectionPlan,
   type FlowFile,
   credentialVariablesOf,
-  askCustomSettings,
   checkGivenCustomFlags,
   type CustomFlagValues,
   customExample,
@@ -154,9 +159,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       project.selection ??
       selectionFromFlags(
         CUSTOM_PROVIDER,
-        await askCustomSettings(
+        await this.askCustomSettings(
           customSettingsToAsk(project.values, existingCustomSettings(connections, project.values)),
-          this.input,
         ),
         ENABLE_FLAG_NAMES,
         customExample(ENABLE_FLAG_NAMES),
@@ -542,6 +546,47 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       }
     }
     return editedFiles(schema, edits);
+  }
+
+  /**
+   * The settings of a custom connection, asking only for the ones not already
+   * given. A given value goes through the same parser as a typed one, so every
+   * setting is checked against the contract the server enforces on apply. The
+   * ones given on the command line were checked under their flag before this
+   * ran (`checkGivenCustomFlags`).
+   */
+  private async askCustomSettings(given: CustomFlagValues): Promise<Required<CustomFlagValues>> {
+    const slug = await this.input({
+      kind: "text",
+      name: "connection name",
+      message:
+        "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
+      parse: (value) => parseConnectionSlug(value, RESERVED_SLUGS),
+      given: given.slug,
+    });
+    const displayName = await this.input({
+      kind: "text",
+      name: "display name",
+      message: "What name should the sign-in button show? For example Acme SSO.",
+      parse: parseDisplayName,
+      given: given.displayName,
+    });
+    const issuer = await this.input({
+      kind: "text",
+      name: "issuer",
+      message: "What is the issuer URL of the provider?",
+      parse: parseIssuer,
+      given: given.issuer,
+    });
+    const scopes = await this.input({
+      kind: "text",
+      name: "scopes",
+      message: "Which scopes should we request? Separate them with spaces.",
+      parse: parseScopes,
+      given: given.scopes,
+      initialValue: DEFAULT_SCOPES.join(" "),
+    });
+    return { slug, displayName, issuer, scopes: scopes.join(" ") };
   }
 
   /**

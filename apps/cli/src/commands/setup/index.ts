@@ -42,7 +42,6 @@ import {
   callbackUriFor,
   customFlagText,
   checkGivenCustomFlags,
-  askCustomSettings,
   customExample,
   customFlagValues,
   flagText,
@@ -106,6 +105,7 @@ import {
 import { installDependenciesForSetup } from "./install";
 import { moveDevPort } from "./move-dev-port";
 import {
+  askCustomSettings,
   PickFrameworkPrompt,
   SETUP_PROMPTS,
   type SetupAnswers,
