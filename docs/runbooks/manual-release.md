@@ -15,7 +15,8 @@ pull request ([Product notes](#product-notes)).
 3. `release-publish` runs the Changesets action and opens or updates the
    generated version PR.
 4. Review the generated version PR. It should update package versions,
-   changelogs, and the `@zitadel/server` npm runtime version.
+   changelogs, and the `@zitadel/server` npm runtime version; its description
+   lists each change once, as the GitHub Release will.
 5. Merge the version PR only after CI is green.
 6. `release-publish` runs automatically from that merge commit on `main`,
    publishes npm packages with Changesets, and pushes the
