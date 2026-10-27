@@ -1,13 +1,13 @@
 package deployment
 
 import (
+	"time"
+
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// NewestFirst is deployed_at DESC, id DESC. id breaks deployed_at ties
-// deterministically when two deployments share a timestamp. Filtered to one
-// environment, the first row under this order is its current deployment.
+// NewestFirst is deployed_at DESC, id DESC.
 func NewestFirst() database.OrderBy[domain.DeploymentField] {
 	return database.OrderBy[domain.DeploymentField]{
 		Columns: []database.Column[domain.DeploymentField]{
@@ -18,10 +18,7 @@ func NewestFirst() database.OrderBy[domain.DeploymentField] {
 	}
 }
 
-// ByIDs matches the named deployments of one project. An OR of equals rather
-// than an IN clause, because IN is not in the shared filter vocabulary and
-// the id sets here are small — the current-deployment pointers of one page of
-// environments.
+// ByIDs matches the named deployments of one project.
 func ByIDs(projectID string, ids []string) database.Filter[domain.DeploymentField] {
 	matches := make([]database.Filter[domain.DeploymentField], len(ids))
 	for i, id := range ids {
@@ -33,20 +30,17 @@ func ByIDs(projectID string, ids []string) database.Filter[domain.DeploymentFiel
 	)
 }
 
-// ListOptions returns options for listing a project's deployments, newest
-// first, capped at limit. A non-nil environmentID narrows the list to that
-// environment's history.
-func ListOptions(projectID string, environmentID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
-	filter := database.Filter[domain.DeploymentField](
-		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID))
-	if environmentID != nil {
-		filter = database.And(
-			filter,
-			database.Equal(database.Col(domain.DeploymentFieldEnvironmentID), *environmentID),
-		)
+// ListOptions lists a project's deployments newest first; a non-nil origin
+// narrows it to that origin's history.
+func ListOptions(projectID string, origin *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
+	filters := []database.Filter[domain.DeploymentField]{
+		database.Equal(database.Col(domain.DeploymentFieldProjectID), projectID),
+	}
+	if origin != nil {
+		filters = append(filters, database.CorrelatedEqual(database.Col(domain.DeploymentFieldOrigin), *origin))
 	}
 	return &database.ListOptions[domain.DeploymentField]{
-		Filter: filter,
+		Filter: database.And(filters...),
 		Pagination: database.Page[domain.DeploymentField]{
 			Limit:   limit,
 			OrderBy: NewestFirst(),
@@ -54,18 +48,32 @@ func ListOptions(projectID string, environmentID *string, limit uint32) *databas
 	}
 }
 
-// CheckExpectedCurrent enforces the optimistic-concurrency guard on create.
-// current is the environment's current deployment, nil when nothing runs; on
-// a mismatch the conflict error carries what actually runs, read by the
-// dialect because only its transaction sees the locked state.
-func CheckExpectedCurrent(current *domain.Deployment, expected *string) error {
-	if expected == nil || (current != nil && current.ID == *expected) {
-		return nil
+// NewestOfKindOptions lists the project's newest deployment of kind.
+func NewestOfKindOptions(projectID string, kind domain.DeploymentOriginKind) *database.ListOptions[domain.DeploymentField] {
+	opts := ListOptions(projectID, nil, 1)
+	opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldOriginKind), kind.String()))
+	return opts
+}
+
+// LiveListOptions lists the deployments some origin still serves, newest
+// first; a non-nil releaseID narrows it to that release. ListLiveDeployments
+// applies the time with LiveAt.
+func LiveListOptions(projectID string, releaseID *string, limit uint32) *database.ListOptions[domain.DeploymentField] {
+	opts := ListOptions(projectID, nil, limit)
+	if releaseID != nil {
+		opts.Filter = database.And(opts.Filter, database.Equal(database.Col(domain.DeploymentFieldReleaseID), *releaseID))
 	}
-	details := domain.DeploymentConflictDetails{}
-	if current != nil {
-		details.CurrentDeploymentID = current.ID
-		details.CurrentReleaseID = current.ReleaseID
-	}
-	return domain.ErrDeploymentConflict(details)
+	return opts
+}
+
+// ServesOrigin matches the deployment origin serves at now.
+func ServesOrigin(origin string, now time.Time) database.Filter[domain.DeploymentField] {
+	return database.CorrelatedEqual(database.Col(domain.DeploymentFieldServesOrigin), origin, now)
+}
+
+// LiveAt returns opts narrowed to the deployments some origin serves at now.
+func LiveAt(opts *database.ListOptions[domain.DeploymentField], now time.Time) *database.ListOptions[domain.DeploymentField] {
+	live := *opts
+	live.Filter = database.And(opts.Filter, database.CorrelatedEqual(database.Col(domain.DeploymentFieldLive), now))
+	return &live
 }

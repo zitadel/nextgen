@@ -96,6 +96,11 @@ type AuthAttempt struct {
 	// passkey enrollment, ADR 056) whose attempt row is only a state carrier:
 	// it must never be handed off, exchanged, or read through the attempt API.
 	Internal bool
+
+	// DeploymentID and ReleaseID seal the runtime resolution for later
+	// attempt ops; empty when create did not resolve a deployment.
+	DeploymentID string
+	ReleaseID    string
 }
 
 const AuthAttemptTTL = 15 * time.Minute
@@ -175,9 +180,19 @@ func (a *AuthAttempt) ExpiresAt() time.Time {
 	return a.CreatedAt.Add(*a.TimeToLive)
 }
 
-// IsCompleted returns true if all required checks are verified successfully.
-// Matching is by factor class, so a completed passkey enrollment satisfies a
-// required passkey check.
+// IsCompleted reports whether the attempt has verified enough to mint a
+// session. Every required check must be satisfied by a verified factor of its
+// class (matching is by class, so a completed passkey enrollment satisfies a
+// required passkey check), and — fail closed — the attempt must carry at least
+// one verified credential-class factor (password, passkey, or SSO).
+//
+// Identifier resolution alone (the user factor) proves only who the caller
+// claims to be, never that they are that user, so it never completes an
+// attempt. This holds even when RequiredChecks is empty, which it is on every
+// attempt the REST and flow paths create today: the project
+// default-required-checks policy is not wired yet (see the [NewAuthAttempt]
+// callers), and an empty list must not let the identifier alone complete an
+// attempt and mint a session through handoff/exchange.
 func (a *AuthAttempt) IsCompleted() bool {
 	for _, requiredCheck := range a.RequiredChecks {
 		_, ok := a.FactorByClass(requiredCheck)
@@ -185,7 +200,20 @@ func (a *AuthAttempt) IsCompleted() bool {
 			return false
 		}
 	}
-	return true
+	return a.hasVerifiedCredential()
+}
+
+// hasVerifiedCredential reports whether a verified credential-class factor
+// (password, passkey, or SSO — never the bare user identifier) is present on
+// the attempt. See [AuthCheckType.IsCredential].
+func (a *AuthAttempt) hasVerifiedCredential() bool {
+	for _, check := range a.Checks {
+		factor, ok := check.(AuthFactor)
+		if ok && factor.Type().IsCredential() {
+			return true
+		}
+	}
+	return false
 }
 
 // IsHandedOff returns true if a handoff token has been generated.

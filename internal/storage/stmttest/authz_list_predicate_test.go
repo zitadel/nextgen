@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
+	"github.com/zitadel/nextgen/internal/storage/policystore"
 )
 
 func TestAuthzListPredicate_Teams(t *testing.T) {
@@ -213,5 +214,47 @@ func TestAuthzListPredicate_JSONSchemasLatestRevision(t *testing.T) {
 			"the grant covers the older revision only")
 		assert.Empty(t, list(service.JSONSchemaQueryOptions{LatestRevisionPerObjectType: true}),
 			"the newer revision suppresses the older one even though the caller cannot read it")
+	})
+}
+
+// The policy reads join each policy to its revisions under the alias p, so
+// the predicate correlates on p.id: a grant on one policy shows that policy
+// and every one of its revisions, and nothing of another policy.
+func TestAuthzListPredicate_Policies(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, userSchemaURL := ensureUserTestProject(t, d.stmts)
+		suffix := uniqueSuffix(t)
+		granted := createPolicy(t, d.stmts, projectID, "test.granted", `{}`)
+		revisePolicy(t, d, granted, `{"n":1}`)
+		hidden := createPolicy(t, d.stmts, projectID, "test.hidden", `{}`)
+
+		principal := "usr-policy-viewer-" + suffix
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, userSchemaURL, principal, principal+"@example.com", "Policy Viewer")))
+
+		catalogID, err := d.stmts.ActiveSystemCatalogID(t.Context())
+		require.NoError(t, err)
+		require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(),
+			newTestAssignment(projectID, "asgn-"+suffix, domain.AuthzPrincipalTypeUser, principal, "project", "viewer", domain.NewResourceAssignmentScope(granted.ID))))
+
+		ctx := service.WithAuthzListFilter(t.Context(), service.AuthzListFilter{
+			AuthzCheckParams: domain.AuthzCheckParams{
+				CatalogID: catalogID, ProjectID: projectID, PrincipalHomeProjectID: projectID,
+				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ObjectType: "project", Relation: "viewer",
+			},
+			ResourceKind: domain.ResourceKindPolicy,
+		})
+
+		policies, err := d.stmts.ListPolicies(ctx, policystore.ListOptions(projectID, "", 10))
+		require.NoError(t, err)
+		assert.Equal(t, []string{granted.ID}, policyIDs(policies))
+
+		revisions, err := d.stmts.ListPolicyRevisions(ctx, projectID, granted.ID, database.Page[domain.PolicyField]{Limit: 10})
+		require.NoError(t, err)
+		assert.Len(t, revisions.Items, 2, "the grant covers every revision of the policy")
+
+		revisions, err = d.stmts.ListPolicyRevisions(ctx, projectID, hidden.ID, database.Page[domain.PolicyField]{Limit: 10})
+		require.NoError(t, err)
+		assert.Empty(t, revisions.Items)
 	})
 }

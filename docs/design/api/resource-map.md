@@ -4,7 +4,7 @@
 
 ## How to read this page
 
-All paths are shown without a version segment. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
+API paths are shown without their prefix: `/projects` is served at `/api/v1/projects` under [ADR 077](../../adrs/077-api-path-prefix.md) (Proposed), and at `/projects` until it lands. [Hosted protocol surfaces](#hosted-protocol-surfaces) and [Debug](#debug) paths are shown as served, at the root. Header-selected versioning (`Zitadel-Version`) is target design — the shipped API is unversioned (see [`conventions.md`](conventions.md#direction-not-shipped)).
 
 Standard REST semantics apply: `POST` on the collection creates, `GET` on the collection lists (scope required — see [`url-architecture.md`](url-architecture.md#scope-resolution-as-a-first-class-invariant)), and `GET`/`PATCH` on the item reads/updates. `DELETE` on managed resources runs the resource's lifecycle semantics first (usually deactivate/tombstone); it is not a blind SQL hard-delete. Action verbs use slash form (`POST /users/{id}/verify_email`).
 
@@ -19,7 +19,8 @@ A project is a tenant / deployment. One project is reserved as the **platform pr
 /projects/{id}
 /projects/{id}/domains
 /projects/{id}/features
-/projects/{id}/allowed_origins
+/projects/{id}/origins
+/projects/{id}/origins/remove
 /projects/{id}/signing_keys
 /projects/{id}/api_keys
 /projects/{id}/webhooks
@@ -86,8 +87,12 @@ Users live inside projects. A user in the platform project is a developer/admin;
 
 ```http
 /users/{id}
+/users/{id}/identity_links      # provider accounts a sign-in linked to the user
+/users/{id}/password            # when the current password was set (PUT sets it)
 /me                             # resolves to the calling user
 /me/memberships                 # every team_membership the caller holds
+/users/me/schema                # the schema the caller's own record is validated against
+/users/me/teams                 # the caller's own team roster
 ```
 
 Create takes an explicit scope; the list derives it from the credential:
@@ -388,7 +393,8 @@ continues to come from that source, not from these design sketches.
 ## See also
 
 - [`../glossary.md`](../glossary.md)
-- [`url-architecture.md`](url-architecture.md) — flat vs nested rule, no version segment
+- [`url-architecture.md`](url-architecture.md) — flat vs nested rule
+- [ADR 077](../../adrs/077-api-path-prefix.md) — the `/api/v1/` prefix
 - [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts detail
 - [`credentials.md`](credentials.md) — api_keys, `sk_*` tokens
 - [`system-permission-catalog.md`](system-permission-catalog.md) — required permission names

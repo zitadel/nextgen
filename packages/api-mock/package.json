@@ -10,11 +10,6 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
-    "./openid-configuration": {
-      "@zitadel/source": "./src/openid-configuration.ts",
-      "types": "./dist/openid-configuration.d.mts",
-      "import": "./dist/openid-configuration.mjs"
-    },
     "./platform": {
       "@zitadel/source": "./src/platform-handlers.ts",
       "types": "./dist/platform-handlers.d.mts",
@@ -47,7 +42,7 @@
   "scripts": {
     "start": "tsx bin/start.ts",
     "dev": "tsx watch bin/start.ts",
-    "test": "node ../../scripts/task-guard.mjs --mutex browser-tests --retries 3 -- vitest run",
+    "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",
     "test:all": "vitest run",
     "build": "tsdown",

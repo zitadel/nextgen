@@ -21,10 +21,11 @@ type FlowSSOIdentityResolver struct {
 	users       UserService
 	schemaStore domain.JSONSchemaStore
 	hashers     ProjectHasherResolver
+	passwords   PasswordGate
 }
 
-func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver) *FlowSSOIdentityResolver {
-	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers}
+func NewFlowSSOIdentityResolver(db StatementPool, connections IDPConnectionService, users UserService, schemaStore domain.JSONSchemaStore, hashers ProjectHasherResolver, passwords PasswordGate) *FlowSSOIdentityResolver {
+	return &FlowSSOIdentityResolver{db: db, connections: connections, users: users, schemaStore: schemaStore, hashers: hashers, passwords: passwords}
 }
 
 var _ domain.FlowSSOIdentityService = (*FlowSSOIdentityResolver)(nil)
@@ -123,7 +124,11 @@ func (r *FlowSSOIdentityResolver) LoadParked(ctx context.Context, in domain.Flow
 	if err != nil {
 		return nil, fmt.Errorf("load parked sso identity: read linked user: %w", err)
 	}
-	if user.SchemaURL != in.UserSchemaURL {
+	sameSchema, err := r.storedUserSchemaMatches(ctx, in.ProjectID, user.SchemaURL, in.UserSchemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("load parked sso identity: %w", err)
+	}
+	if !sameSchema {
 		// The flow validates against one schema and cannot continue with a
 		// user of another. The response stays generic; the log says why.
 		getLoggingContext(ctx, "flow").Warn("sso identity is linked to a user of another schema",
@@ -298,13 +303,15 @@ func (r *FlowSSOIdentityResolver) CreateLinked(ctx context.Context, in domain.Fl
 	// a unique value, and is not mistaken for a collision.
 	actions := []UserAction{&ssoClaimAction{bind: bind}, createUser}
 	if in.Password != "" {
-		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers))
+		actions = append(actions, NewSetUserPasswordAction(SetPasswordInput{ProjectID: in.ProjectID, UserID: userID, Password: in.Password}, r.hashers, r.passwords))
 	}
 	actions = append(actions, &ssoLinkAction{subject: in.Subject, bind: bind})
 	if err := r.users.ApplyActions(ctx, actions...); err != nil {
-		// Audited like a create through the user API.
-		emitUserCreateFailedBestEffort(ctx, r.db, createUser, err)
-		if errors.Is(err, domain.ErrUserInvalid()) {
+		if unique, ok := errors.AsType[*database.UniqueError](err); ok {
+			// Audited like a create through the user API.
+			emitUserCreateFailedBestEffort(ctx, r.db.Statements(), in.ProjectID, unique)
+		}
+		if domain.IsUserInvalid(err) {
 			// The validator's messages quote the values, so only where they
 			// failed is logged.
 			var locations []string
@@ -399,7 +406,11 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 	// The registry key has no schema, so the owner can be a user of another
 	// schema that also marks the property project-unique. The flow cannot
 	// continue with that user, and creation would collide on the value.
-	if user.SchemaURL != userSchemaURL {
+	sameSchema, err := r.storedUserSchemaMatches(ctx, projectID, user.SchemaURL, userSchemaURL)
+	if err != nil {
+		return "", fmt.Errorf("find unique owner: %w", err)
+	}
+	if !sameSchema {
 		getLoggingContext(ctx, "flow").Warn("sso claim is owned by a user of another schema",
 			slog.String("project_id", projectID),
 			slog.String("attribute", attribute),
@@ -409,4 +420,33 @@ func (r *FlowSSOIdentityResolver) FindUniqueOwner(ctx context.Context, projectID
 		return "", domain.ErrSSOOwnerOtherSchema
 	}
 	return user.ID, nil
+}
+
+// UserHasPasskey reads one passkey row of the user. A passkey ceremony on a
+// step with this user bound lists the same rows as allowCredentials, so the
+// answer tells the visitor nothing that choosing the action would not.
+func (r *FlowSSOIdentityResolver) UserHasPasskey(ctx context.Context, projectID, userID string) (bool, error) {
+	opts := &database.ListOptions[domain.UserPasskeyField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.UserPasskeyFieldProjectID), projectID),
+			database.Equal(database.Col(domain.UserPasskeyFieldUserID), userID),
+		),
+	}
+	result, err := r.db.Statements().ListUserPasskeys(ctx, opts.WithLimit(1))
+	if err != nil {
+		return false, fmt.Errorf("read user passkeys: %w", err)
+	}
+	return len(result.Items) > 0, nil
+}
+
+// storedUserSchemaMatches compares a stored user's schema with the flow's.
+// Both ids come from stored records, never from the request, so a schema the
+// project does not hold is an inconsistency on the server's side and not a
+// client error.
+func (r *FlowSSOIdentityResolver) storedUserSchemaMatches(ctx context.Context, projectID, userSchemaID, flowSchemaID string) (bool, error) {
+	same, err := sameUserSchema(ctx, r.schemaStore, projectID, userSchemaID, flowSchemaID)
+	if errors.Is(err, domain.ErrJSONSchemaNotFound()) {
+		return false, domain.ErrInternal(err).WithMessage("user schema revision not found")
+	}
+	return same, err
 }

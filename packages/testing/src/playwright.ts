@@ -3,6 +3,7 @@ import { test as base, type Page } from "@playwright/test";
 import { waitForHandshake } from "./handshake";
 import { connectZitadel } from "./index";
 import { enableVirtualPasskey, type VirtualPasskey } from "./passkey";
+import { sessionCookieName } from "./session";
 import type {
   ConnectedZitadel,
   Identity,
@@ -32,9 +33,11 @@ export interface ZitadelTestFixtures {
   };
   /**
    * Start the test authenticated: a fresh user, a real session minted through
-   * the flow API, and the cookie injected into a dedicated browser context —
-   * the default `page` stays signed out for login-flow tests. Requires
-   * `use.baseURL` (every withZitadel consumer sets it).
+   * the flow API, and its cookie injected into a dedicated browser context,
+   * under the server's name and under the project's ({@link sessionCookieName}),
+   * so it signs the app in whichever cookie its proxy reads. The default `page`
+   * stays signed out for login-flow tests. Requires `use.baseURL` (every withZitadel
+   * consumer sets it).
    */
   authenticatedPage: AuthenticatedPage;
   /**
@@ -64,13 +67,14 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
         );
       }
       // Wait, don't read-once: the supervisor's Playwright readiness URL is
-      // the instance's /healthz, which answers as soon as the *server* is up
-      // — the handshake lands only after *bootstrap* (project, schema,
-      // flows) completes a moment later. Suites with an `app` entry never
-      // see the gap (the app runner waits for the handshake before the app
-      // reports ready), but in app-less mode the first worker can get here
-      // first. Bootstrap after health is seconds at most, so the default
-      // wait is generous; a bootstrap failure surfaces as this timeout.
+      // the instance's /readyz, which answers as soon as the *server* and its
+      // database are up — the handshake lands only after *bootstrap*
+      // (project, schema, flows) completes a moment later. Suites with an
+      // `app` entry never see the gap (the app runner waits for the handshake
+      // before the app reports ready), but in app-less mode the first worker
+      // can get here first. Bootstrap after readiness is seconds at most, so
+      // the default wait is generous; a bootstrap failure surfaces as this
+      // timeout.
       await use(connectZitadel(await waitForHandshake(handshakePath)));
     },
     // `auto`: every worker waits for the bootstrapped instance before its
@@ -104,9 +108,16 @@ export const test = base.extend<ZitadelTestFixtures, ZitadelWorkerFixtures>({
     }
     const session = await zitadel.seedSession({ origin: baseURL });
     const context = await browser.newContext({ baseURL });
-    // `addCookies` takes either url or domain/path; url derives the rest.
+    // `addCookies` takes either url or domain/path; url derives the rest. The
+    // session goes in under both names, so it signs the app in whichever its
+    // proxy reads: a server SDK and the dev proxy setup writes read the
+    // project's cookie (ADR 073), a proxy that passes the server's cookie
+    // through reads that one.
     const { path: _path, ...cookie } = session.cookie;
-    await context.addCookies([{ ...cookie, url: baseURL }]);
+    await context.addCookies([
+      { ...cookie, url: baseURL },
+      { ...cookie, name: sessionCookieName(zitadel.handle.projectId), url: baseURL },
+    ]);
     const page = await context.newPage();
     await use({ page, user: session.user, session });
     await context.close();
@@ -138,6 +149,8 @@ export { enableVirtualPasskey } from "./passkey";
 export type { VirtualPasskey } from "./passkey";
 export { withZitadel } from "./playwright-config";
 export type { WithZitadelOptions } from "./playwright-config";
+export { identity } from "./seed";
+export { SESSION_COOKIE_NAME, sessionCookieName } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

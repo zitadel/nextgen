@@ -89,11 +89,10 @@ describe("add user sheet", () => {
 
     expect(await screen.findByRole("heading", { name: "Add user" })).toBeInTheDocument();
     // Single schema is preselected — there is no choice to make.
-    expect(await screen.findByRole("combobox", { name: "User Schema" })).toHaveTextContent(
-      "Business",
-    );
+    const picker = await screen.findByRole("combobox", { name: "User Schema" });
+    await waitFor(() => expect(picker).toHaveTextContent("Business"));
     for (const label of ["Email", "Given name", "Family name", "Company name"]) {
-      expect(screen.getByLabelText(label)).toBeInTheDocument();
+      expect(await screen.findByLabelText(label)).toBeInTheDocument();
     }
   });
 
@@ -134,7 +133,7 @@ describe("add user sheet", () => {
     // An optional property alone must not satisfy the gate. Asserted here rather
     // than end to end: this needs a schema with both required and optional
     // properties, and the seeded instance's schema requires everything it defines.
-    await userEvent.type(screen.getByLabelText("Given name"), "Maya");
+    await userEvent.type(await screen.findByLabelText("Given name"), "Maya");
     expect(submit).toBeDisabled();
 
     await userEvent.type(screen.getByLabelText("Email"), "maya.patel@acme.com");
@@ -153,7 +152,7 @@ describe("add user sheet", () => {
     await openSheet();
 
     await userEvent.type(await screen.findByLabelText("Email"), "maya.patel@acme.com");
-    await userEvent.type(screen.getByLabelText("Given name"), "Maya");
+    await userEvent.type(await screen.findByLabelText("Given name"), "Maya");
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     await waitFor(() => expect(body).toBeDefined());
@@ -193,7 +192,7 @@ describe("add user sheet", () => {
 
     const picker = await screen.findByRole("combobox", { name: "User Schema" });
     // Two schemas across the pages, so nothing is preselected.
-    expect(picker).toHaveTextContent("Select schema");
+    await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
     await userEvent.click(picker);
     expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
@@ -209,7 +208,7 @@ describe("add user sheet", () => {
 
     const picker = await screen.findByRole("combobox", { name: "User Schema" });
     // Two schemas, so nothing is preselected.
-    expect(picker).toHaveTextContent("Select schema");
+    await waitFor(() => expect(picker).toHaveTextContent("Select schema"));
 
     await userEvent.click(picker);
     await userEvent.click(await screen.findByRole("option", { name: /Business/ }));
@@ -346,10 +345,13 @@ describe("add user sheet", () => {
     // The accessible name must not absorb the marker.
     expect(screen.getByLabelText("Family name")).toBeInTheDocument();
   });
-  it("sends a numeric property as a JSON number, not a string", async () => {
-    // `schemaFields` maps `type: number|integer` to a number input, but an input
-    // always yields a string — JSON Schema validates the property against a JSON
-    // number, so `"42"` would be rejected.
+  it.each([
+    ["42", 42],
+    // `Number` would read hex as 16; the server says what is wrong instead.
+    ["0x10", "0x10"],
+  ])("sends a numeric property typed %s as %j", async (typed, sent) => {
+    // An input always yields a string, but JSON Schema validates the property
+    // against a JSON number, so `"42"` would be rejected.
     stubSchemas({
       sch_seats: {
         ...BUSINESS,
@@ -370,12 +372,10 @@ describe("add user sheet", () => {
     await openSheet();
 
     await userEvent.type(await screen.findByLabelText("Email"), "a@acme.com");
-    await userEvent.type(screen.getByLabelText("Seats"), "42");
+    await userEvent.type(screen.getByLabelText("Seats"), typed);
     await userEvent.click(screen.getByRole("button", { name: "Add user" }));
 
     await waitFor(() => expect(body).toBeDefined());
-    const attributes = body?.attributes as Record<string, unknown>;
-    expect(attributes.seats).toBe(42);
-    expect(typeof attributes.seats).toBe("number");
+    expect(body?.attributes).toMatchObject({ seats: sent });
   });
 });

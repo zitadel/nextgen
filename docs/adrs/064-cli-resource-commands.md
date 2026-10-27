@@ -11,6 +11,13 @@
 > is settled as `env`, which is singular under the same rule. Rationale and the
 > noun list: [`docs/design/glossary.md` §11](../design/glossary.md#11-cli-grammar).
 > The shipped commands are renamed without a deprecation window (alpha).
+>
+> **Amendment (2026-10-15):** §6 and §13 are extended by
+> [ADR 071](071-cli-resource-properties.md). Every leaf of a request body gets
+> a flag, nested ones included (`--oidc-client-id`); `--set <path>=<value>`
+> reaches any field; the document, the field flags and `--set` merge key by
+> key; and a `${{ NAME }}` reference, a boolean, or a value the schema fixes is
+> not taken for a credential.
 
 Reference documentation for the surface lives in
 [`docs/design/cli/resource-commands.md`](../design/cli/resource-commands.md).
@@ -79,6 +86,11 @@ environments get <name>`. Two spellings for one thing is worse than either.
 Either this surface adopts `env`, or ADR 035 is amended to the plural —
 recorded below rather than decided here, because it is a public command
 contract someone else already wrote down.
+
+`env` has since shipped, as the amendment above settles it, but as a command
+about the developer's machine rather than a resource: an environment is an env
+file, `zitadel env` shows which one resolved, and there is no `environments`
+resource command.
 
 > Amended 2026-10-07: settled as `env`, which is singular under the amended §2.
 
@@ -295,7 +307,8 @@ those routes exist, the CLI matches the API it has.
 ### 13. Credentials never reach a command line
 
 No flag, argument, or record entry may carry one; the operator credential is
-read from `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
+read from `ZITADEL_PROJECT_SECRET` in the environment the command runs in,
+falling back to `.zitadel/secret` ([ADR 036](036-api-credential-planes.md)). Shell
 history and process listings are readable by other users, so this is enforced
 in code rather than documented as advice.
 

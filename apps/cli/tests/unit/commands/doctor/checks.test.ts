@@ -1,8 +1,19 @@
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ClaimCheck,
@@ -13,6 +24,7 @@ import {
   FrameworkCheck,
   GitignoreCheck,
   ManagedFilesCheck,
+  MetaSchemasCheck,
   ProjectMatchCheck,
   SchemaCheck,
   SecretCheck,
@@ -22,6 +34,8 @@ import {
 import { loadPatchContext } from "../../../../src/commands/doctor/patch-context";
 import { createOrca } from "../../../../src/lib/orca";
 import { proxyConfTemplate } from "../../../../src/lib/orca/patchers/rule/angular/templates";
+import { bearerOnlyProxyConf } from "../../../helpers/proxy-conf";
+import { projectMetaSchemas } from "../../../../src/lib/meta-schemas";
 import { MANAGED_MARKER } from "../../../../src/lib/paths";
 import { hashScaffoldFile } from "../../../../src/lib/scaffold-manifest";
 import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
@@ -29,10 +43,11 @@ import type { ScaffoldManifest } from "../../../../src/lib/sync/types";
 const tempDirs: string[] = [];
 
 // Matches the generated `CreateSchemaBody` zod (the `user-schema` branch):
-// required keys are `kind`, `metaSchema`, `x-auth-methods`.
+// required keys are `kind`, `metaSchema`, `objectType`, `x-auth-methods`.
 const VALID_USER_SCHEMA = {
   kind: "user-schema",
-  metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+  objectType: "human-user",
+  metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
   "x-auth-methods": { passkey: { enabled: true } },
   properties: { email: { type: "string" } },
 };
@@ -41,6 +56,7 @@ const SECRET = {
   project_id: "proj-001",
   project_secret: "sk_proj_test",
   preview_secret: "sk_proj_preview",
+  primary_origins: [],
   preview_origins: [],
   // Recent, so the claim window reads as open; the closed-window test writes
   // its own stale timestamp.
@@ -69,9 +85,9 @@ async function makeProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "next" },
-      environments: { development: { issuer: "http://localhost:3000" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
   await writeFile(
@@ -149,9 +165,9 @@ async function makeAngularProject(): Promise<string> {
       project: "proj-001",
       server: "https://api.zitadel.cloud",
       framework: { id: "angular" },
-      environments: { development: { issuer: "http://localhost:4200" } },
     }),
   );
+  await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:4200\n");
   await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
   await chmod(join(cwd, ".zitadel/secret"), 0o600);
   await writeFile(
@@ -182,6 +198,54 @@ async function makeAngularProject(): Promise<string> {
   await writeFile(join(cwd, "src/app/app.ts"), `${MANAGED_MARKER}\nexport class App {}\n`);
   await writeFile(join(cwd, "src/app/app.html"), `<!-- ${MANAGED_MARKER} -->\n<main></main>\n`);
   await writeFile(join(cwd, "proxy.conf.cjs"), proxyConfTemplate());
+  return cwd;
+}
+
+/**
+ * A Nuxt 4 app as an older setup left it: every page and plugin it wrote is
+ * on disk, and its manifest records both plugins as infrastructure.
+ */
+async function makeOlderNuxtProject(): Promise<string> {
+  const cwd = await mkdtemp(join(tmpdir(), "zitadel-checks-nuxt-"));
+  tempDirs.push(cwd);
+  await mkdir(join(cwd, ".zitadel"), { recursive: true });
+  await mkdir(join(cwd, "app/pages"), { recursive: true });
+  await mkdir(join(cwd, "app/plugins"), { recursive: true });
+  await writeFile(
+    join(cwd, "package.json"),
+    JSON.stringify({
+      name: "demo",
+      dependencies: { nuxt: "^4.1.0", "@zitadel/sdk-nuxt": "latest" },
+    }),
+  );
+  await writeFile(
+    join(cwd, "zitadel.json"),
+    JSON.stringify({
+      project: "proj-001",
+      server: "https://api.zitadel.cloud",
+      framework: { id: "nuxt" },
+      environments: { development: { issuer: "http://localhost:3000" } },
+    }),
+  );
+  await writeFile(join(cwd, ".zitadel/secret"), JSON.stringify(SECRET));
+  await chmod(join(cwd, ".zitadel/secret"), 0o600);
+  await writeFile(join(cwd, "nuxt.config.ts"), "export default defineNuxtConfig({});\n");
+  const files: ScaffoldManifest["files"] = {};
+  for (const [path, cls] of [
+    ["app/pages/login.vue", "presentation"],
+    ["app/pages/register.vue", "presentation"],
+    ["app/pages/profile.vue", "presentation"],
+    ["app/plugins/zitadel-components.client.ts", "infrastructure"],
+    ["app/plugins/auth.server.ts", "infrastructure"],
+  ] as const) {
+    const contents = `// ${MANAGED_MARKER}\n`;
+    await writeFile(join(cwd, path), contents);
+    files[path] = { hash: hashScaffoldFile(contents), class: cls };
+  }
+  await writeFile(
+    join(cwd, ".zitadel/state.json"),
+    JSON.stringify({ framework: "nuxt", resources: {}, scaffold: { files } }),
+  );
   return cwd;
 }
 
@@ -290,6 +354,197 @@ describe("GitignoreCheck", () => {
   });
 });
 
+describe("MetaSchemasCheck", () => {
+  /** Writes every meta-schema as setup does for `cliVersion`. */
+  async function writeMetaSchemas(cwd: string, cliVersion = ctxFor(cwd).cliVersion): Promise<void> {
+    for (const file of projectMetaSchemas(cliVersion)) {
+      await mkdir(join(cwd, file.path, ".."), { recursive: true });
+      await writeFile(join(cwd, file.path), file.contents);
+    }
+  }
+
+  /** A meta-schema file the project holds, by name. */
+  const metaFile = (name: string) => `.zitadel/meta/${name}`;
+
+  it("passes when the project holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("warns on a missing schema and names doctor --fix", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({ missing: [metaFile("branding.json")], outdated: [] });
+    expect(outcome.message).toContain("doctor --fix writes this version's");
+  });
+
+  it("passes schemas another CLI version wrote when only the version differs", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd, "0.2.0");
+    const held = await readFile(join(cwd, metaFile("branding.json")), "utf8");
+    const current = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    expect(held).not.toBe(current?.contents);
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("reports a schema it cannot read, and fix leaves it alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await mkdir(join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      unreadable: [{ path: metaFile("branding.json"), reason: "EISDIR" }],
+    });
+    expect(outcome.message).not.toContain("doctor --fix");
+  });
+
+  it("reports a schema that is a symlink, and fix leaves its target alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await rm(join(cwd, metaFile("branding.json")));
+    await symlink("../secret", join(cwd, metaFile("branding.json")));
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({
+      missing: [],
+      outdated: [],
+      linked: [metaFile("branding.json")],
+    });
+    expect(outcome.message).toContain(`${metaFile("branding.json")} is a symbolic link`);
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, metaFile("branding.json")))).isSymbolicLink()).toBe(true);
+  });
+
+  it("writes nothing through a symlinked .zitadel/meta/", async () => {
+    const cwd = await makeProject();
+    const elsewhere = await makeProject();
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(elsewhere, join(cwd, ".zitadel/meta"));
+    const before = await readdir(elsewhere);
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toEqual({ missing: [], outdated: [], linked: [".zitadel/meta"] });
+    expect(await readdir(elsewhere)).toEqual(before);
+  });
+
+  it("passes a symlinked .zitadel/meta/ that holds this CLI's schemas", async () => {
+    const cwd = await makeProject();
+    const shared = await makeProject();
+    await writeMetaSchemas(shared);
+    await mkdir(join(cwd, ".zitadel"), { recursive: true });
+    await symlink(join(shared, ".zitadel/meta"), join(cwd, ".zitadel/meta"));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("writes nothing when the project pins a newer @zitadel/* version", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "a newer dialect"}\n');
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({ dependencies: { "@zitadel/sdk-next": "0.2.0" } }),
+    );
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.details).toMatchObject({
+      outdated: [metaFile("flow-definition.json")],
+      newer_pin: { name: "@zitadel/sdk-next", version: "0.2.0" },
+    });
+    expect(outcome.message).not.toContain("doctor --fix writes");
+    expect(await readFile(join(cwd, metaFile("flow-definition.json")), "utf8")).toBe(
+      '{"title": "a newer dialect"}\n',
+    );
+  });
+
+  it("warns on a schema that differs from this CLI's", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await writeFile(join(cwd, metaFile("flow-definition.json")), '{"title": "an older dialect"}\n');
+
+    const outcome = await new MetaSchemasCheck().run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.details).toMatchObject({ outdated: [metaFile("flow-definition.json")] });
+  });
+
+  it("passes a schema that only differs in key order or formatting", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    const file = projectMetaSchemas(ctxFor(cwd).cliVersion).find(
+      (meta) => meta.path === metaFile("branding.json"),
+    );
+    const reordered = Object.fromEntries(Object.entries(file?.body ?? {}).reverse());
+    await writeFile(join(cwd, metaFile("branding.json")), JSON.stringify(reordered));
+
+    expect((await new MetaSchemasCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix writes the missing and outdated schemas and leaves other files alone", async () => {
+    const cwd = await makeProject();
+    await writeMetaSchemas(cwd);
+    await rm(join(cwd, metaFile("branding.json")));
+    await writeFile(join(cwd, metaFile("flow-definition.json")), "{}\n");
+    await writeFile(join(cwd, metaFile("mine.json")), '{"kept": true}\n');
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    expect(await readFile(join(cwd, metaFile("mine.json")), "utf8")).toBe('{"kept": true}\n');
+  });
+
+  it("fix creates .zitadel/meta/ when the project has none", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix is a no-op under dryRun", async () => {
+    const cwd = await makeProject();
+    const check = new MetaSchemasCheck();
+
+    await check.fix(ctxFor(cwd, true));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("warn");
+  });
+});
+
 describe("EnvExampleCheck", () => {
   it("fails when a key is missing, then fix appends it", async () => {
     const cwd = await makeProject();
@@ -387,6 +642,120 @@ describe("DependencyCheck", () => {
     expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("fail");
   });
 
+  // The check asks each framework's own patcher which SDK packages it adds, so one row
+  // per framework pins that the doctor names exactly those, the widget SDK included.
+  it.each([
+    ["next", { next: "^16" }, "@zitadel/sdk-next"],
+    ["nuxt", { nuxt: "^4" }, "@zitadel/sdk-nuxt"],
+    ["react", { react: "^19", vite: "^8" }, "@zitadel/sdk-react"],
+    ["vue", { vue: "^3.5", vite: "^8" }, "@zitadel/sdk-vue"],
+    ["solid", { "solid-js": "^1.9", vite: "^8" }, "@zitadel/sdk-solid"],
+    ["svelte", { svelte: "^5", vite: "^8" }, "@zitadel/sdk-svelte"],
+    ["qwik", { "@qwik.dev/core": "^2.0.0-beta.45", vite: "^8" }, "@zitadel/sdk-qwik"],
+    ["angular", { "@angular/core": "^20" }, "@zitadel/sdk-angular"],
+    [
+      "sveltekit",
+      { "@sveltejs/kit": "^2", svelte: "^5" },
+      "@zitadel/sdk-sveltekit, @zitadel/sdk-svelte",
+    ],
+    [
+      "tanstack-start",
+      { react: "^19", "@tanstack/react-start": "^1.168.10" },
+      "@zitadel/sdk-tanstack-start",
+    ],
+    [
+      "solid-start",
+      { "solid-js": "^1.9", "@solidjs/start": "^2.0.0" },
+      "@zitadel/sdk-solid-start, @zitadel/sdk-solid",
+    ],
+    [
+      "qwik-router",
+      { "@qwik.dev/core": "^2.0.0-beta.45", "@qwik.dev/router": "^2.0.0-beta.45" },
+      "@zitadel/sdk-qwik-router, @zitadel/sdk-qwik",
+    ],
+  ])("requires the %s SDK package, not just the CLI", async (_framework, dependencies, missing) => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies,
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: `package.json does not declare ${missing}, which the app imports`,
+    });
+  });
+
+  it("fails when the only @zitadel package is not the SDK the app imports", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome).toMatchObject({
+      status: "fail",
+      message: "package.json does not declare @zitadel/sdk-next, which the app imports",
+    });
+  });
+
+  it("fails a meta-framework app that lacks the widget SDK its pages import", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { "@sveltejs/kit": "^3", svelte: "^5", "@zitadel/sdk-sveltekit": "latest" },
+      }),
+    );
+    const outcome = await new DependencyCheck().run(ctxFor(cwd));
+    expect(outcome.message).toBe(
+      "package.json does not declare @zitadel/sdk-svelte, which the app imports",
+    );
+  });
+
+  it("passes a meta-framework app that declares both of its SDKs", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: {
+          "@sveltejs/kit": "^3",
+          svelte: "^5",
+          "@zitadel/sdk-sveltekit": "latest",
+          "@zitadel/sdk-svelte": "latest",
+        },
+      }),
+    );
+    expect((await new DependencyCheck().run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix re-adds the SDK an app kept only the CLI in place of", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^15" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const check = new DependencyCheck();
+
+    await check.fix(ctxFor(cwd));
+
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   it("fix re-adds the SDK dependency via the patcher", async () => {
     const cwd = await makeProject();
     await writeFile(
@@ -399,6 +768,31 @@ describe("DependencyCheck", () => {
     await check.fix(ctxFor(cwd));
 
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  it("fix does not create proxy.ts beside an edited middleware.ts when the SDK is missing", async () => {
+    const cwd = await makeProject();
+    await writeFile(
+      join(cwd, "package.json"),
+      JSON.stringify({
+        name: "demo",
+        dependencies: { next: "^16" },
+        devDependencies: { "@zitadel/cli": "0.1.0-alpha.0" },
+      }),
+    );
+    const editedMiddleware = `${MANAGED_MARKER}\nexport function middleware() { /* custom */ }\n`;
+    await writeFile(join(cwd, "middleware.ts"), editedMiddleware);
+    await writeScaffoldState(cwd, {
+      files: { "middleware.ts": { hash: "0".repeat(64), class: "infrastructure" } },
+    });
+
+    await new DependencyCheck().fix(ctxFor(cwd));
+
+    expect(await readFile(join(cwd, "package.json"), "utf8")).toContain("@zitadel/sdk-next");
+    expect(await readFile(join(cwd, "middleware.ts"), "utf8")).toBe(editedMiddleware);
+    await expect(readFile(join(cwd, "proxy.ts"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 
   it("fix reclaims proxy.ts for Next 16 projects", async () => {
@@ -672,17 +1066,7 @@ describe("ManagedFilesCheck", () => {
       join(cwd, "package.json"),
       JSON.stringify({ ...pkg, scripts: { dev: devScript } }),
     );
-    const config = JSON.parse(await readFile(join(cwd, "zitadel.json"), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    await writeFile(
-      join(cwd, "zitadel.json"),
-      JSON.stringify({
-        ...config,
-        environments: { development: { issuer: `http://localhost:${String(issuerPort)}` } },
-      }),
-    );
+    await writeFile(join(cwd, ".env.local"), `ZITADEL_ISSUER=http://localhost:${issuerPort}\n`);
     return cwd;
   }
 
@@ -765,6 +1149,47 @@ describe("ManagedFilesCheck", () => {
     expect(outcome.status).toBe("warn");
     expect(outcome.message).toContain("unverifiable managed config wiring");
     expect(outcome.message).toContain("angular.json");
+  });
+
+  // Sign-in works without the session-cookie hooks (ADR 073); without them the
+  // Console and the app share one session cookie on localhost.
+  it("warns while the managed proxy lacks the session-cookie hooks, and --fix adds them", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    await writeFile(proxyPath, bearerOnlyProxyConf());
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain(
+      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
+    );
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
+  // The edit leaves a managed proxy it cannot recognize as it is, so that
+  // --fix does not fail; the doctor must not read that as applied.
+  it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const reformatted = bearerOnlyProxyConf().replace(
+      'configure: (proxy) => proxy.on("proxyReq", setBearer),',
+      "configure: (proxy) => proxy.on('proxyReq', setBearer),",
+    );
+    await writeFile(proxyPath, reformatted);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain("unverifiable managed config wiring");
+    expect(outcome.message).toContain("session-cookie hooks (ADR 073) must be added by hand");
+    await check.fix(ctxFor(cwd));
+    expect(await readFile(proxyPath, "utf8")).toBe(reformatted);
   });
 
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
@@ -1029,6 +1454,35 @@ function setBearer(proxyReq) {
   });
 });
 
+describe("ManagedFilesCheck on a Nuxt app from an older setup", () => {
+  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
+    "drops the retired %s record once the user deleted the file",
+    async (retired) => {
+      const cwd = await makeOlderNuxtProject();
+      await rm(join(cwd, retired));
+      const check = new ManagedFilesCheck();
+      expect((await check.run(ctxFor(cwd))).message).toContain(retired);
+
+      await check.fix(ctxFor(cwd));
+
+      expect((await readScaffoldState(cwd)).files).not.toHaveProperty(retired);
+      expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+    },
+  );
+
+  it.each(["app/plugins/auth.server.ts", "app/plugins/zitadel-components.client.ts"])(
+    "keeps the retired %s record while the file is on disk",
+    async (retired) => {
+      const cwd = await makeOlderNuxtProject();
+      await rm(join(cwd, "app/pages/login.vue"));
+
+      await new ManagedFilesCheck().fix(ctxFor(cwd));
+
+      expect((await readScaffoldState(cwd)).files).toHaveProperty(retired);
+    },
+  );
+});
+
 describe("ProjectMatchCheck", () => {
   it("passes when secret project_id matches config project", async () => {
     const cwd = await makeProject();
@@ -1149,7 +1603,6 @@ describe("loadPatchContext", () => {
         project: "proj-001",
         server: "https://api.zitadel.cloud",
         framework: { id: "next" },
-        environments: { development: { issuer: "http://localhost:3000" } },
         preset: "passkey-first",
         useCase: "consumer",
       }),
@@ -1161,8 +1614,21 @@ describe("loadPatchContext", () => {
     expect(ctx.preset).toBe("passkey-first");
     expect(ctx.useCase).toBe("consumer");
     expect(ctx.scaffoldedFramework).toBe(true);
-    // The config issuer still wins over the manifest port.
+    // The issuer in the env file still wins over the manifest port.
     expect(ctx.issuer).toBe("http://localhost:3000");
+  });
+
+  it("takes the issuer from the project's files, never the shell's environment", async () => {
+    const cwd = await makeProject();
+    vi.stubEnv("ZITADEL_ENV", "production");
+    vi.stubEnv("ZITADEL_ISSUER", "https://auth.example.com");
+    try {
+      expect((await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0")).issuer).toBe(
+        "http://localhost:3000",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("falls back to the manifest dev_port for the issuer", async () => {
@@ -1175,6 +1641,7 @@ describe("loadPatchContext", () => {
         framework: { id: "next" },
       }),
     );
+    await rm(join(cwd, ".env.local"));
     await writeScaffoldState(cwd, { files: {}, dev_port: 3005 });
 
     const ctx = await loadPatchContext(cwd, createOrca(), "0.1.0-alpha.0");

@@ -294,6 +294,72 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(details), "oidc")
 	})
+
+	// The schema accepts each document below; the engine's parse refuses it,
+	// before the slug lookup, so neither a new nor an existing slug is touched.
+	const oidcBlock = `"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"]`
+	for name, tc := range map[string]struct {
+		document string
+		wantErr  domain.Error
+	}{
+		"a partial endpoint block names the missing endpoints": {
+			document: `{"slug":"google","protocol":"oidc","display_name":"Google","oidc":{` + oidcBlock + `,` +
+				`"authorization_endpoint":"https://accounts.google.com/auth","token_endpoint":"https://oauth2.googleapis.com/token"}}`,
+			wantErr: domain.ErrIDPEndpointsPartial([]string{"jwks_uri", "userinfo_endpoint"}),
+		},
+		"a userinfo endpoint alone under id_token_mapping is partial": {
+			document: `{"slug":"google","protocol":"oidc","display_name":"Google","oidc":{` + oidcBlock + `,` +
+				`"id_token_mapping":true,"userinfo_endpoint":"https://openidconnect.googleapis.com/v1/userinfo"}}`,
+			wantErr: domain.ErrIDPEndpointsPartial([]string{"authorization_endpoint", "jwks_uri", "token_endpoint"}),
+		},
+	} {
+		t.Run(name+" and stores nothing", func(t *testing.T) {
+			t.Parallel()
+			f := newIDPConnectionFixture(t)
+
+			_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, []byte(tc.document))
+			var domErr domain.Error
+			require.ErrorAs(t, err, &domErr)
+			assert.Equal(t, tc.wantErr.Code, domErr.Code)
+			assert.Equal(t, tc.wantErr.Details, domErr.Details)
+			assert.Empty(t, *f.events)
+		})
+	}
+
+	// OAuth 2.0 is gone from the schema, and with it the strategy pointer
+	// that only an oauth2 block could resolve.
+	for name, document := range map[string]string{
+		"an oauth2 connection": `{"slug":"github","protocol":"oauth2","display_name":"GitHub","subject_claim":"id",` +
+			`"oauth2":{"authorization_endpoint":"https://github.com/login/oauth/authorize",` +
+			`"token_endpoint":"https://github.com/login/oauth/access_token","userinfo_endpoint":"https://api.github.com/user",` +
+			`"client_id":"id","client_secret":"${{ S }}"}}`,
+		"a strategy pointer": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
+			`"verified_claims":{"email":"$supplementary_fetch"},"oidc":{` + oidcBlock + `}}`,
+	} {
+		t.Run(name+" is an invalid document", func(t *testing.T) {
+			t.Parallel()
+			f := newIDPConnectionFixture(t)
+
+			_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, []byte(document))
+			require.ErrorIs(t, err, domain.ErrRequestInvalid())
+			assert.Empty(t, *f.events)
+		})
+	}
+
+	t.Run("an oidc block that names every endpoint is accepted", func(t *testing.T) {
+		t.Parallel()
+		f := newIDPConnectionFixture(t)
+		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
+		f.tx.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).Return(nil)
+
+		document := []byte(`{"slug":"corp","protocol":"oidc","display_name":"Corp",` +
+			`"oidc":{"issuer":"https://sso.example.com","client_id":"id","client_secret":"${{ S }}","scopes":["openid"],` +
+			`"authorization_endpoint":"https://sso.example.com/authorize","token_endpoint":"https://sso.example.com/token",` +
+			`"jwks_uri":"https://sso.example.com/keys","userinfo_endpoint":"https://sso.example.com/userinfo"}}`)
+		got, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, document)
+		require.NoError(t, err)
+		assert.True(t, got.Created)
+	})
 }
 
 func TestIDPConnectionService_Reads(t *testing.T) {
@@ -374,4 +440,89 @@ func TestIDPConnectionService_ListFilters(t *testing.T) {
 			assert.ErrorIs(t, err, tt.wantErr)
 		})
 	}
+}
+
+func TestResolveExistingIDP_HistoricalMatchReuses(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	stale := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   googleConnection("https://accounts.google.com", "A"),
+		CreatedAt:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	want := googleConnection("https://accounts.google.com", "B")
+	matched := *stale
+	matched.Document = want
+	matched.RevisionID = "idprev_2"
+
+	stmts.EXPECT().ListIDPConnectionRevisions(gomock.Any(), idpProjectID, "idp_1", gomock.Any()).
+		Return(&database.ListResult[*domain.IDPConnection]{Items: []*domain.IDPConnection{&matched, stale}}, nil)
+
+	got, err := service.ResolveExistingIDP(svc, t.Context(), stmts, stale, want)
+	require.NoError(t, err)
+	assert.Equal(t, "idprev_2", got.Connection.RevisionID)
+}
+
+func TestResolveExistingIDP_PostLockEqualitySkipsRevise(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	stale := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   googleConnection("https://accounts.google.com", "A"),
+	}
+	want := googleConnection("https://accounts.google.com", "B")
+	locked := *stale
+	locked.Document = want
+	locked.RevisionID = "idprev_2"
+
+	stmts.EXPECT().ListIDPConnectionRevisions(gomock.Any(), idpProjectID, "idp_1", gomock.Any()).
+		Return(&database.ListResult[*domain.IDPConnection]{Items: []*domain.IDPConnection{stale}}, nil)
+	gomock.InOrder(
+		stmts.EXPECT().LockIDPConnection(gomock.Any(), idpProjectID, "idp_1").Return(nil),
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(&locked, nil),
+	)
+
+	got, err := service.ResolveExistingIDP(svc, t.Context(), stmts, stale, want)
+	require.NoError(t, err)
+	assert.Equal(t, "idprev_2", got.Connection.RevisionID)
+}
+
+func TestResolveOrCreate_SlugTakenReentersResolve(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	svc := service.NewIDPConnectionServiceForTest(nil, nil)
+
+	doc := googleConnection("https://accounts.google.com", "Google")
+	winner := &domain.IDPConnection{
+		ProjectID:  idpProjectID,
+		ID:         "idp_1",
+		Slug:       "google",
+		RevisionID: "idprev_1",
+		Document:   doc,
+	}
+
+	gomock.InOrder(
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil)),
+		stmts.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).
+			Return(database.NewUniqueError("idp_connections", "idp_connections_slug", nil)),
+		stmts.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(winner, nil),
+	)
+
+	got, err := service.ResolveOrCreateIDP(svc, t.Context(), stmts, idpProjectID, "google", doc)
+	require.NoError(t, err)
+	assert.Equal(t, "idp_1", got.Connection.ID)
+	assert.False(t, got.Created)
 }

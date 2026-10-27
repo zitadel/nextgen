@@ -1,13 +1,11 @@
-import { text } from "@clack/prompts";
-
 import {
+  type CatalogProviderId,
   type ConnectionEndpoints,
   idpProvider,
-  ISSUER_REQUIREMENT,
-  isSupportedIssuer,
+  parseIssuer,
 } from "@zitadel/config/idp";
 
-import { bailOnCancel } from "../prompt-cancel";
+import type { Asker } from "../input";
 
 /**
  * Ask where a provider lives, on a development run only.
@@ -24,12 +22,12 @@ import { bailOnCancel } from "../prompt-cancel";
  * the document it would if none of this existed.
  */
 export async function askConnectionEndpoints(options: {
-  readonly provider: string;
+  readonly provider: CatalogProviderId;
   readonly developmentBuild: boolean;
-  /** The command being cancelled, for the wording a Ctrl-C produces. */
-  readonly command: string;
+  /** How the question is asked: the running command's `input`. */
+  readonly ask: Asker;
 }): Promise<ConnectionEndpoints | undefined> {
-  const { provider, developmentBuild, command } = options;
+  const { provider, developmentBuild, ask } = options;
   if (!developmentBuild) {
     return undefined;
   }
@@ -40,23 +38,17 @@ export async function askConnectionEndpoints(options: {
   // is rejected as `idp.endpoints_partial`. Asking for four URLs to satisfy
   // that would be a worse question than asking for none, and a stand-in
   // serves its own discovery document just as the vendor does.
-  return { issuer: await askUrl("Issuer", idpProvider(provider).issuer, command) };
-}
-
-/**
- * One issuer question, pre-filled with the answer that needs no thought.
- *
- * Validated against the connection contract rather than merely parsed: `new
- * URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would be
- * written to a connection that then fails on apply. Refusing at the prompt puts
- * the complaint where the value was typed.
- */
-async function askUrl(message: string, initialValue: string, command: string): Promise<string> {
-  const answer = await text({
-    message,
-    initialValue,
-    validate: (value) => (isSupportedIssuer(String(value ?? "")) ? undefined : ISSUER_REQUIREMENT),
-  });
-  bailOnCancel(answer, command);
-  return String(answer).trim();
+  // Validated against the connection contract rather than merely parsed: `new
+  // URL` accepts `http://idp.internal:9100` and `file:///tmp/idp`, which would
+  // be written to a connection that then fails on apply. Refusing at the prompt
+  // puts the complaint where the value was typed.
+  return {
+    issuer: await ask({
+      kind: "text",
+      name: "issuer",
+      message: "What is the issuer URL of the provider?",
+      parse: parseIssuer,
+      initialValue: idpProvider(provider).issuer,
+    }),
+  };
 }

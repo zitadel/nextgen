@@ -1,12 +1,19 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@clack/prompts", async () => (await import("../../helpers/clack")).clackDouble());
+
+import { cancel, isCancel, select } from "@clack/prompts";
 
 import { getDefaultBrandingConfig } from "@zitadel/config/defaults";
 
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import BrandingEject from "../../../src/commands/branding/eject";
+import { projectMetaSchemas } from "../../../src/lib/meta-schemas";
+import { cliVersion, parseJson, runCliForTest } from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 const tempDirs: string[] = [];
 
@@ -75,6 +82,48 @@ describe("branding eject", () => {
     const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
     expect(meta).toContain("npx @zitadel/cli@");
     expect(meta).not.toMatch(/`zitadel /);
+  });
+
+  it("writes the dialect meta-schema byte for byte as setup does", async () => {
+    const cwd = await makeProject();
+
+    await eject(cwd);
+
+    const expected = projectMetaSchemas(cliVersion.version).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
+  });
+
+  it("replaces an outdated dialect meta-schema with this version's", async () => {
+    const cwd = await makeProject();
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel/meta/branding.json"), '{"title": "an older dialect"}\n');
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    const expected = projectMetaSchemas(cliVersion.version).find(
+      (file) => file.path === ".zitadel/meta/branding.json",
+    );
+    const meta = await readFile(join(cwd, ".zitadel/meta/branding.json"), "utf8");
+    expect(meta).toBe(expected?.contents);
+  });
+
+  it("writes nothing through a dialect meta-schema that is a symlink", async () => {
+    const cwd = await makeProject();
+    await writeFile(join(cwd, ".zitadel/secret"), '{"project_secret": "sk_proj_test"}\n');
+    await mkdir(join(cwd, ".zitadel/meta"), { recursive: true });
+    await symlink("../secret", join(cwd, ".zitadel/meta/branding.json"));
+
+    const res = await eject(cwd);
+
+    expect(res.exitCode, res.stderr).toBe(0);
+    expect(await readFile(join(cwd, ".zitadel/secret"), "utf8")).toBe(
+      '{"project_secret": "sk_proj_test"}\n',
+    );
+    expect((await lstat(join(cwd, ".zitadel/meta/branding.json"))).isSymbolicLink()).toBe(true);
   });
 
   it("--design minimal writes the card-less template on the centered layout", async () => {
@@ -146,5 +195,39 @@ describe("branding eject", () => {
     const res = await eject(cwd);
     expect(res.exitCode).not.toBe(0);
     expect(res.stdout + res.stderr).toContain("not a Zitadel project");
+  });
+});
+
+describe("branding eject asked on a terminal", () => {
+  // The built CLI bundles its own prompts, so a prompt can only be answered
+  // by running the command from source, where `input` is the one module asked.
+  const ejecting = (cwd: string) => asTerminal(() => BrandingEject.run(["--cwd", cwd]));
+
+  afterEach(() => {
+    vi.mocked(select).mockReset();
+    vi.mocked(isCancel).mockReset();
+    vi.mocked(isCancel).mockReturnValue(false);
+  });
+
+  it("scaffolds the design that was chosen", async () => {
+    const cwd = await makeProject();
+    vi.mocked(select).mockResolvedValueOnce("minimal" as never);
+
+    await ejecting(cwd);
+
+    expect(await readFile(join(cwd, ".zitadel/branding/login.liquid"), "utf8")).toBe(
+      getDefaultBrandingConfig("minimal").template,
+    );
+  });
+
+  it("fails, scaffolding nothing, on Ctrl-C", async () => {
+    const cwd = await makeProject();
+    vi.mocked(isCancel).mockReturnValue(true);
+    vi.mocked(select).mockResolvedValueOnce(Symbol("cancel") as never);
+
+    await expect(ejecting(cwd)).rejects.toThrow();
+
+    expect(cancel).toHaveBeenCalledWith("Cancelled.");
+    await expect(readFile(join(cwd, ".zitadel/branding/branding.json"), "utf8")).rejects.toThrow();
   });
 });

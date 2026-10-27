@@ -36,7 +36,7 @@ export function userIdentifier(user: Record<string, unknown>): string | undefine
 /**
  * The muted secondary line shown under a heading: the identifier, but only
  * when a display name is the primary (rendering the identifier twice says
- * nothing). The users list shows the identifier as its own column instead.
+ * nothing). The detail heading and the users list's User cell both use it.
  */
 export function userIdentitySecondary(user: Record<string, unknown>): string | undefined {
   return field(user, "display") ? field(user, "identifier") : undefined;
@@ -51,17 +51,29 @@ export function userIdentitySecondary(user: Record<string, unknown>): string | u
 export function userMetadata(user: Record<string, unknown>): {
   status?: string;
   createdAt?: string;
+  /**
+   * The team that owns the user's lifecycle (ADR 024): `null` when the user is
+   * self-owned, absent on a record that does not report it. Not a membership.
+   */
+  lifecycleOwnerTeamId?: string | null;
 } {
   const metadata = user.metadata;
   if (!metadata || typeof metadata !== "object") return {};
   const record = metadata as Record<string, unknown>;
-  return { status: field(record, "status"), createdAt: field(record, "created_at") };
+  const owner = record.lifecycle_owner_team_id;
+  return {
+    status: field(record, "status"),
+    createdAt: field(record, "created_at"),
+    lifecycleOwnerTeamId: owner === null ? null : field(record, "lifecycle_owner_team_id"),
+  };
 }
 
 /** One embedded membership, reduced to what a cell renders and links to. */
 export interface UserTeam {
   id: string;
   name: string;
+  /** `membership_status`: `pending`, `active` or `inactive`; absent if unreported. */
+  status?: string;
 }
 
 /**
@@ -84,7 +96,7 @@ export function userTeams(user: Record<string, unknown>): UserTeam[] {
       const record = team as Record<string, unknown>;
       const id = field(record, "id");
       const name = field(record, "name");
-      return id && name ? { id, name } : undefined;
+      return id && name ? { id, name, status: field(record, "membership_status") } : undefined;
     })
     .filter(isPresent);
 }

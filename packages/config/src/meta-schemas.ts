@@ -10,16 +10,22 @@
  * server embeds) ahead of build, typecheck and test. Those are generated in
  * turn from the OpenAPI YAML by `scripts/generate-meta-schemas.ts` at the repo
  * root, so the YAML is the only thing to edit.
+ *
+ * `project.json`, the schema of `zitadel.json`, is the exception: only the CLI
+ * reads that file, so its schema is written by hand here
+ * (`project-config.schema.json`) and never reaches the server.
  */
 import authMethodMetaSchema from "../meta-schemas/auth-method.json" with { type: "json" };
 import authMethodsMetaSchema from "../meta-schemas/auth-methods.json" with { type: "json" };
 import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "json" };
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with { type: "json" };
 import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with { type: "json" };
+import policyMetaSchema from "../meta-schemas/policy.json" with { type: "json" };
 import propertyNameMetaSchema from "../meta-schemas/property-name.json" with { type: "json" };
 import ssoAuthMethodMetaSchema from "../meta-schemas/sso-auth-method.json" with { type: "json" };
 import userPropertyMetaSchema from "../meta-schemas/user-property.json" with { type: "json" };
 import userSchemaMetaSchema from "../meta-schemas/user-schema.json" with { type: "json" };
+import projectConfigSchema from "./project-config.schema.json" with { type: "json" };
 
 /** Project-relative directory setup writes the meta-schemas to. */
 export const META_SCHEMA_DIR = ".zitadel/meta";
@@ -35,6 +41,18 @@ export const FLOW_FILE_SCHEMA_REF = "../meta/flow-definition.json";
  * `.zitadel/branding/` — resolves to `{@link META_SCHEMA_DIR}/branding.json`.
  */
 export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
+
+/**
+ * The `$schema` value policy files carry, relative to `.zitadel/policies/` —
+ * resolves to `{@link META_SCHEMA_DIR}/policy.json`.
+ */
+export const POLICY_FILE_SCHEMA_REF = "../meta/policy.json";
+
+/**
+ * The `$schema` value `zitadel.json` carries, relative to the project root —
+ * resolves to `{@link META_SCHEMA_DIR}/project.json`.
+ */
+export const PROJECT_FILE_SCHEMA_REF = "./.zitadel/meta/project.json";
 
 export type MetaSchemaFile = { name: string; body: object };
 
@@ -55,5 +73,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "sso-auth-method.json", body: ssoAuthMethodMetaSchema as object },
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
+    { name: "policy.json", body: policyMetaSchema as object },
+    { name: "project.json", body: projectConfigSchema as object },
   ];
 }

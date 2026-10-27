@@ -2,10 +2,12 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/ogen-go/ogen/ogenerrors"
 	api "github.com/zitadel/nextgen/api/generated"
@@ -17,6 +19,10 @@ import (
 
 type SecurityHandler struct {
 	tokenService service.TokenService
+	// platformProjectID is the deployment's platform project (ADR 075). A
+	// session of a user homed there carries it in ScopeContext, which is what
+	// opens the platform operator path; empty opens it for nobody.
+	platformProjectID string
 }
 
 func NewSecurityHandler(
@@ -27,6 +33,14 @@ func NewSecurityHandler(
 	}
 }
 
+// WithPlatformProject names the deployment's platform project (ADR 075). A
+// chainable setter, like Handler's, so the constructor's call sites stay as
+// they are.
+func (s *SecurityHandler) WithPlatformProject(projectID string) *SecurityHandler {
+	s.platformProjectID = projectID
+	return s
+}
+
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -34,7 +48,7 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	if !payload.Type.IsProjectSecret() {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
@@ -74,7 +88,7 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	}
 	token, err := s.tokenService.IntrospectToken(ctx, t.APIKey)
 	if err != nil {
-		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		return nil, introspectionFailure(err)
 	}
 	err = domain.ValidateSessionToken(token)
 	if err != nil {
@@ -95,17 +109,53 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 	if token.UserID != "" {
 		// Session.Token() never mints Scope (always empty). Users skip the
 		// project.write ceiling in credentialCeiling; Check uses PrincipalType/ID.
-		ctx = WithScopeContext(ctx, ScopeContext{
+		scope := ScopeContext{
 			ProjectID:     token.ProjectID,
 			Scope:         token.Scope,
 			PrincipalType: domain.AuthzPrincipalTypeUser,
 			PrincipalID:   token.UserID,
-		})
+		}
+		if s.platformProjectID != "" && token.ProjectID == s.platformProjectID {
+			scope.PlatformProjectID = s.platformProjectID
+		}
+		ctx = WithScopeContext(ctx, scope)
 	}
 	return ctx, nil
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
+
+// isRejectedToken reports whether a failed IntrospectToken judged the presented
+// credential and rejected it (malformed, undecryptable, naming an unknown key,
+// expired or revoked), rather than failing to decide. Every check that turns
+// introspection into a refusal asks this, so the session cookie and the
+// step-up proof refuse the same tokens.
+func isRejectedToken(err error) bool {
+	return errors.Is(err, domain.ErrInvalidToken()) ||
+		errors.Is(err, domain.ErrInvalidTokenIdentifiers()) ||
+		errors.Is(err, domain.ErrTokenRevoked()) ||
+		errors.Is(err, domain.ErrEncryptionKeyNotFound())
+}
+
+// introspectionFailure decides what a failed IntrospectToken means for the
+// request. Only a rejected credential ([isRejectedToken]) is an unsatisfied
+// requirement: 401. Anything else means the server could not tell (the token
+// store or key store failed). A domain server fault passes on unchanged, so the
+// error handler answers it with its own status (500, 501 or 503). Any other
+// error becomes an internal one, an unclassified error included: the error
+// handler takes a security error without a domain server fault for a refused
+// credential. Collapsing a failure into a 401 would tell every client its
+// session is dead during an outage, and SDKs clear their session cookie on a
+// 401.
+func introspectionFailure(err error) error {
+	if isRejectedToken(err) {
+		return ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	if e, ok := errors.AsType[domain.Error](err); ok && domain.IsServerFault(e) {
+		return err
+	}
+	return domain.ErrInternal(err)
+}
 
 // sessionCookieOperations is the session-only 401 rewrite allowlist.
 // Dual-scheme ops stay off it so a bad Bearer is not a missing-session message.
@@ -117,6 +167,11 @@ var sessionCookieOperations = map[api.OperationName]bool{
 	api.PatchMyUserOperation:           true,
 	api.CompleteClaimOperation:         true,
 	api.ListMyProjectsOperation:        true,
+	api.GetMyUserSchemaOperation:       true,
+	api.ListMyTeamsOperation:           true,
+	api.ListMyPasskeysOperation:        true,
+	api.ListMyIdentityLinksOperation:   true,
+	api.GetMyPasswordStateOperation:    true,
 }
 
 // userBoundSessionOperations require a session with UserID. Anonymous
@@ -124,32 +179,52 @@ var sessionCookieOperations = map[api.OperationName]bool{
 // session-only operation nothing else can satisfy, so the skip becomes the 401
 // the contract declares.
 var userBoundSessionOperations = map[api.OperationName]bool{
-	api.CreateGrantOperation:    true,
-	api.GetGrantOperation:       true,
-	api.DeleteGrantOperation:    true,
-	api.QueryGrantsOperation:    true,
-	api.QueryUsersOperation:     true,
-	api.QueryTeamsOperation:     true,
-	api.GetTeamOperation:        true,
-	api.ListMyProjectsOperation: true,
-	api.GetProjectOperation:     true,
-	api.PatchProjectOperation:   true,
+	api.CreateGrantOperation:         true,
+	api.GetGrantOperation:            true,
+	api.DeleteGrantOperation:         true,
+	api.QueryGrantsOperation:         true,
+	api.QueryUsersOperation:          true,
+	api.QueryTeamsOperation:          true,
+	api.GetTeamOperation:             true,
+	api.ListMyProjectsOperation:      true,
+	api.GetMyUserSchemaOperation:     true,
+	api.ListMyTeamsOperation:         true,
+	api.ListMyPasskeysOperation:      true,
+	api.ListMyIdentityLinksOperation: true,
+	api.GetMyPasswordStateOperation:  true,
+	api.GetProjectOperation:          true,
+	api.PatchProjectOperation:        true,
+	api.ListProjectAdminsOperation:   true,
 	// Console management screens (#1300 §1). Their writes need the CSRF token
 	// (ADR 053 §5, csrf.go).
-	api.CreateUserOperation:          true,
-	api.GetUserByIDOperation:         true,
-	api.ListUserPasskeysOperation:    true,
-	api.DeleteUserByIDOperation:      true,
-	api.CreateTeamOperation:          true,
-	api.UpdateTeamOperation:          true,
-	api.ListSchemasOperation:         true,
-	api.GetSchemaByIdOperation:       true,
-	api.ListFlowDefinitionsOperation: true,
-	api.GetFlowDefinitionOperation:   true,
-	api.ListBrandingOperation:        true,
-	api.GetBrandingByIdOperation:     true,
-	api.QueryIdpsOperation:           true,
-	api.GetIdpByIdOperation:          true,
+	api.CreateUserOperation:            true,
+	api.GetUserByIDOperation:           true,
+	api.PatchUserByIDOperation:         true,
+	api.ListUserTeamsOperation:         true,
+	api.ListUserPasskeysOperation:      true,
+	api.GetUserPasswordStateOperation:  true,
+	api.ListUserIdentityLinksOperation: true,
+	api.DeleteUserByIDOperation:        true,
+	api.CreateTeamOperation:            true,
+	api.UpdateTeamOperation:            true,
+	api.ListSchemasOperation:           true,
+	api.GetSchemaByIdOperation:         true,
+	api.ListFlowDefinitionsOperation:   true,
+	api.GetFlowDefinitionOperation:     true,
+	api.ListBrandingOperation:          true,
+	api.GetBrandingByIdOperation:       true,
+	api.QueryIdpsOperation:             true,
+	api.GetIdpByIdOperation:            true,
+	api.GetIdpRevisionByIdOperation:    true,
+	// The Releases screens read a project's releases and where each went,
+	// deploy one, roll a deployment back and revoke a release.
+	api.ListReleasesOperation:       true,
+	api.GetReleaseByIdOperation:     true,
+	api.ListDeploymentsOperation:    true,
+	api.GetDeploymentByIdOperation:  true,
+	api.CreateDeploymentOperation:   true,
+	api.RollbackDeploymentOperation: true,
+	api.RevokeReleaseOperation:      true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
@@ -181,6 +256,25 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil
+}
+
+// requireSelf resolves the caller of a self-access operation (`/me`). With
+// project_id, a session of another project is refused first, whatever state it
+// is in (holdSessionToProject). Any other refusal answers like a missing
+// session, so it never tells a caller that its cookie is genuine but its user
+// is gone (#553).
+func requireSelf(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
+	token, ok := sessionTokenFromContext(ctx)
+	if ok {
+		if err := holdSessionToProject(token, projectID); err != nil {
+			return domain.Self{}, err
+		}
+	}
+	self, err := domain.SelfFromSession(token, time.Now())
+	if err != nil {
+		return domain.Self{}, invalidSessionCredential(err)
+	}
+	return self, nil
 }
 
 type contextKey struct{}
@@ -286,6 +380,10 @@ type ScopeContext struct {
 	PrincipalID   string
 	// TeamID is the token team for sk_team_ principals (resolver ConstraintTeamID).
 	TeamID string
+	// PlatformProjectID is the deployment's platform project when this is a
+	// session of a user homed there (ADR 075), which adds the platform operator
+	// path to every Check. Empty for every other credential.
+	PlatformProjectID string
 	// SecretHash is domain.HashSecret of the presented bearer string: the
 	// proof-of-possession seam for the claim flow (ADR 046 §3). The claim
 	// service stores it on init and compares it on status; it is set only on

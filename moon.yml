@@ -31,20 +31,38 @@ tasks:
       persistent: true
       runInCI: false
 
+  # The hosted cloud on localhost: `vercel dev -L` over vercel.json's
+  # services, on a throwaway master key and SQLite (scripts/run-cloud.mjs).
+  cloud:
+    command: "node scripts/run-cloud.mjs"
+    options:
+      cache: false
+      persistent: true
+      runInCI: false
+
+  # Deprecated alias for `e2e:journey` (the journey moved into the e2e project).
+  # Hands over to it, passing any runner flags straight through.
   journey:
-    command: "node scripts/run-journey.mjs"
+    description: "Deprecated: use `moon run e2e:journey`."
+    command: "corepack"
+    args:
+      - "pnpm"
+      - "exec"
+      - "moon"
+      - "run"
+      - "e2e:journey"
+      - "--"
     options:
       cache: false
       runInCI: false
 
   # The local runtime image (ghcr.io/zitadel/nextgen:local-dev): the server
-  # cross-compiled for linux, with both UI dists embedded, in the release
+  # cross-compiled for linux, with the console's dist embedded, in the release
   # Dockerfile. Needs Docker, so it stays out of CI.
   build-local-image:
     command: "node scripts/build-local-runtime-image.mjs"
     deps:
       - "console:build"
-      - "login-ui:build"
     options:
       cache: false
       runInCI: false
@@ -77,12 +95,20 @@ tasks:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
       - "scripts/dev-process.mjs"
+      - "scripts/dev-process.test.mjs"
+      - "scripts/shims/pnpm"
       - "scripts/generate-meta-schemas.ts"
       - "scripts/generate-meta-schemas.test.ts"
       - "scripts/release-artifacts.mjs"
       - "scripts/release-github.mjs"
       - "scripts/release-github.test.mjs"
       - "scripts/release-manifest.mjs"
+      - "scripts/render-builtin-schemas.mjs"
+      - "scripts/render-builtin-schemas.test.mjs"
+      # Read by that test: it renders every built-in schema.
+      - "api/openapi/endpoints/schemas/*.json"
+      # The server's default schema namespace, which the renderer must match.
+      - "packages/config/src/defaults.ts"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
@@ -113,6 +139,9 @@ tasks:
       - "packages/*/package.json"
       - "apps/*/tsconfig*.json"
       - "packages/*/tsconfig*.json"
+      - "e2e/moon.yml"
+      - "e2e/package.json"
+      - "e2e/tsconfig*.json"
       - "vitest.config.ts"
       - "vitest.shared.mjs"
       - "vitest.shared.d.mts"
@@ -153,8 +182,10 @@ tasks:
       - "apps/*/moon.yml"
       - "packages/*/moon.yml"
       - "tools/*/moon.yml"
+      - "e2e/moon.yml"
       - "apps/*/package.json"
       - "packages/*/package.json"
+      - "e2e/package.json"
     options:
       cache: true
       runInCI: true

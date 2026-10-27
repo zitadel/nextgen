@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-solid",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Solid components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid#readme",
   "bugs": {
@@ -26,12 +26,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && attw --pack . --profile=esm-only",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
@@ -42,6 +43,7 @@
     "solid-js": ">=1.6"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@solidjs/testing-library": "^0.8.10",
     "@testing-library/jest-dom": "^6.0.0",
     "@types/node": "catalog:",
@@ -49,7 +51,7 @@
     "@zitadel/api-mock": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
-    "solid-js": "^1.9.12",
+    "solid-js": "^1.9.16",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-dts": "catalog:",

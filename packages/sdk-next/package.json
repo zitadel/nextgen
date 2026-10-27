@@ -1,7 +1,7 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "1.0.0-alpha.25",
-  "description": "Next.js helpers and mock auth UI for Zitadel",
+  "version": "0.1.0",
+  "description": "Next.js middleware, helpers and components for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
     "url": "https://github.com/zitadel/nextgen/issues"
@@ -18,6 +18,7 @@
   "type": "module",
   "sideEffects": [
     "./dist/client.js",
+    "./dist/components.js",
     "./dist/auth.js",
     "./dist/provider.js"
   ],
@@ -33,6 +34,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "import": "./dist/client.js"
+    },
+    "./components": {
+      "types": "./dist/components.d.ts",
+      "import": "./dist/components.js"
     },
     "./react": {
       "types": "./dist/react.d.ts",
@@ -54,32 +59,37 @@
     "access": "public"
   },
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\"",
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node -e \"require('node:fs').copyFileSync('src/jsx.d.ts', 'dist/jsx.d.ts')\" && attw --pack . --profile=esm-only",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",
     "@zitadel/components": "workspace:*",
     "@zitadel/sdk-core": "workspace:*",
-    "server-only": "^0.0.1"
+    "@zitadel/sdk-react": "workspace:*",
+    "server-only": "^0.0.1",
+    "ufo": "catalog:"
   },
   "peerDependencies": {
-    "next": ">=15",
+    "next": ">=15.2.3",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "jsdom": "catalog:",
-    "next": "^16.2.11",
+    "next": "^16.3.8",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",

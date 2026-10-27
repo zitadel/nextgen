@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import "./zl-field.js";
 import type { ZlField } from "./zl-field.js";
@@ -169,5 +169,161 @@ describe("<zl-field> aria wiring", () => {
     const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
     expect(field.value).toBe("restored@acme.com");
     expect(input.value).toBe("restored@acme.com");
+  });
+});
+
+describe("<zl-field> password toggle", () => {
+  let host: HTMLDivElement;
+
+  beforeEach(() => {
+    host = document.createElement("div");
+    document.body.appendChild(host);
+  });
+
+  afterEach(() => {
+    host.remove();
+  });
+
+  async function mount(html: string, props: Partial<ZlField> = {}): Promise<ZlField> {
+    host.innerHTML = html;
+    const field = host.querySelector("zl-field") as ZlField;
+    Object.assign(field, props);
+    await field.updateComplete;
+    return field;
+  }
+
+  const input = (field: ZlField) => field.shadowRoot?.querySelector("input") as HTMLInputElement;
+  const toggle = (field: ZlField) =>
+    field.shadowRoot?.querySelector<HTMLButtonElement>('[part~="password-toggle"]') ?? null;
+
+  it("is off unless the property is set", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`);
+    expect(toggle(field)).toBeNull();
+    expect(input(field).hasAttribute("spellcheck")).toBe(false);
+  });
+
+  it("cannot be switched on from markup", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" password-toggle></zl-field>`);
+    expect(field.passwordToggle).toBe(false);
+    expect(toggle(field)).toBeNull();
+  });
+
+  it("ignores the property on a non-password field", async () => {
+    const field = await mount(`<zl-field name="email" type="email"></zl-field>`, {
+      passwordToggle: true,
+    });
+    expect(toggle(field)).toBeNull();
+  });
+
+  it("replaces the clear button, so the field shows one icon", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+    });
+    const actions = field.shadowRoot?.querySelectorAll('[part~="trailing-action"]') ?? [];
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.getAttribute("aria-label")).toBe("Show password");
+  });
+
+  it("keeps the toggle in the error state instead of the alert icon", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" error="Wrong"></zl-field>`, {
+      passwordToggle: true,
+    });
+    expect(toggle(field)).not.toBeNull();
+    expect(field.shadowRoot?.querySelector('zl-icon[name="alert-circle"]')).toBeNull();
+  });
+
+  it("reveals and hides the value from a button in the tab order", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" value="hunter2"></zl-field>`, {
+      passwordToggle: true,
+      passwordToggleLabel: "Passwort anzeigen",
+    });
+    const button = toggle(field)!;
+    expect(button.tabIndex).toBe(0);
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+    expect(input(field).type).toBe("password");
+
+    button.click();
+    await field.updateComplete;
+    expect(input(field).type).toBe("text");
+    expect(input(field).value).toBe("hunter2");
+    expect(toggle(field)!.getAttribute("aria-pressed")).toBe("true");
+    // One name in both states; `aria-pressed` alone says which (APG).
+    expect(toggle(field)!.getAttribute("aria-label")).toBe("Passwort anzeigen");
+
+    toggle(field)!.click();
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+    expect(toggle(field)!.getAttribute("aria-pressed")).toBe("false");
+    expect(toggle(field)!.getAttribute("aria-label")).toBe("Passwort anzeigen");
+  });
+
+  it("points the toggle at the input it controls", async () => {
+    const field = await mount(`<zl-field name="pw" type="password" label="Password"></zl-field>`, {
+      passwordToggle: true,
+    });
+    expect(toggle(field)!.getAttribute("aria-controls")).toBe(input(field).id);
+  });
+
+  it("keeps the toggle on a read-only password field, which still hides the clear button", async () => {
+    const field = await mount(
+      `<zl-field name="pw" type="password" value="hunter2" readonly></zl-field>`,
+      {
+        passwordToggle: true,
+      },
+    );
+    expect(toggle(field)).not.toBeNull();
+    expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
+  });
+
+  it("opts the input out of spellcheck and autocorrect", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
+      passwordToggle: true,
+    });
+    expect(input(field).getAttribute("spellcheck")).toBe("false");
+    expect(input(field).getAttribute("autocapitalize")).toBe("off");
+    expect(input(field).getAttribute("autocorrect")).toBe("off");
+  });
+
+  it("hides the value again when the toggle is withdrawn", async () => {
+    const field = await mount(`<zl-field name="pw" type="password"></zl-field>`, {
+      passwordToggle: true,
+    });
+    toggle(field)!.click();
+    await field.updateComplete;
+    field.passwordToggle = false;
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+    field.passwordToggle = true;
+    await field.updateComplete;
+    expect(input(field).type).toBe("password");
+  });
+});
+
+describe("<zl-field> events", () => {
+  const input = (field: ZlField) => field.shadowRoot?.querySelector("input") as HTMLInputElement;
+
+  it("keeps zl-input inside the widget", async () => {
+    // Arrange
+    const heardOnPage = vi.fn();
+    const heardInWidget = vi.fn();
+    const host = document.body.appendChild(document.createElement("div"));
+    const root = host.attachShadow({ mode: "open" });
+    const element = document.createElement("zl-field");
+    window.addEventListener("zl-input", heardOnPage, true);
+    element.addEventListener("zl-input", heardInWidget);
+    onTestFinished(() => {
+      window.removeEventListener("zl-input", heardOnPage, true);
+      host.remove();
+    });
+    root.append(element);
+    await element.updateComplete;
+
+    // Act
+    input(element).value = "hunter2";
+    input(element).dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Assert
+    expect(heardInWidget).toHaveBeenCalledOnce();
+    expect(heardOnPage).not.toHaveBeenCalled();
   });
 });

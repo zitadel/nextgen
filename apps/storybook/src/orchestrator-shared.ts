@@ -27,8 +27,8 @@ import { brandingPresets, type BrandingPresetId } from "./branding-presets.js";
  *   rendered fields change without a separate component.
  * - `branding` swaps the tenant payload the mock overlays on every response.
  * - `sso` offers identity providers on the steps that can start a sign-in,
- *   which is what the flow looks like after `zitadel sso enable`. The shipped
- *   flow has none, so it is off by default.
+ *   which is what the flow looks like after `zitadel auth-method sso enable`.
+ *   The shipped flow has none, so it is off by default.
  *
  * Interactive fixture emails (typed live in the rendered form):
  * - `wrong@example.com` -> inline "Wrong email or password." on the password
@@ -61,9 +61,8 @@ export const mock = setupMockHandlers();
  * The providers the mock offers when `sso` is on, **derived from the component
  * library** instead of a hard-coded list: every brand mark `@zitadel/components`
  * ships (`SHIPPED_BRAND_ICON_NAMES`, e.g. `brand-google`) becomes a provider whose
- * button carries that logo. Add a glyph there and it appears here automatically —
- * no Google/GitHub to drift out of sync, and no dependency on `@zitadel/config`
- * (Storybook already depends on `@zitadel/components`, not on config).
+ * button carries that logo. Add a glyph there and it appears here automatically,
+ * with no hand-kept Google/GitHub list to drift out of sync.
  */
 const BRAND_PROVIDERS: MockSsoProvider[] = SHIPPED_BRAND_ICON_NAMES.map((brand) => {
   const template = brand.replace(/^brand-/, "");
@@ -199,7 +198,7 @@ export const orchestratorBase = {
       },
       options: ["off", "on"],
       description:
-        "Backend-returned identity providers on sign-in-capable steps, as `zitadel sso enable` leaves them. `off` = the shipped default (none). `on` = every provider `@zitadel/components` ships a brand mark for (derived from `SHIPPED_BRAND_ICON_NAMES`) plus one without a mark to show the labelled-button fallback. Rendered as `<zl-sso-providers>`.",
+        "Backend-returned identity providers on sign-in-capable steps, as `zitadel auth-method sso enable` leaves them. `off` = the shipped default (none). `on` = every provider `@zitadel/components` ships a brand mark for (derived from `SHIPPED_BRAND_ICON_NAMES`) plus one without a mark to show the labelled-button fallback. Rendered as `<zl-sso-providers>`.",
       table: { category: "Flow engine", defaultValue: { summary: "off" } },
     },
     passkey: {

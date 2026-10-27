@@ -22,8 +22,8 @@ type SecurityHandler interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. Every such
 	// request must also send the session's token from `GET /sessions/me/csrf` in the
 	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// sign-out (`revokeMySession`) and the `POST …/query` reads, which need no
-	// token. Safe methods (`GET`) are not checked. A request a project secret
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
 	// authenticates is not affected.
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
@@ -48,34 +48,56 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
 	CompleteClaimOperation:         []string{},
+	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
 	DeleteUserByIDOperation:        []string{},
 	GetBrandingByIdOperation:       []string{},
+	GetDeploymentByIdOperation:     []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
+	GetIdpRevisionByIdOperation:    []string{},
+	GetMyPasswordStateOperation:    []string{},
 	GetMySessionOperation:          []string{},
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
+	GetMyUserSchemaOperation:       []string{},
+	GetPolicyOperation:             []string{},
+	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
+	GetReleaseByIdOperation:        []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
+	GetUserPasswordStateOperation:  []string{},
 	ListBrandingOperation:          []string{},
+	ListDeploymentsOperation:       []string{},
 	ListFlowDefinitionsOperation:   []string{},
+	ListMyIdentityLinksOperation:   []string{},
+	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
+	ListMyTeamsOperation:           []string{},
+	ListPoliciesOperation:          []string{},
+	ListPolicyRevisionsOperation:   []string{},
+	ListProjectAdminsOperation:     []string{},
+	ListReleasesOperation:          []string{},
 	ListSchemasOperation:           []string{},
+	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
+	ListUserTeamsOperation:         []string{},
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
+	PatchUserByIDOperation:         []string{},
 	QueryGrantsOperation:           []string{},
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
 	RevokeMySessionOperation:       []string{},
+	RevokeReleaseOperation:         []string{},
+	RollbackDeploymentOperation:    []string{},
 	UpdateTeamOperation:            []string{},
 }
 
@@ -102,6 +124,9 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	AddOriginOperation: []string{
+		"origin.write",
+	},
 	BeginUserPasskeyRegistrationOperation: []string{
 		"user.write",
 	},
@@ -174,6 +199,10 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetDeploymentByIdOperation: []string{
 		"deployment.read",
 	},
+	GetDeploymentVariablesOperation: []string{
+		"deployment.read",
+		"variable.read",
+	},
 	GetEventOperation: []string{
 		"events.read",
 	},
@@ -188,6 +217,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
+	},
+	GetPolicyOperation: []string{
+		"policy.read",
+	},
+	GetPolicyRevisionOperation: []string{
+		"policy.read",
 	},
 	GetProjectOperation: []string{
 		"project.write",
@@ -205,6 +240,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 		"team.read",
 	},
 	GetUserByIDOperation: []string{
+		"user.read",
+	},
+	GetUserPasswordStateOperation: []string{
 		"user.read",
 	},
 	GetVariableOperation: []string{
@@ -234,11 +272,26 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
 	},
+	ListPoliciesOperation: []string{
+		"policy.read",
+	},
+	ListPolicyRevisionsOperation: []string{
+		"policy.read",
+	},
+	ListPreviewsOperation: []string{
+		"deployment.read",
+	},
+	ListProjectAdminsOperation: []string{
+		"project.write",
+	},
 	ListReleasesOperation: []string{
 		"release.read",
 	},
 	ListSchemasOperation: []string{
 		"schema.read",
+	},
+	ListUserIdentityLinksOperation: []string{
+		"user.read",
 	},
 	ListUserPasskeysOperation: []string{
 		"user.read",
@@ -252,6 +305,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PatchUserByIDOperation: []string{
 		"user.write",
+	},
+	PublishPolicyOperation: []string{
+		"policy.write",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",
@@ -271,11 +327,20 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	QueryUsersOperation: []string{
 		"user.read",
 	},
+	RemoveOriginOperation: []string{
+		"origin.delete",
+	},
+	RemovePreviewOperation: []string{
+		"deployment.write",
+	},
 	RevokeReleaseOperation: []string{
 		"release.write",
 	},
 	RevokeSessionOperation: []string{
 		"session.delete",
+	},
+	RollbackDeploymentOperation: []string{
+		"deployment.write",
 	},
 	SetUserPasswordOperation: []string{
 		"user.write",
@@ -364,8 +429,8 @@ type SecuritySource interface {
 	// request is refused with `403` and code `auth.csrf_invalid`. Every such
 	// request must also send the session's token from `GET /sessions/me/csrf` in the
 	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// sign-out (`revokeMySession`) and the `POST …/query` reads, which need no
-	// token. Safe methods (`GET`) are not checked. A request a project secret
+	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
+	// project secret
 	// authenticates is not affected.
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.

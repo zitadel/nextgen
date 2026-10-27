@@ -262,6 +262,14 @@ unchanged; only the cookie-authenticated browser leg it opens is affected.
 >   `POST …/query` reads. A refusal is `403 auth.csrf_invalid`, listed in each
 >   affected operation's default error responses.
 >
+> **Amendment (2026-10-20):** sign-out is no longer exempt. Since each app's
+> SDK proxy forwards only its own project's session cookie (ADR 073), the
+> session widgets read the token through it from
+> `GET /sessions/me/csrf?project_id=…` and send it with
+> `DELETE /sessions/me`. The `POST …/query` reads remain the only exemption.
+> An older `@zitadel/components` that signs out without the token is refused
+> with `403 auth.csrf_invalid`.
+>
 > Session liveness (the "active user session" condition above) needs no
 > check of its own: revoking or rotating a session deletes its token records,
 > a token record expires with its session, and every request introspects the
@@ -317,6 +325,19 @@ exception for project secrets does not extend to foreign human sessions.
 > shape they already rely on. `TestConsoleSessionForeignTargetIsIndistinguishable`
 > pins both: every operation the Console calls answers a real foreign target
 > exactly as it answers a missing one.
+
+> **Implementation note (2026-10-21, #2112):** the foothold of a by-id check
+> covers the target, not the whole project: a grant scoped project-wide, to the
+> target's team or to the target itself, a membership in the target team or the
+> target's team, or the caller's own user record. Anything else answers like
+> an unknown id, so a principal granted on one team cannot confirm another
+> team or its users exist. Creates, project operations and lists keep the
+> project-wide foothold; they answer before any id is looked up, and the list
+> partial view depends on it. Deletes keep two existing exceptions: an
+> operator project secret gets `204` for an id that names nothing (D10's
+> delete idempotency), and `DELETE /teams/{id}` answers every refusal with
+> `403`. `TestConsoleSessionTeamScopedCannotProbeOtherTeams` pins the case for
+> a session.
 
 ### 8. Audit events are written in the protected project
 
@@ -403,7 +424,7 @@ the account that minted it.
 Cloud operations and self-hosted break-glass may use an explicit
 deployment-wide operator relation or credential. Its issuance, activation,
 customer visibility, and audit requirements are defined separately with staff
-support governance. It must not be represented as
+support governance, in [ADR 075](075-platform-operators.md). It must not be represented as
 `project:platform#admin -> every project`, and it must not be approximated by a
 platform-homed automation key granted broad roles — the operator credential is
 explicit precisely so issuance governance, customer visibility, and audit

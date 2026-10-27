@@ -65,7 +65,9 @@ const (
 	// The SSO callback's outcome, separate from auth.check.*: a succeeded
 	// exchange is not a sign-in, since the identity may still match no account.
 	// An authorization failure is the provider's error response, or a callback
-	// with no code; an exchange failure is anything after a code arrived.
+	// with no code; an exchange failure is anything after a code arrived. A
+	// callback refused before its exchange, on another connection's path or
+	// with a foreign `iss`, follows the same split.
 	EventTypeAuthSSOAuthorizationFailed EventType = "auth.sso.authorization.failed"
 	EventTypeAuthSSOExchangeSucceeded   EventType = "auth.sso.exchange.succeeded"
 	EventTypeAuthSSOExchangeFailed      EventType = "auth.sso.exchange.failed"
@@ -81,6 +83,9 @@ const (
 
 	EventTypeBrandingCreated EventType = "branding.created"
 
+	EventTypePolicyCreated EventType = "policy.created"
+	EventTypePolicyUpdated EventType = "policy.updated"
+
 	EventTypeReleaseCreated EventType = "release.created"
 	EventTypeReleaseRevoked EventType = "release.revoked"
 
@@ -90,6 +95,14 @@ const (
 	EventTypeIDPIdentityLinkCreated EventType = "idp.identity_link.created"
 
 	EventTypeDeploymentCreated EventType = "deployment.created"
+
+	EventTypeOriginAdded   EventType = "origin.added"
+	EventTypeOriginRemoved EventType = "origin.removed"
+
+	EventTypeVariableSet     EventType = "variable.set"
+	EventTypeVariableRemoved EventType = "variable.removed"
+
+	EventTypePreviewRemoved EventType = "preview.removed"
 
 	EventTypeAuthzGranted EventType = "authz.granted"
 	EventTypeAuthzRevoked EventType = "authz.revoked"
@@ -145,8 +158,21 @@ type EventClientMetadata struct {
 
 // EventMetadata is the events.metadata JSON object.
 type EventMetadata struct {
-	Client *EventClientMetadata `json:"client,omitempty"`
+	Client        *EventClientMetadata        `json:"client,omitempty"`
+	Authorization *EventAuthorizationMetadata `json:"authorization,omitempty"`
 }
+
+// EventAuthorizationMetadata is events.metadata.authorization: the path that
+// authorized the request, when it was not a grant on the protected project
+// (ADR 053 §8, ADR 075 §5).
+type EventAuthorizationMetadata struct {
+	Path               string `json:"path"`
+	ActorHomeProjectID string `json:"actor_home_project_id,omitempty"`
+}
+
+// EventAuthorizationPathPlatformOperator marks a request the platform operator
+// relation authorized (ADR 075 §5).
+const EventAuthorizationPathPlatformOperator = "platform_operator"
 
 // EventField enumerates filterable/sortable Event columns.
 type EventField uint8

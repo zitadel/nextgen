@@ -285,6 +285,9 @@ func writeErrorResponses(
 		if endpoint.csrfChecked {
 			errFuncs = append(errFuncs, csrfErrors...)
 		}
+		errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
+			return slices.Contains(remappedErrors, errFunc)
+		})
 		if excluded := operationExcludedErrors[endpoint.operationID]; len(excluded) > 0 {
 			errFuncs = slices.DeleteFunc(errFuncs, func(errFunc string) bool {
 				return slices.Contains(excluded, errFunc)
@@ -884,9 +887,12 @@ var transportErrors = []string{
 
 // securityErrors join transportErrors for operations that declare a security
 // requirement: the generated middleware rejects a failed one before dispatch,
-// as auth.unauthorized. An operation with `security: []` — the health probes,
+// as auth.unauthorized. A security handler that cannot introspect the
+// credential (the token or key store failed) answers with the status of the
+// fault instead (OgenErrorHandler): unavailable, not_implemented, or internal
+// for the rest. An operation with `security: []` — the health probes,
 // the pre-authentication flow steps — has no requirement to fail, so listing
-// the code there would advertise an answer it cannot give. Over-advertising is
+// these codes there would advertise answers it cannot give. Over-advertising is
 // harmless to decode, but it costs the typed models the precision that makes
 // them worth generating.
 //
@@ -894,6 +900,9 @@ var transportErrors = []string{
 // call-graph walk, so gating here only drops the transport's contribution.
 var securityErrors = []string{
 	"domain.ErrAuthUnauthorized",
+	"domain.ErrInternal",
+	"domain.ErrNotImplemented",
+	"domain.ErrUnavailable",
 }
 
 // csrfErrors join for operations the session cookie may authenticate that
@@ -917,31 +926,79 @@ func acceptsSessionCookie(op methodsFileOperation) bool {
 	return false
 }
 
+// remappedErrors are domain sentinels that errorResponse answers under another
+// code on every operation, so no operation's union lists them. Each one's
+// public code is a transport error, already in every union. gen_error_schemas
+// still writes their schema, as it does for every domain code.
+var remappedErrors = []string{
+	// Attributes failing the user schema answer req.invalid, the way request
+	// validation answers a malformed body.
+	"domain.ErrUserAttributesInvalid",
+}
+
 // operationExcludedErrors drops internal sentinels from the generated default
 // error union when the API handler intentionally remaps them to a different
 // public code before the response is written.
 var operationExcludedErrors = map[string][]string{
-	"listMyProjects": {"domain.ErrSessionTokenInvalid"},
+	// Self-access operations answer any refused session as auth.unauthorized
+	// (requireSelf, #553).
+	"getMyUser":           {"domain.ErrSessionTokenInvalid"},
+	"patchMyUser":         {"domain.ErrSessionTokenInvalid"},
+	"getMyUserSchema":     {"domain.ErrSessionTokenInvalid"},
+	"listMyTeams":         {"domain.ErrSessionTokenInvalid"},
+	"listMyPasskeys":      {"domain.ErrSessionTokenInvalid"},
+	"listMyIdentityLinks": {"domain.ErrSessionTokenInvalid"},
+	"getMyPasswordState":  {"domain.ErrSessionTokenInvalid"},
+	"listMyProjects":      {"domain.ErrSessionTokenInvalid"},
 	// The flow engine catches a stale parked SSO row with errors.Is and renders
-	// the step; the analysis cannot see that check prune the error.
-	"getFlowStep": {"domain.ErrSSOStateInvalid"},
+	// the step; the analysis cannot see that check prune the error. The SSO
+	// resolver turns a user schema the project does not hold into
+	// domain.ErrInternal (storedUserSchemaMatches), so sch.not_found never
+	// reaches the response.
+	"getFlowStep": {"domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
 	// All are consumed in the state machine's sso branch: a missing
 	// connection becomes flow.invalid_action, an unavailable provider
 	// re-renders the step with error.sso_unavailable, and a parked row that is
-	// gone renders the step again.
-	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrSSOStateInvalid"},
+	// gone renders the step again. sch.not_found is remapped as for
+	// getFlowStep.
+	"submitFlowStep": {"domain.ErrFlowSSOUnavailable", "domain.ErrIDPConnectionNotFound", "domain.ErrJSONSchemaNotFound", "domain.ErrSSOStateInvalid"},
+	// The identifier lookup of the flow path turns a bound user schema the
+	// project does not hold into domain.ErrInternal (resolveIdentifier), so
+	// sch.not_found never reaches the response.
+	"verifyChallengeProof": {"domain.ErrJSONSchemaNotFound"},
+	// sch.not_found is remapped as for verifyChallengeProof.
+	"finishUserPasskeyRegistration": {"domain.ErrJSONSchemaNotFound"},
+	// Create and revise run the engine's connection parse after the schema
+	// check. The schema already refuses a missing protocol block, scopes
+	// without openid, and a cleartext endpoint as req.invalid, so only the
+	// parse's own rule, the partial endpoint block, reaches the caller; any
+	// other parse refusal is reported as req.invalid.
+	"createIdp": {
+		"domain.ErrIDPEndpointCleartext",
+		"domain.ErrIDPProtocolBlockMissing",
+		"domain.ErrIDPScopesMissingOpenID",
+	},
 	// A new flow has no parked SSO row, so the collection step's prefill
-	// returns before it reads the attempt's row or a connection.
+	// returns before it reads the attempt's row or a connection. A
+	// session_token that introspection rejects is refused as req.invalid
+	// (provenSessionID), so tkn.revoked never reaches the response.
 	"createFlow": {
 		"domain.ErrAuthAttemptNotFound",
 		"domain.ErrFlowRestartRequired",
 		"domain.ErrIDPConnectionNotFound",
 		"domain.ErrIDPEndpointCleartext",
 		"domain.ErrIDPEndpointsPartial",
-		"domain.ErrIDPOAuth2Unsupported",
 		"domain.ErrIDPProtocolBlockMissing",
 		"domain.ErrIDPScopesMissingOpenID",
-		"domain.ErrIDPStrategyPointerUnsupported",
+		"domain.ErrTokenRevoked",
+	},
+	// A session_token that introspection rejects is refused as
+	// att.invalid_request (provenSessionID), so the token's own codes never
+	// reach the response.
+	"createAuthAttempt": {
+		"domain.ErrEncryptionKeyNotFound",
+		"domain.ErrInvalidToken",
+		"domain.ErrTokenRevoked",
 	},
 }
 

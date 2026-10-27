@@ -3,6 +3,7 @@ import {
   CreateFlowDefinitionBody,
   CreateIdpBody,
   CreateSchemaBody,
+  PublishPolicyBody,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
 import { z } from "zod";
 
@@ -20,6 +21,22 @@ export const createFlowDefinitionRequestSchema = CreateFlowDefinitionBody;
  * never a literal.
  */
 export const idpConnectionConfigSchema = CreateIdpBody.shape.idp;
+
+/**
+ * A `.zitadel/policies/<operation>.json` file: the publish body
+ * (`POST /policies`) plus `$schema`. Strict at both levels, unlike the
+ * generated body: a typo in a setting must fail `plan`, as the editor's
+ * meta-schema (`policy.json`) already flags it.
+ *
+ * With one operation the generated body is a single object. A second
+ * operation turns it into a union without `.shape`, so this stops compiling
+ * and has to become a discriminated union on `operation`, strict per branch.
+ */
+export const policyConfigSchema = z.strictObject({
+  $schema: z.string().optional(),
+  operation: PublishPolicyBody.shape.operation,
+  config: z.strictObject(PublishPolicyBody.shape.config.shape),
+});
 
 /** The wire shape of a branding revision (`POST /branding` request body). */
 export const brandingWireSchema = CreateBrandingBody;
@@ -39,9 +56,9 @@ export const localFileReferenceSchema = z.strictObject({ $file: z.string().min(1
 export const brandingConfigSchema = z
   .strictObject({
     // Strict, unlike the generated wire schema: a typo like `hero_urll`
-    // must fail plan, not silently pass, get ignored by the server, and
-    // vanish on canonical write-back. The editor meta-schema already
-    // rejects unknown keys; the CLI gate has to agree.
+    // must fail plan, not silently pass and get ignored by the server. The
+    // editor meta-schema already rejects unknown keys; the CLI gate has to
+    // agree.
     ...CreateBrandingBody.shape,
     // Raw strings instead of the generated uri fields: those trim and
     // normalize before refinement runs, hiding exactly the forms the wire
@@ -178,9 +195,14 @@ function validateBrandingAssetUrl(
     return;
   }
   if (parsed.protocol !== "https:" || parsed.host === "") {
+    // Worded as the server words it (validateBrandingFontURL,
+    // validateBrandingAssetURL): only a field with the carve-out mentions it.
     ctx.addIssue({
       code: "custom",
-      message: `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
+      message:
+        options.loopback === false
+          ? `${field} must be an absolute https URL.`
+          : `${field} must be an absolute https URL (http is allowed for canonical loopback development hosts only).`,
     });
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/api",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Generated TypeScript API client for the pre-release Zitadel preview.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/api#readme",
   "bugs": {
@@ -42,6 +42,11 @@
       "types": "./dist/generated/endpoints/zitadelNextGen.zod.d.mts",
       "import": "./dist/generated/endpoints/zitadelNextGen.zod.mjs"
     },
+    "./generated/operations": {
+      "@zitadel/source": "./src/generated/operations.ts",
+      "types": "./dist/generated/operations.d.mts",
+      "import": "./dist/generated/operations.mjs"
+    },
     "./runtime/base-url": {
       "@zitadel/source": "./src/runtime/base-url.ts",
       "types": "./dist/runtime/base-url.d.mts",
@@ -70,15 +75,17 @@
   },
   "scripts": {
     "generate": "node ../../scripts/task-guard.mjs --mutex generated-sources -- orval --config orval.config.ts --clean",
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "devDependencies": {
     "@faker-js/faker": "catalog:",
+    "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "msw": "catalog:",
     "orval": "catalog:",
@@ -88,7 +95,6 @@
     "vitest": "catalog:"
   },
   "peerDependencies": {
-    "@tanstack/react-query": "catalog:",
     "msw": "catalog:",
     "@faker-js/faker": "catalog:"
   },

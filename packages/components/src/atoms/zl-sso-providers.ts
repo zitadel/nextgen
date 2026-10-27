@@ -39,8 +39,9 @@ const NAME_PLACEHOLDER = "{name}";
  * Driven entirely by data. The step carries `sso_providers`, each entry a
  * `{id, name, template}` the engine resolved from the connection, and this
  * atom renders one button each in the order given. Nothing here knows which
- * vendors exist: Google ships today and GitHub, Microsoft and the rest arrive
- * as catalog entries plus a mark in `<zl-icon>`, with no change to this file.
+ * vendors exist: Google and GitHub ship today, and Microsoft and the rest
+ * arrive as catalog entries plus a mark in `<zl-icon>`, with no change to this
+ * file.
  *
  * A template with no mark of its own still gets a working button, labelled
  * with the vendor's name and no glyph. That is deliberate — a placeholder
@@ -57,6 +58,8 @@ const NAME_PLACEHOLDER = "{name}";
  * element is replaced, not updated — and the template passes `disabled` while
  * the step is submitting. Any "pending" flag kept here would be thrown away
  * on that same frame, so the disabled attribute is the whole mechanism.
+ *
+ * @fires {CustomEvent<ZlSsoSelectDetail>} zl-sso-select - An identity provider was chosen; carries the provider identifier.
  */
 @customElement("zl-sso-providers")
 export class ZlSsoProviders extends LitElement {

@@ -24,13 +24,15 @@ content:
         - $ref: '../../../components/schemas/errors/flow-unsupported.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
         - $ref: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
-        - $ref: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
         - $ref: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
         - $ref: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
-        - $ref: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/tkn-invalid.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
+        - $ref: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
+        - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
@@ -39,6 +41,7 @@ content:
         - $ref: '../../../components/schemas/errors/user-invalid.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
         - $ref: '../../../components/schemas/errors/user-password_empty.yaml'
+        - $ref: '../../../components/schemas/errors/user-password_policy_violation.yaml'
         - $ref: '../../../components/schemas/errors/user-password_too_long.yaml'
       discriminator:
         propertyName: code
@@ -63,13 +66,15 @@ content:
           flow.unsupported: '../../../components/schemas/errors/flow-unsupported.yaml'
           idp.endpoint_cleartext: '../../../components/schemas/errors/idp-endpoint_cleartext.yaml'
           idp.endpoints_partial: '../../../components/schemas/errors/idp-endpoints_partial.yaml'
-          idp.oauth2_unsupported: '../../../components/schemas/errors/idp-oauth2_unsupported.yaml'
           idp.protocol_block_missing: '../../../components/schemas/errors/idp-protocol_block_missing.yaml'
           idp.scopes_missing_openid: '../../../components/schemas/errors/idp-scopes_missing_openid.yaml'
-          idp.strategy_pointer_unsupported: '../../../components/schemas/errors/idp-strategy_pointer_unsupported.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           tkn.invalid: '../../../components/schemas/errors/tkn-invalid.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
+          proj.origin_not_allowed: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
+          proj.preview_not_live: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
+          rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           enc_key.unknown_alg: '../../../components/schemas/errors/enc_key-unknown_alg.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
@@ -78,6 +83,7 @@ content:
           user.invalid: '../../../components/schemas/errors/user-invalid.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
           user.password_empty: '../../../components/schemas/errors/user-password_empty.yaml'
+          user.password_policy_violation: '../../../components/schemas/errors/user-password_policy_violation.yaml'
           user.password_too_long: '../../../components/schemas/errors/user-password_too_long.yaml'
     examples:
       att.already_handed_off:
@@ -180,11 +186,6 @@ content:
         value:
           code: idp.endpoints_partial
           message: 'identity provider connection: the endpoints are partially set'
-      idp.oauth2_unsupported:
-        summary: idp.oauth2_unsupported
-        value:
-          code: idp.oauth2_unsupported
-          message: 'identity provider connection: the oauth2 protocol is not supported yet'
       idp.protocol_block_missing:
         summary: idp.protocol_block_missing
         value:
@@ -195,11 +196,6 @@ content:
         value:
           code: idp.scopes_missing_openid
           message: 'identity provider connection: OIDC scopes must contain openid'
-      idp.strategy_pointer_unsupported:
-        summary: idp.strategy_pointer_unsupported
-        value:
-          code: idp.strategy_pointer_unsupported
-          message: 'identity provider connection: an oidc connection cannot verify a property by strategy'
       internal:
         summary: internal
         value:
@@ -215,6 +211,26 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
+      proj.origin_not_allowed:
+        summary: proj.origin_not_allowed
+        value:
+          code: proj.origin_not_allowed
+          message: 'the request origin is not an origin of this project'
+      proj.preview_not_live:
+        summary: proj.preview_not_live
+        value:
+          code: proj.preview_not_live
+          message: 'no live preview for this origin; run zitadel preview on this branch'
+      rel.not_found:
+        summary: rel.not_found
+        value:
+          code: rel.not_found
+          message: 'release: not found'
+      rel.revoked:
+        summary: rel.revoked
+        value:
+          code: rel.revoked
+          message: 'the release this attempt runs on was revoked'
       req.invalid:
         summary: req.invalid
         value:
@@ -255,8 +271,13 @@ content:
         value:
           code: user.password_empty
           message: 'The password must not be empty.'
+      user.password_policy_violation:
+        summary: user.password_policy_violation
+        value:
+          code: user.password_policy_violation
+          message: 'The password does not meet the password policy.'
       user.password_too_long:
         summary: user.password_too_long
         value:
           code: user.password_too_long
-          message: 'The password is too long. It can be at most 64 characters.'
+          message: 'The password is too long for the project''s password hashing method.'

@@ -210,7 +210,7 @@ describe("authentication screen", () => {
     const router = await renderAt("/authentication");
     await userEvent.click(await screen.findByRole("tab", { name: "Identity providers" }));
     await waitFor(() =>
-      expect(router.state.location.search).toMatchObject({ tab: "identity-providers" }),
+      expect(router.state.resolvedLocation?.search).toMatchObject({ tab: "identity-providers" }),
     );
   });
 
@@ -230,8 +230,8 @@ describe("authentication screen", () => {
     await screen.findByRole("table");
     expect(screen.queryByRole("tab", { name: "Identity providers" })).not.toBeInTheDocument();
     // The URL drops the tab it cannot show, and keeps the project.
-    await waitFor(() => expect(router.state.location.search).not.toHaveProperty("tab"));
-    expect(router.state.location.search).toMatchObject({ project: "proj_test" });
+    await waitFor(() => expect(router.state.resolvedLocation?.search).not.toHaveProperty("tab"));
+    expect(router.state.resolvedLocation?.search).toMatchObject({ project: "proj_test" });
     expect(screen.getByText("google")).toBeInTheDocument();
     expect(screen.getByText("okta")).toBeInTheDocument();
     // Whether a slug has a connection is not something this caller can see.
@@ -260,7 +260,7 @@ describe("authentication screen", () => {
     serve({ idps: [] });
     await renderAt("/authentication?tab=identity-providers");
     expect(await screen.findByText(/This project has no identity providers/)).toBeInTheDocument();
-    expect(screen.getByText("zitadel sso enable")).toBeInTheDocument();
+    expect(screen.getByText("zitadel auth-method sso enable")).toBeInTheDocument();
   });
 });
 
@@ -269,9 +269,12 @@ describe("identity provider detail", () => {
     serve({
       idps: [
         connection("idp_google", "google", "Google", {
-          oidc: undefined,
-          protocol: "oauth2",
-          oauth2: { client_id: "1234.apps.example.com", client_secret: "${{ SECRET }}" },
+          oidc: {
+            issuer: "https://accounts.example.com",
+            client_id: "1234.apps.example.com",
+            client_secret: "${{ SECRET }}",
+            scopes: ["openid"],
+          },
         }),
       ],
     });

@@ -12,6 +12,19 @@ import (
 	"github.com/zitadel/nextgen/internal/idp"
 )
 
+var errSSOCallbackMixUp = errors.New("sso callback answered by another connection")
+
+// refusedEventType is the event a callback refused before its exchange is
+// recorded with, chosen like for any other callback: a failure after a code
+// arrived is an exchange failure, a callback without one an authorization
+// failure.
+func refusedEventType(in FlowSSOCallbackInput) domain.EventType {
+	if in.Code == "" {
+		return domain.EventTypeAuthSSOAuthorizationFailed
+	}
+	return domain.EventTypeAuthSSOExchangeFailed
+}
+
 // oauthErrorAccessDenied is the one authorization error code that means the
 // person declined (RFC 6749 §4.1.2.1).
 const oauthErrorAccessDenied = "access_denied"
@@ -36,6 +49,13 @@ func NewFlowSSOCallback(connections IDPConnectionService, attempts AuthAttemptSe
 // FlowSSOCallbackInput is the provider's redirect, picked apart by the
 // handler.
 type FlowSSOCallbackInput struct {
+	// Issuer is the authorization response's `iss` (RFC 9207), empty when
+	// the provider sent none.
+	Issuer string
+	// ConnectionSlug is the connection the callback path names: each
+	// connection has its own redirect URI, so it says which provider sent the
+	// browser back.
+	ConnectionSlug string
 	// State is the state query value, verbatim.
 	State string
 	// Code is the authorization code; empty when the provider failed.
@@ -80,7 +100,26 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	audit.BindPublicRequest(ctx, projectID, "", "")
 	pending := check.Pending
 
+	if in.ConnectionSlug != pending.ProviderSlug {
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback path names connection %q, the state pins %q", errSSOCallbackMixUp, in.ConnectionSlug, pending.ProviderSlug), refusedEventType(in))
+	}
+
+	var conn idp.Connection
+	var connErr error
+	if in.Issuer != "" || (in.Error == "" && in.Code != "") {
+		conn, connErr = c.pinnedConnection(ctx, projectID, pending)
+	}
+	if in.Issuer != "" && connErr == nil && in.Issuer != conn.OIDC.Issuer {
+		return c.fail(ctx, projectID, check, fmt.Errorf("%w: the callback's iss %q is not the issuer %q of connection %q", errSSOCallbackMixUp, in.Issuer, conn.OIDC.Issuer, pending.ProviderSlug), refusedEventType(in))
+	}
 	if in.Error != "" {
+		if connErr != nil {
+			getLoggingContext(ctx, "flow").Warn("sso callback could not check the iss of a provider error",
+				slog.String("project_id", projectID),
+				slog.String("slug", pending.ProviderSlug),
+				slog.Any("error", connErr),
+			)
+		}
 		// access_denied is the person saying no and gets its own key. Every
 		// other code is the provider failing.
 		key := domain.FlowStepErrorSSOFailed
@@ -98,11 +137,19 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 		)
 		return c.park(ctx, projectID, check, key, domain.EventTypeAuthSSOAuthorizationFailed)
 	}
+
 	if in.Code == "" {
 		return c.fail(ctx, projectID, check, errors.New("the callback carried neither a code nor an error"), domain.EventTypeAuthSSOAuthorizationFailed)
 	}
 
-	identity, err := c.exchange(ctx, projectID, in.Code, pending)
+	if connErr != nil {
+		return c.fail(ctx, projectID, check, connErr, domain.EventTypeAuthSSOExchangeFailed)
+	}
+	deploymentID, err := c.deploymentID(ctx, projectID, check.AuthAttemptID)
+	if err != nil {
+		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
+	}
+	identity, err := c.exchange(ctx, projectID, deploymentID, in.Code, pending, conn)
 	if err != nil {
 		return c.fail(ctx, projectID, check, err, domain.EventTypeAuthSSOExchangeFailed)
 	}
@@ -123,21 +170,30 @@ func (c *FlowSSOCallback) Process(ctx context.Context, in FlowSSOCallbackInput) 
 	return FlowSSOCallbackOutput{ReturnTarget: pending.ReturnTarget}, nil
 }
 
-// exchange rebuilds the engine client from the revision and redirect URI the
-// record pinned at submit and runs the token exchange.
-func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, pending *domain.SSOStatePayload) (idp.ExternalIdentity, error) {
+func (c *FlowSSOCallback) pinnedConnection(ctx context.Context, projectID string, pending *domain.SSOStatePayload) (idp.Connection, error) {
 	connection, err := c.connections.GetRevision(ctx, projectID, pending.ConnectionRevisionID)
 	if err != nil {
-		return idp.ExternalIdentity{}, err
+		return idp.Connection{}, err
 	}
-	conn, err := idp.ParseConnection(connection.RevisionID, connection.Document)
+	return idp.ParseConnection(connection.RevisionID, connection.Document)
+}
+
+func (c *FlowSSOCallback) deploymentID(ctx context.Context, projectID, attemptID string) (string, error) {
+	if attemptID == "" {
+		return "", nil
+	}
+	attempt, err := c.attempts.GetByID(ctx, projectID, attemptID)
 	if err != nil {
+		return "", err
+	}
+	return attempt.DeploymentID, nil
+}
+
+func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, deploymentID, code string, pending *domain.SSOStatePayload, conn idp.Connection) (idp.ExternalIdentity, error) {
+	if err := resolveSSOClientID(ctx, c.variables, projectID, deploymentID, &conn); err != nil {
 		return idp.ExternalIdentity{}, err
 	}
-	if err := resolveSSOClientID(ctx, c.variables, projectID, &conn); err != nil {
-		return idp.ExternalIdentity{}, err
-	}
-	secret, err := c.resolveClientSecret(ctx, projectID, conn)
+	secret, err := c.resolveClientSecret(ctx, projectID, deploymentID, conn)
 	if err != nil {
 		return idp.ExternalIdentity{}, err
 	}
@@ -156,15 +212,14 @@ func (c *FlowSSOCallback) exchange(ctx context.Context, projectID, code string, 
 		RedirectURI:  pending.RedirectURI,
 		RevisionID:   pending.ConnectionRevisionID,
 		ClientSecret: secret,
-		// No strategy registry exists yet; a connection whose
-		// verified_claims need one fails the ceremony (requireStrategy).
-		SupplementaryFetch: nil,
 	})
 }
 
 // resolveClientSecret reads the secret for the token exchange from the
-// project's variables.
-func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID string, conn idp.Connection) (string, error) {
+// variable the connection names. A plain value is refused: it is readable
+// through the variables surface, and refusing it makes the misconfiguration
+// visible.
+func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID, deploymentID string, conn idp.Connection) (string, error) {
 	name, ok := domain.VariableReferenceName(conn.OIDC.ClientSecretRef)
 	if !ok {
 		// The schema accepts only a whole-value `${{ NAME }}` reference. The
@@ -172,15 +227,9 @@ func (c *FlowSSOCallback) resolveClientSecret(ctx context.Context, projectID str
 		// logged.
 		return "", errors.New("client_secret is not a variable reference")
 	}
-	vars, err := c.variables.GetDecryptedVariables(ctx, domain.VariableOwner{ProjectID: projectID}, name)
+	secret, err := secretVariable(ctx, c.variables, decrypterOfWritingKey(ctx, c.keys), projectID, deploymentID, name)
 	if err != nil {
 		return "", err
-	}
-	secret := ""
-	// A plain variable is refused: it is readable through the variables
-	// surface, and refusing it makes the misconfiguration visible.
-	if len(vars) == 1 && vars[0].IsSecret {
-		secret, _ = vars[0].Value.(string)
 	}
 	if secret == "" {
 		return "", fmt.Errorf("client_secret variable %q is missing, not a secret, or not a string", name)

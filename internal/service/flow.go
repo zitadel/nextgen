@@ -8,6 +8,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/storage/database"
+	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
 
 // FlowService is the flow engine's use-case surface. The API handler
@@ -75,25 +76,100 @@ type ResolveFlowHint struct {
 func NewFlowService(
 	v2Pool *DB,
 	stateMachine domain.FlowStateMachine,
+	builtinBases domain.BuiltinSchemaBases,
 ) FlowService {
 	return &flowService{
 		v2Pool:       v2Pool,
 		stateMachine: stateMachine,
+		builtinBases: builtinBases,
 	}
 }
 
 type flowService struct {
 	v2Pool       *DB
 	stateMachine domain.FlowStateMachine
+	// builtinBases resolves a definition's user schema given as a built-in
+	// schema's `$id` under whichever base the project stores it.
+	builtinBases domain.BuiltinSchemaBases
 }
 
 var _ FlowService = (*flowService)(nil)
 
-func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
+// Resolve picks the definition that serves the request. When the request
+// resolved to a release (WithRuntimeResolution), only the revisions that
+// release pins are candidates: by name, the one pinned under that handle; by
+// audience, the pinned set scored as usual. A release pinning no flow
+// definition, and a request without a release, read the newest revisions.
+func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Resolve")
+	defer end(&err)
+
+	pinned := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)
+	if len(pinned) > 0 {
+		return s.resolvePinned(ctx, req, pinned)
+	}
+	// TODO(#1616): a request with no release still reads the newest revisions.
+	// A release that pins no flow definition keeps this path.
 	if req.Name != nil {
 		return s.resolveByName(ctx, req)
 	}
 	return s.resolveByAudience(ctx, req)
+}
+
+func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned PinnedRevisions) (*domain.FlowDefinition, error) {
+	if req.Name != nil {
+		revisionID, ok := pinned[*req.Name]
+		if !ok {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		def, err := s.v2Pool.Statements().GetFlowDefinitionByID(ctx, req.ProjectID, revisionID)
+		if err != nil {
+			if isNoRowFound(err) {
+				return nil, domain.ErrFlowDefinitionNotFound()
+			}
+			return nil, err
+		}
+		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
+			return nil, domain.ErrFlowDefinitionNotFound()
+		}
+		if !flowServesPurpose(def, req.Purpose) {
+			return nil, domain.ErrFlowDefinitionPurposeMismatch()
+		}
+		return def, nil
+	}
+
+	revisionIDs := make([]string, 0, len(pinned))
+	for _, revisionID := range pinned {
+		revisionIDs = append(revisionIDs, revisionID)
+	}
+	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
+		Filter: flowdefinition.ByIDs(req.ProjectID, revisionIDs),
+	}, FlowDefinitionQueryOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var best *domain.FlowDefinition
+	bestScore := -1
+	for _, def := range result.Items {
+		if req.SchemaVersion != nil && def.SchemaVersion != *req.SchemaVersion {
+			continue
+		}
+		if !flowServesPurpose(def, req.Purpose) {
+			continue
+		}
+		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
+			continue
+		}
+		score := flowAudienceScore(def, req.Hint)
+		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
+			best, bestScore = def, score
+		}
+	}
+	if best == nil {
+		return nil, domain.ErrFlowDefinitionNotFound()
+	}
+	return best, nil
 }
 
 func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
@@ -215,7 +291,10 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Start")
+	defer end(&err)
+
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
 	}
@@ -223,6 +302,15 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 	// front so it maps to 400 rather than silently producing an unlinked flow.
 	if req.SessionID != nil && *req.SessionID == "" {
 		return domain.FlowStepResult{}, domain.ErrRequestInvalid().WithMessage("session_id must not be empty")
+	}
+
+	// The definition names its schema by objectType or id, but the flow and
+	// the users it creates are validated against one revision, pinned here at
+	// start.
+	userSchema, schemaErr := resolveUserSchema(ctx, s.v2Pool.Statements(), s.builtinBases, req.Definition.ProjectID, req.Definition.UserSchema)
+	if schemaErr != nil {
+		return domain.FlowStepResult{}, domain.ErrInternal(schemaErr).WithMessage(
+			fmt.Sprintf("failed to resolve user schema %q of flow definition %s", req.Definition.UserSchema, req.Definition.ID))
 	}
 
 	sessionID, err := s.resolveFlowSession(ctx, req)
@@ -243,7 +331,7 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		Purpose:       req.Purpose,
 		Session:       domain.FlowSessionRef{ID: sessionID},
 		RedirectURI:   req.RedirectURI,
-		UserSchemaURL: req.Definition.UserSchema,
+		UserSchemaURL: userSchema.URL,
 	}
 	if req.AuthRequestID != nil {
 		in.AuthRequest = &domain.FlowAuthRequestRef{ID: *req.AuthRequestID}
@@ -254,11 +342,22 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (domain.F
 		return domain.FlowStepResult{}, err
 	}
 	result.State.ID = flowID
+	if resolution := RuntimeResolutionFromContext(ctx); resolution != nil {
+		if resolution.Deployment != nil {
+			result.State.DeploymentID = resolution.Deployment.ID
+		}
+		if resolution.Release != nil {
+			result.State.ReleaseID = resolution.Release.ID
+		}
+	}
 
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain.FlowStepResult, error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.Submit")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
 	}
@@ -301,7 +400,10 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (domain
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (domain.FlowStepResult, error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ domain.FlowStepResult, err error) {
+	ctx, end := startSpan(ctx, "FlowService.GetStep")
+	defer end(&err)
+
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")
 	}

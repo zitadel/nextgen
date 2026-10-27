@@ -18,9 +18,11 @@ import { describe, expect, it } from "vitest";
 import heroTemplate from "./__fixtures__/legacy-designs/hero.liquid";
 import splitRightTemplate from "./__fixtures__/legacy-designs/split-right.liquid";
 import splitTemplate from "./__fixtures__/legacy-designs/split.liquid";
-import { createLiquidEngine } from "./liquid.js";
+import { createLiquidEngine, localiseFlowErrorKeys } from "./liquid.js";
+import { en } from "./locales/en.js";
 import { mandatoryGatesMarkerComment, patchMandatoryGates } from "./mandatory-gates.js";
 import { createSanitiser } from "./sanitiser.js";
+import { TEMPLATE_NAMES } from "./template-names.js";
 
 const locale: Record<string, string> = {
   "identifier.title": "Sign in",
@@ -36,6 +38,7 @@ const locale: Record<string, string> = {
   "sso-conflict.action.sign_in": "Back to sign in",
   "sso.continue_with": "Continue with {name}",
   "sso.divider": "or",
+  "action.use_another_account": "Use another account",
 };
 
 const step: CreateFlow201Step = {
@@ -94,6 +97,80 @@ function renderDesign(design: string): string {
   const sanitised = createSanitiser()(rendered);
   return patchMandatoryGates(sanitised, step, locale);
 }
+
+/**
+ * The account chip on a step that names the visitor's identifier. The
+ * template decides what it shows: on the sign-in password step the avatar and
+ * the way back to change the account; on sign-up the way back without the
+ * avatar, since no account exists yet; on the SSO conflict step, which has its
+ * own way out (`sign_in`), the avatar alone. Sign-up is read from the engine's
+ * purpose, which marks the password field `new-password`, not from step names.
+ */
+describe("account chip", () => {
+  const passwordStep = {
+    ...context,
+    step: { name: "password", texts: { title_key: "identifier.title" } },
+    fields: [
+      {
+        name: "password",
+        type: "password",
+        text_key: "identifier.field.email",
+        autocomplete: "current-password",
+      },
+    ],
+    actions: [
+      { name: "submit", kind: "submit", text_key: "submit.continue", primary: true },
+      { name: "back", kind: "back", text_key: "action.back" },
+    ],
+    identifier: { value: "Maya@Example.com" },
+  };
+  // A custom flow's name for its sign-up password step: only the purpose says
+  // it is one.
+  const signUpStep = {
+    ...passwordStep,
+    step: { name: "choose-secret", texts: { title_key: "identifier.title" } },
+    fields: [{ ...passwordStep.fields[0], autocomplete: "new-password" }],
+  };
+  const conflictStep = {
+    ...passwordStep,
+    actions: [
+      ...passwordStep.actions,
+      { name: "sign_in", kind: "navigate", text_key: "sso-conflict.action.sign_in" },
+    ],
+  };
+
+  function chip(design: string, data: Record<string, unknown>): Element | null {
+    const engine = createLiquidEngine({ locale });
+    const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), data));
+    const doc = document.createElement("template");
+    doc.innerHTML = html;
+    return doc.content.querySelector('zl-account[data-testid="zitadel-account"]');
+  }
+
+  for (const design of BRANDING_DESIGNS) {
+    describe(design, () => {
+      it("signs in: the avatar, and the whole chip goes back to change the account", () => {
+        const account = chip(design, passwordStep);
+        expect(account?.getAttribute("identifier")).toBe("Maya@Example.com");
+        expect(account?.getAttribute("action")).toBe("back");
+        expect(account?.getAttribute("label")).toBe("Use another account");
+        expect(account?.hasAttribute("avatar")).toBe(true);
+      });
+
+      it("signs up: the way back, but no avatar for an account that does not exist yet", () => {
+        const account = chip(design, signUpStep);
+        expect(account?.getAttribute("action")).toBe("back");
+        expect(account?.hasAttribute("avatar")).toBe(false);
+      });
+
+      it("only names the account on a step with its own way out", () => {
+        const account = chip(design, conflictStep);
+        expect(account?.hasAttribute("action")).toBe(false);
+        expect(account?.hasAttribute("avatar")).toBe(true);
+      });
+    });
+  }
+});
 
 describe("branding design catalog", () => {
   it("ships only widget-structure designs (#1039)", () => {
@@ -227,12 +304,47 @@ describe("branding design catalog", () => {
     });
 
     it("renders nothing for a step with no providers", () => {
-      // The shipped presets carry none until `sso enable` adds one, so this
-      // is the common case and must cost the markup nothing.
+      // The shipped presets carry none until `auth-method sso enable` adds one,
+      // so this is the common case and must cost the markup nothing.
       expect(render(context)).not.toContain("zl-sso-providers");
       expect(render({ ...context, sso_providers: [] })).not.toContain("zl-sso-providers");
     });
   });
+
+  /**
+   * A failed provider sign-in comes back as a plain step error key the engine's
+   * callback stored on the originating step (`flow_sso_callback.go`), and the
+   * step shows it like any other form-level error: the key's `.title` and
+   * `.body`, through the same localisation the orchestrator applies.
+   */
+  describe.each([...BRANDING_DESIGNS, "default.liquid"])(
+    "%s after a failed provider return",
+    (design) => {
+      function render(stepError: string): string {
+        const engine = createLiquidEngine({ locale: en });
+        const errors = localiseFlowErrorKeys(stepError, {
+          locale: en,
+          stepName: step.name ?? "",
+          fields: (step.fields ?? []).map((field) => field.name),
+        });
+        const ctx = { ...context, errors };
+        const rendered =
+          design === "default.liquid"
+            ? engine.renderFileSync(TEMPLATE_NAMES.default, ctx)
+            : engine.parseAndRenderSync(getDefaultBrandingConfig(design).template, ctx);
+        return createSanitiser()(rendered);
+      }
+
+      it.each(["error.sso_cancelled", "error.sso_failed"])("renders %s's title and body", (key) => {
+        const html = render(key);
+
+        expect(html).toContain(en[`${key}.title`]);
+        expect(html).toContain(en[`${key}.body`]);
+        // The key itself must not leak through as copy.
+        expect(html).not.toContain(key);
+      });
+    },
+  );
 
   it("legacy split revisions keep the brand pane and mirror class", () => {
     const split = renderDesign("split");
@@ -308,5 +420,23 @@ describe("branding design catalog", () => {
     const centered = renderDesign("centered");
     expect(centered).toContain("<zl-card");
     expect(centered).toContain('src="https://cdn.example.com/logo.svg"');
+  });
+
+  // The step after the flow moved between sign-in and sign-up by itself
+  // carries a notice, which <zitadel-login> lifts into `messages`.
+  it("every shipped design shows a notice, as information", () => {
+    const engine = createLiquidEngine({
+      locale: { ...locale, "notice.user_not_found": "No account" },
+    });
+    const withNotice = {
+      ...context,
+      messages: [{ level: "info", text_key: "notice.user_not_found" }],
+    };
+    for (const design of BRANDING_DESIGNS) {
+      const html = createSanitiser()(engine.parseAndRenderSync(templateFor(design), withNotice));
+      expect(html, design).toContain(
+        '<zl-alert severity="info" data-zl-step-message="">No account</zl-alert>',
+      );
+    }
   });
 });

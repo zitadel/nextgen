@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  maskPublicCliVersion,
   normalizePublicCliCommand,
   normalizePublicCliJson,
   normalizePublicCliProse,
   npmDistTagForCliVersion,
   npmSelectorForCliVersion,
+  optionArgs,
+  portableCommands,
   publicCliCommand,
+  sdkVersionForCli,
 } from "../../../src/lib/public-cli";
 
 describe("public CLI command formatting", () => {
@@ -16,9 +20,19 @@ describe("public CLI command formatting", () => {
     expect(publicCliCommand("start", "0.1.0-alpha.1")).toBe("npx @zitadel/cli@0.1.0-alpha.1 start");
   });
 
-  it("uses latest for stable versions", () => {
+  it.each([
+    ["1.0.0-alpha.25", "1.0.0-alpha.25"],
+    ["v1.0.0-alpha.25", "1.0.0-alpha.25"],
+    ["0.1.0", "0.1.0"],
+    ["1.0.0", "1.0.0"],
+    ["1.0.0-beta.2", "beta"],
+  ])("pins scaffolded SDKs for CLI %s at %s", (cliVersion, expected) => {
+    expect(sdkVersionForCli(cliVersion)).toBe(expected);
+  });
+
+  it("pins a release's follow-ups to its own version, whose dist-tag is latest", () => {
     expect(npmDistTagForCliVersion("0.1.0")).toBe("latest");
-    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@latest start");
+    expect(publicCliCommand("start", "0.1.0")).toBe("npx @zitadel/cli@0.1.0 start");
   });
 
   it("preserves command args exactly", () => {
@@ -111,5 +125,71 @@ describe("normalizePublicCliJson", () => {
       pattern: "^https://",
       nothing: null,
     });
+  });
+});
+
+describe("maskPublicCliVersion", () => {
+  it("makes documents normalized for different CLI versions equal", () => {
+    const body = { description: "Run `zitadel deploy` to publish.", items: ["`zitadel doctor`"] };
+
+    expect(maskPublicCliVersion(normalizePublicCliJson(body, "1.2.0"))).toEqual(
+      maskPublicCliVersion(normalizePublicCliJson(body, "1.3.0")),
+    );
+  });
+
+  it("keeps everything but the version", () => {
+    expect(maskPublicCliVersion({ a: "`npx @zitadel/cli@1.2.0 deploy` and @zitadel/sdk" })).toEqual(
+      { a: "`npx @zitadel/cli@* deploy` and @zitadel/sdk" },
+    );
+  });
+});
+
+describe("portableCommands", () => {
+  it("prefixes every command when every argument is portable", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/app"]], "1.0.0")).toEqual([
+      expect.stringMatching(/ plan$/),
+      expect.stringMatching(/ apply --cwd \/home\/dev\/app$/),
+    ]);
+  });
+
+  it("accepts a plain value and a POSIX-style path", () => {
+    expect(
+      portableCommands(
+        [["plan", "--schema", "default-human-user", "--cwd", "/home/dev/my-app"]],
+        "1.0.0",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("rejects anything a POSIX shell, PowerShell or cmd.exe could read differently", () => {
+    for (const value of [
+      "my users",
+      "x;y",
+      "$(id)",
+      "a&b",
+      "%PATH%",
+      "it's",
+      "a|b",
+      "a`b",
+      "C:\\dev",
+    ]) {
+      expect(portableCommands([["plan", "--cwd", value]], "1.0.0"), value).toEqual([]);
+    }
+  });
+
+  it("returns none when any argument in any command needs quoting", () => {
+    expect(portableCommands([["plan"], ["apply", "--cwd", "/home/dev/my app"]], "1.0.0")).toEqual(
+      [],
+    );
+  });
+});
+
+describe("optionArgs", () => {
+  it("passes the option and its value as two arguments", () => {
+    expect(optionArgs("--schema", "customers")).toEqual(["--schema", "customers"]);
+  });
+
+  it("joins a value that starts with a dash to its option", () => {
+    expect(optionArgs("--schema", "--force")).toEqual(["--schema=--force"]);
   });
 });

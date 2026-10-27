@@ -1,6 +1,13 @@
 post:
   operationId: createUser
+  x-zitadel-cli: users create
   summary: Create user
+  description: |
+    Creates a user whose attributes satisfy the user schema the request names.
+
+    The server assigns the user's id. With `team_id`, the user also becomes an
+    active member of that team. A value the schema marks unique that another
+    user already holds is refused with `409`.
   tags:
     - Users
   security:
@@ -43,7 +50,14 @@ post:
           schema:
             $ref: user.yaml
     '400':
-      description: The provided input was not valid
+      description: |
+        The provided input was not valid.
+
+        Attributes that fail the user schema answer `req.invalid`, the same
+        way a malformed body does: `details.details.fields` lists the dotted
+        path of every failing field from the request body, such as
+        `attributes.country` or `attributes.address.zip`. Only the field
+        names are reported, never the rejected values.
       content:
         application/json:
           schema:
@@ -64,8 +78,12 @@ post:
       description: |
         A user already exists with one of the unique values. E.g.: when the
         schema indicates that the email field should be unique across the team,
-        only one user can have a given `email` attribute. See the body for more
-        details.
+        only one user can have a given `email` attribute.
+
+        `details.details.fields` names the attributes whose value is taken in
+        the same dotted form as a `400`, such as `attributes.email`. The user
+        holding the value is not named. When no attribute can be named, as
+        when the value was freed again since, `details` is absent.
       content:
         application/json:
           schema:

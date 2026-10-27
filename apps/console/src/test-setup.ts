@@ -1,7 +1,7 @@
 import { format } from "node:util";
 
 import { cleanup, configure } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { _resetConfigForTesting } from "@zitadel/api/config";
 import "@testing-library/jest-dom/vitest";
 
@@ -67,6 +67,35 @@ for (const method of ["error", "warn"] as const) {
   });
 }
 
+// The app router preloads a link's route when it is hovered (`defaultPreload:
+// "intent"`), so a hover followed by a click loads a screen twice whenever the
+// two are far enough apart — which a busy machine makes them. Specs assert on
+// what a screen asked for, not on when a hover happened, so every router a spec
+// builds starts with preload off. Production keeps it.
+//
+// Every screen is a code-split chunk the router imports on its first visit.
+// Left to the first render, that cold import runs inside the file's first
+// `findBy*`, and on a busy CI runner it alone can outlast asyncUtilTimeout: the
+// file's first test fails while the rest pass. So the mock imports every
+// screen's chunk before it hands out the router; the route objects keep them
+// loaded for every router the file builds.
+vi.mock("./router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./router")>();
+  const { createMemoryHistory } = await import("@tanstack/react-router");
+  const preloadRouter = actual.createAppRouter({ history: createMemoryHistory() });
+  await Promise.all(
+    Object.values(preloadRouter.routesById).map((route) => preloadRouter.loadRouteChunk(route)),
+  );
+  return {
+    ...actual,
+    createAppRouter: (...args: Parameters<typeof actual.createAppRouter>) => {
+      const router = actual.createAppRouter(...args);
+      router.update({ ...router.options, defaultPreload: false });
+      return router;
+    },
+  };
+});
+
 // jsdom has no matchMedia; the theme hook (src/theme.ts) reads it. Default to
 // dark (no light-scheme match) and provide the add/removeEventListener surface.
 if (typeof window !== "undefined" && !window.matchMedia) {
@@ -88,6 +117,12 @@ if (typeof window !== "undefined" && !window.matchMedia) {
 // (used by the sidebar user menu). A no-op stub is enough for jsdom specs.
 if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   class ResizeObserverStub {
+    // The real constructor's signature, so `new ResizeObserver(callback)` in
+    // the code under test matches it. Kept, though jsdom specs never call it.
+    readonly callback: ResizeObserverCallback;
+    constructor(callback: ResizeObserverCallback) {
+      this.callback = callback;
+    }
     observe(): void {
       /* no-op: jsdom specs never lay out */
     }

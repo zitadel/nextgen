@@ -28,9 +28,7 @@ properties:
             - deployment_id
           properties:
             origin:
-              type: string
-              format: uri
-              description: The origin, as scheme and host.
+              $ref: ../../../../components/schemas/origin.yaml
             deployment_id:
               $ref: ../../../../components/schemas/deployment-id.yaml
               description: The newest deployment to the origin, which pins the release.

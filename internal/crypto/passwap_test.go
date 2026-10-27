@@ -1061,6 +1061,19 @@ func TestHasherFactory(t *testing.T) {
 		assert.NoError(t, bcryptHasher.VerifyHash(writtenWithArgon2, password))
 	})
 
+	// A mismatch is told apart from a hash the verifier cannot read, so a
+	// caller comparing against kept passwords can fail closed on the latter.
+	t.Run("VerifyHash tells a mismatch from an unreadable hash", func(t *testing.T) {
+		factory := newFactory(t)
+		encoded, err := factory.Default().Hash(password)
+		require.NoError(t, err)
+
+		assert.ErrorIs(t, factory.Default().VerifyHash(encoded, password+"x"), ErrHashMismatch)
+		err = factory.Default().VerifyHash("$unknown$hash", password)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrHashMismatch)
+	})
+
 	t.Run("Check refuses a method the deployment would not take back", func(t *testing.T) {
 		factory := newFactory(t)
 

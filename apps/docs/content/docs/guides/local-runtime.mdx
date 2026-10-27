@@ -1,0 +1,93 @@
+---
+title: Run Zitadel locally
+description: Start, stop, and reset the local Zitadel the CLI manages, and sign in to its console.
+---
+
+`zitadel start` runs Zitadel on your machine for app development:
+
+```sh
+npx @zitadel/cli@latest start
+```
+
+It runs the `@zitadel/server` npm binary that matches the CLI's version. The runtime is meant for app developers and agents, so it does not need Docker, Go, Moon, or this repository.
+
+## What start creates
+
+By default the server starts with the platform project and a local admin, `admin@zitadel.localhost`, so you exist on your own server without signing up. The admin's password is generated, kept in `.zitadel/local/admin.json`, and never printed. Projects that `zitadel setup --server local` creates are attached to the admin's team, so they are owned from the start ([Claim](/docs/concepts/project-team-user#claim)). Setting `NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=false`, or pinning another project, starts a bare server with neither.
+
+The server keeps its state in the directory you started it in:
+
+- `.zitadel/local/runtime.json`: the runtime's metadata, including its port.
+- `.zitadel/local/nextgen-data`: its data. With no database override, that is SQLite at `zitadel.db` ([Databases](/docs/concepts/databases)).
+
+None of it belongs in source control ([Configuration as code](/docs/concepts/repo-config#what-stays-out-of-source-control)).
+
+## Open the console
+
+`start` creates a local admin but prints no console link: its next step is `setup`. Once `setup` has created your project, print a one-time link that signs you in to the console as the local admin. Run before that, the console only shows "No projects yet". The link works once, within a minute:
+
+```sh
+npx @zitadel/cli@latest console
+```
+
+The command opens the link in a browser. Add `--no-open` to print it without opening anything, which is what you want over SSH or on a headless machine. It finds the local admin from the directory `start` ran in or one inside it. Where there is none, because `start` never ran there or ran with the platform bootstrap turned off, it fails with `E_VALIDATION` and tells you to run `start` first.
+
+How the credential file and the password are handled, and how to turn the local admin off: [SKILL.md](https://github.com/zitadel/nextgen/blob/main/apps/cli/skills/zitadel-cli/SKILL.md).
+
+## Ports
+
+Each directory runs its own server. The first one listens on `http://localhost:8080`, the next directory you start gets `8081`, and so on, and a directory keeps its port when you stop and start it again. `start` prints the URLs, and the port is recorded in `.zitadel/local/runtime.json`. Choose a port yourself when needed:
+
+```sh
+npx @zitadel/cli@latest start --port 8081
+```
+
+## Read the server's log
+
+When a sign-in step or a request fails, the browser only says that it did. The server logs why, for example that it could not reach a sign-in provider. Keep the log open in another terminal while you work:
+
+```sh
+npx @zitadel/cli@latest logs --follow
+```
+
+On a terminal, warnings are yellow and errors red. To print only those:
+
+```sh
+npx @zitadel/cli@latest logs --level warn
+```
+
+`--level` takes `debug`, `info`, `warn` or `error`. `--tail` sets how many lines to print, 200 by default, counting only the lines `--level` shows. `logs` finds the server from the directory `start` ran in or one inside it.
+
+## Inspect, stop, and reset
+
+Run these in the directory `start` ran in. Unlike `setup`, `console`, `logs` and `doctor`, `status`, `stop` and `reset` look for the local runtime only in the current directory, or in the one `--cwd` names.
+
+Show status:
+
+```sh
+npx @zitadel/cli@latest status
+```
+
+Stop the runtime while preserving its data:
+
+```sh
+npx @zitadel/cli@latest stop
+```
+
+Delete the runtime data:
+
+```sh
+npx @zitadel/cli@latest reset --force
+```
+
+`stop --all` is the exception: it stops every runtime the CLI started on this machine with the default binary backend, wherever it ran (macOS and Linux only).
+
+## The Docker backend
+
+Use Docker only when intentionally testing the Docker backend:
+
+```sh
+npx @zitadel/cli@latest start --runtime docker
+```
+
+Every command and flag: [CLI reference](/docs/reference/cli).

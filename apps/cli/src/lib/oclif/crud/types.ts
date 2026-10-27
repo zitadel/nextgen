@@ -1,7 +1,8 @@
 import type { Interfaces } from "@oclif/core";
 
 import type { CommandGroup } from "../groups";
-import type { GlobalOptions } from "../types";
+import type { Connection } from "../environment-command";
+import type { References } from "./secrets";
 
 /**
  * Contract between a resource registry and the CRUD factory. Everything is
@@ -123,13 +124,34 @@ export type GetSpec<Ctx> = Readonly<{
 // Method syntax makes `body` bivariant, so a concrete-body spec still assigns to
 // the erased spec the registry and factory hold; the body/schema fit is checked
 // at the builder call site, not as bodies flow through the factory.
-export type CreateSpec<Ctx, B = Json> = Readonly<{
-  schema: Schema<B>;
-  call(ctx: Ctx, body: B): Promise<unknown>;
-}>;
-export type UpdateSpec<Ctx, B = Json> = Readonly<{
-  schema: Schema<B>;
-  call(ctx: Ctx, id: string, body: B): Promise<unknown>;
+export type CreateSpec<Ctx, B = Json> = Readonly<
+  WriteShape & {
+    schema: Schema<B>;
+    call(ctx: Ctx, body: B): Promise<unknown>;
+  }
+>;
+export type UpdateSpec<Ctx, B = Json> = Readonly<
+  WriteShape & {
+    schema: Schema<B>;
+    call(ctx: Ctx, id: string, body: B): Promise<unknown>;
+  }
+>;
+
+/** What a write declares about its body beyond the schema. */
+export type WriteShape = Readonly<{
+  /**
+   * Property of the request body the resource's document sits under (`idp`).
+   * Field flags, `--set` paths, `--data` and `--file` then address the
+   * document itself — the shape the resource has in a file under `.zitadel/`
+   * and in `get --json` — and the factory wraps it on the way out.
+   */
+  root?: string;
+  /**
+   * The flags of the command's leading example, for a body whose rules the
+   * required fields cannot carry: a grant names exactly one of `user` and
+   * `team`, which no generated example can know.
+   */
+  example?: string;
 }>;
 export type DeleteSpec<Ctx> = Readonly<{
   /**
@@ -161,6 +183,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * commands have no file to carry a `static group`, so the table says it.
    */
   group?: CommandGroup;
+  /** Position of the resource's row within its group on the root help, lowest first. */
+  groupOrder?: number;
   /** Property carrying the resource's own id on the wire. */
   idField: string;
   /**
@@ -174,6 +198,8 @@ export type ResourceDescriptor<Ctx> = Readonly<{
    * What the positional accepts, for `--help`. Defaults to
    * `<singular> <idArg>`, which reads well when the argument is an `id` or a
    * `name` but not when a resource takes more than one kind of reference.
+   * `get` also reads it into its summary, "Get one <singular> by …", so word
+   * it as a noun phrase that follows "by".
    */
   idDescription?: string;
   /** Dot-paths projected into the human-readable table; `--json` carries the full resource. */
@@ -223,12 +249,21 @@ export type QueryParts = Readonly<{
 }>;
 
 export type ResourceCommandOptions<Ctx> = Readonly<{
-  /** Opens the platform connection every verb calls through; runs after flag parsing. */
-  connect: (meta: GlobalOptions) => Promise<Ctx>;
+  /**
+   * Shapes the platform connection every verb calls through. It receives the
+   * command's own `connect`, so nothing connects until a verb needs it.
+   */
+  connect: (open: () => Promise<Connection>) => Promise<Ctx>;
   /** Filter operations the query endpoints accept (`equals`, `contains`, …). */
   operations: readonly string[];
   /** Extra flags added to every generated command. */
   flags?: Interfaces.FlagInput;
   /** Wire vocabulary; each property falls back to {@link DEFAULT_WIRE}. */
   wire?: Partial<WireConventions>;
+  /**
+   * How the platform spells a reference to a value it holds elsewhere. A
+   * reference is not a credential, so it may stand on a command line; without
+   * this, no value is taken for one.
+   */
+  references?: References;
 }>;

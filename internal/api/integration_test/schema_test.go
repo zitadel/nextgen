@@ -42,6 +42,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "password with identifier",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "https://example.com/schemas/pw-with-identifier.json",
+                  "objectType": "pw-with-identifier",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -95,6 +96,7 @@ func TestCreateSchema(t *testing.T) {
 				"metaSchema": "https://json-schema.org/draft/2020-12/schema",
 				"$id":        "https://example.com/my-invalid-schema.json",
 				"kind":       "does not exist",
+				"objectType": "invalid-kind",
 				"title":      "an invalid user schema",
 				"x-auth-methods": map[string]any{
 					"passkey": map[string]any{
@@ -130,6 +132,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "without id",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "duplicate-id",
+                  "objectType": "duplicate-id",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -176,6 +179,7 @@ func TestCreateSchema(t *testing.T) {
                   "title": "password without identifier",
                   "$schema": "https://json-schema.org/draft/2020-12/schema",
                   "$id": "https://example.com/schemas/pw-no-identifier.json",
+                  "objectType": "pw-no-identifier",
                   "metaSchema": "%s/user-schema.json",
                   "kind": "user-schema",
                   "type": "object",
@@ -251,6 +255,40 @@ func TestGetSchema(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		t.Parallel()
+
+		t.Run("a schema read naming another project", func(t *testing.T) {
+			t.Parallel()
+
+			// A project of its own: "ok/simple" creates the same object type in
+			// the shared one, and two revisions created in the same microsecond
+			// conflict (idx_json_schemas_object_type_revision).
+			owner, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+			ownerClient, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+			require.NoError(t, err)
+			harness.SetProjectSecretOnApiClient(t, ownerClient, owner)
+
+			schemaJSON := []byte(harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
+			var schemaObj map[string]any
+			require.NoError(t, json.Unmarshal(schemaJSON, &schemaObj))
+			delete(schemaObj, "$id")
+			schemaJSON, err = json.Marshal(schemaObj)
+			require.NoError(t, err)
+			schemaID := harness.CreateUserSchema(t, owner, string(schemaJSON))
+
+			other, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+			require.NoError(t, err)
+
+			// The project's own secret may read the schema, but not as part of
+			// another project.
+			resp, err := ownerClient.GetSchemaById(t.Context(), api.GetSchemaByIdParams{
+				ID:        schemaID,
+				ProjectID: api.NewOptProjectID(api.ProjectID(other.ID)),
+			})
+			assert.NoError(t, err)
+			require.IsType(t, &api.GetSchemaByIdErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+			assert.Equal(t, http.StatusNotFound, resp.(*api.GetSchemaByIdErrorResponseStatusCode).StatusCode)
+		})
 
 		t.Run("schema not found", func(t *testing.T) {
 			t.Parallel()
@@ -378,7 +416,7 @@ func TestSchemaRevisions(t *testing.T) {
 				for _, item := range list {
 					doc, ok := item.Schema.GetUserSchema()
 					if assert.True(t, ok, "list row should carry the user-schema document") {
-						assert.Equal(t, tc.objectType, doc.ObjectType.Value)
+						assert.Equal(t, tc.objectType, doc.ObjectType)
 					}
 					assert.False(t, item.Metadata.CreatedAt.IsZero())
 				}

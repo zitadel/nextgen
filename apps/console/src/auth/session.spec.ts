@@ -10,8 +10,11 @@ import {
   _resetSessionForTesting,
   fetchSession,
   invalidateSessionCache,
+  sanitizeNextPath,
   sessionPage,
+  signOut,
 } from "./session";
+import { _resetRuntimeForTesting, _setRuntimeForTesting } from "@/runtime/runtime";
 import { makeTestSession } from "@/test/session.fixture";
 import { server } from "@/test/msw";
 
@@ -21,6 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setApiCsrfToken(undefined);
+  _resetRuntimeForTesting();
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -59,9 +63,6 @@ function stubCsrf(respond: () => Response) {
 
 const token = (value: string) => () => HttpResponse.json({ csrf_token: value });
 const failing = () => HttpResponse.json({ code: "internal", message: "no" }, { status: 500 });
-
-/** Resolves false after the pending requests had their turn. */
-const pending = () => new Promise<false>((resolve) => setTimeout(() => resolve(false), 50));
 
 /** What customFetch does on a 403 auth.csrf_invalid: ask for a token to retry with. */
 function rejectWrite(): Promise<string | undefined> {
@@ -130,12 +131,15 @@ describe("fetchSession", () => {
     const calls = stubCsrf(token("tok_b"));
     // It never settles: answering null would send the guard to /login while
     // the reload is pending.
-    const settled = await Promise.race([fetchSession().then(() => true), pending()]);
+    let settled = false;
+    void fetchSession().then(() => {
+      settled = true;
+    });
 
+    await vi.waitFor(() => expect(sessionPage.reload).toHaveBeenCalledOnce());
     expect(settled).toBe(false);
     expect(calls()).toBe(0);
     expect(getApiCsrfToken()).toBeUndefined();
-    expect(sessionPage.reload).toHaveBeenCalledOnce();
   });
 
   // The person belongs to the document, so losing the session does not clear
@@ -213,6 +217,82 @@ describe("fetchSession", () => {
   });
 });
 
+// On localhost the console and the apps share one cookie jar, so the cookie may
+// hold an app's session. It signs no one in to the console.
+describe("fetchSession, held to the console's project", () => {
+  beforeEach(() => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_platform" });
+  });
+
+  it("names the console's project in the session read", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(makeTestSession({ project_id: "proj_platform" }));
+      }),
+    );
+    stubCsrf(token("tok"));
+
+    expect(await fetchSession()).toMatchObject({ project_id: "proj_platform" });
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+  });
+
+  it.each([
+    [
+      "the server refuses it",
+      () =>
+        HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        ),
+    ],
+    [
+      "an older server answers for it",
+      () => HttpResponse.json(makeTestSession({ project_id: "proj_app" })),
+    ],
+  ])("reports no session for an app's session when %s", async (_label, respond) => {
+    server.use(http.get("*/sessions/me", respond));
+    const calls = stubCsrf(failing);
+
+    expect(await fetchSession()).toBeNull();
+    expect(calls()).toBe(0);
+  });
+
+  it("names the console's project in the token read", async () => {
+    stubSessionBody({ project_id: "proj_platform" });
+    const urls: string[] = [];
+    server.use(
+      http.get("*/sessions/me/csrf", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json({ csrf_token: "tok" });
+      }),
+    );
+
+    await fetchSession();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+    expect(getApiCsrfToken()).toBe("tok");
+  });
+
+  // The server refuses to revoke an app's session the cookie holds, so signing
+  // out of the console never signs anyone out of the app.
+  it("names the console's project in the sign-out, and takes its refusal as signed out", async () => {
+    const urls: string[] = [];
+    server.use(
+      http.delete("*/sessions/me", ({ request }) => {
+        urls.push(request.url);
+        return HttpResponse.json(
+          { code: "sess.project_mismatch", message: "different project" },
+          { status: 403 },
+        );
+      }),
+    );
+
+    await expect(signOut()).resolves.toBeUndefined();
+    expect(new URL(urls[0] ?? "").searchParams.get("project_id")).toBe("proj_platform");
+  });
+});
+
 describe("CSRF rejection", () => {
   it("hands back a fresh token when the same person is still signed in", async () => {
     stubSession("user_a");
@@ -271,6 +351,24 @@ describe("CSRF rejection", () => {
     expect(getApiCsrfToken()).toBe("tok_a");
   });
 
+  // Only the server's project-mismatch answer means another project's session.
+  // Any other 403 on the re-check (a proxy, a firewall) is an unreadable
+  // session, which must not cost the person their page.
+  it("keeps the page when the re-check is refused for another reason", async () => {
+    _setRuntimeForTesting({ mode: "standalone", console_project_id: "proj_test" });
+    stubSession("user_a");
+    stubCsrf(token("tok_a"));
+    await fetchSession();
+
+    server.use(
+      http.get("*/sessions/me", () => HttpResponse.text("<html>Forbidden</html>", { status: 403 })),
+    );
+    expect(await rejectWrite()).toBeUndefined();
+
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+    expect(getApiCsrfToken()).toBe("tok_a");
+  });
+
   // Without a recorded person there is nothing to compare the session to, so
   // no token is handed back and nothing is retried.
   it("does not retry when this page has no person yet", async () => {
@@ -311,5 +409,103 @@ describe("CSRF rejection", () => {
     expect(await rejected).toBeUndefined();
     expect(sessionPage.reload).toHaveBeenCalledOnce();
     expect(getApiCsrfToken()).toBeUndefined();
+  });
+});
+
+describe("signOut", () => {
+  /** Answers DELETE /sessions/me: 204 with the token `want`, else the CSRF refusal. */
+  function stubRevoke(want: string) {
+    const sent: (string | null)[] = [];
+    server.use(
+      http.delete("*/sessions/me", ({ request }) => {
+        const csrf = request.headers.get("x-zitadel-csrf");
+        sent.push(csrf);
+        return csrf === want
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json({ code: "auth.csrf_invalid", message: "csrf" }, { status: 403 });
+      }),
+    );
+    return sent;
+  }
+
+  it("sends the session's CSRF token and drops the cached session after", async () => {
+    stubSession("user_a");
+    stubCsrf(token("tok"));
+    await fetchSession();
+    const sent = stubRevoke("tok");
+
+    await signOut();
+
+    expect(sent).toEqual(["tok"]);
+    expect(getApiCsrfToken()).toBeUndefined();
+    stubSession(null);
+    expect(await fetchSession()).toBeNull();
+  });
+
+  // No token yet (its read failed at load): the revoke is refused, the
+  // re-check reads the session to hand back a token, and the retry signs out.
+  // That re-check cached the session, so it must not outlive the sign-out, or
+  // /login would read it and bounce straight back into the console.
+  it("drops the session the refused token's re-check cached", async () => {
+    stubSession("user_a");
+    stubCsrf(failing);
+    await fetchSession();
+    expect(getApiCsrfToken()).toBeUndefined();
+    stubCsrf(token("tok"));
+    const sent = stubRevoke("tok");
+
+    await signOut();
+
+    expect(sent).toEqual([null, "tok"]);
+    stubSession(null);
+    expect(await fetchSession()).toBeNull();
+    expect(sessionPage.reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("sanitizeNextPath", () => {
+  it.each([
+    ["/", "/"],
+    ["/users", "/users"],
+    ["/users?tab=x", "/users?tab=x"],
+    ["/users?project=proj_test#top", "/users?project=proj_test#top"],
+    // Only where the browser goes is checked: a URL in the query stays the
+    // screen's own business.
+    ["/users?q=https://app.example", "/users?q=https://app.example"],
+  ])("keeps %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  // The login screen joins the path with the deployment prefix, which a `..`
+  // left in place would climb out of.
+  it.each([
+    ["/users/../schemas", "/schemas"],
+    ["/../users", "/users"],
+    ["/./users?tab=x", "/users?tab=x"],
+  ])("collapses the dot segments in %s", (next, path) => {
+    expect(sanitizeNextPath(next)).toBe(path);
+  });
+
+  it.each([
+    ["no value", undefined],
+    ["an empty value", ""],
+    ["a path without a leading slash", "users"],
+    ["an absolute URL", "https://evil.example/phish"],
+    ["a protocol-relative URL", "//evil.example"],
+    // Browsers read `\` as `/`.
+    ["a backslash", "/\\evil.example"],
+    ["a backslash further in", "/users/\\evil.example"],
+    // Browsers drop tabs and newlines.
+    ["a tab", "/\t/evil.example"],
+    ["a newline", "/\n/evil.example"],
+    ["a carriage return", "/\r/evil.example"],
+    ["another control character", "/\u0000/evil.example"],
+    ["DEL", "/\u007f/evil.example"],
+    // Each of these collapses to //evil.example.
+    ["a dot segment before //", "/.//evil.example"],
+    ["a parent segment before //", "/users/..//evil.example"],
+    ["an encoded dot segment before //", "/%2e//evil.example"],
+  ])("refuses %s", (_, next) => {
+    expect(sanitizeNextPath(next)).toBeUndefined();
   });
 });

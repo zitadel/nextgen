@@ -40,7 +40,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 
 import { applyBranding } from "./branding.js";
-import { HandoffError, JWK, verifyHandoffToken } from "./crypto.js";
+import { JWK, verifyHandoffToken } from "./crypto.js";
 import { defaultDevBranding } from "./default-dev-branding.js";
 import { setupMockHandlers } from "./handlers.js";
 import { buildOpenIdConfiguration } from "./openid-configuration.js";
@@ -54,9 +54,9 @@ const SESSION_TTL_SECONDS = 3600;
 export const PLATFORM_PROJECT_ID = "platform";
 
 /**
- * Tracks handoff tokens (by `jti`) we've already consumed so a replay
- * surfaces as 410 Gone. Per the spec a handoff is single-use — a real
- * backend rejects the second exchange.
+ * Tracks handoff tokens (by `jti`) we've already consumed so a replay is
+ * refused. Per the spec a handoff is single-use — a real backend rejects the
+ * second exchange.
  *
  * Module-scoped because each process keeps one set; for the dev loop the
  * mock runs for the whole session and we want consumption state to persist
@@ -105,6 +105,35 @@ function lookupSession(req: express.Request): SessionLookup {
   }
   return { status: "active", token, session };
 }
+
+/**
+ * Holds the request's session to its `project_id`, as the server does on every
+ * `/sessions/me` route once the cookie has authenticated the request: a value
+ * outside the project-id pattern (or not a single string) is a bad request, and
+ * a session of another project is refused with `403 sess.project_mismatch`, the
+ * way an app on a shared host sees one. The refusal clears no cookie: the
+ * session is live in its own project. Answers the refusal and returns `true`.
+ */
+function refuseForProject(
+  req: express.Request,
+  res: express.Response,
+  session: StoredSession,
+): boolean {
+  const projectId = req.query.project_id;
+  if (projectId === undefined) return false;
+  if (typeof projectId !== "string" || !/^[a-zA-Z0-9_-]+$/.test(projectId)) {
+    res.status(400).json(errorBody("req.invalid", "project_id is not a valid project id."));
+    return true;
+  }
+  if (session.project_id !== projectId) {
+    res
+      .status(403)
+      .json(errorBody("sess.project_mismatch", "The session belongs to a different project."));
+    return true;
+  }
+  return false;
+}
+
 /**
  * A session's CSRF token (ADR 053 §5), served by GET /sessions/me/csrf and
  * checked on claim/complete. Derived from the session cookie exactly as the Go
@@ -142,9 +171,8 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * Build the configured Express app without binding it to a port.
  *
  * Returning the bare app (rather than a listening {@link Server}) lets a
- * serverless host — e.g. a Vercel function — use it directly as a
- * request handler, while {@link startMockServer} wraps it for the
- * standalone dev server.
+ * caller mount it as a request handler, while {@link startMockServer} wraps
+ * it for the standalone dev server.
  *
  * The issuer is fixed at construction on purpose: the handoff tokens the
  * mock signs (inside the MSW handlers) and the `expectedIss` it later
@@ -156,15 +184,14 @@ const idempotencyCache = new Map<string, IdempotencyCacheEntry>();
  * branding overlay is likewise module-scoped — `applyBranding` mutates it
  * during construction. So two apps built in the same process **share** all
  * of that state; there is no per-instance isolation. This is intentional
- * for the single-app dev/serverless use cases; tests that need isolation
- * should run in separate workers (as Vitest does) rather than creating
- * multiple apps in one.
+ * for the single-app dev server; tests that need isolation should run in
+ * separate workers (as Vitest does) rather than creating multiple apps in
+ * one.
  *
  * @param options.issuer - Absolute base URL this mock advertises as its
- *   OIDC issuer (`http://localhost:8080` locally, the preview domain on
- *   Vercel). Embedded in the discovery document and used as the expected
- *   issuer when verifying handoff tokens (the JWKS responses carry only
- *   the key, not the issuer).
+ *   OIDC issuer (e.g. `http://localhost:8080`). Embedded in the discovery
+ *   document and used as the expected issuer when verifying handoff tokens
+ *   (the JWKS responses carry only the key, not the issuer).
  */
 export function createMockApp(options: { issuer: string }): express.Express {
   applyBranding(defaultDevBranding);
@@ -172,11 +199,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
   const app = express();
   app.use(cookieParser());
 
-  // CORS reflects any origin, with credentials, on purpose. Besides local
-  // development, apps/mock-zitadel deploys this app publicly for every pull
-  // request so a demo app, an SDK or a manual test on another origin can be
-  // pointed at a branch, and those callers need the session cookie. It serves
-  // only fake data. The real server's rules (ADR 053 §5) are not modelled here.
+  // CORS reflects any origin, with credentials, on purpose: a demo app, an SDK
+  // or a manual test on another local origin (another port) needs the session
+  // cookie. It serves only fake data. The real server's rules (ADR 053 §5) are
+  // not modelled here.
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     res.setHeader("Vary", "Origin");
@@ -251,26 +277,29 @@ export function createMockApp(options: { issuer: string }): express.Express {
           );
         return;
       }
+      // The server answers every token it will not exchange alike: it deletes
+      // the attempt on exchange, so a replay looks exactly like a token it
+      // never issued, and an expired one gets the same answer.
+      const refuseHandoff = () => {
+        res
+          .status(400)
+          .json(
+            errorBody(
+              "sess.invalid_handoff_token",
+              "handoff token is unknown, already exchanged, or expired",
+            ),
+          );
+      };
       let claims: { sub: string; iss: string; jti?: string };
       try {
         claims = await verifyHandoffToken(handoff_token, { expectedIss: iss });
-      } catch (err) {
-        if (err instanceof HandoffError && err.kind === "expired") {
-          res
-            .status(410)
-            .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
-          return;
-        }
-        res
-          .status(401)
-          .json(errorBody("invalid_handoff_token", "handoff token failed verification"));
+      } catch {
+        refuseHandoff();
         return;
       }
       const { jti } = claims;
       if (jti !== undefined && consumedHandoffJtis.has(jti)) {
-        res
-          .status(410)
-          .json(errorBody("handoff_consumed", "handoff token expired or already consumed"));
+        refuseHandoff();
         return;
       }
       if (jti !== undefined) {
@@ -371,8 +400,10 @@ export function createMockApp(options: { issuer: string }): express.Express {
       case "expired":
         res.status(401).json(errorBody("unauthenticated", "session expired"));
         return;
-      case "active":
+      case "active": {
+        if (refuseForProject(req, res, found.session)) return;
         res.json(found.session);
+      }
     }
   });
 
@@ -382,10 +413,14 @@ export function createMockApp(options: { issuer: string }): express.Express {
     // Both the token and the 401 are session state: neither may be stored.
     res.setHeader("Cache-Control", "private, no-store");
     const found = lookupSession(req);
+    // The server's token gate refuses a missing, unknown, revoked or expired
+    // cookie before the handler runs, so its project check, like this one,
+    // only ever sees a live session.
     if (found.status !== "active") {
       res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
       return;
     }
+    if (refuseForProject(req, res, found.session)) return;
     res.json({ csrf_token: csrfTokenFor(found.token) });
   });
 
@@ -393,19 +428,28 @@ export function createMockApp(options: { issuer: string }): express.Express {
   // Go server's revokeMySession handler and the SDK proxy's logout call.
   app.delete("/sessions/me", (req: express.Request, res: express.Response) => {
     const found = lookupSession(req);
-    switch (found.status) {
-      case "missing":
-        res.status(401).json(errorBody("unauthenticated", "no session cookie"));
-        return;
-      case "unknown":
-        res.status(404).json(errorBody("session_not_found", "session not found"));
-        return;
-      case "expired":
-        res.status(409).json(errorBody("session_revoked", "session already revoked or expired"));
-        return;
-      case "active":
-        sessionStore.delete(found.token);
+    // As on GET /sessions/me/csrf: the server's token gate answers these 401
+    // before the handler, whatever project the request names.
+    if (found.status !== "active") {
+      res.status(401).json(errorBody("auth.unauthorized", "Missing or invalid session token."));
+      return;
     }
+    // ADR 053 §5: sign-out is a cookie-authenticated write, so it carries the
+    // session's CSRF token. Checked before the project hold, in the same order
+    // as the Go server's security handler.
+    if (req.get("x-zitadel-csrf") !== csrfTokenFor(found.token)) {
+      res
+        .status(403)
+        .json(
+          errorBody(
+            "auth.csrf_invalid",
+            "The request failed cross-site request forgery validation.",
+          ),
+        );
+      return;
+    }
+    if (refuseForProject(req, res, found.session)) return;
+    sessionStore.delete(found.token);
     res.setHeader("Set-Cookie", [
       `__nextgen_session=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0`,
       `__nextgen_display=; Path=/; SameSite=Lax; Max-Age=0`,

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -38,7 +39,7 @@ func TestProjectStatements_Create(t *testing.T) {
 		})
 
 		t.Run("empty id is assigned by dialect", func(t *testing.T) {
-			project := &domain.Project{Name: "project-" + uniqueSuffix(t), PreviewOrigins: []string{}}
+			project := &domain.Project{Name: "project-" + uniqueSuffix(t), Origins: []domain.Origin{}}
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 
@@ -65,7 +66,10 @@ func TestProjectStatements_Update(t *testing.T) {
 	forEachDialect(t, func(t *testing.T, d dialect) {
 		t.Run("updates name and refreshes updated_at", func(t *testing.T) {
 			project := newTestProject(uniqueProjectID(t))
-			project.PreviewOrigins = []string{"*.example.com", "localhost:3000"}
+			project.Origins = []domain.Origin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+			}
 			t.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
 			require.NoError(t, d.stmts.CreateProject(t.Context(), project))
 			createdUpdatedAt := project.UpdatedAt
@@ -76,7 +80,10 @@ func TestProjectStatements_Update(t *testing.T) {
 			require.NoError(t, d.stmts.UpdateProject(t.Context(), project))
 			assert.True(t, project.UpdatedAt.After(createdUpdatedAt))
 			assert.Equal(t, createdAt.UTC(), project.CreatedAt.UTC())
-			assert.Equal(t, []string{"*.example.com", "localhost:3000"}, project.PreviewOrigins)
+			assert.Equal(t, []domain.Origin{
+				{Pattern: "https://*.example.com", Kind: domain.OriginKindPreview},
+				{Pattern: "http://localhost:3000", Kind: domain.OriginKindPreview},
+			}, project.Origins)
 
 			stored, err := d.stmts.GetProjectByID(t.Context(), project.ID)
 			require.NoError(t, err)
@@ -200,6 +207,32 @@ func TestProjectStatements_Get(t *testing.T) {
 		t.Run("not found returns NoRowFoundError", func(t *testing.T) {
 			_, err := d.stmts.GetProjectByID(t.Context(), uniqueProjectID(t))
 			assert.ErrorIs(t, err, new(database.NoRowFoundError))
+		})
+
+		t.Run("GetProject reads the owning team when asked", func(t *testing.T) {
+			projectID := ensureProject(t, d.stmts)
+			otherID := ensureProject(t, d.stmts)
+			teamID := "team-owner-" + uniqueSuffix(t)
+			require.NoError(t, d.stmts.CreateTeam(t.Context(), newTestTeam(projectID, teamID)))
+			owningTeamID := func(id string) string {
+				t.Helper()
+				stored, err := d.stmts.GetProject(t.Context(), id, service.ProjectQueryOptions{OwningTeam: true})
+				require.NoError(t, err)
+				assert.Equal(t, id, stored.ID)
+				return stored.OwningTeamID
+			}
+			assert.Empty(t, owningTeamID(projectID), "an unclaimed project has no owning team")
+
+			claim := domain.NewClaimTeamAssignment(projectID, teamID)
+			require.NoError(t, d.stmts.CreateAuthzAssignment(t.Context(), claim))
+			assert.Equal(t, teamID, owningTeamID(projectID))
+			assert.Empty(t, owningTeamID(otherID), "another project's claim is not this one's")
+			plain, err := d.stmts.GetProject(t.Context(), projectID, service.ProjectQueryOptions{})
+			require.NoError(t, err)
+			assert.Empty(t, plain.OwningTeamID, "without the option the owning team is left out")
+
+			require.NoError(t, d.stmts.RevokeAuthzAssignment(t.Context(), projectID, claim.ID))
+			assert.Empty(t, owningTeamID(projectID), "a revoked claim owns nothing")
 		})
 	})
 }

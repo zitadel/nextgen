@@ -19,7 +19,7 @@ Validation runs in two layers:
 | `name` | ✓ | The handle that groups revisions; not unique. Every `POST` publishes a new revision under the name. Resolution by name prefers the highest active `schema_version`, then the newest revision of it. |
 | `schema_version` | ✓ | Monotonic per `(project_id, name)`. First key of resolution by name (see `name`); the server hard-codes it today, so the newest revision decides. |
 | `status` | ✓ | `draft`, `active`, `deprecated`, `archived`. Only `active` is resolvable. |
-| `user_schema` | ✓ | URL of the user schema this flow's `fields` resolve against. Captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
+| `user_schema` | ✓ | `objectType` of the user schema this flow's `fields` resolve against; a schema id is accepted on write and stored as its `objectType`. The project's newest revision of it is captured into `FlowState.UserSchemaURL` at `Start` so mid-flow schema changes don't reshape in-flight data. |
 | `purposes` | ✓ | Map from purpose (`login`, `register`, `recovery`, `profiling`, `reauth`, `link_account`) to the name of that purpose's entry-point step. |
 | `audience` | optional | `app_ids[]`, `team_ids[]`. Empty = project default. Specificity for resolution is app > team > default. |
 | `steps` | ✓ | Ordered list of `FlowDefinitionStep`. Order doesn't drive runtime; transitions do. |
@@ -69,7 +69,7 @@ Transition values:
 
 - Every key in `purposes` is a supported `FlowDefinitionPurpose`.
 - Every value in `purposes` matches a step `name`.
-- `user_schema` URL resolves to a user-type schema. May be deferred until promotion to runtime use.
+- `user_schema` names a schema of the project.
 - **Flip-table coverage.** A definition that serves both `login` and `register` must wire `user_not_found` (login entry) and `user_already_exists` (register entry) on the entry step. Solo-purpose flows don't need the counter outcome. See [ADR 017](../../adrs/017-flow-engine-auth-attempt-dispatch.md).
 - **`on_success` manifest cross-check.** Every credential kind a mutation establishes (per `ManifestForOnSuccess`) must be collected on the step itself or on some upstream step in the graph. `create_user` establishes `{identifier, password}` — both must appear in `fields` somewhere reachable.
 
@@ -102,6 +102,5 @@ Transition values:
 
 ## Open questions
 
-- **When to resolve `user_schema`.** On write, only at runtime use, or somewhere in between? Tied to the still-undecided definition lifecycle.
 - **Cross-project pivots.** Out of scope — pivots and switches resolve within the same `project_id` when implemented.
 - **Built-in default flow.** Should the project-wide default ship embedded (`go:embed`)?

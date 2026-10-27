@@ -9,7 +9,7 @@ import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
 import { baseTest } from "../../vitest.shared.mjs";
 
-const consoleBase = "/ui/console/";
+const defaultConsoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
 const defaultApiBase = "/api";
 const defaultBackendUrl = "http://localhost:8080";
@@ -17,14 +17,23 @@ const defaultBackendUrl = "http://localhost:8080";
 export default defineConfig(({ command, mode, isPreview }) => ({
   root: import.meta.dirname,
   // The build emits absolute `/ui/console/` asset URLs (the console embeds in
-  // the Go server under that path). `vite preview` runs with command "serve",
-  // so it must opt into the same base or the built index.html's asset links
-  // 404 and the SPA never mounts. The dev server (plain "serve") stays at "/".
-  base: command === "build" || isPreview ? consoleBase : "/",
+  // the Go server under that path; the hosted cloud builds for another, see
+  // consoleBase). `vite preview` runs with command "serve", so it must opt
+  // into the same base or the built index.html's asset links 404 and the SPA
+  // never mounts. The dev server (plain "serve") stays at "/".
+  base: command === "build" || isPreview ? consoleBase(mode) : "/",
   define: {
     "import.meta.env.CONSOLE_VERCEL_INSIGHTS": JSON.stringify(vercelInsights(mode)),
     "import.meta.env.CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE": JSON.stringify(
       speedInsightsSampleRate(mode),
+    ),
+    // The Zitadel server the dev loop proxies to, which the page cannot see
+    // from its own origin (`src/lib/server-origin.ts`). Empty in a build, where
+    // the console is served with the API, and in tests, which have no server.
+    "import.meta.env.CONSOLE_SERVER_ORIGIN": JSON.stringify(
+      command === "serve" && !isPreview && mode !== "test"
+        ? new URL(devBackendUrl(mode)).origin
+        : "",
     ),
   },
   server: {
@@ -90,10 +99,26 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     unstubEnvs: true,
     // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
     // test that makes several queries, so a slow query reports its own Testing
-    // Library diagnostic rather than being cut short by this budget.
-    testTimeout: 20_000,
+    // Library diagnostic rather than being cut short by this budget. A file's
+    // first test also imports the router and every screen (test-setup.ts): in
+    // CI that first test takes ~9s, and up to ~16s on a busy runner.
+    testTimeout: 30_000,
   },
 }));
+
+/**
+ * The Go server the dev proxy forwards to. Node-only var — deliberately NOT
+ * VITE_ prefixed, so it is never inlined into the client bundle as-is; only
+ * its origin is, as CONSOLE_SERVER_ORIGIN. Loading with an empty prefix stays
+ * config-time and server-side only, so `.env.local` works without exporting it
+ * in the shell; the process environment still wins. `console:dev-real`
+ * threads it from the boot-captured @zitadel/testing instance handle
+ * (`scripts/dev-real.mts`).
+ */
+function devBackendUrl(mode: string): string {
+  const nodeEnv = loadEnv(mode, import.meta.dirname, "");
+  return process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
+}
 
 function devApiProxy(mode: string): Record<string, ProxyOptions> {
   // Public, browser-safe var (VITE_ prefixed): the API base the SDK client
@@ -111,14 +136,7 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
         "takes its sign-in project from /console/runtime.json. Remove it from your env.",
     );
   }
-  // Node-only var — deliberately NOT VITE_ prefixed, so it is never inlined
-  // into the client bundle. Loading with an empty prefix stays config-time and
-  // server-side only, so `.env.local` works without exporting it in the shell;
-  // the process environment still wins. `console:dev-real` threads it from the
-  // boot-captured @zitadel/testing instance handle (`scripts/dev-real.mts`).
-  const nodeEnv = loadEnv(mode, import.meta.dirname, "");
-  const backendUrl =
-    process.env.CONSOLE_BACKEND_URL || nodeEnv.CONSOLE_BACKEND_URL || defaultBackendUrl;
+  const backendUrl = devBackendUrl(mode);
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
@@ -151,6 +169,20 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       },
     },
   };
+}
+
+// The path the build is served under: the Go server's `/ui/console/`, unless
+// CONSOLE_BASE_PATH names another. The hosted cloud's console service sets
+// `/console/` (repo-root vercel.json) and points the server's console links
+// there (apps/cloud/launcher). Unprefixed for the same reason as the insights
+// variable below. Anything but an absolute path fails the build.
+function consoleBase(mode: string): string {
+  const name = "CONSOLE_BASE_PATH";
+  const value = loadEnv(mode, import.meta.dirname, "")[name] || defaultConsoleBase;
+  if (!/^(\/[\w.-]+)+\/?$/.test(value)) {
+    throw new Error(`${name} must be an absolute path such as /console/, got "${value}".`);
+  }
+  return value.endsWith("/") ? value : `${value}/`;
 }
 
 // `1` in the hosted cloud's build (src/vite-env.d.ts). Not VITE_-prefixed:

@@ -5,7 +5,6 @@ package integration_test
 import (
 	"testing"
 
-	"github.com/go-faster/jx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,6 +35,7 @@ func newSSOCollectionFixture(t *testing.T) *ssoCollectionFixture {
 		"metaSchema": "https://test.example.schemas.com/schemas/user-schema.json",
 		"$id": "https://sso-collection.example.com/schemas/user.json",
 		"kind": "user-schema",
+		"objectType": "sso-collection-user",
 		"type": "object",
 		"x-identifier": "email",
 		"x-auth-methods": {
@@ -109,7 +109,7 @@ func collectionClaims() (map[string]any, map[string]bool) {
 // rotated cookie and the rendered step.
 func (f *ssoCollectionFixture) collect(t *testing.T, subject string) (ssoFlow, api.FlowStep) {
 	t.Helper()
-	flow := f.startFlow(t, "")
+	flow := f.startFlow(t, nil)
 	claims, verified := collectionClaims()
 	parkSSOResult(t, f.project.ID, flow.attemptID, f.connection.RevisionID, subject, claims, verified)
 	resp := f.getStep(t, flow)
@@ -122,16 +122,12 @@ func (f *ssoCollectionFixture) collect(t *testing.T, subject string) (ssoFlow, a
 
 func (f *ssoCollectionFixture) submit(t *testing.T, flow ssoFlow, fields map[string]string) api.SubmitFlowStepRes {
 	t.Helper()
-	raw := api.FlowSubmitRequestFields{}
-	for name, value := range fields {
-		raw[name] = jx.Raw(`"` + value + `"`)
+	// submitAction omits the field set when fields is nil; the collection
+	// step always posts one, empty or not.
+	if fields == nil {
+		fields = map[string]string{}
 	}
-	resp, err := f.client.SubmitFlowStep(t.Context(), &api.FlowSubmitRequest{
-		Action: "submit",
-		Fields: api.NewOptFlowSubmitRequestFields(raw),
-	}, api.SubmitFlowStepParams{ID: flow.id, Zflow: flow.zflow})
-	require.NoError(t, err)
-	return resp
+	return f.submitAction(t, flow, "submit", fields)
 }
 
 // requireStepError asserts the submit kept the flow on register-sso with

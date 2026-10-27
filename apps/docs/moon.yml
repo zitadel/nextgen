@@ -2,6 +2,12 @@ id: "docs"
 language: "typescript"
 layer: "application"
 stack: "frontend"
+dependsOn:
+  - "api"
+  # The live examples (components/examples) render the components, the login
+  # over the mock.
+  - "api-mock"
+  - "components"
 
 workspace:
   inheritedTasks:
@@ -10,7 +16,9 @@ workspace:
       - "test"
 
 tasks:
-  # Bundles api/openapi into .generated/, which lib/openapi.ts imports. The
+  # Bundles api/openapi into .generated/, which lib/openapi.ts imports, with
+  # its error codes, which lib/error-reference.ts imports, and the CLI's
+  # command reference, which lib/cli-reference.ts imports. The
   # content needs no generation step: lib/source.ts defines its collection
   # with Fumadocs MDX's macro.
   generate:
@@ -20,20 +28,52 @@ tasks:
       - "/api/openapi/**/*.yaml"
       # The bundle applies the repo's Redocly config.
       - "/redocly.yaml"
+      # Written by the CLI's reference test from its command table.
+      - "/apps/cli/command-reference.json"
+      # Written by Changesets on every release: the release notes.
+      - "/apps/cli/CHANGELOG.md"
     outputs:
       - ".generated/openapi.mjs"
       - ".generated/openapi.d.mts"
+      - ".generated/errors.mjs"
+      - ".generated/errors.d.mts"
+      - ".generated/cli.mjs"
+      - ".generated/cli.d.mts"
 
   typecheck:
     deps:
       - "generate"
+      # The live examples import the components and the mock, each from its
+      # dist/. The mock's build reaches the client's (api:build, after
+      # api:generate), which the mock calls and the API reference's TypeScript
+      # samples compile against (scripts/sdk-samples.ts, tsconfig.samples.json).
+      - "api-mock:build"
+      - "components:build"
+    inputs:
+      # Declaring inputs drops the default project folder, so it is restated.
+      - "**/*"
+      # The client's runtime, which the samples call too.
+      - "/packages/api/src/**/*"
 
   build:
     command: "corepack pnpm exec next build"
     deps:
+      # After typecheck, never beside it: `next build` empties .next/types and
+      # fills it again, and tsc reads the route types there (next-env.d.ts
+      # imports .next/types/routes.d.ts), so side by side typecheck failed
+      # with TS2304 on PageProps, LayoutProps and RouteContext. The build is
+      # the one that waits: it takes longer, and fails on a type error anyway.
+      # An edge, not a mutex: moon holds a mutex only while the command runs,
+      # not while it restores or archives .next.
+      - "typecheck"
+      # Listed here and not only reached through typecheck: typecheck has no
+      # outputs, so moon would not hash generate through it.
       - "generate"
-      # app/global.css imports the design tokens' CSS variables.
-      - "design-tokens:generate"
+      # The live examples' packages, as for typecheck. The components' build
+      # reaches design-tokens:generate, whose CSS variables app/global.css
+      # imports.
+      - "api-mock:build"
+      - "components:build"
     outputs:
       - ".next/**/*"
     options:
@@ -47,7 +87,9 @@ tasks:
     command: "corepack pnpm exec next dev --port 3003"
     deps:
       - "generate"
-      - "design-tokens:generate"
+      # The live examples' packages and the design tokens, as for build.
+      - "api-mock:build"
+      - "components:build"
     options:
       persistent: true
       runInCI: false
@@ -72,14 +114,13 @@ tasks:
       cache: false
       runInCI: false
 
-  # The same suite against a deployment of the hosted cloud, which
-  # DOCS_BASE_URL names (VERCEL_AUTOMATION_BYPASS_SECRET opens its
-  # protection); .github/workflows/deployment-checks.yml runs it for every
-  # deployment.
+  # The same suite against a deployment of the hosted cloud, which CLOUD_URL
+  # names (playwright.deployment.config.mts; VERCEL_AUTOMATION_BYPASS_SECRET
+  # opens its protection). The root's `pnpm check:cloud` runs it beside every
+  # other deployment suite, and .github/workflows/deployment-checks.yml runs
+  # it for every deployment. The config refuses to run without CLOUD_URL.
   e2e-deployment:
-    script: |
-      [ -n "${DOCS_BASE_URL:-}" ] || { echo "DOCS_BASE_URL names the deployment to test" >&2; exit 1; }
-      corepack pnpm exec playwright test
+    command: "corepack pnpm exec playwright test --config playwright.deployment.config.mts"
     options:
       cache: false
       runInCI: false

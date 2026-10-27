@@ -1,0 +1,62 @@
+name: pr-title
+
+# The PR title check (scripts/check-pr-title.mjs), split out of ci.yml's
+# `full-pr` job (#1474). There it read the title from the event payload, which
+# a rerun replays unchanged, and renaming a PR started no run: a retitled PR
+# kept failing on its old title until the next push, and that push reran all
+# of `full-pr`. Here a title edit starts a run of its own, and every run reads
+# the title the PR has now. The script imports Node built-ins only, so the job
+# installs nothing.
+
+on:
+  pull_request:
+    # `edited` also fires for description and base edits. Those run too:
+    # skipping them would post a skipped check on the same commit as a failed
+    # one, and a skipped check reads as passing.
+    types: [opened, edited, synchronize, reopened]
+  # A merge group has no title to check, so the job skips there. The trigger
+  # gives the queue that (passing) check, which it waits for once branch
+  # protection requires `pr-title`.
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pr-title:
+    if: ${{ github.event_name == 'pull_request' }}
+    # Fork PRs run their own copy of the script here. The job needs nothing a
+    # Depot runner adds, so it stays on a GitHub-hosted one for every PR.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # The script diffs `<base>...HEAD`, which needs the merge base.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      # The title comes from the API, not github.event.pull_request.title,
+      # which a rerun replays from the run it reruns. The base comes from that
+      # payload on purpose: so does the checked-out merge commit, and the two
+      # have to agree. A PR title is attacker-controlled text on a public repo,
+      # so it reaches the script through a shell variable — never interpolated
+      # into the shell body.
+      - name: Check PR title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          title="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title)"
+          node scripts/check-pr-title.mjs --title "$title" --base "$BASE_SHA" --summary

@@ -9,8 +9,8 @@
  */
 
 /* Widget-first: the default host is content-sized and paints nothing —
-   the embedding app owns the page. `variant="page"` (hosted shell,
-   scaffolded login routes) opts into the full-page chrome. The
+   the embedding app owns the page. `variant="page"` (scaffolded login
+   routes) opts into the full-page chrome. The
    `--zl-page-min-height` custom property overrides the height in both
    modes (a host-set value always wins over the variant default). */
 :host {
@@ -140,17 +140,17 @@ img[data-zl-asset-broken] {
   color: var(--zl-muted-foreground);
 }
 
-/* The two groups the card body holds. The card spaces them 28px apart; each
-   packs its own members tighter. Explicit wrappers rather than sibling
+/* The two groups the card body holds. The card spaces them 20px apart, and
+   the fields within a group the same. Explicit wrappers rather than sibling
    selectors, so an ejected template composes them on purpose. */
 .zl-field-group {
   display: flex;
   flex-direction: column;
-  gap: var(--zl-spacing-7);
+  gap: var(--zl-spacing-5);
 }
 /* A step can declare no fields at all — the passkey upsell is title, copy and
    two buttons. The wrapper still renders, and an empty flex item would keep
-   claiming the card's 28px gap. `:has(*)` rather than `:empty` because Liquid
+   claiming the card's 20px gap. `:has(*)` rather than `:empty` because Liquid
    leaves whitespace text nodes behind, which `:empty` counts. */
 .zl-field-group:not(:has(*)) {
   display: none;
@@ -221,6 +221,28 @@ img[data-zl-asset-broken] {
    out of the muted line it sits in rather than taking the underline away. */
 .zl-card-nav__link:hover {
   color: var(--zl-foreground);
+}
+/* Account row: emitted only by templates ejected before `<zl-account>` drew
+   the account a step signs in to. The address wraps anywhere so a long one
+   never widens the card. */
+.zl-card-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zl-spacing-1) var(--zl-spacing-3);
+  margin: 0;
+  font-family: var(--zl-font-family-sans);
+  font-size: var(--zl-text-sm-size);
+  line-height: var(--zl-text-sm-leading);
+  font-weight: var(--zl-font-weight-normal);
+  color: var(--zl-muted-foreground);
+}
+.zl-card-account__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--zl-foreground);
+  font-weight: var(--zl-font-weight-medium);
 }
 /* Standalone forgot-password row: emitted only by templates ejected before
    `<zl-field>` carried the link on its label row. */

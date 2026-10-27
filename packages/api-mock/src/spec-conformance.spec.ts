@@ -21,9 +21,12 @@
  * Endpoints covered structurally (orval emits no `*Response` zod for these
  * because they have no static response schema — POSTs that return only an
  * `id`, or out-of-spec routes):
- *   - POST /projects                    → { id, project_secret, … }
  *   - POST /schemas                     → { id }
  *   - POST /flow_definitions            → flow-definition-response envelope
+ *
+ * Also covered by zod here:
+ *   - POST /projects                    → CreateProjectResponse
+ *   - POST /projects/:id/origins        → AddOriginResponse
  *
  * `GET /schemas/:id` is NOT zod-validated here: the mock stores whatever
  * the user POSTed verbatim, so the response shape depends on the request
@@ -33,8 +36,10 @@
 import type { Server } from "node:http";
 
 import {
+  AddOriginResponse,
   CompleteClaimResponse,
   CreateIdpResponse,
+  CreateProjectResponse,
   ExchangeHandoffResponse,
   GetClaimStatusResponse,
   GetFlowDefinitionResponse,
@@ -45,7 +50,7 @@ import {
   ListFlowDefinitionsResponse,
   QueryIdpsResponse,
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.zod";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import { signHandoffToken } from "./crypto.js";
 import {
@@ -76,6 +81,21 @@ afterAll(async () => {
     server.close(() => resolve());
   });
 });
+
+/**
+ * The `__nextgen_session` cookie of a session belonging to `project`, active
+ * with a verified factor.
+ */
+async function sessionCookie(project: string): Promise<string> {
+  const handoff = await signHandoffToken({ sub: project, iss: BASE });
+  const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handoff_token: handoff }),
+  });
+  const setCookie = exchange.headers.getSetCookie().find((c) => c.startsWith("__nextgen_session="));
+  return setCookie?.split(";")[0] ?? "";
+}
 
 /**
  * Helper: a valid flow-definition body that satisfies the spec's
@@ -143,6 +163,104 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     });
   });
 
+  // Mirrors the server: a read that names a project refuses a session of any
+  // other project, and serves its own as before.
+  test("GET /sessions/me with project_id refuses a session of another project", async () => {
+    const handoff = await signHandoffToken({ sub: "app-user@example.com", iss: BASE });
+    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me_app`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ handoff_token: handoff }),
+    });
+    expect(exchange.status).toBe(200);
+    const cookie = exchange.headers
+      .getSetCookie()
+      .find((c) => c.startsWith("__nextgen_session="))
+      ?.split(";")[0];
+
+    const refused = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const served = await fetch(`${BASE}/sessions/me?project_id=proj_me_app`, {
+      headers: { cookie: cookie ?? "" },
+    });
+    expect(served.status).toBe(200);
+    expect(await served.json()).toMatchObject({ project_id: "proj_me_app" });
+
+    // Like the server, a project_id outside the project-id pattern is a bad
+    // request, not a verdict on the session.
+    for (const invalid of ["", "proj%20me"]) {
+      const rejected = await fetch(`${BASE}/sessions/me?project_id=${invalid}`, {
+        headers: { cookie: cookie ?? "" },
+      });
+      expect(rejected.status).toBe(400);
+    }
+  });
+
+  // Mirrors the server: the CSRF token read and sign-out hold the session to
+  // the project they name the way the read does, and a refused sign-out leaves
+  // the session and its cookie alone.
+  test("GET /sessions/me/csrf and DELETE /sessions/me with project_id refuse a session of another project", async () => {
+    const cookie = await sessionCookie("proj_me_signout");
+    const headers = { cookie };
+    // Sign-out is a write: it carries the session's CSRF token, which is
+    // checked before the project hold and the parameter, as on the server.
+    const signOutHeaders = { cookie, "x-zitadel-csrf": csrfTokenFor(cookie.split("=")[1] ?? "") };
+
+    const refusedToken = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_other`, {
+      headers,
+    });
+    expect(refusedToken.status).toBe(403);
+    expect(refusedToken.headers.get("cache-control")).toBe("private, no-store");
+    expect(await refusedToken.json()).toMatchObject({ code: "sess.project_mismatch" });
+
+    const refusedSignOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_other`, {
+      method: "DELETE",
+      headers: signOutHeaders,
+    });
+    expect(refusedSignOut.status).toBe(403);
+    expect(await refusedSignOut.json()).toMatchObject({ code: "sess.project_mismatch" });
+    expect(refusedSignOut.headers.getSetCookie()).toEqual([]);
+
+    // A project_id that is no project id is a bad request, one shaped as an
+    // object by the query parser too. The server authenticates first, so
+    // without a cookie the answer is the 401.
+    for (const query of ["project_id=", "project_id=proj%20me", "project_id[toString]=x"]) {
+      const rejectedToken = await fetch(`${BASE}/sessions/me/csrf?${query}`, { headers });
+      expect(rejectedToken.status).toBe(400);
+      const rejectedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+        method: "DELETE",
+        headers: signOutHeaders,
+      });
+      expect(rejectedSignOut.status).toBe(400);
+      const forgedSignOut = await fetch(`${BASE}/sessions/me?${query}`, {
+        method: "DELETE",
+        headers,
+      });
+      expect(forgedSignOut.status).toBe(403);
+      expect((await fetch(`${BASE}/sessions/me/csrf?${query}`)).status).toBe(401);
+      expect((await fetch(`${BASE}/sessions/me?${query}`, { method: "DELETE" })).status).toBe(401);
+    }
+
+    // The refusals ended nothing: its own project still gets its token and
+    // signs it out.
+    const token = await fetch(`${BASE}/sessions/me/csrf?project_id=proj_me_signout`, {
+      headers,
+    });
+    expect(token.status).toBe(200);
+    expect(await token.json()).toEqual({ csrf_token: csrfTokenFor(cookie.split("=")[1] ?? "") });
+
+    const signedOut = await fetch(`${BASE}/sessions/me?project_id=proj_me_signout`, {
+      method: "DELETE",
+      headers: signOutHeaders,
+    });
+    expect(signedOut.status).toBe(204);
+    expect(signedOut.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
+  });
+
   test("GET /sessions/me returns body parseable by GetMySessionResponse with a user ref", async () => {
     const handoff = await signHandoffToken({ sub: "me@example.com", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_me`, {
@@ -184,6 +302,46 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(body.code).toBe("sess.project_id_missing");
   });
 
+  // The server cannot tell a replayed token from one it never issued (it
+  // deletes the attempt on exchange), so it refuses both, and an expired one,
+  // with the same 400 (internal/api/integration_test/session_exchange_test.go).
+  describe("POST /sessions/exchange refuses a handoff token it will not exchange", () => {
+    const exchange = (handoffToken: string) =>
+      fetch(`${BASE}/sessions/exchange?project_id=proj_refused`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ handoff_token: handoffToken }),
+      });
+    const expectRefused = async (res: Response) => {
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as Record<string, unknown>;
+      expect(body.code).toBe("sess.invalid_handoff_token");
+    };
+
+    test("a replay of an exchanged token", async () => {
+      const handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      expect((await exchange(handoff)).status).toBe(200);
+      await expectRefused(await exchange(handoff));
+    });
+
+    test("a token it never issued", async () => {
+      await expectRefused(await exchange("handoff_never_issued"));
+    });
+
+    test("an expired token", async () => {
+      // Signed two minutes ago, so its 60-second lifetime is over.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      let handoff: string;
+      try {
+        vi.setSystemTime(Date.now() - 120_000);
+        handoff = await signHandoffToken({ sub: "proj_refused", iss: BASE });
+      } finally {
+        vi.useRealTimers();
+      }
+      await expectRefused(await exchange(handoff));
+    });
+  });
+
   test("DELETE /sessions/me revokes an active session and clears the cookie", async () => {
     const handoff = await signHandoffToken({ sub: "proj_revoke", iss: BASE });
     const exchange = await fetch(`${BASE}/sessions/exchange?project_id=proj_revoke`, {
@@ -201,9 +359,21 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const before = await fetch(`${BASE}/sessions/me`, { headers: { cookie: sessionCookie } });
     expect(before.status).toBe(200);
 
-    const revoke = await fetch(`${BASE}/sessions/me`, {
+    // Without the session's CSRF token, sign-out is refused and ends nothing.
+    const forged = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: sessionCookie },
+    });
+    expect(forged.status).toBe(403);
+    expect(await forged.json()).toMatchObject({ code: "auth.csrf_invalid" });
+    expect(forged.headers.getSetCookie()).toEqual([]);
+
+    const revoke = await fetch(`${BASE}/sessions/me`, {
+      method: "DELETE",
+      headers: {
+        cookie: sessionCookie,
+        "x-zitadel-csrf": csrfTokenFor(sessionCookie.split("=")[1] ?? ""),
+      },
     });
     expect(revoke.status).toBe(204);
     expect(revoke.headers.getSetCookie().some((c) => /^__nextgen_session=;/.test(c))).toBe(true);
@@ -242,17 +412,42 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     const res = await fetch(`${BASE}/sessions/me`, { method: "DELETE" });
     expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("unauthenticated");
+    expect(body.code).toBe("auth.unauthorized");
   });
 
-  test("DELETE /sessions/me with an unknown session token returns 404", async () => {
+  // The server's token gate refuses a cookie whose token record is gone (never
+  // issued, revoked) or expired before the handler runs, so it answers 401
+  // whatever project the request names.
+  test("DELETE /sessions/me with an unknown session token returns 401", async () => {
     const res = await fetch(`${BASE}/sessions/me`, {
       method: "DELETE",
       headers: { cookie: "__nextgen_session=deadbeefdeadbeef" },
     });
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(401);
     const body = (await res.json()) as Record<string, unknown>;
-    expect(body.code).toBe("session_not_found");
+    expect(body.code).toBe("auth.unauthorized");
+  });
+
+  test("an expired session answers 401, not the project mismatch, on sign-out and the CSRF read", async () => {
+    const cookie = await sessionCookie("proj_me_expired");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      // Past the mock's one-hour session lifetime.
+      vi.setSystemTime(Date.now() + 2 * 3_600_000);
+      for (const route of [
+        { path: "/sessions/me", method: "DELETE" },
+        { path: "/sessions/me/csrf", method: "GET" },
+      ]) {
+        const res = await fetch(`${BASE}${route.path}?project_id=proj_me_other`, {
+          method: route.method,
+          headers: { cookie },
+        });
+        expect(res.status).toBe(401);
+        expect(await res.json()).toMatchObject({ code: "auth.unauthorized" });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("GET /console/runtime.json names the project the console signs into", async () => {
@@ -274,33 +469,105 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         name: "conformance-app",
-        preview_origins: ["http://localhost:3000"],
+        origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
         seed_defaults: false,
       }),
     });
     expect(res.status).toBe(201);
-    const body = (await res.json()) as Record<string, unknown>;
-    // No CreateProjectResponse zod schema is emitted by orval. Validate
-    // structurally against the fields create-project-response.yaml requires.
-    expect(typeof body.id).toBe("string");
-    expect(body.name).toBe("conformance-app");
-    expect(typeof body.project_secret).toBe("string");
-    expect(typeof body.preview_secret).toBe("string");
-    expect(Array.isArray(body.preview_origins)).toBe(true);
-    expect(typeof body.created_at).toBe("string");
+    const body = await res.json();
+    expect(() => CreateProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      name: "conformance-app",
+      origins: [{ pattern: "http://localhost:3000", kind: "preview" }],
+    });
   });
 
   test("GET /projects/:id matches GetProjectResponse", async () => {
     const create = await fetch(`${BASE}/projects`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: "conformance-app" }),
+      body: JSON.stringify({
+        name: "conformance-app",
+        origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+      }),
     });
     const { id } = (await create.json()) as { id: string };
     const res = await fetch(`${BASE}/projects/${id}`);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(() => GetProjectResponse.parse(body)).not.toThrow();
+    expect(body).toMatchObject({
+      origins: [{ pattern: "http://localhost:3000", kind: "primary" }],
+    });
+  });
+
+  test("POST /projects/:id/origins adds a pattern and is idempotent for the same kind", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "origins-app", seed_defaults: false }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const first = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(first.status).toBe(201);
+    const firstBody = await first.json();
+    expect(() => AddOriginResponse.parse(firstBody)).not.toThrow();
+    expect(firstBody).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+    expect(firstBody).not.toHaveProperty("check");
+    expect(firstBody).not.toHaveProperty("warning");
+
+    const again = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "primary" }),
+    });
+    expect(again.status).toBe(201);
+    expect(await again.json()).toEqual({ pattern: "https://app.example.com", kind: "primary" });
+
+    const conflict = await fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://app.example.com", kind: "preview" }),
+    });
+    expect(conflict.status).toBe(409);
+    const conflictBody = (await conflict.json()) as Record<string, unknown>;
+    expect(conflictBody.code).toBe("origin.kind_conflict");
+  });
+
+  test("POST /projects/:id/origins/remove is idempotent 204", async () => {
+    const create = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "origins-remove-app",
+        origins: [{ pattern: "https://preview.example.com", kind: "preview" }],
+        seed_defaults: false,
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+
+    const remove = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(remove.status).toBe(204);
+
+    const again = await fetch(`${BASE}/projects/${id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ pattern: "https://preview.example.com" }),
+    });
+    expect(again.status).toBe(204);
+
+    const get = await fetch(`${BASE}/projects/${id}`);
+    const body = await get.json();
+    expect(body.origins).toEqual([]);
   });
 
   test("GET /projects/:id on unknown id returns spec-compliant error envelope", async () => {
@@ -317,7 +584,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind: "user-schema",
-        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -337,7 +605,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         kind: "user-schema",
-        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance",
         // Mirrors the server's designation rule (ADR 058 §1): password
         // requires a designated project-unique identifier.
         "x-identifier": "email",
@@ -368,7 +637,8 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // envelope.
     const doc = {
       kind: "user-schema",
-      metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+      objectType: "conformance",
       "x-auth-methods": { password: { enabled: true } },
       title: "CustomTitle",
       "x-custom-extension": { keep: true },
@@ -395,7 +665,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
   test("GET /schemas lists envelopes carrying the full document", async () => {
     const doc = {
       kind: "user-schema",
-      metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+      metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
       objectType: "conformance-list",
       "x-auth-methods": { password: { enabled: true } },
     };
@@ -426,7 +696,7 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           kind: "user-schema",
-          metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+          metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
           objectType: `paging-${i}`,
           "x-auth-methods": { password: { enabled: true } },
         }),
@@ -505,6 +775,33 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     // POST 201 and GET 200 share the `flow-definition-response`
     // envelope per the spec, so the GET response zod schema validates both.
     expect(() => GetFlowDefinitionResponse.parse(body)).not.toThrow();
+  });
+
+  test("POST /flow_definitions stores a schema id as the objectType it names", async () => {
+    const schema = await fetch(`${BASE}/schemas?project_id=proj_conformance_handle`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://zitadel.com/schemas/v1/user-schema.json",
+        objectType: "conformance-handle",
+        "x-auth-methods": { passkey: { enabled: true } },
+        properties: { email: { type: "string", format: "email", "x-unique": "project" } },
+      }),
+    });
+    const { id } = (await schema.json()) as { id: string };
+
+    const res = await fetch(`${BASE}/flow_definitions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        project_id: "proj_conformance_handle",
+        flow_definition: { ...validFlowDefinitionBody(), user_schema: id },
+      }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { flow_definition: { user_schema: string } };
+    expect(body.flow_definition.user_schema).toBe("conformance-handle");
   });
 
   test("POST /flow_definitions rejects an invalid definition with the server's flowdef.invalid envelope", async () => {
@@ -667,22 +964,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
     );
   }
 
-  // A session belonging to `project`, active with a verified factor. The claim
-  // page runs in the platform project, so an eligible claim session uses
-  // PLATFORM_PROJECT_ID; passing a customer project yields an ineligible one.
-  async function sessionCookie(project: string): Promise<string> {
-    const handoff = await signHandoffToken({ sub: project, iss: BASE });
-    const exchange = await fetch(`${BASE}/sessions/exchange?project_id=${project}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ handoff_token: handoff }),
-    });
-    const setCookie = exchange.headers
-      .getSetCookie()
-      .find((c) => c.startsWith("__nextgen_session="));
-    return setCookie?.split(";")[0] ?? "";
-  }
-
+  // The claim page runs in the platform project, so an eligible claim session
+  // uses PLATFORM_PROJECT_ID; passing a customer project yields an ineligible
+  // one.
   const platformSessionCookie = () => sessionCookie(PLATFORM_PROJECT_ID);
 
   /**
@@ -1047,9 +1331,9 @@ describe("api-mock claim lifecycle — init / status / complete conformance", ()
 });
 
 /**
- * The identity provider connection and variable endpoints the CLI's SSO
- * journey needs. The Go service does not exist yet (#1003), so this mock is
- * the only place `sso enable` / `plan` / `apply` can be driven end to end.
+ * The identity provider connection and variable endpoints the CLI's SSO journey
+ * needs. The Go service does not exist yet (#1003), so this mock is the only
+ * place `auth-method sso enable` / `plan` / `apply` can be driven end to end.
  */
 describe("api-mock idp connections and variables", () => {
   const connection = (over: Record<string, unknown> = {}) => ({
@@ -1113,6 +1397,77 @@ describe("api-mock idp connections and variables", () => {
     expect((body.definition as Record<string, unknown>).display_name).toBe("Google Workspace");
   });
 
+  describe("an oidc block that names only some endpoints", () => {
+    // The server's rule: none (discovery), or authorization_endpoint, jwks_uri,
+    // token_endpoint, and userinfo_endpoint unless id_token_mapping is true.
+    const endpoints = {
+      authorization_endpoint: "https://idp.test/authorize",
+      jwks_uri: "https://idp.test/jwks",
+      token_endpoint: "https://idp.test/token",
+      userinfo_endpoint: "https://idp.test/userinfo",
+    };
+    const withOidc = (over: object) =>
+      connection({
+        oidc: {
+          issuer: "https://idp.test",
+          scopes: ["openid"],
+          client_id: "${{ GOOGLE_CLIENT_ID }}",
+          client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+          ...over,
+        },
+      });
+
+    test.each<[string, object, string[]]>([
+      [
+        "one endpoint",
+        { token_endpoint: endpoints.token_endpoint },
+        ["authorization_endpoint", "jwks_uri", "userinfo_endpoint"],
+      ],
+      ["all but jwks_uri", { ...endpoints, jwks_uri: undefined }, ["jwks_uri"]],
+      [
+        "userinfo_endpoint alone under id_token_mapping",
+        { userinfo_endpoint: endpoints.userinfo_endpoint, id_token_mapping: true },
+        ["authorization_endpoint", "jwks_uri", "token_endpoint"],
+      ],
+    ])(
+      "refuses %s with idp.endpoints_partial, listing what is missing",
+      async (_case, over, missing) => {
+        const projectId = await newProject("idp-endpoints-partial");
+
+        const res = await putIdp(projectId, withOidc(over));
+
+        expect(res.status).toBe(400);
+        expect(await res.json()).toEqual({
+          code: "idp.endpoints_partial",
+          message: "identity provider connection: the endpoints are partially set",
+          details: { details: { missing } },
+        });
+      },
+    );
+
+    test("refuses a revision too, before the slug is looked up", async () => {
+      const projectId = await newProject("idp-endpoints-partial-revise");
+      expect((await putIdp(projectId, connection())).status).toBe(201);
+
+      const res = await putIdp(projectId, withOidc({ jwks_uri: endpoints.jwks_uri }));
+
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("idp.endpoints_partial");
+    });
+
+    test.each<[string, object]>([
+      ["every endpoint", endpoints],
+      [
+        "every endpoint but userinfo under id_token_mapping",
+        { ...endpoints, userinfo_endpoint: undefined, id_token_mapping: true },
+      ],
+    ])("accepts %s", async (_case, over) => {
+      const projectId = await newProject("idp-endpoints-full");
+
+      expect((await putIdp(projectId, withOidc(over))).status).toBe(201);
+    });
+  });
+
   test("reads one back by id, and 404s an id the project does not own", async () => {
     const mine = await newProject("idp-read-mine");
     const other = await newProject("idp-read-other");
@@ -1153,14 +1508,18 @@ describe("api-mock idp connections and variables", () => {
     });
     // 200 with the addressed owner read back, not 204.
     expect(patch.status).toBe(200);
-    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toBe(
-      "824.apps.googleusercontent.com",
-    );
+    expect(((await patch.json()) as Record<string, unknown>).GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
 
     const res = await fetch(`${BASE}/variables?project_id=${projectId}`);
     const body = (await res.json()) as Record<string, unknown>;
     expect(GetVariablesResponse.safeParse(body).success).toBe(true);
-    expect(body.GOOGLE_CLIENT_ID).toBe("824.apps.googleusercontent.com");
+    expect(body.GOOGLE_CLIENT_ID).toEqual({
+      primary: "824.apps.googleusercontent.com",
+      preview: "824.apps.googleusercontent.com",
+    });
   });
 
   test("reads and deletes one variable by name", async () => {
@@ -1173,7 +1532,7 @@ describe("api-mock idp connections and variables", () => {
 
     const read = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`);
     expect(read.status).toBe(200);
-    expect(await read.json()).toBe(900);
+    expect(await read.json()).toEqual({ primary: 900, preview: 900 });
 
     const removed = await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`, {
       method: "DELETE",
@@ -1182,7 +1541,7 @@ describe("api-mock idp connections and variables", () => {
     expect((await fetch(`${BASE}/variables/SESSION_TTL?project_id=${projectId}`)).status).toBe(404);
   });
 
-  test("answers var.not_found for a name this owner does not hold", async () => {
+  test("answers var.not_found for a name the project does not hold", async () => {
     const projectId = await newProject("vars-missing");
 
     const res = await fetch(`${BASE}/variables/ABSENT?project_id=${projectId}`);
@@ -1220,7 +1579,7 @@ describe("api-mock idp connections and variables", () => {
       await fetch(`${BASE}/variables?project_id=${projectId}`)
     ).json()) as Record<string, unknown>;
 
-    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ secret: true });
+    expect(body.GOOGLE_CLIENT_SECRET).toEqual({ primary: { secret: true } });
     expect(JSON.stringify(body)).not.toContain("GOCSPX-real");
   });
 
@@ -1238,7 +1597,7 @@ describe("api-mock idp connections and variables", () => {
     await patch({ DROP: null });
 
     const body = (await (await fetch(url)).json()) as Record<string, unknown>;
-    expect(body.KEEP).toBe("a");
+    expect(body.KEEP).toEqual({ primary: "a", preview: "a" });
     expect(body).not.toHaveProperty("DROP");
   });
 
@@ -1360,30 +1719,65 @@ describe("api-mock idp and variable contract details", () => {
     expect(res.status).toBe(400);
   });
 
-  test("keeps an environment's variables separate from the project's", async () => {
-    // The project level does not see into its environments and an environment
-    // does not inherit the project's: they are distinct owners.
-    const projectId = await newProject("vars-owners");
-    const write = (query: string, payload: object) =>
-      fetch(`${BASE}/variables?${query}`, {
+  test("keeps each kind's value separate", async () => {
+    // Nothing falls back between kinds: a preview value is its own, and a
+    // removal naming a kind leaves the other kind's value.
+    const projectId = await newProject("vars-kinds");
+    const url = (kind?: string) =>
+      `${BASE}/variables?project_id=${projectId}${kind === undefined ? "" : `&kind=${kind}`}`;
+    const write = (kind: string | undefined, payload: object) =>
+      fetch(url(kind), {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload),
       });
-    await write(`project_id=${projectId}`, { SHARED: { value: "project", secret: false } });
-    await write(`project_id=${projectId}&environment_name=production`, {
-      SHARED: { value: "prod", secret: false },
+    await write(undefined, { SHARED: "prod" });
+    await write("preview", { SHARED: "test" });
+
+    expect(await (await fetch(url())).json()).toEqual({
+      SHARED: { primary: "prod", preview: "test" },
+    });
+    expect(await (await fetch(url("primary"))).json()).toEqual({ SHARED: { primary: "prod" } });
+
+    const removed = await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`, {
+      method: "DELETE",
+    });
+    expect(removed.status).toBe(204);
+    expect(
+      (await fetch(`${BASE}/variables/SHARED?project_id=${projectId}&kind=preview`)).status,
+    ).toBe(404);
+    expect(await (await fetch(url())).json()).toEqual({ SHARED: { primary: "prod" } });
+  });
+
+  test("writes a secret naming no kind for primary only, removing the preview value", async () => {
+    const projectId = await newProject("vars-secret-kind");
+    const url = `${BASE}/variables?project_id=${projectId}`;
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: "plain", HOST: "example.com" }),
+    });
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ TOKEN: { value: "s3cr3t", secret: true } }),
     });
 
-    const atProject = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}`)
-    ).json()) as Record<string, unknown>;
-    const atEnv = (await (
-      await fetch(`${BASE}/variables?project_id=${projectId}&environment_name=production`)
-    ).json()) as Record<string, unknown>;
+    expect(await (await fetch(url)).json()).toEqual({
+      TOKEN: { primary: { secret: true } },
+      HOST: { primary: "example.com", preview: "example.com" },
+    });
+  });
 
-    expect(atProject.SHARED).toBe("project");
-    expect(atEnv.SHARED).toBe("prod");
+  test("answers not_implemented for a deployment's variables", async () => {
+    const projectId = await newProject("vars-deployment");
+
+    const res = await fetch(
+      `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
+    );
+
+    expect(res.status).toBe(501);
+    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1400,6 +1794,547 @@ describe("api-mock idp and variable contract details", () => {
     const second = await write({ SECOND: { value: "b", secret: false } });
 
     const body = (await second.json()) as Record<string, unknown>;
-    expect(body).toEqual({ FIRST: "a", SECOND: "b" });
+    expect(body).toEqual({
+      FIRST: { primary: "a", preview: "a" },
+      SECOND: { primary: "b", preview: "b" },
+    });
+  });
+});
+describe("api-mock releases and deployments", () => {
+  async function newProject(name: string): Promise<{ id: string; secret: string }> {
+    const res = await fetch(`${BASE}/projects`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const body = (await res.json()) as { id: string; project_secret: string };
+    return { id: body.id, secret: body.project_secret };
+  }
+
+  const addPrimary = (id: string, secret: string, pattern: string) =>
+    fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ pattern, kind: "primary" }),
+    });
+
+  const rel1 = { pointers: [{ kind: "schema", revision_id: "sch_a" }] };
+  const rel2 = { pointers: [{ kind: "schema", revision_id: "sch_b" }] };
+
+  const createRelease = (id: string, secret: string, body: object) =>
+    fetch(`${BASE}/releases?project_id=${id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify(body),
+    });
+
+  const createDeployment = (id: string, secret: string, body: object) =>
+    fetch(`${BASE}/deployments?project_id=${id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify(body),
+    });
+
+  test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
+    const project = await newProject("release-build-idps");
+    const connection = (secret: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer: "https://accounts.google.com",
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: secret,
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const first = await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ A }}")] },
+    });
+
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(expect.objectContaining({ kind: "idp", handle: "google" }));
+
+    // The connection is the project's now, created by the build rather than by
+    // a separate write before it.
+    const listed = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(listed.idps.map((idp) => idp.slug)).toEqual(["google"]);
+
+    // A changed document revises the same connection, so the slug keeps
+    // pointing at it rather than a second one appearing.
+    await build({
+      bundle: { schemas: [], flow_definitions: [], idps: [connection("${{ B }}")] },
+    });
+    const again = (await (
+      await fetch(`${BASE}/idps/query?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { idps: { slug: string }[] };
+    expect(again.idps).toHaveLength(1);
+  });
+
+  test("refuses a build that would change a connection's fixed field", async () => {
+    const project = await newProject("release-build-idp-immutable");
+    const connection = (issuer: string) => ({
+      slug: "google",
+      protocol: "oidc",
+      template: "google",
+      display_name: "Google",
+      oidc: {
+        issuer,
+        client_id: "111.apps.googleusercontent.com",
+        client_secret: "${{ GOOGLE_CLIENT_SECRET }}",
+        scopes: ["openid"],
+      },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://accounts.google.com")],
+      },
+    });
+
+    const res = await build({
+      bundle: {
+        schemas: [],
+        flow_definitions: [],
+        idps: [connection("https://login.microsoftonline.com")],
+      },
+    });
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
+    const project = await newProject("release-build-policies");
+    const policy = (min_length: number) => ({
+      operation: "auth.factor.password.set",
+      config: { min_length },
+    });
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+    const listed = async () =>
+      (
+        (await (
+          await fetch(`${BASE}/policies?project_id=${project.id}`, {
+            headers: { authorization: `Bearer ${project.secret}` },
+          })
+        ).json()) as { policies: { id: string; revision_id: string; config: object }[] }
+      ).policies;
+
+    const first = await build({ bundle: { policies: [policy(12)] } });
+    expect(first.status).toBe(201);
+    const pointers = ((await first.json()) as { pointers: { kind: string; handle: string }[] })
+      .pointers;
+    expect(pointers).toContainEqual(
+      expect.objectContaining({ kind: "policy", handle: "auth.factor.password.set" }),
+    );
+    const [published] = await listed();
+    expect(published?.config).toEqual({ min_length: 12 });
+
+    await build({ bundle: { policies: [policy(14)] } });
+    const [revised] = await listed();
+    expect(revised?.id).toBe(published?.id);
+    expect(revised?.revision_id).not.toBe(published?.revision_id);
+    expect(revised?.config).toEqual({ min_length: 14 });
+
+    // Going back adds a revision, as the service does, so the earlier config
+    // applies again and the build is a new release rather than the first one.
+    const back = await build({ bundle: { policies: [policy(12)] } });
+    expect(back.status).toBe(201);
+    const [again] = await listed();
+    expect(again?.config).toEqual({ min_length: 12 });
+    expect(again?.revision_id).not.toBe(published?.revision_id);
+  });
+
+  test("refuses a bundle whose policy breaks its template's rule, or carries one twice", async () => {
+    const project = await newProject("release-build-policy-invalid");
+    const build = (body: object) =>
+      fetch(`${BASE}/releases/build?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(body),
+      });
+
+    const contradicting = await build({
+      bundle: {
+        policies: [
+          { operation: "auth.factor.password.set", config: { min_length: 20, max_length: 10 } },
+        ],
+      },
+    });
+    expect(contradicting.status).toBe(400);
+    const refused = (await contradicting.json()) as {
+      code: string;
+      details: { resources: { kind: string; code: string }[] };
+    };
+    expect(refused.code).toBe("rel.invalid");
+    expect(refused.details.resources).toEqual([
+      expect.objectContaining({ kind: "policy", code: "pol.invalid" }),
+    ]);
+
+    const once = { operation: "auth.factor.password.set", config: {} };
+    const twice = await build({ bundle: { policies: [once, once] } });
+    expect(twice.status).toBe(400);
+    expect(
+      ((await twice.json()) as { details: { resources: unknown[] } }).details.resources,
+    ).toHaveLength(2);
+  });
+
+  test("creates a release and dedupes a resubmission on content", async () => {
+    const project = await newProject("release-create");
+
+    const first = await createRelease(project.id, project.secret, { ...rel1, message: "one" });
+    expect(first.status).toBe(201);
+    const created = (await first.json()) as { id: string; content_hash: string; revoked_at: null };
+    expect(created.content_hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(created.revoked_at).toBeNull();
+
+    const again = await createRelease(project.id, project.secret, { ...rel1, message: "two" });
+    expect(again.status).toBe(200);
+    expect(((await again.json()) as { id: string }).id).toBe(created.id);
+  });
+
+  test("filters the release list by content hash", async () => {
+    const project = await newProject("release-filter");
+    const created = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      content_hash: string;
+    };
+
+    const match = await fetch(
+      `${BASE}/releases?project_id=${project.id}&content_hash=${encodeURIComponent(created.content_hash)}`,
+    );
+    expect(((await match.json()) as { releases: unknown[] }).releases).toHaveLength(1);
+
+    const miss = await fetch(
+      `${BASE}/releases?project_id=${project.id}&content_hash=sha256:${"0".repeat(64)}`,
+    );
+    expect(((await miss.json()) as { releases: unknown[] }).releases).toHaveLength(0);
+  });
+
+  test("deploys a release to every primary origin and is idempotent", async () => {
+    const project = await newProject("deploy-primary");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const first = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(first.status).toBe(201);
+    const deployment = (await first.json()) as {
+      targets: { origin: string }[];
+      release_id: string;
+    };
+    expect(deployment.targets).toEqual([{ origin: "https://app.acme.com" }]);
+
+    const again = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(again.status).toBe(200);
+  });
+
+  test("rejects primary with no primary origin, and an unknown origin", async () => {
+    const project = await newProject("deploy-no-primary");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const noPrimary = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+    });
+    expect(noPrimary.status).toBe(400);
+    expect(((await noPrimary.json()) as { code: string }).code).toBe("dep.invalid");
+
+    const unknown = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://not-allowed.example.com"],
+    });
+    expect(unknown.status).toBe(403);
+    expect(((await unknown.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+  });
+
+  test("carries the deployment kind, and turns a replaced one inactive", async () => {
+    const project = await newProject("deploy-kind-status");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+
+    const live = await createDeployment(project.id, project.secret, {
+      release_id: first.id,
+      targets: ["primary"],
+    });
+    expect(await live.json()).toMatchObject({ kind: "primary", status: "live" });
+
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const history = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { deployments: { release_id: string; status: string }[] };
+    expect(history.deployments.find((entry) => entry.release_id === first.id)?.status).toBe(
+      "inactive",
+    );
+  });
+
+  test("refuses a primary origin named one by one", async () => {
+    const project = await newProject("deploy-exact-primary");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const res = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com"],
+    });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      code: "dep.invalid",
+      message: "deployment: deploy primary origins with the primary keyword",
+    });
+  });
+
+  test("refuses a rollback whose expected deployment is no longer the newest", async () => {
+    const project = await newProject("deploy-rollback-guard");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ expected_deployment_id: firstDeploy.id }),
+      },
+    );
+
+    expect(rollback.status).toBe(409);
+    expect(((await rollback.json()) as { code: string }).code).toBe("dep.conflict");
+  });
+
+  test("deploys by digest the release of this project, not another's with the same digest", async () => {
+    const first = await newProject("deploy-digest-a");
+    const second = await newProject("deploy-digest-b");
+    await addPrimary(second.id, second.secret, "https://app.acme.com");
+    await createRelease(first.id, first.secret, rel1);
+    const own = (await (await createRelease(second.id, second.secret, rel1)).json()) as {
+      content_hash: string;
+    };
+
+    const deployed = await createDeployment(second.id, second.secret, {
+      content_hash: own.content_hash,
+      targets: ["primary"],
+    });
+
+    expect(deployed.status).toBe(201);
+  });
+
+  test("writes a new preview deployment for a release the URL already serves", async () => {
+    const project = await newProject("deploy-preview-renewal");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    await createDeployment(project.id, project.secret, body);
+
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+
+    expect(renewed.status).toBe(201);
+  });
+
+  test("gives a preview deployment without a ttl the project's default expiry", async () => {
+    const project = await newProject("deploy-preview-default-ttl");
+    await fetch(`${BASE}/projects/${project.id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://*-acme.vercel.app", kind: "preview" }),
+    });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["https://x-acme.vercel.app"],
+      })
+    ).json()) as { targets: { expires_at: string | null }[] };
+
+    expect(deployed.targets[0]?.expires_at).not.toBeNull();
+  });
+
+  test("refuses a rollback to an origin that is no longer primary with 403", async () => {
+    const project = await newProject("deploy-rollback-removed");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPrimary(project.id, project.secret, "https://www.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    await fetch(`${BASE}/projects/${project.id}/origins/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ pattern: "https://www.acme.com" }),
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${deployment.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ message: "revert" }),
+      },
+    );
+
+    expect(rollback.status).toBe(403);
+    expect(((await rollback.json()) as { code: string }).code).toBe("proj.origin_not_allowed");
+  });
+
+  test("rolls back to an earlier deployment, reversing the live release", async () => {
+    const project = await newProject("deploy-rollback");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const first = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const firstDeploy = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: first.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+
+    const second = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: second.id,
+      targets: ["primary"],
+    });
+
+    const rollback = await fetch(
+      `${BASE}/deployments/${firstDeploy.id}/rollback?project_id=${project.id}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ message: "revert" }),
+      },
+    );
+    expect(rollback.status).toBe(201);
+    const rolled = (await rollback.json()) as {
+      release_id: string;
+      metadata: { reason: string; rollback_to: string };
+    };
+    expect(rolled.release_id).toBe(first.id);
+    expect(rolled.metadata.reason).toBe("rollback");
+    expect(rolled.metadata.rollback_to).toBe(firstDeploy.id);
+
+    const live = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+    ).json()) as { deployments: { release_id: string }[] };
+    expect(live.deployments).toHaveLength(1);
+    expect(live.deployments[0]?.release_id).toBe(first.id);
+  });
+
+  test("refuses to revoke a release an origin still serves, then allows it", async () => {
+    const project = await newProject("release-revoke");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const served = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: served.id,
+      targets: ["primary"],
+    });
+
+    const inUse = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+    expect(inUse.status).toBe(409);
+    expect(((await inUse.json()) as { code: string }).code).toBe("rel.in_use");
+
+    const next = (await (await createRelease(project.id, project.secret, rel2)).json()) as {
+      id: string;
+    };
+    await createDeployment(project.id, project.secret, {
+      release_id: next.id,
+      targets: ["primary"],
+    });
+
+    const ok = await fetch(`${BASE}/releases/${served.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { revoked_at: string }).revoked_at).not.toBeNull();
   });
 });

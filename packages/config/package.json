@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -43,6 +43,11 @@
       "types": "./dist/schemas.d.mts",
       "import": "./dist/schemas.mjs"
     },
+    "./server": {
+      "@zitadel/source": "./src/server.ts",
+      "types": "./dist/server.d.mts",
+      "import": "./dist/server.mjs"
+    },
     "./branding-url": {
       "@zitadel/source": "./src/branding-url.ts",
       "types": "./dist/branding-url.d.mts",
@@ -64,7 +69,7 @@
       "import": "./dist/normalize.mjs"
     },
     "./validate": {
-      "@zitadel/source": "./src/validate.ts",
+      "@zitadel/source": "./src/validation/index.ts",
       "types": "./dist/validate.d.mts",
       "import": "./dist/validate.mjs"
     },
@@ -88,15 +93,16 @@
   },
   "scripts": {
     "sync-schemas": "node ../../scripts/task-guard.mjs --mutex generated-sources -- node scripts/sync-meta-schemas.mjs",
-    "prebuild": "pnpm run sync-schemas",
-    "build": "tsdown",
-    "pretypecheck": "pnpm run sync-schemas",
+    "prebuild": "node --run sync-schemas",
+    "build": "tsdown && attw --pack . --profile=esm-only",
+    "pretypecheck": "node --run sync-schemas",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
-    "pretest": "pnpm run sync-schemas",
+    "pretest": "node --run sync-schemas",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "dependencies": {
     "@zitadel/api": "workspace:*",

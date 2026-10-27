@@ -50,6 +50,13 @@ func gitRef() string {
 
 var notIdentifierChar = regexp.MustCompile(`[^a-z0-9_]+`)
 
+// previewSchemaEpoch is mixed into the preview database name hash. Bump it
+// when sticky preview databases cannot remigrate (goose out-of-order or a
+// renumber that left columns applied under a reused version) so the next
+// deploy gets a fresh empty database. The orphaned name is left for later
+// cleanup.
+const previewSchemaEpoch = "3"
+
 // previewDatabaseName is the database of a preview: one per Git branch, so a
 // branch keeps its data across pushes and from before its pull request
 // exists. Postgres names hold 63 bytes; the readable part is cut short and a
@@ -62,7 +69,7 @@ func previewDatabaseName(ref string) (string, error) {
 	if len(slug) > 40 {
 		slug = strings.TrimRight(slug[:40], "_")
 	}
-	sum := sha256.Sum256([]byte(ref))
+	sum := sha256.Sum256([]byte(previewSchemaEpoch + "\n" + ref))
 	hash := hex.EncodeToString(sum[:4])
 	if slug == "" {
 		return "preview_" + hash, nil
@@ -91,10 +98,10 @@ func parsePostgresURL(dsn string) (*url.URL, error) {
 }
 
 // checkServedThroughPooler fails a build whose serving URL reaches the same
-// endpoint as its migrator URL, which is the direct port: Vercel starts an
-// instance per concurrent request from cold, every instance holds its own
-// connections, and without the pooler a burst exhausts the cluster's
-// connection slots within seconds. Instances that find none fail to start.
+// endpoint as its migrator URL, which is the direct port: a burst starts new
+// instances, every instance holds its own connections, and without the
+// pooler a burst exhausts the cluster's connection slots within seconds.
+// Instances that find none fail to start.
 func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 	serving, err := url.Parse(servingDSN)
 	if err != nil || servingDSN == "" {
@@ -113,6 +120,9 @@ func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 
 // ensureDatabase is ensurePreviewDatabase; tests replace it.
 var ensureDatabase = ensurePreviewDatabase
+
+// dropDatabase is dropPreviewDatabase; tests replace it.
+var dropDatabase = dropPreviewDatabase
 
 // ensurePreviewDatabase creates the preview's database unless it exists and
 // stamps it with the branch and the time of this deployment, so a cleanup can
@@ -167,6 +177,56 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 		fmt.Fprintf(os.Stderr, "launcher: could not stamp preview database %s: %v\n", name, err)
 	}
 	return nil
+}
+
+// dropPreviewDatabase drops a preview database so the next ensurePreviewDatabase
+// call recreates it empty. Used when goose refuses to migrate because the
+// sticky preview still carries an older version set (for example after a
+// migration was renumbered on the branch). Production never calls this.
+//
+// Preview databases are often owned by adminRole (createDatabase elevates when
+// the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
+// connecting role, then once as adminRole on insufficient_privilege.
+func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	config, err := pgx.ParseConfig(baseDSN)
+	if err != nil {
+		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
+	}
+	for key := range config.RuntimeParams {
+		if strings.HasPrefix(key, "pool_") {
+			delete(config.RuntimeParams, key)
+		}
+	}
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		return fmt.Errorf("connect to the preview cluster: %w", err)
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+
+	identifier := pgx.Identifier{name}.Sanitize()
+	if err := dropDatabaseAsConnectingOrAdmin(ctx, conn, identifier); err != nil {
+		return fmt.Errorf("drop preview database %s: %w", name, err)
+	}
+	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s to remigrate from an empty schema\n", name)
+	return nil
+}
+
+func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identifier string) error {
+	drop := "DROP DATABASE IF EXISTS " + identifier + " WITH (FORCE)"
+	// Prefer adminRole first: createDatabase often owns the DB as postgres.
+	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
+		_, err := conn.Exec(ctx, drop)
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
+		if err == nil {
+			return nil
+		}
+		// Fall through and try as the connecting role.
+	}
+	_, err := conn.Exec(ctx, drop)
+	return err
 }
 
 // adminRole is PlanetScale's default role. A dashboard role that inherits it

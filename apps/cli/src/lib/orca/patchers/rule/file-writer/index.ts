@@ -1,7 +1,8 @@
-import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 import { ZitadelError } from "../../../../errors";
+import { enforceMode, envLine } from "../../../../fs-safe";
 import { isObject, parseJsonObject, setTopLevelJsonKey, stableStringify } from "../../../../json";
 import type { PatchedFile } from "../../types";
 import type { FileOp, ScaffoldPlan, ScaffoldResult } from "./types";
@@ -96,7 +97,13 @@ async function applyOp(
       await appendText(abs(opts.cwd, op.path), op.contents, op.ifMissing, opts.dryRun, result);
       break;
     case "merge-env":
-      await mergeEnv(abs(opts.cwd, op.path), op.entries, op.comment ?? [], opts.dryRun, result);
+      await mergeEnv(
+        abs(opts.cwd, op.path),
+        op.entries,
+        { comment: op.comment ?? [], mode: op.mode, overwrite: op.overwrite === true },
+        opts.dryRun,
+        result,
+      );
       break;
     case "merge-json":
       await mergeJson(abs(opts.cwd, op.path), op.patch, opts.dryRun, result);
@@ -165,7 +172,7 @@ async function editFile(
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, next);
   if (mode !== undefined) {
-    await chmod(tmp, mode).catch(() => undefined);
+    await enforceMode(tmp, mode);
   }
   await rename(tmp, path);
   record(result, path, "file", action);
@@ -202,7 +209,7 @@ async function ensureDir(
   }
   await mkdir(path, { recursive: true, mode });
   if (mode) {
-    await chmod(path, mode).catch(() => undefined);
+    await enforceMode(path, mode);
   }
   if (!existed) {
     record(result, path, "dir", "create");
@@ -242,7 +249,7 @@ async function writeText(
   const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
   await writeFile(tmp, contents, { mode: opts.mode });
   if (opts.mode) {
-    await chmod(tmp, opts.mode).catch(() => undefined);
+    await enforceMode(tmp, opts.mode);
   }
   await rename(tmp, path);
   record(result, path, "file", action);
@@ -281,20 +288,55 @@ async function appendText(
 async function mergeEnv(
   path: string,
   entries: Readonly<Record<string, string>>,
-  comment: ReadonlyArray<string>,
+  {
+    comment,
+    mode,
+    overwrite,
+  }: { comment: ReadonlyArray<string>; mode?: number; overwrite: boolean },
   dryRun: boolean,
   result: ScaffoldAccumulator,
 ): Promise<void> {
   const raw = await readIfExists(path);
-  const existing = raw ?? "";
+  const keyOf = (line: string) => line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/)?.[1];
+  // With `overwrite`, a line holding one of the entries is rewritten in place
+  // with this run's value; otherwise the file's own value stands.
+  const replaced = overwrite
+    ? (raw ?? "")
+        .split("\n")
+        .map((line) => {
+          const key = keyOf(line);
+          return key !== undefined && key in entries ? envLine(key, entries[key] as string) : line;
+        })
+        .join("\n")
+    : raw;
+  const existing = replaced ?? "";
   const present = new Set(
     existing
       .split(/\r?\n/g)
-      .map((line) => line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)=/)?.[1])
+      .map(keyOf)
       .filter((value): value is string => Boolean(value)),
   );
   const additions = Object.entries(entries).filter(([key]) => !present.has(key));
+  if (additions.length === 0 && replaced !== raw) {
+    if (!dryRun) {
+      await writeFile(path, existing, { mode });
+      if (mode !== undefined) {
+        await enforceMode(path, mode);
+      }
+    }
+    record(result, path, "file", "update");
+    return;
+  }
   if (additions.length === 0) {
+    // Nothing to add, but a secret-bearing target (`mode` set) must still have
+    // its permissions re-asserted: `writeFile`'s mode applied only when the
+    // file was first created and is masked by the umask, so a setup or
+    // `doctor --fix` rerun would otherwise leave an existing `.env.*.local` at
+    // whatever loose mode it drifted to. Matches how `env add` and
+    // `writeZitadelSecret` chmod unconditionally.
+    if (mode !== undefined && raw !== undefined && !dryRun) {
+      await enforceMode(path, mode);
+    }
     result.filesSkipped.push(path);
     return;
   }
@@ -303,7 +345,7 @@ async function mergeEnv(
   const [firstCommentLine] = commentLines;
   const header =
     firstCommentLine !== undefined && !existing.includes(firstCommentLine) ? commentLines : [];
-  const block = [...header, ...additions.map(([key, value]) => `${key}=${value}`)].join("\n");
+  const block = [...header, ...additions.map(([key, value]) => envLine(key, value))].join("\n");
   const next = `${existing}${existing && !existing.endsWith("\n") ? "\n" : ""}${block}\n`;
   const action = raw === undefined ? "create" : "update";
   if (dryRun) {
@@ -311,7 +353,13 @@ async function mergeEnv(
     return;
   }
   await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, next);
+  await writeFile(path, next, { mode });
+  // `writeFile`'s mode is honoured only when it creates the file and is masked
+  // by the umask, so re-assert it when rewriting an existing secret-bearing
+  // target too (see the no-additions path above).
+  if (mode !== undefined) {
+    await enforceMode(path, mode);
+  }
   record(result, path, "file", action);
 }
 
@@ -376,7 +424,24 @@ async function addDependency(
   const current = parseJsonObject(existing, path);
   const key = op.dev ? "devDependencies" : "dependencies";
   const deps = isObject(current[key]) ? (current[key] as Record<string, unknown>) : {};
-  if (deps[op.name] === op.version) {
+  // A package the app needs at runtime stays in `dependencies`: a dev add never
+  // demotes it, because that would break `--omit=dev` installs.
+  if (
+    op.dev &&
+    isObject(current.dependencies) &&
+    Object.hasOwn(current.dependencies as Record<string, unknown>, op.name)
+  ) {
+    result.filesSkipped.push(path);
+    return;
+  }
+  // Only devDependencies -> dependencies moves. peerDependencies and
+  // optionalDependencies entries are the developer's and are left alone.
+  const other =
+    !op.dev && isObject(current.devDependencies)
+      ? (current.devDependencies as Record<string, unknown>)
+      : undefined;
+  const listedInOther = other !== undefined && Object.hasOwn(other, op.name);
+  if (deps[op.name] === op.version && !listedInOther) {
     result.filesSkipped.push(path);
     return;
   }
@@ -384,12 +449,24 @@ async function addDependency(
   // the document. Every byte outside it — key order, blank lines, inline
   // objects, line endings — stays untouched; the touched map itself is
   // name-sorted, matching what a package manager writes.
-  const contents = setTopLevelJsonKey(
+  let contents = setTopLevelJsonKey(
     existing,
     path,
     key,
     sortByKey({ ...deps, [op.name]: op.version }),
   );
+  // A package listed in both sections is never intended, and some toolchains
+  // refuse it outright (Qwik's starter vite.config.ts throws on start). Move a
+  // devDependencies entry the developer already has into dependencies instead
+  // of duplicating it.
+  if (listedInOther) {
+    contents = setTopLevelJsonKey(
+      contents,
+      path,
+      "devDependencies",
+      Object.fromEntries(Object.entries(other).filter(([name]) => name !== op.name)),
+    );
+  }
   if (dryRun) {
     record(result, path, "file", "update");
     result.depsAdded.push(op.name);

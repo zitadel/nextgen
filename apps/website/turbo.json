@@ -1,20 +1,29 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
-  // The coming-soon page at the hosted cloud's root (Next.js). Mirrors
-  // apps/website/moon.yml; it has no tests yet.
+  // The hosted cloud's front page at / (Next.js). Mirrors
+  // apps/website/moon.yml; `test` is the root's.
   "tasks": {
-    // Moon keeps typecheck and build apart with a mutex: `next typegen`
-    // writes .next/types, which `next build` wipes and rewrites, so side by
-    // side one fails on the other's files. Turbo orders them instead.
+    // Typecheck waits for the build, as in moon.yml: `next typegen` and
+    // `next build` both write .next/types, where tsc reads the route types,
+    // and `next build` empties it and fills it again. A task-guard mutex
+    // would leave a gap: a cache hit restores .next without running the
+    // script.
     "typecheck": {
       "dependsOn": ["build"]
     },
+    // The showcase's login previews (app/showcase/login-preview.tsx) import
+    // the atoms of @zitadel/components, which Next resolves to the package's
+    // dist/.
     "build": {
+      "dependsOn": ["@zitadel/components#build"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "start": {
       "dependsOn": ["build"]
+    },
+    "dev": {
+      "dependsOn": ["@zitadel/components#build"]
     }
   }
 }

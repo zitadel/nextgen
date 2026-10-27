@@ -84,6 +84,9 @@ test-output
 
 ## Framework build outputs (Next.js / Nuxt / SvelteKit)
 .next/
+# Next.js rewrites it on every `next dev`, `next build` and `next typegen`,
+# and dev points it at other route types (apps/AGENTS.md)
+next-env.d.ts
 .nuxt/
 .nuxt-typecheck/
 .output/
@@ -108,9 +111,6 @@ nextgen-data/
 !/internal/staticui/console/dist/
 /internal/staticui/console/dist/*
 !/internal/staticui/console/dist/.gitkeep
-!/internal/staticui/login/dist/
-/internal/staticui/login/dist/*
-!/internal/staticui/login/dist/.gitkeep
 apps/demo-next/tsconfig.tsbuildinfo
 packages/api-mock/tsconfig.tsbuildinfo
 
@@ -123,3 +123,7 @@ tsconfig.tsbuildinfo
 
 # Turborepo (pilot, see turbo.json)
 .turbo
+
+# Vercel CLI: what `vercel dev` (scripts/run-cloud.mjs) keeps, its Go builds
+# and its lock, and a `vercel link`
+.vercel

@@ -3,13 +3,13 @@
   "extends": ["//"],
   "tasks": {
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["build", "@zitadel/api-mock#build"]
     },
     "build": {
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-vue#build-release"]
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
     },
     // api-mock serves the Flow API to the specs (test-setup.ts).
     "test": {

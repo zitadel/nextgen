@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
 	"time"
 
 	"github.com/zitadel/nextgen/internal/authz/compiler"
@@ -26,13 +27,16 @@ type ManagedIDGenerator interface {
 type AllStatements interface {
 	ManagedIDGenerator
 	ProjectStatements
+	OriginStatements
 	FlowDefinitionStatements
 	CryptoKeyStatements
 	JSONSchemaStatements
 	ReleaseStatements
 	IDPConnectionStatements
+	PolicyStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
+	PreviewStatements
 	TeamStatements
 	TeamMembershipStatements
 	TokenStatements
@@ -45,6 +49,7 @@ type AllStatements interface {
 	UserRecoveryCodesStatements
 	BrandingStatements
 	VariableStatements
+	VariableSetStatements
 	ClaimStatements
 	ResourceScopeStatements
 	AuthzAssignmentStatements
@@ -65,6 +70,9 @@ type ProjectStatements interface {
 	Statements
 	CreateProject(ctx context.Context, entity *domain.Project) error
 	GetProjectByID(ctx context.Context, id string) (*domain.Project, error)
+	// GetProject is GetProjectByID reading what opts asks for besides the
+	// project's own row, in the same round trip.
+	GetProject(ctx context.Context, id string, opts ProjectQueryOptions) (*domain.Project, error)
 	UpdateProject(ctx context.Context, entity *domain.Project) error
 	// SetProjectPasswordHashPolicy writes the hashing method the project's
 	// passwords are written with. A nil policy clears the choice, which returns
@@ -74,6 +82,25 @@ type ProjectStatements interface {
 	ListProjects(ctx context.Context, filter *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 	// DeleteProjectByID removes the project. changed is false when no row matched.
 	DeleteProjectByID(ctx context.Context, id string) (changed bool, err error)
+}
+
+// OriginStatements persists project origin patterns under the natural key
+// (project_id, pattern). There is no minted origin id.
+type OriginStatements interface {
+	Statements
+	// GetOrigin returns one origin matching filter, or a
+	// [database.NoRowFoundError] when none matches.
+	GetOrigin(ctx context.Context, filter database.Filter[domain.OriginField]) (*domain.Origin, error)
+	// ListOrigins returns origins matching filter. Default order is
+	// created_at, then pattern, then project_id when OrderBy is empty.
+	ListOrigins(ctx context.Context, filter *database.ListOptions[domain.OriginField]) (*database.ListResult[*domain.Origin], error)
+	// InsertOrigin stores one origin. inserted is false when the same
+	// (project_id, pattern) already exists (caller decides kind conflict vs
+	// idempotent add).
+	InsertOrigin(ctx context.Context, projectID string, origin domain.Origin) (inserted bool, err error)
+	// DeleteOriginByPattern removes one pattern. deleted is false when none
+	// matched. When deleted, removed carries the row that was deleted.
+	DeleteOriginByPattern(ctx context.Context, projectID, pattern string) (deleted bool, removed *domain.Origin, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -113,6 +140,14 @@ type CryptoKeyStatements interface {
 // 	Transactioner[JSONSchemaStatements]
 // }
 
+// ProjectQueryOptions selects what a project read loads besides the project's
+// own row.
+type ProjectQueryOptions struct {
+	// OwningTeam reads the team that owns the project (ADR 054 §2) into
+	// Project.OwningTeamID.
+	OwningTeam bool
+}
+
 // JSONSchemaQueryOptions carries query modes for ListJSONSchemas that are not
 // column predicates. Column predicates stay in Filter / ListOptions.
 type JSONSchemaQueryOptions struct {
@@ -149,6 +184,47 @@ type ReleaseStatements interface {
 	// absent from the result, not an error.
 	GetReleasesByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Release, error)
 	ListReleases(ctx context.Context, filter *database.ListOptions[domain.ReleaseField]) (*database.ListResult[*domain.Release], error)
+	// RevokeRelease stamps revoked_at once; revoking again returns the first
+	// stamp.
+	RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error)
+}
+
+// PolicyStatements persists operation policies and their revisions (ADR 066,
+// ADR 063): a policy per operation per project, and an immutable revision per
+// publish.
+type PolicyStatements interface {
+	Statements
+	// CreatePolicy writes the policy, its first revision and the
+	// resource-scope row in one transaction, and sets the ids and timestamps
+	// on entity. An operation that already has a policy in the project
+	// returns *database.UniqueError.
+	CreatePolicy(ctx context.Context, entity *domain.Policy) error
+	// RevisePolicy appends a revision holding entity.Config and sets
+	// RevisionID and UpdatedAt on entity. An unknown policy returns
+	// *database.NoRowFoundError; a second revision of one policy in the same
+	// instant returns *database.UniqueError.
+	RevisePolicy(ctx context.Context, entity *domain.Policy) error
+	// LockPolicy takes the policy row's write lock for the rest of the
+	// transaction, so concurrent revisions of one policy serialize. It must be
+	// called inside a transaction. An unknown id returns
+	// *database.NoRowFoundError.
+	LockPolicy(ctx context.Context, projectID, id string) error
+	// GetPolicy returns the one policy filter selects at its newest revision
+	// (policystore.ByOperation, policystore.ByID), or
+	// *database.NoRowFoundError.
+	GetPolicy(ctx context.Context, filter database.Filter[domain.PolicyField]) (*domain.Policy, error)
+	// GetPolicyRevision returns the policy at the given revision, newest or
+	// not, or *database.NoRowFoundError. It stays apart from GetPolicy, which
+	// only ever reads newest revisions: a pinned revision must reach a
+	// superseded one.
+	GetPolicyRevision(ctx context.Context, projectID, revisionID string) (*domain.Policy, error)
+	// ListPolicies returns each policy the options select at its newest
+	// revision, first published first unless the options order otherwise.
+	ListPolicies(ctx context.Context, opts *database.ListOptions[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
+	// ListPolicyRevisions pages one policy's revisions, superseded ones
+	// included, newest first unless the page orders otherwise. An unknown
+	// policy lists nothing.
+	ListPolicyRevisions(ctx context.Context, projectID, policyID string, page database.Page[domain.PolicyField]) (*database.ListResult[*domain.Policy], error)
 }
 
 // IDPConnectionStatements persists identity provider connections and their
@@ -204,6 +280,10 @@ type IDPIdentityLinkStatements interface {
 	// GetIDPIdentityLink returns the link matching filter. No match returns
 	// *database.NoRowFoundError.
 	GetIDPIdentityLink(ctx context.Context, filter database.Filter[domain.IDPIdentityLinkField]) (*domain.IDPIdentityLink, error)
+	// ListIDPIdentityLinks pages the links matching filter. No match returns an
+	// empty page, so a caller needs UserExists to tell an unknown user from a
+	// user with no links.
+	ListIDPIdentityLinks(ctx context.Context, filter *database.ListOptions[domain.IDPIdentityLinkField]) (*database.ListResult[*domain.IDPIdentityLink], error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -214,23 +294,42 @@ type IDPIdentityLinkStatements interface {
 
 type DeploymentStatements interface {
 	Statements
-	// CreateDeployment inserts the deployment and points the environment's
-	// current_deployment_id at it, atomically. A non-nil
-	// expectedCurrentDeploymentID makes the swap conditional: when the
-	// environment's current deployment is not exactly that one, nothing is
-	// written and domain.ErrDeploymentConflict reports what actually runs.
-	// An environment that does not exist is a NoRowFoundError.
-	//
-	// Idempotent on the running release: when the environment's current
-	// deployment already points at entity's release, nothing is written,
-	// entity is overwritten with that existing record, and created is false.
-	CreateDeployment(ctx context.Context, entity *domain.Deployment, expectedCurrentDeploymentID *string) (created bool, err error)
+	// GetNewestPerOrigin returns, for each of origins that has one, the newest
+	// deployment to it.
+	GetNewestPerOrigin(ctx context.Context, projectID string, origins []string) ([]domain.OriginDeployment, error)
+	// CreateDeployment writes the deployment with every origin, under an
+	// optimistic lock: read is what GetNewestPerOrigin returned for its origins,
+	// and when another deploy wrote to one of them since, nothing is written
+	// and it fails with a UniqueError. The caller re-reads and retries.
+	CreateDeployment(ctx context.Context, entity *domain.Deployment, read []domain.OriginDeployment) error
 	GetDeploymentByID(ctx context.Context, projectID, id string) (*domain.Deployment, error)
-	// GetDeploymentsByIDs reads the named deployments in one round trip, for
-	// hydrating current_deployment on environment reads. Unknown ids are
-	// simply absent from the result, not an error.
+	// GetDeploymentsByIDs skips unknown ids.
 	GetDeploymentsByIDs(ctx context.Context, projectID string, ids []string) ([]*domain.Deployment, error)
+	// ListDeployments lists deployments with every origin they named.
 	ListDeployments(ctx context.Context, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// ListLiveDeployments lists, with deployment.LiveListOptions, the
+	// deployments some origin serves at now, each narrowed to those origins.
+	ListLiveDeployments(ctx context.Context, now time.Time, filter *database.ListOptions[domain.DeploymentField]) (*database.ListResult[*domain.Deployment], error)
+	// GetLiveDeployment is the deployment origin serves at now, narrowed to the
+	// origins it still serves; a NoRowFoundError when it serves nothing,
+	// including after its preview expired.
+	GetLiveDeployment(ctx context.Context, projectID, origin string, now time.Time) (*domain.Deployment, error)
+}
+
+type PreviewStatements interface {
+	Statements
+	// UpsertPreviews creates the previews of origins or renews their expiry,
+	// keeping created_at.
+	UpsertPreviews(ctx context.Context, projectID string, origins []string, expiresAt, createdAt time.Time) error
+	GetPreview(ctx context.Context, projectID, origin string) (*domain.Preview, error)
+	// ListPreviews takes preview.LiveListOptions or preview.ExpiredListOptions.
+	ListPreviews(ctx context.Context, filter *database.ListOptions[domain.PreviewField]) (*database.ListResult[*domain.Preview], error)
+	// DeleteLivePreview deletes only if the preview is still live at now, so
+	// an expired one is left for the sweep. Idempotent.
+	DeleteLivePreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
+	// DeleteExpiredPreview deletes only if the preview expired by now, so a
+	// racing renewal survives the sweep.
+	DeleteExpiredPreview(ctx context.Context, projectID, origin string, now time.Time) (deleted bool, err error)
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods
@@ -377,6 +476,15 @@ type AuthAttemptStatements interface {
 	MarkSSOCallbackCollision(ctx context.Context, projectID, authAttemptID, checkID, userID string) error
 }
 
+// UniqueAttributeClaim is a value of a unique attribute as the
+// unique-attributes registry stores it: under a team scope ("" for
+// project-wide), by key and value hash.
+type UniqueAttributeClaim struct {
+	TeamID    string
+	Key       domain.AttributeKey
+	ValueHash [sha256.Size]byte
+}
+
 // UserQueryOptions carries EAV match/hydrate options for GetUser / ListUsers.
 // Column predicates stay in Filter / ListOptions.
 type UserQueryOptions struct {
@@ -436,6 +544,10 @@ type UserStatements interface {
 	// attribute key, so a patch keeps the scope an existing claim was created
 	// under. An unknown user reads as an empty map, not an error.
 	GetUserUniqueAttributeScopes(ctx context.Context, projectID, userID string) (map[domain.AttributeKey]string, error)
+	// GetTakenUniqueAttributeKeys returns the keys of the claims whose value a
+	// user other than userID holds in the unique-attributes registry, in no
+	// particular order.
+	GetTakenUniqueAttributeKeys(ctx context.Context, projectID, userID string, claims []UniqueAttributeClaim) ([]domain.AttributeKey, error)
 	GetUser(ctx context.Context, filter database.Filter[domain.UserField], opts UserQueryOptions) (*domain.User, error)
 	ListUsers(ctx context.Context, filter *database.ListOptions[domain.UserField], opts UserQueryOptions) (*database.ListResult[*domain.User], error)
 	DeactivateUser(ctx context.Context, projectID, userID string) error
@@ -451,6 +563,11 @@ type UserStatements interface {
 
 type UserPasswordStatements interface {
 	Statements
+	// SetUserPassword adds pw as the user's current password and sets pw.ID
+	// when it is empty; the password it replaces becomes history. Concurrent
+	// sets of one user all succeed and take effect one after the other, so
+	// the one that lands last is current. An unknown user returns
+	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
@@ -517,26 +634,63 @@ type BrandingStatements interface {
 
 type VariableStatements interface {
 	Statements
-	// GetVariables returns the variables owner entered, for the given names (all
-	// names when none are given), ordered by name. Every owner column is matched
-	// exactly, so a name owner has not entered is absent even when another owner
-	// of the same project holds it -- nothing is inherited. This is the only
-	// place the owner predicate is enforced, so a caller never sees a variable
-	// entered elsewhere.
+	// GetVariables returns the variables owner entered for kind, for the given
+	// names (all names when none are given), ordered by name. The owner column
+	// and the kind are matched exactly, so a name owner has not entered for
+	// that kind is absent even when another owner of the same project holds
+	// it, or the same owner holds it for the other kind -- nothing is
+	// inherited and nothing falls back from primary to preview. This is the
+	// only place the owner predicate is enforced, so a caller never sees a
+	// variable entered elsewhere.
 	//
-	// The primary key is the name plus the owner, so at most one variable comes
-	// back per name and the caller has nothing to choose between.
-	GetVariables(ctx context.Context, owner domain.VariableOwner, names ...string) ([]*domain.Variable, error)
-	// SetVariable writes variable under its own name and owner, replacing the
-	// value and IsSecret flag of an existing variable with the same name and
-	// owner. A project that is missing or names no existing project is
+	// The primary key is the name plus the owner and kind, so at most one
+	// variable comes back per name and the caller has nothing to choose
+	// between.
+	GetVariables(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, names ...string) ([]*domain.Variable, error)
+	// SetVariable writes variable under its own name, owner and kind,
+	// replacing the value and IsSecret flag of an existing variable with the
+	// same name, owner and kind. A value that applies to both kinds is two
+	// calls. A project that is missing or names no existing project is
 	// rejected by the table.
 	SetVariable(ctx context.Context, variable *domain.Variable) error
-	// DeleteVariable removes the variable owner entered under name. Removing one
-	// that is not there returns NoRowFoundError; it never deletes a variable
-	// with a different owner, since the owner column must match exactly, so
-	// one owner cannot remove what another entered.
-	DeleteVariable(ctx context.Context, owner domain.VariableOwner, name string) error
+	// DeleteVariable removes the variable owner entered under name for kind.
+	// Removing one that is not there returns NoRowFoundError; it never
+	// deletes a variable with a different owner or kind, since both must
+	// match exactly, so one owner cannot remove what another entered and
+	// removing the primary value leaves the preview one.
+	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error
+}
+
+// VariableSetStatements freezes the variables a deployment is created with
+// and reads them back (ADR 069). A set is content-addressed: identical values
+// in one project are stored once, however many deployments use them.
+type VariableSetStatements interface {
+	Statements
+	// FreezeDeploymentVariables copies the variables of projectID for the
+	// deployment's origin kind into an immutable set and links deploymentID
+	// to it, in one transaction. The kind is the deployment's own, read from
+	// its row inside that transaction, never a caller's choice. It reads the
+	// rows of that kind only: a preview deployment freezes the preview values
+	// and nothing else, so a name entered for primary alone is absent from
+	// it, and a value that applies to both kinds is in both freezes because
+	// it was entered twice. A project with no variables freezes the empty
+	// set, which is stored and linked like any other.
+	//
+	// The set is inserted only when its hash is new to the project, so a
+	// deployment whose values did not change writes no set row and shares
+	// the one that exists. The link is one row per deployment: freezing the
+	// same deployment twice returns UniqueError, and a deployment that does
+	// not exist in projectID -- including one of another project -- returns
+	// NoRowFoundError, since there is no row to read the kind from.
+	//
+	// Secrets are copied as the ciphertext stored, never decrypted. The set
+	// returned is what a later GetDeploymentVariables reads back.
+	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
+	// GetDeploymentVariables returns the set deploymentID was frozen with,
+	// as it was then, whatever the project's variables have become since. A
+	// deployment that was never frozen -- or does not exist, or belongs to
+	// another project -- returns NoRowFoundError.
+	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
 
 type ClaimStatements interface {
@@ -596,12 +750,25 @@ type AuthzAssignmentStatements interface {
 	CreateAuthzAssignment(ctx context.Context, assignment *domain.AuthzAssignment) error
 	GetAuthzAssignment(ctx context.Context, projectID, id string) (*domain.AuthzAssignment, error)
 	ListAuthzAssignments(ctx context.Context, projectID string, principalType domain.AuthzPrincipalType, principalID string, includeRevoked bool) ([]*domain.AuthzAssignment, error)
+	// ListActiveAuthzAssignmentsByRelation lists the unrevoked assignments on
+	// objectType.relation in the project, whoever holds them, ordered by
+	// creation. Expiry is not consulted. The platform.operators reconcile
+	// reads the operators it granted with it (ADR 075 §4).
+	ListActiveAuthzAssignmentsByRelation(ctx context.Context, projectID, objectType, relation string) ([]*domain.AuthzAssignment, error)
 	// ListManagedGrants lists unrevoked collaboration grants (user/team
 	// viewer|editor|admin) with cursor pagination. Setup and owning-team
 	// rows are excluded in SQL. projectID is required and always ANDed
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// ListProjectAdmins returns a page of the people, by user id, who
+	// administer the project: as active members of the owning team, as active
+	// members of a team with an unexpired admin grant, or as existing users
+	// with an unexpired admin grant. Only people viewerUserID may see are
+	// listed: those with a grant of their own, or members of one of the
+	// project's admin teams that viewerUserID is also an active member of.
+	// Each carries every way they administer the project.
+	ListProjectAdmins(ctx context.Context, projectID, viewerUserID string, page database.Page[domain.ProjectAdminField]) (*database.ListResult[*domain.ProjectAdminRecord], error)
 	// GetActiveOwningTeamGrant returns the project's active owning-team grant
 	// (object project, relation team) or NoRowFoundError when the project is
 	// unclaimed. The unique active grant is the claim source of truth
@@ -629,9 +796,11 @@ type AuthzAssignmentStatements interface {
 	//     the tupleset team, so nothing names the user on the project at all.
 	//
 	// Every route is evaluated on the active system catalog, mirroring
-	// CheckAuthz. page.OrderBy carries the sort columns; a cursor issued for a
-	// different OrderBy is rejected.
-	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
+	// CheckAuthz. opts.Filter narrows the set (a name search) and is ANDed
+	// with that predicate in the same statement, so paging walks only the
+	// matches (ADR 053 §6). opts.Pagination.OrderBy carries the sort columns;
+	// a cursor issued for a different OrderBy is rejected.
+	ListAuthorizedProjects(ctx context.Context, homeProjectID, userID string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error)
 }
 
 // AuthzMembershipEdgeStatements persists the authz projection of set membership.
@@ -692,13 +861,22 @@ type AuthzCatalogStatements interface {
 //     homeProjectID) or a local membership edge in project. Empty homeProjectID
 //     falls back to projectID.
 //   - CheckAuthz: allowed + foothold in one round-trip (assignments, closure, membership, TTU).
+//     It answers from the protected project's grants only; params.PlatformProjectID is ignored.
+//     With a ResourceID the foothold covers that target only (an assignment scoped
+//     project-wide, to ResourceTeamID or to ResourceID, a membership in the target
+//     team or the target's team, or the user's own record; #2112); without one it
+//     is HasAuthzProjectFoothold.
+//   - CheckPlatformOperator: the deployment-wide operator path (ADR 075 §3), which the
+//     resolver asks when CheckAuthz did not allow.
 //   - ListAuthzObjectIDs: L4/oracle helper materializing authorized RSI ids for one kind.
 //     List *endpoints* compose an injectable SQL predicate (ADR 033); that lands with HTTP wiring.
+//     Both include the operator path when params.PlatformOperatorEligible().
 type AuthzResolverStatements interface {
 	Statements
 	ActiveSystemCatalogID(ctx context.Context) (string, error)
 	HasAuthzProjectFoothold(ctx context.Context, projectID, homeProjectID string, principalType domain.AuthzPrincipalType, principalID string) (bool, error)
 	CheckAuthz(ctx context.Context, params domain.AuthzCheckParams) (allowed bool, foothold bool, err error)
+	CheckPlatformOperator(ctx context.Context, params domain.AuthzPlatformCheckParams) (bool, error)
 	ListAuthzObjectIDs(ctx context.Context, params domain.AuthzListObjectsParams) ([]string, error)
 }
 

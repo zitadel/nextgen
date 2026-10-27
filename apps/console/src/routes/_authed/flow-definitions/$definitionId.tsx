@@ -5,7 +5,7 @@ import { api } from "@/api/zitadel";
 import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
 import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
-import { DETAIL_PANEL_PAGE } from "@/components/layout";
+import { Page } from "@/components/layout";
 import { EYEBROW, PANEL_BODY_CELL, PANEL_HEAD_CELL } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +29,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")({
-  staticData: { scope: "project" },
+  staticData: { scope: "project", resource: "login flow" },
   loaderDeps: projectScopeDeps,
   loader: async ({ params, deps }) => {
     const entry = await api.getFlowDefinition(params.definitionId);
@@ -39,30 +39,30 @@ export const Route = createFileRoute("/_authed/flow-definitions/$definitionId")(
       definition,
       createdAt: entry.created_at,
       // No `expand` on this endpoint, so the badge costs a second call.
-      schemaName: await resolveSchemaName(
-        definition.user_schema,
-        requireProjectScope(deps.project),
-      ),
-      schemaId: definition.user_schema,
+      ...(await resolveSchema(definition.user_schema, requireProjectScope(deps.project))),
     };
   },
   component: FlowDefinitionDetail,
 });
 
-/**
- * Schema ids are unique per project only, so the lookup names the project the
- * flow belongs to — otherwise an ambiguous id resolves in the caller's own.
- */
-async function resolveSchemaName(
-  id: string | undefined,
+/** The newest revision of the schema the flow names by `objectType`. */
+async function resolveSchema(
+  objectType: string | undefined,
   projectId: string,
-): Promise<string | undefined> {
-  if (!id) return undefined;
+): Promise<{ schemaName?: string; schemaId?: string }> {
+  if (!objectType) return {};
   try {
-    const body = await api.getSchemaById(id, { project_id: projectId });
-    return schemaDisplayName(body.schema, id);
+    const page = await api.listSchemas({
+      project_id: projectId,
+      object_type: objectType,
+      revisions: "latest",
+      limit: 1,
+    });
+    const latest = page.schemas[0];
+    if (!latest) return {};
+    return { schemaName: schemaDisplayName(latest.schema, objectType), schemaId: latest.id };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -73,7 +73,7 @@ function FlowDefinitionDetail() {
   const steps = definition.steps ?? [];
 
   return (
-    <div className={DETAIL_PANEL_PAGE}>
+    <Page inset="panel">
       <DetailPanel>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           {/* Stacks below `sm` so a long schema name cannot squeeze the title. */}
@@ -90,7 +90,7 @@ function FlowDefinitionDetail() {
           </div>
 
           {/* The design draws a third value, `EXPIRES AT`; nothing backs it. */}
-          <MetaCard>
+          <MetaCard bordered={false}>
             <MetaValue label="Flow ID" value={definitionId} copyable />
             <MetaRule />
             <MetaValue label="Created" value={formatDate(createdAt)} />
@@ -128,7 +128,7 @@ function FlowDefinitionDetail() {
 
         <DocumentViewer document={definition} noun="definition" />
       </DetailPanel>
-    </div>
+    </Page>
   );
 }
 

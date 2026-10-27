@@ -11,8 +11,9 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      # server.edge.spec.ts imports the built dist/server.mjs.
+      - "~:build"
       - "api-mock:build"
-      - "design-tokens:build"
 
   build:
     deps:
@@ -55,7 +56,7 @@ tasks:
   # Full lane (the CI gate): `test:all` runs the jsdom `unit` project and the
   # real-Chromium `browser` project in one Vitest process, so both land in one
   # aggregated junit.xml. moon invokes `test:all` uniformly across every
-  # package. The fast unit-only lane is `pnpm test` for local iteration;
+  # package. The fast unit-only lane is `pnpm test:unit` for local iteration;
   # `pnpm test:browser` runs the browser project alone. The browser project
   # has a 60-120s Chromium cold start, which this lane pays in CI by design.
   test:
@@ -66,13 +67,8 @@ tasks:
       # guards the built artifact, so the dev build must run first.
       - "build"
     options:
-      # Serialize the real-Chromium browser suites across projects. Each boots
-      # its own Chromium + Vite dev server; running several at once under moon's
-      # parallel CI graph starves the servers and drops in-flight module fetches
-      # ("Failed to fetch dynamically imported module"). A mutex shared by every
-      # browser-mode `test` task lets only one run at a time. (#1490)
-      mutex: "browser-tests"
-      # Retry a failed browser suite in CI. The flake is a cold-start race:
-      # the first attempt warms the Vite dep cache, so a retry runs warm and
-      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      # Retry a failed browser suite in CI, as a safety net. It was added for
+      # "Failed to fetch dynamically imported module": Chromium aborting module
+      # imports when a container changes the host's addresses, which ci.yml's
+      # "Keep Docker's interface churn away from Chromium" step prevents. (#1490)
       retryCount: 3

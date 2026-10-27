@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,12 +10,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
-	"github.com/zitadel/nextgen/internal/staticui/login"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
 )
 
-// The mux's routing table is a cross-surface contract: the embedded SPAs are
+// The mux's routing table is a cross-surface contract: the embedded console is
 // built against the paths it mounts, and nothing in a TypeScript build fails
 // when they disagree. The console shipped calling `/api/*` — a path this mux
 // has never served — because that disagreement had no test on either side.
@@ -36,12 +37,11 @@ func apiEcho() http.Handler {
 }
 
 // requireEmbeddedUI fails rather than skips: `server:test` depends on
-// console:build and login-ui:build, so a missing dist means the tree was
-// built wrong, not that this case is inapplicable.
+// console:build, so a missing dist means the tree was built wrong, not that
+// this case is inapplicable.
 func requireEmbeddedUI(t *testing.T) {
 	t.Helper()
 	require.NoError(t, console.ValidateDist(), "run `moon run console:build`")
-	require.NoError(t, login.ValidateDist(), "run `moon run login-ui:build`")
 }
 
 func idpCallbackEcho() http.Handler {
@@ -60,12 +60,10 @@ func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
 	return mux
 }
 
-func uiConfig(consoleEnabled, loginEnabled bool) ServerConfig {
+func uiConfig(consoleEnabled bool) ServerConfig {
 	return ServerConfig{
 		ConsoleEnabled: consoleEnabled,
 		ConsolePath:    "/ui/console",
-		LoginEnabled:   loginEnabled,
-		LoginPath:      "/ui/login",
 	}
 }
 
@@ -76,17 +74,18 @@ func get(t *testing.T, mux *http.ServeMux, path string) *httptest.ResponseRecord
 	return rec
 }
 
-func TestBuildHTTPMuxServesBothUISurfacesAndTheAPIAtRoot(t *testing.T) {
+func TestBuildHTTPMuxServesTheConsoleAndTheAPIAtRoot(t *testing.T) {
 	requireEmbeddedUI(t)
-	mux := newTestMux(t, uiConfig(true, true))
+	mux := newTestMux(t, uiConfig(true))
 
-	for _, path := range []string{"/ui/console/", "/ui/login/"} {
-		rec := get(t, mux, path)
-		assert.Equal(t, http.StatusOK, rec.Code, "%s should be served by its static handler", path)
-		assert.Empty(t, rec.Header().Get("X-Test-Handler"), "%s must not reach the API handler", path)
-	}
+	rec := get(t, mux, "/ui/console/")
+	assert.Equal(t, http.StatusOK, rec.Code, "the console should be served by its static handler")
+	assert.Empty(t, rec.Header().Get("X-Test-Handler"), "the console must not reach the API handler")
 
-	rec := get(t, mux, consoleRuntimePath)
+	// The server serves no login page of its own: the customer's app does.
+	assert.Equal(t, "api", get(t, mux, "/ui/login/").Header().Get("X-Test-Handler"))
+
+	rec = get(t, mux, consoleRuntimePath)
 	require.Equal(t, http.StatusOK, rec.Code)
 	assert.JSONEq(t, `{"mode":"standalone","console_project_id":"proj_first"}`, rec.Body.String())
 }
@@ -97,7 +96,7 @@ func TestBuildHTTPMuxServesBothUISurfacesAndTheAPIAtRoot(t *testing.T) {
 // shipped build. Restoring an `/api` shim would break this case, deliberately.
 func TestBuildHTTPMuxDoesNotMountTheAPIUnderAPIPrefix(t *testing.T) {
 	requireEmbeddedUI(t)
-	mux := newTestMux(t, uiConfig(true, true))
+	mux := newTestMux(t, uiConfig(true))
 
 	for path, want := range map[string]string{
 		"/flow":            "/flow",
@@ -111,14 +110,15 @@ func TestBuildHTTPMuxDoesNotMountTheAPIUnderAPIPrefix(t *testing.T) {
 	}
 }
 
-// The IdP callback is an exact mount ahead of the API catch-all: the provider
-// redirects the browser to it, so it must exist whatever UI surfaces are on.
-// Both spellings are served — the prefixed path when the instance is the
-// browser origin, the stripped one as a scaffolded app's SDK proxy forwards it.
+// The IdP callback is mounted per connection ahead of the API catch-all: the
+// provider redirects the browser to it, so it must exist whatever UI surfaces
+// are on. Both spellings are served: the prefixed path when the instance is
+// the browser origin, the stripped one as a scaffolded app's SDK proxy
+// forwards it.
 func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
-	mux := newTestMux(t, uiConfig(false, false))
+	mux := newTestMux(t, uiConfig(false))
 
-	for _, path := range []string{api.IDPCallbackPath, api.IDPCallbackUpstreamPath} {
+	for _, path := range []string{api.IDPCallbackPath("google"), api.IDPCallbackUpstreamPath("google")} {
 		rec := get(t, mux, path+"?state=s&code=c")
 		assert.Equal(t, "idp-callback", rec.Header().Get("X-Test-Handler"), path)
 		// A longer path is not the callback and stays with the API namespace.
@@ -126,12 +126,49 @@ func TestBuildHTTPMuxMountsTheIDPCallback(t *testing.T) {
 	}
 }
 
-// The runtime document is not console-only: the hosted login shell resolves
-// the project it signs into from the same two fields, so a console-disabled
-// deployment must still serve it.
-func TestBuildHTTPMuxServesRuntimeDocumentForTheLoginSurfaceAlone(t *testing.T) {
-	requireEmbeddedUI(t)
-	mux := newTestMux(t, uiConfig(false, true))
+// The shared callback that preceded the per-connection routes is not mounted:
+// a callback that names no connection is the shape the mix-up attack relies on
+// (RFC 9700 §4.4). It falls through to the API, which does not process it.
+func TestBuildHTTPMuxServesNoSharedIDPCallback(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false))
+
+	for _, path := range []string{"/__nextgen/idp/callback", "/idp/callback"} {
+		assert.Equal(t, "api", get(t, mux, path+"?state=s&code=c").Header().Get("X-Test-Handler"), path)
+	}
+}
+
+// slugRecorder is the callback's service half, recording what the handler
+// read from the request.
+type slugRecorder struct{ in service.FlowSSOCallbackInput }
+
+func (s *slugRecorder) Process(_ context.Context, in service.FlowSSOCallbackInput) (service.FlowSSOCallbackOutput, error) {
+	s.in = in
+	return service.FlowSSOCallbackOutput{ReturnTarget: "https://app.example.com/login"}, nil
+}
+
+// The real handler behind the production chain: a middleware that rebuilt the
+// request would drop the path wildcard, and every callback would then fail the
+// connection check.
+func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
+	for _, path := range []string{api.IDPCallbackPath("google"), api.IDPCallbackUpstreamPath("google")} {
+		recorder := &slugRecorder{}
+		mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), apiEcho(), api.NewIDPCallbackHandler(recorder),
+			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
+			nil)
+		require.NoError(t, err)
+
+		rec := get(t, mux, path+"?state=s&code=c")
+		require.Equal(t, http.StatusSeeOther, rec.Code, path)
+		assert.Equal(t, "google", recorder.in.ConnectionSlug, path)
+	}
+}
+
+// A console served elsewhere still discovers its project from this server:
+// the hosted cloud runs the console as a service of its own, and the console's
+// dev server proxies the document. So a deployment with its own console off
+// must still serve it.
+func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
+	mux := newTestMux(t, uiConfig(false))
 
 	rec := get(t, mux, consoleRuntimePath)
 	require.Equal(t, http.StatusOK, rec.Code)
@@ -142,24 +179,13 @@ func TestBuildHTTPMuxServesRuntimeDocumentForTheLoginSurfaceAlone(t *testing.T) 
 	assert.Equal(t, "api", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
 }
 
-// With neither surface enabled there is nothing to bootstrap, so the path
-// carries no special meaning and belongs to the API's namespace like any
-// other. (`console-e2e:e2e-real` runs in exactly this configuration.)
-func TestBuildHTTPMuxOmitsRuntimeDocumentWhenNoUISurfaceIsEnabled(t *testing.T) {
-	mux := newTestMux(t, uiConfig(false, false))
-
-	rec := get(t, mux, consoleRuntimePath)
-	assert.Equal(t, "api", rec.Header().Get("X-Test-Handler"))
-	assert.Equal(t, consoleRuntimePath, rec.Header().Get("X-Test-Path"))
-}
-
 // checkSessionCSRF refuses every cookie-authenticated request that did not pass
 // through api.WithCSRFRequest, so a mux without it would lock the Console out;
 // pinned here so a refactor of the chain cannot drop it unnoticed.
 func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 	t.Parallel()
 	recorded := false
-	mux, err := buildHTTPMux(uiConfig(false, false), idgen.NewULID(),
+	mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(),
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			recorded = api.CSRFRequestRecorded(r.Context())
 			w.WriteHeader(http.StatusTeapot)

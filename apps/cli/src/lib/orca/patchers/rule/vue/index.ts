@@ -1,11 +1,22 @@
-import { npmDistTagForCliVersion } from "../../../../public-cli";
+import { sdkVersionForCli } from "../../../../public-cli";
 import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
-import { type ViteSupport, buildViteProxyOp } from "../vite-support";
+import { PUBLIC_PROJECT_ID_VARIABLE } from "../public-project-id";
+import { assertMountsRootComponent, type RootMount, viteEntry } from "../root-component";
+import { type ViteSupport, buildViteProxyOp, buildViteSessionCookieOp } from "../vite-support";
 import { appTemplate } from "./templates";
 
 const SDK_DEPENDENCY = "@zitadel/sdk-vue";
+
+/** The managed root component, and how `main.ts` creates the app from it. */
+const ROOT: RootMount = {
+  path: "src/App.vue",
+  binding: { name: "App", named: false },
+  extension: true,
+  calls: ["createApp", "createSSRApp"],
+  mounts: "argument",
+};
 
 /**
  * Rule-based patcher for a Vite + Vue single-page app. Inherits the shared
@@ -20,30 +31,47 @@ export class VuePatcher extends AbstractRulePatcher implements ViteSupport {
     return framework === "vue";
   }
 
-  viteProxyOp(devPort: number, server: string): FileOp {
-    return buildViteProxyOp(devPort, server);
+  viteProxyOp(devPort: number, server: string, previousPort?: number): FileOp {
+    return buildViteProxyOp(devPort, server, previousPort);
+  }
+
+  viteSessionCookieOp(): FileOp {
+    return buildViteSessionCookieOp();
+  }
+
+  protected override async preflight(_ctx: PatchContext, cwd: string): Promise<void> {
+    await assertMountsRootComponent(cwd, await viteEntry(cwd), ROOT);
+  }
+
+  protected devPortOps(ctx: PatchContext, previousPort: number | undefined): FileOp[] {
+    return [this.viteProxyOp(ctx.framework.devPort, ctx.server, previousPort)];
   }
 
   protected routeOps(ctx: PatchContext): FileOp[] {
     return [
-      { kind: "write", path: "src/App.vue", contents: appTemplate(ctx) },
+      { kind: "write", path: ROOT.path, contents: appTemplate(ctx) },
       this.viteProxyOp(ctx.framework.devPort, ctx.server),
-      { kind: "merge-env", path: ".env.example", entries: { VITE_ZITADEL_PROJECT_ID: "" } },
+      this.viteSessionCookieOp(),
+      {
+        kind: "merge-env",
+        path: ".env.example",
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.vue]: "" },
+      },
       {
         kind: "merge-env",
         path: ".env.local",
-        entries: { VITE_ZITADEL_PROJECT_ID: ctx.project.id },
+        entries: { [PUBLIC_PROJECT_ID_VARIABLE.vue]: ctx.project.id },
       },
       {
         kind: "add-dep",
         name: SDK_DEPENDENCY,
-        version: npmDistTagForCliVersion(ctx.cliVersion),
+        version: sdkVersionForCli(ctx.cliVersion),
       },
     ];
   }
 
   protected routeFiles(_view: PatchView): ReadonlyArray<string> {
-    return ["src/App.vue"];
+    return [ROOT.path];
   }
 
   protected routeDeps(_view: PatchView): ReadonlyArray<string> {

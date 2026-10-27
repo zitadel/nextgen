@@ -17,13 +17,11 @@ import (
 
 // Step error text keys the state machine emits when an auth-attempt
 // proof is rejected. Every engine-emitted step error must be a
-// localizable `error.*` catalog key or a reserved outcome token:
-// /login localizes only `error.*`-prefixed step errors and treats
-// outcome tokens as routing, so anything else renders verbatim (see
+// localizable `error.*` catalog key: /login localizes only
+// `error.*`-prefixed step errors, so anything else renders verbatim (see
 // `localiseFlowErrorKeys` in
 // packages/components/src/orchestrator/liquid.ts). New emission sites
-// add a const here; [FlowStepErrorAllowed] and its contract test keep
-// the set honest.
+// add a const here; TestFlowStepErrorContract keeps the set honest.
 const (
 	// FlowStepErrorInvalidCredentials reports a rejected password
 	// proof. The client routes it inline to the password field
@@ -67,24 +65,69 @@ const (
 	FlowStepErrorSSOUserCannotBeCreated = "error.sso_user_cannot_be_created"
 	// FlowStepErrorUserAlreadyExists reports a unique value another user
 	// holds where the engine cannot bind that user, so it cannot route
-	// user_already_exists: a user of another schema.
+	// user_already_exists: a user of another schema. Also what an unwired
+	// user_already_exists outcome renders.
 	FlowStepErrorUserAlreadyExists = "error.user_already_exists"
+	// FlowStepErrorUserNotFound reports an unknown identifier on a step
+	// that does not wire user_not_found.
+	FlowStepErrorUserNotFound = "error.user_not_found"
+	// FlowStepErrorSSOUserNotFound reports a provider identity with no
+	// account on a step that does not wire sso_user_not_found.
+	FlowStepErrorSSOUserNotFound = "error.sso_user_not_found"
+	// FlowStepErrorOutcomeUnhandled reports an unwired outcome with no
+	// key of its own.
+	FlowStepErrorOutcomeUnhandled = "error.outcome_unhandled"
+	// FlowStepErrorSignInFirst reports a password submitted on a sign-in
+	// step that has no user to check it against, such as a conflict step
+	// reached without binding the colliding user. The password is
+	// discarded; the user has to sign in from the start. The key avoids the
+	// `error.<field>_<rule>` shape so it cannot read as a field's validation
+	// error.
+	FlowStepErrorSignInFirst = "error.sign_in_first"
 )
+
+// unwiredOutcomeErrors maps an implicit outcome the current step does not
+// route to the step error it renders instead.
+var unwiredOutcomeErrors = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      FlowStepErrorUserNotFound,
+	FlowImplicitOutcomeUserAlreadyExists: FlowStepErrorUserAlreadyExists,
+	FlowImplicitOutcomeSSOUserNotFound:   FlowStepErrorSSOUserNotFound,
+}
 
 // errSSOClaimRejected reports a verified unique claim that fails its own
 // property. The user may not change a verified value, and the account cannot
 // hold this one, so nothing is created and no step is shown to collect it.
 var errSSOClaimRejected = errors.New("flow state machine: the user schema rejects a verified unique claim")
 
-// FlowStepErrorAllowed reports whether a step error value honors the
-// client contract: a localizable `error.*` text key or a reserved
-// outcome token (reservedOutcomes in flow_definition_validator.go).
-func FlowStepErrorAllowed(key string) bool {
-	if strings.HasPrefix(key, "error.") {
-		return true
+// UnwiredOutcomeError returns the step error an unwired outcome renders.
+func UnwiredOutcomeError(outcome string) string {
+	if key, ok := unwiredOutcomeErrors[outcome]; ok {
+		return key
 	}
-	_, ok := reservedOutcomes[key]
-	return ok
+	return FlowStepErrorOutcomeUnhandled
+}
+
+// Step notice text keys: why the engine moved the flow to another purpose
+// without the user asking, carried on the step it lands on. Like step
+// errors, they are `notice.*` catalog keys the client localizes.
+const (
+	// FlowStepNoticeUserNotFound tells a user whose identifier has no
+	// account that the sign-in continues as a sign-up.
+	FlowStepNoticeUserNotFound = "notice.user_not_found"
+	// FlowStepNoticeUserAlreadyExists tells a user signing up with an
+	// identifier that has an account that the flow continues as a sign-in.
+	FlowStepNoticeUserAlreadyExists = "notice.user_already_exists"
+	// FlowStepNoticeSSOUserNotFound tells a user whose provider sign-in has
+	// no account that the sign-in continues as a sign-up.
+	FlowStepNoticeSSOUserNotFound = "notice.sso_user_not_found"
+)
+
+// purposeChangeNotices maps an implicit outcome that can move the flow to
+// another purpose to the notice the step it lands on carries.
+var purposeChangeNotices = map[string]string{
+	FlowImplicitOutcomeUserNotFound:      FlowStepNoticeUserNotFound,
+	FlowImplicitOutcomeUserAlreadyExists: FlowStepNoticeUserAlreadyExists,
+	FlowImplicitOutcomeSSOUserNotFound:   FlowStepNoticeSSOUserNotFound,
 }
 
 // FlowStateMachine drives a flow definition forward in response to
@@ -184,8 +227,15 @@ type FlowStepResult struct {
 // FlowStep is the capability payload the API surfaces to the client.
 // It mirrors the OpenAPI `flow-step` component in domain terms.
 type FlowStep struct {
-	Name         string
-	Texts        FlowStepTexts
+	Name  string
+	Texts FlowStepTexts
+	// Purpose is what the flow does on this step, the state's
+	// CurrentPurpose: a client tells a sign-in from a sign-up by it, since
+	// step names are the definition's to choose.
+	Purpose FlowDefinitionPurpose
+	// Notice is a `notice.*` key saying why an implicit outcome moved the
+	// flow to Purpose. Set only on the step that move renders.
+	Notice       *string
 	Error        *string
 	Complete     *FlowStepComplete
 	RedirectURL  *string
@@ -303,6 +353,7 @@ type FlowStateMachineRuntime struct {
 	ssoProviders  FlowSSOProviderResolver
 	ssoIdentities FlowSSOIdentityService
 	ssoRedirects  FlowSSORedirectIssuer
+	passwords     FlowPasswordPolicy
 	now           func() time.Time
 }
 
@@ -317,6 +368,7 @@ func NewFlowStateMachine(
 	ssoProviders FlowSSOProviderResolver,
 	ssoIdentities FlowSSOIdentityService,
 	ssoRedirects FlowSSORedirectIssuer,
+	passwords FlowPasswordPolicy,
 	now func() time.Time,
 ) *FlowStateMachineRuntime {
 	if now == nil {
@@ -331,6 +383,7 @@ func NewFlowStateMachine(
 		ssoProviders:  ssoProviders,
 		ssoIdentities: ssoIdentities,
 		ssoRedirects:  ssoRedirects,
+		passwords:     passwords,
 		now:           now,
 	}
 }
@@ -601,7 +654,8 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 	// schema consumes only the top-level properties it defines.
 	claims := ssoSchemaClaims(schema, parked.Claims)
 	probeClaims, uniqueClaims := ssoUniqueClaims(schema, claims)
-	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
+	identifier := newSchemaReader(schema).String(SchemaAnnotationIdentifier)
+	if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims, identifier); err != nil || bound {
 		return FlowImplicitOutcomeUserAlreadyExists, err
 	}
 	// Neither linked to nor colliding with the user the flow or its attempt
@@ -642,12 +696,12 @@ func (r *FlowStateMachineRuntime) provisionSSOIdentity(ctx context.Context, stat
 		// Another flow took a unique value since the probe (a request on this
 		// attempt loses on the parked row instead): whoever took a probed
 		// attribute is bound, and anything else falls back to collection.
-		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims); err != nil || bound {
+		if bound, err := r.bindSSOCollision(ctx, state, step, parked, probeClaims, claims, identifier); err != nil || bound {
 			return FlowImplicitOutcomeUserAlreadyExists, err
 		}
 		return FlowImplicitOutcomeSSOUserNotFound, nil
 	}
-	if errors.Is(err, ErrUserInvalid()) {
+	if IsUserInvalid(err) {
 		// A claim the user may edit fails the schema (too long, bad format):
 		// collect it so the user can fix it.
 		return FlowImplicitOutcomeSSOUserNotFound, nil
@@ -821,8 +875,9 @@ var errSSOUnroutable = errors.New("flow state machine: sso outcome cannot route 
 // that user, so a row another request replaced binds nothing
 // (ErrSSOStateInvalid) and a retry after a lost cookie catches up from the
 // marker. It returns errSSOUnroutable, before binding, when step cannot route
-// user_already_exists.
-func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any) (bool, error) {
+// user_already_exists. identifier is the property the schema designates as
+// the identifier, for [recordSSOConflict].
+func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *FlowState, step *FlowDefinitionStep, parked *FlowSSOParkedIdentity, probeClaims []string, values map[string]any, identifier string) (bool, error) {
 	for _, name := range probeClaims {
 		value, ok := maputil.GetNested[any](values, AttributeKey(name).Nodes())
 		if !ok || value == nil || value == "" {
@@ -858,9 +913,48 @@ func (r *FlowStateMachineRuntime) bindSSOCollision(ctx context.Context, state *F
 			return false, fmt.Errorf("flow state machine: bind sso collision: %w", err)
 		}
 		recordResolvedUser(state, owner)
+		recordSSOConflict(state, parked, values, identifier)
 		return true, nil
 	}
 	return false, nil
+}
+
+// recordSSOConflict notes what the steps after a collision show the bound
+// user: the connection whose sign-in collided, which they leave out, and the
+// account's identifier, which [pairedIdentifier] hands the step.
+//
+// The step names the account only by a value the visitor brought: one the
+// provider verified, so the visitor proved they hold it, or one they typed on
+// this flow. Either way the step adds nothing to what the conflict itself
+// confirms, that an account with this value exists
+// (docs/design/idp/3-social-login-flow.md, Enumeration Note). An identifier
+// claim the provider did not verify names nothing unless the visitor submitted
+// that same value on this flow, and a value typed earlier that is not the
+// colliding one is dropped, so the step never names another account.
+func recordSSOConflict(state *FlowState, parked *FlowSSOParkedIdentity, values map[string]any, identifier string) {
+	state.CollectedData.SSOConflictConnectionID = parked.ConnectionID
+	if identifier == "" {
+		return
+	}
+	path := AttributeKey(identifier).Nodes()
+	value, ok := maputil.GetNested[string](values, path)
+	if !ok || value == "" {
+		// The provider sent no identifier: what the visitor typed, if
+		// anything, stays, as after a typed collision.
+		return
+	}
+	claim, claimed := maputil.GetNested[string](parked.Claims, path)
+	switch {
+	case claimed && claim == value && parked.Verified[path[0]]:
+		_ = maputil.SetNested(state.CollectedData.UserData, path, value)
+	case claimed && claim == value:
+		// Unverified. An empty value reads as absent to every reader.
+		if typed, ok := collectedString(state.CollectedData.UserData, identifier); ok && typed != value {
+			_ = maputil.SetNested(state.CollectedData.UserData, path, "")
+		}
+	}
+	// Otherwise the value is the visitor's own typing on a collection step,
+	// already in UserData.
 }
 
 // ssoClaimsComplete reports whether the claims can create a user unattended:
@@ -1016,6 +1110,12 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 		return r.processSSO(pc)
 	}
 	actionKind := stepActionKind(currentStep, in.Action)
+	// Only an action the step declares can be submitted. The outcome names
+	// (user_not_found, sso_authenticated, ...) are routed by the engine
+	// alone; a client naming one would otherwise take that route.
+	if actionKind == FlowActionKindUnset {
+		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), in.Action, currentStep.Name)
+	}
 
 	// Back and Navigate both skip the input pipeline entirely.
 	if actionKind == FlowActionKindBack {
@@ -1049,7 +1149,7 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	// If a ceremony is pending and the user picked a different action,
 	// drop it so we don't re-emit the abandoned prompt.
 	if state.PendingChallenge != nil && in.ChallengeResponse == nil &&
-		!pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
+		!pendingMatchesKind(state.PendingChallenge.Method, actionKind) {
 		state.ClearPendingChallenge()
 	}
 
@@ -1059,8 +1159,6 @@ func (r *FlowStateMachineRuntime) Process(ctx context.Context, def *FlowDefiniti
 	case FlowActionKindPasskeyRegister:
 		return r.processPasskeyRegister(pc, resolved)
 	default:
-		// Submit and unset-kind actions both go here. An unknown
-		// user-supplied action lands here too and fails inside routeOutcome.
 		return r.processSubmit(pc, resolved)
 	}
 }
@@ -1110,6 +1208,7 @@ func (r *FlowStateMachineRuntime) processSSO(pc *processCtx) (FlowStepResult, er
 		Step: &FlowStep{
 			Name:        FlowStepNameSSORedirect,
 			Texts:       FlowStepTexts{TitleKey: flowSSORedirectTitleKey},
+			Purpose:     pc.state.CurrentPurpose,
 			RedirectURL: &out.RedirectURL,
 		},
 		SSOBindingNonce: out.BindingNonce,
@@ -1222,14 +1321,22 @@ func (r *FlowStateMachineRuntime) renderStepError(pc *processCtx, resolved FlowR
 // renders (or terminates on a terminal step). When outcome differs
 // from the user-submitted action it came from a handler diversion
 // (e.g. user_not_found); a missing transition in that case degrades
-// to a step error instead of ErrFlowInvalidAction. If irreversible,
-// BackStack is dropped after advance.
+// to the outcome's step error instead of ErrFlowInvalidAction. If
+// irreversible, BackStack is dropped after advance.
 func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowResolvedFields, outcome string, irreversible bool) (FlowStepResult, error) {
 	transition, ok := pc.currentStep.Transitions[outcome]
 	if !ok {
 		if outcome != pc.in.Action {
-			msg := outcome
-			return r.renderStepError(pc, resolved, &msg)
+			// The found user is already on the attempt. Keeping it would block
+			// a corrected identifier and let a passkey register on that user.
+			// The password stays: on sign-up it is the one chosen for the new
+			// account, and a later step may not collect it again.
+			if outcome == FlowImplicitOutcomeUserAlreadyExists {
+				if err := r.dropResolvedUser(pc, "unrouted collision"); err != nil {
+					return FlowStepResult{}, err
+				}
+			}
+			return r.renderStepError(pc, resolved, new(UnwiredOutcomeError(outcome)))
 		}
 		return FlowStepResult{}, fmt.Errorf("%w: %q on step %q", ErrFlowInvalidAction(), pc.in.Action, pc.currentStep.Name)
 	}
@@ -1259,6 +1366,7 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 		if err := r.dropResolvedUser(pc, "re-purpose"); err != nil {
 			return FlowStepResult{}, err
 		}
+		pc.state.CollectedData.AuthMethods.Password = ""
 		pc.state.CurrentPurpose = *transition.Purpose
 
 		// Purpose entries link to each other, forming a zero-input loop.
@@ -1295,20 +1403,19 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 	if err != nil {
 		return FlowStepResult{}, err
 	}
+	// The user asked to sign in or to sign up; an outcome that changed which
+	// one says why, or a typo silently becomes a new account. The notice is
+	// not kept in the state, so a later render of the step goes without it.
+	if notice, ok := purposeChangeNotices[outcome]; ok && pc.state.CurrentPurpose != prevPurpose {
+		step.Notice = &notice
+	}
 	return FlowStepResult{State: pc.state, Step: step}, nil
 }
 
 // dropResolvedUser abandons the identity this flow had settled on: the
-// resolved user, the credential material collected to authenticate them, and
-// any in-flight ceremony. When a user was resolved it rotates the auth
-// attempt in lockstep.
-//
-// The collected password goes because it belongs to the identity being
-// dropped, and [mergeCollected] banks it before the proof is ever checked —
-// so a rejected password outlives its attempt otherwise, and would be handed
-// to create_user for whoever the flow resolves next. Nothing prefills from
-// it (a password field always renders empty), so clearing it costs the user
-// nothing.
+// resolved user and any in-flight ceremony. When a user was resolved it
+// rotates the auth attempt in lockstep. The collected password is left to
+// the caller, since only some callers drop the identity it belongs to.
 //
 // The persisted attempt carries the resolved user as a factor, and
 // PrepareUserChallenge refuses a second user challenge on a session-linked
@@ -1322,7 +1429,6 @@ func (r *FlowStateMachineRuntime) routeOutcome(pc *processCtx, resolved FlowReso
 func (r *FlowStateMachineRuntime) dropResolvedUser(pc *processCtx, reason string) error {
 	hadResolvedUser := pc.state.CollectedData.UserID != ""
 	clearUserBoundState(pc.state)
-	pc.state.CollectedData.AuthMethods.Password = ""
 	if !hadResolvedUser {
 		return nil
 	}
@@ -1467,7 +1573,8 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 		}
 	}
 	probe, _ := ssoUniqueClaims(schema, attributes)
-	bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+	identifier := root.String(SchemaAnnotationIdentifier)
+	bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes, identifier)
 	if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 		return result, err
 	}
@@ -1506,35 +1613,36 @@ func (r *FlowStateMachineRuntime) processSSOCollection(pc *processCtx, resolved 
 	case errors.Is(err, ErrUserAlreadyExists()):
 		// Another flow took a unique value since the probe: whoever took it
 		// is bound.
-		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes)
+		bound, err := r.bindSSOCollision(pc.ctx, state, step, collected, probe, attributes, identifier)
 		if result, handled, err := r.ssoCollectionBindResult(pc, resolved, loadInput, bound, err); handled {
 			return result, err
 		}
 		return r.renderStepError(pc, resolved, new(FlowStepErrorUserAlreadyExists))
 	case errors.Is(err, ErrSSOStateInvalid()):
 		return r.resolveStaleSSOSubmit(pc, resolved, loadInput)
-	case errors.Is(err, ErrUserInvalid()):
+	case errors.Is(err, ErrUserPasswordPolicyViolation(nil)):
+		// The password the user chose breaks the policy: show it on the
+		// password field, as registration does, so they can pick another.
+		if derr, ok := errors.AsType[Error](err); ok {
+			if details, ok := derr.Details.(PasswordPolicyViolations); ok {
+				return r.renderStepError(pc, resolved, new(PasswordPolicyStepError(details.Violations)))
+			}
+		}
+		return FlowStepResult{}, fmt.Errorf("flow state machine: create sso user: %w", err)
+	case IsUserInvalid(err):
 		// RequiredPaths does not see a property that allOf or a reference
 		// requires. The schema library locates it by keyword, as in
 		// properties/account allOf/0 required/id. It reports a property a then
 		// requires the same way, without the condition, so that one is treated
 		// as required too. anyOf and oneOf report no location, so their
 		// failures stay sso_user_invalid.
-	failures:
 		for _, ve := range ValidationFailures(err) {
 			if ve.Loc == nil || len(*ve.Loc) == 0 || !strings.HasPrefix((*ve.Loc)[len(*ve.Loc)-1], "required/") {
 				continue
 			}
-			var path AttributeKey
-			for _, segment := range *ve.Loc {
-				keyword, name, _ := strings.Cut(segment, "/")
-				switch keyword {
-				case "properties", "required":
-					path = path.AppendNode(name)
-				case "allOf":
-				default:
-					continue failures
-				}
+			path, complete := ValidationErrAttributeKey(ve, attributes)
+			if !complete {
+				continue
 			}
 			if !slices.ContainsFunc(resolved.Fields, func(f FlowField) bool { return f.Name == string(path) }) {
 				return r.renderStepError(pc, resolved, new(FlowStepErrorSSOUserCannotBeCreated))
@@ -1742,6 +1850,7 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 				AttemptID:     state.AuthAttemptID,
 				AttributeName: name,
 				Value:         value,
+				UserSchemaURL: state.UserSchemaURL,
 			})
 			if errors.Is(err, ErrAuthAttemptProofRejected(nil)) {
 				if state.CurrentPurpose == FlowDefinitionPurposeRegister {
@@ -1767,6 +1876,15 @@ func (r *FlowStateMachineRuntime) dispatchChallenges(pc *processCtx, resolved Fl
 		case FlowFieldChallengePassword:
 			if state.CurrentPurpose != FlowDefinitionPurposeLogin {
 				continue
+			}
+			// A sign-in password is checked, not stored: [mergeCollected]
+			// has already banked it, so it is dropped here rather than
+			// carried into whatever the flow resolves next. The only
+			// on_success a login step can run is create_user, which would
+			// store it on a new account rather than the one it verified.
+			state.CollectedData.AuthMethods.Password = ""
+			if state.CollectedData.UserID == "" {
+				return flowDispatchResult{StepError: new(FlowStepErrorSignInFirst)}, nil
 			}
 			err := r.authAttempts.SubmitPassword(ctx, FlowSubmitPasswordInput{
 				ProjectID: state.ProjectID,
@@ -1848,7 +1966,7 @@ type passkeyPhaseResult struct {
 // processPasskey runs all two-phase WebAuthn ceremonies (authentication and
 // registration) for the current step:
 //   - resume/abandon leg: a challenge is pending and no proof has arrived. If
-//     the submission targets the same ceremony (or is action-less), re-emit
+//     the submission targets the same ceremony, re-emit
 //     the pending challenge. Otherwise the user picked a different action;
 //     drop the pending challenge and let normal routing run.
 //   - verify leg: a ChallengeResponse arrived → dispatch to the right service
@@ -1865,7 +1983,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 	switch {
 	// A ceremony is in flight but no proof arrived: resume or abandon.
 	case state.PendingChallenge != nil && in.ChallengeResponse == nil:
-		if !pendingMatchesKind(state.PendingChallenge.Method, in.Action, actionKind) {
+		if !pendingMatchesKind(state.PendingChallenge.Method, actionKind) {
 			state.ClearPendingChallenge()
 			return passkeyPhaseResult{}, nil
 		}
@@ -1935,6 +2053,7 @@ func (r *FlowStateMachineRuntime) processPasskey(pc *processCtx, resolved FlowRe
 						AttemptID:     state.AuthAttemptID,
 						AttributeName: candidate[0],
 						Value:         candidate[1],
+						UserSchemaURL: state.UserSchemaURL,
 					})
 					if rerr == nil {
 						recordResolvedUser(state, userID)
@@ -2097,13 +2216,9 @@ func passkeyRegistrationDisplay(resolved FlowResolvedFields, collected map[strin
 }
 
 // pendingMatchesKind reports whether a no-proof POST should resume the
-// pending ceremony (vs. abandon it). An empty submitted action covers
-// passive POSTs; otherwise the submitted action's kind must match the
-// pending ceremony's method.
-func pendingMatchesKind(pendingMethod, submittedAction string, submittedKind FlowActionKind) bool {
-	if submittedAction == "" {
-		return true
-	}
+// pending ceremony (vs. abandon it): the submitted action's kind must match
+// the pending ceremony's method.
+func pendingMatchesKind(pendingMethod string, submittedKind FlowActionKind) bool {
 	switch pendingMethod {
 	case FlowChallengeMethodPasskey:
 		return submittedKind == FlowActionKindPasskey
@@ -2197,6 +2312,12 @@ func (r *FlowStateMachineRuntime) processBack(pc *processCtx) (FlowStepResult, e
 		if err := r.dropResolvedUser(pc, "back to identification"); err != nil {
 			return FlowStepResult{}, err
 		}
+		// The password belongs to the identity being dropped, and
+		// [mergeCollected] banks it before the proof is ever checked, so a
+		// rejected password would otherwise reach create_user for whoever the
+		// flow resolves next. A password field always renders empty, so
+		// clearing it costs the user nothing.
+		pc.state.CollectedData.AuthMethods.Password = ""
 	}
 
 	// Prefill and build after the drop, so the step reflects the state the
@@ -2229,10 +2350,11 @@ func (r *FlowStateMachineRuntime) terminate(pc *processCtx, step *FlowDefinition
 	}
 
 	// Skip handoff when no user was resolved (e.g. user_not_found →
-	// no-account). PrepareHandoff can't catch this today: attempts are
-	// started with empty RequiredChecks, so IsCompleted is vacuously
-	// true and a token would be minted. Remove once the policy engine
-	// populates RequiredChecks.
+	// no-account): render the terminal step without minting a token. Handoff
+	// itself now fails closed on an identifier-only attempt (IsCompleted
+	// requires a verified credential-class factor), but a no-account terminal
+	// has nothing to hand off and must return the step cleanly rather than
+	// surface ErrAuthAttemptNotCompleted.
 	if pc.state.CollectedData.UserID == "" {
 		return FlowStepResult{State: pc.state, Step: rendered}, nil
 	}
@@ -2288,7 +2410,46 @@ func (r *FlowStateMachineRuntime) resolveStepFields(ctx context.Context, state *
 	if err != nil {
 		return FlowResolvedFields{}, fmt.Errorf("flow state machine: resolve fields on step %q: %w", step.Name, err)
 	}
+	if err := r.applyPasswordPolicy(ctx, state, step, resolved.Fields); err != nil {
+		return FlowResolvedFields{}, err
+	}
 	return resolved, nil
+}
+
+// applyPasswordPolicy sets the length rules of a step's password fields for
+// the purpose the flow runs under, so the rendered step and the submit check
+// carry the same ones. Where the user chooses a password (register,
+// recovery), the field carries the project's policy bounds: the form can show
+// them, and a candidate the gate would refuse is refused on this step. Where
+// the user enters one they have, the field carries none: a stored password
+// may predate a stricter policy, and verifying it is the only check. The
+// bounds are public on purpose: a user cannot choose a valid password without
+// them (ADR 066, What a step discloses).
+func (r *FlowStateMachineRuntime) applyPasswordPolicy(ctx context.Context, state *FlowState, step *FlowDefinitionStep, fields []FlowField) error {
+	if !choosesPassword(state.CurrentPurpose) {
+		return nil
+	}
+	read := false
+	var minLength, maxLength int
+	for i := range fields {
+		f := &fields[i]
+		if f.Challenge != FlowFieldChallengePassword {
+			continue
+		}
+		if !read {
+			if r.passwords == nil {
+				return fmt.Errorf("%w: password policy not wired", ErrFlowIntegrity())
+			}
+			var err error
+			minLength, maxLength, err = r.passwords.PasswordLengthBounds(ctx, state.ProjectID)
+			if err != nil {
+				return fmt.Errorf("flow state machine: read the password policy on step %q: %w", step.Name, err)
+			}
+			read = true
+		}
+		f.Validation = withPasswordBounds(f.Validation, minLength, maxLength)
+	}
+	return nil
 }
 
 // resolveVisitedFields resolves the union of fields collected by every
@@ -2344,11 +2505,25 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 	if err != nil {
 		return nil, err
 	}
+	conflict := state.CollectedData.SSOConflictConnectionID
+	if conflict != "" {
+		// Choosing the provider whose sign-in collided would collide again.
+		providers = slices.DeleteFunc(providers, func(p FlowSSOProvider) bool {
+			return p.ConnectionID == conflict
+		})
+	}
+	offerPasskey, err := r.offersPasskey(ctx, state, step)
+	if err != nil {
+		return nil, err
+	}
 	// Surface only user-selectable actions declared on the step.
 	// Implicit outcomes (e.g. user_not_found) live in step.Transitions
 	// but are engine-emitted routing keys, not buttons for the client.
 	actions := make([]FlowAction, 0, len(step.Actions)+1)
 	for _, a := range step.Actions {
+		if a.Kind == FlowActionKindPasskey && !offerPasskey {
+			continue
+		}
 		textKey := a.TextKey
 		if textKey == "" {
 			textKey = step.Name + ".action." + a.Name
@@ -2370,9 +2545,17 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		})
 	}
 	applyAutocomplete(resolved.Fields, state.CurrentPurpose)
+	// A step that offers providers reaches users who have no password, and the
+	// text cannot depend on the user without revealing how the account signs in.
+	// It gets its own key; a client without that key falls back to the plain one.
+	descriptionKey := step.Name + ".description"
+	if len(providers) > 0 {
+		descriptionKey += ".sso"
+	}
 	return &FlowStep{
 		Name:         step.Name,
-		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: step.Name + ".description"},
+		Texts:        FlowStepTexts{TitleKey: step.Name + ".title", DescriptionKey: descriptionKey},
+		Purpose:      state.CurrentPurpose,
 		Error:        errorKey,
 		Complete:     complete,
 		RedirectURL:  redirectURL,
@@ -2381,6 +2564,26 @@ func (r *FlowStateMachineRuntime) buildStep(ctx context.Context, state *FlowStat
 		SSOProviders: providers,
 		Identifier:   pairedIdentifier(resolved, state.CollectedData.UserData),
 	}, nil
+}
+
+// offersPasskey reports whether the step's passkey sign-in actions are shown.
+// They are, except to a user bound by an external sign-in's collision who has
+// no passkey: the ceremony could only fail for them. That reveals nothing the
+// action would not, since a ceremony for a bound user lists that user's
+// passkeys as allowCredentials. Anyone else is never asked, so the step does
+// not depend on an account the visitor has not reached.
+func (r *FlowStateMachineRuntime) offersPasskey(ctx context.Context, state *FlowState, step *FlowDefinitionStep) (bool, error) {
+	if state.CollectedData.SSOConflictConnectionID == "" || state.CollectedData.UserID == "" {
+		return true, nil
+	}
+	if !stepHasActionKind(step, FlowActionKindPasskey) {
+		return true, nil
+	}
+	has, err := r.ssoIdentities.UserHasPasskey(ctx, state.ProjectID, state.CollectedData.UserID)
+	if err != nil {
+		return false, fmt.Errorf("flow state machine: read passkeys of the bound user: %w", err)
+	}
+	return has, nil
 }
 
 // applyAutocomplete stamps each field's autofill token. The purpose is not
@@ -2464,11 +2667,8 @@ func stepHasActionKind(step *FlowDefinitionStep, kind FlowActionKind) bool {
 
 // stepActionKind returns the kind of the step's action with the given name.
 // Returns the zero value (unset) when name does not match any action on the
-// step — including the empty action submitted by passive POSTs.
+// step.
 func stepActionKind(step *FlowDefinitionStep, actionName string) FlowActionKind {
-	if actionName == "" {
-		return FlowActionKindUnset
-	}
 	for _, a := range step.Actions {
 		if a.Name == actionName {
 			return a.Kind
@@ -2500,6 +2700,7 @@ func recordResolvedUser(state *FlowState, userID string) {
 func clearUserBoundState(state *FlowState) {
 	state.ClearPendingChallenge()
 	state.CollectedData.UserID = ""
+	state.CollectedData.SSOConflictConnectionID = ""
 }
 
 // prefillFromCollected sets FlowField.Value from collectedData for any field

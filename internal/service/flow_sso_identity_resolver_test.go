@@ -76,14 +76,14 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	hasher := cryptomock.NewMockHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
-	users := service.NewUserService(pool, schemaStore, nil, nil)
+	users := service.NewUserService(pool, schemaStore, nil, nil, nil, domain.BuiltinSchemaBases{})
 	return &ssoResolverFixture{
 		pool:        pool,
 		stmts:       stmts,
 		connections: connections,
 		schemaStore: schemaStore,
 		hasher:      hasher,
-		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}),
+		resolver:    service.NewFlowSSOIdentityResolver(pool, connections, users, schemaStore, service.FixedProjectHasherResolver{Hasher: hasher}, noPolicyGate(t)),
 	}
 }
 
@@ -122,6 +122,15 @@ func (f *ssoResolverFixture) expectParked(attempt *domain.AuthAttempt, link *dom
 	f.expectAttempt(attempt)
 	f.expectRevision(ssoResolverConnectionDocument)
 	f.stmts.EXPECT().GetIDPIdentityLink(gomock.Any(), gomock.Any()).Return(link, linkErr)
+}
+
+// expectObjectTypes wires the schema reads that compare a user's schema with
+// the flow's: each id maps to the objectType it is a revision of.
+func (f *ssoResolverFixture) expectObjectTypes(objectTypes map[string]string) {
+	for schemaURL, objectType := range objectTypes {
+		f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, schemaURL).
+			Return(&domain.JSONSchema{ProjectID: ssoProjectID, URL: schemaURL, ObjectType: &objectType}, nil)
+	}
 }
 
 // expectCreateUser wires the user half of CreateLinked: the minted id, the
@@ -376,6 +385,7 @@ func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *te
 	f := newSSOResolverFixture(t)
 	f.expectParked(parkedAttempt(parkedResult()), &domain.IDPIdentityLink{ID: "idplink-1", UserID: "user-1"}, nil)
 	f.stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1", SchemaURL: otherSchemaURL}, nil)
+	f.expectObjectTypes(map[string]string{otherSchemaURL: "staff", ssoSchemaURL: "customer"})
 
 	var logged bytes.Buffer
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
@@ -386,6 +396,52 @@ func TestFlowSSOIdentityResolver_LoadParked_OtherSchemaRestartsAndLogsBoth(t *te
 	assert.Contains(t, logged.String(), otherSchemaURL)
 	assert.NotContains(t, err.Error(), ssoSchemaURL)
 	assert.NotContains(t, err.Error(), otherSchemaURL)
+}
+
+// A user keeps the revision it was created under, and the flow runs against
+// the newest one: a republished schema must not lock its linked users out.
+func TestFlowSSOIdentityResolver_LoadParked_OlderRevisionOfSameSchemaResolves(t *testing.T) {
+	t.Parallel()
+	const olderRevisionURL = "sch_older"
+	f := newSSOResolverFixture(t)
+	f.expectParked(parkedAttempt(parkedResult()), &domain.IDPIdentityLink{ID: "idplink-1", UserID: "user-1"}, nil)
+	f.stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1", SchemaURL: olderRevisionURL}, nil)
+	f.expectObjectTypes(map[string]string{olderRevisionURL: "customer", ssoSchemaURL: "customer"})
+
+	got, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, &domain.FlowSSOLinkedUser{LinkID: "idplink-1", UserID: "user-1"}, got.Link)
+}
+
+// The linked user's schema id comes from a stored row, so a revision the
+// project does not hold is the server's inconsistency: an internal error, not
+// a schema mismatch (409) and not a client-facing schema not-found.
+func TestFlowSSOIdentityResolver_LoadParked_UnknownUserSchemaIsInternal(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.expectParked(parkedAttempt(parkedResult()), &domain.IDPIdentityLink{ID: "idplink-1", UserID: "user-1"}, nil)
+	f.stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1", SchemaURL: "sch_gone"}, nil)
+	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, "sch_gone").Return(nil, database.NewNoRowFoundError(nil))
+
+	_, err := f.resolver.LoadParked(t.Context(), loadInput())
+	var domErr domain.Error
+	require.ErrorAs(t, err, &domErr)
+	assert.Equal(t, domain.ErrInternal(nil).Code, domErr.Code)
+	assert.NotErrorIs(t, err, domain.ErrFlowRestartRequired())
+}
+
+func TestFlowSSOIdentityResolver_LoadParked_SchemaReadErrorFails(t *testing.T) {
+	t.Parallel()
+	boom := errors.New("boom")
+	f := newSSOResolverFixture(t)
+	f.expectParked(parkedAttempt(parkedResult()), &domain.IDPIdentityLink{ID: "idplink-1", UserID: "user-1"}, nil)
+	f.stmts.EXPECT().GetUser(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.User{ID: "user-1", SchemaURL: "sch_older"}, nil)
+	f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, "sch_older").Return(nil, boom)
+
+	_, err := f.resolver.LoadParked(t.Context(), loadInput())
+	require.ErrorIs(t, err, boom)
+	assert.NotErrorIs(t, err, domain.ErrFlowRestartRequired(), "a failed read is not a schema mismatch")
 }
 
 // The user the attempt already carries (a signed-in session copies its user
@@ -832,7 +888,8 @@ func TestFlowSSOIdentityResolver_CreateLinked_InvalidUserLogsLocations(t *testin
 	ctx := zlog.WithLoggingContext(t.Context(), slog.New(slog.NewTextHandler(&logged, nil)))
 
 	_, err := f.resolver.CreateLinked(ctx, in)
-	require.ErrorIs(t, err, domain.ErrUserInvalid())
+	require.ErrorIs(t, err, domain.ErrUserAttributesInvalid(nil))
+	assert.True(t, domain.IsUserInvalid(err))
 	assert.Contains(t, logged.String(), "level=WARN")
 	assert.Contains(t, logged.String(), "/email")
 	assert.NotContains(t, logged.String(), "secret-value")
@@ -846,6 +903,22 @@ func TestFlowSSOIdentityResolver_CreateLinked_LostRaceEmitsUserCreateFailed(t *t
 	f.inTransaction(t)
 	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
 	f.expectCreateUser(database.NewUniqueError("users", "uq_unique_attributes", nil))
+
+	_, err := f.resolver.CreateLinked(t.Context(), createInput())
+	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
+	assert.NotNil(t, f.event(domain.EventTypeUserCreateFailed))
+}
+
+// Losing the link race rolls the created user back, so it is audited like a
+// lost create.
+func TestFlowSSOIdentityResolver_CreateLinked_LostLinkRaceEmitsUserCreateFailed(t *testing.T) {
+	t.Parallel()
+	f := newSSOResolverFixture(t)
+	f.inTransaction(t)
+	f.stmts.EXPECT().DeleteSSOCallback(gomock.Any(), ssoProjectID, ssoAttemptID, "ch-1").Return(nil)
+	f.expectCreateUser(nil)
+	f.stmts.EXPECT().CreateIDPIdentityLink(gomock.Any(), gomock.Any()).
+		Return(database.NewUniqueError("idp_identity_links", "uq_idp_identity_links_connection_subject", nil))
 
 	_, err := f.resolver.CreateLinked(t.Context(), createInput())
 	require.ErrorIs(t, err, domain.ErrUserAlreadyExists())
@@ -899,19 +972,44 @@ func TestFlowSSOIdentityResolver_CreateLinked_EmitsIdentityLinkCreated(t *testin
 func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("boom")
+	const otherSchemaURL = "https://example.test/user/v1/other.user.schema.json"
 	for name, tc := range map[string]struct {
-		user    *domain.User
-		err     error
-		want    string
-		wantErr error
+		user        *domain.User
+		err         error
+		objectTypes map[string]string
+		schemaErr   error
+		want        string
+		wantErr     error
 	}{
 		"hit":  {user: &domain.User{ID: "user-9", SchemaURL: ssoSchemaURL}, want: "user-9"},
 		"miss": {err: database.NewNoRowFoundError(nil)},
+		// The owner was created under an older revision of the flow's schema:
+		// it is the same schema, so the collision binds it.
+		"owner on an older revision": {
+			user:        &domain.User{ID: "user-9", SchemaURL: "sch_older"},
+			objectTypes: map[string]string{"sch_older": "customer", ssoSchemaURL: "customer"},
+			want:        "user-9",
+		},
 		// The registry key has no schema: the value can belong to a user of
 		// another schema that also marks the property project-unique.
 		"owner of another schema": {
-			user:    &domain.User{ID: "user-9", SchemaURL: "https://example.test/user/v1/other.user.schema.json"},
-			wantErr: domain.ErrSSOOwnerOtherSchema,
+			user:        &domain.User{ID: "user-9", SchemaURL: otherSchemaURL},
+			objectTypes: map[string]string{otherSchemaURL: "staff", ssoSchemaURL: "customer"},
+			wantErr:     domain.ErrSSOOwnerOtherSchema,
+		},
+		// A failed read is neither a match (binding the owner) nor another
+		// schema (restarting the flow).
+		"schema read fails": {
+			user:      &domain.User{ID: "user-9", SchemaURL: "sch_older"},
+			schemaErr: boom,
+			wantErr:   boom,
+		},
+		// The owner's schema id comes from a stored row: a revision the
+		// project does not hold is internal, not a client-facing not-found.
+		"owner schema missing": {
+			user:      &domain.User{ID: "user-9", SchemaURL: "sch_gone"},
+			schemaErr: database.NewNoRowFoundError(nil),
+			wantErr:   domain.ErrInternal(nil),
 		},
 		"error": {err: boom, wantErr: boom},
 	} {
@@ -927,6 +1025,10 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 					UniqueTeamID: new(""),
 				}).
 				Return(tc.user, tc.err)
+			f.expectObjectTypes(tc.objectTypes)
+			if tc.schemaErr != nil {
+				f.schemaStore.EXPECT().GetJSONSchemaByID(gomock.Any(), ssoProjectID, tc.user.SchemaURL).Return(nil, tc.schemaErr)
+			}
 
 			got, err := f.resolver.FindUniqueOwner(t.Context(), ssoProjectID, ssoSchemaURL, "email", "alice@example.com")
 			if tc.wantErr != nil {
@@ -935,6 +1037,34 @@ func TestFlowSSOIdentityResolver_FindUniqueOwner(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// One passkey row is enough to answer, so the read asks for one, of this
+// user in this project.
+func TestFlowSSOIdentityResolver_UserHasPasskey(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name string
+		keys []*domain.UserPasskey
+		want bool
+	}{
+		{name: "none", want: false},
+		{name: "one", keys: []*domain.UserPasskey{{UserID: "user-1"}}, want: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newSSOResolverFixture(t)
+			f.stmts.EXPECT().
+				ListUserPasskeys(gomock.Any(), gomock.Cond(func(opts *database.ListOptions[domain.UserPasskeyField]) bool {
+					return opts.Pagination.Limit == 1 && opts.Filter != nil
+				})).
+				Return(&database.ListResult[*domain.UserPasskey]{Items: tt.keys}, nil)
+
+			got, err := f.resolver.UserHasPasskey(t.Context(), ssoProjectID, "user-1")
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

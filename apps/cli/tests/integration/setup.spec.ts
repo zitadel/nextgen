@@ -2,10 +2,12 @@ import { realpath } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
+import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { anApp } from "../helpers/project";
+import { aNewAppDirectory, anApp, type ScaffoldedApp, PASSWORD_POLICY } from "../helpers/project";
 
 const platform = usePlatformMock();
+useLocalServers();
 
 const SOCIAL_CREDENTIALS = {
   clientId: "1234-abc.apps.googleusercontent.com",
@@ -13,6 +15,31 @@ const SOCIAL_CREDENTIALS = {
 };
 
 const SCAFFOLDED_PAGES = ["app/login/page.tsx", "app/register/page.tsx", "app/profile/page.tsx"];
+
+const ACME = {
+  slug: "acme-sso",
+  displayName: "Acme SSO",
+  issuer: "https://sso.acme.example",
+};
+const ACME_CREDENTIALS = { clientId: "acme-client-id", secret: "acme-client-secret" };
+
+/** The providers setup can enable, with how to ask for each and what it publishes. */
+const PROVIDERS = [
+  {
+    name: "a social provider",
+    slug: "google",
+    variables: "GOOGLE",
+    credentials: SOCIAL_CREDENTIALS,
+    setUp: (app: ScaffoldedApp) => app.setupWithSso("google", SOCIAL_CREDENTIALS),
+  },
+  {
+    name: "a custom OpenID Connect provider",
+    slug: "acme-sso",
+    variables: "ACME_SSO",
+    credentials: ACME_CREDENTIALS,
+    setUp: (app: ScaffoldedApp) => app.setupWithCustomSso(ACME, ACME_CREDENTIALS),
+  },
+];
 
 describe("setup", () => {
   describe("against an invalid server", () => {
@@ -35,6 +62,29 @@ describe("setup", () => {
         const result = await app.setup();
 
         expect(result).toFailWith("E_NETWORK");
+      });
+
+      it("still names a custom connection flag that is wrong", async () => {
+        const app = await anApp();
+        platform.isUnavailable();
+
+        const result = await app.setupSsoWith(
+          [
+            "--sso",
+            "custom",
+            "--sso-slug",
+            "Acme",
+            "--sso-display-name",
+            "Acme SSO",
+            "--sso-issuer",
+            "https://sso.acme.example",
+            "--sso-client-id",
+            "acme-client-id",
+          ],
+          "acme-client-secret",
+        );
+
+        expect(result).toFailWith("E_VALIDATION");
       });
     });
 
@@ -60,6 +110,96 @@ describe("setup", () => {
 
         expect(result).toSucceed();
         expect((await before.changes()).added).toEqual(expect.arrayContaining(SCAFFOLDED_PAGES));
+      });
+
+      it("publishes a password policy with the recommended minimum length", async () => {
+        const app = await anApp();
+
+        await app.setup();
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 15 } }),
+        ]);
+      });
+
+      it("puts a given minimum password length into the policy", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "12"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: { min_length: 12 } }),
+        ]);
+      });
+
+      it("reads a minimum password length of 0 as none", async () => {
+        const app = await anApp();
+
+        await app.setup(["--password-min-length", "0"]);
+
+        expect(await app.publishedPolicies()).toEqual([
+          expect.objectContaining({ operation: PASSWORD_POLICY, config: {} }),
+        ]);
+      });
+
+      it("refuses a minimum password length outside the bounds before creating anything", async () => {
+        const app = await anApp();
+
+        const result = await app.setup(["--password-min-length", "65"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("creates a new app in the directory start ran in", async () => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("previews a new app on a dry run", async () => {
+        const app = await aNewAppDirectory();
+
+        const result = await app.setupNewApp(["--dry-run"]);
+
+        expect(result).toSucceed();
+      });
+
+      it("creates no app on a dry run", async () => {
+        const app = await aNewAppDirectory();
+        const before = await app.snapshot();
+
+        await app.setupNewApp(["--dry-run"]);
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it.each([
+        ["the platform is down", () => platform.isUnavailable()],
+        ["the schema upload fails", () => platform.rejectsSchemaUploads()],
+      ])("leaves the directory start ran in as it was when %s", async (_failure, fail) => {
+        const app = await aNewAppDirectory();
+        await app.startLocalServer();
+        const before = await app.snapshot();
+        fail();
+
+        await app.setupNewApp();
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
+
+      it("sets a new app up as new when rerun after a failed run", async () => {
+        const app = await aNewAppDirectory();
+        platform.isUnavailable();
+        await app.setupNewApp();
+        platform.recovers();
+
+        const rerun = await app.setupNewApp();
+
+        const { data } = app.envelopeOf<{ files_written: string[] }>(rerun);
+        expect(data.files_written).toContain("app/page.tsx");
       });
 
       it("reports the configuration files it wrote", async () => {
@@ -95,7 +235,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("installs the dependencies it added", async () => {
@@ -154,7 +294,7 @@ describe("setup", () => {
 
         expect(await app.setup()).toBeSkipped();
 
-        expect((await app.plan()).total).toBeGreaterThan(0);
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it("does not claim to be configured after a failed run", async () => {
@@ -166,6 +306,18 @@ describe("setup", () => {
         expect(await app.hasBeenConfigured()).toBe(false);
       });
 
+      it("rolls back the credential env file a failed run created", async () => {
+        const app = await anApp();
+        platform.rejectsSchemaUploads();
+
+        expect(await app.setup()).toFail();
+
+        // setup created `.env.development.local` with the project it had to
+        // abandon; the rollback removes it so a rerun does not inherit the
+        // abandoned project's id (`merge-env` only adds missing keys).
+        await expect(app.readProjectFile(".env.development.local")).rejects.toThrow();
+      });
+
       it("lets a rerun finish what a failed run started", async () => {
         const app = await anApp();
         platform.rejectsSchemaUploads();
@@ -174,7 +326,7 @@ describe("setup", () => {
 
         expect(await app.setup(["--force"])).toSucceed();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(await app.deployDryRun()).toSucceed();
       });
 
       it.each([
@@ -213,89 +365,201 @@ describe("setup", () => {
         },
       );
 
-      it("registers a social provider asked for during setup", async () => {
-        const app = await anApp();
+      describe.each(PROVIDERS)("with $name", (provider) => {
+        it("registers the connection under its slug", async () => {
+          const app = await anApp();
 
-        const result = await app.setupWithSso("google", SOCIAL_CREDENTIALS);
+          const result = await provider.setUp(app);
 
-        expect(result).toSucceed();
-        expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual(["google"]);
+          expect(result).toSucceed();
+          expect((await app.registeredIdps()).map((idp) => idp.slug)).toEqual([provider.slug]);
+        });
+
+        it("publishes the client id as a readable project variable", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const published = await app.projectVariables();
+
+          expect(published).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({
+                name: `${provider.variables}_CLIENT_ID`,
+                value: provider.credentials.clientId,
+              }),
+            ]),
+          );
+        });
+
+        it("publishes the secret without its value", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const published = await app.projectVariables();
+
+          const held = published.find(
+            (variable) => variable.name === `${provider.variables}_CLIENT_SECRET`,
+          );
+          expect(held).toMatchObject({ secret: true });
+          expect(held).not.toHaveProperty("value");
+        });
+
+        it("commits a reference to the client id", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const connection = await app.committed.idpConnection(provider.slug);
+
+          expect(connection.oidc.client_id).toBe(`\${{ ${provider.variables}_CLIENT_ID }}`);
+        });
+
+        it("commits a reference to the client secret", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const connection = await app.committed.idpConnection(provider.slug);
+
+          expect(connection.oidc.client_secret).toBe(`\${{ ${provider.variables}_CLIENT_SECRET }}`);
+        });
+
+        it("keeps the secret out of every file in the project", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          expect(await app.filesContaining(provider.credentials.secret)).toEqual([]);
+        });
+
+        it("keeps the client id out of every file in the project", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          expect(await app.filesContaining(provider.credentials.clientId)).toEqual([]);
+        });
+
+        it("names the connection among the published auth methods", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const { schema } = await app.publishedSchema();
+
+          expect(schema["x-auth-methods"]?.sso).toEqual({
+            enabled: true,
+            providers: [provider.slug],
+          });
+        });
+
+        it("offers the connection on the steps a sign-in starts from", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toEqual(
+            expect.arrayContaining(["identifier", "register"]),
+          );
+        });
+
+        it("offers the connection on the conflict step too", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          const offering = await app.stepsOfferingSso();
+
+          expect(offering.map((step) => step.name)).toContain("sso-conflict");
+        });
+
+        it("offers only the connection on every step that offers one", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          for (const step of await app.stepsOfferingSso()) {
+            expect(step.sso_providers, step.name).toEqual([provider.slug]);
+          }
+        });
+
+        it("says where each offering step returns from the provider", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          for (const step of await app.stepsOfferingSso()) {
+            expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
+          }
+        });
+
+        it("leaves nothing to reconcile", async () => {
+          const app = await anApp();
+          expect(await provider.setUp(app)).toSucceed();
+
+          expect(await app.deployDryRun()).toSucceed();
+        });
       });
 
-      it("publishes that provider's client id as a readable project variable", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+      describe("with a custom provider but not both credentials", () => {
+        const flags = [
+          "--sso",
+          "custom",
+          "--sso-slug",
+          "acme-sso",
+          "--sso-display-name",
+          "Acme SSO",
+          "--sso-issuer",
+          "https://sso.acme.example",
+        ];
 
-        const published = await app.projectVariables();
+        it("will not set up the provider without a client secret", async () => {
+          const app = await anApp();
 
-        expect(published).toEqual(
-          expect.arrayContaining([
-            expect.objectContaining({
-              name: "GOOGLE_CLIENT_ID",
-              value: SOCIAL_CREDENTIALS.clientId,
-            }),
-          ]),
-        );
-      });
+          const result = await app.setupSsoWith(
+            [...flags, "--sso-client-id", "acme-client-id"],
+            "",
+          );
 
-      it("publishes that provider's secret without its value", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+          expect(result).toFailWith("E_VALIDATION");
+        });
 
-        const published = await app.projectVariables();
+        it("names the secret as what is missing", async () => {
+          const app = await anApp();
 
-        const held = published.find((variable) => variable.name === "GOOGLE_CLIENT_SECRET");
-        expect(held).toMatchObject({ secret: true });
-        expect(held).not.toHaveProperty("value");
-      });
+          const result = await app.setupSsoWith(
+            [...flags, "--sso-client-id", "acme-client-id"],
+            "",
+          );
 
-      it("commits references to both of that provider's credentials", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+          expect(result).toExplain("No client secret supplied");
+          expect(result).toHintAt("Pipe it in on stdin.");
+        });
 
-        const connection = await app.committed.idpConnection("google");
+        it("suggests piping the secret in, without carrying one", async () => {
+          const app = await anApp();
 
-        expect(connection.oidc.client_id).toBe("${{ GOOGLE_CLIENT_ID }}");
-        expect(connection.oidc.client_secret).toBe("${{ GOOGLE_CLIENT_SECRET }}");
-      });
+          const result = await app.setupSsoWith(
+            [...flags, "--sso-client-id", "acme-client-id"],
+            "",
+          );
 
-      it("keeps that provider's credentials out of every file in the project", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+          expect(result).toSuggest(`printf '%s' "$CLIENT_SECRET" | `);
+          expect(result).toSuggest("setup --sso custom --sso-client-id <id>");
+        });
 
-        expect(await app.filesContaining(SOCIAL_CREDENTIALS.secret)).toEqual([]);
-        expect(await app.filesContaining(SOCIAL_CREDENTIALS.clientId)).toEqual([]);
-      });
+        it("will not set up the provider without a client id", async () => {
+          const app = await anApp();
 
-      it("names that provider among the published auth methods", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+          const result = await app.setupSsoWith(flags, "acme-client-secret");
 
-        const { schema } = await app.publishedSchema();
+          expect(result).toExplain("--sso-client-id");
+        });
 
-        expect(schema["x-auth-methods"]?.sso).toEqual({ enabled: true, providers: ["google"] });
-      });
+        it.each([
+          ["a client secret", [...flags, "--sso-client-id", "acme-client-id"], ""],
+          ["a client id", flags, "acme-client-secret"],
+        ])("writes nothing when it is refused for want of %s", async (_missing, args, secret) => {
+          const app = await anApp();
+          const before = await app.snapshot();
 
-      it("offers that provider on the published steps a sign-in starts from", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
+          await app.setupSsoWith(args, secret);
 
-        const offering = await app.stepsOfferingSso();
-
-        expect(offering.map((step) => step.name)).toEqual(
-          expect.arrayContaining(["identifier", "register"]),
-        );
-        for (const step of offering) {
-          expect(step.sso_providers, step.name).toEqual(["google"]);
-          expect(Object.keys(step.transitions ?? {}), step.name).toContain("sso_authenticated");
-        }
-      });
-
-      it("leaves nothing to reconcile after enabling one during setup", async () => {
-        const app = await anApp();
-        expect(await app.setupWithSso("google", SOCIAL_CREDENTIALS)).toSucceed();
-
-        expect(await app.plan()).toReportNothingToDo();
+          expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+        });
       });
     });
   });

@@ -4,66 +4,115 @@
     "server": {
       "root": ".",
       "framework": "go",
-      "installCommand": "sh apps/cloud/install.sh",
-      "buildCommand": "sh apps/cloud/build.sh"
+      "entrypoint": "apps/cloud/launcher/main.go",
+      "buildCommand": "sh apps/cloud/build.sh",
+      "functions": {
+        "apps/cloud/launcher/main.go": {
+          "regions": ["fra1"]
+        }
+      }
     },
     "console": {
       "root": "apps/console",
       "framework": "vite",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && CONSOLE_VERCEL_INSIGHTS=1 sh apps/cloud/turbo-build.sh @zitadel/console && rm -rf apps/console/dist && mkdir -p apps/console/dist/ui/console && cp -R internal/staticui/console/dist/. apps/console/dist/ui/console/",
-      "outputDirectory": "dist",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
+      "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
+      "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
         {
-          "source": "/ui/console/(.*)",
-          "destination": "/ui/console/index.html"
+          "source": "/console/:path(.*)?",
+          "destination": "/:path"
+        },
+        {
+          "source": "/((?!assets/).*)",
+          "destination": "/index.html"
         }
       ]
-    },
-    "storybook": {
-      "root": "apps/storybook",
-      "framework": "storybook",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "cd ../.. && sh apps/cloud/turbo-build.sh @zitadel/storybook && cd apps/storybook && mv dist storybook && mkdir dist && mv storybook dist/",
-      "outputDirectory": "dist"
     },
     "docs": {
       "root": "apps/docs",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build --filter=@zitadel/api --filter=@zitadel/api-mock --filter=@zitadel/components && pnpm run build"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
-      "installCommand": "sh ../cloud/install.sh",
-      "buildCommand": "corepack pnpm run build"
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
+    },
+    "schemas": {
+      "root": "apps/cloud",
+      "installCommand": "true",
+      "buildCommand": "node ../../scripts/render-builtin-schemas.mjs",
+      "devCommand": "node ../../scripts/render-builtin-schemas.mjs --serve",
+      "outputDirectory": "../../dist/cloud-schemas",
+      "headers": [
+        {
+          "source": "/schemas/v1/(.*)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/schema+json"
+            },
+            {
+              "key": "Cache-Control",
+              "value": "public, max-age=3600, stale-while-revalidate=86400"
+            },
+            {
+              "key": "Access-Control-Allow-Origin",
+              "value": "*"
+            }
+          ]
+        }
+      ]
     }
   },
   "redirects": [
     {
-      "source": "/ui/console",
-      "destination": "/ui/console/",
+      "source": "/console",
+      "destination": "/console/",
       "permanent": true
     },
     {
-      "source": "/storybook",
-      "destination": "/storybook/",
+      "source": "/ui/console",
+      "destination": "/console/",
+      "permanent": false
+    },
+    {
+      "source": "/ui/console/:path(.*)",
+      "destination": "/console/:path",
+      "permanent": false
+    },
+    {
+      "source": "/changelog/",
+      "destination": "/changelog",
       "permanent": true
     }
   ],
   "rewrites": [
     {
-      "source": "/ui/console/(.*)",
+      "source": "/console/runtime.json",
+      "destination": {
+        "service": "server"
+      }
+    },
+    {
+      "source": "/console/(.*)",
       "destination": {
         "service": "console"
       }
     },
     {
-      "source": "/storybook/(.*)",
+      "source": "/schemas/v1/(.*)",
       "destination": {
-        "service": "storybook"
+        "service": "schemas"
       }
+    },
+    {
+      "source": "/telemetry/mixpanel/:path(.*)",
+      "destination": "https://api-eu.mixpanel.com/:path"
     },
     {
       "source": "/docs",
@@ -84,7 +133,31 @@
       }
     },
     {
+      "source": "/changelog",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
       "source": "/_next/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/favicons/(.*)",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/llms.txt",
       "destination": {
         "service": "website"
       }
@@ -96,10 +169,11 @@
       }
     }
   ],
-  "regions": ["fra1"],
+  "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],
   "git": {
     "deploymentEnabled": {
-      "changeset-release/*": false
+      "changeset-release/*": false,
+      "gh-readonly-queue/**": false
     }
   }
 }

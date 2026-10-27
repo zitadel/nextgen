@@ -18,7 +18,7 @@ JSX you drop into your routes.
 
 ## When to use
 
-- **Fresh project:** prefer the CLI. `zitadel setup --framework solid`
+- **Fresh project:** prefer the CLI. `npx @zitadel/cli@latest setup --framework solid`
   scaffolds a wired Solid app (and the dev proxy) for you — see the
   `zitadel-cli` skill. Don't hand-assemble what the CLI generates.
 - **This skill:** an app that already exists, or a custom integration the
@@ -31,7 +31,7 @@ JSX you drop into your routes.
 TypeScript >= 5.0.
 
 ```sh
-npm install @zitadel/sdk-solid
+npm install @zitadel/sdk-solid@latest
 ```
 
 ## Integrate
@@ -63,15 +63,55 @@ import { ZitadelLogout, ZitadelSession } from '@zitadel/sdk-solid';
 
 `purpose` selects the flow (`"login"`, etc.); `postSignInUrl` /
 `postSignOutUrl` are where the widget navigates after the flow completes.
-Flow events are surfaced as optional callbacks — `onFlowStep`,
-`onFlowInput`, `onFlowComplete`, and `onFlowError` — when you need to react
-to the flow yourself.
+The widget's events reach you as the callbacks listed under Widget props and
+events.
 
 **Same-origin proxy.** The widgets call `${proxyPath}/…` same-origin
 (default `/__nextgen`). For local development the CLI dev proxy covers this;
 you can also skip the proxy and point `proxyPath` straight at the backend
 cross-origin, e.g. `proxyPath: "http://localhost:8080"` (the `zitadel start`
 local runtime default port).
+
+## Widget props and events
+
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+
+| Prop | Type | Default | Widgets | Description |
+| --- | --- | --- | --- | --- |
+| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
+| `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
+| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
+| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
+| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
+| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
+| `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
+| `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
+| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
+| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | Colour mode. Unset follows the tenant's branding theme on Login, then the variant default (`dark` for `page`, `auto` for `widget`); Logout defaults to `auto`. `auto` follows `prefers-color-scheme`. |
+| `suppressHeader` | `boolean` | `false` | Login, Session | Visually hides the widget's own heading block while keeping it in the accessibility tree, for pages that already carry the heading. |
+| `suppressPasswordToggle` | `boolean` | `false` | Login | Hides the show/hide button on password fields. |
+| `heading` | `string` | `"Signed in as"` | Session | Heading text override. |
+| `logoutLabel` | `string` | `"Sign out"` | Session | Logout action label override. |
+| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides merged over the builtin dictionaries, keyed by primary language subtag, for example `{ en: { "identifier.title": "Welcome back" } }`. |
+| `lang` | `string` | browser language | Login | BCP-47 language override. |
+
+Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+
+| Widget event | Fires when | Detail | Widgets | Callback |
+| --- | --- | --- | --- | --- |
+| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep` |
+| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput` |
+| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete` |
+| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect` |
+| `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError` |
+| `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout` |
+
+```tsx
+<ZitadelLogin project={project} theme="light" onFlowComplete={(detail) => track(detail)} />
+```
+
+When your callback for `zitadel-flow-complete`, `zitadel-flow-redirect` or `zitadel-signout` returns a promise, the widget waits for it to settle (up to two seconds) before it navigates.
 
 ## Read these, don't guess
 
@@ -92,6 +132,7 @@ Exported surface (discover-first, confirm against the types above):
 
 ## Gotchas
 
+- **Server rendering.** If your app renders on the server, mount the widget on the client only, after hydration, or pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow.
 - **Production SPA deployment is not yet supported.** The same-origin proxy
   path must come from your hosting platform, and the CLI can't scaffold those
   configs yet, so a production SPA build has no proxy to talk to. See

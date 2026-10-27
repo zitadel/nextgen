@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-core",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "Core types and shared utilities for Zitadel SDKs",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-core#readme",
   "bugs": {
@@ -17,12 +17,13 @@
   ],
   "type": "module",
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only",
     "typecheck": "tsc --noEmit -p tsconfig.lib.json && tsc --noEmit -p tsconfig.spec.json",
     "test": "vitest run",
     "test:all": "pnpm run test",
     "lint": "biome check .",
-    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build"
+    "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
+    "prepack": "publint --strict"
   },
   "exports": {
     ".": {
@@ -50,12 +51,15 @@
     "access": "public"
   },
   "dependencies": {
-    "@zitadel/api": "workspace:*"
+    "@zitadel/api": "workspace:*",
+    "ufo": "catalog:"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/components": "workspace:*",
+    "jsdom": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

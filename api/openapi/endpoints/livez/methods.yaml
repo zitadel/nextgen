@@ -3,20 +3,22 @@ get:
   tags:
     - System
   summary: Check server liveness
-  description: Check whether the server is started
+  description: |
+    Answers `ok` while the server process serves HTTP, and checks nothing behind it.
+
+    Point a liveness probe here. It never checks the database, so an outage
+    of the database does not restart every instance; `GET /readyz` takes an
+    instance out of rotation instead.
   security: []
   responses:
     '200':
-      description: The server is started
+      description: The server process serves HTTP.
       content:
         text/plain:
           examples:
             ok:
               summary: Server is live
               value: ok
-            fail:
-              summary: Server is not live
-              value: fail
     '4XX':
       description: The request was rejected by the server.
       content:
@@ -24,8 +26,4 @@ get:
           schema:
             $ref: ../../components/error-details.yaml
     default:
-      description: Unexpected error response.
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
+      $ref: getLive-error-response.yaml

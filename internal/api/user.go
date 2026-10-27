@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -32,7 +33,7 @@ func (h *Handler) CreateUser(ctx context.Context, req *api.CreateUserRequest, pa
 		Attributes: *attributes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
@@ -167,14 +168,39 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 	if err != nil {
 		return nil, err
 	}
+	res := userPasskeysResponse(passkeys, nextPage)
+	return &res, nil
+}
 
-	res := &api.ListUserPasskeysResponse{
-		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(passkeys), len(passkeys)),
+// ListMyPasskeys serves the signed-in user's own passkeys on the session alone,
+// the read ListUserPasskeys answers for a caller who may read the user.
+func (h *Handler) ListMyPasskeys(ctx context.Context, params api.ListMyPasskeysParams) (api.ListMyPasskeysRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	passkeys, nextPage, err := h.userService.ListPasskeys(ctx, service.ListPasskeysInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserPasskeysResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userPasskeysResponse(passkeys, nextPage),
+	}, nil
+}
+
+func userPasskeysResponse(passkeys []*domain.UserPasskey, nextPage string) api.ListUserPasskeysResponse {
+	res := api.ListUserPasskeysResponse{
+		Passkeys: make([]api.ListUserPasskeysResponsePasskeysItem, len(passkeys)),
 	}
 	if nextPage != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
 	}
-
 	for i, key := range passkeys {
 		res.Passkeys[i] = api.ListUserPasskeysResponsePasskeysItem{
 			ID:        key.ID,
@@ -182,8 +208,66 @@ func (h *Handler) ListUserPasskeys(ctx context.Context, params api.ListUserPassk
 			CreatedAt: key.CreatedAt,
 		}
 	}
+	return res
+}
 
-	return res, nil
+func (h *Handler) ListUserIdentityLinks(ctx context.Context, params api.ListUserIdentityLinksParams) (api.ListUserIdentityLinksRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
+	if err != nil {
+		return nil, err
+	}
+
+	links, nextPage, err := h.userService.ListIdentityLinks(ctx, service.ListIdentityLinksInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	res := userIdentityLinksResponse(links, nextPage)
+	return &res, nil
+}
+
+// ListMyIdentityLinks serves the signed-in user's own identity links on the
+// session alone, the read ListUserIdentityLinks answers for a caller who may
+// read the user.
+func (h *Handler) ListMyIdentityLinks(ctx context.Context, params api.ListMyIdentityLinksParams) (api.ListMyIdentityLinksRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	links, nextPage, err := h.userService.ListIdentityLinks(ctx, service.ListIdentityLinksInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserIdentityLinksResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userIdentityLinksResponse(links, nextPage),
+	}, nil
+}
+
+func userIdentityLinksResponse(links []*domain.IDPIdentityLink, nextPage string) api.ListUserIdentityLinksResponse {
+	res := api.ListUserIdentityLinksResponse{
+		IdentityLinks: make([]api.UserIdentityLink, len(links)),
+	}
+	if nextPage != "" {
+		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(nextPage))
+	}
+	for i, link := range links {
+		res.IdentityLinks[i] = api.UserIdentityLink{
+			ID:           link.ID,
+			ConnectionID: link.ConnectionID,
+			CreatedAt:    link.CreatedAt,
+		}
+	}
+	return res
 }
 
 // ListUserTeams serves the user's team roster — the N:N membership list, one
@@ -195,8 +279,8 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
-	// Same permission as the embedded read, or this becomes the way around it.
-	if err := requireMembershipRead(ctx); err != nil {
+	// Same gate as the embedded read, or this becomes the way around it.
+	if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 		return nil, err
 	}
 
@@ -209,18 +293,41 @@ func (h *Handler) ListUserTeams(ctx context.Context, params api.ListUserTeamsPar
 	if err != nil {
 		return nil, err
 	}
+	res := userTeamsResponse(teams)
+	return &res, nil
+}
 
-	res := &api.ListUserTeamsResponse{
-		Teams: make([]api.UserTeam, 0, len(teams.Items)),
+// ListMyTeams lists the teams of the cookie's user, held to project_id when the
+// caller names one (requireSelf).
+func (h *Handler) ListMyTeams(ctx context.Context, params api.ListMyTeamsParams) (api.ListMyTeamsRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
 	}
+	teams, err := h.userService.ListUserTeams(ctx, service.ListUserTeamsInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.ListUserTeamsResponseHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userTeamsResponse(teams),
+	}, nil
+}
+
+func userTeamsResponse(teams *service.ListUserTeamsOutput) api.ListUserTeamsResponse {
+	res := api.ListUserTeamsResponse{Teams: make([]api.UserTeam, 0, len(teams.Items))}
 	if teams.NextPageToken != "" {
 		res.NextPageToken = api.NewOptNilPageToken(api.PageToken(teams.NextPageToken))
 	}
 	for _, team := range teams.Items {
 		res.Teams = append(res.Teams, apiUserTeam(*team))
 	}
-
-	return res, nil
+	return res
 }
 
 func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams) (api.GetUserByIDRes, error) {
@@ -230,14 +337,8 @@ func (h *Handler) GetUserByID(ctx context.Context, params api.GetUserByIDParams)
 	}
 	var teamID *string
 	if params.TeamID.IsSet() {
-		// team_id answers "is this user an active member of that team", the
-		// membership read POST /users/query gates the same way: by scope for a
-		// project secret, by project-wide read for a session.
-		reads, err := h.userReadsProject(ctx, projectID)
-		if err != nil {
-			return nil, err
-		}
-		if err := requireMembershipReadUnless(ctx, reads); err != nil {
+		// team_id answers "is this user an active member of that team".
+		if err := h.requireMembershipReadIn(ctx, projectID); err != nil {
 			return nil, err
 		}
 		teamID = new(string(params.TeamID.Value))
@@ -278,16 +379,18 @@ func (h *Handler) PatchUserByID(ctx context.Context, req *api.PatchUserRequest, 
 
 	user, err := h.userService.PatchUser(ctx, input)
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
 }
 
-func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) (api.PatchMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
+// PatchMyUser updates the user of the cookie's session, held to project_id when
+// the caller names one (requireSelf).
+func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest, params api.PatchMyUserParams) (api.PatchMyUserRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
 	}
 
 	attributes, err := convertUsingJson[map[string]any](req.Attributes)
@@ -296,11 +399,11 @@ func (h *Handler) PatchMyUser(ctx context.Context, req *api.PatchMyUserRequest) 
 	}
 
 	user, err := h.userService.PatchMyUser(ctx, service.PatchMyUserInput{
-		SessionToken: sessionToken,
-		Attributes:   *attributes,
+		Self:       self,
+		Attributes: *attributes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, userAttributesRequestInvalid(err)
 	}
 
 	return domainUserToApiUser(user)
@@ -323,21 +426,84 @@ func (h *Handler) SetUserPassword(ctx context.Context, req *api.SetUserPasswordR
 	return &api.SetUserPasswordNoContent{}, nil
 }
 
-func (h *Handler) GetMyUser(ctx context.Context) (api.GetMyUserRes, error) {
-	sessionToken, ok := sessionTokenFromContext(ctx)
-	if !ok {
-		return nil, domain.ErrSessionTokenInvalid()
-	}
-	input := service.GetMyUserInput{
-		SessionToken: sessionToken,
-	}
-
-	user, err := h.userService.GetMyUser(ctx, input)
+func (h *Handler) GetUserPasswordState(ctx context.Context, params api.GetUserPasswordStateParams) (api.GetUserPasswordStateRes, error) {
+	projectID, err := h.requireResourceAccess(ctx, string(params.UserID), userAccess, opRead)
 	if err != nil {
 		return nil, err
 	}
+	setAt, err := h.userService.GetPasswordSetAt(ctx, service.GetPasswordInput{
+		ProjectID: projectID,
+		UserID:    string(params.UserID),
+	})
+	if err != nil {
+		return nil, err
+	}
+	res := userPasswordState(setAt)
+	return &res, nil
+}
 
+// GetMyPasswordState serves the signed-in user's own password state on the
+// session alone, the read GetUserPasswordState answers for a caller who may
+// read the user.
+func (h *Handler) GetMyPasswordState(ctx context.Context, params api.GetMyPasswordStateParams) (api.GetMyPasswordStateRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	setAt, err := h.userService.GetPasswordSetAt(ctx, service.GetPasswordInput{
+		ProjectID: self.ProjectID(),
+		UserID:    self.UserID(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &api.UserPasswordStateHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     userPasswordState(setAt),
+	}, nil
+}
+
+func userPasswordState(setAt *time.Time) api.UserPasswordState {
+	res := api.UserPasswordState{}
+	if setAt != nil {
+		res.SetAt = api.NewOptDateTime(*setAt)
+	}
+	return res
+}
+
+// GetMyUser reads the user of the cookie's session, held to project_id when the
+// caller names one (requireSelf).
+func (h *Handler) GetMyUser(ctx context.Context, params api.GetMyUserParams) (api.GetMyUserRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	user, err := h.userService.GetMyUser(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
 	return domainUserToApiUser(user)
+}
+
+// GetMyUserSchema reads the schema of the cookie's user, held to project_id when
+// the caller names one (requireSelf).
+func (h *Handler) GetMyUserSchema(ctx context.Context, params api.GetMyUserSchemaParams) (api.GetMyUserSchemaRes, error) {
+	self, err := requireSelf(ctx, params.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	schema, err := h.userService.GetMyUserSchema(ctx, service.GetMyUserInput{Self: self})
+	if err != nil {
+		return nil, err
+	}
+	apiSchema, err := domainSchemaToApiSchema(schema)
+	if err != nil {
+		return nil, err
+	}
+	return &api.SchemaHeaders{
+		CacheControl: api.NewOptString(sessionStateCacheControl),
+		Response:     *apiSchema,
+	}, nil
 }
 
 // ------------------ Mappers ---------------
@@ -447,11 +613,21 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	switch err.Code {
 	case domain.ErrUserInvalid().Code,
 		domain.ErrUserPasswordEmpty().Code,
-		domain.ErrUserPasswordTooLong().Code:
+		domain.ErrUserPasswordTooLong().Code,
+		domain.ErrUserPasswordPolicyViolation(nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
+	case domain.ErrUserAttributesInvalid(nil).Code:
+		// Outside the /users endpoints (which answer req.invalid, see
+		// userAttributesRequestInvalid) no request body carries attributes
+		// to name.
+		return errorResponseWithStatusCode(http.StatusBadRequest,
+			domain.ErrUserInvalid().WithMessage("user is not valid according to schema").WithParent(err))
 	case domain.ErrUserNotFound().Code:
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrUserAlreadyExists().Code:
+		if taken, ok := err.Details.(domain.UserAttributesDetails); ok {
+			err = err.WithDetails(userAttributeFieldPaths(taken))
+		}
 		return errorResponseWithStatusCode(http.StatusConflict, err)
 	case domain.ErrUserConflict().Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
@@ -460,4 +636,36 @@ func userErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 	default:
 		return internalErrorResponse(err)
 	}
+}
+
+// userAttributesRequestInvalid answers a user schema failure of a /users write
+// like request validation: the client gets one shape for "fix these fields",
+// whether ogen or the user schema refused them, named by their path from the
+// request body.
+func userAttributesRequestInvalid(err error) error {
+	invalid, ok := errors.AsType[domain.Error](err)
+	if !ok || invalid.Code != domain.ErrUserAttributesInvalid(nil).Code {
+		return err
+	}
+	attrs, ok := invalid.Details.(domain.UserAttributesDetails)
+	if !ok {
+		// Without the keys there are no fields to name: userErrorResponse
+		// answers it as a schema failure instead.
+		return err
+	}
+	return domain.ErrRequestInvalid().WithParent(err).WithDetails(userAttributeFieldPaths(attrs))
+}
+
+// userAttributeFieldPaths names the attributes in attrs by their path from
+// the request body, which carries them under attributes.
+func userAttributeFieldPaths(attrs domain.UserAttributesDetails) domain.InvalidFieldPathsDetails {
+	fields := make([]string, 0, len(attrs.Keys))
+	for _, key := range attrs.Keys {
+		path := domain.AttributeKey("attributes")
+		if key != "" {
+			path = path.AppendNode(string(key))
+		}
+		fields = append(fields, string(path))
+	}
+	return domain.InvalidFieldPathsDetails{Fields: fields}
 }

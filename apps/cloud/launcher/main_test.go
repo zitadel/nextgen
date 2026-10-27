@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,11 +40,12 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_DATABASE_POSTGRES",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT",
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT",
+		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
-		"NEXTGEN_SERVER_LOGIN_ENABLED",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
+		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
 		"PORT",
 		"VERCEL_BRANCH_URL",
 		"VERCEL_ENV",
@@ -90,7 +94,7 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	configPath := filepath.Join(dataDir, "nextgen.yaml")
-	assert.Equal(t, []string{"server", "--config", configPath}, args)
+	assert.Equal(t, []string{"server", "--config", configPath, "--migrate"}, args, "a local run migrates its own database")
 
 	config, err := os.ReadFile(configPath)
 	require.NoError(t, err)
@@ -248,20 +252,102 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	t.Setenv("VERCEL_ENV", "production")
 	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "nextgen-preview-cloud.vercel.app")
-	// Leftovers from an earlier layout must not move the console or the login.
+	// Leftovers from an earlier layout must not move the console.
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ENABLED", "true")
-	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/console")
-	t.Setenv("NEXTGEN_SERVER_LOGIN_ENABLED", "false")
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_PATH", "/ui/console")
+	t.Setenv("NEXTGEN_SERVER_REQUEST_ID_HEADER", "x-request-id")
 
 	_, err := prepareServer(nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, "false", os.Getenv("NEXTGEN_SERVER_CONSOLE_ENABLED"), "the console is a service of its own")
-	assert.Equal(t, "/ui/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
-	assert.Equal(t, "true", os.Getenv("NEXTGEN_SERVER_LOGIN_ENABLED"), "keeps /console/runtime.json mounted")
+	assert.Equal(t, "/console", os.Getenv("NEXTGEN_SERVER_CONSOLE_PATH"), "where vercel.json mounts the console")
+	assert.Equal(t, "x-vercel-id", os.Getenv("NEXTGEN_SERVER_REQUEST_ID_HEADER"), "the ID Vercel's dashboard shows")
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+}
+
+// vercel.json mounts the console service, and builds it, at the path the
+// server's console links point to; JSON has no comments to say so.
+func TestVercelJSONServesTheConsoleAtConsolePath(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			BuildCommand string `json:"buildCommand"`
+			Rewrites     []struct {
+				Source      string `json:"source"`
+				Destination string `json:"destination"`
+			} `json:"rewrites"`
+		} `json:"services"`
+		Rewrites []struct {
+			Source      string          `json:"source"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	console := config.Services["console"]
+	assert.Contains(t, console.BuildCommand, "CONSOLE_BASE_PATH="+consolePath+"/ ", "the base the console is built for")
+	// The service receives the request's full path; its first rewrite maps
+	// the mount onto the build's own root.
+	require.NotEmpty(t, console.Rewrites)
+	assert.Equal(t, consolePath+"/:path(.*)? → /:path", console.Rewrites[0].Source+" → "+console.Rewrites[0].Destination,
+		"where the console service serves the build from")
+
+	// The first matching rewrite wins, and the server's runtime document
+	// (cmd/server/console_runtime.go) lies under the console's mount.
+	var routes []string
+	for _, rewrite := range config.Rewrites {
+		var destination struct{ Service string }
+		if json.Unmarshal(rewrite.Destination, &destination) != nil {
+			continue
+		}
+		if rewrite.Source == "/console/runtime.json" || strings.HasPrefix(rewrite.Source, consolePath+"/") {
+			routes = append(routes, rewrite.Source+" → "+destination.Service)
+		}
+	}
+	assert.Equal(t, []string{"/console/runtime.json → server", consolePath + "/(.*) → console"}, routes)
+}
+
+// The other services' functions run in the project-wide regions; the server
+// stays beside its database in Frankfurt. @vercel/go matches a functions key
+// against the entrypoint's path and silently ignores one that does not match.
+func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Services map[string]struct {
+			Entrypoint string `json:"entrypoint"`
+			Functions  map[string]struct {
+				Regions []string `json:"regions"`
+			} `json:"functions"`
+		} `json:"services"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	server := config.Services["server"]
+	require.Len(t, server.Functions, 1)
+	function, ok := server.Functions[server.Entrypoint]
+	require.True(t, ok, "the server's functions key is its entrypoint, %q", server.Entrypoint)
+	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
+}
+
+// The console service builds into the server's embed directory in the same
+// checkout, so the function is compiled without it; a plain build would
+// carry the console whenever that service built first.
+func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	require.NoError(t, err)
+	var builds []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "go build") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
+			builds = append(builds, line)
+		}
+	}
+	require.Len(t, builds, 1, "build.sh compiles the function once")
+	assert.Contains(t, builds[0], "-tags noconsole")
 }
 
 func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
@@ -299,18 +385,47 @@ func TestPublicBase(t *testing.T) {
 func TestPrepareServerRendersTheBootstrapAdminDocument(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
-	doc := `{"header":{"version":1},"authenticators":[]}`
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
 	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
 
 	args, err := prepareServer([]string{"--disable-master-key-generation"})
 	require.NoError(t, err)
 
 	adminPath := filepath.Join(dataDir, "admin-user.json")
-	assert.Equal(t, []string{"server", "--config", filepath.Join(dataDir, "nextgen.yaml"), "--user-file", adminPath, "--disable-master-key-generation"}, args)
+	assert.Equal(t, []string{"server", "--config", filepath.Join(dataDir, "nextgen.yaml"), "--migrate", "--user-file", adminPath, "--disable-master-key-generation"}, args)
 	written, err := os.ReadFile(adminPath)
 	require.NoError(t, err)
 	assert.Equal(t, doc, string(written))
 	assert.Empty(t, os.Getenv("BOOTSTRAP_ADMIN_USER_JSON_B64"))
+}
+
+func TestPrepareServerMakesTheBootstrapAdminAnOperator(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"project_id":"proj_platform","id":"user_platformadmin"},"authenticators":{}}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_platformadmin", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerKeepsConfiguredOperators(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	doc := `{"header":{"version":1,"id":"user_platformadmin"},"authenticators":{}}`
+	t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(doc)))
+	t.Setenv("NEXTGEN_PLATFORM_OPERATORS", "user_support")
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "user_support", os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
+}
+
+func TestPrepareServerNamesNoOperatorWithoutABootstrapAdmin(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+	assert.Empty(t, os.Getenv("NEXTGEN_PLATFORM_OPERATORS"))
 }
 
 func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
@@ -321,6 +436,34 @@ func TestPrepareServerLocallyKeepsTheConfiguredDatabase(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "postgres://local/db", os.Getenv("NEXTGEN_DATABASE_POSTGRES"), "without CLOUD_DATABASE_URL a local run keeps its own database")
+}
+
+// Only a local run serving its own database migrates when it starts: no build
+// step ran for it. A deployment, or a local run against a cloud database,
+// never changes a schema by starting.
+func TestPrepareServerMigratesOnlyALocalRunsOwnDatabase(t *testing.T) {
+	for _, tc := range []struct {
+		name, env, databaseURL string
+		migrates               bool
+	}{
+		{name: "by hand", env: "", migrates: true},
+		{name: "vercel dev", env: "development", migrates: true},
+		{name: "local against a cloud database", env: "", databaseURL: pooledURL},
+		{name: "preview", env: "preview", databaseURL: pooledURL},
+		{name: "production", env: "production", databaseURL: pooledURL},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setLauncherEnv(t, t.TempDir())
+			t.Setenv("VERCEL_ENV", tc.env)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			t.Setenv("CLOUD_DATABASE_URL", tc.databaseURL)
+
+			args, err := prepareServer(nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.migrates, slices.Contains(args, "--migrate"), "args: %q", args)
+		})
+	}
 }
 
 func TestPrepareServerRefusesBadInput(t *testing.T) {
@@ -363,6 +506,16 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "needs its Git branch")
+		},
+		"a bootstrap admin document without a user id, which would start the cloud without an operator": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":{"version":1},"authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "names no user id")
+		},
+		"a bootstrap admin document that does not decode": func(t *testing.T) {
+			t.Setenv("BOOTSTRAP_ADMIN_USER_JSON_B64", base64.StdEncoding.EncodeToString([]byte(`{"header":"x","authenticators":{}}`)))
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
 		},
 		"a database URL that is not a postgres URL": func(t *testing.T) {
 			t.Setenv("CLOUD_DATABASE_URL", "host=db user=u")
@@ -423,6 +576,111 @@ func TestPrepareMigrationCreatesAndMigratesAPreviewDatabase(t *testing.T) {
 	assert.Equal(t, "eu-central.pg.psdb.cloud:5432", migrated.Host, "the migration lock needs a session, which the pooler cannot hold")
 	assert.Equal(t, "/"+previewName(t), migrated.Path)
 	assert.Equal(t, defaultDataDir, os.Getenv("NEXTGEN_SERVER_DATA_DIR"))
+}
+
+func TestShouldRecreatePreviewOnMigrateError(t *testing.T) {
+	assert.False(t, shouldRecreatePreviewOnMigrateError(nil))
+	assert.False(t, shouldRecreatePreviewOnMigrateError(assert.AnError))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
+		"unknown database error: detected 2 missing (out-of-order) migrations lower than database version (37): versions 34,35")))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
+		"detected 1 missing (out-of-order) migration lower than database version (3): version 2")))
+	assert.True(t, shouldRecreatePreviewOnMigrateError(fmt.Errorf(
+		`launcher: unknown database error: ERROR: column "deployment_id" of relation "auth_attempts" already exists (SQLSTATE 42701)`)))
+}
+
+func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {
+	ensureCalls := stubEnsureDatabase(t)
+	var dropped []string
+	previousDrop := dropDatabase
+	dropDatabase = func(_ context.Context, _, name string) error {
+		dropped = append(dropped, name)
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+
+	attempts := 0
+	previousExec := executeServer
+	executeServer = func([]string) error {
+		attempts++
+		if attempts == 1 {
+			return fmt.Errorf("detected 2 missing (out-of-order) migrations lower than database version (37): versions 34,35")
+		}
+		return nil
+	}
+	t.Cleanup(func() { executeServer = previousExec })
+
+	setLauncherEnv(t, "")
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runMigrate(nil))
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, []string{previewName(t)}, dropped)
+	assert.Len(t, *ensureCalls, 2, "ensure runs before each migrate attempt")
+}
+
+func TestRunMigrateRecreatesPreviewOnDuplicateColumn(t *testing.T) {
+	ensureCalls := stubEnsureDatabase(t)
+	var dropped []string
+	previousDrop := dropDatabase
+	dropDatabase = func(_ context.Context, _, name string) error {
+		dropped = append(dropped, name)
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+
+	attempts := 0
+	previousExec := executeServer
+	executeServer = func([]string) error {
+		attempts++
+		if attempts == 1 {
+			return fmt.Errorf(`unknown database error: ERROR: column "deployment_id" of relation "auth_attempts" already exists (SQLSTATE 42701)`)
+		}
+		return nil
+	}
+	t.Cleanup(func() { executeServer = previousExec })
+
+	setLauncherEnv(t, "")
+	t.Setenv("VERCEL_ENV", "preview")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	require.NoError(t, runMigrate(nil))
+	assert.Equal(t, 2, attempts)
+	assert.Equal(t, []string{previewName(t)}, dropped)
+	assert.Len(t, *ensureCalls, 2)
+}
+
+func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {
+	ensureCalls := stubEnsureDatabase(t)
+	var dropped int
+	previousDrop := dropDatabase
+	dropDatabase = func(context.Context, string, string) error {
+		dropped++
+		return nil
+	}
+	t.Cleanup(func() { dropDatabase = previousDrop })
+
+	previousExec := executeServer
+	executeServer = func([]string) error {
+		return fmt.Errorf("detected 1 missing (out-of-order) migration lower than database version (3): version 2")
+	}
+	t.Cleanup(func() { executeServer = previousExec })
+
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("VERCEL_GIT_COMMIT_REF", "main")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
+
+	err := runMigrate(nil)
+	require.Error(t, err)
+	assert.Zero(t, dropped)
+	assert.Empty(t, *ensureCalls, "production creates no preview database")
 }
 
 func TestPrepareMigrationMigratesProductionInPlace(t *testing.T) {

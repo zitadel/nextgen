@@ -1,11 +1,13 @@
 import type {
+  ListUserIdentityLinks200IdentityLinksItem,
   QueryIdps200IdpsItem,
   QueryIdps200IdpsItemDefinition,
 } from "@zitadel/api/generated/model";
-import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { api } from "@/api/zitadel";
+import { consoleSessionProject } from "@/auth/session";
 import type { FlowDefinitionEntry } from "./flow-definition";
+import { nullOnForbidden } from "./api-error";
 import { readAllPages } from "./paging";
 import {
   type SchemaEntry,
@@ -40,32 +42,56 @@ export type IdpDefinition = QueryIdps200IdpsItemDefinition;
  * providers tab and leaves the Sign-in tab on raw slugs. Any other failure is
  * a real error and reaches the route's error boundary.
  */
-export async function fetchAllIdps(projectId: string): Promise<IdpConnection[] | null> {
-  try {
-    return await readAllPages(async (pageToken) => {
+export function fetchAllIdps(projectId: string): Promise<IdpConnection[] | null> {
+  return nullOnForbidden(
+    readAllPages(async (pageToken) => {
       // The API sorts ascending by default.
       const page = await api.queryIdps(
         { limit: 100, page_token: pageToken, sorting: { field: "created_at", direction: "desc" } },
         { project_id: projectId },
       );
       return { items: page.idps, next: page.next_page_token };
-    });
-  } catch (cause) {
-    if (cause instanceof ApiError && cause.status === 403) return null;
-    throw cause;
-  }
+    }),
+  );
+}
+
+/** One provider account linked to a user. */
+export type UserIdentityLink = ListUserIdentityLinks200IdentityLinksItem;
+
+/** A user's linked provider accounts, oldest first: the order they were linked in. */
+export function fetchUserIdentityLinks(userId: string): Promise<UserIdentityLink[]> {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listUserIdentityLinks(userId, { limit: 100, page_token: pageToken });
+    return { items: page.identity_links, next: page.next_page_token };
+  });
 }
 
 /**
- * The connection's client id, as written: `oidc` or `oauth2`, whichever block
- * the protocol uses. A `${{ VAR }}` reference is shown verbatim — the value
- * differs per environment, and resolving it is the engine's job.
+ * The signed-in person's own linked provider accounts, oldest first, read with
+ * the session alone (`GET /users/me/identity_links`): no grant needed, so it
+ * answers for a platform user who holds none.
  */
-export function idpClientId(definition: IdpDefinition): string | undefined {
-  return definition.oidc?.client_id ?? definition.oauth2?.client_id;
+export function fetchMyIdentityLinks(): Promise<UserIdentityLink[]> {
+  return readAllPages(async (pageToken) => {
+    const page = await api.listMyIdentityLinks({
+      limit: 100,
+      page_token: pageToken,
+      ...consoleSessionProject(),
+    });
+    return { items: page.identity_links, next: page.next_page_token };
+  });
 }
 
-const PROTOCOL_LABELS: Record<string, string> = { oidc: "OIDC", oauth2: "OAuth 2.0" };
+/**
+ * The connection's client id, as written in its `oidc` block. A `${{ VAR }}`
+ * reference is shown verbatim: the value differs per environment, and
+ * resolving it is the engine's job.
+ */
+export function idpClientId(definition: IdpDefinition): string | undefined {
+  return definition.oidc?.client_id;
+}
+
+const PROTOCOL_LABELS: Record<string, string> = { oidc: "OIDC" };
 
 /** `oidc` → `OIDC`. An unknown protocol renders verbatim rather than blank. */
 export function idpProtocolLabel(protocol: string): string {

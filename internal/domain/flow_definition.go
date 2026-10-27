@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"maps"
+	"reflect"
+	"slices"
 	"strings"
 	"time"
 )
@@ -124,7 +127,7 @@ type FlowDefinition struct {
 	Status        FlowDefinitionStatus
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
-	// UserSchema is the URL of the JSON schema this flow operates on.
+	// UserSchema is the objectType of the user schema this flow operates on.
 	UserSchema string
 	// Purposes maps each purpose this definition handles to the name of
 	// its entry-point step. Every value must match a step in [Steps].
@@ -155,6 +158,55 @@ func NewFlowDefinition(
 		Audience:      audience,
 		Steps:         steps,
 	}, nil
+}
+
+// Equal reports whether d and other carry the same author-facing content.
+// Identity fields (project, revision id, timestamps) and SchemaVersion are
+// ignored — they are server-owned and not part of a reuse decision.
+// Nil and empty slices/maps on steps compare equal so an HTTP-mapped empty
+// Actions list matches a storage-reloaded nil one.
+func (d *FlowDefinition) Equal(other *FlowDefinition) bool {
+	if d == nil || other == nil {
+		return d == other
+	}
+	return d.Name == other.Name &&
+		d.Status == other.Status &&
+		d.UserSchema == other.UserSchema &&
+		maps.Equal(d.Purposes, other.Purposes) &&
+		slices.Equal(d.Audience.AppIDs, other.Audience.AppIDs) &&
+		slices.Equal(d.Audience.TeamIDs, other.Audience.TeamIDs) &&
+		flowDefinitionStepsEqual(d.Steps, other.Steps)
+}
+
+func flowDefinitionStepsEqual(a, b []FlowDefinitionStep) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !flowDefinitionStepEqual(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func flowDefinitionStepEqual(a, b FlowDefinitionStep) bool {
+	return a.Name == b.Name &&
+		slices.Equal(a.Fields, b.Fields) &&
+		slices.Equal(a.Actions, b.Actions) &&
+		nilEmptyMapsEqual(a.Gates, b.Gates) &&
+		slices.Equal(a.SSOProviders, b.SSOProviders) &&
+		reflect.DeepEqual(a.OnSuccess, b.OnSuccess) &&
+		reflect.DeepEqual(a.Complete, b.Complete) &&
+		nilEmptyMapsEqual(a.Transitions, b.Transitions)
+}
+
+// nilEmptyMapsEqual treats nil and empty maps as the same, then DeepEquals.
+func nilEmptyMapsEqual[M ~map[K]V, K comparable, V any](a, b M) bool {
+	if len(a) == 0 && len(b) == 0 {
+		return true
+	}
+	return reflect.DeepEqual(a, b)
 }
 
 // InitialStepFor returns the entry-point step name for purpose, or
@@ -297,6 +349,10 @@ type FlowSSOProvider struct {
 	ID       string
 	Name     string
 	Template string
+	// ConnectionID is the connection's stable id. It is not rendered: the
+	// engine matches it against the connection an external identity came
+	// through.
+	ConnectionID string
 }
 
 // FlowStepTransition maps an action name to either a target step (regular) or a pivot purpose.

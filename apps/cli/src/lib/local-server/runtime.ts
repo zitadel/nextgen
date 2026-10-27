@@ -4,9 +4,11 @@ import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { ZitadelError } from "../errors";
-import { isObject, parseJsonObject } from "../json";
-import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary } from "./env-vars";
+import { isErrno, ZitadelError } from "../errors";
+import { isPortableShellWord, isTrainVersion } from "../public-cli";
+import { unscopedCommand } from "../suggestion";
+import { parseJsonObject } from "../json";
+import { EMPTY_SUMMARY, type EnvSummary, isEnvSummary, LOCAL_DEFAULTS } from "./env-vars";
 
 export const LOCAL_SERVER_IMAGE_NAME = "ghcr.io/zitadel/nextgen";
 export const DEFAULT_LOCAL_SERVER_IMAGE = `${LOCAL_SERVER_IMAGE_NAME}:latest`;
@@ -129,7 +131,7 @@ export function localServerUrl(port: number): string {
 
 export function defaultLocalServerImageForCliVersion(cliVersion: string): string {
   const normalized = cliVersion.trim().replace(/^v/, "");
-  if (/^\d+\.\d+\.\d+-alpha\.\d+$/.test(normalized)) {
+  if (isTrainVersion(normalized)) {
     return `${LOCAL_SERVER_IMAGE_NAME}:${normalized}`;
   }
   return DEFAULT_LOCAL_SERVER_IMAGE;
@@ -238,13 +240,58 @@ export function sameLocalServer(a: string, b: string): boolean {
   }
 }
 
+/**
+ * How the server at `serverUrl` reaches this machine's loopback, judged by the
+ * nearest runtime record: `allowed` when that record's process server got the
+ * loopback allow list, `container` when it runs in Docker (its localhost is
+ * the container), `unknown` for any other server or an unreadable record.
+ */
+export async function loopbackReach(
+  cwd: string,
+  serverUrl: string,
+): Promise<"allowed" | "container" | "unknown"> {
+  const nearest = await readNearestRuntimeMetadata(cwd).catch(() => undefined);
+  if (!nearest || !sameLocalServer(nearest.runtime.server_url, serverUrl)) {
+    return "unknown";
+  }
+  if (nearest.runtime.backend === "docker") {
+    return "container";
+  }
+  return Object.keys(LOCAL_DEFAULTS).every((name) => nearest.runtime.env?.injected.includes(name))
+    ? "allowed"
+    : "unknown";
+}
+
 /** Runtime metadata of the server started in `cwd` or the nearest parent with one. */
-async function readNearestRuntimeMetadata(
+export async function readNearestRuntimeMetadata(
   cwd: string,
 ): Promise<{ dir: string; runtime: RuntimeMetadata } | undefined> {
   const dir = await findUpward(cwd, LOCAL_RUNTIME_FILE);
-  const runtime = dir ? await readRuntimeMetadata(dir) : undefined;
-  return dir && runtime ? { dir, runtime } : undefined;
+  if (!dir) {
+    return undefined;
+  }
+  let runtime: RuntimeMetadata | undefined;
+  try {
+    runtime = await readRuntimeMetadata(dir);
+  } catch (error) {
+    // A record in a parent is recovered where it is: the bare commands would
+    // act on the working directory instead.
+    throw dir === cwd ? error : retargetMalformedRuntime(error, dir);
+  }
+  return runtime ? { dir, runtime } : undefined;
+}
+
+/**
+ * The runtime record when it can be read, `undefined` when it is missing or
+ * malformed. For commands that only want a hint from it (the port a directory
+ * had) before they report a malformed record themselves, with the fix.
+ */
+export async function peekRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
+  try {
+    return await readRuntimeMetadata(cwd);
+  } catch {
+    return undefined;
+  }
 }
 
 export async function readRuntimeMetadata(cwd: string): Promise<RuntimeMetadata | undefined> {
@@ -277,13 +324,18 @@ export async function removeLocalData(cwd: string): Promise<void> {
   await rm(localRuntimePaths(cwd).dataDir, { recursive: true, force: true });
 }
 
+/**
+ * Whether the server at `serverUrl` is ready: `/readyz` answers once the
+ * server's database does, so a server that started but cannot reach its
+ * database is not healthy.
+ */
 export async function checkLocalServerHealth(
   serverUrl: string,
   timeoutMs = 1500,
 ): Promise<boolean> {
   try {
-    const healthUrl = new URL("/healthz", serverUrl);
-    const response = await fetch(healthUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    const readyUrl = new URL("/readyz", serverUrl);
+    const response = await fetch(readyUrl, { signal: AbortSignal.timeout(timeoutMs) });
     return response.ok;
   } catch {
     return false;
@@ -291,56 +343,18 @@ export async function checkLocalServerHealth(
 }
 
 /**
- * Best-effort local-server detection for optional UI (the setup wizard's
- * server choice). Same sources as {@link resolveLocalServer} — the runtime
- * metadata written by `zitadel start` in this directory or a parent, then the
- * default localhost URL — but
- * never throws: a malformed `runtime.json` or an unhealthy server yields
- * `undefined` (doctor owns diagnosing those states), and an unhealthy
- * metadata URL still falls back to the default-port probe so a server
- * started from a different directory is found.
+ * The error for a directory with no running server of its own. With a
+ * `serverUrl` there is a record whose server is not running; without one there
+ * is no record in the directory or a parent. The hint offers `--server` for the
+ * case where someone really does mean another directory's server, since
+ * nothing falls back to one on its own.
  */
-export async function detectHealthyLocalServer(cwd: string): Promise<string | undefined> {
-  let runtime: RuntimeMetadata | undefined;
-  try {
-    runtime = (await readNearestRuntimeMetadata(cwd))?.runtime;
-  } catch {
-    runtime = undefined;
-  }
-  if (runtime && (await checkLocalServerHealth(runtime.server_url))) {
-    return runtime.server_url;
-  }
-  const alreadyProbedDefault = runtime?.server_url === DEFAULT_LOCAL_SERVER_URL;
-  if (!alreadyProbedDefault && (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL))) {
-    return DEFAULT_LOCAL_SERVER_URL;
-  }
-  return undefined;
-}
-
-export async function resolveLocalServer(cwd: string): Promise<string> {
-  const nearest = await readNearestRuntimeMetadata(cwd);
-  if (nearest) {
-    const { server_url } = nearest.runtime;
-    if (await checkLocalServerHealth(server_url)) {
-      return server_url;
-    }
-    // This directory's own metadata is authoritative. A parent's can outlive
-    // its server (`stop` keeps it), so it does not rule out the default one.
-    if (nearest.dir === cwd || server_url === DEFAULT_LOCAL_SERVER_URL) {
-      throw localServerNotRunning(server_url);
-    }
-  }
-
-  if (await checkLocalServerHealth(DEFAULT_LOCAL_SERVER_URL)) {
-    return DEFAULT_LOCAL_SERVER_URL;
-  }
-  throw localServerNotRunning(DEFAULT_LOCAL_SERVER_URL);
-}
-
-export function localServerNotRunning(serverUrl: string): ZitadelError {
+export function localServerNotRunning(serverUrl?: string): ZitadelError {
   return new ZitadelError("E_LOCAL_SERVER_NOT_RUNNING", "Local Zitadel server is not running", {
-    hint: `No healthy local server responded at ${serverUrl}.`,
-    nextCommands: ["zitadel start"],
+    hint: serverUrl
+      ? `No healthy local server responded at ${serverUrl}.`
+      : "No local server has been started in this directory or a parent. Run `zitadel start`, or name a server another directory started with --server <url>.",
+    nextCommands: [unscopedCommand("start")],
     details: { server_url: serverUrl },
   });
 }
@@ -429,11 +443,6 @@ function normalizeRuntimeMetadata(input: Record<string, unknown>): RuntimeMetada
   };
 }
 
-export async function assertWritableDirectory(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: 0o700 });
-  await access(path, constants.W_OK);
-}
-
 async function nearestExistingDirectory(path: string): Promise<string> {
   let current = path;
   while (true) {
@@ -454,15 +463,6 @@ async function nearestExistingDirectory(path: string): Promise<string> {
       current = parent;
     }
   }
-}
-
-function isErrno(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === code
-  );
 }
 
 export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<string, unknown> {
@@ -496,10 +496,6 @@ export function runtimeSummary(metadata: RuntimeMetadata | undefined): Record<st
   };
 }
 
-export function isRuntimeObject(value: unknown): value is RuntimeMetadata {
-  return isObject(value) && value.schema_version === 1;
-}
-
 function isValidPort(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= 65_535;
 }
@@ -529,7 +525,40 @@ function explicitUrlPort(value: string): number | undefined {
 function malformedRuntime(input: Record<string, unknown>): ZitadelError {
   return new ZitadelError("E_VALIDATION", `${LOCAL_RUNTIME_FILE} is malformed`, {
     hint: "Run `zitadel reset --force`, then `zitadel start`.",
-    nextCommands: ["zitadel reset --force", "zitadel start"],
+    nextCommands: [unscopedCommand("reset --force"), unscopedCommand("start")],
     details: input,
+  });
+}
+
+/**
+ * The malformed-record error again, with its recovery aimed at `dir`. The
+ * commands are written out only when `dir` can sit in them unquoted on every
+ * shell (POSIX, PowerShell, cmd.exe quote differently); otherwise the
+ * arguments are handed over as `details.suggested_args`, which no shell reads.
+ */
+export function retargetMalformedRuntime(error: unknown, dir: string): unknown {
+  if (!(error instanceof ZitadelError) || error.message !== `${LOCAL_RUNTIME_FILE} is malformed`) {
+    return error;
+  }
+  const resetArgs = ["reset", "--force", "--cwd", dir];
+  const startArgs = ["start", "--cwd", dir];
+  const suggestedArgs = [resetArgs, startArgs];
+  const portable = suggestedArgs.every((args) => args.every(isPortableShellWord));
+  const reset = `zitadel ${resetArgs.join(" ")}`;
+  const start = `zitadel ${startArgs.join(" ")}`;
+  return new ZitadelError(error.code, error.message, {
+    hint: portable
+      ? `Run \`${reset}\`, then \`${start}\`.`
+      : `Run \`zitadel reset --force\`, then \`zitadel start\`, each with --cwd ${dir} ` +
+        "(details.suggested_args holds the exact arguments).",
+    ...(portable
+      ? {
+          nextCommands: [
+            unscopedCommand(resetArgs.join(" ")),
+            unscopedCommand(startArgs.join(" ")),
+          ],
+        }
+      : {}),
+    details: { ...(error.details as Record<string, unknown>), suggested_args: suggestedArgs },
   });
 }

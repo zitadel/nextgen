@@ -1,5 +1,4 @@
-import { Link, useMatchRoute } from "@tanstack/react-router";
-// `BookOpen` / `Search` return with the parked footer items below.
+import { Link, useMatch, useMatchRoute } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -8,38 +7,35 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import type { NavGroup } from "@/nav";
 
 import { ContextSwitcher } from "./context-switcher";
 import { ZitadelLogo } from "./icons";
-import { ThemeToggle } from "./theme-toggle";
+import { SearchDialog, SearchTrigger, useSearchShortcut } from "./search";
 import { useNavItems } from "./use-nav-items";
-import { SETTINGS_PATH, type ShellUser, UserMenuItem } from "./user-menu";
-
-export type { ShellUser };
+import type { NavView } from "@/nav";
+import { SETTINGS_PATH, type ShellUser, UserMenuButton, UserMenuItem } from "./user-menu";
 
 /**
  * Console shell built on shadcn's `Sidebar` block. `collapsible="icon"` gives
  * the 256px → icon-rail collapse with tooltips, ⌘/Ctrl+B, mobile off-canvas, and
- * rail — all from the component. The context bar (sidebar trigger, project
- * switcher, theme toggle) sits at the top of the content column in the portal
- * view, and is absent from the Settings view, which the design draws without
- * one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
+ * rail — all from the component. The sidebar's header carries the logo and the
+ * collapse toggle; the context bar (project and team switchers, search)
+ * sits at the top of the content column in the portal view, and is absent from
+ * the Settings view, which the design draws without one. Colours come from `@zitadel/design-tokens` via the shadcn utility names;
  * the sidebar surface uses `background` per the design (see `ui/sidebar.tsx`).
+ *
+ * Projects is the console's home and draws no sidebar (`HomeShell`): the
+ * sidebar is the selected project's screens, and the home is above every
+ * project rather than inside one.
  */
 export function AppShell({
   children,
@@ -54,9 +50,25 @@ export function AppShell({
 }) {
   const matchRoute = useMatchRoute();
   const inSettings = !!matchRoute({ to: SETTINGS_PATH, fuzzy: true });
+  const atHome = !!useMatch({ from: HOME_ROUTE, shouldThrow: false });
+  // The palette is the shell's, not the bar's: ⌘K opens it in the Settings
+  // view too, which draws no bar.
+  const [searchOpen, setSearchOpen] = useSearchShortcut();
+
+  const searchDialog = <SearchDialog open={searchOpen} onOpenChange={setSearchOpen} />;
+
+  if (atHome) {
+    return (
+      <HomeShell user={user} onSignOut={onSignOut} onSearch={() => setSearchOpen(true)}>
+        {searchDialog}
+        {children}
+      </HomeShell>
+    );
+  }
 
   return (
     <SidebarProvider defaultOpen={readSidebarOpen()}>
+      {searchDialog}
       <AppSidebar user={user} onSignOut={onSignOut} />
       {/* `min-w-0` because the inset is a flex item, and a flex item's default
           `min-width: auto` makes it grow to fit its widest content instead of
@@ -66,12 +78,54 @@ export function AppShell({
       <SidebarInset className="min-w-0">
         {/* No context bar in the Settings view: the settings design draws none,
             and the switcher it carries is a *project* control that says nothing
-            about an account screen. The sidebar's own header keeps a trigger, so
-            collapsing still works without it. */}
-        {!inSettings && <ContextBar />}
+            about an account screen. */}
+        {!inSettings && <ContextBar onSearch={() => setSearchOpen(true)} userId={user?.userId} />}
         {children}
       </SidebarInset>
     </SidebarProvider>
+  );
+}
+
+/** The console's home: Projects, the one screen drawn without the sidebar. */
+const HOME_ROUTE = "/_authed/projects/";
+
+/**
+ * The home's chrome: one 56px bar, ruled underneath like the portal's, with
+ * the logo on the left and search and the account on the right. No project
+ * switcher, since the page is that list at full size (D21), and no sidebar,
+ * since its screens are a project's and none is open here.
+ */
+function HomeShell({
+  children,
+  user,
+  onSignOut,
+  onSearch,
+}: {
+  children: ReactNode;
+  user?: ShellUser;
+  onSignOut?: () => void;
+  onSearch: () => void;
+}) {
+  return (
+    <div className="flex min-h-svh w-full flex-col bg-background">
+      <header className={`${TOP_BAR} px-4`}>
+        <HomeLink className="text-foreground" />
+        <div className="flex min-w-0 items-center gap-3">
+          <BarSearch onSearch={onSearch} />
+          <UserMenuButton user={user} onSignOut={onSignOut} />
+        </div>
+      </header>
+      <main className="min-w-0 flex-1">{children}</main>
+    </div>
+  );
+}
+
+/** Home is Projects, the list of every project, from any screen. */
+function HomeLink({ className }: { className: string }) {
+  return (
+    <Link to="/projects" aria-label="Home" className={`inline-flex items-center ${className}`}>
+      <ZitadelLogo className="h-[21px] w-auto" />
+    </Link>
   );
 }
 
@@ -83,24 +137,20 @@ function readSidebarOpen(): boolean {
 }
 
 /**
- * The collapsed rail's 44px header band. The rail owns the collapse toggle —
- * the context bar hides its own while collapsed, so the two never compete.
+ * The sidebar's top band: the logo with the collapse toggle beside it, 56px
+ * tall, level with the top bar. In the icon rail the logo goes and the toggle
+ * centres — there is no room for both, and the toggle brings the logo back.
  */
-const RAIL_HEADER = "hidden h-11 items-center justify-center group-data-[collapsible=icon]:flex";
+const BRAND_HEADER =
+  "h-14 shrink-0 flex-row items-center justify-between py-0 pr-3 pl-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0";
 
-/** Both header buttons are 28px square in the rail, per the design. */
-const RAIL_BUTTON = "size-7!";
+/** The design's `Sidebar / Header Button`: 28px square around a 16px glyph. */
+const HEADER_BUTTON = "size-7! text-sidebar-foreground";
 
-/**
- * The back row is a full-width 32px row while extended and a 28px square in the
- * rail, so its collapsed size is a variant rather than a flat override.
- */
-const BACK_BUTTON = "group-data-[collapsible=icon]:size-7!";
-
-// The rule under the header sits inside its 48px, so the bottom inset gives
+// The rule under the back row sits inside its 48px, so the bottom inset gives
 // up the pixel the rule takes.
 const SETTINGS_HEADER =
-  "border-b border-border pb-[calc(--spacing(2)-1px)] group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0";
+  "border-b border-border pb-[calc(--spacing(2)-1px)] group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0";
 
 /**
  * The sidebar has two views and the **route** decides which is showing:
@@ -109,7 +159,7 @@ const SETTINGS_HEADER =
  * what lets a settings URL survive a refresh, and it keeps the shell consistent
  * with ADR 0001's route-driven nav.
  *
- * Both views collapse to the same 48px icon rail.
+ * Both views share the brand header and collapse to the same 48px icon rail.
  */
 function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => void }) {
   const matchRoute = useMatchRoute();
@@ -117,20 +167,22 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
 
   return (
     <Sidebar collapsible="icon">
-      {inSettings ? <SettingsHeader /> : <PortalHeader />}
+      <BrandHeader />
+      {inSettings && <SettingsHeader />}
 
-      <SidebarContent>{inSettings ? <SettingsNav /> : <PortalNav />}</SidebarContent>
+      <SidebarContent>
+        {inSettings ? (
+          <NavList view="settings" label="Account settings" />
+        ) : (
+          <NavList view="portal" label="Primary" />
+        )}
+      </SidebarContent>
 
       <SidebarFooter>
         <SidebarMenu>
-          {/* Search and Documentation are parked: both rendered as ordinary
-              enabled buttons with no handler, so clicking them did nothing at
-              all — the worst of the three states, since they looked live.
-
-              Search needs a cross-resource query endpoint; ADR 031's
-              `POST /{resource}/query` exists only for projects today, so there
-              is nothing to search across. Documentation needs a published URL
-              for the docs site to point at. */}
+          {/* Documentation is parked: it needs a published URL for the docs
+              site to point at, and a row that does nothing reads as broken.
+              Search lives in the top bar. */}
           <UserMenuItem user={user} onSignOut={onSignOut} />
         </SidebarMenu>
       </SidebarFooter>
@@ -140,20 +192,12 @@ function AppSidebar({ user, onSignOut }: { user?: ShellUser; onSignOut?: () => v
   );
 }
 
-/** Portal header: the full logo lockup, replaced by the toggle in the rail. */
-function PortalHeader() {
+/** Logo lockup, linking home, and the collapse toggle; the toggle alone in the rail. */
+function BrandHeader() {
   return (
-    <SidebarHeader className="px-4 py-6 group-data-[collapsible=icon]:p-0">
-      <div className={RAIL_HEADER}>
-        <SidebarTrigger className={RAIL_BUTTON} />
-      </div>
-      <Link
-        to="/"
-        aria-label="Home"
-        className="inline-flex items-center text-sidebar-foreground group-data-[collapsible=icon]:hidden"
-      >
-        <ZitadelLogo aria-hidden />
-      </Link>
+    <SidebarHeader className={BRAND_HEADER}>
+      <HomeLink className="text-sidebar-foreground group-data-[collapsible=icon]:hidden" />
+      <SidebarTrigger className={HEADER_BUTTON} />
     </SidebarHeader>
   );
 }
@@ -170,15 +214,12 @@ function PortalHeader() {
 function SettingsHeader() {
   return (
     <SidebarHeader className={SETTINGS_HEADER}>
-      <div className={RAIL_HEADER}>
-        <SidebarTrigger className={RAIL_BUTTON} />
-      </div>
       {/* One row, restyled per state — rendering a separate rail copy would put
           two "Back to dashboard" links in the accessibility tree at once, with only
           CSS deciding which one is real. */}
-      <SidebarMenu className="group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center">
+      <SidebarMenu className="group-data-[collapsible=icon]:items-center">
         <SidebarMenuItem>
-          <SidebarMenuButton asChild tooltip="Back to dashboard" className={BACK_BUTTON}>
+          <SidebarMenuButton asChild tooltip="Back to dashboard">
             <Link to="/">
               <ArrowLeft aria-hidden />
               <span>Back to dashboard</span>
@@ -191,139 +232,84 @@ function SettingsHeader() {
 }
 
 /**
- * Settings nav: the design's grouped list, `ACCOUNT` over `WORKSPACE`.
+ * Both sidebars' nav: one flat list of the view's routes (`staticData.nav`,
+ * Console ADR 0001). Portal is the project's screens; Settings holds the
+ * person's profile alone while accounts are not surfaced (Console ADR 0005
+ * §3). A row stays marked on the screens beneath it, so a resource's detail
+ * keeps its list marked. Projects is not a row: it is the home, behind the
+ * logo and the project switcher's `All projects`. Design-only entries
+ * (`DESIGN_ONLY_NAV`, empty today) render disabled.
  *
- * Rows attach the same way Portal's do, through `staticData.nav` on the route,
- * and declare `view: "settings"` so they leave the primary list alone.
- *
- * A heading renders only when a route claims it. Profile claims `ACCOUNT`.
- * No screen claims `WORKSPACE` yet, so that heading is absent rather than a
- * heading over nothing.
+ * Rows keep their height and a 2px gap in both sidebar states, so collapsing
+ * moves nothing vertically.
  */
-function SettingsNav() {
-  const items = useNavItems("settings");
+function NavList({ view, label }: { view: NavView; label: string }) {
+  const items = useNavItems(view);
   const matchRoute = useMatchRoute();
 
   return (
-    <>
-      {SETTINGS_GROUPS.map((group) => {
-        const rows = items.filter((item) => item.nav.group === group);
-        if (rows.length === 0) return null;
-        return (
-          <SidebarGroup key={group} role="navigation" aria-label={group}>
-            <SidebarGroupLabel>{group}</SidebarGroupLabel>
-            <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
-              {rows.map((item) => {
-                const Icon = item.nav.icon;
-                const label = item.nav.label;
-                // Every settings row is a built route: `useNavItems` merges the
-                // design-only entries into the portal list only.
-                if (!item.to) return null;
-                return (
-                  <SidebarMenuItem key={label}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={!!matchRoute({ to: item.to, fuzzy: true })}
-                      tooltip={label}
-                    >
-                      <Link to={item.to} title={label}>
-                        {Icon && <Icon aria-hidden />}
-                        <span>{label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroup>
-        );
-      })}
-    </>
-  );
-}
-
-/** Heading order in the Settings nav, top to bottom, as the design draws it. */
-const SETTINGS_GROUPS: NavGroup[] = ["ACCOUNT", "WORKSPACE"];
-
-/** Portal nav: the flat list, with `User schemas` nested under `Users`. */
-function PortalNav() {
-  const items = useNavItems();
-  const matchRoute = useMatchRoute();
-
-  return (
-    <SidebarGroup role="navigation" aria-label="Primary" className="py-0">
-      <SidebarMenu className="gap-0 group-data-[collapsible=icon]:gap-1">
-        {items.map((item) => {
-          const Icon = item.nav.icon;
-          const label = item.nav.label;
-          if (!item.to) {
-            return (
-              <SidebarMenuItem key={label}>
-                <SidebarMenuButton
-                  tooltip={label}
-                  className="cursor-default"
-                  aria-disabled="true"
-                  title={`${label} — not available yet`}
-                  onClick={(event) => event.preventDefault()}
-                >
-                  {Icon && <Icon aria-hidden />}
-                  <span>{label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          }
-          // A parent with children highlights only on an exact match: the
-          // child paths sit under it (`/schemas` is a sibling route, but
-          // `Users` fuzzy-matching its own subtree would light both rows).
-          const active = !!matchRoute({ to: item.to, fuzzy: item.to !== "/" });
-          return (
-            <SidebarMenuItem key={label}>
-              <SidebarMenuButton asChild isActive={active} tooltip={label}>
-                <Link to={item.to} title={label}>
-                  {Icon && <Icon aria-hidden />}
-                  <span>{label}</span>
+    <SidebarGroup role="navigation" aria-label={label} className="pt-4 pb-0">
+      <SidebarMenu className="gap-0.5">
+        {items.map(({ to, nav: { icon: Icon, label: name } }) => (
+          <SidebarMenuItem key={name}>
+            {to ? (
+              <SidebarMenuButton
+                asChild
+                isActive={!!matchRoute({ to, fuzzy: to !== "/" })}
+                tooltip={name}
+              >
+                <Link to={to} title={name}>
+                  <Icon aria-hidden />
+                  <span>{name}</span>
                 </Link>
               </SidebarMenuButton>
-              {item.children.length > 0 && (
-                <SidebarMenuSub>
-                  {item.children.map((child) => (
-                    <SidebarMenuSubItem key={child.nav.label}>
-                      <SidebarMenuSubButton
-                        asChild
-                        isActive={!!matchRoute({ to: child.to, fuzzy: true })}
-                      >
-                        <Link to={child.to} title={child.nav.label}>
-                          <span>{child.nav.label}</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              )}
-            </SidebarMenuItem>
-          );
-        })}
+            ) : (
+              <SidebarMenuButton
+                tooltip={name}
+                className="cursor-default"
+                aria-disabled="true"
+                title={`${name} — not available yet`}
+                onClick={(event) => event.preventDefault()}
+              >
+                <Icon aria-hidden />
+                <span>{name}</span>
+              </SidebarMenuButton>
+            )}
+          </SidebarMenuItem>
+        ))}
       </SidebarMenu>
     </SidebarGroup>
   );
 }
 
-function ContextBar() {
-  // While the sidebar is collapsed the rail carries the toggle in its header,
-  // per the design. Rendering this one as well would put two on screen.
-  const { state } = useSidebar();
-
+/**
+ * The top bar: the project switcher (and the team switcher on a team's page)
+ * on the left, search on the right. 56px and ruled underneath, level with the
+ * sidebar's brand header. The collapse toggle lives in the sidebar and the
+ * theme in the account menu, so the bar carries neither.
+ */
+function ContextBar({ onSearch, userId }: { onSearch: () => void; userId?: string }) {
   return (
-    // 64px tall with its content centred, per the navbar every screen draws.
-    <div className="sticky top-0 z-10 flex items-start justify-between gap-4 bg-background px-2 py-3 md:items-center md:px-4">
-      <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:items-center">
-        {/* Desktop only — mobile keeps the persistent icon rail. */}
-        {state === "expanded" && (
-          <SidebarTrigger className="hidden text-foreground md:inline-flex" />
-        )}
-        <ContextSwitcher />
-      </div>
-      <ThemeToggle />
+    <div className={`${TOP_BAR} px-2 md:px-4`}>
+      {/* The signed-in person, whose recent projects the switcher keeps. */}
+      <ContextSwitcher userId={userId} />
+      <BarSearch onSearch={onSearch} />
+    </div>
+  );
+}
+
+/** The top bar both shells draw: 56px, ruled underneath, level with the sidebar's brand header. */
+const TOP_BAR =
+  "sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-background";
+
+/**
+ * The bar's search. Hidden on phones, as in the proposal: ⌘K still opens it,
+ * and the bar needs the width for the switchers.
+ */
+function BarSearch({ onSearch }: { onSearch: () => void }) {
+  return (
+    <div className="hidden w-75 justify-end sm:flex">
+      <SearchTrigger onOpen={onSearch} />
     </div>
   );
 }

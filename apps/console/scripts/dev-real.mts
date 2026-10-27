@@ -57,7 +57,7 @@ const seedOnly = process.argv.includes("--seed-only");
  * to the seeded project instead. Opt-in, not the default: making
  * `proj_platform` the deployment's default project is exactly the
  * standalone-semantics change the demo and embedded suites must not see (see
- * `cli-journey-e2e/scripts/run-local.mjs`).
+ * `e2e/journey/scripts/run-local.mjs`).
  */
 const claimMode = process.argv.includes("--claim");
 
@@ -240,12 +240,18 @@ if (!claimMode && devUser && !(await grantDevUserAdmin(devUser.id))) {
  * and the plain methods by several, and the connection's "Used by" names one.
  *
  * Both schemas are the bootstrapped one with their own type, title and methods,
- * so they carry the properties the seeded users already validate against. The
+ * so they carry the properties the seeded users already validate against.
+ * `Employees` adds an optional boolean and integer, and one employee is seeded
+ * with both set, so the user page shows a switch and a number field. The
  * client id and secret are `${{ VAR }}` references: no variable backs them, so
  * the connection renders but cannot complete a sign-in — which nothing here
  * asks of it. Best-effort, like the grant: a failure costs the screen its
  * data, not the instance.
  */
+const EMPLOYEE_EMAIL = "employee@zitadel.local";
+/** The revision the seeded connection was created as; a release pins it. */
+let idpRevisionId: string | null = null;
+
 async function seedAuthentication(): Promise<boolean> {
   const headers = {
     authorization: `Bearer ${projectSecret}`,
@@ -278,6 +284,7 @@ async function seedAuthentication(): Promise<boolean> {
       },
     });
     if (!idp.ok) return false;
+    idpRevisionId = ((await idp.json()) as { revision_id: string }).revision_id;
 
     const list = await fetch(scoped("/schemas", { kind: "user-schema", revisions: "latest" }), {
       headers,
@@ -293,6 +300,7 @@ async function seedAuthentication(): Promise<boolean> {
     // document a schema rather than a revision of the bootstrapped one.
     const { $id: _id, ...document } = base;
     const methods = (document["x-auth-methods"] ?? {}) as Record<string, unknown>;
+    const properties = (document.properties ?? {}) as Record<string, unknown>;
 
     const customers = await post("/schemas", {
       ...document,
@@ -307,8 +315,31 @@ async function seedAuthentication(): Promise<boolean> {
       objectType: "employee",
       title: "Employees",
       "x-auth-methods": { ...methods, sso: { enabled: false } },
+      properties: {
+        ...properties,
+        newsletter: { type: "boolean", title: "Newsletter" },
+        deskNumber: { type: "integer", title: "Desk number" },
+      },
     });
-    return customers.ok && employees.ok;
+    if (!customers.ok || !employees.ok) return false;
+    const { id: schema } = (await employees.json()) as { id: string };
+    // Its own warning: the provider and schemas above are seeded either way.
+    const employee = await post("/users", {
+      schema,
+      attributes: {
+        email: EMPLOYEE_EMAIL,
+        givenName: "Evelyn",
+        familyName: "Berezin",
+        newsletter: true,
+        deskNumber: 42,
+      },
+    }).catch(() => undefined);
+    if (!employee?.ok) {
+      console.warn(
+        `[console-dev-real] could not seed ${EMPLOYEE_EMAIL}; the user page has no boolean or number field to show.`,
+      );
+    }
+    return true;
   } catch {
     return false;
   }
@@ -317,6 +348,109 @@ async function seedAuthentication(): Promise<boolean> {
 if (!claimMode && !(await seedAuthentication())) {
   console.warn(
     "[console-dev-real] could not seed the identity provider and its schemas; the Authentication screen will have no connection to show.",
+  );
+}
+
+/**
+ * Two releases pinning the project's configuration, and their deployments, so
+ * the release and deployment screens render against real data: one built from
+ * a clean tree with a message, pinning the newest revision of every user
+ * schema and login flow seeded above, the identity provider connection and a
+ * branding revision; one from a dirty tree without a message, pinning the
+ * flows and the schemas they sign into. Releases are otherwise only ever built
+ * by the CLI from a repository. Best-effort, like the rest: a failure costs
+ * the screens their rows, not the instance, and the warning says why.
+ */
+async function seedReleases(): Promise<string | null> {
+  const headers = { authorization: `Bearer ${projectSecret}`, "content-type": "application/json" };
+  const scoped = (path: string, extra: Record<string, string> = {}) =>
+    `${baseUrl}${path}?${new URLSearchParams({ project_id: projectId, ...extra }).toString()}`;
+  const list = async <T,>(
+    path: string,
+    key: string,
+    extra: Record<string, string>,
+  ): Promise<T[]> => {
+    const response = await fetch(scoped(path, extra), {
+      headers,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) throw new Error(`GET ${path} answered ${response.status}`);
+    return ((await response.json()) as Record<string, T[]>)[key] ?? [];
+  };
+  try {
+    const latest = { revisions: "latest" };
+    const [schemas, flows] = await Promise.all([
+      list<{ id: string; schema: { objectType?: string } }>("/schemas", "schemas", latest),
+      list<{ id: string; flow_definition: { user_schema?: string } }>(
+        "/flow_definitions",
+        "flow_definitions",
+        latest,
+      ),
+    ]);
+    const schemaPointers = schemas.map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const flowPointers = flows.map(({ id }) => ({ kind: "flow_definition", revision_id: id }));
+    // A release must pin every handle its revisions name: the schema each
+    // flow signs into, and the provider the customer schema allows.
+    const signedInto = new Set(flows.map((flow) => flow.flow_definition.user_schema));
+    const flowSchemaPointers = schemas
+      .filter((schema) => signedInto.has(schema.schema.objectType))
+      .map(({ id }) => ({ kind: "schema", revision_id: id }));
+    const idpPointers = idpRevisionId ? [{ kind: "idp", revision_id: idpRevisionId }] : [];
+    const post = async <T,>(path: string, body: unknown): Promise<T> => {
+      const response = await fetch(scoped(path), {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (!response.ok) {
+        throw new Error(`POST ${path} answered ${response.status}: ${await response.text()}`);
+      }
+      return (await response.json()) as T;
+    };
+    // Nothing seeds a branding revision, and a release that pins none has no
+    // Branding group to show; one revision of the bundled template is enough.
+    const branding = await post<{ id: string }>("/branding", { layout: "split" });
+    const first = await post<{ id: string }>("/releases", {
+      pointers: [
+        ...schemaPointers,
+        ...flowPointers,
+        ...idpPointers,
+        { kind: "branding", revision_id: branding.id },
+      ],
+      message: "Add phone_number to human-user",
+      git_sha: "4a5b268343c0ffee0123456789abcdef01234567",
+    });
+    const second = await post<{ id: string }>("/releases", {
+      pointers: [...flowSchemaPointers, ...flowPointers],
+      git_sha: "9f2c1a7b4e83d05f6c2b19ae7d430f821c6b5de9",
+      git_dirty: true,
+    });
+    // Where the releases went: two primary origins and a preview pattern,
+    // then the first release to primary, the second after it (so the first
+    // reads as superseded), and the first again to a preview URL. Loopback
+    // stays admitted without a pattern, so the console itself is unaffected.
+    const origins = `/projects/${projectId}/origins`;
+    await post(origins, { pattern: "https://app.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://www.acme.com", kind: "primary" });
+    await post(origins, { pattern: "https://*-acmeinc.vercel.app", kind: "preview" });
+    await post("/deployments", { release_id: first.id, targets: ["primary"] });
+    await post("/deployments", { release_id: second.id, targets: ["primary"] });
+    await post("/deployments", {
+      release_id: first.id,
+      targets: ["https://acme-k3x9v2-acmeinc.vercel.app"],
+      ttl: "168h",
+    });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+const releaseSeedFailure = claimMode ? null : await seedReleases();
+if (releaseSeedFailure !== null) {
+  console.warn(
+    `[console-dev-real] could not seed releases (${releaseSeedFailure}); the release and deployment screens will have no rows to show.`,
   );
 }
 
@@ -362,6 +496,7 @@ console.log(
     `  │  instance   ${baseUrl}`,
     `  │  project    ${projectId}`,
     `  │  users      ${seeded.length} seeded`,
+    ...(claimMode ? [] : [`  │             + ${EMPLOYEE_EMAIL}, no password (cannot sign in)`]),
     "  │",
     `  │  sign in at ${consoleOrigin}/login`,
     `  │    email     ${DEV_USER.email}`,

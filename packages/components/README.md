@@ -35,7 +35,7 @@ for the form-association / accessibility decisions baked into every input atom.
 ## Install
 
 ```sh
-corepack pnpm add @zitadel/components
+corepack pnpm add @zitadel/components@latest
 ```
 
 `lit`, `liquidjs`, `dompurify`, and `lucide` are runtime dependencies and are intentionally
@@ -133,7 +133,7 @@ fixtures:
   response (presets include `font_url` for Inter).
 - **Framework demos (TCP server)** — `moon run api-mock:start`
   serves the same handlers on port 8080 (set `PORT` to override) with
-  `defaultDevBranding` (Arimo `font_url`) applied at boot. See
+  `defaultDevBranding` (dark theme, no font) applied at boot. See
   [`apps/demo-next`](../../apps/demo-next/README.md)
   and [`apps/demo-nuxt`](../../apps/demo-nuxt/README.md).
 
@@ -210,7 +210,8 @@ full-page chrome:
 ```html
 <zitadel-login variant="page"></zitadel-login>
 <!-- claims the viewport, paints the surface background from tokens,
-     loads the brand font, focuses the first field -->
+     links the tenant's branding font_url if it has one,
+     focuses the first field -->
 ```
 
 Width-responsive chrome (the split designs' two-column collapse, the compact
@@ -219,6 +220,12 @@ narrow embed on a desktop viewport lays out like a phone. Fine-grained height
 control in either mode: `--zl-page-min-height` (inherits across the shadow
 boundaries, releasing the orchestrator mount and the `zl-page-shell` atom in
 one setting). `embedding.browser.spec.ts` pins this whole contract.
+
+**Fonts are opt-in.** The package fetches no typeface of its own: the token
+stacks name Arimo first and fall back to the system font, so an unbranded
+login sends no request to a font CDN. To render a face, load it in your app
+(`next/font`, `@fontsource/*`, your own `@font-face`), or set branding
+`typography.font_url`, which a `page` links into the document `<head>`.
 
 **Colour mode** ships light and dark. A `page` renders dark (the design
 system's primary surface); a `widget` follows the visitor's
@@ -246,12 +253,29 @@ controls expose hooks such as `zitadel-input-email`, `zitadel-input-password`,
 and `zitadel-action-submit-button`. Hooks are method-named even when the flow
 engine names a credential field `x-auth-methods#<method>` — the `name`
 attribute keeps that raw form key, only the `data-testid` hooks are normalised
-(`hookName` in `src/internal/hook-name.ts`).
+(`hookName` in `src/internal/hook-name.ts`). For sign-out, `<zitadel-session>`'s
+button carries `zitadel-session-logout`, and its native button
+`zitadel-session-logout-button`. `<zitadel-logout>` has no hook. By default it
+shows an avatar menu: open it ("Open user menu"), then target the `.signout-btn`
+button in its shadow root. Given a `<template>` child, it shows that markup
+instead, and the element marked `data-action="logout"` signs out.
 
 A tenant Liquid template can already be supplied through the branding
 payload's `liquid_template` field; a dedicated declarative `template`
 surface on `<zitadel-login>` is not yet exposed. The orchestrator otherwise
 renders the bundled `default.liquid`. Tracked as a follow-up.
+
+## Server rendering and late configuration
+
+A server-rendered page ships the widget as a bare custom element, and the browser upgrades it as soon as the components bundle has run, usually before the framework has hydrated and handed the element its configuration. Attributes the server writes into the markup (`project-id`, `proxy-path`, `purpose`, `flow-name`) are there at upgrade, but properties (the `project` handle from `configureZitadel()`, `locales`) only arrive on hydration, and some wrappers set even the attribute-shaped values as properties once the element is running. `<zitadel-login>` reads its configuration once, when it starts, and does not restart when the configuration changes later: an element that starts with no resolvable project sends no request and shows "requires a configured project", and a `purpose` or `flow-name` that arrives after the start does not change the flow already running. `<zitadel-session>` and `<zitadel-logout>` wait for a project and fetch the identity once, with whatever resolved first.
+
+So the configuration has to be there when the element starts. Give a raw element `project-id` and `proxy-path` as attributes in the server markup, configure globally with `configureZitadel()` before the bundle loads, or mount the widget on the client only, after hydration. Which of these a framework wrapper supports differs, so follow the page for your SDK.
+
+Do not build on server-rendered markup that carries an object-valued prop. React 19 does not apply a custom element's object property while hydrating it, so a `project` handle passed to a raw `<zitadel-login>` that was server-rendered is never delivered. Pass `project-id` and `proxy-path` as strings, configure globally before the bundle loads, or mount on the client only.
+
+### Edge runtimes
+
+Cloudflare Workers and Vercel Edge have no DOM, and bundlers target them with the `browser` condition next to `workerd`, `worker` or `edge-light`, so Lit's browser build throws `HTMLElement is not defined` as soon as it is imported. When one of those conditions is active together with `browser`, the package root therefore resolves to a build that never loads Lit and defines no element. It keeps what does not need one: `businessLocales` and the other locales, `tokens` and `cssVars`, the branding helpers, the attribution markup and the flow API client. The elements, their manifests, the sanitiser and `ThemeController` are not in it, so a bundle for those runtimes fails at build time if it imports one. The other entries (`./atoms`, `./manifests`, `./orchestrator`, `./standalone`) are unchanged and still need a DOM, as does the root under `browser` alone. Without `browser`, `workerd`, `worker` and `edge-light` resolve to the full root as before.
 
 ## Element APIs
 
@@ -265,9 +289,10 @@ renders the bundled `default.liquid`. Tracked as a follow-up.
 | `flowName` / `flow-name` | `string` | Run the flow definition with this `name` instead of the project default |
 | `project` | `ZitadelProject` | SDK handle from `configureZitadel()`. Object property (not an attribute). When unset, the element falls back to the global handle from `getZitadelConfig()` |
 | `lang` | `string` | BCP 47 tag (e.g. `"de"`, `"en-US"`). Resolves to a built-in dictionary; falls back to `<html lang>` / `navigator.language` |
-| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work |
-| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here |
-| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh |
+| `locales` | `Record<string, Locale>` | Custom locale dictionaries keyed by language code; spread over the built-in dictionary so partial overrides work. The `en` entries also fill whatever another language has no text for |
+| `postSignInUrl` / `post-sign-in-url` | `string` | After `complete: "show"`, exchange the `handoff_token` for a session cookie and navigate here, or back to the path in the page's `next` query parameter when that is a path on the page's origin: every server SDK's middleware sends a signed-out visit to a protected route to the login page with `?next=<path>`. A `next` that is a URL, starts with `//`, or holds a `\` or a control character is ignored |
+| `forcePostSignInUrl` / `force-post-sign-in-url` | `boolean` | Navigate to `post-sign-in-url` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own |
+| `resumeFlowId` / `resume-flow-id` | `string` | Resume an existing flow handle instead of starting fresh. Unset, `null` or `""` fall back to the `flow` query parameter. Every SDK's login wrapper takes it as `resumeFlowId` |
 | `previewState` / `preview-state` | `'default' \| 'validation_error' \| 'submission_error' \| 'loading' \| 'success'` | Preview mode for operator surfaces such as the console's branding screen. The flow still starts, so the step is the one the project serves; the element then shows it in this state and submits nothing. Only the purpose's entry step can be previewed. `LOGIN_PREVIEW_STATES` lists the values, and `loginPreviewStatesFor(step)` the ones that show a served step differently from `default`; any other value runs the flow for real |
 | `previewSuccessStep` / `preview-success-step` | `string` | The terminal step the `success` preview paints, for a flow definition that names it differently from the default flow's `done` |
 
@@ -275,7 +300,9 @@ Events: `zitadel-flow-input`, `zitadel-flow-step`, `zitadel-flow-complete`,
 `zitadel-flow-error`, `zitadel-flow-redirect`. `zitadel-flow-step` fires for
 every applied step including the first, so a host app can drive its own chrome
 (progress, headings, analytics) from mount onwards rather than from the first
-submit.
+submit. A heading follows `step.purpose`, `login` or `register`: the login
+switches between them by itself when an email does or does not have an account,
+and then shows the visitor a notice saying why.
 
 `zitadel-flow-redirect` fires when a step hands the browser to an identity
 provider, carrying the URL to send it to. The widget then navigates there
@@ -284,7 +311,10 @@ is a full-page destination on another origin, so there is nothing a router
 could do with it. The event is a notification, not a hook — it is not
 cancelable, and a host listener cannot substitute its own navigation. Use it
 to record the hand-off (analytics, a spinner, saving scroll state) before the
-page goes away. The framework wrappers surface it as `onFlowRedirect`, except
+page goes away. The detail carries `waitUntil(promise)`: the widget waits for
+the promises its listeners pass, up to two seconds, before it navigates.
+`zitadel-flow-complete` and `zitadel-signout` carry it too, for the navigation
+that follows them. The framework wrappers surface it as `onFlowRedirect`, except
 Vue and Angular, which emit `flowRedirect`, and Qwik, which takes
 `onFlowRedirect$`.
 The orchestrator exposes `::part(form)` for tenant-side CSS hooks. Adopts
@@ -295,8 +325,11 @@ design tokens and `branding.font_url` into its shadow root on each update.
 Session menu / sign-out control for embedded apps. Reads the signed-in
 identity from `getMySession` (`GET /sessions/me`) — the same source as
 `<zitadel-session>` — calls `revokeMySession` (`DELETE /sessions/me`) through
-the SDK handle, and clears the session. Uses the same token adoption as
-`<zitadel-login>` (`applyBaseTokens`).
+the SDK handle, and clears the session. The read and the revoke name the
+handle's project: a session of another project on the same host, such as the
+Console's on `localhost`, shows no identity and stays signed in. A session that
+already ended, in another tab or by expiring, signs out without an error. Uses
+the same token adoption as `<zitadel-login>` (`applyBaseTokens`).
 
 | Property | Type | Notes |
 | --- | --- | --- |
@@ -347,6 +380,23 @@ Inline status message for the four Figma severities (`error \| success \|
 warning \| info`). Renders the matching icon automatically; supports an
 optional `heading` and default-slot body.
 
+### `<zl-sso-providers>`
+
+One outline button per identity provider the step offers. A provider's logo
+shows automatically when `<zl-icon>` ships a `brand-<template>` mark for its
+catalog `template` (`SHIPPED_BRAND_ICON_NAMES`); any other provider, including
+a tenant's own OIDC connection, stays text-only rather than getting a stand-in
+logo.
+
+- Multicolour marks (Google) keep the vendor's colours.
+- Monochrome marks (GitHub) carry no fill and follow the button's foreground,
+  so they flip with light and dark mode.
+- Every mark sits in the button's leading slot at 16px.
+
+To add a provider's logo, add its official artwork to `BRAND_GLYPHS` in
+`src/atoms/zl-icon.ts` and its name to `BrandIconName` and
+`SHIPPED_BRAND_ICON_NAMES`; the buttons and the Storybook mock pick it up.
+
 ### `<zl-icon>` / `<zl-pill>` / `<zl-card>` / `<zl-page-shell>`
 
 Pure presentational atoms — icons render from a curated inline-SVG sprite,
@@ -371,6 +421,7 @@ packages/components/
 │   ├── tokens/            re-export of @zitadel/design-tokens
 │   ├── styles/            shared host styles, focus ring, t() css-var bridge
 │   ├── manifests.ts       per-atom attribute / part / event manifests
+│   ├── server.ts          Lit-free subset the root resolves to on edge
 │   └── index.ts           barrel
 ├── tsdown.config.ts       library build (externalises lit/liquidjs/dompurify)
 └── vitest.config.ts       jsdom (unit) + chromium (browser) projects

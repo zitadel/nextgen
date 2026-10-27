@@ -104,8 +104,9 @@ describe("teams screen", () => {
   it("opens the team when the row is clicked", async () => {
     server.use(
       http.post(TEAMS_URL, () => HttpResponse.json({ teams: [team()] })),
-      // The click opens the team's page, whose loader reads the team.
+      // The click opens the team's page, whose loader reads the team and its members.
       http.get(`http://localhost/api/teams/${team().id}`, () => HttpResponse.json(team())),
+      http.post("*/api/users/query", () => HttpResponse.json({ users: [] })),
     );
     const router = await renderTeams();
 
@@ -116,7 +117,9 @@ describe("teams screen", () => {
     // The team's page, not only its URL: the test ends once the page has read
     // its team, rather than with that read still in flight.
     expect(await screen.findByRole("heading", { name: "Acme Web" })).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe(`/teams/${team().id}`);
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.pathname).toBe(`/teams/${team().id}`),
+    );
   });
 
   it("offers View team from the row menu", async () => {
@@ -148,6 +151,8 @@ describe("teams screen", () => {
     await userEvent.type(name, "Acme Web");
     await userEvent.click(screen.getByRole("button", { name: "Add team" }));
 
+    // The drawer closes once the team is created and the list has been read again.
+    await waitFor(() => expect(screen.queryByLabelText("Team name")).not.toBeInTheDocument());
     expect(created).toEqual([{ name: "Acme Web" }]);
   });
 

@@ -25,6 +25,10 @@ type stubAuthzStmts struct {
 	kinds map[string]domain.ResourceKind
 	// elsewhere forces ExistsResourceScopeElsewhere for a resource_id (shared URL across foreign projects).
 	elsewhere map[string]bool
+	// operator answers CheckPlatformOperator (ADR 075); false by default.
+	operator bool
+	// operatorAsked, when set, records each CheckPlatformOperator question.
+	operatorAsked *[]domain.AuthzPlatformCheckParams
 }
 
 func (stubAuthzStmts) IsStatements() {}
@@ -49,6 +53,13 @@ func (s stubAuthzStmts) CheckAuthz(ctx context.Context, params domain.AuthzCheck
 		return *s.allowCheck, foothold, nil
 	}
 	return params.PrincipalID == params.ProjectID, foothold, nil
+}
+
+func (s stubAuthzStmts) CheckPlatformOperator(_ context.Context, params domain.AuthzPlatformCheckParams) (bool, error) {
+	if s.operatorAsked != nil {
+		*s.operatorAsked = append(*s.operatorAsked, params)
+	}
+	return s.operator, nil
 }
 
 func (s stubAuthzStmts) ListAuthzObjectIDs(context.Context, domain.AuthzListObjectsParams) ([]string, error) {
@@ -813,6 +824,64 @@ func TestRequireResourceAccess(t *testing.T) {
 
 	_, err = requireResourceAccess(preview, stmts, "", "usr_a", userAccess, opDelete)
 	assertDomainCode(t, err, domain.ErrUserPermissionDenied().Code)
+}
+
+// The index holds a built-in schema under the base its row is stored at, so
+// a path id under another base must be looked up under each of them before
+// it is a miss; the first id names the resource in that miss.
+func TestRequireResourceAccessAmong(t *testing.T) {
+	const stored = "https://schemas.test/builtin/v1/default-human-user.json"
+	const asked = "https://schemas.test/builtin/v0/default-human-user.json"
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{stored: "proj_a"},
+		kinds:  map[string]domain.ResourceKind{stored: domain.ResourceKindSchema},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccessAmong(operator, stmts, "", []string{asked, stored}, schemaAccess, opRead)
+	if err != nil {
+		t.Fatalf("twin id: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	_, err = requireResourceAccessAmong(operator, stmts, "", []string{asked, "https://schemas.test/builtin/v2/default-human-user.json"}, schemaAccess, opRead)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
+
+	// The one-id form is unchanged.
+	_, err = requireResourceAccess(operator, stmts, "", asked, schemaAccess, opRead)
+	assertDomainCode(t, err, domain.ErrJSONSchemaNotFound().Code)
+}
+
+// A route scoped to the project the caller names answers its not-found when
+// the id lives in another project, also for a project secret, whose lookup
+// stays in its own project whatever the hint says.
+func TestRequireResourceAccessHonoursTheNamedProject(t *testing.T) {
+	stmts := stubAuthzStmts{
+		scopes: map[string]string{"pol_a": "proj_a"},
+		kinds:  map[string]domain.ResourceKind{"pol_a": domain.ResourceKindPolicy},
+	}
+	operator := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID: "proj_a", Scope: []string{"project.write", "project.read"},
+		PrincipalType: domain.AuthzPrincipalTypeSKProj, PrincipalID: "proj_a",
+	})
+
+	projectID, err := requireResourceAccess(operator, stmts, "proj_a", "pol_a", policyAccess, opRead)
+	if err != nil {
+		t.Fatalf("own project: %v", err)
+	}
+	if projectID != "proj_a" {
+		t.Fatalf("projectID = %q, want proj_a", projectID)
+	}
+
+	for _, named := range []string{"proj_b", "proj_unknown"} {
+		_, err = requireResourceAccess(operator, stmts, named, "pol_a", policyAccess, opRead)
+		assertDomainCode(t, err, domain.ErrPolicyNotFound().Code)
+	}
 }
 
 func TestRequireResourceAccessWrongKind(t *testing.T) {

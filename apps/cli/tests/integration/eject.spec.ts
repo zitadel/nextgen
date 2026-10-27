@@ -117,6 +117,37 @@ describe("eject", () => {
         expect(removed).toContain("AGENTS.md");
         expect(modified).toContain("README.md");
       });
+
+      it("backs up the CLI secret env file away from the tree", async () => {
+        const app = await aPatchedApp();
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--force", "--json"]);
+
+        const { removed } = await before.changes();
+        expect(removed).toContain(".env.development.local");
+      });
+    });
+
+    describe("without --force when no one can be asked", () => {
+      it("is refused", async () => {
+        const app = await aPatchedApp();
+
+        const result = await app.run(["eject", "--json"]);
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(result).toHintAt("--force");
+        expect(result).toSuggest("eject --force");
+      });
+
+      it("removes nothing", async () => {
+        const app = await aPatchedApp();
+        const before = await app.snapshot();
+
+        await app.run(["eject", "--json"]);
+
+        expect(await before.changes()).toMatchObject({ added: [], modified: [], removed: [] });
+      });
     });
 
     it("changes nothing on a dry run", async () => {

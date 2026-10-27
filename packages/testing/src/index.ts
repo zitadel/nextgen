@@ -92,7 +92,8 @@ export type { BootstrapProjectOptions, BootstrappedProject } from "./bootstrap";
 export { readHandshakeSync, waitForHandshake, writeHandshake } from "./handshake";
 export { bootLocalServer } from "./lifecycle";
 export type { BootedServer, BootServerOptions } from "./lifecycle";
-export { SESSION_COOKIE_NAME } from "./session";
+export { identity } from "./seed";
+export { SESSION_COOKIE_NAME, sessionCookieName } from "./session";
 export type {
   ConnectedZitadel,
   Identity,

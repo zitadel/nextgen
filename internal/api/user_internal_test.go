@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"go.uber.org/mock/gomock"
 
@@ -210,6 +211,9 @@ func (s *stubQueryUsersService) ListUsers(_ context.Context, input service.ListU
 func (s *stubQueryUsersService) ListPasskeys(context.Context, service.ListPasskeysInput) ([]*domain.UserPasskey, string, error) {
 	return nil, "", errors.New("unexpected ListPasskeys")
 }
+func (s *stubQueryUsersService) ListIdentityLinks(context.Context, service.ListIdentityLinksInput) ([]*domain.IDPIdentityLink, string, error) {
+	return nil, "", errors.New("unexpected ListIdentityLinks")
+}
 func (s *stubQueryUsersService) ListUserTeams(context.Context, service.ListUserTeamsInput) (*service.ListUserTeamsOutput, error) {
 	return nil, errors.New("unexpected ListUserTeams")
 }
@@ -219,12 +223,19 @@ func (s *stubQueryUsersService) GetUserByID(context.Context, service.GetUserInpu
 func (s *stubQueryUsersService) SetPassword(context.Context, service.SetPasswordInput) error {
 	return errors.New("unexpected SetPassword")
 }
+func (s *stubQueryUsersService) GetPasswordSetAt(context.Context, service.GetPasswordInput) (*time.Time, error) {
+	return nil, errors.New("unexpected GetPasswordSetAt")
+}
 func (s *stubQueryUsersService) GetMyUser(context.Context, service.GetMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected GetMyUser")
 }
 func (s *stubQueryUsersService) PatchUser(context.Context, service.PatchUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchUser")
 }
+func (s *stubQueryUsersService) GetMyUserSchema(context.Context, service.GetMyUserInput) (*domain.JSONSchema, error) {
+	return nil, errors.New("unexpected GetMyUserSchema")
+}
+
 func (s *stubQueryUsersService) PatchMyUser(context.Context, service.PatchMyUserInput) (*domain.User, error) {
 	return nil, errors.New("unexpected PatchMyUser")
 }

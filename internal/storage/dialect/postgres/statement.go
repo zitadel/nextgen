@@ -16,13 +16,16 @@ type queryExecutor interface {
 
 type statements struct {
 	projectStatements
+	originStatements
 	flowDefinitionStatements
 	cryptoKeyStatements
 	jsonSchemaStatements
 	releaseStatements
 	idpConnectionStatements
+	policyStatements
 	idpIdentityLinkStatements
 	deploymentStatements
+	previewStatements
 	teamStatements
 	teamMembershipStatements
 	tokenStatements
@@ -35,6 +38,7 @@ type statements struct {
 	userRecoveryCodesStatements
 	brandingStatements
 	variableStatements
+	variableSetStatements
 	claimStatements
 	resourceScopeStatements
 	authzAssignmentStatements
@@ -52,15 +56,19 @@ func (s statements) Statements() service.AllStatements {
 func (s statements) IsStatements() {}
 
 func newStatements(client queryExecutor) statements {
+	client = traced(client)
 	return statements{
 		projectStatements:             newProjectStatements(client),
+		originStatements:              newOriginStatements(client),
 		flowDefinitionStatements:      newFlowDefinitionStatements(client),
 		cryptoKeyStatements:           newCryptoKeyStatements(client),
 		jsonSchemaStatements:          newJSONSchemaStatements(client),
 		releaseStatements:             newReleaseStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
+		policyStatements:              newPolicyStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),
+		previewStatements:             newPreviewStatements(client),
 		teamStatements:                newTeamStatements(client),
 		teamMembershipStatements:      newTeamMembershipStatements(client),
 		tokenStatements:               newTokenStatements(client),
@@ -73,6 +81,7 @@ func newStatements(client queryExecutor) statements {
 		userRecoveryCodesStatements:   newUserRecoveryCodesStatements(client),
 		brandingStatements:            newBrandingStatements(client),
 		variableStatements:            newVariableStatements(client),
+		variableSetStatements:         newVariableSetStatements(client),
 		claimStatements:               newClaimStatements(client),
 		resourceScopeStatements:       newResourceScopeStatements(client),
 		authzAssignmentStatements:     newAuthzAssignmentStatements(client),

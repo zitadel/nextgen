@@ -11,9 +11,9 @@ dependsOn:
 tasks:
   typecheck:
     deps:
+      # The edge spec imports this package's built dist.
       - "api-mock:build"
-      - "components:build"
-      - "sdk-core:build"
+      - "build"
 
   build:
     deps:
@@ -53,11 +53,8 @@ tasks:
       - "install-browsers"
       - "build"
     options:
-      # Shared mutex with the other browser-mode suites so only one real-Chromium
-      # Vite server runs at a time; concurrent servers starve under moon's CI
-      # graph and drop module fetches. (#1490)
-      mutex: "browser-tests"
-      # Retry a failed browser suite in CI. The flake is a cold-start race:
-      # the first attempt warms the Vite dep cache, so a retry runs warm and
-      # clears the "Failed to fetch dynamically imported module" failure. (#1490)
+      # Retry a failed browser suite in CI, as a safety net. It was added for
+      # "Failed to fetch dynamically imported module": Chromium aborting module
+      # imports when a container changes the host's addresses, which ci.yml's
+      # "Keep Docker's interface churn away from Chromium" step prevents. (#1490)
       retryCount: 3

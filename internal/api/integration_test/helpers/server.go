@@ -14,6 +14,7 @@ import (
 	"github.com/zitadel/nextgen/internal/api/middleware"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/service"
+	"go.opentelemetry.io/otel"
 )
 
 // serverLog is a concurrency-safe sink for the test server's request logs.
@@ -36,7 +37,7 @@ func (h *Harness) ServerLog() string {
 	return h.serverLog.buf.String()
 }
 
-func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
+func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 	t.Helper()
 	h.testServer.mutex.Lock()
 	defer h.testServer.mutex.Unlock()
@@ -53,8 +54,8 @@ func (h *Harness) EnsureTestServer(t *testing.T) *httptest.Server {
 		// middleware chain: the callback on both its spellings, ahead of the
 		// API catch-all.
 		mux := http.NewServeMux()
-		mux.Handle(api.IDPCallbackPath, callback)
-		mux.Handle(api.IDPCallbackUpstreamPath, callback)
+		mux.Handle(api.IDPCallbackPattern, callback)
+		mux.Handle(api.IDPCallbackUpstreamPattern, callback)
 		mux.Handle("/", h.withServerLog(api.WithSessionStateNoStore(api.WithCSRFRequest(h.EnsureGeneratedServer(t)))))
 		h.testServer.value = httptest.NewServer(mux)
 	}
@@ -73,7 +74,7 @@ func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.H
 	})
 }
 
-func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
+func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 	t.Helper()
 	h.generatedServer.mutex.Lock()
 	defer h.generatedServer.mutex.Unlock()
@@ -84,19 +85,29 @@ func (h *Harness) EnsureGeneratedServer(t *testing.T) *generated.Server {
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithNotFound(api.OgenNotFound(nil)),
+			generated.WithMethodNotAllowed(api.OgenMethodNotAllowed),
+			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
 		)
 		require.NoError(t, err)
 	}
 	return h.generatedServer.value
 }
 
-func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
+// ConsoleOrigin is the test server's own origin, the one its
+// server.public_base would name: claim URLs point at its console, and the flow
+// gate admits it to open any project's flow.
+const ConsoleOrigin = "https://console.invalid"
+
+func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 	t.Helper()
 	h.handler.mutex.Lock()
 	defer h.handler.mutex.Unlock()
 
 	if h.handler.value == nil {
 		platform := h.EnsurePlatformProject(t)
+		db := h.EnsureServiceDB(t)
+		releaseService := h.EnsureReleaseService(t)
 		h.handler.value = api.NewHandler(
 			h.EnsureFlowService(t),
 			h.EnsureAuthAttemptService(t),
@@ -111,22 +122,23 @@ func (h *Harness) EnsureHandler(t *testing.T) *api.Handler {
 			h.EnsureFlowDefinitionService(t),
 			h.EnsureTeamService(t),
 			h.EnsureBrandingService(t),
-			h.EnsureReleaseService(t),
+			releaseService,
+			h.EnsureDeploymentService(t),
 			h.EnsureIDPConnectionService(t),
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
-			service.NewClaimService(h.EnsureServiceDB(t), "https://console.invalid/ui/console", platform.ID),
-			service.NewGrantService(h.EnsureServiceDB(t), service.StatementsUserRefResolver{Pool: h.EnsureServiceDB(t)}, platform.ID),
-			service.NewVariableService(h.EnsureServiceDB(t), h.EnsureKeyService(t)),
-			h.EnsureServiceDB(t),
+			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
+			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
+			service.NewVariableService(db, h.EnsureKeyService(t)),
+			db,
 			platform.ID,
-		)
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
 	}
 	return h.handler.value
 }
 
-func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
+func (h *Harness) EnsureSecurityHandler(t testing.TB) *api.SecurityHandler {
 	t.Helper()
 	h.securityHandler.mutex.Lock()
 	defer h.securityHandler.mutex.Unlock()
@@ -134,7 +146,7 @@ func (h *Harness) EnsureSecurityHandler(t *testing.T) *api.SecurityHandler {
 	if h.securityHandler.value == nil {
 		h.securityHandler.value = api.NewSecurityHandler(
 			h.EnsureTokenService(t),
-		)
+		).WithPlatformProject(h.EnsurePlatformProject(t).ID)
 	}
 	return h.securityHandler.value
 }

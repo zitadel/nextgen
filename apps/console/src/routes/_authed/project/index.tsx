@@ -1,13 +1,14 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { Box, SlidersHorizontal } from "lucide-react";
+import { Boxes, Settings } from "lucide-react";
 
 import { api } from "@/api/zitadel";
 import { MetaRule, MetaValue } from "@/components/detail-meta";
-import { DETAIL_BODY, DetailHeader, DetailPage } from "@/components/detail-page";
+import { DETAIL_BODY, DetailHeader } from "@/components/detail-page";
 import { ProjectAdmins } from "@/components/project-admins";
 import { RenameCard } from "@/components/rename-card";
 import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { Page } from "@/components/layout";
 
 /**
  * Project settings — the selected project's own page.
@@ -20,7 +21,7 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
  *
  * The header card carries `PROJECT ID` and `CREATED`. The design draws a third
  * cell, `ISSUER` — the project's issuer origin — but nothing carries it:
- * `project-response` is `id`, `name`, `preview_origins`, `created_at` and
+ * `project-response` is `id`, `name`, `origins`, `created_at` and
  * `updated_at`, and `issuer` appears nowhere in the spec, the console or the
  * domain layer. The cell is left out rather than shown empty, and returns as one
  * more `MetaValue` when the field lands.
@@ -35,7 +36,7 @@ export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
   staticData: {
     scope: "project",
-    nav: { label: "Project settings", order: 6, icon: SlidersHorizontal },
+    nav: { label: "Project settings", order: 9, icon: Settings },
   },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
@@ -57,9 +58,9 @@ function ProjectDetail() {
   const router = useRouter();
 
   return (
-    <DetailPage>
+    <Page>
       <DetailHeader
-        icon={Box}
+        icon={Boxes}
         title={project.name}
         meta={
           <>
@@ -88,6 +89,6 @@ function ProjectDetail() {
         viewerUserId={session.user_id ?? undefined}
         onChanged={() => void router.invalidate()}
       />
-    </DetailPage>
+    </Page>
   );
 }

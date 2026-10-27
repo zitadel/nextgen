@@ -1,7 +1,14 @@
 # ADR 048: Wide Events as Internal Audit Primitive
 
-> **Status:** Proposed
+> **Status:** Implemented — 2026-10-24 (originally Proposed 2026-07-03)
 > **Date:** 2026-07-03
+>
+> **Amendment (2026-10-24):** shipped in #808 (`internal/audit/`), with
+> `x-audit` declarations (#901) and requestor context on `request.api`
+> (#964). The ADR 053 §8 amendment below is only partly built: events carry
+> `metadata.authorization` with `path` and `actor_home_project_id`, set today
+> only for the `platform_operator` path of
+> [ADR 075](075-platform-operators.md); the `team_id` rule is unchanged.
 > **Context:** Audit logging for nextgen relational storage
 > **Builds on:** [ADR 028](028-storage-v2-statements-and-dialects.md), [ADR 010](010-session-auth-attempt-check-model.md), [ADR 011](011-resource-identifiers.md), [ADR 047](047-dialect-id-generation.md), [ADR 008](008-users-eav-store.md), [ADR 033](033-internal-permission-management.md), [ADR 046](046-claim-lifecycle-v2.md), [oxidel ADR-023](https://github.com/zitadel/oxidel/blob/main/docs/adr/023-wide-events.md)
 > **Related:** [ADR 049](049-events-api-retention-export.md) (API, retention, export)

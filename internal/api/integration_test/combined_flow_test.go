@@ -43,7 +43,7 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowResponseHeaders{}, createResp, helpers.MustMarshal(t, createResp))
 	flowHeaders := createResp.(*api.FlowResponseHeaders)
@@ -70,6 +70,9 @@ func TestCombinedFlowLoginFlipToRegister(t *testing.T) {
 	require.IsType(t, &api.SubmitFlowStepOK{}, flipResp, helpers.MustMarshal(t, flipResp))
 	flipOK := flipResp.(*api.SubmitFlowStepOK)
 	require.Equal(t, "register-identifier", flipOK.Response.Step.Name, "user_not_found must flip to register-identifier")
+	require.Equal(t, api.NewOptFlowStepPurpose(api.FlowStepPurposeRegister), flipOK.Response.Step.Purpose)
+	require.Equal(t, api.NewOptNilString(domain.FlowStepNoticeUserNotFound), flipOK.Response.Step.Notice,
+		"the user asked to sign in, so the sign-up says why")
 	zflow = mustExtractZflow(t, flipOK.SetCookie)
 
 	// Complete the register-identifier step. The default schema collects only
@@ -219,7 +222,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
@@ -240,7 +243,7 @@ func TestPurposeNavRotatesAuthAttempt(t *testing.T) {
 	loginResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID
@@ -342,7 +345,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	regResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeRegister,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	regHeaders := regResp.(*api.FlowResponseHeaders)
 	regID := regHeaders.Response.ID
@@ -363,7 +366,7 @@ func TestBackToIdentifierRotatesAuthAttempt(t *testing.T) {
 	loginResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,
-	})
+	}, api.CreateFlowParams{})
 	require.NoError(t, err)
 	loginHeaders := loginResp.(*api.FlowResponseHeaders)
 	flowID := loginHeaders.Response.ID

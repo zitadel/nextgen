@@ -158,9 +158,10 @@ func resolveAuthMethodField(authMethods xAuthMethodsReader, field Field, stepNam
 		Type:      fieldType,
 		Challenge: challenge,
 		Required:  true,
-		Validation: &FlowFieldValidation{
-			MinLength: 8, // TODO: should come from policy or user-schema
-		},
+		// No length rule here: whether the user chooses the password depends
+		// on the purpose on the flow state, which the step's fields are
+		// resolved against at render and at submit alike (see
+		// FlowStateMachineRuntime.applyPasswordPolicy).
 	}, nil
 }
 
@@ -527,6 +528,24 @@ func (x xAuthMethodsReader) IsEnabled(method string) bool {
 	}
 	enabled, _ := entry["enabled"].(bool)
 	return enabled
+}
+
+// SSOProviders returns the IDP connection slugs under `sso.providers`, or
+// none when SSO is not enabled.
+func (x xAuthMethodsReader) SSOProviders() []string {
+	if !x.IsEnabled("sso") {
+		return nil
+	}
+	methods, _ := x.raw.V.(map[string]any)
+	sso, _ := methods["sso"].(map[string]any)
+	providers, _ := sso["providers"].([]any)
+	slugs := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if slug, ok := provider.(string); ok {
+			slugs = append(slugs, slug)
+		}
+	}
+	return slugs
 }
 
 // requirednessKeywords can make a property required outside a `required`

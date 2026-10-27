@@ -11,19 +11,21 @@
  */
 import { DevPortPrompt } from "./dev-port";
 import { FrameworkConfirmPrompt } from "./framework-confirm";
+import { PasswordPolicyPrompt } from "./password-policy";
 import { ServerPrompt } from "./server";
 import { SignInPresetPrompt } from "./sign-in-preset";
 import { SocialSignInPrompt } from "./social-sign-in";
 import type { SetupPrompt } from "./types";
 import { UseCasePrompt } from "./use-case";
 
-export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer } from "./types";
-export { bail } from "./cancel";
+export type { PromptContext, SetupAnswers, SetupPrompt, SsoAnswer, SsoDraft } from "./types";
+export { completeSso } from "./types";
 export { DevPortPrompt } from "./dev-port";
 export { FrameworkConfirmPrompt } from "./framework-confirm";
+export { PasswordPolicyPrompt } from "./password-policy";
 export { ServerPrompt } from "./server";
 export { SignInPresetPrompt } from "./sign-in-preset";
-export { SocialSignInPrompt } from "./social-sign-in";
+export { askCustomSettings, SocialSignInPrompt } from "./social-sign-in";
 export { UseCasePrompt } from "./use-case";
 export { PickFrameworkPrompt } from "./pick-framework";
 
@@ -34,5 +36,6 @@ export const SETUP_PROMPTS: ReadonlyArray<SetupPrompt> = [
   new DevPortPrompt(),
   new UseCasePrompt(),
   new SignInPresetPrompt(),
+  new PasswordPolicyPrompt(),
   new SocialSignInPrompt(),
 ];

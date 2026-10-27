@@ -3,7 +3,8 @@
  *
  * Drives an xstate `flowMachine` actor. `POST /flow` resets the actor and
  * starts a new walk; `POST /flow/{id}/submit` advances the actor and returns
- * the matching step fixture; `GET /flow/{id}` re-renders the current step.
+ * the matching step fixture; `GET /flow/{id}` re-renders the current step;
+ * `GET /__nextgen/idp/callback` (and `/idp/callback`) is the provider's return.
  *
  * Branding is applied by `withBranding` (overlay set via `applyBranding`).
  * Request bodies are captured for assertions via the `getCaptured` method
@@ -22,6 +23,7 @@ import {
 } from "@zitadel/api/generated/endpoints/zitadelNextGen.msw";
 import type {
   CreateFlow201,
+  CreateFlow201StepPurpose,
   CreateFlowBody,
   CreateFlowBodyPurpose,
   ExchangeHandoffBody,
@@ -31,6 +33,11 @@ import { http, HttpResponse, type RequestHandler } from "msw";
 
 import { withBranding } from "./branding.js";
 import { withPasskey } from "./passkey.js";
+import {
+  parseRedirectTarget,
+  RedirectTargetError,
+  type RedirectTarget,
+} from "./redirect-target.js";
 import { withSsoProviders } from "./sso-providers.js";
 import {
   doneStep,
@@ -81,24 +88,83 @@ export type MockHandle = {
    * The browser's half of the round trip cannot happen in-process: choosing a
    * provider navigates the whole page to the authorization endpoint, and it is
    * the provider's return to the callback that advances the flow. This stands
-   * in for that leg, sending the same `sso` and `callback` submissions the HTTP
-   * handler does and resolving the branch by the same rule, so a caller that
+   * in for that leg: it sends the same `sso` submission the client does, then
+   * drives the same transition the callback route does, so a caller that
    * cannot leave the page — a Storybook story, a component test — can still
    * reach `register-sso` and `sso-conflict`.
    *
    * Which one it lands on follows from the email, exactly as it does over the
    * wire: an address this provider has already signed up signs straight in, an
    * address that has an account here but no link is the collision, and anything
-   * else is a new identity.
+   * else is a new identity. With `error`, the provider's OAuth error code, the
+   * flow goes back to the step the provider was chosen on, carrying
+   * `error.sso_cancelled` for `access_denied` and `error.sso_failed` otherwise.
    */
   returnFromProvider: (input: {
     provider: string;
     email: string;
     purpose?: CreateFlowBodyPurpose;
+    error?: string;
   }) => string;
 };
 
 const FLOW_ID = "flow_mock";
+
+/** The purpose a step of the default flow serves, where the step decides it. */
+const STEP_PURPOSES: Partial<Record<FlowStepName, CreateFlow201StepPurpose>> = {
+  identifier: "login",
+  password: "login",
+  "passkey-login": "login",
+  "sso-conflict": "login",
+  register: "register",
+  "register-password": "register",
+  "register-sso": "register",
+  recover: "recovery",
+};
+
+/**
+ * The engine's one answer to a callback it cannot place (`idp_callback.go`):
+ * without a pending sign-in there is no return target to send the browser to.
+ */
+const IDP_CALLBACK_ERROR_PAGE = `<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Sign-in failed</title></head>
+<body><p>The sign-in could not be completed. Return to the application and try again.</p></body>
+</html>
+`;
+
+/**
+ * Why an sso submission's `return_target` is refused, or null when it is not.
+ *
+ * The engine (`internal/api/flow.go`) first parses the target with
+ * `httputil.ParseRedirectTarget`, ported as `parseRedirectTarget`, then binds it
+ * to the request origin: the `Origin` header, else the request's own host. The
+ * callback redirects to this value, so a target the server would refuse would
+ * make it an open redirect, and a client that sends one must fail here as it
+ * would against the server. The accepted target is the one stored, as on the
+ * engine.
+ */
+function returnTargetRefusal(
+  request: Request,
+  rawTarget: string,
+): { refusal: string } | { target: string } {
+  let parsed: RedirectTarget;
+  try {
+    parsed = parseRedirectTarget(rawTarget);
+  } catch (error) {
+    if (error instanceof RedirectTargetError) {
+      return { refusal: `return_target ${JSON.stringify(rawTarget)} is ${error.message}` };
+    }
+    throw error;
+  }
+  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  if (parsed.origin.toLowerCase() !== origin.toLowerCase()) {
+    return {
+      refusal: `return_target ${JSON.stringify(rawTarget)} is not on the request origin ${JSON.stringify(origin)}`,
+    };
+  }
+  return { target: parsed.href };
+}
 
 /**
  * Build the MSW handlers. Each call creates an independent closure (actor,
@@ -119,6 +185,14 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   // engine keys links on the provider's subject; see SsoIdentityStore for why
   // the mock keys on email.
   const ssoIdentities = new SsoIdentityStore();
+  // Where the callback sends the browser back to, recorded by the `sso`
+  // submission as the engine records it on the state row. Only read while the
+  // flow waits in `sso-redirect`, which every HTTP path enters through that
+  // submission, so it is never stale when read.
+  let returnTarget: string | null = null;
+  // A failed provider return parks its key here, and the next render of the
+  // originating step shows it once, as the engine's replay guard does.
+  let pendingStepError: string | null = null;
 
   /**
    * Which branch the provider's return takes.
@@ -140,6 +214,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
   function reset(): void {
     actor = startFlowActor();
+    pendingStepError = null;
     captured = [];
     authn.clear();
     // Links too: a caller asking for a clean mock must not inherit an email
@@ -148,35 +223,92 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     ssoIdentities.clear();
   }
 
+  /** A new walk; a step error parked on the previous one does not carry over. */
+  function startFlow(purpose: CreateFlowBodyPurpose): void {
+    actor = startFlowActor();
+    pendingStepError = null;
+    actor.send({ type: "START", purpose });
+  }
+
   function registerCredential(userHandle: string, credentialId: string): void {
     authn.register(userHandle, credentialId);
+  }
+
+  /**
+   * The provider's return, as the engine's callback processes it
+   * (`flow_sso_callback.go`). An OAuth error response is stored as a step
+   * error, `error.sso_cancelled` for `access_denied` (the person said no) and
+   * `error.sso_failed` for anything else, and the flow goes back to the step
+   * the provider was chosen on. Otherwise the identity decides the branch.
+   *
+   * Registering through a provider is what creates the link, and the submit
+   * handler records it on the `register-sso` submit rather than here, so a
+   * caller returning twice with the same email gets a new identity both times,
+   * which is what not having finished the registration means.
+   */
+  function completeProviderReturn(input: { email?: string; error?: string | null }): void {
+    if (input.error) {
+      pendingStepError =
+        input.error === "access_denied" ? "error.sso_cancelled" : "error.sso_failed";
+      actor.send({ type: "PROVIDER_RETURN", fields: {}, outcome: "error" });
+      return;
+    }
+    const { context } = actor.getSnapshot();
+    const email = input.email ?? context.capturedFields.email;
+    actor.send({
+      type: "PROVIDER_RETURN",
+      fields: email ? { email } : {},
+      outcome: resolveSsoOutcome(context.ssoProviderId, email),
+    });
   }
 
   function returnFromProvider(input: {
     provider: string;
     email: string;
     purpose?: CreateFlowBodyPurpose;
+    error?: string;
   }): string {
-    actor = startFlowActor();
-    actor.send({ type: "START", purpose: input.purpose ?? "login" });
+    startFlow(input.purpose ?? "login");
     actor.send({
       type: "SUBMIT",
       action: "sso",
       fields: {},
       sso_provider_id: input.provider,
     });
-    // Registering through a provider is what creates the link, and the HTTP
-    // path records it on the `register-sso` submit rather than here — so a
-    // caller walking this twice with the same email gets a new identity both
-    // times, which is what not having finished the registration means.
-    actor.send({
-      type: "SUBMIT",
-      action: "callback",
-      fields: { email: input.email },
-      sso_provider_id: input.provider,
-      sso_outcome: resolveSsoOutcome(input.provider, input.email),
-    });
+    completeProviderReturn({ email: input.email, error: input.error });
     return FLOW_ID;
+  }
+
+  /**
+   * `GET /__nextgen/idp/callback`, the route the provider redirects to.
+   *
+   * The engine reads `state`, `code` and the OAuth error response from the
+   * query; the mock has a single flow, so it needs no state. A mock provider
+   * has no `id_token` either, so an `email` query parameter stands in for its
+   * email claim, falling back to the address the flow already captured.
+   * Either way the browser goes back with `303` to the `return_target` of the
+   * `sso` submission, where `GET /flow/{id}` shows the result.
+   */
+  function idpCallback({ request }: { request: Request }): Response {
+    const noStore = { "Cache-Control": "private, no-store" };
+    const target = returnTarget;
+    // Every return leaves `sso-redirect`, so a replay lands here too, as an
+    // unknown or consumed state does on the engine.
+    if (actor.getSnapshot().value !== "sso-redirect" || !target) {
+      return new HttpResponse(IDP_CALLBACK_ERROR_PAGE, {
+        status: 400,
+        headers: { ...noStore, "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    const query = new URL(request.url).searchParams;
+    const error = query.get("error");
+    completeProviderReturn({
+      email: query.get("email") ?? undefined,
+      // A return with neither a code nor an error is a failed callback in the
+      // engine, not a sign-in.
+      error: error ?? (query.get("code") ? null : "invalid_request"),
+    });
+    return new HttpResponse(null, { status: 303, headers: { ...noStore, Location: target } });
   }
 
   function getCaptured(): readonly CapturedRequest[] {
@@ -199,7 +331,21 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * response even though project enablement has not changed.
    */
   function withOverlays(step: CreateFlow201): CreateFlow201 {
-    return withPasskey(withSsoProviders(step));
+    return withPurpose(withPasskey(withSsoProviders(step)));
+  }
+
+  /**
+   * `step.purpose`, as the server reports it: the default flow fixes it on the
+   * steps that sign in or sign up, and the others keep the purpose the flow
+   * started with. The mock never switches between them by itself, so no step
+   * carries a `notice`.
+   */
+  function withPurpose(response: CreateFlow201): CreateFlow201 {
+    const purpose =
+      STEP_PURPOSES[response.step.name as FlowStepName] ??
+      actor.getSnapshot().context.purpose ??
+      "login";
+    return { ...response, step: { ...response.step, purpose } };
   }
 
   /**
@@ -208,7 +354,13 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
    * can start a sign-in. Both are off unless a caller opted in.
    */
   async function currentResponse(): Promise<CreateFlow201> {
-    return withOverlays(await renderCurrentStep());
+    const response = withOverlays(await renderCurrentStep());
+    const error = pendingStepError;
+    if (!error) {
+      return response;
+    }
+    pendingStepError = null;
+    return { ...response, step: { ...response.step, error } };
   }
 
   async function renderCurrentStep(): Promise<CreateFlow201> {
@@ -254,8 +406,7 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
     getCreateFlowMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as CreateFlowBody;
       captured.push({ kind: "createFlow", body });
-      actor = startFlowActor();
-      actor.send({ type: "START", purpose: body.purpose });
+      startFlow(body.purpose);
       return currentResponse();
     }),
     // Hand-written rather than the generated wrapper: that one answers 200
@@ -267,15 +418,32 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       captured.push({ kind: "submitFlowStep", flowId, body });
       // The engine refuses an sso submission without `return_target`, the
       // page the callback sends the browser back to, before anything else.
-      // The mock has no callback and no cookies, but a caller that omits it
-      // must not pass here and fail against the engine.
-      if (body.action === "sso" && !body.return_target) {
+      let acceptedTarget: string | null = null;
+      if (body.action === "sso") {
+        const checked =
+          body.return_target === undefined || body.return_target === null
+            ? { refusal: "return_target is required for action sso" }
+            : returnTargetRefusal(request, body.return_target);
+        if ("refusal" in checked) {
+          return HttpResponse.json(
+            { code: "req.invalid", message: checked.refusal },
+            { status: 400 },
+          );
+        }
+        acceptedTarget = checked.target;
+      }
+      const before = actor.getSnapshot().value as FlowStepName | "idle";
+      // Only the provider's return to the callback route leaves for the
+      // provider's result; no client action stands in for it.
+      if (before === "sso-redirect") {
         return HttpResponse.json(
-          { code: "req.invalid", message: "return_target is required for action sso" },
+          { code: "flow.invalid_action", message: "action is not allowed on the current step" },
           { status: 400 },
         );
       }
-      const before = actor.getSnapshot().value as FlowStepName | "idle";
+      if (body.action === "sso") {
+        returnTarget = acceptedTarget;
+      }
       const fields = (body.fields ?? {}) as Record<string, string>;
       const email = fields.email;
       const snapshot = actor.getSnapshot();
@@ -360,13 +528,6 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
 
       const submitted = loginCred ? { ...fields, email: loginCred.userHandle } : fields;
       const provider = snapshot.context.ssoProviderId;
-      // Leaving the provider, nothing has resolved yet. Coming back from it,
-      // the identity decides where the flow goes — the lookup the engine does
-      // before it picks a branch.
-      const ssoOutcome =
-        before === "sso-redirect"
-          ? resolveSsoOutcome(provider, submitted.email ?? snapshot.context.capturedFields.email)
-          : null;
       // Registering through a provider is what creates the link, so it is
       // recorded when the step that mints the account submits.
       if (before === "register-sso" && body.action !== "sign_in") {
@@ -380,7 +541,6 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         action: body.action,
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
-        sso_outcome: ssoOutcome,
       });
       return ok(await currentResponse());
     }),
@@ -388,6 +548,11 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });
       return currentResponse();
     }),
+    // Both mounts the engine serves (`internal/api/flow_sso.go`): the
+    // published path, and the one an SDK proxy forwards after stripping its
+    // prefix.
+    http.get("*/__nextgen/idp/callback", idpCallback),
+    http.get("*/idp/callback", idpCallback),
     getExchangeHandoffMockHandler(async ({ request }) => {
       const body = (await request.clone().json()) as ExchangeHandoffBody;
       const url = new URL(request.url);
@@ -396,9 +561,15 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       return getExchangeHandoffResponseMock();
     }),
     // The session endpoints `<zitadel-session>` and `<zitadel-logout>` read on
-    // mount. In-process there is no session cookie to present, so both answer
-    // the contract's 401 for a signed-out browser.
+    // mount and on sign-out. In-process there is no session cookie to present,
+    // so all of them answer the contract's 401 for a signed-out browser.
     http.get("*/sessions/me", () =>
+      HttpResponse.json(
+        { code: "auth.unauthorized", message: "no session cookie" },
+        { status: 401, headers: { "Cache-Control": "private, no-store" } },
+      ),
+    ),
+    http.get("*/sessions/me/csrf", () =>
       HttpResponse.json(
         { code: "auth.unauthorized", message: "no session cookie" },
         { status: 401, headers: { "Cache-Control": "private, no-store" } },

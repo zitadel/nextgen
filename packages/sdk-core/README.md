@@ -14,7 +14,7 @@ building your own middleware or need the types without a framework wrapper.
 | `@zitadel/sdk-core` | The middleware, JWT, and runtime-resolution exports in one namespace. The `/types` widget contract is **not** re-exported from the root — import it from `@zitadel/sdk-core/types` |
 | `@zitadel/sdk-core/types` | The SPA widget contract (`ZitadelFlowStepDetail` and the other widget event/config/handler/props types the SPA SDKs re-export) |
 | `@zitadel/sdk-core/jwt` | `verifyJwt`, `decodeJwt`, `isJwtShaped`, `JWKS_TTL_MS` |
-| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`) |
+| `@zitadel/sdk-core/middleware` | The middleware layer: `NextgenSession`, `AuthResult`, `NextgenMiddlewareOptions`, route matching (`matchesRoutes`), response-header filtering (`filterResponseHeaders`, `HOP_BY_HOP`), session judgement (`resolveSession`, the opaque session check `checkOpaqueSessionToken`), and the session cookie per project (`sessionCookieName`, `proxySessionCookies`, `serializeSessionCookie`) |
 
 It also exports `resolveZitadelRuntime` / `resolveZitadelRuntimeEnv` and
 `ZitadelRuntimeError` for resolving the runtime environment
@@ -26,7 +26,8 @@ This is the canonical description of the verification pipeline every SDK
 middleware runs (`verifyJwt`):
 
 1. The bearer token from the `Authorization` header is checked first; the
-   `__nextgen_session` cookie is the fallback.
+   session cookie is the fallback (see
+   [The session cookie](#the-session-cookie)).
 2. The JWT header is decoded to extract `kid` and `alg`.
 3. Tokens with an `alg` not in `allowedAlgorithms` (`RS256`, `ES256` by
    default) are rejected immediately — no JWKS fetch.
@@ -40,9 +41,67 @@ middleware runs (`verifyJwt`):
 8. `exp` must be present and in the future (with `clockSkewMs` tolerance) —
    tokens without an expiry are rejected.
 9. `nbf` and `iat` are validated with `clockSkewMs` tolerance when present.
+10. `aud` must name the app's project (`projectId`).
 
 Opaque (non-JWT) session tokens are validated against the backend's
-`GET /sessions/me` instead, bounded by `opaqueTokenTimeoutMs`.
+`GET /sessions/me?project_id=…` instead, bounded by `opaqueTokenTimeoutMs`
+(`checkOpaqueSessionToken`). That is a call to the server, so a middleware
+whose render layer checks the session itself can skip it where it decides
+nothing: with `checkOpaqueSession: false`, `resolveSession` hands the token on
+unchecked and touches no cookie. The Next.js middleware does so off its
+protected routes, where `auth()` checks the session.
+
+A session belongs to one project, while a browser sends the session cookie
+to every app on the same host, including the Console of a local server. So a
+session counts as signed in only in the app's own project: `projectId`, which
+each SDK otherwise reads from `ZITADEL_PROJECT_ID` (then its framework's public
+project id variable, as `zitadel setup` writes both). The backend refuses an
+opaque session of another project (`403 sess.project_mismatch`), and the SDK
+checks the project the answer names as well. A session of another project
+reads as signed out and keeps its cookie, since it is live in its own app.
+With no project configured, no session counts as signed in.
+
+Only the backend's refusal makes the session cookie dead, and only then does
+the middleware clear it: a `401`, or a `404` with the `sess.not_found` code for
+a session that is gone. A JWT session cookie is dead when it fails verification
+or names no user of this project. Any other outcome (a `5xx`, no answer in
+time, a network error) is not a refusal: the request counts as signed out, the
+cookie stays, and a protected route answers `503 Service Unavailable` rather
+than send a user who may well be signed in to the login page. A Bearer token
+that signs no one in here leaves the cookie to be judged on its own.
+
+`resolveSession` is the one implementation of these rules; every server SDK's
+middleware calls it.
+
+## The session cookie
+
+The server sets and reads one session cookie, `__nextgen_session`. A browser
+shares a host's cookies across every port, so under that name alone the Console
+of a local server and every app on `localhost` would keep their sessions in one
+slot and sign each other out. An app with a server SDK therefore keeps its
+session in a cookie of its own, `sessionCookieName(projectId)`:
+`__nextgen_session_<projectId>` (ADR 073).
+
+- **The proxy** (`proxySessionCookies`) renames the server's `Set-Cookie` to the
+  app's name on the way to the browser, and on the way to the server sends the
+  app's cookie under the server's name. No other session cookie, the
+  Console's or another app's, goes up.
+- **The middleware** (`resolveSession`) reads the app's cookie, and clears only
+  that cookie when the backend refuses its session.
+- **A session kept under the server's name** before the change, by this app or,
+  on `localhost`, by the Console, is read only where the server holds it to the
+  app's project: by the middleware, and by the proxy for the session probe
+  `GET /sessions/me?project_id=…`. A session that signs a user of this project
+  in is copied to the app's cookie, and the old cookie stays: the Console may
+  share the project. When the app next signs a user in (`POST /sessions/exchange`)
+  or out (`DELETE /sessions/me`), the proxy retires it: cleared when it holds a
+  session of this project (and on sign-out that session is ended), or a dead
+  one; left when it holds another project's.
+- **Every response that sets a session cookie** sends
+  `Cache-Control: private, no-store` (`SESSION_COOKIE_CACHE_CONTROL`), and
+  `Secure` follows the server's rule on the scheme and host a proxy in front of
+  the app forwarded (`X-Forwarded-Proto`, `X-Forwarded-Host`).
+- **Without a project**, the proxy passes the cookies through unchanged.
 
 Framework-specific steps (header tunnelling, `auth()` re-verification) are
 documented in each framework SDK's README on top of this pipeline.

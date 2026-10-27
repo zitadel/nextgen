@@ -18,6 +18,21 @@ export const CLI_COMMAND_STARTED = "cli_command_started";
 export const CLI_COMMAND_COMPLETED = "cli_command_completed";
 export const CLI_COMMAND_FAILED = "cli_command_failed";
 
+/**
+ * The properties the Vercel Web Analytics copy of a lifecycle event keeps, in
+ * priority order, the header first: the intake takes 8.
+ */
+export const VERCEL_EVENT_KEYS = [
+  "surface",
+  "cli_version",
+  "server_kind",
+  "command",
+  "status",
+  "reason",
+  "host_agent",
+  "non_interactive",
+] as const;
+
 export const FIRST_RUN_NOTICE =
   "Zitadel CLI collects anonymous usage analytics to help improve the tool. " +
   "No personal data, project details, server URLs, or file contents are ever " +
@@ -74,11 +89,12 @@ function profileDeviceProperties(meta: GlobalOptions): Properties {
 
 /**
  * Build the dimensions shared by every lifecycle event, merged with any
- * per-command `extra`. The allow-list: only enums, booleans, counts, and
- * versions cross the boundary — never URLs, project ids, file paths, emails, or
- * secrets. `extra` is spread first so the canonical base dimensions always win;
- * callers order their own extras so reserved lifecycle fields win over command
- * props.
+ * per-command `extra`. They include the header every Zitadel component sends,
+ * as `docs/product-analytics-events.yaml` defines it. The allow-list: only
+ * enums, booleans, counts, and versions cross the boundary — never URLs,
+ * project ids, file paths, emails, or secrets. `extra` is spread first so the
+ * canonical base dimensions always win; callers order their own extras so
+ * reserved lifecycle fields win over command props.
  */
 export function commandEventProperties(
   meta: GlobalOptions,
@@ -88,6 +104,7 @@ export function commandEventProperties(
   const { env } = meta;
   return {
     ...extra,
+    surface: "cli",
     ...eventDeviceProperties(meta),
     ip: 0,
     invocation_id: invocationId,

@@ -1,0 +1,11 @@
+{
+  "title": "Guides",
+  "pages": [
+    "local-runtime",
+    "deploy",
+    "social-sign-in",
+    "customize-design",
+    "customize-copy",
+    "troubleshooting"
+  ]
+}

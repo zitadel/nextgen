@@ -24,15 +24,15 @@ and release workflows. Agent-facing workspace rules live in
 
 ### I am adding Zitadel to my app
 
-| I want to...                                         | Run                                           |
-| ---------------------------------------------------- | --------------------------------------------- |
-| Check local runtime prerequisites                    | `npx @zitadel/cli@alpha doctor`               |
-| Start local Zitadel                                  | `npx @zitadel/cli@alpha start`                |
-| Add auth to my app                                   | `npx @zitadel/cli@alpha setup --server local` |
-| Open the local console, signed in as the local admin | `npx @zitadel/cli@alpha console`              |
-| Check generated app files                            | `npx @zitadel/cli@alpha doctor`               |
-| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@alpha stop`                 |
-| Delete local Zitadel data                            | `npx @zitadel/cli@alpha reset --force`        |
+| I want to...                                         | Run                                            |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| Check local runtime prerequisites                    | `npx @zitadel/cli@latest doctor`               |
+| Start local Zitadel                                  | `npx @zitadel/cli@latest start`                |
+| Add auth to my app                                   | `npx @zitadel/cli@latest setup --server local` |
+| Open the local console, signed in as the local admin | `npx @zitadel/cli@latest console`              |
+| Check generated app files                            | `npx @zitadel/cli@latest doctor`               |
+| Stop local Zitadel, keeping data                     | `npx @zitadel/cli@latest stop`                 |
+| Delete local Zitadel data                            | `npx @zitadel/cli@latest reset --force`        |
 
 The published `zitadel` runtime commands run the released local runtime through
 the `@zitadel/server` npm binary by default and do not require Docker, Go, Moon,
@@ -60,12 +60,17 @@ skill, and the per-framework SDK and component skills. Without it, only the
 top-level router skill is installed. The CLI skill also ships inside the
 `@zitadel/cli` package.
 
+After a successful interactive `setup`, the CLI suggests this command once if it
+finds a coding agent on your machine. "Once" is per machine, not per project: the
+CLI records it in your user config directory. Set `NO_SKILLS_PROMPT=1` to never
+see it.
+
 ## Customer quick start
 
 ```sh
 mkdir myapp
 cd myapp
-npx @zitadel/cli@alpha doctor
+npx @zitadel/cli@latest doctor
 ```
 
 Pick a server before running `setup`. It cannot be changed on this app
@@ -75,14 +80,15 @@ Zitadel Cloud instance if you want the project to belong to your team there.
 ### Local
 
 ```sh
-npx @zitadel/cli@alpha start
-npx @zitadel/cli@alpha setup --server local
+npx @zitadel/cli@latest start
+npx @zitadel/cli@latest setup --server local
 npm run dev
 ```
 
 `start` boots the local Zitadel runtime and creates a local admin,
-`admin@zitadel.localhost`. It ends by printing a sign-in link for the
-management console. That link works once.
+`admin@zitadel.localhost`. It ends by telling you to run `setup`. Once `setup`
+has created your project it offers `zitadel console`; before that the console has
+nothing to show.
 
 `setup --server local` creates the project and, by default, attaches it to
 that admin's team, so the project is owned from the start and `zitadel claim`
@@ -91,10 +97,10 @@ reports it as already owned. If that attempt fails, setup prints a warning and
 bootstrap off, the server has no local admin and no claiming at all, so the
 project simply has no owning team.
 
-Any time you need the console again, print a fresh link:
+Once your project exists, print a sign-in link for the console. The link works once:
 
 ```sh
-npx @zitadel/cli@alpha console
+npx @zitadel/cli@latest console
 ```
 
 The console shows your project and lets you add colleagues as project admins
@@ -110,10 +116,20 @@ you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
 
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
+
 ### Zitadel Cloud
 
 ```sh
-npx @zitadel/cli@alpha setup --server https://api.zitadel.cloud
+npx @zitadel/cli@latest setup --server https://preview.zitadel.com
 npm run dev
 ```
 
@@ -122,7 +138,7 @@ and `console` do not apply there. Once the app is up, attach the project to
 your team:
 
 ```sh
-npx @zitadel/cli@alpha claim
+npx @zitadel/cli@latest claim
 ```
 
 This opens a browser so you can sign in with your own Zitadel account (not
@@ -146,8 +162,8 @@ docker compose up -d
 | Surface            | URL                               |
 | ------------------ | --------------------------------- |
 | Management console | http://localhost:8080/ui/console/ |
-| Sign-in shell      | http://localhost:8080/ui/login/   |
-| Health             | http://localhost:8080/healthz     |
+| Liveness probe     | http://localhost:8080/livez       |
+| Readiness probe    | http://localhost:8080/readyz      |
 
 A fresh Compose server has no project and no user yet, so this console shows
 its setup prompt until you seed one (see
@@ -174,30 +190,27 @@ search, and publishes LLM-friendly text at `/docs/llms.txt`,
 ## Current status
 
 This repository is pre-release. The Go `server` command serves the OpenAPI
-surface and embeds the console and login UIs at `/ui/console/` and `/ui/login/`.
-CI produces installable snapshots for review, not official releases.
+surface and embeds the console at `/ui/console/`; the login lives in your app.
+Releases are `0.x` previews on npm's `latest` tag, and until 1.0.0 a minor
+release can carry a breaking change
+([ADR 074](docs/adrs/074-preview-releases-on-0x.md)).
 
 For product direction and the four pillars, see [VISION.md](VISION.md).
 
 ## CI
 
 Pull requests are gated by the GitHub Actions context `full-pr`, shown in the
-pull request UI as `ci / full-pr`. On a 16-core runner it runs a Go
-generated-file drift check, lint, type checks, builds, unit and browser
-tests, Go tests including Postgres/Spanner/SQLite dialect integration, a
-non-publishing release snapshot, and fresh-app journeys against the snapshot's
-npm tarballs.
-Changesets version PRs run a smaller release validation path instead, and
-Changesets comments give release-intent feedback without adding a blocking
-gate. The full step list lives in
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
-[CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
+pull request UI as `ci / full-pr`: generated-file checks, lint, type checks,
+builds, unit and browser tests, the Go database lanes, a non-publishing release
+snapshot, and the end-to-end suites against the snapshot's npm tarballs.
+Changesets version PRs run a smaller release validation path instead. The full
+step list is in [CONTRIBUTING.md](CONTRIBUTING.md#what-ci-runs).
 
 ## Releases
 
 Moon builds the artifacts (Go binaries, containers, archives) and the draft
 GitHub Release; Changesets owns versions, npm publishing, and release notes,
-with the public packages on one fixed alpha train. Build a local snapshot with
+with the public packages on one fixed release train. Build a local snapshot with
 `moon run release:snapshot` (more in [CONTRIBUTING.md](CONTRIBUTING.md)). To
 cut or recover a release, follow the
 [release runbook](docs/runbooks/manual-release.md); for when to add a

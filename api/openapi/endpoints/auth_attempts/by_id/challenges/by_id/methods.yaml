@@ -39,5 +39,18 @@ post:
         application/json:
           schema:
             $ref: ../../../auth-attempt-response.yaml
+    '409':
+      description: |
+        The proof was rejected (`att.proof_rejected`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../../components/error-details.yaml
+          examples:
+            proof_rejected:
+              summary: The proof was rejected
+              value:
+                code: att.proof_rejected
+                message: 'the submitted proof was rejected'
     default:
       $ref: verifyChallengeProof-error-response.yaml

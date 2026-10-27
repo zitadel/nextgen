@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -22,13 +23,13 @@ type stubProjectService struct {
 	created *domain.Project
 }
 
-func (s stubProjectService) Create(context.Context, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) Create(context.Context, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (s stubProjectService) CreateWithID(context.Context, string, string, []string, bool) (*domain.Project, error) {
+func (s stubProjectService) CreateWithID(context.Context, string, string, []domain.Origin, bool) (*domain.Project, error) {
 	return s.created, nil
 }
-func (stubProjectService) Get(context.Context, string) (*domain.Project, error) {
+func (stubProjectService) Get(context.Context, string, service.ProjectQueryOptions) (*domain.Project, error) {
 	return nil, domain.ErrProjectNotFound()
 }
 func (stubProjectService) DefaultProject(context.Context, string) (*domain.Project, error) {
@@ -43,7 +44,16 @@ func (stubProjectService) List(context.Context, service.ListProjectsRequest) (*s
 func (stubProjectService) ListAuthorized(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
 	return nil, domain.ErrSessionTokenInvalid()
 }
+func (stubProjectService) ListEveryProject(context.Context, service.ListAuthorizedProjectsRequest) (*service.ListProjectsResponse, error) {
+	return nil, domain.ErrSessionTokenInvalid()
+}
 func (stubProjectService) Delete(context.Context, string) error { return nil }
+func (stubProjectService) AddOrigin(context.Context, string, domain.Origin) (*domain.Origin, error) {
+	return nil, domain.ErrNotImplemented()
+}
+func (stubProjectService) RemoveOrigin(context.Context, string, string) error {
+	return domain.ErrNotImplemented()
+}
 
 var _ service.ProjectService = stubProjectService{}
 
@@ -103,4 +113,36 @@ func TestCreateProject_StampsActorSlot(t *testing.T) {
 	require.NotNil(t, slot.RequestID)
 	assert.Equal(t, "req_create", *slot.RequestID)
 	assert.False(t, slot.Authenticated)
+}
+
+// TestProjectDetailResponseCarriesProjectResponse keeps the two project bodies
+// in step: every field projectResponse sets must reach projectDetailResponse
+// with the same value, so a field added to one cannot be left out of the
+// other. The fixture fills every field, which the first check enforces.
+func TestProjectDetailResponseCarriesProjectResponse(t *testing.T) {
+	now := time.Now()
+	project := &domain.Project{
+		ID:        "proj_detail",
+		Name:      "Acme",
+		Origins:   []domain.Origin{{Pattern: "https://preview.example.com", Kind: domain.OriginKindPreview}},
+		CreatedAt: now.Add(-time.Hour),
+		UpdatedAt: now,
+		PasswordHashPolicy: &domain.PasswordHashPolicy{
+			Algorithm: "bcrypt",
+			Params:    map[string]any{"cost": float64(10)},
+		},
+	}
+	base := reflect.ValueOf(*projectResponse(project))
+	project.OwningTeamID = "team_owner"
+	detail := reflect.ValueOf(*projectDetailResponse(project))
+	for i := range base.NumField() {
+		name := base.Type().Field(i).Name
+		require.False(t, base.Field(i).IsZero(), "the fixture must set %s so the comparison covers it", name)
+		got := detail.FieldByName(name)
+		require.True(t, got.IsValid(), "ProjectDetailResponse has no field %s", name)
+		assert.Equal(t, base.Field(i).Interface(), got.Interface(), "projectDetailResponse must copy %s", name)
+	}
+	assert.Equal(t, api.NewNilTeamID("team_owner"), detail.FieldByName("OwningTeamID").Interface())
+	project.OwningTeamID = ""
+	assert.True(t, projectDetailResponse(project).OwningTeamID.IsNull(), "no owning team is null")
 }

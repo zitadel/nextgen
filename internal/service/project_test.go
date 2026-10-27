@@ -66,6 +66,7 @@ func createMockedProjectService(t *testing.T) (svc service.ProjectService,
 		schemaValidator,
 		keyService,
 		testHasherFactory(t),
+		domain.DefaultSharedHosts,
 	)
 
 	return
@@ -96,19 +97,19 @@ func TestProjectService_Create(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                   string
-		projectName            string
-		previewOrigins         []string
-		seedDefaults           bool
-		setupMocks             func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
-		wantErr                error
-		expectedPreviewOrigins []string
+		name            string
+		projectName     string
+		origins         []domain.Origin
+		seedDefaults    bool
+		setupMocks      func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements)
+		wantErr         error
+		expectedOrigins []domain.Origin
 	}{
 		{
-			name:           "ok — no preview origins",
-			projectName:    "test",
-			previewOrigins: nil,
-			seedDefaults:   true,
+			name:         "ok — no preview origins",
+			projectName:  "test",
+			origins:      nil,
+			seedDefaults: true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, p *domain.Project) error {
@@ -133,13 +134,16 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
-			expectedPreviewOrigins: make([]string, 0),
+			expectedOrigins: make([]domain.Origin, 0),
 		},
 		{
-			name:           "ok — with preview origins",
-			projectName:    "test",
-			previewOrigins: []string{"*.vercel.app", "*.netlify.app"},
-			seedDefaults:   true,
+			name:        "ok — with preview origins",
+			projectName: "test",
+			origins: []domain.Origin{
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
+			},
+			seedDefaults: true,
 			setupMocks: func(masterKey *cryptomock.MockCrypter, statements *servicemocks.MockAllStatements) {
 				statements.EXPECT().CreateProject(gomock.Any(), gomock.Any()).DoAndReturn(
 					func(_ context.Context, p *domain.Project) error {
@@ -156,7 +160,10 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any())
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any())
 			},
-			expectedPreviewOrigins: []string{"*.vercel.app", "*.netlify.app"},
+			expectedOrigins: []domain.Origin{
+				{Pattern: "https://*-acme.vercel.app", Kind: domain.OriginKindPreview},
+				{Pattern: "https://*--acme.netlify.app", Kind: domain.OriginKindPreview},
+			},
 		},
 		{
 			name:         "ok — skip fallback defaults",
@@ -179,7 +186,7 @@ func TestProjectService_Create(t *testing.T) {
 				statements.EXPECT().CreateJSONSchema(gomock.Any(), gomock.Any()).Times(0)
 				statements.EXPECT().CreateFlowDefinition(gomock.Any(), gomock.Any()).Times(0)
 			},
-			expectedPreviewOrigins: make([]string, 0),
+			expectedOrigins: make([]domain.Origin, 0),
 		},
 		{
 			name:        "project creation error should bubble up",
@@ -205,7 +212,7 @@ func TestProjectService_Create(t *testing.T) {
 			svc, _, _, _, _, masterKey, _, _, _, statements := createMockedProjectService(t)
 			tc.setupMocks(masterKey, statements)
 
-			got, err := svc.Create(context.Background(), tc.projectName, tc.previewOrigins, tc.seedDefaults)
+			got, err := svc.Create(context.Background(), tc.projectName, tc.origins, tc.seedDefaults)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -213,7 +220,7 @@ func TestProjectService_Create(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			if assert.NotNil(t, got) {
-				assert.Equal(t, tc.expectedPreviewOrigins, got.PreviewOrigins)
+				assert.Equal(t, tc.expectedOrigins, got.Origins)
 			}
 		})
 	}
@@ -224,11 +231,11 @@ func TestProjectService_Get(t *testing.T) {
 
 	now := time.Now().UTC()
 	project := &domain.Project{
-		ID:             "proj_aaa",
-		Name:           "project aaa",
-		CreatedAt:      now,
-		UpdatedAt:      now,
-		PreviewOrigins: []string{"myapp.example.com"},
+		ID:        "proj_aaa",
+		Name:      "project aaa",
+		CreatedAt: now,
+		UpdatedAt: now,
+		Origins:   []domain.Origin{{Pattern: "https://myapp.example.com", Kind: domain.OriginKindPreview}},
 	}
 
 	tests := []struct {
@@ -242,7 +249,7 @@ func TestProjectService_Get(t *testing.T) {
 			name: "ok",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(project, nil)
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{}).Return(project, nil)
 			},
 			want: project,
 		},
@@ -250,7 +257,7 @@ func TestProjectService_Get(t *testing.T) {
 			name: "not found",
 			id:   "proj_aaa",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").Return(nil, database.NewNoRowFoundError(nil))
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{}).Return(nil, database.NewNoRowFoundError(nil))
 			},
 			wantErr: database.NewNoRowFoundError(nil),
 		},
@@ -263,7 +270,7 @@ func TestProjectService_Get(t *testing.T) {
 			svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 			tc.setupStmt(statements)
 
-			got, err := svc.Get(context.Background(), tc.id)
+			got, err := svc.Get(context.Background(), tc.id, service.ProjectQueryOptions{})
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 				assert.Nil(t, got)
@@ -294,18 +301,23 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "updated project name",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, project *domain.Project) error {
-						project.CreatedAt = createdAt
-						project.UpdatedAt = updatedAt
-						return nil
-					})
+				// The update reads the whole project back, owning team included.
+				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
+					Return(&domain.Project{
+						ID:           "proj_aaa",
+						Name:         "updated project name",
+						CreatedAt:    createdAt,
+						UpdatedAt:    updatedAt,
+						OwningTeamID: "team_owner",
+					}, nil)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "proj_aaa", got.ID)
 				assert.Equal(t, "updated project name", got.Name)
 				assert.Equal(t, createdAt, got.CreatedAt)
 				assert.Equal(t, updatedAt, got.UpdatedAt)
+				assert.Equal(t, "team_owner", got.OwningTeamID)
 			},
 		},
 		{
@@ -320,12 +332,10 @@ func TestProjectService_Update(t *testing.T) {
 			id:          "proj_aaa",
 			projectName: "  updated project name  ",
 			setupStmt: func(s *servicemocks.MockAllStatements) {
-				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).DoAndReturn(
-					func(_ context.Context, project *domain.Project) error {
-						project.CreatedAt = createdAt
-						project.UpdatedAt = updatedAt
-						return nil
-					})
+				// The update reads the whole project back, owning team included.
+				s.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
+				s.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
+					Return(&domain.Project{ID: "proj_aaa", Name: "updated project name"}, nil)
 			},
 			check: func(t *testing.T, got *domain.Project) {
 				assert.Equal(t, "updated project name", got.Name)
@@ -413,7 +423,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil)
 		// No UpdateProject: the caller named no name, so nothing renames. The
 		// row is read instead, so the answer carries the project as it stands.
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
 			Return(&domain.Project{ID: "proj_aaa", Name: "kept", PasswordHashPolicy: want}, nil)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
@@ -432,7 +442,7 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		var cleared *domain.PasswordHashPolicy
 
 		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", nil).Return(nil)
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_aaa").
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
 			Return(&domain.Project{ID: "proj_aaa", Name: "kept"}, nil)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
@@ -449,14 +459,14 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		want := policy(t, "bcrypt", map[string]any{"cost": 12})
 
-		statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil)
-		// The rename reads the row back, which is how the policy just written
-		// reaches the response without a second read.
-		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).
-			DoAndReturn(func(_ context.Context, project *domain.Project) error {
-				project.PasswordHashPolicy = want
-				return nil
-			})
+		gomock.InOrder(
+			statements.EXPECT().SetProjectPasswordHashPolicy(gomock.Any(), "proj_aaa", want).Return(nil),
+			// The rename runs second; the read back is how the policy just
+			// written reaches the response.
+			statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil),
+			statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
+				Return(&domain.Project{ID: "proj_aaa", Name: "renamed", PasswordHashPolicy: want}, nil),
+		)
 
 		got, err := svc.Update(t.Context(), service.UpdateProjectRequest{
 			ID:                 "proj_aaa",
@@ -474,6 +484,8 @@ func TestProjectService_UpdatePasswordHashPolicy(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 		// No SetProjectPasswordHashPolicy: a rename must not clear a policy.
 		statements.EXPECT().UpdateProject(gomock.Any(), gomock.Any()).Return(nil)
+		statements.EXPECT().GetProject(gomock.Any(), "proj_aaa", service.ProjectQueryOptions{OwningTeam: true}).
+			Return(&domain.Project{ID: "proj_aaa", Name: "renamed"}, nil)
 
 		_, err := svc.Update(t.Context(), service.UpdateProjectRequest{
 			ID:   "proj_aaa",
@@ -869,10 +881,10 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		t.Parallel()
 
 		first := &domain.Project{
-			ID:             "proj_first",
-			CreatedAt:      time.Now().UTC(),
-			UpdatedAt:      time.Now().UTC(),
-			PreviewOrigins: []string{},
+			ID:        "proj_first",
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+			Origins:   []domain.Origin{},
 		}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
@@ -901,8 +913,8 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("skips the platform project even when it is the oldest row", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
-		real := &domain.Project{ID: "proj_real", PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
+		real := &domain.Project{ID: "proj_real", Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
@@ -919,7 +931,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("returns nil when only the platform project exists", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
@@ -938,11 +950,11 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("a configured platform project id is honored", func(t *testing.T) {
 		t.Parallel()
 
-		platform := &domain.Project{ID: domain.PlatformProjectID, PreviewOrigins: []string{}}
+		platform := &domain.Project{ID: domain.PlatformProjectID, Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-		statements.EXPECT().GetProjectByID(gomock.Any(), domain.PlatformProjectID).Return(platform, nil)
+		statements.EXPECT().GetProject(gomock.Any(), domain.PlatformProjectID, service.ProjectQueryOptions{}).Return(platform, nil)
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 
 		got, err := svc.DefaultProject(context.Background(), domain.PlatformProjectID)
@@ -970,11 +982,11 @@ func TestProjectService_DefaultProject(t *testing.T) {
 	t.Run("returns the configured project when it exists", func(t *testing.T) {
 		t.Parallel()
 
-		configured := &domain.Project{ID: "proj_custom", PreviewOrigins: []string{}}
+		configured := &domain.Project{ID: "proj_custom", Origins: []domain.Origin{}}
 
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
-		statements.EXPECT().GetProjectByID(gomock.Any(), "proj_custom").Return(configured, nil)
+		statements.EXPECT().GetProject(gomock.Any(), "proj_custom", service.ProjectQueryOptions{}).Return(configured, nil)
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 
 		got, err := svc.DefaultProject(context.Background(), "proj_custom")
@@ -989,7 +1001,7 @@ func TestProjectService_DefaultProject(t *testing.T) {
 		svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
 
 		statements.EXPECT().
-			GetProjectByID(gomock.Any(), "proj_gone").
+			GetProject(gomock.Any(), "proj_gone", service.ProjectQueryOptions{}).
 			Return(nil, database.NewNoRowFoundError(errors.New("no rows")))
 		statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).Times(0)
 
@@ -1036,7 +1048,7 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 		result       *database.ListResult[*domain.Project]
 		statementErr error
 		wantErr      error
-		checkCall    func(t *testing.T, home, user string, page database.Page[domain.ProjectField])
+		checkCall    func(t *testing.T, home, user string, opts *database.ListOptions[domain.ProjectField])
 		checkResp    func(t *testing.T, resp *service.ListProjectsResponse)
 	}{
 		{
@@ -1046,15 +1058,16 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
 				NextCursor: []byte("next"),
 			},
-			checkCall: func(t *testing.T, home, user string, page database.Page[domain.ProjectField]) {
+			checkCall: func(t *testing.T, home, user string, opts *database.ListOptions[domain.ProjectField]) {
 				assert.Equal(t, "proj_platform", home)
 				assert.Equal(t, "user_a", user)
-				assert.Equal(t, uint32(20), page.Limit)
-				assert.Empty(t, page.Cursor)
-				assert.Equal(t, database.OrderAsc, page.OrderBy.Direction)
+				assert.Nil(t, opts.Filter, "no search: every project the user can act on")
+				assert.Equal(t, uint32(20), opts.Pagination.Limit)
+				assert.Empty(t, opts.Pagination.Cursor)
+				assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
 				assert.Equal(t, []database.Column[domain.ProjectField]{
 					database.Col(domain.ProjectFieldID),
-				}, page.OrderBy.Columns)
+				}, opts.Pagination.OrderBy.Columns)
 			},
 			checkResp: func(t *testing.T, resp *service.ListProjectsResponse) {
 				assert.Len(t, resp.Projects, 2)
@@ -1065,16 +1078,27 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			name:   "limit clamped to max",
 			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", Limit: 500},
 			result: &database.ListResult[*domain.Project]{},
-			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
-				assert.Equal(t, uint32(100), page.Limit)
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, uint32(100), opts.Pagination.Limit)
 			},
 		},
 		{
 			name:   "page token is passed through as the cursor",
 			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", PageToken: "tok"},
 			result: &database.ListResult[*domain.Project]{},
-			checkCall: func(t *testing.T, _, _ string, page database.Page[domain.ProjectField]) {
-				assert.Equal(t, []byte("tok"), page.Cursor)
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			},
+		},
+		{
+			// The search is a filter on the same statement, so storage applies it
+			// together with the grants rather than to a page of them.
+			name:   "name search narrows the grant query",
+			req:    service.ListAuthorizedProjectsRequest{HomeProjectID: "proj_platform", UserID: "user_a", NameContains: "Acme", PageToken: "tok"},
+			result: &database.ListResult[*domain.Project]{},
+			checkCall: func(t *testing.T, _, _ string, opts *database.ListOptions[domain.ProjectField]) {
+				assert.Equal(t, database.StringContainsFold(database.Col(domain.ProjectFieldName), "Acme"), opts.Filter)
+				assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
 			},
 		},
 		{
@@ -1099,10 +1123,10 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			expectActiveSessionUser(statements)
 
 			var gotHome, gotUser string
-			var gotPage database.Page[domain.ProjectField]
+			var gotOpts *database.ListOptions[domain.ProjectField]
 			statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-				func(_ context.Context, home, user string, page database.Page[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
-					gotHome, gotUser, gotPage = home, user, page
+				func(_ context.Context, home, user string, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+					gotHome, gotUser, gotOpts = home, user, opts
 					return tc.result, tc.statementErr
 				})
 
@@ -1113,13 +1137,73 @@ func TestProjectService_ListAuthorized(t *testing.T) {
 			}
 			require.NoError(t, err)
 			if tc.checkCall != nil {
-				tc.checkCall(t, gotHome, gotUser, gotPage)
+				tc.checkCall(t, gotHome, gotUser, gotOpts)
 			}
 			if tc.checkResp != nil {
 				tc.checkResp(t, resp)
 			}
 		})
 	}
+}
+
+// A platform operator can act on every project (ADR 075 §6): ListEveryProject
+// pages all of them, in the same order and with the same cursor as the grant
+// query, and never asks the grant query.
+func TestProjectService_ListEveryProject(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Nil(t, opts.Filter, "every project: no filter")
+			assert.Equal(t, []byte("tok"), opts.Pagination.Cursor)
+			assert.Equal(t, uint32(20), opts.Pagination.Limit)
+			assert.Equal(t, database.OrderAsc, opts.Pagination.OrderBy.Direction)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{
+				Items:      []*domain.Project{{ID: "proj_a"}, {ID: "proj_b"}},
+				NextCursor: []byte("next"),
+			}, nil
+		})
+
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		PageToken:     "tok",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 2)
+	assert.Equal(t, "next", resp.NextPageToken)
+}
+
+// An operator searches like anyone (ADR 075 §6): the name filter that narrows
+// the grant query narrows the listing of every project the same way.
+func TestProjectService_ListEveryProjectByName(t *testing.T) {
+	t.Parallel()
+
+	svc, _, _, _, _, _, _, _, _, statements := createMockedProjectService(t)
+	expectActiveSessionUser(statements)
+	statements.EXPECT().ListAuthorizedProjects(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	statements.EXPECT().ListProjects(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, opts *database.ListOptions[domain.ProjectField]) (*database.ListResult[*domain.Project], error) {
+			assert.Equal(t, database.StringContainsFold(database.Col(domain.ProjectFieldName), "acme"), opts.Filter)
+			assert.Equal(t, []database.Column[domain.ProjectField]{
+				database.Col(domain.ProjectFieldID),
+			}, opts.Pagination.OrderBy.Columns)
+			return &database.ListResult[*domain.Project]{Items: []*domain.Project{{ID: "proj_a"}}}, nil
+		})
+
+	resp, err := svc.ListEveryProject(context.Background(), service.ListAuthorizedProjectsRequest{
+		HomeProjectID: "proj_platform",
+		UserID:        "user_a",
+		NameContains:  "acme",
+	})
+	require.NoError(t, err)
+	assert.Len(t, resp.Projects, 1)
 }
 
 // An empty user or home project must never reach storage: the predicate would

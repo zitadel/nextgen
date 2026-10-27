@@ -6,17 +6,27 @@ content:
       oneOf:
         - $ref: '../../components/schemas/errors/att-invalid_request.yaml'
         - $ref: '../../components/schemas/errors/auth-unauthorized.yaml'
+        - $ref: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
         - $ref: '../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../components/schemas/errors/internal.yaml'
+        - $ref: '../../components/schemas/errors/not_implemented.yaml'
+        - $ref: '../../components/schemas/errors/proj-mismatch.yaml'
         - $ref: '../../components/schemas/errors/req-invalid.yaml'
+        - $ref: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+        - $ref: '../../components/schemas/errors/unavailable.yaml'
       discriminator:
         propertyName: code
         mapping:
           att.invalid_request: '../../components/schemas/errors/att-invalid_request.yaml'
           auth.unauthorized: '../../components/schemas/errors/auth-unauthorized.yaml'
+          enc_key.decrypt_failed: '../../components/schemas/errors/enc_key-decrypt_failed.yaml'
           evt.invalid: '../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../components/schemas/errors/internal.yaml'
+          not_implemented: '../../components/schemas/errors/not_implemented.yaml'
+          proj.mismatch: '../../components/schemas/errors/proj-mismatch.yaml'
           req.invalid: '../../components/schemas/errors/req-invalid.yaml'
+          enc_key.unknown_alg: '../../components/schemas/errors/enc_key-unknown_alg.yaml'
+          unavailable: '../../components/schemas/errors/unavailable.yaml'
     examples:
       att.invalid_request:
         summary: att.invalid_request
@@ -28,6 +38,11 @@ content:
         value:
           code: auth.unauthorized
           message: 'The request lacks valid authentication credentials.'
+      enc_key.decrypt_failed:
+        summary: enc_key.decrypt_failed
+        value:
+          code: enc_key.decrypt_failed
+          message: 'failed to decrypt data'
       evt.invalid:
         summary: evt.invalid
         value:
@@ -38,8 +53,28 @@ content:
         value:
           code: internal
           message: 'An unexpected error occurred.'
+      not_implemented:
+        summary: not_implemented
+        value:
+          code: not_implemented
+          message: 'This feature is not implemented yet.'
+      proj.mismatch:
+        summary: proj.mismatch
+        value:
+          code: proj.mismatch
+          message: 'the project named in the request is not the one the credential belongs to'
       req.invalid:
         summary: req.invalid
         value:
           code: req.invalid
           message: 'The request is invalid and fails base validation (missing required fields, wrong types, failed regex, etc.). Check the details for more information.'
+      enc_key.unknown_alg:
+        summary: enc_key.unknown_alg
+        value:
+          code: enc_key.unknown_alg
+          message: 'unsupported encryption algorithm'
+      unavailable:
+        summary: unavailable
+        value:
+          code: unavailable
+          message: 'The service could not complete the request right now. Try again.'

@@ -22,33 +22,50 @@ body {
 `;
 }
 
-/** `pages/index.vue` — redirects the app root to `/login`. */
+/**
+ * `pages/index.vue` — redirects the app root to `/login`. The redirect runs
+ * before render; the empty template only keeps Vue from warning that the page
+ * has nothing to render.
+ */
 export function indexPageTemplate(): string {
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
 await navigateTo("/login", { replace: true });
 </script>
+
+<template>
+  <div />
+</template>
 `;
 }
 
 /**
+ * The `<script setup>` every page shares. It imports nothing: the module
+ * auto-imports `useZitadelProject`, and an import from `@zitadel/sdk-nuxt`'s
+ * root would evaluate the Lit elements during SSR.
+ */
+const PROJECT_SETUP = "const project = useZitadelProject();";
+
+/**
  * A login/register page rendering `<zitadel-login>` inside `<ClientOnly>`.
- * Business-use-case projects additionally bind the SDK's `businessLocales`
- * overlay, restoring work-email copy on top of the widget's neutral built-in
+ * Business-use-case projects additionally bind the `businessLocales`
+ * overlay, which the SDK module's client plugin provides as
+ * `useNuxtApp().$zitadelBusinessLocales`, restoring work-email copy on top of the widget's neutral built-in
  * dictionaries. A plain `:locales` binding suffices even on the raw custom
  * element: Vue sets bindings whose key exists on the element as DOM
  * properties (unlike React 18, which is why the Next template needs a ref).
  */
 function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   const business = ctx.useCase === "business";
-  const importNames = business ? "businessLocales, useZitadelProject" : "useZitadelProject";
   // The overlay ships with the SDK, so the generated page only wires it up
   // (and stays plain otherwise).
-  const localesComment = business
+  const localesSetup = business
     ? `
 // Set up for a business audience: businessLocales overlays work-email copy on
 // the login widget's neutral built-in dictionaries. Remove the :locales
-// binding to fall back to the neutral wording.`
+// binding to fall back to the neutral wording. The SDK module provides the
+// overlay in the browser, where <ClientOnly> renders the widget.
+const { $zitadelBusinessLocales: businessLocales } = useNuxtApp();`
     : "";
   const localesAttr = business ? '\n        :locales="businessLocales"' : "";
   const purposeAttr = purpose === "register" ? '\n        purpose="register"' : "";
@@ -72,9 +89,7 @@ function authPage(purpose: "login" | "register", ctx: PatchContext): string {
   const wrapperClose = widget ? "</div>" : "</main>";
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
-import { ${importNames} } from "@zitadel/sdk-nuxt";${localesComment}
-
-const project = useZitadelProject();
+${PROJECT_SETUP}${localesSetup}
 </script>
 
 <template>
@@ -131,9 +146,7 @@ export function profilePageTemplate(ctx: PatchContext): string {
     : `<zitadel-session variant="page" :project="project" post-sign-out-url="/login" />`;
   return `<script setup lang="ts">
 ${MANAGED_MARKER}
-import { useZitadelProject } from "@zitadel/sdk-nuxt";
-
-const project = useZitadelProject();
+${PROJECT_SETUP}
 </script>
 
 <template>
@@ -144,48 +157,5 @@ const project = useZitadelProject();
     </ClientOnly>
   ${wrapperClose}
 </template>
-`;
-}
-
-/** `plugins/zitadel-components.client.ts` — register the Lit elements client-side. */
-export function componentsPluginTemplate(): string {
-  return `${MANAGED_MARKER}
-// Register Lit custom elements on the client only. Importing @zitadel/components
-// from a page <script setup> would run during SSR and break the widgets.
-import "@zitadel/components";
-
-export default defineNuxtPlugin(() => {});
-`;
-}
-
-/** `plugins/auth.server.ts` — seed the client auth state from the server context. */
-export function authPluginTemplate(): string {
-  return `${MANAGED_MARKER}
-import { defineNuxtPlugin, useRequestEvent, useState } from "#imports";
-import type { ClientAuthResult } from "@zitadel/sdk-nuxt";
-
-export default defineNuxtPlugin(() => {
-  const event = useRequestEvent();
-  const auth = event?.context.nextgenAuth ?? {
-    isAuthenticated: false as const,
-    session: null,
-  };
-
-  // Strip the raw JWT before seeding useState — it must not appear in the SSR
-  // payload where client-side scripts could read it.
-  const clientAuth: ClientAuthResult = auth.isAuthenticated
-    ? {
-        isAuthenticated: true,
-        session: {
-          userId: auth.session.userId,
-          identifier: auth.session.identifier,
-          identifierProperty: auth.session.identifierProperty,
-          display: auth.session.display,
-        },
-      }
-    : { isAuthenticated: false, session: null };
-
-  useState<ClientAuthResult>("nextgen-auth", () => clientAuth);
-});
 `;
 }

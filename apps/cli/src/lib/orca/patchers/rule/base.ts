@@ -1,11 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { metaSchemaFiles, META_SCHEMA_DIR } from "@zitadel/config/meta-schemas";
+import { META_SCHEMA_DIR, PROJECT_FILE_SCHEMA_REF } from "@zitadel/config/meta-schemas";
 
 import { stableStringify } from "../../../json";
-import { normalizePublicCliJson } from "../../../public-cli";
+import { projectMetaSchemas } from "../../../meta-schemas";
 import { DEFAULT_SERVER } from "../../../server";
+import { portFromIssuer } from "../../detectors/port";
+import { configIssuerOp, envIssuerOp } from "./dev-port-move";
 import { scaffold } from "./file-writer";
 import type { FileOp, ScaffoldPlan } from "./file-writer/types";
 import {
@@ -25,6 +27,13 @@ import type {
   PatchView,
 } from "../types";
 import { reclaimableOps, withoutExistingTargets } from "./reclaim";
+
+/**
+ * Closes every {@link AbstractRulePatcher.preflight} refusal. `--force` is the
+ * obvious next try after an `E_CONFLICT`, and it changes nothing there.
+ */
+export const PREFLIGHT_FORCE_NOTE =
+  "--force can't fix this: it only replaces files at the paths setup writes.";
 
 /**
  * Base for rule-based (deterministic, template-driven) patchers, as opposed to
@@ -51,8 +60,20 @@ export abstract class AbstractRulePatcher implements Patcher {
 
   /** Apply the full plan (base `.zitadel/` files + framework routes). */
   async patch(ctx: PatchContext, opts: PatchExecOptions): Promise<PatchResult> {
+    await this.preflight(ctx, opts.cwd);
     return scaffold(this.plan(ctx), opts);
   }
+
+  /**
+   * Refuses, with `E_CONFLICT`, a project the plan would leave broken without
+   * conflicting on any path it writes: the file-writer only stops on a file
+   * at exactly a path in the plan, and some of the app's own files break the
+   * integration from another path. Setup's dry-run patch runs this before it
+   * creates a project. `force` does not skip it: forcing replaces files at the
+   * plan's paths, and these files sit elsewhere. `repair` does not run it —
+   * `doctor` reports what it finds instead. Defaults to nothing to check.
+   */
+  protected async preflight(_ctx: PatchContext, _cwd: string): Promise<void> {}
 
   /**
    * Re-apply only the reclaimable subset — env files, gitignore, the SDK
@@ -85,12 +106,29 @@ export abstract class AbstractRulePatcher implements Patcher {
     return scaffold({ ops, summary: plan.summary }, execOpts);
   }
 
+  /** See {@link Patcher.moveDevPort}. */
+  async moveDevPort(
+    ctx: PatchContext,
+    previousIssuer: string,
+    opts: PatchExecOptions,
+  ): Promise<PatchResult> {
+    const ops: FileOp[] = [
+      ...this.devPortOps(ctx, portFromIssuer(previousIssuer)),
+      envIssuerOp(ctx.issuer),
+      configIssuerOp(previousIssuer, ctx.issuer),
+      ...guidanceOps(ctx),
+    ];
+    return scaffold({ ops, summary: [this.summary(ctx)] }, opts);
+  }
+
   /**
    * Probe whether the labelled config wirings are still applied, using each
    * merge transform's own idempotency: the transforms only add what is
    * missing and return the source unchanged when everything they manage is
    * present, so a changed output means the wiring is absent from the user's
-   * config. Every labelled wiring gets a verdict: a missing host file is
+   * config. An op whose transform leaves a file it cannot recognize as it is
+   * brings its own `verify`, so that such a file reads as `unknown`, not
+   * applied. Every labelled wiring gets a verdict: a missing host file is
    * `detached` (the wiring cannot be applied in a file that does not exist),
    * and a transform that throws on restructured content yields `unknown` —
    * surfaced rather than silently dropped, so a deleted `angular.json` can
@@ -121,11 +159,16 @@ export abstract class AbstractRulePatcher implements Patcher {
         continue;
       }
       try {
-        statuses.push({
-          path,
-          wiring: op.wiring,
-          state: op.edit(source) === source ? "applied" : "detached",
-        });
+        const verdict = op.verify
+          ? op.verify(source)
+          : op.edit(source) === source
+            ? "applied"
+            : "detached";
+        statuses.push(
+          typeof verdict === "string"
+            ? { path, wiring: op.wiring, state: verdict }
+            : { path, wiring: op.wiring, state: "unknown", reason: verdict.unknown },
+        );
       } catch (error) {
         statuses.push({
           path,
@@ -146,7 +189,7 @@ export abstract class AbstractRulePatcher implements Patcher {
       markedFiles,
       rootConfigFiles: ["zitadel.json"],
       directories: [".zitadel"],
-      envBackups: [".env.local"],
+      envBackups: [".env.local", ".env.development.local"],
       dependencies: this.routeDeps(view),
       configEdits: this.routeConfigEdits(view),
       guidanceFiles: ["AGENTS.md", "README.md"],
@@ -242,7 +285,12 @@ export abstract class AbstractRulePatcher implements Patcher {
           project_id: ctx.project.id,
           project_secret: ctx.project.project_secret,
           preview_secret: ctx.project.preview_secret,
-          preview_origins: ctx.project.preview_origins,
+          primary_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "primary")
+            .map((origin) => origin.pattern),
+          preview_origins: ctx.project.origins
+            .filter((origin) => origin.kind === "preview")
+            .map((origin) => origin.pattern),
           created_at: ctx.project.created_at,
         })}\n`,
       },
@@ -271,40 +319,57 @@ export abstract class AbstractRulePatcher implements Patcher {
           ZITADEL_URL: ctx.server,
         },
       },
+      // What the CLI reads, as opposed to `.env.local`, which the app reads.
+      {
+        kind: "merge-env",
+        path: ".env.development.local",
+        mode: 0o600,
+        // The CLI's own file: a value a prompt saved here before setup ran
+        // must give way to the project setup just created.
+        overwrite: true,
+        entries: {
+          ZITADEL_URL: ctx.server,
+          ZITADEL_PROJECT_ID: ctx.project.id,
+          ZITADEL_PROJECT_SECRET: ctx.project.project_secret,
+          ZITADEL_PREVIEW_TOKEN: ctx.project.preview_secret,
+          // The setup issuer, so the SSO recovery command (which pins
+          // `--env-file .env.development.local`) resolves the local origin
+          // rather than falling through to a production `ZITADEL_ISSUER` in
+          // the process environment.
+          ZITADEL_ISSUER: ctx.issuer,
+        },
+      },
       {
         kind: "write",
         path: ".zitadel/state.json",
         contents: `${stableStringify({ framework: ctx.framework.id, resources: {} })}\n`,
       },
-      // The dialect meta-schemas, committed with the project so flow files'
-      // relative `$schema` pointers resolve offline (editor validation) and
-      // agents can read the flow/schema dialect without the docs site. Their
+      // The dialect meta-schemas, committed with the project so the relative
+      // `$schema` pointers of `zitadel.json` and the flow files resolve
+      // offline (editor validation) and agents can read the flow/schema
+      // dialect without the docs site. Their
       // descriptions become editor tooltips inside the generated app, so the
       // `zitadel …` mentions are rewritten to the runnable public form on the
       // way out — the shared source keeps the bare spelling the server wants.
       { kind: "mkdir", path: META_SCHEMA_DIR },
-      ...metaSchemaFiles().map(
-        (file): FileOp => ({
-          kind: "write",
-          path: `${META_SCHEMA_DIR}/${file.name}`,
-          contents: `${JSON.stringify(normalizePublicCliJson(file.body, ctx.cliVersion), null, 2)}\n`,
-        }),
+      ...projectMetaSchemas(ctx.cliVersion).map(
+        (file): FileOp => ({ kind: "write", path: file.path, contents: file.contents }),
       ),
-      // Guidance for humans (README) and agents (AGENTS.md): the golden
-      // journey and the customize→plan→apply loop. Marker-fenced managed
-      // sections — existing content is never clobbered.
-      {
-        kind: "edit",
-        path: "AGENTS.md",
-        edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
-      },
-      {
-        kind: "edit",
-        path: "README.md",
-        edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
-      },
+      ...guidanceOps(ctx),
     ];
   }
+
+  /**
+   * The ops that hold the dev server to `ctx.framework.devPort`, for
+   * {@link moveDevPort}. `previousPort` is the port the app is moving off: a
+   * config pin still on it is rewritten, any other pin is left alone. Each
+   * framework names its own, because the port lives in the dev script for
+   * some and in the dev-server config for others.
+   */
+  protected abstract devPortOps(
+    ctx: PatchContext,
+    previousPort: number | undefined,
+  ): ReadonlyArray<FileOp>;
 
   /** Framework-specific route/middleware write ops plus the SDK dependency. */
   protected abstract routeOps(ctx: PatchContext): ReadonlyArray<FileOp>;
@@ -319,6 +384,26 @@ export abstract class AbstractRulePatcher implements Patcher {
   protected abstract summary(ctx: PatchContext): { title: string; detail: string };
 }
 
+/**
+ * Guidance for humans (README) and agents (AGENTS.md): the golden journey and
+ * the customize→plan→apply loop. Marker-fenced managed sections — existing
+ * content is never clobbered.
+ */
+function guidanceOps(ctx: PatchContext): FileOp[] {
+  return [
+    {
+      kind: "edit",
+      path: "AGENTS.md",
+      edit: (source) => upsertGuidanceSection(source, agentsGuidanceSection(ctx), AGENTS_HEADER),
+    },
+    {
+      kind: "edit",
+      path: "README.md",
+      edit: (source) => upsertGuidanceSection(source, readmeGuidanceSection(ctx), README_HEADER),
+    },
+  ];
+}
+
 /** Reads a text file, mapping every failure to `undefined`. */
 async function readTextIfExists(path: string): Promise<string | undefined> {
   try {
@@ -330,21 +415,14 @@ async function readTextIfExists(path: string): Promise<string | undefined> {
 
 /** Builds the `zitadel.json` body persisted at the project root. */
 function projectConfig(ctx: PatchContext): Record<string, unknown> {
-  const environments: Record<string, unknown> = { development: { issuer: ctx.issuer } };
-  if (ctx.project.preview_origins.length > 0) {
-    // preview_origins are already full origins (scheme://host[:port]); don't
-    // prepend a scheme or it doubles up (https://http://localhost:3000).
-    environments.preview = {
-      issuer_pattern: [...ctx.project.preview_origins],
-    };
-  }
   return {
-    $schema: "https://schemas.zitadel.com/v2/project.schema.json",
+    // The copy setup writes into .zitadel/meta/, so an editor validates the
+    // file offline against the CLI version that wrote it.
+    $schema: PROJECT_FILE_SCHEMA_REF,
     project: ctx.project.id,
     server: resolveServerOrigin(ctx.server),
     framework: { id: ctx.framework.id },
     branding: { renderer: ctx.rendererId, attribution: "visible" },
-    environments,
     ...(ctx.preset === undefined ? {} : { preset: ctx.preset }),
     ...(ctx.useCase === undefined ? {} : { useCase: ctx.useCase }),
   };

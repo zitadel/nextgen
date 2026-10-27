@@ -45,6 +45,12 @@ tags:
       revisioned connection document and referenced by its slug from user
       schemas and flow definitions. Create-or-revise, query, read by id, and
       revision reads. A slug resolves through the query.
+  - name: Policies
+    description: |
+      Operation policies (ADR 066): a project publishes, per guarded
+      operation, the settings that operation is checked against, such as a
+      password policy's minimum length. Every publish is an immutable
+      revision.
   - name: Releases
     description: |
       A release is a snapshot of a project's configuration: one revision of
@@ -62,6 +68,21 @@ tags:
       A release's content never changes. If it must never be served again,
       revoke it. A release can't be revoked while any origin still serves
       it.
+  - name: Deployments
+    description: |
+      A deployment makes one release live on one or more targets — the
+      project's primary origins, or preview URLs — and freezes the variable
+      values those targets use.
+
+      Deployments form an append-only history of what ran where, and when. A
+      rollback is another deployment: it re-deploys an earlier one with the
+      variable values it froze, and the deployments in between stay in the
+      history.
+  - name: Previews
+    description: |
+      Preview URLs that are live. A deployment to a URL matching one of the
+      project's preview patterns creates or renews its preview; list them
+      here and remove one before it expires.
   - name: Grants
     description: |
       Collaboration grants that bind a user or team to project.viewer,
@@ -73,24 +94,26 @@ tags:
       identity, session, admin, and entity events; filter by `category` /
       `event_type`. Response items are a discriminated Event union on
       `event_type` with typed payloads per docs/design/api/events-catalog.md.
+  - name: Event Webhooks
+    description: |
+      Events the server POSTs to a webhook sink as it stores them (ADR 049),
+      one event per request and, within a project, in the order they were
+      stored. The body is the event as `GET /events` returns it; `event_type`
+      tells the webhooks apart. Delivery is at least once, so drop duplicates
+      by `id`. The sink is set in the server's configuration, under
+      `events.export`.
   - name: Variables
     description: |
       Named values a project enters and references from configuration documents
-      as `${{ NAME }}` (ADR 062). A variable belongs to the project or to one of
-      its environments, which is how a value that must differ per environment
-      reaches a release that is promoted between them unchanged.
-
-      Those owners are separate rather than a hierarchy: a variable is read,
-      written and deleted at exactly the owner a request addresses, and nothing
-      is inherited in either direction.
+      as `${{ NAME }}`. A variable has a value per kind, `primary` or `preview`,
+      and each deployment freezes the values of its kind. There is no fallback
+      between kinds.
 
       Secrets are the same resource with the value stored encrypted: same
       names, same references, same endpoints. They are write-only — a read says
       that a secret is held, never what it is.
 
 paths:
-  /healthz:
-    $ref: endpoints/healthz/methods.yaml
   /livez:
     $ref: endpoints/livez/methods.yaml
   /readyz:
@@ -101,6 +124,8 @@ paths:
     $ref: endpoints/users/query/methods.yaml
   /users/{user_id}:
     $ref: endpoints/users/by_id/methods.yaml
+  /users/{user_id}/identity_links:
+    $ref: endpoints/users/by_id/identity_links/methods.yaml
   /users/{user_id}/passkeys:
     $ref: endpoints/users/by_id/passkeys/methods.yaml
   /users/{user_id}/passkeys/registrations:
@@ -113,8 +138,18 @@ paths:
     $ref: endpoints/users/by_id/teams/methods.yaml
   /users/me:
     $ref: endpoints/users/me/methods.yaml
+  /users/me/identity_links:
+    $ref: endpoints/users/me/identity_links/methods.yaml
+  /users/me/passkeys:
+    $ref: endpoints/users/me/passkeys/methods.yaml
+  /users/me/password:
+    $ref: endpoints/users/me/password/methods.yaml
   /users/me/projects:
     $ref: endpoints/users/me/projects/methods.yaml
+  /users/me/schema:
+    $ref: endpoints/users/me/schema/methods.yaml
+  /users/me/teams:
+    $ref: endpoints/users/me/teams/methods.yaml
   /flow:
     $ref: endpoints/flow/methods.yaml
   /flow/{id}:
@@ -137,6 +172,8 @@ paths:
     $ref: endpoints/projects/query/methods.yaml
   /projects/{project_id}:
     $ref: endpoints/projects/by_id/methods.yaml
+  /projects/{project_id}/admins:
+    $ref: endpoints/projects/by_id/admins/methods.yaml
   /projects/{project_id}/claim/init:
     $ref: endpoints/projects/by_id/claim/init/methods.yaml
   /projects/{project_id}/claim/status:
@@ -145,6 +182,14 @@ paths:
     $ref: endpoints/projects/by_id/claim/complete/methods.yaml
   /projects/{project_id}/claim/window:
     $ref: endpoints/projects/by_id/claim/window/methods.yaml
+  /projects/{project_id}/origins:
+    $ref: endpoints/projects/by_id/origins/methods.yaml
+  /projects/{project_id}/origins/remove:
+    $ref: endpoints/projects/by_id/origins/remove/methods.yaml
+  /projects/{project_id}/previews:
+    $ref: endpoints/projects/by_id/previews/methods.yaml
+  /projects/{project_id}/previews/remove:
+    $ref: endpoints/projects/by_id/previews/remove/methods.yaml
   /sessions:
     $ref: endpoints/sessions/methods.yaml
   /sessions/query:
@@ -185,6 +230,14 @@ paths:
     $ref: endpoints/idps/by_id/revisions/methods.yaml
   /idps/revisions/{revision_id}:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /policies:
+    $ref: endpoints/policies/methods.yaml
+  /policies/{policy_id}:
+    $ref: endpoints/policies/by_id/methods.yaml
+  /policies/{policy_id}/revisions:
+    $ref: endpoints/policies/by_id/revisions/methods.yaml
+  /policies/revisions/{revision_id}:
+    $ref: endpoints/policies/revisions/by_id/methods.yaml
   /releases:
     $ref: endpoints/releases/methods.yaml
   /releases/build:
@@ -211,6 +264,102 @@ paths:
     $ref: endpoints/deployments/methods.yaml
   /deployments/{deployment_id}:
     $ref: endpoints/deployments/by_id/methods.yaml
+  /deployments/{deployment_id}/rollback:
+    $ref: endpoints/deployments/by_id/rollback/methods.yaml
+  /deployments/{deployment_id}/variables:
+    $ref: endpoints/deployments/by_id/variables/methods.yaml
+
+# One per domain event type, keyed by its event_type. gen_event_schemas writes
+# the files and fails until this list names exactly the domain's event types.
+webhooks:
+  auth.attempt.created:
+    $ref: endpoints/events/webhooks/auth-attempt-created.yaml
+  auth.attempt.handed_off:
+    $ref: endpoints/events/webhooks/auth-attempt-handed_off.yaml
+  auth.check.failed:
+    $ref: endpoints/events/webhooks/auth-check-failed.yaml
+  auth.check.succeeded:
+    $ref: endpoints/events/webhooks/auth-check-succeeded.yaml
+  auth.factor.passkey.enrolled:
+    $ref: endpoints/events/webhooks/auth-factor-passkey-enrolled.yaml
+  auth.factor.password.set:
+    $ref: endpoints/events/webhooks/auth-factor-password-set.yaml
+  auth.sso.authorization.failed:
+    $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
+  auth.sso.exchange.failed:
+    $ref: endpoints/events/webhooks/auth-sso-exchange-failed.yaml
+  auth.sso.exchange.succeeded:
+    $ref: endpoints/events/webhooks/auth-sso-exchange-succeeded.yaml
+  auth.token.issued:
+    $ref: endpoints/events/webhooks/auth-token-issued.yaml
+  auth.token.revoked:
+    $ref: endpoints/events/webhooks/auth-token-revoked.yaml
+  authz.granted:
+    $ref: endpoints/events/webhooks/authz-granted.yaml
+  authz.revoked:
+    $ref: endpoints/events/webhooks/authz-revoked.yaml
+  branding.created:
+    $ref: endpoints/events/webhooks/branding-created.yaml
+  deployment.created:
+    $ref: endpoints/events/webhooks/deployment-created.yaml
+  flowdef.created:
+    $ref: endpoints/events/webhooks/flowdef-created.yaml
+  flowdef.deleted:
+    $ref: endpoints/events/webhooks/flowdef-deleted.yaml
+  flowdef.updated:
+    $ref: endpoints/events/webhooks/flowdef-updated.yaml
+  idp.created:
+    $ref: endpoints/events/webhooks/idp-created.yaml
+  idp.identity_link.created:
+    $ref: endpoints/events/webhooks/idp-identity_link-created.yaml
+  idp.updated:
+    $ref: endpoints/events/webhooks/idp-updated.yaml
+  origin.added:
+    $ref: endpoints/events/webhooks/origin-added.yaml
+  origin.removed:
+    $ref: endpoints/events/webhooks/origin-removed.yaml
+  policy.created:
+    $ref: endpoints/events/webhooks/policy-created.yaml
+  policy.updated:
+    $ref: endpoints/events/webhooks/policy-updated.yaml
+  preview.removed:
+    $ref: endpoints/events/webhooks/preview-removed.yaml
+  project.created:
+    $ref: endpoints/events/webhooks/project-created.yaml
+  project.deleted:
+    $ref: endpoints/events/webhooks/project-deleted.yaml
+  project.updated:
+    $ref: endpoints/events/webhooks/project-updated.yaml
+  release.created:
+    $ref: endpoints/events/webhooks/release-created.yaml
+  release.revoked:
+    $ref: endpoints/events/webhooks/release-revoked.yaml
+  request.api:
+    $ref: endpoints/events/webhooks/request-api.yaml
+  schema.created:
+    $ref: endpoints/events/webhooks/schema-created.yaml
+  session.deleted:
+    $ref: endpoints/events/webhooks/session-deleted.yaml
+  session.established:
+    $ref: endpoints/events/webhooks/session-established.yaml
+  team.created:
+    $ref: endpoints/events/webhooks/team-created.yaml
+  team.deactivated:
+    $ref: endpoints/events/webhooks/team-deactivated.yaml
+  team.updated:
+    $ref: endpoints/events/webhooks/team-updated.yaml
+  user.create.failed:
+    $ref: endpoints/events/webhooks/user-create-failed.yaml
+  user.created:
+    $ref: endpoints/events/webhooks/user-created.yaml
+  user.deleted:
+    $ref: endpoints/events/webhooks/user-deleted.yaml
+  user.updated:
+    $ref: endpoints/events/webhooks/user-updated.yaml
+  variable.removed:
+    $ref: endpoints/events/webhooks/variable-removed.yaml
+  variable.set:
+    $ref: endpoints/events/webhooks/variable-set.yaml
 
 components:
   securitySchemes:

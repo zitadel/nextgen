@@ -45,6 +45,15 @@ describe("branding eject", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
+      it("starts from the default design when none is named and no one can be asked", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.run(["branding", "eject", "--non-interactive", "--json"]);
+
+        expect(result).toSucceed();
+        expect(app.envelopeOf<{ design: string }>(result).data.design).toEqual(expect.any(String));
+      });
+
       it("publishes nothing by itself", async () => {
         const published = platform.capturesBrandingPublishes();
         const app = await aSetUpApp();
@@ -55,26 +64,27 @@ describe("branding eject", () => {
         expect(published.count).toBe(0);
       });
 
-      it("publishes the ejected design on the next apply", async () => {
-        const published = platform.capturesBrandingPublishes();
+      it("carries the ejected design into the next deploy's release", async () => {
         const app = await aSetUpApp();
         expect(await app.run(MINIMAL_DESIGN)).toSucceed();
+        await app.addPrimaryOrigin();
 
-        const result = await app.apply();
+        const data = await app.deployData();
 
-        expect(result).toSucceed();
-        expect(published.count).toBe(1);
-        expect(published.last).toMatchObject({ layout: "centered" });
+        // The scaffold's schema, flow and password policy, plus the ejected
+        // branding.
+        expect(data.resources).toBe(4);
       });
 
-      it("leaves nothing to reconcile once the design is published", async () => {
-        platform.capturesBrandingPublishes();
+      it("re-deploys the same release once the design is published", async () => {
         const app = await aSetUpApp();
         expect(await app.run(MINIMAL_DESIGN)).toSucceed();
+        await app.addPrimaryOrigin();
+        const before = await app.deployData();
 
-        expect(await app.apply()).toSucceed();
+        const after = await app.deployData();
 
-        expect(await app.plan()).toReportNothingToDo();
+        expect(after.content_hash).toBe(before.content_hash);
       });
     });
   });

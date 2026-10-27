@@ -115,6 +115,10 @@ func (s sessionExchangeStore) GetAuthAttemptByHandoffToken(ctx context.Context, 
 	return newAuthAttemptStatements(s.client).GetAuthAttemptByHandoffToken(ctx, projectID, handoffTokenHash)
 }
 
+func (s sessionExchangeStore) GetReleaseByID(ctx context.Context, projectID, id string) (*domain.Release, error) {
+	return newReleaseStatements(s.client).GetReleaseByID(ctx, projectID, id)
+}
+
 func (s sessionExchangeStore) DeleteAuthAttempt(ctx context.Context, projectID, attemptID string) error {
 	return newAuthAttemptStatements(s.client).DeleteAuthAttemptByID(ctx, projectID, attemptID)
 }

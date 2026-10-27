@@ -27,10 +27,24 @@ export type FileOp =
       readonly path: string;
       readonly entries: Readonly<Record<string, string>>;
       /**
+       * Permission bits for this op's target. On create they set the file's
+       * mode; on an existing file a set `mode` is re-asserted (chmod), because
+       * a secret-bearing `.env.*.local` must not be left at a looser mode it
+       * drifted to — `writeFile`'s mode applies only on creation and is masked
+       * by the umask.
+       */
+      readonly mode?: number;
+      /**
        * Lines written as `# ` comments above the entries the first time any of
        * them is added; a file that already carries the first line keeps it.
        */
       readonly comment?: ReadonlyArray<string>;
+      /**
+       * Replace the value of an entry the file already holds, rather than keep
+       * it. For a file the CLI owns, where a value saved earlier must not
+       * outrank the one this run just learned.
+       */
+      readonly overwrite?: boolean;
     }
   | {
       readonly kind: "merge-json";
@@ -79,7 +93,19 @@ export type FileOp =
        * home page) are not probed.
        */
       readonly wiring?: "infrastructure" | "convenience";
+      /**
+       * Reads the wiring's state for the doctor, for a transform whose output
+       * cannot tell "applied" from "cannot be applied here": one that leaves a
+       * file it does not recognize as it is, so that the run does not fail.
+       * Returns `applied`, `detached`, or why the file cannot be checked
+       * (reported as `unknown`, a warning). Without it, the doctor runs the
+       * transform and reads an unchanged file as applied.
+       */
+      readonly verify?: (source: string) => WiringVerdict;
     };
+
+/** A wiring's state as an edit's own {@link FileOp} `verify` reads it. */
+export type WiringVerdict = "applied" | "detached" | { readonly unknown: string };
 
 /**
  * A rule-based patcher's plan: the ordered file operations to apply plus a

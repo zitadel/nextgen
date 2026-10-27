@@ -8,6 +8,7 @@ import {
   installDependenciesForSetup,
   type SetupInstallInput,
 } from "../../../../src/commands/setup/install";
+import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
 import type { runPackageCommand } from "../../../../src/lib/package-manager";
 
 const dirs: string[] = [];
@@ -32,13 +33,15 @@ function input(overrides: Partial<SetupInstallInput> = {}): SetupInstallInput {
     env: {},
     issuer: "http://localhost:3000",
     json: true,
+    selector: environmentSelectorSuffix({ envFile: ".env.development.local" }),
     scaffoldedFramework: false,
     skipInstall: false,
     ...overrides,
   };
 }
 
-const planCommand = "npx @zitadel/cli@latest plan";
+const selector = " --env-file .env.development.local";
+const planCommand = `npx @zitadel/cli@1.2.3 deploy --dry-run${selector}`;
 
 describe("setup dependency installation", () => {
   it("installs when setup added a dependency", async () => {
@@ -69,7 +72,7 @@ describe("setup dependency installation", () => {
     expect(result.nextActions.join("\n")).toContain(".zitadel/schemas/");
     expect(result.nextActions.join("\n")).toContain(".zitadel/flows/");
     expect(result.nextActions.join("\n")).toContain(
-      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@latest apply to publish.`,
+      `See your changes before they go live: ${planCommand} to preview, then npx @zitadel/cli@1.2.3 deploy -m '<what changed>'${selector} to publish.`,
     );
     expect(result.nextCommands).toEqual(["npm run dev", planCommand]);
   });
@@ -86,7 +89,7 @@ describe("setup dependency installation", () => {
       text:
         "Once login works, this shows your next steps (customizing is covered in " +
         "your README's Zitadel section):",
-      command: "npx @zitadel/cli@latest status",
+      command: `npx @zitadel/cli@1.2.3 status${selector}`,
     });
     const boxText = result.boxActions
       .map((action) => [action.text, action.command].filter(Boolean).join(" "))

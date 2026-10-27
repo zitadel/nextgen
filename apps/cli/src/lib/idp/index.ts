@@ -21,6 +21,9 @@ export {
   type ConnectionFile,
   type ConnectionPlan,
   credentialVariablesOf,
+  checkCustomSlug,
+  refuseChangedIssuer,
+  storedCustomSettings,
   type StoredVariables,
   planConnection,
   refuseResolvedSecret,
@@ -30,11 +33,33 @@ export {
 export {
   applySsoToFlow,
   applySsoToSchema,
+  removeSsoFromFlow,
+  removeSsoFromSchema,
   ssoEditRefusal,
+  ssoProvidersRefusal,
   type SsoEditTarget,
   type SsoResult,
   type SsoSkipped,
 } from "./documents";
+
+export {
+  customFlagText,
+  selectionFromFlags,
+  type CustomFlagNames,
+  checkGivenCustomFlags,
+  customExample,
+  customFlagValues,
+  ENABLE_FLAG_KEYS,
+  flagText,
+  SETUP_FLAG_KEYS,
+  loopbackIssuerWarning,
+  type LoopbackReach,
+  ENABLE_FLAG_NAMES,
+  givenCustomFlags,
+  SETUP_FLAG_NAMES,
+  ssoEnableArgs,
+  type CustomFlagValues,
+} from "./custom";
 
 export { callbackUriFor } from "./callback";
 
@@ -45,6 +70,7 @@ export {
   type PublishState,
   reportClientIdOutcome,
   reportSecretOutcome,
+  republishArgs,
   republishCommand,
   republishCommands,
   type SecretOutcome,
@@ -56,6 +82,7 @@ export {
   authMethods,
   enabledMethods,
   type FlowFile,
+  methodsOf,
   readFlowFiles,
   readSchemaFiles,
   type SchemaFile,

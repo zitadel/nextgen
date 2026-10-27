@@ -1,20 +1,32 @@
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ZitadelClient } from "@zitadel/api/client";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { DEFAULT_FLOW_CONFIG_PATH, DEFAULT_SCHEMA_CONFIG_PATH } from "@zitadel/config/defaults";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { normalizeFlowBody, normalizeSchemaBody } from "@zitadel/config/normalize";
+import {
+  normalizeFlowBody,
+  normalizeIdpBody,
+  normalizeSchemaBody,
+} from "@zitadel/config/normalize";
 
-import { materializeSetupResources } from "../../../src/lib/setup-resources";
+import {
+  assertNoSetupResourceConflicts,
+  materializeSetupResources,
+} from "../../../src/lib/setup-resources";
 import { IDPS_DIR } from "../../../src/lib/idp";
+import { acmeSelection, googleSelection } from "../../helpers/idp-values";
 import { FLOWS_DIR } from "../../../src/lib/flows";
 import { SCHEMAS_DIR } from "../../../src/lib/user-schema";
+import { PASSWORD_POLICY_PATH, POLICIES_DIR } from "../../../src/lib/policies";
+import { stableStringify } from "../../../src/lib/json";
 import { hashForState } from "../../../src/lib/sync";
 import type { ZitadelState } from "../../../src/lib/sync/types";
+import { takeReportedWarnings } from "../../../src/lib/warnings";
 
 const TEST_CLI_VERSION = "0.1.0-alpha.18";
 
@@ -41,6 +53,7 @@ describe("materializeSetupResources", () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockRejectedValue(new Error("flow create failed")),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await expect(
@@ -62,7 +75,7 @@ describe("materializeSetupResources", () => {
     });
   });
 
-  it("reuses the server-returned schema id as user_schema on the flow", async () => {
+  it("names the schema by its objectType on the flow", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi
@@ -72,6 +85,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -85,29 +99,17 @@ describe("materializeSetupResources", () => {
     const flowFile = JSON.parse(await readFile(join(cwd, DEFAULT_FLOW_CONFIG_PATH), "utf8")) as {
       user_schema: string;
     };
-    expect(flowFile.user_schema).toBe("sch_01KWHF");
+    expect(flowFile.user_schema).toBe("human-user");
   });
 
-  it("reconciles the schema file with the server's stored body and seeds its hash", async () => {
-    const canonical = {
-      objectType: "human-user",
-      kind: "user-schema",
-      title: "ServerCanonicalTitle",
-      properties: { email: { type: "string", "x-audit": false } },
-    };
+  it("keeps the schema file as written and seeds its hash from it", async () => {
     const client = {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
-      // `GET /schemas/{id}` serves the `{id, schema, metadata}` envelope;
-      // write-back must unwrap the document before it reaches disk.
-      getSchemaById: vi.fn().mockResolvedValue({
-        id: "sch_01KWHF",
-        schema: canonical,
-        metadata: { created_at: "2026-01-01T00:00:00Z" },
-      }),
       createFlowDefinition: vi.fn().mockResolvedValue({
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -118,48 +120,15 @@ describe("materializeSetupResources", () => {
       cliVersion: TEST_CLI_VERSION,
     });
 
-    const schemaFile = JSON.parse(
-      await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8"),
-    ) as Record<string, unknown>;
-    // The file holds the server's stored body VERBATIM: the server keeps
-    // schema bytes as uploaded, so a spelled-out meta-schema default must
-    // survive write-back or the next revision would publish without it.
-    expect(schemaFile.title).toBe("ServerCanonicalTitle");
-    expect(schemaFile.properties).toEqual({ email: { type: "string", "x-audit": false } });
-
+    const written = await readFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "utf8");
+    const posted = vi.mocked(client.createSchema).mock.calls[0]?.[0];
+    expect(written).toBe(`${stableStringify(posted)}\n`);
     const state = JSON.parse(
       await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
     ) as ZitadelState;
     expect(state.resources[DEFAULT_SCHEMA_CONFIG_PATH]?.hash).toBe(
-      hashForState({ normalize: normalizeSchemaBody }, schemaFile),
+      hashForState({ normalize: normalizeSchemaBody }, JSON.parse(written) as object),
     );
-  });
-
-  // Setup reconciliation used to pre-encode the created schema's id. The
-  // generated client owns the encoding now (#1272), so pre-encoding here sent
-  // `%25` for every delimiter in a `$id` URL and the fetch 404'd.
-  it("fetches the created schema by its id verbatim, leaving encoding to the client", async () => {
-    const id = "https://nextgen.com/api/schemas/default-human-user.json";
-    const getSchemaById = vi.fn().mockResolvedValue({
-      id,
-      schema: { objectType: "human-user", kind: "user-schema", title: "T" },
-      metadata: { created_at: "2026-01-01T00:00:00Z" },
-    });
-    const client = {
-      createSchema: vi.fn().mockResolvedValue({ id }),
-      getSchemaById,
-      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
-    } as unknown as ZitadelClient;
-
-    await materializeSetupResources({
-      cwd,
-      client,
-      projectId: "project_123",
-      force: false,
-      cliVersion: TEST_CLI_VERSION,
-    });
-
-    expect(getSchemaById).toHaveBeenCalledWith(id);
   });
 
   it("keeps the server's empty audience echo out of the flow file and hashes past it", async () => {
@@ -172,6 +141,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: { audience: {}, ...body.flow_definition },
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -205,6 +175,7 @@ describe("materializeSetupResources", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -245,6 +216,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -269,7 +241,7 @@ describe("materializeSetupResources", () => {
     // is not one of its dependencies) — every command mention must be the
     // runnable public npx form.
     for (const readme of [schemasReadme, flowsReadme]) {
-      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} plan`);
+      expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
       expect(readme).not.toMatch(/`zitadel /);
     }
   });
@@ -283,6 +255,7 @@ describe("materializeSetupResources", () => {
         id: "flow_01KWHG",
         status: "active",
       }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     const result = await materializeSetupResources({
@@ -299,6 +272,341 @@ describe("materializeSetupResources", () => {
   });
 });
 
+describe("materializeSetupResources password policy", () => {
+  /** A client whose schema, flow and policy creates succeed. */
+  function client(): ZitadelClient {
+    return {
+      createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
+      createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG", status: "active" }),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
+    } as unknown as ZitadelClient;
+  }
+
+  it("publishes and writes the recommended minimum when none was given", async () => {
+    const platform = client();
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(vi.mocked(platform.publishPolicy)).toHaveBeenCalledWith(
+      { operation: "auth.factor.password.set", config: { min_length: 15 } },
+      { project_id: "project_123" },
+    );
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as object;
+    expect(written).toEqual({
+      $schema: "../meta/policy.json",
+      operation: "auth.factor.password.set",
+      config: { min_length: 15 },
+    });
+    expect(result.passwordMinLengthSet).toBe(true);
+  });
+
+  it("publishes and writes an empty policy for an explicit none", async () => {
+    const platform = client();
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+      passwordMinLength: null,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: {},
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({});
+    expect(result.passwordMinLengthSet).toBe(false);
+  });
+
+  it("says no minimum was published when a kept policy file has none", async () => {
+    // Telemetry reports what was published: a kept file without a minimum
+    // stays without one when none was given, whatever the default.
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"history_depth":2}}\n`,
+    );
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(result.passwordMinLengthSet).toBe(false);
+  });
+
+  it("puts the given minimum into the published policy and its file", async () => {
+    const platform = client();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+      passwordMinLength: 12,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 12 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ min_length: 12 });
+  });
+
+  it("records the policy id and the hash setup records for its resources", async () => {
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: false,
+    });
+
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[PASSWORD_POLICY_PATH]).toEqual({
+      id: "pol_01KWHP",
+      hash: hashForState(
+        {
+          normalize: () => ({ operation: "auth.factor.password.set", config: { min_length: 15 } }),
+        },
+        {},
+      ),
+    });
+  });
+
+  it("writes the policies README with runnable commands", async () => {
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: false,
+    });
+
+    const readme = await readFile(join(cwd, POLICIES_DIR, "README.md"), "utf8");
+    expect(readme).toContain("min_length");
+    expect(readme).toContain(`npx @zitadel/cli@${TEST_CLI_VERSION} deploy`);
+    expect(readme).not.toMatch(/`zitadel /);
+    expect(result.filesWritten).toContain(join(cwd, POLICIES_DIR, "README.md"));
+  });
+
+  it("refuses an existing policy file before creating anything", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), "{}\n");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+    expect(vi.mocked(platform.createSchema)).not.toHaveBeenCalled();
+    expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      hint: expect.stringContaining("--force to keep this policy"),
+    });
+  });
+
+  it("keeps an existing policy file under --force and publishes it as it is", async () => {
+    const platform = client();
+    const existing = `{"$schema":"../meta/policy.json","operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 14, history_depth: 2 },
+    });
+    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+  });
+
+  it("puts a given minimum into an existing policy file under --force, keeping its other settings", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
+    );
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: 10,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { min_length: 10, history_depth: 2 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ min_length: 10, history_depth: 2 });
+  });
+
+  it("leaves a kept policy file untouched when the given minimum is the one it has", async () => {
+    const existing = `{"operation":"auth.factor.password.set","config":{"min_length":14}}\n`;
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(join(cwd, PASSWORD_POLICY_PATH), existing);
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: client(),
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: 14,
+    });
+
+    expect(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")).toBe(existing);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+  });
+
+  it("removes the minimum from an existing policy file under --force on an explicit none", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":14,"history_depth":2}}\n`,
+    );
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: true,
+      passwordMinLength: null,
+    });
+
+    expect(vi.mocked(platform.publishPolicy).mock.calls[0]?.[0]).toEqual({
+      operation: "auth.factor.password.set",
+      config: { history_depth: 2 },
+    });
+    const written = JSON.parse(await readFile(join(cwd, PASSWORD_POLICY_PATH), "utf8")) as {
+      config: object;
+    };
+    expect(written.config).toEqual({ history_depth: 2 });
+  });
+
+  it("refuses an invalid existing policy file under --force in the preflight, before anything is created", async () => {
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
+    );
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).rejects.toMatchObject({
+      code: "E_VALIDATION",
+    });
+  });
+
+  it("refuses an invalid existing policy file under --force before publishing it", async () => {
+    const platform = client();
+    await mkdir(join(cwd, POLICIES_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, PASSWORD_POLICY_PATH),
+      `{"operation":"auth.factor.password.set","config":{"min_length":0}}\n`,
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: true,
+      }),
+    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    expect(vi.mocked(platform.publishPolicy)).not.toHaveBeenCalled();
+  });
+
+  it("goes on without a policy against a server that has no policy endpoints", async () => {
+    takeReportedWarnings();
+    const platform = client();
+    vi.mocked(platform.publishPolicy).mockRejectedValue(
+      new ApiError(404, "http://localhost:8080/policies", "404 page not found", "Not Found"),
+    );
+
+    const result = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: platform,
+      projectId: "project_123",
+      force: false,
+    });
+
+    expect(existsSync(join(cwd, PASSWORD_POLICY_PATH))).toBe(false);
+    expect(existsSync(join(cwd, POLICIES_DIR, "README.md"))).toBe(false);
+    expect(result.filesWritten).not.toContain(join(cwd, PASSWORD_POLICY_PATH));
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[PASSWORD_POLICY_PATH]).toBeUndefined();
+    expect(takeReportedWarnings()).toEqual([expect.stringContaining("no policy endpoints")]);
+    expect(result.passwordMinLengthSet).toBe(false);
+  });
+
+  it("still fails on a policy the server refuses", async () => {
+    const platform = client();
+    vi.mocked(platform.publishPolicy).mockRejectedValue(
+      new ApiError(
+        400,
+        "http://localhost:8080/policies",
+        { code: "req.invalid", message: "bad" },
+        "Bad Request",
+      ),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: platform,
+        projectId: "project_123",
+        force: false,
+      }),
+    ).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
 describe("materializeSetupResources branding", () => {
   it("never scaffolds branding files or publishes a branding revision (#1039)", async () => {
     const createBranding = vi.fn();
@@ -306,6 +614,7 @@ describe("materializeSetupResources branding", () => {
       createSchema: vi.fn().mockResolvedValue({ id: "sch_01KWHF" }),
       createFlowDefinition: vi.fn().mockResolvedValue({ id: "flow_01KWHG" }),
       createBranding,
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
     await materializeSetupResources({
@@ -344,11 +653,12 @@ describe("materializeSetupResources with a social provider", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
   }
 
   // A list now: setup enables any number of providers in one run.
-  const google = [{ provider: "google", clientId: "1234-abc.apps.googleusercontent.com" }];
+  const google = [{ selection: googleSelection }];
 
   it("writes the connection and records the id the platform assigned", async () => {
     const client = recordingClient();
@@ -380,40 +690,60 @@ describe("materializeSetupResources with a social provider", () => {
     expect(state.resources[`${IDPS_DIR}/google.json`]).toMatchObject({ id: "idp_01KWHE" });
   });
 
-  it("refuses to write back a connection the server returned with a secret value", async () => {
-    // The write-back commits the canonical body to `.zitadel/idps/`, so a
-    // resolved secret must stop here rather than reach a committed file.
+  it("writes the connection it uploaded, whatever the server stored", async () => {
+    // The server spells out defaults the file leaves to it, and a server that
+    // resolved the secret would hand back a credential: neither reaches the
+    // committed file, which holds what setup uploaded and nothing else.
     const client = recordingClient();
-    const leaking = {
-      ...client,
-      createIdp: () =>
-        Promise.resolve({
-          id: "idp_1",
-          revision_id: "idprev_1",
-          slug: "google",
-          definition: {
-            slug: "google",
-            protocol: "oidc",
-            oidc: { issuer: "https://accounts.google.com", client_secret: "GOCSPX-real" },
-          },
-        }),
-    } as unknown as typeof client;
+    const createIdp = vi.fn().mockImplementation(async ({ idp }: { idp: object }) => ({
+      id: "idp_1",
+      revision_id: "idprev_1",
+      slug: "google",
+      definition: {
+        ...idp,
+        oidc: {
+          ...(idp as { oidc: object }).oidc,
+          client_secret: "GOCSPX-real",
+          pkce_enabled: true,
+          token_endpoint_auth_method: "client_secret_basic",
+        },
+      },
+    }));
 
-    await expect(
-      materializeSetupResources({
-        cwd,
-        cliVersion: TEST_CLI_VERSION,
-        client: leaking,
-        projectId: "project_123",
-        force: false,
-        sso: google,
-      }),
-    ).rejects.toMatchObject({ code: "E_VALIDATION" });
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: { ...client, createIdp } as unknown as typeof client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
 
-    const written = existsSync(join(cwd, IDPS_DIR, "google.json"))
-      ? await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")
-      : "";
+    const written = await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8");
+    expect(written).toBe(`${stableStringify(createIdp.mock.calls[0]?.[0].idp)}\n`);
     expect(written).not.toContain("GOCSPX-real");
+    expect(written).not.toContain("pkce_enabled");
+  });
+
+  it("records the hash plan computes for the connection file", async () => {
+    const client = recordingClient();
+
+    await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client,
+      projectId: "project_123",
+      force: false,
+      sso: google,
+    });
+
+    const file = JSON.parse(await readFile(join(cwd, IDPS_DIR, "google.json"), "utf8")) as object;
+    const state = JSON.parse(
+      await readFile(join(cwd, ".zitadel/state.json"), "utf8"),
+    ) as ZitadelState;
+    expect(state.resources[`${IDPS_DIR}/google.json`]?.hash).toBe(
+      hashForState({ normalize: normalizeIdpBody }, file),
+    );
   });
 
   it("leaves no connection file behind when the create fails", async () => {
@@ -493,6 +823,128 @@ describe("materializeSetupResources with a social provider", () => {
     expect(kept.mine).toBe(true);
   });
 
+  it("does not read the connection files when no provider was chosen", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "draft.json"), "{not json");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+      }),
+    ).resolves.toBeDefined();
+  });
+
+  it("names setup's own slug flag when it refuses a connection to another issuer", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.other.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { hint?: string }).hint).toContain("--sso-slug");
+  });
+
+  it("suggests enabling the provider that was chosen, not always Google", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "acme.json"),
+      JSON.stringify({ slug: "acme", oidc: { issuer: "https://sso.acme.example" } }),
+    );
+
+    const error = await materializeSetupResources({
+      cwd,
+      cliVersion: TEST_CLI_VERSION,
+      client: recordingClient(),
+      projectId: "project_123",
+      force: false,
+      sso: [{ selection: acmeSelection }],
+    }).catch((err: unknown) => err);
+
+    expect((error as { nextCommands?: string[] }).nextCommands?.[0]).toContain(
+      "--provider custom --slug acme",
+    );
+  });
+
+  it("refuses a connection another file already holds the slug of, before creating anything", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("refuses a custom connection whose variables another file would share", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "other.json"),
+      JSON.stringify({
+        slug: "other",
+        oidc: {
+          issuer: "https://other.example",
+          client_id: "${{ ACME_CLIENT_ID }}",
+          client_secret: "${{ OTHER_CLIENT_SECRET }}",
+        },
+      }),
+    );
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client: recordingClient(),
+        projectId: "project_123",
+        force: false,
+        sso: [{ selection: acmeSelection }],
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  // Setup does not remove a connection file it wrote, so a schema refused
+  // after the connection exists would leave a file the retry refuses on.
+  it("refuses an existing default schema before it creates the connection", async () => {
+    const client = recordingClient();
+    await mkdir(join(cwd, SCHEMAS_DIR), { recursive: true });
+    await writeFile(join(cwd, DEFAULT_SCHEMA_CONFIG_PATH), "{}\n");
+
+    await expect(
+      materializeSetupResources({
+        cwd,
+        cliVersion: TEST_CLI_VERSION,
+        client,
+        projectId: "project_123",
+        force: false,
+        sso: google,
+      }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+
+    expect(client.createIdp).not.toHaveBeenCalled();
+    expect(existsSync(join(cwd, IDPS_DIR, "google.json"))).toBe(false);
+  });
+
   it("creates the connection before the flow that names it", async () => {
     const client = recordingClient();
 
@@ -556,13 +1008,7 @@ describe("materializeSetupResources with a social provider", () => {
   });
 });
 
-/**
- * Cardinality greater than one, which the catalog cannot supply today: it
- * registers Google alone (`packages/config/src/idp/index.ts`). Mocking the
- * lookup is the alternative to a production seam that exists only for tests —
- * the loops under test take whatever `idpProvider` returns, so two distinct
- * fakes exercise them exactly as two real providers would.
- */
+/** Several providers at once: Google from the catalog, and a custom connection beside it. */
 describe("materializeSetupResources with several providers", () => {
   let cwd: string;
 
@@ -573,39 +1019,13 @@ describe("materializeSetupResources with several providers", () => {
       join(cwd, ".zitadel/state.json"),
       JSON.stringify({ framework: "next", resources: {} }),
     );
-    vi.resetModules();
   });
 
   afterEach(async () => {
-    vi.doUnmock("@zitadel/config/idp");
-    vi.resetModules();
     await rm(cwd, { recursive: true, force: true });
   });
 
   it("creates a connection per provider and names every slug", async () => {
-    const actual =
-      await vi.importActual<typeof import("@zitadel/config/idp")>("@zitadel/config/idp");
-    const google = actual.idpProvider("google");
-    // Two providers differing only in slug and display name: enough for the
-    // loops, and the connection body stays a real one the contract accepts.
-    vi.doMock("@zitadel/config/idp", () => ({
-      ...actual,
-      IDP_PROVIDERS: ["google", "acme"],
-      idpProvider: (slug: string) => ({
-        ...google,
-        slug,
-        displayName: slug === "acme" ? "Acme SSO" : "Google",
-        connection: (input: Parameters<typeof google.connection>[0]) => ({
-          ...(google.connection(input) as Record<string, unknown>),
-          slug,
-          display_name: slug === "acme" ? "Acme SSO" : "Google",
-        }),
-      }),
-    }));
-
-    const { materializeSetupResources: materialize } = await import(
-      "../../../src/lib/setup-resources"
-    );
     const client = {
       createIdp: vi.fn().mockImplementation(async (body: { idp: { slug?: string } }) => ({
         // A distinct id per connection, so a first-only bug cannot hide behind
@@ -621,18 +1041,16 @@ describe("materializeSetupResources with several providers", () => {
           status: "active",
           flow_definition: body.flow_definition,
         })),
+      publishPolicy: vi.fn().mockResolvedValue({ id: "pol_01KWHP" }),
     } as unknown as ZitadelClient;
 
-    await materialize({
+    await materializeSetupResources({
       cwd,
       cliVersion: TEST_CLI_VERSION,
       client,
       projectId: "project_123",
       force: false,
-      sso: [
-        { provider: "google", clientId: "google-client-id" },
-        { provider: "acme", clientId: "acme-client-id" },
-      ],
+      sso: [{ selection: googleSelection }, { selection: acmeSelection }],
     });
 
     // One create and one file each, not just the first.
@@ -651,5 +1069,70 @@ describe("materializeSetupResources with several providers", () => {
     };
     const identifier = flow.steps.find((step) => step.name === "identifier");
     expect(identifier?.sso_providers).toEqual(["google", "acme"]);
+  });
+});
+
+/**
+ * Setup runs this before it creates the project: a conflict found once the
+ * project exists leaves the project behind, and the rerun's `.env.local`
+ * keeps its id and secret.
+ */
+describe("assertNoSetupResourceConflicts", () => {
+  it.each([DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH])(
+    "refuses an existing %s without --force",
+    async (path) => {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+
+      await expect(assertNoSetupResourceConflicts({ cwd, force: false })).rejects.toMatchObject({
+        code: "E_CONFLICT",
+        message: `${path} already exists`,
+        hint: expect.stringContaining("--force"),
+      });
+    },
+  );
+
+  it("lets --force replace the default schema and flow", async () => {
+    for (const path of [DEFAULT_SCHEMA_CONFIG_PATH, DEFAULT_FLOW_CONFIG_PATH]) {
+      await mkdir(join(cwd, dirname(path)), { recursive: true });
+      await writeFile(join(cwd, path), "{}\n");
+    }
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: true })).resolves.toBe(undefined);
+  });
+
+  it("refuses an existing connection for a chosen provider, even with --force", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "google.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({
+      code: "E_CONFLICT",
+      message: `${IDPS_DIR}/google.json already exists`,
+      hint: expect.stringContaining("never replaces or removes one"),
+    });
+  });
+
+  it("refuses a chosen provider whose slug another connection file holds, before the project exists", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(
+      join(cwd, IDPS_DIR, "elsewhere.json"),
+      JSON.stringify({ slug: "google", template: "google" }),
+    );
+
+    await expect(
+      assertNoSetupResourceConflicts({ cwd, force: true, sso: [{ selection: googleSelection }] }),
+    ).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("ignores a connection for a provider nobody chose", async () => {
+    await mkdir(join(cwd, IDPS_DIR), { recursive: true });
+    await writeFile(join(cwd, IDPS_DIR, "google.json"), JSON.stringify({ slug: "google" }));
+
+    await expect(assertNoSetupResourceConflicts({ cwd, force: false })).resolves.toBe(undefined);
   });
 });

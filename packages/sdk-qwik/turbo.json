@@ -2,19 +2,19 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The edge spec imports this package's built dist.
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/components#build", "@zitadel/sdk-core#build"]
+      "dependsOn": ["@zitadel/api-mock#build", "build"]
     },
     "build": {
       "dependsOn": ["@zitadel/components#build", "@zitadel/sdk-core#build"]
     },
     "build-release": {
-      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release", "@zitadel/sdk-svelte#build-release"]
+      "dependsOn": ["@zitadel/components#build-release", "@zitadel/sdk-core#build-release"]
     },
     // The suite runs in real Chromium (Qwik 2's client render and the wrapped
     // Lit components need a real DOM); api-mock serves the Flow API to the
-    // specs. The script serialises the browser suites across packages
-    // (`browser-tests` lock) and retries the cold-start flake (#1490).
+    // specs. The script retries a failed suite (#1490).
     "test": {
       "dependsOn": ["@zitadel/api-mock#build", "install-browsers", "build"]
     }

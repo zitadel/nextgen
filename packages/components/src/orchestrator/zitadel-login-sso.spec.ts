@@ -22,7 +22,16 @@ import type { ZitadelLogin } from "./zitadel-login.js";
  * Driven by the shared mock rather than bespoke handlers, so the request the
  * orchestrator actually sends is validated against the generated client.
  */
-const API_BASE = "https://flow-sso.test.invalid";
+// The SDK proxy on the page's own origin, the only setup external sign-in
+// supports: the provider returns to `/__nextgen/idp/callback` there, and the
+// engine binds the `return_target` to the request origin. Node's fetch sends no
+// `Origin` header, so the request host stands in for it, as on the engine.
+const API_BASE = `${window.location.origin}/__nextgen`;
+
+/** A request as `METHOD /path`, the path relative to the proxy. */
+function apiCall(request: Request): string {
+  return `${request.method} ${request.url.slice(API_BASE.length).split("?")[0]}`;
+}
 
 const GOOGLE = { id: "google", name: "Google", template: "google" };
 const ACME = { id: "acme-sso", name: "Acme SSO", template: "oidc-generic" };
@@ -90,8 +99,42 @@ describe("<zitadel-login> with identity providers", () => {
     return element.shadowRoot?.querySelector("zl-sso-providers") as ZlSsoProviders;
   }
 
+  /**
+   * Mount on `location` as a fresh page load, recording the requests the
+   * widget makes until `ready` renders. `url` is the address it leaves behind.
+   */
+  async function landOn(
+    location: string,
+    ready: string,
+  ): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
+    const seen: string[] = [];
+    const record = ({ request }: { request: Request }) => {
+      seen.push(apiCall(request));
+    };
+    server.events.on("request:start", record);
+    const original = window.location.href;
+    const target = new URL(location, original);
+    window.history.replaceState({}, "", target.pathname + target.search + target.hash);
+    const element = document.createElement("zitadel-login") as ZitadelLogin;
+    let url = "";
+    try {
+      element.purpose = "login";
+      element.project = testProject;
+      host.appendChild(element);
+      await waitFor(() => element.shadowRoot?.querySelector(ready));
+      await element.updateComplete;
+      url = window.location.search + window.location.hash;
+    } finally {
+      window.history.replaceState({}, "", original);
+      server.events.removeListener("request:start", record);
+    }
+    return { element, seen, url };
+  }
+
   /** Stub navigation for the duration of `run`, returning the calls made. */
-  async function withStubbedNavigation(run: () => Promise<void>): Promise<string[]> {
+  async function withStubbedNavigation(
+    run: (assign: ReturnType<typeof vi.fn>) => Promise<void>,
+  ): Promise<string[]> {
     const assign = vi.fn();
     const { location } = window;
     Object.defineProperty(window, "location", {
@@ -99,7 +142,7 @@ describe("<zitadel-login> with identity providers", () => {
       value: { ...location, assign },
     });
     try {
-      await run();
+      await run(assign);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
     }
@@ -213,6 +256,36 @@ describe("<zitadel-login> with identity providers", () => {
     expect(completes).toHaveLength(0);
   });
 
+  it("waits for work a zitadel-flow-redirect listener registers before navigating", async () => {
+    const element = await mountLogin();
+    const atom = providerAtom(element);
+    await atom.updateComplete;
+    const finish = new AbortController();
+    const redirected = vi.fn();
+    element.addEventListener("zitadel-flow-redirect", (event) => {
+      redirected();
+      if (event instanceof CustomEvent) {
+        event.detail.waitUntil(
+          new Promise((resolve) => finish.signal.addEventListener("abort", resolve)),
+        );
+      }
+    });
+
+    const calls = await withStubbedNavigation(async (assign) => {
+      atom.shadowRoot
+        ?.querySelectorAll("zl-button")[0]
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+      await vi.waitFor(() => expect(redirected).toHaveBeenCalledOnce());
+      await element.updateComplete;
+      expect(assign).not.toHaveBeenCalled();
+
+      finish.abort();
+      await vi.waitFor(() => expect(assign).toHaveBeenCalledOnce());
+    });
+
+    expect(calls).toEqual(["https://idp.mock.invalid/authorize"]);
+  });
+
   it("does not paint the redirect step it is navigating away from", async () => {
     const element = await mountLogin();
     const atom = providerAtom(element);
@@ -270,32 +343,77 @@ describe("<zitadel-login> with identity providers", () => {
     expect(redirects).toHaveLength(0);
   });
 
-  it("resumes the flow a provider callback left in the URL", async () => {
-    // The callback finishes by navigating the browser back with `?flow=<id>`.
-    // It is a fresh page load, so nothing of the previous document survives:
-    // a widget that ignores the parameter starts a new flow, and the user
-    // lands on a blank sign-in screen having just signed in.
-    const seen: string[] = [];
-    const record = ({ request }: { request: Request }) => {
-      seen.push(`${request.method} ${new URL(request.url).pathname}`);
-    };
-    server.events.on("request:start", record);
-    const original = window.location.href;
-    window.history.replaceState({}, "", "/login?flow=flow_mock");
-
-    try {
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      element.purpose = "login";
-      element.project = testProject;
-      host.appendChild(element);
-      await waitFor(() => element.shadowRoot?.querySelector("zl-field"));
-    } finally {
-      window.history.replaceState({}, "", original);
-      server.events.removeListener("request:start", record);
+  /**
+   * The whole round trip against the mock, the way the engine runs it: the
+   * provider button assigns `redirect_url`, the provider sends the browser to
+   * the callback route, the callback answers `303` to the `return_target` the
+   * submission carried, and the fresh page load resumes with `GET /flow/{id}`.
+   * Only the provider itself is missing, so the test makes its redirect.
+   */
+  describe("the provider round trip", () => {
+    /** Choose the first provider and return where the page was sent and asked to come back to. */
+    async function leaveForProvider(): Promise<{ redirectUrl: string; returnTarget: string }> {
+      const element = await mountLogin();
+      const atom = providerAtom(element);
+      await atom.updateComplete;
+      const navigations = await withStubbedNavigation(async () => {
+        atom.shadowRoot
+          ?.querySelectorAll("zl-button")[0]
+          ?.dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+        // The loader paints after the navigation, so the redirect has happened.
+        await waitFor(() =>
+          element.shadowRoot?.querySelector('slot[name="loader"]') ? true : null,
+        );
+      });
+      element.remove();
+      const submit = mock
+        .getCaptured()
+        .find(
+          (entry): entry is Extract<typeof entry, { kind: "submitFlowStep" }> =>
+            entry.kind === "submitFlowStep",
+        );
+      return { redirectUrl: navigations[0] ?? "", returnTarget: submit?.body.return_target ?? "" };
     }
 
-    expect(seen).toContain("GET /flow/flow_mock");
-    expect(seen).not.toContain("POST /flow");
+    /** The provider redirecting to the callback; answers where the callback sends the browser. */
+    async function provider(query: Record<string, string>): Promise<string> {
+      const res = await fetch(`${API_BASE}/idp/callback?${new URLSearchParams(query)}`, {
+        redirect: "manual",
+      });
+      expect(res.status).toBe(303);
+      return res.headers.get("location") ?? "";
+    }
+
+    it("comes back through the callback and resumes onto the next step", async () => {
+      const { redirectUrl, returnTarget } = await leaveForProvider();
+      expect(redirectUrl).toBe("https://idp.mock.invalid/authorize");
+
+      const location = await provider({ state: "s", code: "c", email: "ada@example.test" });
+      expect(location).toBe(returnTarget);
+
+      // A fresh page load: a widget that ignored `?flow=` would start a new
+      // flow and leave the user on a blank sign-in screen.
+      const { element, seen } = await landOn(location, 'zl-field[name="given_name"]');
+      expect(seen).toContain("GET /flow/flow_mock");
+      expect(seen).not.toContain("POST /flow");
+      expect(element.shadowRoot?.querySelector('zl-field[name="given_name"]')).not.toBeNull();
+    });
+
+    it.each([
+      ["access_denied", "Sign-in cancelled"],
+      ["server_error", "Sign-in failed"],
+    ])("shows the localised error on the step it started from after %s", async (error, title) => {
+      const { returnTarget } = await leaveForProvider();
+
+      const location = await provider({ state: "s", error });
+      expect(location).toBe(returnTarget);
+
+      const { element } = await landOn(location, "zl-alert");
+      const alert = element.shadowRoot?.querySelector("zl-alert");
+      expect(alert?.getAttribute("heading")).toBe(title);
+      // Back on the identifier, not stranded on the redirect step.
+      expect(element.shadowRoot?.querySelector('zl-field[name="email"]')).not.toBeNull();
+    });
   });
 
   describe("when the server answers flow.restart_required", () => {
@@ -305,29 +423,7 @@ describe("<zitadel-login> with identity providers", () => {
         { status: 409 },
       );
 
-    async function resumeStale(): Promise<{ element: ZitadelLogin; seen: string[]; url: string }> {
-      const seen: string[] = [];
-      const record = ({ request }: { request: Request }) => {
-        seen.push(`${request.method} ${new URL(request.url).pathname}`);
-      };
-      server.events.on("request:start", record);
-      const original = window.location.href;
-      window.history.replaceState({}, "", "/login?keep=1&flow=flow_stale#top");
-      const element = document.createElement("zitadel-login") as ZitadelLogin;
-      let url = "";
-      try {
-        element.purpose = "login";
-        element.project = testProject;
-        host.appendChild(element);
-        await waitFor(() => element.shadowRoot?.querySelector("zl-field, zl-alert"));
-        await element.updateComplete;
-        url = window.location.search + window.location.hash;
-      } finally {
-        window.history.replaceState({}, "", original);
-        server.events.removeListener("request:start", record);
-      }
-      return { element, seen, url };
-    }
+    const resumeStale = () => landOn("/login?keep=1&flow=flow_stale#top", "zl-field, zl-alert");
 
     it("starts a fresh flow and tells the user why", async () => {
       server.use(http.get("*/flow/:id", restartRequired, { once: true }));
@@ -435,7 +531,7 @@ describe("<zitadel-login> with identity providers", () => {
       // stuck on a startup error has no way forward.
       const seen: string[] = [];
       const record = ({ request }: { request: Request }) => {
-        seen.push(`${request.method} ${new URL(request.url).pathname}`);
+        seen.push(apiCall(request));
       };
       server.events.on("request:start", record);
       server.use(http.get("*/flow/:id", () => HttpResponse.json(body, { status })));

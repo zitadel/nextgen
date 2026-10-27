@@ -12,6 +12,8 @@ post:
     - Single-use (atomic exchange, no retry)
     - Audience-bound (requires matching project key for exchange)
     - Idempotency-safe within a 5-minute window (see conventions)
+
+    Revoke refusal for a sealed release happens at handoff exchange, not here.
   tags:
     - Authentication Attempts
   security:
@@ -31,5 +33,18 @@ post:
         application/json:
           schema:
             $ref: handoff-response.yaml
+    '409':
+      description: |
+        The attempt is not complete (`att.not_completed`).
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+          examples:
+            not_completed:
+              summary: The attempt is not complete
+              value:
+                code: att.not_completed
+                message: 'authentication attempt is not completed'
     default:
       $ref: createHandoff-error-response.yaml

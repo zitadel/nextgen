@@ -15,7 +15,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 // Absolute base so requests parse under jsdom/undici and MSW can intercept.
 const FLOWS_URL = "http://localhost/api/flow_definitions";
 const FLOW_URL = "http://localhost/api/flow_definitions/flow_1";
-const SCHEMA_URL = "http://localhost/api/schemas/sch_1";
+const SCHEMAS_URL = "http://localhost/api/schemas";
 
 /**
  * A definition serving both purposes out of order, so the row's fixed purpose
@@ -24,7 +24,7 @@ const SCHEMA_URL = "http://localhost/api/schemas/sch_1";
 const DEFINITION = {
   name: "default-login",
   status: "active",
-  user_schema: "sch_1",
+  user_schema: "human-user",
   purposes: { register: "register", login: "identifier" },
   steps: [
     {
@@ -56,6 +56,11 @@ const DETAIL_RESPONSE = {
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-02T00:00:00Z",
 };
+
+/** `GET /schemas` answering with the newest revision of the flow's schema. */
+function schemasResponse() {
+  return { schemas: [SCHEMA_EMBED], next_page_token: null };
+}
 
 function listResponse() {
   return { flow_definitions: [{ ...DETAIL_RESPONSE, user_schema: SCHEMA_EMBED }] };
@@ -141,11 +146,47 @@ describe("login flows list", () => {
     try {
       server.use(
         http.get(FLOWS_URL, () =>
-          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+          HttpResponse.json(
+            { code: "internal", message: "boom" },
+            { status: 500, headers: { "x-request-id": "req_01TEST" } },
+          ),
         ),
       );
       await renderAt("/flow-definitions");
-      expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+      expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
+      expect(screen.getByText("Error 500")).toBeInTheDocument();
+      expect(screen.getByText("boom")).toBeInTheDocument();
+      // The reference to quote is the request ID from the response; the code
+      // would only repeat the sentence.
+      expect(screen.getByText("req_01TEST")).toBeInTheDocument();
+      expect(screen.queryByText("internal")).toBeNull();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    } finally {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+  it("leaves a refused project for Projects, without it", async () => {
+    // A `?project=` the server refuses fails every scoped screen, and every
+    // link keeps it: the way on must drop it, or it leads back here.
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      server.use(
+        http.get(FLOWS_URL, () =>
+          HttpResponse.json({ code: "req.invalid", message: "invalid" }, { status: 400 }),
+        ),
+        http.get("http://localhost/api/users/me/projects", () =>
+          HttpResponse.json({ projects: [] }),
+        ),
+      );
+      const router = await renderAt("/flow-definitions", "proj_bad\\");
+      const way = await screen.findByRole("link", { name: "Go to Projects" });
+      expect(way.getAttribute("href")).not.toContain("project=");
+
+      way.click();
+      await vi.waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/projects"));
+      expect(router.state.resolvedLocation?.search).not.toHaveProperty("project");
     } finally {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
@@ -157,7 +198,7 @@ describe("login flow detail", () => {
   it("renders the steps table, the schema badge and the flow id", async () => {
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
-      http.get(SCHEMA_URL, () => HttpResponse.json({ schema: SCHEMA })),
+      http.get(SCHEMAS_URL, () => HttpResponse.json(schemasResponse())),
     );
     await renderAt("/flow-definitions/flow_1");
 
@@ -172,30 +213,33 @@ describe("login flow detail", () => {
     expect(screen.getAllByRole("cell", { name: "—" })).toHaveLength(2);
   });
 
-  it("names the schema as the selected project knows it", async () => {
-    // Schema ids are unique per project only, so the badge's lookup names the
-    // project rather than letting the id resolve in the caller's own.
-    const projects: (string | null)[] = [];
+  it("names the newest revision of the schema in the selected project", async () => {
+    // The flow names its schema by objectType, which means the project's
+    // newest revision of it, so the badge's lookup names both.
+    const queries: URLSearchParams[] = [];
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
       http.get("*/api/projects/proj_other", () =>
         HttpResponse.json({ id: "proj_other", name: "Other project" }),
       ),
-      http.get(SCHEMA_URL, ({ request }) => {
-        projects.push(new URL(request.url).searchParams.get("project_id"));
-        return HttpResponse.json({ schema: SCHEMA });
+      http.get(SCHEMAS_URL, ({ request }) => {
+        queries.push(new URL(request.url).searchParams);
+        return HttpResponse.json(schemasResponse());
       }),
     );
     await renderAt("/flow-definitions/flow_1", "proj_other");
 
     expect(await screen.findByRole("link", { name: "Minimal" })).toBeInTheDocument();
-    expect(projects).toEqual(["proj_other"]);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]?.get("project_id")).toBe("proj_other");
+    expect(queries[0]?.get("object_type")).toBe("human-user");
+    expect(queries[0]?.get("revisions")).toBe("latest");
   });
 
   it("drops the schema badge when the schema cannot be read", async () => {
     server.use(
       http.get(FLOW_URL, () => HttpResponse.json(DETAIL_RESPONSE)),
-      http.get(SCHEMA_URL, () =>
+      http.get(SCHEMAS_URL, () =>
         HttpResponse.json({ code: "sch.permission_denied", message: "no" }, { status: 403 }),
       ),
     );

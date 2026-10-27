@@ -14,7 +14,6 @@ import {
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
-  ResourcePage,
   ResourceRow,
   ResourceTitle,
   RowMenu,
@@ -22,6 +21,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
+import { CLI_DEPLOY, CliCommand, CliHint } from "@/components/cli-hint";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
 import { formatDate } from "@/lib/date";
 import {
@@ -33,13 +33,14 @@ import {
 } from "@/lib/flow-definition";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { schemaDisplayName } from "@/lib/schema";
+import { Page } from "@/components/layout";
 
 export const Route = createFileRoute("/_authed/flow-definitions/")({
   // Order 5: Users sits at 3, Authentication at 4.
   staticData: { scope: "project", nav: { label: "Login flows", order: 5, icon: Workflow } },
   loaderDeps: projectScopeDeps,
   loader: async ({ deps }) => {
-    // Without the embed the row has only the schema's id, not its name.
+    // Without the embed the row has only the schema's objectType.
     // `latest` because this is a directory of flows, not a revision history:
     // publishing under an existing name generates a new row, and only the newest
     // one is the flow.
@@ -60,7 +61,7 @@ export interface FlowRow {
   updatedAt: string;
   /** `undefined` when the schema does not resolve for this caller. */
   schemaName: string | undefined;
-  /** The id behind {@link schemaName}, for the row's link to the schema. */
+  /** The revision behind {@link schemaName}, for the row's link to the schema. */
   schemaId: string | undefined;
 }
 
@@ -74,7 +75,7 @@ function toFlowRow(entry: FlowDefinitionEntry): FlowRow {
     definition,
     updatedAt: entry.updated_at,
     schemaName: embed ? schemaDisplayName(embed.schema, definition.user_schema) : undefined,
-    schemaId: definition.user_schema,
+    schemaId: embed?.id,
   };
 }
 
@@ -82,7 +83,7 @@ function LoginFlowsScreen() {
   const { flows } = Route.useLoaderData();
 
   return (
-    <ResourcePage>
+    <Page>
       <ResourceTitle>Login flows</ResourceTitle>
 
       <div className={`${RESOURCE_TABLE_WRAP} ${RESOURCE_TABLE_TOP}`}>
@@ -109,8 +110,12 @@ function LoginFlowsScreen() {
             )}
           </TableBody>
         </Table>
+        <CliHint>
+          Edit the definitions locally, then deploy your changes with{" "}
+          <CliCommand>{CLI_DEPLOY}</CliCommand>.
+        </CliHint>
       </div>
-    </ResourcePage>
+    </Page>
   );
 }
 

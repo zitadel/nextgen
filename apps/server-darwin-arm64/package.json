@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/server-darwin-arm64",
-  "version": "1.0.0-alpha.25",
+  "version": "0.1.0",
   "description": "macOS arm64 Zitadel server binary.",
   "homepage": "https://github.com/zitadel/nextgen#readme",
   "bugs": {
@@ -24,6 +24,9 @@
   "files": [
     "bin"
   ],
+  "scripts": {
+    "prepack": "publint --strict"
+  },
   "publishConfig": {
     "access": "public"
   }

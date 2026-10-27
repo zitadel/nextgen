@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError, NetworkError } from "@zitadel/api/runtime/fetch";
 
 import { EXIT_CODES, ZitadelError, toZitadelError } from "../../../src/lib/errors";
+import { unscopedCommand } from "../../../src/lib/suggestion";
 
 describe("EXIT_CODES", () => {
   it("maps every error code to its documented exit number", () => {
@@ -17,6 +18,7 @@ describe("EXIT_CODES", () => {
       E_CONFLICT: 5,
       E_PORT_IN_USE: 5,
       E_VALIDATION: 3,
+      E_CREDENTIAL_MISSING: 3,
       E_NOT_IMPLEMENTED: 2,
       E_CANCELLED: 130,
     });
@@ -27,7 +29,7 @@ describe("ZitadelError", () => {
   it("carries the code, message, and optional extras", () => {
     const err = new ZitadelError("E_CONFLICT", "boom", {
       hint: "try again",
-      nextCommands: ["zitadel doctor", "zitadel init"],
+      nextCommands: [unscopedCommand("doctor"), unscopedCommand("init")],
       details: { field: "x" },
     });
     expect(err).toBeInstanceOf(Error);
@@ -102,9 +104,7 @@ describe("toZitadelError", () => {
     expect(result.code).toBe("E_NETWORK");
     expect(result.exitCode).toBe(4);
     expect(result.message).toBe("GET http://localhost:8080/idps got no response (ECONNREFUSED)");
-    expect(result.hint).toBe(
-      "Check your connection, ZITADEL_API_BASE, or the configured server URL.",
-    );
+    expect(result.hint).toBe("Check your connection and the server URL (ZITADEL_URL or --server).");
     expect(result.details).toEqual({ url: "http://localhost:8080/idps", reason: "unreachable" });
   });
 
@@ -166,6 +166,17 @@ describe("toZitadelError", () => {
     expect(result.details).toBe("just a string");
   });
 
+  it("reports a 409 as a conflict with the state the platform holds", () => {
+    const err = new ApiError(
+      409,
+      "http://mock/releases/rel_1/revoke?project_id=proj_1",
+      { code: "rel.in_use", message: "release: still served by an origin" },
+      "POST http://mock/releases/rel_1/revoke returned 409",
+    );
+
+    expect(toZitadelError(err).code).toBe("E_CONFLICT");
+  });
+
   it("surfaces the server's message + nested details.details on ApiError 400", () => {
     const err = new ApiError(
       400,
@@ -216,6 +227,21 @@ describe("toZitadelError", () => {
     );
   });
 
+  it("tells a server without the operation from a wrong server", () => {
+    const err = new ApiError(
+      404,
+      "http://localhost:8080/widgets",
+      { code: "req.not_found", message: "No API operation matches this path." },
+      "GET http://localhost:8080/widgets returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe(
+      "http://localhost:8080/widgets has no such endpoint on this Zitadel server",
+    );
+    expect(result.hint).toContain("different versions");
+  });
+
   it("falls back to the fetch-layer message when the body is not an envelope", () => {
     const err = new ApiError(
       502,
@@ -231,6 +257,16 @@ describe("toZitadelError", () => {
     const server = new ApiError(500, "http://mock/x", { message: "boom" }, "GET returned 500");
     expect(toZitadelError(auth).code).toBe("E_AUTH");
     expect(toZitadelError(server).code).toBe("E_NETWORK");
+  });
+
+  it("classifies a 403 refusing a target origin as E_VALIDATION, not E_AUTH", () => {
+    const refused = new ApiError(
+      403,
+      "http://mock/deployments",
+      { code: "proj.origin_not_allowed", message: "project: https://x is not a primary origin" },
+      "POST returned 403",
+    );
+    expect(toZitadelError(refused).code).toBe("E_VALIDATION");
   });
 });
 
@@ -274,5 +310,49 @@ describe("fields the platform blames", () => {
 
   it("adds no hint when the envelope blames nothing", () => {
     expect(immutable({ code: "req.invalid", message: "nope" }).hint).toBeUndefined();
+  });
+});
+
+/**
+ * `idp.endpoints_partial` names the endpoints a connection left out only in
+ * the envelope, so the hint carries them, as it does the blamed fields.
+ */
+describe("endpoints the platform reports missing", () => {
+  const partial = (body: unknown) =>
+    toZitadelError(
+      new ApiError(400, "http://localhost:8140/idps?project_id=p", body, "Bad Request"),
+    );
+
+  it("names them, in the server's order, as the server nests them", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      message: "identity provider connection: the endpoints are partially set",
+      details: { details: { missing: ["jwks_uri", "userinfo_endpoint"] } },
+    });
+
+    expect(error.code).toBe("E_VALIDATION");
+    expect(error.hint).toBe(
+      "The server reports these endpoints missing: jwks_uri, userinfo_endpoint.",
+    );
+  });
+
+  it("says endpoint, singular, when one is missing", () => {
+    const error = partial({
+      code: "idp.endpoints_partial",
+      details: { missing: ["token_endpoint"] },
+    });
+
+    expect(error.hint).toBe("The server reports this endpoint missing: token_endpoint.");
+  });
+
+  it("keeps the blamed fields when an envelope lists both", () => {
+    const error = partial({
+      code: "req.invalid",
+      details: { details: { fields: ["oidc.issuer"], missing: ["jwks_uri"] } },
+    });
+
+    expect(error.hint).toBe(
+      "The server rejected this field: oidc.issuer. The server reports this endpoint missing: jwks_uri.",
+    );
   });
 });

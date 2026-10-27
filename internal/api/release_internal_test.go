@@ -127,18 +127,91 @@ func decodeBuildReleaseRequest(body string) (api.BuildReleaseRequest, error) {
 	return req, req.Validate()
 }
 
-// Pins revoke's answer until the service can revoke: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestRevokeReleaseNotImplemented(t *testing.T) {
-	_, err := (&Handler{}).RevokeRelease(t.Context(), api.RevokeReleaseParams{})
-	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+// A revoked release and one still served are both conflicts.
+func TestReleaseErrorResponseConflicts(t *testing.T) {
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseRevoked()).StatusCode)
+	assert.Equal(t, http.StatusConflict, releaseErrorResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{})).StatusCode)
 }
 
-// Pins build's answer until the service can build: 501, not the 500 the
-// generated stub's sentinel would map to.
-func TestBuildReleaseNotImplemented(t *testing.T) {
-	_, err := (&Handler{}).BuildRelease(t.Context(), &api.BuildReleaseRequest{}, api.BuildReleaseParams{})
-	require.Error(t, err)
-	assert.Equal(t, http.StatusNotImplemented, errorResponse(err).StatusCode)
+// The 409 names every origin still serving the release, so the caller can
+// deploy elsewhere or roll back before revoking again.
+func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
+	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}}))
+	require.True(t, ok)
+	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
+	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
+		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+	}, resp.Details.Origins)
+}
+
+// Without the origins the 409 cannot name them, so the generic envelope answers.
+func TestReleaseInUseResponseNeedsOrigins(t *testing.T) {
+	_, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).WithDetails(nil))
+	assert.False(t, ok)
+}
+
+func TestRequireBuildKindScopes(t *testing.T) {
+	t.Parallel()
+
+	bundle := api.ConfigurationBundle{
+		Branding: api.NewOptBranding(api.Branding{
+			Layout: api.NewOptBrandingLayout(api.BrandingLayoutCentered),
+		}),
+		Idps: []api.IdpConnection{{Slug: "google"}},
+	}
+
+	t.Run("project.write covers every kind", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"project.write", "release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, bundle))
+	})
+
+	t.Run("missing branding.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "idp.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "branding.write")
+	})
+
+	t.Run("missing idp.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write", "branding.write"},
+		})
+		err := requireBuildKindScopes(ctx, bundle)
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "idp.write")
+	})
+
+	t.Run("missing policy.write is named", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		err := requireBuildKindScopes(ctx, api.ConfigurationBundle{
+			Policies: []api.PublishPolicyRequest{api.NewPasswordSetPolicyInputPublishPolicyRequest(api.PasswordSetPolicyInput{
+				Operation: api.PasswordSetPolicyInputOperationAuthFactorPasswordSet,
+			})},
+		})
+		require.Error(t, err)
+		assertDomainCode(t, err, domain.ErrReleasePermissionDenied().Code)
+		assert.Contains(t, err.Error(), "policy.write")
+	})
+
+	t.Run("empty kinds need no extra scope", func(t *testing.T) {
+		ctx := WithScopeContext(context.Background(), ScopeContext{
+			ProjectID: "proj_a",
+			Scope:     []string{"release.write"},
+		})
+		require.NoError(t, requireBuildKindScopes(ctx, api.ConfigurationBundle{}))
+	})
 }

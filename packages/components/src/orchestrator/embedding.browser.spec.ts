@@ -80,6 +80,18 @@ const fieldlessStep: CreateFlow201 = {
 };
 
 /**
+ * The account row a template ejected before `<zl-account>` still carries, as
+ * the bundled template drew it: layout-chrome.css keeps its styles.
+ */
+const ejectedAccountRowTemplate = `<zl-page-shell data-zl-template-root><zl-card>
+  <p class="zl-card-account" data-testid="zitadel-account">
+    <span class="zl-card-account__value">{{ identifier.value }}</span>
+    <a href="#" class="zl-card-nav__link" data-action="back">Use another account</a>
+  </p>
+  <zl-field name="password" type="password" label="Password"></zl-field>
+</zl-card></zl-page-shell>`;
+
+/**
  * A branding asset URL that genuinely loads in the test browser. It has to
  * be same-origin (the vitest server is loopback http, which
  * `validateBranding` allows for assets, unlike a `data:` URI) and it has to
@@ -312,9 +324,8 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
   afterEach(async () => {
     host.remove();
     stub?.restore();
-    // The font links are document-level state the orchestrator manages on
+    // The font link is document-level state the orchestrator manages on
     // update; isolate tests from each other.
-    document.getElementById("zl-default-font-link")?.remove();
     document.getElementById("zl-font-link")?.remove();
     if (resetViewport) {
       resetViewport = false;
@@ -379,9 +390,36 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(getComputedStyle(surface).padding).toBe("0px");
   });
 
-  it("widget default: no design-system font is injected into the host document", async () => {
-    await mount(identifierStep);
-    expect(document.getElementById("zl-default-font-link")).toBeNull();
+  it("keeps an ejected template's account row inside the card for a long address", async () => {
+    const address = `${"a".repeat(64)}@${"b".repeat(40)}.example`;
+    const element = await mount({
+      ...identifierStep,
+      step: {
+        ...identifierStep.step,
+        name: "password",
+        fields: [
+          {
+            name: "password",
+            type: "password",
+            text_key: "password.field.password",
+            required: true,
+            autocomplete: "current-password",
+          },
+        ],
+        identifier: { value: address, autocomplete: "username" },
+      },
+      branding: { liquid_template: ejectedAccountRowTemplate },
+    });
+    const value = await waitFor(() =>
+      element.shadowRoot?.querySelector<HTMLElement>(".zl-card-account__value"),
+    );
+    const card = element.shadowRoot?.querySelector("zl-card") as HTMLElement;
+    expect(value.textContent).toBe(address);
+    expect(getComputedStyle(value).overflowWrap).toBe("anywhere");
+    expect(value.getBoundingClientRect().right).toBeLessThanOrEqual(
+      card.getBoundingClientRect().right,
+    );
+    expect(card.getBoundingClientRect().width).toBeLessThanOrEqual(360);
   });
 
   it("widget default: does not steal focus on initial load", async () => {
@@ -390,14 +428,13 @@ describe("<zitadel-login> widget-first embedding (chromium)", () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it("variant=page restores the full-page shape, font, and initial focus", async () => {
+  it("variant=page restores the full-page shape and initial focus", async () => {
     const element = await mount(identifierStep, (el) => {
       el.variant = "page";
     });
     const mountNode = element.shadowRoot?.querySelector(".zl-mount") as HTMLElement;
     expect(mountNode.getBoundingClientRect().height).toBeGreaterThanOrEqual(window.innerHeight - 1);
     expect(getComputedStyle(element).backgroundColor).not.toBe(TRANSPARENT);
-    expect(document.getElementById("zl-default-font-link")).not.toBeNull();
     const field = element.shadowRoot?.querySelector("zl-field");
     await waitFor(() => (element.shadowRoot?.activeElement === field ? field : null));
     expect(element.shadowRoot?.activeElement).toBe(field);

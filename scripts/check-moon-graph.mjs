@@ -25,14 +25,16 @@ const DUPLICATES_ALLOWED = new Set(["release:build-public-packages"]);
 // sources), not on its package, so there is no package.json entry to match.
 function artifactEdge(project, target) {
   if (project === "release") return true; // packages and publishes everything
-  if (project === "server") return target === "console" || target === "login-ui"; // //go:embed of the UI dists
+  if (project === "server") return target === "console"; // //go:embed of the console dist
   if (project === "testing") return target === "server"; // integration tests boot the binary
   if (project === "bench") return target === "server"; // vet compiles the Go the server's generation writes
   if (project === "console") return target === "cli"; // dev-real boots an instance through the built CLI
-  if (project === "workspace") return target === "console" || target === "login-ui"; // the local image embeds the UI builds
-  // e2e suites run built apps and the server binary; demo-next's dev server
-  // loads the built sdk-next.
-  if (project.endsWith("-e2e")) return ["cli", "server", "console", "sdk-next"].includes(target);
+  if (project === "workspace") return target === "console"; // the local image embeds the console build
+  // The e2e suite runs built apps, the server binary and the journey's mock
+  // OIDC provider binary; demo-next's dev server loads the built sdk-next,
+  // demo-nuxt's the built sdk-nuxt.
+  if (project === "e2e" || project.endsWith("-e2e"))
+    return ["cli", "server", "console", "oidc-mock"].includes(target) || target.startsWith("sdk-");
   return false;
 }
 
@@ -40,6 +42,7 @@ function artifactEdge(project, target) {
 const UNREACHED_ALLOWED = new Set([
   "cli:@zitadel/server", // the runtime wrapper; cli:test lists it as an input
   "console:@zitadel/testing", // dev-real only, resolved from source
+  "docs:@zitadel/cli", // its committed command-reference.json; docs:generate lists it as an input
 ]);
 
 // moon's own entry point under this node: no package manager in between, so
