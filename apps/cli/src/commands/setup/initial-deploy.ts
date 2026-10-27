@@ -53,7 +53,9 @@ export async function runInitialDeploy(opts: {
   readonly suggest: (args: string) => SuggestedCommand;
 }): Promise<InitialDeployOutcome> {
   try {
-    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(opts.cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } = await buildBundle(
+      opts.cwd,
+    );
     const ctx: StepContext = {
       cwd: opts.cwd,
       client: opts.client,
@@ -66,6 +68,7 @@ export async function runInitialDeploy(opts: {
       bundle,
       brandingSources,
       idpFiles,
+      policyFiles,
       suggest: opts.suggest,
     };
     // Validate only. `deploy` also runs the diff step, which shows what
