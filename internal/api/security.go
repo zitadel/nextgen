@@ -231,6 +231,13 @@ var userBoundSessionOperations = map[api.OperationName]bool{
 	api.RemoveOriginOperation: true,
 	api.GetVariablesOperation: true,
 	api.GetVariableOperation:  true,
+	// The Project settings page shows the password policy and the release
+	// detail a pinned policy revision. Publishing stays with the project
+	// secret.
+	api.ListPoliciesOperation:        true,
+	api.GetPolicyOperation:           true,
+	api.ListPolicyRevisionsOperation: true,
+	api.GetPolicyRevisionOperation:   true,
 }
 
 // sessionUnauthorizedMessage mirrors the 401 descriptions of the
