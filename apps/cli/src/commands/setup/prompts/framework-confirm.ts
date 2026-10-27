@@ -16,7 +16,7 @@ export class FrameworkConfirmPrompt implements SetupPrompt {
     const ack = await ctx.input({
       kind: "confirm",
       name: "confirm the framework",
-      message: `Detected ${ctx.framework.id}. Proceed?`,
+      message: `We detected ${ctx.framework.id}. Would you like to set up Zitadel for it?`,
       initialValue: true,
     });
     if (ack === false) {

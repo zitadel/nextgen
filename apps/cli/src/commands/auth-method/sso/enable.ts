@@ -288,7 +288,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const piped = await this.input({
         kind: "secret",
         name: "client secret",
-        message: "Client secret",
+        message: `What is the client secret of your ${entry.displayName} OAuth app?`,
         parse: parseClientSecret,
         stdin: true,
         optional: true,
@@ -329,7 +329,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const clientId = await this.input({
         kind: "text",
         name: `client id for ${entry.displayName}`,
-        message: "Client ID",
+        message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
         parse: parseClientId,
         given: flags["client-id"],
@@ -343,7 +343,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       const secretValue = await this.input({
         kind: "secret",
         name: `client secret for ${scaffolded.clientSecret}`,
-        message: `Client secret (published to the project as ${scaffolded.clientSecret})`,
+        message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
         parse: parseClientSecret,
         stdin: true,
         retry: retryFor(clientId, `printf '%s' "$CLIENT_SECRET" | `),

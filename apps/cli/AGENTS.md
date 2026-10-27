@@ -42,6 +42,25 @@
 - Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
   prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
   fails on a clack import elsewhere.
+- A command that asks anything extends `Promptable(...)`
+  (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
+  `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so
+  what can prompt is visible from its class, and the compiler rejects a
+  command that asks without it.
+- Word every prompt as a polite question to a person, never a field label or a
+  command. Reviewers: reject a prompt that is not one.
+  - Write "What is the client ID of your Google OAuth app?", not "Client ID" and
+    not "Enter the client ID".
+  - Write "Would you like to deploy now?" or "Should we scaffold the app?" for
+    a yes or no, and "Which framework would you like to scaffold?" for a choice.
+  - Add where the answer comes from or where it goes, in the same message: "It
+    will be stored on the project as GOOGLE_CLIENT_SECRET."
+  - A confirmation that acts on something may be a short direct question, as
+    long as it names the thing and, when it is not obvious, what happens:
+    "Delete user usr_1?" or "Revoke rel_1? Its content can never be served again."
+  - Leave names and ids in a prompt unquoted ("What is the value of user_id?",
+    "Remove FOO from the project?"); a terminal does not render backticks.
+  - Ask the same thing the same way in every command that asks it.
 - A command whose `--force` means something other than "yes to every
   confirm" builds its own asker with `force: false`, as `setup` does.
 - The flag surface follows the [WebCLI spec](https://webcli.com/). Record a new
