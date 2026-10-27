@@ -96,9 +96,8 @@ func TestDefaultTarget(t *testing.T) {
 		pinned[definition.ID] = true
 	}
 	created := fixture.create(t, &api.CreateReleaseRequest{Pointers: pointers})
-	require.IsType(t, &api.CreateReleaseCreated{}, created, helpers.MustMarshal(t, created))
 	deployed := fixture.createDeployment(t, &api.CreateDeploymentRequest{
-		ReleaseID: api.NewOptReleaseID(created.(*api.CreateReleaseCreated).ID),
+		ReleaseID: api.NewOptReleaseID(releaseID(t, created)),
 		Targets:   api.DeploymentTargetsRequest{domain.DeploymentTargetDefault},
 	})
 	require.IsType(t, &api.CreateDeploymentCreated{}, deployed, helpers.MustMarshal(t, deployed))
@@ -109,6 +108,21 @@ func TestDefaultTarget(t *testing.T) {
 		require.Equal(t, http.StatusCreated, resp.StatusCode, "Origin %q: %s", origin, body)
 	}
 	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
+}
+
+// releaseID is the id of a created release. The same pointer set answers 200
+// with the release that already pins it.
+func releaseID(t *testing.T, resp api.CreateReleaseRes) api.ReleaseID {
+	t.Helper()
+	switch created := resp.(type) {
+	case *api.CreateReleaseCreated:
+		return created.ID
+	case *api.CreateReleaseOK:
+		return created.ID
+	default:
+		require.FailNow(t, "create release refused", helpers.MustMarshal(t, resp))
+		return ""
+	}
 }
 
 func assertFlowCode(t *testing.T, projectID, origin, code string) {

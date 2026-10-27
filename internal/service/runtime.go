@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -53,22 +54,36 @@ func (res *RuntimeResolution) logAttrs() []any {
 type RuntimeResolver struct {
 	v2Pool   *DB
 	releases ReleaseService
-	// ownOrigin is the deployment's own origin, normalized; "" when unknown.
-	ownOrigin string
-	now       func() time.Time
+	// ownOrigins are the deployment's console hosts, normalized. A project
+	// that does not list one is served the default target when opening a flow.
+	ownOrigins []string
+	now        func() time.Time
 }
 
-// NewRuntimeResolver builds the resolver. ownOrigin is the origin of the
-// deployment's public base, where its console runs; "" names none.
-func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigin string) *RuntimeResolver {
-	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigin: ownOrigin, now: time.Now}
+// NewRuntimeResolver builds the resolver. ownOrigins are the origins the
+// deployment's console runs on; an empty list names none.
+func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...string) *RuntimeResolver {
+	seen := make(map[string]struct{}, len(ownOrigins))
+	var origins []string
+	for _, origin := range ownOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin == "" {
+			continue
+		}
+		if _, ok := seen[origin]; ok {
+			continue
+		}
+		seen[origin] = struct{}{}
+		origins = append(origins, origin)
+	}
+	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigins: origins, now: time.Now}
 }
 
 // Resolve walks the three layers: the gate refuses an origin no pattern
 // admits, the target is the newest deployment to that exact origin, and the
 // release is that deployment's release unless it is revoked. A request with
-// no origin, and one from the deployment's own origin when the project does
-// not list that host, is served the default target.
+// no origin, and one from a console host the project does not list, is served
+// the default target.
 func (r *RuntimeResolver) Resolve(ctx context.Context, projectID, origin string) (*RuntimeResolution, error) {
 	logger := getLoggingContext(ctx, "runtime").With(
 		slog.String("project_id", projectID),
@@ -111,9 +126,6 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if err != nil {
 		return nil, err
 	}
-	if matched == nil {
-		return nil, domain.ErrReleaseNotDeployed(nil).WithMessage("nothing is deployed to this origin")
-	}
 
 	dep, err := r.newestDeployment(ctx, projectID, matched.origin)
 	if err != nil {
@@ -122,11 +134,7 @@ func (r *RuntimeResolver) resolve(ctx context.Context, projectID, origin string)
 	if dep != nil {
 		return r.finish(ctx, project, matched.origin, matched.pattern, "origin", dep)
 	}
-	// Admitted by the console exemption or as the console host itself, and
-	// not by a project pattern: the default target serves it. A listed
-	// origin, a loopback the project does not run its console on, and a live
-	// preview with no deployment stay not deployed.
-	if matched.open && r.ownOrigin != "" && matched.origin == r.ownOrigin {
+	if matched.miss == missDefault {
 		return r.resolutionForDefault(ctx, project, matched.origin)
 	}
 	return nil, domain.ErrReleaseNotDeployed(map[string]string{"origin": matched.origin}).
@@ -182,37 +190,60 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 	return dep, nil
 }
 
+// missKind is what an admitted origin answers when nothing is deployed to it.
+type missKind uint8
+
+const (
+	// missNotDeployed is a listed origin, a loopback origin, or a live preview.
+	missNotDeployed missKind = iota
+	// missDefault is a console host the project does not list.
+	missDefault
+)
+
 // matchedOrigin is an origin the gate admitted: the normalized request
 // origin, the project origin pattern that matched it (empty when the
-// admission was not a stored pattern), and whether a preview row admitted
-// it. open marks an admission that was not a stored pattern: a loopback
-// origin, or the deployment's own origin.
+// admission was not a stored pattern), and whether a preview row admitted it.
 type matchedOrigin struct {
 	origin  string
 	pattern string
 	preview bool
-	open    bool
+	miss    missKind
 }
 
 // gateOpening is Gate for the request that opens an attempt, which also
-// opens the deployment's own origin where the project's origins refuse it:
-// its console previews a project's login from there with the project's own
-// flow. A project that admits that origin itself keeps its own rules there,
+// opens a console host where the project's origins refuse it: the console
+// previews a project's login from there with the project's own flow. A
+// project that admits that origin itself keeps its own rules there,
 // deployments and previews included. Only the opening takes this exemption;
 // every later step answers to Gate alone, so that origin can show a project's
 // first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
-	if err == nil || r.ownOrigin == "" {
-		return matched, err
+	if err == nil {
+		if matched == nil {
+			return &matchedOrigin{miss: missDefault}, nil
+		}
+		return matched, nil
 	}
-	if !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {
+	if !r.isOwnOrigin(origin) || !errors.Is(err, domain.ErrProjectOriginNotAllowed(nil)) {
 		return nil, err
 	}
-	if normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin)); normErr == nil && normalized == r.ownOrigin {
-		return &matchedOrigin{origin: normalized, open: true}, nil
+	normalized, normErr := domain.NormalizeOrigin(strings.TrimSpace(origin))
+	if normErr != nil {
+		return nil, err
 	}
-	return nil, err
+	return &matchedOrigin{origin: normalized, miss: missDefault}, nil
+}
+
+func (r *RuntimeResolver) isOwnOrigin(origin string) bool {
+	if len(r.ownOrigins) == 0 {
+		return false
+	}
+	normalized, err := domain.NormalizeOrigin(strings.TrimSpace(origin))
+	if err != nil {
+		return false
+	}
+	return slices.Contains(r.ownOrigins, normalized)
 }
 
 // Gate decides whether a request from origin may be served at all. An absent
@@ -230,7 +261,7 @@ func (r *RuntimeResolver) Gate(ctx context.Context, project *domain.Project, ori
 			WithMessage(origin + " is not an origin of this project")
 	}
 	if domain.IsLoopbackOrigin(normalized) {
-		return &matchedOrigin{origin: normalized, open: true}, nil
+		return &matchedOrigin{origin: normalized}, nil
 	}
 	entry, ok := domain.MatchOrigin(project.Origins, normalized)
 	if !ok {

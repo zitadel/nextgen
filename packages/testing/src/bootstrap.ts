@@ -90,10 +90,7 @@ export async function bootstrapProject(
   )) as Record<string, unknown>;
   const releaseId = requireString(release.id, "release id");
   const targets = options.appOrigins?.length ? ["primary", "default"] : ["default"];
-  await client.createDeployment(
-    { release_id: releaseId, targets },
-    { project_id: projectId },
-  );
+  await client.createDeployment({ release_id: releaseId, targets }, { project_id: projectId });
 
   return { projectId, projectSecret, previewSecret, schemaId, flowId };
 }

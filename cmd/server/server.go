@@ -308,9 +308,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
-	// The console previews a project's login from the public base, so opening
-	// a flow admits its origin for every project; no later step does.
-	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
+	// The console previews a project's login from these hosts, so opening a
+	// flow admits them for every project; no later step does.
+	consoleHosts, err := consoleOrigins(cfg.Server.PublicBase)
 	if err != nil {
 		return err
 	}
@@ -342,6 +342,13 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		policyService,
 		builtinBases,
 	)
+	// The platform project lists no origins. A default deployment is what the
+	// console's hosts resolve to; a restart leaves one that already serves.
+	if cfg.Platform.BootstrapProject {
+		if err := platform.EnsureDefaultTarget(ctx, serviceDBPool, schemaService, flowDefinitionSvc, releaseService, deploymentService); err != nil {
+			return fmt.Errorf("failed to deploy the platform default target: %w", err)
+		}
+	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
@@ -444,7 +451,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	pinger.Start()
 	defer pinger.Close()
 
-	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -553,6 +560,30 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	}
 	base.Path = strings.TrimRight(base.Path, "/") + strings.TrimRight(consolePath, "/")
 	return base.String(), nil
+}
+
+// consoleOrigins are the hosts a browser can open the console on: the public
+// base, plus the Vercel deployment, branch, and production URLs when the
+// process is one of those deployments. The unique deployment URL is not the
+// branch alias public_base uses, and a preview serves both.
+func consoleOrigins(publicBase string) ([]string, error) {
+	own, err := publicOrigin(publicBase)
+	if err != nil {
+		return nil, err
+	}
+	origins := []string{own}
+	for _, key := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
+		host := os.Getenv(key)
+		if host == "" {
+			continue
+		}
+		origin, err := domain.NormalizeOrigin("https://" + host)
+		if err != nil {
+			return nil, fmt.Errorf("%s %q is not an origin: %w", key, host, err)
+		}
+		origins = append(origins, origin)
+	}
+	return origins, nil
 }
 
 // publicOrigin is the browser origin of the deployment's public base: where

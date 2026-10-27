@@ -312,8 +312,12 @@ own origin can show a project's first step but cannot sign anyone in to it.
 ## Amendment (2026-10-27): an empty allowlist admits nothing
 
 A project with no origin pattern no longer admits every origin. A loopback
-origin is still always admitted. A request with no `Origin`, and one from
-exactly `server.public_base` when the project does not list that host, is
-served the deployment to the `default` target. No such deployment answers
-`409` with `rel.no_default`. A listed origin, a loopback origin, or a live
-preview with nothing deployed answers `409` with `rel.not_deployed`.
+origin is still always admitted. A request with no `Origin`, and one from a
+console host the project does not list, is served the deployment to the
+`default` target. The console hosts are the origin of `server.public_base`
+and, when set, `VERCEL_URL`, `VERCEL_BRANCH_URL`, and
+`VERCEL_PROJECT_PRODUCTION_URL`. When platform bootstrap is enabled, startup
+deploys the platform project's current schemas and login flows to that
+target. No such deployment answers `409` with `rel.no_default`. A listed
+origin, a loopback origin, or a live preview with nothing deployed answers
+`409` with `rel.not_deployed`.

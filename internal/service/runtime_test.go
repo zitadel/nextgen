@@ -185,6 +185,39 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Empty(t, got.Target)
 	})
 
+	t.Run("another console host with no deployment uses the default target", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		releases := servicemocks.NewMockReleaseService(ctrl)
+		alias := "https://cloud-preview.vercel.app"
+		resolver := service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin, alias)
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID: projectID,
+			Origins: []domain.Origin{
+				{Pattern: origin, Kind: domain.OriginKindPrimary},
+			},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{alias}).
+			Return([]domain.OriginDeployment{}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
+			Return([]domain.OriginDeployment{{
+				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
+			}}, nil)
+		statements.EXPECT().GetDeploymentByID(gomock.Any(), projectID, "dep_default").Return(&domain.Deployment{
+			ID: "dep_default", ProjectID: projectID, ReleaseID: "rel_default",
+		}, nil)
+		releases.EXPECT().Get(gomock.Any(), projectID, "rel_default").Return(&domain.Release{
+			ID: "rel_default", ProjectID: projectID,
+		}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, alias)
+		require.NoError(t, err)
+		assert.Equal(t, "default", got.Source)
+		assert.Equal(t, alias, got.Origin)
+	})
+
 	t.Run("own origin with neither deployment answers no default", func(t *testing.T) {
 		resolver, statements, _ := newMockedRuntimeResolver(t)
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
