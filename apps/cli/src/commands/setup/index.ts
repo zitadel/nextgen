@@ -22,12 +22,10 @@ import {
   selectionName,
   type ConnectionSlug,
 } from "@zitadel/config/idp";
-import { consola } from "consola";
 import semver from "semver";
 
 import { createZitadelClient } from "../../lib/api-client";
 import { isDevelopmentBuild } from "../../lib/build-channel";
-import { renderBoxActions, wrapForBox } from "../../lib/box";
 import { setupDesignRemovedError } from "../../lib/branding/designs";
 import {
   claimAction,
@@ -691,7 +689,7 @@ export default class Setup extends Promptable(BaseCommand) {
     } catch (error) {
       current?.fail();
       if (newApp !== undefined) {
-        await removeNewApp(newApp, cwd);
+        await removeNewApp(newApp, cwd, (text) => this.ui.say(text));
       }
       throw error;
     }
@@ -797,7 +795,13 @@ export default class Setup extends Promptable(BaseCommand) {
           posture,
         });
       } catch (error) {
-        consola.debug("Failed to record the scaffold manifest", error);
+        // Said out loud rather than logged under `--debug`, as every other
+        // best-effort step here is: nothing else tells the developer that
+        // `doctor` will be checking their app files against the templates
+        // instead of against what setup actually wrote.
+        reportWarning(
+          `Could not record what setup scaffolded, so doctor will check this app against the current templates: ${toZitadelError(error).message}`,
+        );
       }
     }
 
@@ -812,6 +816,7 @@ export default class Setup extends Promptable(BaseCommand) {
       selector: recoverySelector(flags.cwd),
       scaffoldedFramework,
       skipInstall: Boolean(flags["skip-install"]),
+      task: (label, work, done) => this.ui.task(label, work, done),
     });
 
     this.recordTelemetry({
@@ -928,7 +933,15 @@ export default class Setup extends Promptable(BaseCommand) {
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
+    //
+    // The two renderings are one summary: a person at a terminal gets it as
+    // the ending of the chain their answers opened, and a run with nobody
+    // watching gets the same thing as text, because the chain draws nothing
+    // then and this report is the whole point of running setup. The overview
+    // is the last step of both — the base command appends it to a chain's
+    // ending, so only the text one names it here.
     let summary: Summary | undefined;
+    let report = "";
     if (!this.jsonEnabled()) {
       const projectFacts = await detectProjectFacts(cwd, app.framework);
       const sections = buildSummary({
@@ -947,43 +960,30 @@ export default class Setup extends Promptable(BaseCommand) {
         ...consoleStep.boxActions,
         ...claimNudge.boxActions,
       ];
-      if (this.ui.interactive) {
-        // The ending of the chain: the headline, the report, then what to run next.
-        summary = {
-          title: "Zitadel is ready",
-          sections: [],
-          lines: renderSummary(sections).split("\n"),
-          next: nextActions,
-          boxed: true,
-          boxTitle: "Zitadel is ready",
-        };
-      } else {
-        // Nobody at a terminal (--non-interactive): the report as a framed box,
-        // as it has always been, separate from the per-step narration above it.
-        // `wrapForBox` caps the content at the terminal width: consola sizes
-        // the frame to the longest line, so an unwrapped sentence wider than
-        // the window would break the right border.
-        consola.box({
-          title: "Zitadel is ready",
-          message: wrapForBox(
-            [
-              renderSummary(sections),
-              "",
-              renderBoxActions([...nextActions, ...exploreAction(this.meta.cliVersion)]),
-            ].join("\n"),
-          ),
-          style: { padding: 1, borderStyle: "rounded", borderColor: "green" },
+      summary = {
+        title: "Zitadel is ready",
+        sections: [],
+        lines: renderSummary(sections).split("\n"),
+        next: nextActions,
+        boxed: true,
+        boxTitle: "Zitadel is ready",
+      };
+      if (!this.ui.interactive) {
+        report = this.ui.ending({
+          ...summary,
+          next: [...nextActions, ...exploreAction(this.meta.cliVersion)],
         });
+        summary = undefined;
       }
     }
 
     const envelope = this.emit({
       status: "ok",
-      // Human-facing output was already shown via consola (box + per-step
-      // narration). Pass an empty `pretty` so the base command's fallback
-      // renderer doesn't duplicate the summary on stdout. The JSON envelope
-      // still carries the full structured payload.
-      pretty: "",
+      // The whole of what a person sees, so the base command's generic
+      // renderer does not summarise the payload underneath it. Empty for a
+      // run that ends on the chain instead, and under `--json`, where the
+      // envelope is the only thing on stdout.
+      pretty: report,
       ...(summary === undefined ? {} : { summary }),
       data: {
         title: "Zitadel is ready.",
@@ -1209,10 +1209,14 @@ export async function localServerHostsPlatform(server: string, timeoutMs = 1500)
  * back what the directory held. A failure to do so is reported, not thrown:
  * the error that stopped setup is the one the developer needs.
  */
-async function removeNewApp(newApp: UndoableScaffold, cwd: string): Promise<void> {
+async function removeNewApp(
+  newApp: UndoableScaffold,
+  cwd: string,
+  say: (text: string) => void,
+): Promise<void> {
   try {
     await newApp.undo();
-    consola.info(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
+    say(`Removed the new app, so ${shortPath(cwd)} holds what it did before setup`);
   } catch (error) {
     reportWarning(
       `Could not remove the new app setup scaffolded in ${cwd}: ${toZitadelError(error).message}`,

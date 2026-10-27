@@ -29,8 +29,6 @@ const STILL_DRAWING_THEMSELVES = [
   "commands/doctor/index.ts: imports consola",
   "commands/env/add.ts: imports consola",
   "commands/logs.ts: writes to process.stdout",
-  "commands/setup/index.ts: imports consola",
-  "commands/setup/install.ts: imports consola",
   "lib/idp/credentials.ts: imports consola",
   "lib/input.ts: imports @clack/prompts",
   "lib/local-server/server.ts: imports consola",

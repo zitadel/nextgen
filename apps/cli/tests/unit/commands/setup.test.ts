@@ -16,7 +16,23 @@ vi.mock("../../../src/commands/setup/prompts", async (importOriginal) => ({
   askCustomSettings: vi.fn(),
 }));
 
-import { confirm, intro, isCancel, multiselect, select, text } from "@clack/prompts";
+/** Whether recording what setup scaffolded fails, for the test that asks it to. */
+let manifestFails = false;
+
+vi.mock("../../../src/lib/scaffold-manifest", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/lib/scaffold-manifest")>();
+  return {
+    ...actual,
+    writeScaffoldManifest: async (...args: Parameters<typeof actual.writeScaffoldManifest>) => {
+      if (manifestFails) {
+        throw new Error("disk full");
+      }
+      return actual.writeScaffoldManifest(...args);
+    },
+  };
+});
+
+import { confirm, intro, isCancel, log, multiselect, outro, select, text } from "@clack/prompts";
 
 import { customExample, SETUP_FLAG_NAMES } from "../../../src/lib/idp";
 import {
@@ -53,6 +69,22 @@ function setup(cwd: string, extra: string[] = []) {
     "https://api.zitadel.cloud",
     ...extra,
   ]);
+}
+
+/** Everything drawn in the chain, as one string. */
+function drawnLines(): string {
+  return vi
+    .mocked(log.message)
+    .mock.calls.map(([text]) => String(text))
+    .join("\n");
+}
+
+/** What a framed report says, a line at a time, with the frame taken off. */
+function framed(output: string): string[] {
+  return output
+    .split("\n")
+    .map((line) => line.replaceAll(/[│╭╮╰╯─]/g, "").trim())
+    .filter((line) => line !== "");
 }
 
 /** Holds a port the system picks until the test ends, and says which. */
@@ -196,6 +228,7 @@ const FRAMEWORK_FIXTURES = [
 ] as const;
 
 afterEach(async () => {
+  manifestFails = false;
   server.resetHandlers();
   resetPlatformStore();
   for (const holder of held.splice(0)) {
@@ -383,12 +416,25 @@ describe("setup command", () => {
 
     expect(res.exitCode).toBe(0);
     // Inside the summary, like every other step: the box is where a command
-    // says what to do next, so nothing trails after it. Off a terminal the box
-    // is drawn with a plain gutter rather than a border.
-    const shown = res.stdout.trimEnd().split("\n");
+    // says what to do next, so nothing trails after it.
+    const shown = framed(res.stdout);
     expect(shown.at(-1)).toContain(expectedPublicCliCommand(""));
     expect(shown.at(-2)).toContain("Explore all commands:");
-    expect(shown.at(-1)?.trimStart().startsWith(">")).toBe(true);
+  });
+
+  it("frames the report under its own headline when nobody is at a terminal", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      ...["setup", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ...["--non-interactive", "--dry-run", "--skip-install", "--framework", "next"],
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    expect(framed(res.stdout)).toContain("Zitadel is ready");
+    // The report is the whole of what is shown: the generic renderer would
+    // have restated the payload's own title under it.
+    expect(res.stdout).not.toContain("Zitadel is ready.");
   });
 
   describe("a custom provider", () => {
@@ -1219,6 +1265,8 @@ describe("setup asked on a terminal", () => {
   let portFree: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     portFree = vi.spyOn(LocalServer, "isPortFree").mockResolvedValue(true);
+    vi.mocked(log.message).mockClear();
+    vi.mocked(outro).mockClear();
   });
   afterEach(() => {
     portFree.mockRestore();
@@ -1245,6 +1293,35 @@ describe("setup asked on a terminal", () => {
     await expect(settingUp(cwd)).rejects.toThrow();
 
     await expect(readFile(join(cwd, "zitadel.json"), "utf8")).rejects.toThrow();
+  });
+
+  it("closes the chain on the one line its report is titled with", async () => {
+    const cwd = await makeNextProject();
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    vi.mocked(select)
+      .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
+      .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+      .mockResolvedValueOnce(15 as never);
+    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+    await settingUp(cwd, "--skip-install");
+
+    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Zitadel is ready"));
+  });
+
+  it("says in the chain that a step it could not finish gave up", async () => {
+    const cwd = await makeNextProject();
+    manifestFails = true;
+    vi.mocked(confirm).mockResolvedValueOnce(true as never);
+    vi.mocked(select)
+      .mockResolvedValueOnce(DEFAULT_SETUP_USE_CASE as never)
+      .mockResolvedValueOnce(DEFAULT_SETUP_PRESET as never)
+      .mockResolvedValueOnce(15 as never);
+    vi.mocked(multiselect).mockResolvedValueOnce([] as never);
+
+    await settingUp(cwd, "--skip-install");
+
+    expect(drawnLines()).toContain("Could not record what setup scaffolded");
   });
 
   describe("in a directory without an app", () => {
@@ -1305,6 +1382,20 @@ describe("setup asked on a terminal", () => {
       await settingUp(cwd, "--skip-install");
 
       expect(intro).toHaveBeenCalledTimes(1);
+    });
+
+    it("says in the chain that the new app is gone again", async () => {
+      const cwd = await makeNewAppDirectory();
+      answeringEveryQuestion();
+      server.use(
+        http.post("*/schemas", () =>
+          HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+        ),
+      );
+
+      await settingUp(cwd, "--skip-install").catch(() => undefined);
+
+      expect(drawnLines()).toContain("Removed the new app");
     });
   });
 });
