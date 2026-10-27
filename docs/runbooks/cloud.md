@@ -486,6 +486,33 @@ project and imports the root admin.
   to `x-vercel-id`), the one an error page and `X-Request-Id` quote: search
   for it. On a protected preview the response's `x-vercel-id` names an outer
   hop that Vercel does not log; search for `X-Request-Id` instead.
+- **Errors:** Vercel tags every line of the Go function `info`, whatever
+  stream it is written to and whatever its `level` field says, Vercel's own
+  crash messages included, so the dashboard's level filter finds no error.
+  Find a failed request by its status instead, then read its lines by its
+  request ID (the `requests` source needs Vercel CLI 64 or newer):
+
+  ```sh
+  npx -y vercel@64.5.0 logs requests --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --environment production --since 24h --query 'httpStatus>=500'
+  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --since 24h --query 'requestId:"<request id>"'
+  ```
+
+  A server that fails to start shows up the same way: the request that
+  started the instance answers 500, and its lines end with the launcher's
+  error and `the user server exited during startup`. An error outside a
+  request, such as a failed event retention run, has no status to find it
+  by: search the messages for the word, which also matches the 4xx
+  `api error` lines, and keep the `ERROR` ones:
+
+  ```sh
+  npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
+    --project cloud --environment production --since 24h --limit 1000 \
+    --query ERROR --json \
+    | jq -r 'select(.type == "log") | .data.message | fromjson? | select(.level == "ERROR") | .msg'
+  ```
+
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only
