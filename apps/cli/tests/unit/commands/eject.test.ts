@@ -188,6 +188,18 @@ describe("eject command", () => {
     expect(entries.some((name) => name.startsWith(".env.local.ejected-"))).toBe(true);
   });
 
+  // One sentence, in the past tense, with no full stop: the chain closes on
+  // it, and "Zitadel ejected, and the remote project is untouched." was two.
+  it("closes on one sentence saying what it did", async () => {
+    const cwd = await makeManagedProject();
+
+    const res = await eject(cwd, ["--force"]);
+
+    expect((parseJson(res.stdout) as { data: { title: string } }).data.title).toBe(
+      "Removed Zitadel from this app, leaving the remote project untouched",
+    );
+  });
+
   it("reports what would be removed in dry-run without touching the filesystem", async () => {
     const cwd = await makeManagedProject();
 

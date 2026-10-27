@@ -28,23 +28,25 @@ describe("Ending", () => {
       expect(ending({}).render()).toBeUndefined();
     });
 
-    it("says where a command that produced nothing ran, without framing it", () => {
-      const below = plain(ending({}, somewhere).render());
-
-      expect(below).toContain("Using project proj-1");
-      expect(below).not.toContain("╭");
+    it("says nothing at all for a command that produced nothing and left nothing to do", () => {
+      expect(ending({}, somewhere).render()).toBeUndefined();
     });
 
-    it("frames the facts a command stated", () => {
+    it("states the facts under the closing line, unframed, when nothing is left to do", () => {
       const below = plain(ending({ sections: [section("Project", ["Id", "proj-1"])] }).render());
 
-      expect(below).toContain("╭");
       expect(below).toContain("proj-1");
+      expect(below).not.toContain("╭");
     });
 
     it("frames the steps a command left to do", () => {
       expect(
-        plain(ending({ next: [{ text: "Deploy it:", command: "zitadel deploy" }] }).render()),
+        plain(
+          ending({
+            next: [{ text: "Deploy it:", command: "zitadel deploy" }],
+            boxed: true,
+          }).render(),
+        ),
       ).toContain("zitadel deploy");
     });
 
@@ -53,9 +55,26 @@ describe("Ending", () => {
     });
 
     it("closes the box with where it ran, under what the command produced", () => {
-      const below = plain(ending({ lines: ["a table"] }, somewhere).render());
+      const below = plain(
+        ending(
+          {
+            lines: ["a table"],
+            next: [{ text: "Deploy it:", command: "zitadel deploy" }],
+            boxed: true,
+          },
+          somewhere,
+        ).render(),
+      );
 
       expect(below.indexOf("a table")).toBeLessThan(below.indexOf("Using project proj-1"));
+    });
+
+    it("leaves a listing alone: no frame, and no line about where it ran", () => {
+      const below = plain(ending({ lines: ["a table"] }, somewhere).render());
+
+      expect(below).toContain("a table");
+      expect(below).not.toContain("╭");
+      expect(below).not.toContain("Using project proj-1");
     });
 
     it("drops the blank lines a command's own rendering left at either end", () => {

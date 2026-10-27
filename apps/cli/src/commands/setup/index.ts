@@ -202,6 +202,8 @@ export default class Setup extends Promptable(BaseCommand) {
     "Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.";
 
   static override heading = "Setting up Zitadel";
+
+  static override summarises = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 1;
   static override examples = [

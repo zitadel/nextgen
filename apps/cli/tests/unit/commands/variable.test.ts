@@ -248,7 +248,7 @@ describe("variable list", () => {
     expect(json.message).toContain("ZITADEL_URL");
   });
 
-  it("says where it ran on a terminal, and says nothing of it on a pipe", async () => {
+  it("answers with the table alone, on a terminal as on a pipe", async () => {
     const cwd = await makeProject();
     server.use(http.get("*/variables", () => HttpResponse.json({ A: { primary: "b" } })));
 
@@ -263,8 +263,9 @@ describe("variable list", () => {
 
     expect(piped.exitCode).toBe(0);
     expect(piped.stdout.trim()).toBe("A\tb\t-");
-    expect(terminal.stdout).toContain("proj_test");
-    expect(terminal.stdout).toContain(new URL(DEFAULT_SERVER).host);
+    // A listing is the answer: no summary, so nothing about where it ran.
+    expect(terminal.stdout).toContain("A");
+    expect(terminal.stdout).not.toContain("Using project");
   });
 
   it("takes the server from ZITADEL_URL, not from zitadel.json", async () => {

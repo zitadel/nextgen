@@ -245,6 +245,24 @@ describe("auth-method sso enable", () => {
     expect(result.stdout).not.toContain("Deploy it to make");
   });
 
+  // The chain's summary says where the command ran, so the label pair it
+  // used to print before the first question has no place any more.
+  it("never labels the project it ran against before its first question", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).not.toContain("Project   ");
+  });
+
+  it("still says which schema it is editing", async () => {
+    const cwd = await setUpProject();
+
+    const result = await enableRendered(cwd, "--client-id", "1234-abc.apps.googleusercontent.com");
+
+    expect(result.stdout).toContain("Editing .zitadel/schemas/default-human-user.json");
+  });
+
   it("prints the callback URI on reuse in text mode", async () => {
     // The URI moved to one per connection after the first release; rerunning
     // the command on the existing connection is how a developer finds the one

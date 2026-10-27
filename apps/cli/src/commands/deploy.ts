@@ -39,6 +39,8 @@ export default class Deploy extends EnvironmentCommand {
     "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
 
   static override heading = "Deploying the configuration";
+
+  static override summarises = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [
@@ -213,12 +215,25 @@ export default class Deploy extends EnvironmentCommand {
         ...nextCommandsData([this.suggest("deployment list")]),
       },
       pretty: [
-        `Deployed ${release.content_hash}`,
+        `Deployed ${abbreviate(release.content_hash)}`,
         `  ${resourceCount} resource${resourceCount === 1 ? "" : "s"} to ${servedOrigins.length} origin${servedOrigins.length === 1 ? "" : "s"}`,
         ...servedOrigins.map((served) => `  - ${served}`),
+        `  Content hash  ${release.content_hash}`,
       ].join("\n"),
     });
   }
+}
+
+/**
+ * A content hash short enough to close the chain on. `sha256:` and 64 hex
+ * digits is wider than a closing line may be, so the whole line is thrown away
+ * and replaced by `Done`; the digest is cut to the 12 characters that identify
+ * it in practice, and the full hash stays in the body under it.
+ */
+export function abbreviate(hash: string): string {
+  const separator = hash.indexOf(":");
+  const algorithm = separator < 0 ? "" : hash.slice(0, separator + 1);
+  return `${algorithm}${hash.slice(separator + 1, separator + 13)}`;
 }
 
 /** The `code` of an API error body, when it carries one. */

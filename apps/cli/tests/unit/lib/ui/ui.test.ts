@@ -136,11 +136,24 @@ describe("Ui", () => {
     it("says where the command ran, as the last line of its summary", () => {
       const ui = watched();
       ui.ranAgainst("proj-1", "api.zitadel.cloud");
-      ui.finish({ title: "Removed the origin", sections: [] });
+      ui.finish({
+        title: "Removed the origin",
+        sections: [],
+        next: [{ text: "Deploy it:", command: "zitadel deploy" }],
+        boxed: true,
+      });
 
       expect(printed()).toContain(
         "Using project proj-1 on your Zitadel server at api.zitadel.cloud.",
       );
+    });
+
+    it("keeps it out of a command that has no summary to put it in", () => {
+      const ui = watched();
+      ui.ranAgainst("proj-1", "api.zitadel.cloud");
+      ui.finish({ title: "Removed the origin", sections: [] });
+
+      expect(printed()).not.toContain("Using project proj-1");
     });
 
     it("hands out a spinner that draws nothing when nobody is watching", () => {

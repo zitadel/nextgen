@@ -15,6 +15,8 @@ export default class Stop extends BaseCommand {
   static override group = CommandGroups.localDevelopment;
 
   static override heading = "Stopping the local Zitadel server";
+
+  static override summarises = true;
   static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({

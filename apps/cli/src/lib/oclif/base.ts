@@ -100,6 +100,19 @@ export abstract class BaseCommand extends Command {
   static heading?: string;
 
   /**
+   * Whether this command ends on a summary: the box holding what it did, what
+   * to do next, and where it ran.
+   *
+   * It belongs to the kind of command, not to what one run happened to
+   * produce. A command that *does* something — sets a project up, ejects it,
+   * enables a provider, reports on its health — summarises. A command that
+   * *answers* something — any list, get or resolve — does not: the table or
+   * the record is the answer, and a border around it only gets in the way of
+   * reading and copying it.
+   */
+  static summarises?: boolean;
+
+  /**
    * The group the root help lists this command under (see `lib/oclif/groups`).
    * Every product command must set it; the root-help test fails otherwise.
    */
@@ -409,7 +422,7 @@ export abstract class BaseCommand extends Command {
             summaryOfText(
               footer === undefined ? rendered : `${rendered}\n\n${footer}`,
               false,
-              normalized.status === "ok" && normalized.boxed === true,
+              this.summarises(),
               this.id,
             ),
           ),
@@ -437,6 +450,9 @@ export abstract class BaseCommand extends Command {
    */
   private withOverview(summary: Summary): Summary {
     const steps = summary.next ?? [];
+    if (!this.summarises()) {
+      return { ...summary, next: [], boxed: false };
+    }
     const overview = steps.some((step) => step.text === OVERVIEW)
       ? []
       : [{ text: OVERVIEW, command: publicCliCommand("", this.config.version) }];
@@ -447,6 +463,11 @@ export abstract class BaseCommand extends Command {
       ...summary,
       next: [...steps, ...overview, ...skills.filter((step) => step !== undefined)],
     };
+  }
+
+  /** Whether this command ends on a summary. See {@link BaseCommand.summarises}. */
+  private summarises(): boolean {
+    return (this.constructor as typeof BaseCommand).summarises === true;
   }
 
   /**

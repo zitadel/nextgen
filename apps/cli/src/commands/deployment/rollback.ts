@@ -22,6 +22,8 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override group = CommandGroups.configuration;
 
   static override heading = "Rolling back a deployment";
+
+  static override summarises = true;
   static override examples = [
     "<%= config.bin %> deployment rollback",
     "<%= config.bin %> deployment rollback dep_01KX5N7C9D2E7F0N9WD3P2E4YM6",

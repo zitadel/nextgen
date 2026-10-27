@@ -12,7 +12,13 @@ import {
   writeRuntimeMetadata,
   type RuntimeMetadata,
 } from "../../../src/lib/local-server/runtime";
-import { expectedPublicCliCommand, parseJson, runCliForTest } from "../../helpers/run-cli";
+import {
+  expectedPublicCliCommand,
+  parseJson,
+  runCliForTest,
+  stripAnsi,
+} from "../../helpers/run-cli";
+import { asTerminal } from "../../helpers/terminal";
 
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
@@ -439,6 +445,19 @@ describe("status command", () => {
         `deploy -m '<what changed>' --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
+  });
+
+  // It resolves the project without opening a connection — the user-presence
+  // probe connects quietly and swallows every failure — so nothing else can
+  // record where it ran.
+  it("names the project it reported on, not only the server", async () => {
+    const cwd = await configuredProject();
+
+    const res = await asTerminal(() =>
+      runCliForTest(["status", "--cwd", cwd, "--server", "https://api.zitadel.cloud"]),
+    );
+
+    expect(stripAnsi(res.stdout)).toContain("Using project proj-001 on your Zitadel server at");
   });
 });
 

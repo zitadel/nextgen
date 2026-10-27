@@ -16,6 +16,8 @@ export default class Reset extends Promptable(BaseCommand) {
   static override group = CommandGroups.localDevelopment;
 
   static override heading = "Resetting the local Zitadel server";
+
+  static override summarises = true;
   static override groupOrder = 4;
   static override flags = {
     force: Flags.boolean({

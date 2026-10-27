@@ -8,6 +8,8 @@ export default class AuthMethodPasswordDisable extends AuthMethodCommand {
   static override group = CommandGroups.authentication;
 
   static override heading = "Disabling password sign-in";
+
+  static override summarises = true;
   static override examples = [
     "<%= config.bin %> auth-method password disable",
     "<%= config.bin %> auth-method password disable --schema customers",

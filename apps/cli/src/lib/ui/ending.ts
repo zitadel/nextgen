@@ -37,8 +37,11 @@ export class Ending {
    */
   render(): string | undefined {
     const body = this.body();
-    if (!this.boxed(body)) {
-      return this.where.known ? `${indent(this.where.render())}\n` : undefined;
+    if (!this.boxed()) {
+      // A listing is what the command was asked for, printed as it is. Where it
+      // ran is part of a summary, so a command that has no summary does not
+      // say it: the table is the answer, and nothing else belongs under it.
+      return body.length === 0 ? undefined : `${indent(body.join("\n"))}\n`;
     }
     // The report and the steps share one frame: what the command produced and
     // what to do about it belong together.
@@ -60,9 +63,13 @@ export class Ending {
     ]);
   }
 
-  /** Whether there is enough to frame: a report, a step, or a command that asked. */
-  private boxed(body: readonly string[]): boolean {
-    return this.summary.boxed === true || (this.summary.next ?? []).length > 0 || body.length > 0;
+  /**
+   * Whether to frame what the command ended on. Only something to do next
+   * earns a frame: a table or a record is what was asked for, and a border
+   * around it helps nobody and breaks copying a wide one.
+   */
+  private boxed(): boolean {
+    return this.summary.boxed === true;
   }
 }
 

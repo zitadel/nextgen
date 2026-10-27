@@ -61,33 +61,40 @@ describe("Chain", () => {
     expect(outro).toHaveBeenCalledWith("Found 1 origin");
   });
 
-  it("frames what the command produced", () => {
+  it("prints a listing as it is, with no frame around it", () => {
     const chain = watching();
     chain.describe("Listing origins");
     chain.finish({ title: "Found 1 origin", sections: [], lines: ["pattern  kind"] });
 
     expect(printed()).toContain("pattern  kind");
-    expect(printed()).toContain("╭");
+    expect(printed()).not.toContain("╭");
   });
 
-  it("does not frame where it ran when there is nothing else to frame", () => {
+  it("keeps where it ran out of a command that has no summary to put it in", () => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.ranAgainst("proj-1", "api.zitadel.cloud");
     chain.finish({ title: "Removed the origin", sections: [] });
 
-    expect(printed()).toContain("Using project proj-1");
+    expect(printed()).not.toContain("Using project proj-1");
     expect(printed()).not.toContain("╭");
   });
 
-  it("says where it ran as the last line of a box it does have", () => {
+  it("says where it ran as the last line of a summary it does have", () => {
     const chain = watching();
-    chain.describe("Listing origins");
+    chain.describe("Deploying the configuration");
     chain.ranAgainst("proj-1", "api.zitadel.cloud");
-    chain.finish({ title: "Found 1 origin", sections: [], lines: ["a table"] });
+    chain.finish({
+      title: "Deployed it",
+      sections: [],
+      lines: ["a detail"],
+      next: [{ text: "Check it:", command: "zitadel status" }],
+      boxed: true,
+    });
 
     const box = printed();
-    expect(box.indexOf("a table")).toBeLessThan(box.indexOf("Using project proj-1"));
+    expect(box).toContain("╭");
+    expect(box.indexOf("a detail")).toBeLessThan(box.indexOf("Using project proj-1"));
   });
 
   it("wraps a note so a box never outgrows the width everything obeys", () => {

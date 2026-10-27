@@ -78,6 +78,8 @@ export default class Doctor extends BaseCommand {
   static override group = CommandGroups.diagnostics;
 
   static override heading = "Checking the setup";
+
+  static override summarises = true;
   static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
@@ -215,6 +217,10 @@ export default class Doctor extends BaseCommand {
       claimSelector,
       selector,
     );
+    // `doctor` never opens a connection, so nothing else records where it ran:
+    // the project it checked and the server that project names are already in
+    // hand here, and the summary's last line is where they belong.
+    this.ui.ranAgainst(projectId, (projectServer ?? this.meta.source).replace(/^https?:\/\//, ""));
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =

@@ -39,7 +39,7 @@ const STILL_DRAWING_THEMSELVES = [
   "lib/oclif/base.ts: writes to process.stderr",
   "lib/package-manager.ts: writes to process.stderr",
   "lib/release/steps/asset-probe.ts: imports consola",
-  "lib/release/steps/diff.ts: writes to process.stdout",
+  "lib/release/steps/diff.ts: imports consola",
   "lib/skills-hint.ts: imports consola",
   "lib/sync/writeback.ts: imports consola",
   "lib/telemetry/index.ts: writes to process.stderr",

@@ -6,6 +6,8 @@ export default class AuthMethodPasskeyEnable extends AuthMethodCommand {
   static override group = CommandGroups.authentication;
 
   static override heading = "Enabling passkey sign-in";
+
+  static override summarises = true;
   static override examples = [
     "<%= config.bin %> auth-method passkey enable",
     "<%= config.bin %> auth-method passkey enable --schema customers",

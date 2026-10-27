@@ -305,11 +305,11 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
           : `Nothing to ${verb} for ${schema.name}`,
       });
     }
+    // Nothing is narrated when nothing changed: the closing line below already
+    // says it, and saying it twice reads as two separate findings.
     if (change.changed) {
       await writeFile(join(cwd, schema.path), `${stableStringify(change.document)}\n`);
       consola.success(`Updated ${schema.path}`);
-    } else {
-      consola.info(`${method} is already ${verb}d for ${schema.name}`);
     }
     this.reportOutcome(outcome);
     return this.emit({

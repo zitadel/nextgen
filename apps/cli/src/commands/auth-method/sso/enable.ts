@@ -99,6 +99,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
   static override group = CommandGroups.authentication;
 
   static override heading = "Enabling single sign-on";
+
+  static override summarises = true;
   static override examples = [
     "<%= config.bin %> auth-method sso enable --provider google",
     "<%= config.bin %> auth-method sso enable --provider google --schema customers",
@@ -262,9 +264,11 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       flowsAfter: edits.flows.map(({ result }) => result.document as Record<string, unknown>),
     };
 
-    consola.info(`Project   ${projectId}`);
+    // Which project this ran against is the summary's last line, not a label
+    // printed before the first question: `connect()` above already recorded it.
+    // The schema is this command's own subject, so it stays as narration.
     consola.info(
-      `Schema    ${schema.path}${schema.methods.length > 0 ? ` (${schema.methods.join(", ")})` : ""}`,
+      `Editing ${schema.path}${schema.methods.length > 0 ? `, which offers ${schema.methods.join(", ")}` : ""}`,
     );
 
     if (dryRun) {

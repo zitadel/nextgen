@@ -118,6 +118,8 @@ export default class Pull extends EnvironmentCommand {
     "Rebuild your .zitadel/ files from a release.\n\nWrites .zitadel/ from the revisions a released snapshot pins.";
 
   static override heading = "Pulling the deployed configuration";
+
+  static override summarises = true;
   static override group = CommandGroups.configuration;
   static override groupOrder = 2;
   static override examples = [
@@ -170,7 +172,10 @@ export default class Pull extends EnvironmentCommand {
     }
 
     const nextCommands = dryRun ? [] : [this.suggest(DEPLOY_ARGS)];
-    const summary = pulled.map((entry) => entry.path).join("\n");
+    const summary = fileList(
+      pulled.map((entry) => entry.path),
+      dryRun,
+    );
     return this.emit({
       status: "ok",
       data: {
@@ -181,8 +186,8 @@ export default class Pull extends EnvironmentCommand {
         ...nextCommandsData(nextCommands),
       },
       pretty: dryRun
-        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)\n${summary}`
-        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}\n${summary}`,
+        ? `Would write ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id} (dry run)${summary}`
+        : `Pulled ${pulled.length} file${pulled.length === 1 ? "" : "s"} from ${release.id}${summary}`,
     });
   }
 
@@ -221,6 +226,20 @@ export default class Pull extends EnvironmentCommand {
       hint: "Pass 'latest', a release id (rel_…), or a deployment id (dep_…).",
     });
   }
+}
+
+/**
+ * The paths under the line that says what they are, ready to append to the
+ * closing sentence. Listed bare in the summary box they are file names with
+ * nothing naming them, so a reader has to guess whether they were written,
+ * skipped or found. Empty for a pull that wrote nothing, which has no list.
+ */
+export function fileList(paths: readonly string[], dryRun: boolean): string {
+  return paths.length === 0
+    ? ""
+    : ["", dryRun ? "Files it would write:" : "Files written:", ...paths.map((p) => `  ${p}`)].join(
+        "\n",
+      );
 }
 
 /**

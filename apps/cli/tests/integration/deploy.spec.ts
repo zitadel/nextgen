@@ -312,6 +312,15 @@ describe("deploy", () => {
 
         expect(result).toPrint("Deployed sha256:");
       });
+
+      it("still gives the whole content hash under the line it closes on", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin("https://app.acme.com");
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("Content hash  sha256:");
+      });
     });
   });
 });

@@ -103,6 +103,8 @@ export default class Eject extends Promptable(BaseCommand) {
   static override group = CommandGroups.localDevelopment;
 
   static override heading = "Ejecting Zitadel from this app";
+
+  static override summarises = true;
   static override groupOrder = 5;
   static override aliases = ["uninstall"];
   static override flags = {
@@ -244,7 +246,7 @@ export default class Eject extends Promptable(BaseCommand) {
     return this.emit({
       status: "ok",
       data: {
-        title: "Zitadel ejected, and the remote project is untouched.",
+        title: "Removed Zitadel from this app, leaving the remote project untouched",
         files_removed: removed,
         files_preserved: preserved,
         backed_up: backedUp,

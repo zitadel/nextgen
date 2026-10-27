@@ -8,6 +8,7 @@ import { Config } from "@oclif/core";
 import Api from "../../../src/commands/api/index";
 import { makeProject } from "../../helpers/local-project";
 import { cliPackageRoot } from "../../helpers/oclif-build";
+import { stripAnsi } from "../../helpers/run-cli";
 
 // The prompts of `zitadel api` run without an operation. The specs run the
 // built CLI, which bundles its own prompts, so a prompt is answered only by
@@ -97,5 +98,27 @@ describe("zitadel api for an operation that needs no credential", () => {
       status: "ok",
       data: { url: "http://localhost:8080/livez" },
     });
+  });
+});
+
+describe("zitadel api, rendered for a terminal", () => {
+  it("keeps where it ran out of output that is only the response", async () => {
+    const cwd = await makeProject({ linked: true });
+    const drawn: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+      drawn.push(typeof chunk === "string" ? chunk : Buffer.from(chunk).toString());
+      return true;
+    });
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const config = await Config.load({ root: cliPackageRoot });
+
+    await Api.run(
+      ["--cwd", cwd, "--no-telemetry", "--server", "http://localhost:8080", "getLive", "--dry-run"],
+      config,
+    );
+
+    // Where a command ran belongs to its summary, and a call that answers with
+    // a response has no summary to put it in.
+    expect(stripAnsi(drawn.join(""))).not.toContain("Using project");
   });
 });

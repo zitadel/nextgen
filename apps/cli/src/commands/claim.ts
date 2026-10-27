@@ -79,6 +79,8 @@ export default class Claim extends EnvironmentCommand {
     "Claim this project to make it permanent. Opens a browser to create an account or sign in.";
 
   static override heading = "Claiming the project";
+
+  static override summarises = true;
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 4;
 

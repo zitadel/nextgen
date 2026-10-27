@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 
 import { COMMANDS } from "../../../src/index";
 import { makeProject as writeProject, readJson } from "../../helpers/local-project";
-import { parseJson, runCliForTest } from "../../helpers/run-cli";
+import { parseJson, runCliForTest, stripAnsi } from "../../helpers/run-cli";
 
 type Envelope = {
   status: string;
@@ -725,6 +725,38 @@ describe("auth-method password and passkey", () => {
         ],
       });
     });
+  });
+
+  // It used to narrate "password is already enabled for …" and then close on
+  // "Nothing to enable for …", which reads as two separate findings.
+  it("says a method that is already on once, as the line it closes on", async () => {
+    const cwd = await makeProject();
+
+    const result = await runCliForTest([
+      "auth-method",
+      "password",
+      "enable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+    ]);
+
+    expect(stripAnsi(result.stdout)).not.toContain("password is already enabled for");
+  });
+
+  it("still closes on what it found when there was nothing to do", async () => {
+    const cwd = await makeProject();
+
+    const result = await runCliForTest([
+      "auth-method",
+      "password",
+      "enable",
+      "--cwd",
+      cwd,
+      "--non-interactive",
+    ]);
+
+    expect(stripAnsi(result.stdout)).toContain("Nothing to enable for default-human-user");
   });
 
   // Every suggestion is meant to be run as written, so each must name a real

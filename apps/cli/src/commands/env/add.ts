@@ -68,6 +68,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   static override group = CommandGroups.configuration;
 
   static override heading = "Adding an environment";
+
+  static override summarises = true;
   static override examples = [
     "<%= config.bin %> env add production --server https://api.zitadel.cloud --app-url https://app.acme.com",
     "<%= config.bin %> env add staging --server https://api.zitadel.cloud --project proj_01K9AA9M3K7E2QX8VB4T",
@@ -191,6 +193,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
       projectSecret = created.project_secret;
       previewToken = created.preview_secret;
     }
+    // This command creates the project and deploys to it, so it says where it
+    // ran like every other command that reaches a server. It never calls
+    // `connect()` — the environment it is adding has no file yet to resolve —
+    // so the project and server are recorded here, as soon as both are known.
+    this.ui.ranAgainst(projectId, server.replace(/^https?:\/\//, ""));
 
     const values: Record<string, string> = {
       ZITADEL_URL: server,
@@ -370,9 +377,14 @@ export default class EnvAdd extends Promptable(BaseCommand) {
         ]),
       },
       pretty: [
-        `Wrote ${file}`,
+        // The closing line is what the run achieved, not the least interesting
+        // of its three outcomes: a file was written, but an environment was
+        // added and a project bound to it.
+        `Added the ${name} environment, bound to ${projectId}`,
         "",
-        `It holds ${Object.keys(values).join(", ")}.`,
+        // Named, not "it": the box this opens is read on its own, and the
+        // line that said which file was written is now the closing line above.
+        `${file} holds ${Object.keys(values).join(", ")}.`,
         "",
         // Quoted like the machine command, and only offered when it can run:
         // without the project secret in the file it would fail to authenticate.

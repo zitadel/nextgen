@@ -112,6 +112,11 @@ export default class Api extends Promptable(BaseCommand) {
       operation.auth === "secret"
         ? await readZitadelSecret(meta.cwd)
         : await readZitadelSecret(meta.cwd).catch(() => undefined);
+    // This command calls the server, so its summary says where it ran, the
+    // same sentence every other command ends on. The project is the one whose
+    // secret authenticates the call, which an unauthenticated operation has
+    // none of.
+    this.ui.ranAgainst(secret?.project_id, meta.source.replace(/^https?:\/\//, ""));
     const positionals = (argv as string[]).slice(args.operation === undefined ? 0 : 1);
     const pathValues = await this.pathValues(target, positionals, secret?.project_id);
     const request = buildRequest({

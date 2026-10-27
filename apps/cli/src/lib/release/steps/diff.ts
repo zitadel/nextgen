@@ -1,3 +1,5 @@
+import { consola } from "consola";
+
 import { brandingReferencePaths } from "../../branding";
 import { diffConfigAgainst } from "../git";
 import type { Step, StepContext } from "../pipeline";
@@ -13,6 +15,12 @@ import { listLiveDeployments, servesPrimary } from "../deployment";
  * prints one line saying no diff is available and carries on. Colour is
  * suppressed under `--json`, `--no-color` and a non-terminal, and the whole
  * line is withheld under `--json` so the envelope travels alone on stdout.
+ *
+ * It says all of that through `consola`, never `process.stdout` directly: a
+ * step is handed a {@link StepContext}, which carries no UI, and while a
+ * command's chain is open the narration bridge draws `consola` lines inside it.
+ * Written straight to the stream, this step's output landed above the chain's
+ * opening `┌`.
  */
 export const diffStep: Step = {
   name: "diff",
@@ -20,7 +28,7 @@ export const diffStep: Step = {
   async run(ctx: StepContext): Promise<void> {
     const note = (line: string): void => {
       if (!ctx.json) {
-        process.stdout.write(`${line}\n`);
+        consola.info(line);
       }
     };
 
@@ -68,7 +76,9 @@ export const diffStep: Step = {
       return;
     }
     if (!ctx.json) {
-      process.stdout.write(diff.endsWith("\n") ? diff : `${diff}\n`);
+      // The diff itself carries no mark: it is the thing being shown, not a
+      // remark about it.
+      consola.log(diff.replace(/\n+$/, ""));
     }
   },
 };
