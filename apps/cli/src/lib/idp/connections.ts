@@ -449,21 +449,8 @@ function planCustomConnection(options: {
     return { action: "create", name, path, slug };
   }
 
+  refuseChangedIssuer(match, slug, issuer, options.slugFlag);
   const oidc = match.body.oidc;
-  const existingIssuer =
-    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
-  if (existingIssuer !== issuer) {
-    throw new ZitadelError(
-      "E_CONFLICT",
-      existingIssuer === undefined
-        ? `${match.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
-        : `${match.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
-      {
-        hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${options.slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
-        details: { file: match.path, slug, issuer, existing_issuer: existingIssuer ?? null },
-      },
-    );
-  }
   refuseDifferentClientId(match, options.clientId);
   refuseCollidingVariables(credentialVariablesOf(match, slug), slug, options.files, match);
   const storedScopes = isObject(oidc) && Array.isArray(oidc.scopes) ? oidc.scopes.join(" ") : "";
@@ -526,19 +513,47 @@ export function checkCustomSlug(
 }
 
 /**
- * The settings a custom connection's file holds, as written, for the ones it
- * has. Nothing is checked here: a hand-edited file may hold anything.
+ * Refuse an issuer other than the one an existing connection was written with.
+ * An applied connection keeps its issuer, so naming another one for the same
+ * slug is a conflict, raised as soon as both are known.
+ */
+export function refuseChangedIssuer(
+  file: ConnectionFile,
+  slug: ConnectionSlug,
+  issuer: string,
+  slugFlag: string,
+): void {
+  const oidc = file.body.oidc;
+  const existingIssuer =
+    isObject(oidc) && typeof oidc.issuer === "string" ? oidc.issuer : undefined;
+  if (existingIssuer === issuer) {
+    return;
+  }
+  throw new ZitadelError(
+    "E_CONFLICT",
+    existingIssuer === undefined
+      ? `${file.path} is already named ${slug} and is not an OIDC connection to ${issuer}`
+      : `${file.path} is already named ${slug} and connects to ${existingIssuer}, not ${issuer}`,
+    {
+      hint: `An applied connection keeps its issuer, and the server compares it exactly, so even a trailing slash names another provider. Choose another ${slugFlag} for this connection, then move the schemas and flows that name the old one to it.`,
+      details: { file: file.path, slug, issuer, existing_issuer: existingIssuer ?? null },
+    },
+  );
+}
+
+/**
+ * The display name and issuer a custom connection's file holds, as written, for
+ * the ones it has. Nothing is checked here: a hand-edited file may hold
+ * anything. Scopes are left out because reusing a connection never applies them.
  */
 export function storedCustomSettings(file: ConnectionFile): {
   displayName?: string;
   issuer?: string;
-  scopes?: string;
 } {
   const oidc = file.body.oidc;
   return {
     ...(typeof file.body.display_name === "string" ? { displayName: file.body.display_name } : {}),
     ...(isObject(oidc) && typeof oidc.issuer === "string" ? { issuer: oidc.issuer } : {}),
-    ...(isObject(oidc) && Array.isArray(oidc.scopes) ? { scopes: oidc.scopes.join(" ") } : {}),
   };
 }
 

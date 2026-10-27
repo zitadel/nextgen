@@ -55,6 +55,7 @@ import {
   publishClientId,
   type PublishState,
   readConnectionFiles,
+  refuseChangedIssuer,
   reportClientIdOutcome,
   republishArgs,
   selectionFromFlags,
@@ -583,9 +584,14 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     const existing = checkCustomSlug(files, slug, ENABLE_FLAG_NAMES.slug);
     beforeAsking(slug);
     // An existing connection is described by its file, so nothing it already
-    // holds is asked again; reuse never rewrites it, so its scopes are not asked
-    // even when the file lacks them.
-    const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug);
+    // holds is asked again; reuse never applies scopes, so they are not asked.
+    const stored = existing === undefined ? undefined : usableStoredSettings(existing, slug, given);
+    // An issuer given as a flag must be the one the connection was written with:
+    // that is known now, not after the next answer.
+    const givenIssuer = given.issuer === undefined ? undefined : parseIssuer(given.issuer);
+    if (existing !== undefined && givenIssuer?.ok) {
+      refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
+    }
     const displayName = await this.input({
       kind: "text",
       name: "display name",
@@ -605,17 +611,13 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,
-      given:
-        given.scopes ??
-        stored?.scopes ??
-        (existing === undefined ? undefined : DEFAULT_SCOPES.join(" ")),
+      given: given.scopes ?? (existing === undefined ? undefined : DEFAULT_SCOPES.join(" ")),
       initialValue: DEFAULT_SCOPES.join(" "),
     });
     return { slug, displayName, issuer, scopes: scopes.join(" ") };
   }
 
   /**
-   * The machine-readable payload.  /**
    * The machine-readable payload. Never the secret, only whether it is held.
    */
   private payload(input: {
@@ -732,14 +734,17 @@ async function readProject(
 }
 
 /**
- * The settings to ask for:/**
  * What the file of an existing custom connection holds, checked as a typed
  * answer is, or a refusal that names the file and the setting: a stored value
  * that cannot be used would otherwise surface as an error about a flag the
  * person never passed. A file with no issuer is not an OIDC connection to
  * reuse at all, whatever issuer is typed.
  */
-function usableStoredSettings(file: ConnectionFile, slug: ConnectionSlug): CustomFlagValues {
+function usableStoredSettings(
+  file: ConnectionFile,
+  slug: ConnectionSlug,
+  given: CustomFlagValues,
+): CustomFlagValues {
   const stored = storedCustomSettings(file);
   if (stored.issuer === undefined) {
     throw new ZitadelError(
@@ -751,8 +756,15 @@ function usableStoredSettings(file: ConnectionFile, slug: ConnectionSlug): Custo
       },
     );
   }
-  const usable = <T>(what: string, value: string | undefined, parse: (v: string) => Parsed<T>) => {
-    const parsed = value === undefined ? undefined : parse(value);
+  // Only a stored value that will be used is held to the rules: one a flag
+  // replaces is not read at all.
+  const usable = <T>(
+    what: string,
+    value: string | undefined,
+    flag: string | undefined,
+    parse: (v: string) => Parsed<T>,
+  ) => {
+    const parsed = flag !== undefined || value === undefined ? undefined : parse(value);
     if (parsed !== undefined && !parsed.ok) {
       throw new ZitadelError(
         "E_VALIDATION",
@@ -763,16 +775,15 @@ function usableStoredSettings(file: ConnectionFile, slug: ConnectionSlug): Custo
         },
       );
     }
-    return value;
+    return flag === undefined ? value : undefined;
   };
   return {
-    displayName: usable("a display name", stored.displayName, parseDisplayName),
-    issuer: usable("an issuer", stored.issuer, parseIssuer),
-    scopes: usable("scopes", stored.scopes, parseScopes),
+    displayName: usable("a display name", stored.displayName, given.displayName, parseDisplayName),
+    issuer: usable("an issuer", stored.issuer, given.issuer, parseIssuer),
   };
 }
 
-/** Whether a custom connection's name, button text and issuer were all given. */ /** Whether a custom connection's name, button text and issuer were all given. */
+/** Whether a custom connection's name, button text and issuer were all given. */
 function hasAllCustomSettings(values: CustomFlagValues): boolean {
   return (
     values.slug !== undefined && values.displayName !== undefined && values.issuer !== undefined

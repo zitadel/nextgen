@@ -13,6 +13,7 @@ import {
   IDPS_DIR,
   credentialVariablesOf,
   checkCustomSlug,
+  refuseChangedIssuer,
   storedCustomSettings,
   planConnection,
   readConnectionFiles,
@@ -135,27 +136,42 @@ describe("checkCustomSlug", () => {
 });
 
 describe("storedCustomSettings", () => {
-  it("reads the display name, issuer and scopes as the file holds them", () => {
+  it("reads the display name and issuer as the file holds them, and not the scopes", () => {
     expect(storedCustomSettings(acmeFile)).toEqual({
       displayName: "Acme SSO",
       issuer: "https://sso.acme.example",
-      scopes: "openid email",
     });
   });
 
   it("reads only what the file has", () => {
     expect(storedCustomSettings(aFile({ slug: "acme-sso" }))).toEqual({});
-    expect(
-      storedCustomSettings(aFile({ slug: "acme-sso", oidc: { issuer: 3, scopes: "x" } })),
-    ).toEqual({});
+    expect(storedCustomSettings(aFile({ slug: "acme-sso", oidc: { issuer: 3 } }))).toEqual({});
+  });
+});
+
+describe("refuseChangedIssuer", () => {
+  const refuse = (given: string) =>
+    refuseChangedIssuer(acmeFile, slug("acme-sso"), given, "--slug");
+
+  it("accepts the issuer the connection was written with", () => {
+    expect(() => refuse("https://sso.acme.example")).not.toThrow();
   });
 
-  it("joins an empty scope list to an empty string, leaving the decision to the caller", () => {
-    expect(
-      storedCustomSettings(
-        aFile({ slug: "acme-sso", oidc: { issuer: "https://a.example", scopes: [] } }),
-      ).scopes,
-    ).toBe("");
+  it("refuses another issuer, even one that differs by a trailing slash", () => {
+    expect(() => refuse("https://sso.acme.example/")).toThrow(
+      /connects to https:\/\/sso.acme.example, not https:\/\/sso.acme.example\//,
+    );
+  });
+
+  it("refuses a file that has no issuer at all", () => {
+    expect(() =>
+      refuseChangedIssuer(
+        aFile({ slug: "acme-sso" }),
+        slug("acme-sso"),
+        "https://a.example",
+        "--slug",
+      ),
+    ).toThrow(/is not an OIDC connection to https:\/\/a.example/);
   });
 });
 

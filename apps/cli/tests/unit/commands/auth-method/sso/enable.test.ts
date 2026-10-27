@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { resetPlatformStore, setupPlatformHandlers } from "@zitadel/api-mock/platform";
@@ -97,12 +97,23 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
   it("names a mistake in a given flag before asking anything", async () => {
     const cwd = await setUpProject();
 
-    // Exit code 3 is the CLI's validation failure.
-    await expect(enableCustom(cwd, "--slug", "Not A Slug")).rejects.toMatchObject({
+    // The slug is not given, so it would be the first question; the bad issuer
+    // is refused before that question, under its flag. Exit code 3 is the
+    // CLI's validation failure.
+    await expect(enableCustom(cwd, "--issuer", "not a url")).rejects.toMatchObject({
       oclif: { exit: 3 },
     });
 
     expect(text).not.toHaveBeenCalled();
+  });
+
+  it("refuses a typed slug that names a provider, as a given one is", async () => {
+    const cwd = await setUpProject();
+    typing("google");
+
+    await expect(enableCustom(cwd)).rejects.toMatchObject({ oclif: { exit: 3 } });
+
+    expect(asked()).toEqual([QUESTION.slug]);
   });
 
   it("asks nothing when every setting was given", async () => {
@@ -163,7 +174,7 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
       ]),
     );
 
-    const output = `${result.stdout}${result.stderr}`;
+    const output = result.stdout;
     expect(output).toContain("Claim mappings in .zitadel/idps/acme-sso.json.");
     expect(output).toContain("email ← email");
     expect(output).toContain("Verification, which a mapping alone does not give:");
@@ -240,7 +251,7 @@ describe("auth-method sso enable --provider custom refuses before it asks", () =
     });
     await writeFile(join(cwd, ".env.local"), "ZITADEL_ISSUER=http://localhost:3000\n");
 
-    await expect(enableCustom(cwd)).rejects.toThrow();
+    await expect(enableCustom(cwd)).rejects.toMatchObject({ code: "EEXIT" });
 
     expect(asked().filter((message) => message === QUESTION.slug)).toEqual([]);
   });
@@ -326,32 +337,127 @@ describe("auth-method sso enable --provider custom for a connection that exists"
   });
 });
 
-describe("auth-method sso enable --provider custom in a script", () => {
-  it.each([
-    ["--non-interactive", ["--non-interactive"]],
-    ["--json", ["--json"]],
-  ])("still stops with the flags it needs under %s, and asks nothing", async (_name, extra) => {
+describe("auth-method sso enable --provider custom against what a connection holds", () => {
+  it("refuses an issuer flag that differs from the connection's before asking anything else", async () => {
     const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+    // Without a stored display name that question would come next, so the
+    // refusal must come first, as soon as the slug is typed.
+    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
+    await writeJson(cwd, ".zitadel/idps/acme-sso.json", { ...file, display_name: undefined });
+    typing(ACME.slug, ACME.displayName);
 
-    const result = await runCliForTest([
+    await expect(enableCustom(cwd, "--issuer", "https://elsewhere.example")).rejects.toMatchObject(
+      exitsWith(5),
+    );
+
+    expect(asked()).toEqual([QUESTION.slug]);
+  });
+
+  it("does not read a stored value that a flag replaces", async () => {
+    const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
+    await writeJson(cwd, ".zitadel/idps/acme-sso.json", { ...file, display_name: "   " });
+    typing(ACME.slug, "acme-client-id");
+
+    await enableCustom(cwd, "--display-name", ACME.displayName);
+
+    expect(asked().filter((message) => /sign-in button/.test(message))).toEqual([]);
+  });
+
+  it("does not hold a stored scope list to the rules, since reuse never applies it", async () => {
+    const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
+    await writeJson(cwd, ".zitadel/idps/acme-sso.json", {
+      ...file,
+      oidc: { ...(file.oidc as object), scopes: ["profile"] },
+    });
+    vi.mocked(text).mockResolvedValueOnce(ACME.slug as never);
+    vi.mocked(text).mockResolvedValue("acme-client-id" as never);
+    vi.mocked(password).mockResolvedValue("acme-secret" as never);
+
+    await enableCustom(cwd);
+
+    expect(asked().filter((message) => /scopes/.test(message))).toEqual([]);
+  });
+
+  it("refuses a stored issuer that cannot be used, naming the file", async () => {
+    const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
+    await writeJson(cwd, ".zitadel/idps/acme-sso.json", { ...file, oidc: { issuer: "not a url" } });
+    typing(ACME.slug);
+
+    await expect(enableCustom(cwd)).rejects.toMatchObject(exitsWith(3));
+
+    expect(asked()).toEqual([QUESTION.slug]);
+  });
+
+  it("finds a connection whose file is named differently from its slug", async () => {
+    const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+    const file = await readJson(cwd, ".zitadel/idps/acme-sso.json");
+    await writeJson(cwd, ".zitadel/idps/renamed.json", file);
+    await rm(join(cwd, ".zitadel/idps/acme-sso.json"));
+    vi.mocked(text).mockResolvedValueOnce(ACME.slug as never);
+    vi.mocked(text).mockResolvedValue("acme-client-id" as never);
+    vi.mocked(password).mockResolvedValue("acme-secret" as never);
+
+    await enableCustom(cwd);
+
+    expect(await readdir(join(cwd, ".zitadel/idps"))).toEqual(["renamed.json"]);
+  });
+
+  it("holds a dry run on an existing slug to the flags, like a script", async () => {
+    const cwd = await setUpProject();
+    await withAcmeConnection(cwd);
+
+    await expect(enableCustom(cwd, "--dry-run", "--slug", ACME.slug)).rejects.toMatchObject(
+      exitsWith(3),
+    );
+
+    expect(text).not.toHaveBeenCalled();
+  });
+});
+
+describe("auth-method sso enable --provider custom in a script", () => {
+  const partial = (cwd: string, ...mode: string[]) =>
+    runCliForTest([
       "auth-method",
       "sso",
       "enable",
       "--cwd",
       cwd,
-      "--json",
-      ...extra,
+      ...mode,
       "--provider",
       "custom",
       "--slug",
       ACME.slug,
     ]);
+  const MISSING = "A custom connection needs --display-name, --issuer";
+
+  it("still stops with the flags it needs under --json, and asks nothing", async () => {
+    const cwd = await setUpProject();
+
+    const result = await partial(cwd, "--json");
 
     expect(parseJson(result.stdout)).toMatchObject({
       status: "error",
       code: "E_VALIDATION",
-      message: "A custom connection needs --display-name, --issuer",
+      message: MISSING,
     });
+    expect(text).not.toHaveBeenCalled();
+  });
+
+  it("still stops with the flags it needs under --non-interactive, and asks nothing", async () => {
+    const cwd = await setUpProject();
+
+    const result = await partial(cwd, "--non-interactive");
+
+    expect(result.exitCode).toBe(3);
+    expect(result.stderr).toContain(MISSING);
     expect(text).not.toHaveBeenCalled();
   });
 

@@ -22,6 +22,7 @@ export {
   type ConnectionPlan,
   credentialVariablesOf,
   checkCustomSlug,
+  refuseChangedIssuer,
   storedCustomSettings,
   type StoredVariables,
   planConnection,
