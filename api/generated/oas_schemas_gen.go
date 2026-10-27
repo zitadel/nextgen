@@ -68035,7 +68035,7 @@ type PasswordSetEvaluateFacts struct {
 	SelfService OptBool `json:"self_service"`
 	// Whether the candidate matches each of the user's kept passwords,
 	// current first, newest first. Only the first `history_depth` entries
-	// count.
+	// count, so at most 4, the highest `history_depth`.
 	HistoryMatches []bool `json:"history_matches"`
 }
 
@@ -68065,7 +68065,9 @@ func (s *PasswordSetEvaluateFacts) SetHistoryMatches(val []bool) {
 // Ref: #
 type PasswordSetEvaluateInput struct {
 	// The candidate password. It is evaluated and dropped: never stored,
-	// logged or returned.
+	// logged or returned. Anything above the server's cap of 64 characters is
+	// refused as `max_length`, as on a real set; the 4096 bound only keeps a
+	// dry run's body small.
 	Password string `json:"password"`
 }
 

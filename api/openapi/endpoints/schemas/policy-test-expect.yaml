@@ -3,7 +3,7 @@ type: object
 additionalProperties: false
 description: |
   The decision a case expects. `code` and `violations` are checked only when
-  given.
+  given, and only a refusal carries them.
 required:
   - allowed
 properties:
@@ -25,3 +25,16 @@ properties:
     description: |
       The names of exactly the rules that should fail, for example
       `["min_length"]`.
+if:
+  properties:
+    allowed:
+      const: true
+  required:
+    - allowed
+then:
+  not:
+    anyOf:
+      - required:
+          - code
+      - required:
+          - violations

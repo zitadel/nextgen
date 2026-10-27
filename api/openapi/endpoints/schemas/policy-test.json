@@ -78,7 +78,8 @@
           "type": "string",
           "format": "password",
           "writeOnly": true,
-          "description": "The candidate password. It is evaluated and dropped: never stored,\nlogged or returned.\n"
+          "maxLength": 4096,
+          "description": "The candidate password. It is evaluated and dropped: never stored,\nlogged or returned. Anything above the server's cap of 64 characters is\nrefused as `max_length`, as on a real set; the 4096 bound only keeps a\ndry run's body small.\n"
         }
       }
     },
@@ -96,10 +97,11 @@
         "history_matches": {
           "type": "array",
           "default": [],
+          "maxItems": 4,
           "items": {
             "type": "boolean"
           },
-          "description": "Whether the candidate matches each of the user's kept passwords,\ncurrent first, newest first. Only the first `history_depth` entries\ncount.\n"
+          "description": "Whether the candidate matches each of the user's kept passwords,\ncurrent first, newest first. Only the first `history_depth` entries\ncount, so at most 4, the highest `history_depth`.\n"
         }
       }
     },
@@ -107,7 +109,7 @@
       "title": "PolicyTestExpect",
       "type": "object",
       "additionalProperties": false,
-      "description": "The decision a case expects. `code` and `violations` are checked only when\ngiven.\n",
+      "description": "The decision a case expects. `code` and `violations` are checked only when\ngiven, and only a refusal carries them.\n",
       "required": [
         "allowed"
       ],
@@ -129,6 +131,32 @@
             "minLength": 1
           },
           "description": "The names of exactly the rules that should fail, for example\n`[\"min_length\"]`.\n"
+        }
+      },
+      "if": {
+        "properties": {
+          "allowed": {
+            "const": true
+          }
+        },
+        "required": [
+          "allowed"
+        ]
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "code"
+              ]
+            },
+            {
+              "required": [
+                "violations"
+              ]
+            }
+          ]
         }
       }
     }

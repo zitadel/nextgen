@@ -105,3 +105,22 @@ func TestPolicyService_EvaluateChecksTheConfigLikeAPublish(t *testing.T) {
 		})
 	}
 }
+
+// Every operation with a template has a dry run: a template that lands
+// without its case in Evaluate fails here rather than refusing every request.
+func TestPolicyService_EvaluateCoversEveryTemplate(t *testing.T) {
+	engine := mustPolicyEngine(t)
+	for _, operation := range engine.Operations() {
+		t.Run(operation, func(t *testing.T) {
+			in := service.EvaluatePolicyInput{Operation: operation, Config: map[string]any{}}
+			switch operation {
+			case service.OperationPasswordSet:
+				in.PasswordSet = &service.PasswordSetEvaluation{Password: "x", SelfService: true}
+			default:
+				t.Fatalf("no dry run input for %s: add its case to Evaluate and here", operation)
+			}
+			_, err := newEvaluateService(t).Evaluate(context.Background(), in)
+			require.NoError(t, err)
+		})
+	}
+}

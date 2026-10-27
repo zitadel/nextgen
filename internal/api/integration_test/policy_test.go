@@ -540,6 +540,25 @@ func TestEvaluatePolicy(t *testing.T) {
 		assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
 	})
 
+	t.Run("an oversized body is refused before evaluating", func(t *testing.T) {
+		for name, req := range map[string]api.PasswordSetEvaluateRequest{
+			"a password above 4096 characters": {Input: api.PasswordSetEvaluateInput{Password: strings.Repeat("a", 4097)}},
+			"more history than any depth reads": {
+				Input: api.PasswordSetEvaluateInput{Password: "x"},
+				Facts: api.NewOptPasswordSetEvaluateFacts(api.PasswordSetEvaluateFacts{HistoryMatches: make([]bool, 5)}),
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				req.Operation = api.PasswordSetEvaluateRequestOperationAuthFactorPasswordSet
+				req.Config = config
+				_, err := client.EvaluatePolicy(t.Context(), api.NewPasswordSetEvaluateRequestEvaluatePolicyRequest(req), api.EvaluatePolicyParams{ProjectID: api.ProjectID(project.ID)})
+				// The generated client validates its own request, so the bound
+				// is part of the contract both sides read.
+				require.Error(t, err)
+			})
+		}
+	})
+
 	t.Run("nothing is stored", func(t *testing.T) {
 		resp, err := client.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(project.ID)})
 		require.NoError(t, err)

@@ -68,7 +68,10 @@ func (s *PolicyService) Evaluate(ctx context.Context, in EvaluatePolicyInput) (_
 		})
 		return passwordDecision(err)
 	default:
-		return nil, domain.ErrInternal(nil).WithMessage("no dry run for operation " + in.Operation)
+		// The config passed its template, so the operation exists; it only has
+		// no dry run yet. TestPolicyService_EvaluateCoversEveryTemplate fails
+		// when a template lands without its case here.
+		return nil, domain.ErrPolicyInvalid(nil, nil).WithMessage("policy: invalid: no dry run for operation " + in.Operation)
 	}
 }
 
