@@ -80,7 +80,24 @@ revision for its purpose in the project, whatever its flow's name. Older
 revisions stay active, so an `audience` added after a flow was deployed
 without one doesn't take that earlier revision out of the running. Removing a
 flow file does not retire the
-flow. Managed files carry a marker comment; `eject` removes only
+flow. Operation policies live in `.zitadel/policies/`: one `<operation>.json`
+per guarded operation, named after its `operation`, holding
+`{"$schema": "../meta/policy.json", "operation": "auth.factor.password.set",
+"config": {"min_length": 15}}`. `deploy` checks each file against
+`.zitadel/meta/policy.json` (known operation, only the template's settings,
+within their bounds) and its name before anything is sent; settings that
+contradict each other (a `min_length` above `max_length`) are refused by the
+server's release build with `rel.invalid`, the policy's entry carrying
+`pol.invalid`. A changed file publishes a new revision of the same policy,
+which applies the next time a password is set. A setting left out is off, and
+`"config": {}` switches every rule off. A sign-in or sign-up uses the policy
+the deployed release carries, so deploying without the file switches it off
+there; a password set through the API, or before the first deploy, uses the
+newest revision, which only `"config": {}` switches off. `policies list` and
+`policies get <id|operation>` read them back. `setup` writes and publishes
+the password policy with a `min_length` of 15; pass `--password-min-length <n>`
+only when the user asks for another value (`0` sets none). Managed files carry
+a marker comment; `eject` removes only
 files that still carry it, preserving anything the user replaced. For app-local
 development, `--server local` resolves through `.zitadel/local/runtime.json` and
 requires a healthy

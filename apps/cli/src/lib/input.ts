@@ -6,8 +6,12 @@ import { ZitadelError } from "./errors";
 import { readStdin } from "./variables";
 import type { SuggestedCommand } from "./suggestion";
 
-/** One option of a `select` or `multiselect`. */
-type Choice<V> = { value: V; label: string; hint?: string };
+/**
+ * One option of a `select` or `multiselect`. A `disabled` one is shown, with
+ * its hint always visible, but cannot be chosen: for a choice that exists but
+ * is not available yet, such as a server that is not running.
+ */
+type Choice<V> = { value: V; label: string; hint?: string; disabled?: boolean };
 
 /** What every question says about itself, whatever it asks for. */
 type Common = {
@@ -147,9 +151,10 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *   A command whose `--force` means something else must not hand out a
  *   session with `force` set.
  *
- * Cancelling a prompt (Ctrl-C) throws `E_VALIDATION` "Cancelled by user"
- * instead of returning a sentinel, so a command never carries on with a
- * missing answer.
+ * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
+ * sentinel, so a command never carries on with a missing answer, and exits
+ * 130 like Ctrl-C anywhere else. The prompt closes with "Cancelled.", which is
+ * all a person is shown: a cancel is their own decision, not an error.
  *
  * Commands call this through `this.input(...)` on `BaseCommand`, which fills in
  * `session` from the command's own flags. It takes the session as an argument
@@ -159,7 +164,7 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  * const clientId = await this.input({
  *   kind: "text",
  *   name: "client id",
- *   message: "Client ID",
+ *   message: "What is the client ID of your Google OAuth app?",
  *   flag: "--client-id",
  *   parse: parseClientId,
  *   given: flags["client-id"],
@@ -175,7 +180,7 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     });
   const cancelled = (): ZitadelError => {
     cancel("Cancelled.");
-    return new ZitadelError("E_VALIDATION", "Cancelled by user");
+    return new ZitadelError("E_CANCELLED", "Cancelled by user");
   };
   const unsupplied = (): ZitadelError => {
     const isText = q.kind === "text" || q.kind === "secret";

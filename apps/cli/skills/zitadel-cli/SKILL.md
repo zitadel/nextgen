@@ -85,7 +85,14 @@ upgrade, so upgrade the app and rerun rather than retrying.
   and the files it looked in; there is no cloud default outside `setup`, and
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
-  project.
+  project. The project it creates has never had a release, so the environment
+  serves the server's own defaults until something is deployed to it: run the
+  `deploy` the result's `next_commands` names, against the file it wrote
+  (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
+  deploy there and then; your runs never are, so they never deploy — run that
+  `deploy` yourself. `data.deployment` carries the `release_id`,
+  `content_hash`, `deployment_id` and `origins` when a person accepted, and is
+  null otherwise — a failed deploy is a warning, never a failed `env add`.
 - **Origins.** `zitadel origin add <url> --kind primary|preview`, `origin list`
   and `origin rm <url>` manage the URLs a project serves: a `primary` origin is
   where the app is served, a `preview` pattern (it may hold a `*`) is where
@@ -152,28 +159,31 @@ upgrade, so upgrade the app and rerun rather than retrying.
 
 The CLI ships its own command list and per-command flags, always correct for the
 installed version. **Do not guess a command name.** Before running any command you
-are not certain of, run `zitadel --help` first and use the exact name it prints:
+are not certain of, look it up first and use the exact name the CLI prints:
 command and resource names — including whether a resource is singular or plural
-and the exact verb — are whatever `--help` shows, never what you would assume. A
-wrong guess costs a failed call and a round of recovery; one cheap `--help` up
-front avoids it. `zitadel --help` is a flat list and cheap to read, so reach for
-it first; treat the CLI's own output as authoritative over anything you remember:
+and the exact verb — are whatever the CLI shows, never what you would assume. A
+wrong guess costs a failed call and a round of recovery; one cheap lookup up
+front avoids it. `zitadel --help` lists each family of commands (`users`,
+`release`) as one row, so it stays short; `zitadel commands` is the flat list of
+every command, verbs included, and `zitadel <family> --help` lists one family's
+verbs. Treat the CLI's own output as authoritative over anything you remember:
 
 ```sh
-npx @zitadel/cli@latest --help               # every command, grouped by purpose
+npx @zitadel/cli@latest --help               # every command family, grouped by purpose
 npx @zitadel/cli@latest commands             # flat list of all commands
 npx @zitadel/cli@latest <command> --help     # a command's flags, which are required, and examples
 npx @zitadel/cli@latest resources --json     # the resource surface in one call (see below); contacts no server
 npx @zitadel/cli@latest api ls --json        # every API operation, its parameters, body and paging; contacts no server
 ```
 
-`--help` groups the surface into project commands (create a project and scaffold
-auth), local-server commands (run a local Zitadel), configuration commands
-(`deploy` plus the config resources), and resource commands (the uniform
-`<resource> <verb>` surface). Read the groups from `--help` rather than from
-memory, since they change as the CLI gains commands.
+`--help` groups the commands by what you are doing: getting started, local
+development, users and teams, authentication, configuration and releases, and
+diagnostics and utilities. A family such as `users` is one row, and
+`zitadel users --help` lists its verbs. Read the groups from `--help` rather than
+from memory, since they change as the CLI gains commands.
 
-Use `zitadel --help` to find *which* command to run. Use `resources --json` when
+Use `zitadel --help` to find *which* family or command to run, and
+`zitadel commands` for the exact verb. Use `resources --json` when
 you need a resource's *fields*: it reports the whole runtime-resource surface at
 once — every resource, its verbs, each verb's `create_fields` / `update_fields`
 (flag name, kind, `required`, any closed value set), its `filter_fields` /
@@ -244,8 +254,9 @@ Exit codes mirror the error class (3 = validation, 4 = network or not-found,
 5 = conflict, 1 = auth, 2 = not-implemented, 130 = cancelled). `E_NETWORK`
 covers a server that answered 5xx and one that never answered — refused,
 unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
-130: a command waiting on the server stops at once with `E_CANCELLED`, and
-any other command exits within a second, possibly without an envelope. An
+130: a command waiting on the server, or on an answer at a prompt, stops at
+once with `E_CANCELLED`, and any other command exits within a second, possibly
+without an envelope. In human mode a cancel prints no error block. An
 unknown command is handled by the CLI's help layer, not the envelope.
 
 ## Clarify before you configure
@@ -341,6 +352,11 @@ terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
 no app: where it would scaffold one, it previews the project, and
 `data.files_written` is empty, because those files depend on the generated app.
+`setup` also writes and publishes the password policy
+(`.zitadel/policies/auth.factor.password.set.json`) with a minimum length of
+15, NIST's minimum for password-only sign-in and the wizard's default. Pass
+`--password-min-length <n>` only when the user asks for another value (`0` sets
+none), and give test users passwords at least that long.
 When setup fails after scaffolding a new app, before its default schema and
 flow are uploaded, it removes the app again and puts back what the directory
 held, so rerunning the same `setup` starts over.
@@ -377,6 +393,10 @@ local admin's team and ends `data.next_commands` with `console`; when it finds
 no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
+
+For a project set up against a hosted server, `doctor` checks no local
+runtime, unless a local server was started in its directory or a parent, or
+`--port`, `--runtime` or `--image` asks about one.
 
 When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, the user
 must register the connection's redirect URI with the provider themselves: give
@@ -415,9 +435,10 @@ holds the warnings and errors, and `--tail` counts only those lines. `logs
 errors red; it refuses `--json`. `start`, and `doctor` when it finds the server
 running, name it in `data.next_actions`.
 
-To move a set-up app to another dev port (the dev server exits with
-`EADDRINUSE`, or another app needs the port), run `setup --dev-port <port>` in
-the app; never change the port in one file by hand. In a directory with a
+To move a set-up app to another dev port (setup's `warnings` say the port is
+already in use, the dev server exits with `EADDRINUSE`, or another app needs
+the port), run `setup --dev-port <port>` in the app; never change the port in
+one file by hand. In a directory with a
 `zitadel.json`, `setup` returns `status: "skipped"` with `reason:
 "already-initialized"`, unless `--dev-port` is given: then it moves the app.
 It allows the new origin on the server first, and a refusal changes nothing.
@@ -440,6 +461,13 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  In a terminal, a custom provider's settings you leave out are asked for, after
+  the checks that need no answer; a connection that already has that slug
+  supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
+  run must pass all three and gets an error naming the missing ones. After
+  writing a new connection the text output prints the claim mappings and names
+  the file to edit them in; `--json` does not carry them, so read the
+  connection file.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless
@@ -451,7 +479,11 @@ than one:
 
 The commands change only local files, apart from
 `auth-method sso enable`, which also stores the provider's credentials on the
-project. When they refuse, they write and publish nothing, on a dry run too.
+project. A provider added by `sso enable` is configured locally, not live: its
+`data.title` says so, `data.next_actions` says to deploy, and `data.next_commands`
+holds `deploy --dry-run` then `deploy`. Only run those once the provider's OAuth
+application exists. `data.title` claims the credentials are stored on the project
+only when they reached it. When they refuse, they write and publish nothing, on a dry run too.
 They refuse to disable a method a login flow still asks for, to change a method
 while a login flow has errors that prevent checking it, to enable password on a
 schema without `x-identifier`, to edit a value that is not the shape they edit,
@@ -472,7 +504,12 @@ same commands as argument lists.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `deploy`. See the reference below for driving the login UI
-and the config-sync details.
+and the config-sync details. The editor schemas in `.zitadel/meta/` are
+generated by the CLI, not config: never edit them. `doctor` warns when one is
+missing or outdated (after an upgrade that changed a dialect), and
+`doctor --fix` writes the current ones, unless the project pins a newer
+`@zitadel/*` version (run that version's `doctor --fix`) or a symlink is on
+the path; `deploy --dry-run` validates without them either way.
 
 ## Reference files
 
@@ -480,4 +517,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding).
+  workflow (schemas, flows, branding, policies).

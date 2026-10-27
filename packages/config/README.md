@@ -22,8 +22,9 @@ Versioned Zitadel local config schemas and defaults — the contract behind the
 ## The customer-facing part
 
 `zitadel setup` copies the defaults into your repo as
-`.zitadel/{schemas,flows,branding}/`, each with a README explaining how to
-edit it (`defaults/README-schemas.md`, `README-flows.md`,
-`README-branding.md` in this package become those files). Those files are
+`.zitadel/{schemas,flows,policies,branding}/`, each with a README explaining
+how to edit it (`defaults/README-schemas.md`, `README-flows.md`,
+`README-policies.md`, `README-branding.md` in this package become those
+files). Those files are
 yours to edit; `zitadel plan` / `zitadel apply` reconcile them with the
 server, and edits publish new revisions rather than mutating state in place.

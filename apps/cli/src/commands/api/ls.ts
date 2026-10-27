@@ -26,8 +26,7 @@ const entryOf = (operation: ApiOperation) => ({
  * what an agent needs to build the call.
  */
 export default class ApiLs extends BaseCommand {
-  static override group = CommandGroups.resources;
-  static override groupOrder = 1;
+  static override group = CommandGroups.diagnostics;
   static override description = "List the operations of the Zitadel API that `zitadel api` calls.";
   static override examples = [
     "<%= config.bin %> api ls",

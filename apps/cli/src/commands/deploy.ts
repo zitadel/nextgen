@@ -36,7 +36,8 @@ import { nextCommandsData } from "../lib/oclif/envelope";
  */
 
 export default class Deploy extends EnvironmentCommand {
-  static override description = "Build a release from .zitadel/ and deploy it to the project.";
+  static override description =
+    "Apply your local configuration to Zitadel.\n\nBuilds a release from .zitadel/ and deploys it to the project. Use --dry-run to preview what would change.";
   static override group = CommandGroups.configuration;
   static override groupOrder = 1;
   static override examples = [
@@ -91,7 +92,8 @@ export default class Deploy extends EnvironmentCommand {
       }
     }
 
-    const { bundle, resourceCount, brandingSources, idpFiles } = await buildBundle(cwd);
+    const { bundle, resourceCount, brandingSources, idpFiles, policyFiles } =
+      await buildBundle(cwd);
     this.recordTelemetry({ resources: resourceCount });
     const ctx: StepContext = {
       cwd,
@@ -105,6 +107,7 @@ export default class Deploy extends EnvironmentCommand {
       bundle,
       brandingSources,
       idpFiles,
+      policyFiles,
       suggest: (args) => this.suggest(args),
     };
 

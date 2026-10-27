@@ -160,6 +160,9 @@ describe("user detail", () => {
     const link = await panel.findByRole("link", { name: "Business sch_business" });
     // The `_authed` layout retains the selected project across navigation.
     expect(link).toHaveAttribute("href", scopedPath("/schemas/sch_business"));
+    // The schema's name sits beside the link, outside it.
+    expect(panel.getByText("Business")).toBeVisible();
+    expect(link).not.toHaveTextContent("Business");
   });
 
   it("shows a URI schema id verbatim and links to it encoded", async () => {
@@ -196,7 +199,9 @@ describe("user detail", () => {
     await renderDetail();
 
     const panel = within(await screen.findByRole("tabpanel"));
-    expect(await panel.findByRole("link", { name: "sch_business sch_business" })).toBeVisible();
+    expect(await panel.findByRole("link", { name: "sch_business" })).toBeVisible();
+    // The id is the name, so it is not printed again beside the link.
+    expect(panel.getAllByText("sch_business")).toHaveLength(1);
   });
 
   it("renders no revision link when the schema cannot be read", async () => {
@@ -238,8 +243,8 @@ describe("user detail", () => {
   });
 
   it("titles the profile card as the user's schema", async () => {
-    // The design names the card "User schema"; the schema's own name is the
-    // revision link beside it. The detail header owns the `h1`.
+    // The design names the card "User schema"; the schema's own name sits
+    // beside it, before the revision link. The detail header owns the `h1`.
     stub();
     await renderDetail();
 

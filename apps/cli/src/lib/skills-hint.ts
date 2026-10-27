@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import consola from "consola";
 import * as rosie from "rosie-skills";
 
-import { command, printBox } from "./box";
+import { command } from "./box";
 import { telemetryConfigDir } from "./telemetry/identity";
 
 export type SkillsHintInput = {
@@ -16,15 +17,20 @@ const SHOWN_FILE = "skills-hint.json";
 const INSTALL_COMMAND = "npx skills add zitadel/nextgen --full-depth";
 
 /**
- * Show, once and before the command's own output, a banner telling a developer
- * who has AI coding agents installed how to give them the Zitadel skills. The
- * CLI never installs anything itself: it names the command and the developer
- * runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
+ * Tell a developer who has AI coding agents installed how to give them the
+ * Zitadel skills, once per machine and after the command's own next steps.
+ * The CLI never installs anything itself: it names the command and the
+ * developer runs it. Modelled on Wrangler's skills suggestion, minus the prompt.
+ *
+ * The marker lives in the user's CLI config directory (`telemetryConfigDir`),
+ * not in a project, so a second project on the same machine does not show it
+ * again. It is written only once the note is about to be shown, and removed
+ * again if showing it fails.
  *
  * Silent in CI, in non-interactive runs, when no agent is detected, once it has
  * been shown, and when `NO_SKILLS_PROMPT` is set. Fail-open: nothing here may
  * fail the command the user actually ran, and losing the race to create the marker
- * (`EEXIST`) just means another run is showing the banner.
+ * (`EEXIST`) just means another run is showing the note.
  */
 export async function showSkillsHint({ env, interactive }: SkillsHintInput): Promise<void> {
   try {
@@ -35,31 +41,38 @@ export async function showSkillsHint({ env, interactive }: SkillsHintInput): Pro
     if (existsSync(shownPath)) {
       return;
     }
-    const names = (await rosie.agents())
-      .filter((agent) => agent.detected && agent.installPath !== null)
-      .map((agent) => agent.display);
-    if (names.length === 0) {
+    // Detected agents only decide whether the note is relevant; it does not
+    // name them.
+    const detected = (await rosie.agents()).some(
+      (agent) => agent.detected && agent.installPath !== null,
+    );
+    if (!detected) {
       return;
     }
     // Created exclusively and before printing: of two concurrent first runs only
-    // one gets past `wx`, and an interrupted run never shows the banner twice.
+    // one gets past `wx`, and an interrupted run never shows the note twice.
     mkdirSync(dirname(shownPath), { recursive: true });
     writeFileSync(shownPath, `${JSON.stringify({ date: new Date().toISOString() })}\n`, {
       flag: "wx",
     });
 
-    printBox({
-      title: "Zitadel skills",
-      tone: "info",
-      message: [
-        `Zitadel detected AI coding agents on this machine: ${names.join(", ")}.`,
-        "They work best with the Zitadel skills installed. To add them, run:",
-        "",
-        `  ${command(INSTALL_COMMAND)}`,
-        "",
-        "This banner shows once. Set NO_SKILLS_PROMPT=1 to never see it.",
-      ].join("\n"),
-    });
+    try {
+      consola.log(
+        [
+          "",
+          "Using an AI coding agent?",
+          "Install Zitadel skills to help your agent work with Zitadel’s CLI and authentication integrations:",
+          "",
+          `  ${command(INSTALL_COMMAND)}`,
+          "",
+          "Optional. You can continue without installing skills.",
+        ].join("\n"),
+      );
+    } catch (error) {
+      // Not shown after all, so it must not count as shown.
+      unlinkSync(shownPath);
+      throw error;
+    }
   } catch {
     // A hint must never break `setup` or the root help.
   }

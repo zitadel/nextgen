@@ -169,6 +169,45 @@ func TestOracle_HandBuilt(t *testing.T) {
 		assert.False(t, noGrant.OracleFoothold("customer", "platform", domain.AuthzPrincipalTypeUser, "alice"))
 	})
 
+	t.Run("targeted foothold follows scope", func(t *testing.T) {
+		teamA, resX := "team_a", "usr_x"
+		g := Graph{
+			Assignments: []*domain.AuthzAssignment{
+				{ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "scoped",
+					ScopeKind: domain.AuthzScopeKindTeam, ScopeTeamID: &teamA},
+				{ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "single",
+					ScopeKind: domain.AuthzScopeKindResource, ScopeResourceID: &resX},
+				{ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "wide",
+					ScopeKind: domain.AuthzScopeKindProject},
+			},
+			Memberships: []*domain.AuthzMembershipEdge{
+				domain.NewUserTeamMembershipEdge("p1", "team_m", "member"),
+			},
+		}
+		at := func(principal, resourceID, resourceTeamID string) bool {
+			return g.OracleFootholdParams(domain.AuthzCheckParams{
+				ProjectID: "p1", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: principal,
+				ResourceID: resourceID, ResourceTeamID: resourceTeamID,
+			})
+		}
+		assert.True(t, at("scoped", "team_a", "team_a"))
+		assert.False(t, at("scoped", "team_b", "team_b"))
+		assert.False(t, at("scoped", "usr_y", ""))
+		assert.True(t, at("scoped", "", ""), "no target: project-wide")
+
+		assert.True(t, at("single", "usr_x", ""))
+		assert.False(t, at("single", "usr_y", ""))
+
+		assert.True(t, at("wide", "team_b", "team_b"))
+
+		assert.True(t, at("member", "team_m", "team_m"))
+		assert.False(t, at("member", "team_b", "team_b"))
+		assert.True(t, at("member", "", ""))
+
+		assert.True(t, at("nobody", "nobody", ""), "own user record")
+		assert.False(t, at("nobody", "usr_y", ""))
+	})
+
 	t.Run("local membership shortcut ignores distinct home", func(t *testing.T) {
 		g := Graph{
 			Memberships: []*domain.AuthzMembershipEdge{

@@ -62,6 +62,14 @@ func SessionIDArg(sessionID *string) any {
 	return *sessionID
 }
 
+// EmptyStringArg binds an empty string as SQL NULL.
+func EmptyStringArg(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // MarshalPayloadJSON marshals a challenge or factor payload, returning nil when empty.
 func MarshalPayloadJSON(payload any) (json.RawMessage, error) {
 	if payload == nil {
