@@ -17,13 +17,6 @@ export const WIDTH = 80;
 /** What the chain's own gutter (`│  `) costs a line drawn inside it. */
 export const GUTTER = 3;
 
-/**
- * How wide a line looks on screen. Colour is invisible but not weightless:
- * a styled line is a dozen characters longer than it reads, so every width
- * decision here measures what the terminal shows, never `String.length`.
- */
-const visible = (line: string): number => stripAnsi(line).length;
-
 /** Anything that can turn itself into the text that is printed. */
 export interface Renderable {
   render(): string;
@@ -37,6 +30,39 @@ export interface Renderable {
 export const COLUMN_GAP = 2;
 
 /**
+ * The mark a column builder leaves in a gap it aligned itself.
+ *
+ * Alignment is evidence only where there is something to align with. A record
+ * of one field is one line, so the columns `renderDetail` built have nothing
+ * above or below them to agree with and {@link columnRows} cannot see them —
+ * and widening that heuristic to cover a lone line is the bug it was written
+ * to kill, since a one-row table and a sentence with a stray double space are
+ * the same string. So the builder says so instead, in the gap itself: a word
+ * joiner, which is zero width, is not whitespace, and does not occur in a
+ * value. {@link Prose} removes it from everything it renders, so it reaches
+ * the layout and never the eye.
+ */
+export const COLUMN_MARK = "\u2060";
+
+/** The gap between two cells, marked as one a column builder aligned. */
+export const columnGap = (width: number = COLUMN_GAP): string =>
+  `${COLUMN_MARK}${" ".repeat(width)}`;
+
+/** Whatever this text says without its marks, for anything but the layout. */
+export const stripColumnMarks = (text: string): string => text.replaceAll(COLUMN_MARK, "");
+
+/**
+ * A line as the terminal shows it. Colour is invisible but not weightless: a
+ * styled line is a dozen characters longer than it reads, and a marked gap is
+ * one character longer, so every width decision here measures what the
+ * terminal shows, never `String.length`.
+ */
+const bare = (line: string): string => stripColumnMarks(stripAnsi(line));
+
+/** How wide a line looks on screen. */
+const visible = (line: string): number => bare(line).length;
+
+/**
  * Where each column after the first begins, inside the line.
  *
  * Measured at the end of the gap rather than its start: a cell is padded to
@@ -44,7 +70,7 @@ export const COLUMN_GAP = 2;
  * space it was padded with.
  */
 const gaps = (line: string): number[] =>
-  [...stripAnsi(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
+  [...bare(line).matchAll(new RegExp(`\\S( {${COLUMN_GAP},})(?=\\S)`, "g"))].map(
     (match) => match.index + 1 + (match[1]?.length ?? 0),
   );
 
@@ -86,7 +112,12 @@ const columnRows = (lines: readonly string[]): boolean[] => {
  *   is what keeps every box exactly {@link WIDTH} columns however wide the
  *   table it is handed.
  * - `"detect"` (the default) — a mix, such as what a command rendered for
- *   itself: each line is a row if it lines up with its neighbour.
+ *   itself: a line is a row if its builder marked the gap it aligned
+ *   ({@link COLUMN_MARK}), or, for text nothing here built, if it lines up
+ *   with its neighbour.
+ *
+ * Whichever answer it is given, the marks are removed from what it renders:
+ * they are how a builder reaches this decision, and nothing after it.
  */
 export class Prose implements Renderable {
   private readonly text: string;
@@ -100,12 +131,15 @@ export class Prose implements Renderable {
   }
 
   render(): string {
+    const marked = this.text.split("\n").map((line) => line.includes(COLUMN_MARK));
+    const lines = this.text.split("\n").map(stripColumnMarks);
     if (this.columns === true) {
-      return this.text;
+      return lines.join("\n");
     }
-    const lines = this.text.split("\n");
-    const rows = this.columns === false ? [] : columnRows(lines);
-    return lines.map((line, index) => (rows[index] === true ? line : this.wrap(line))).join("\n");
+    const aligned = this.columns === false ? [] : columnRows(lines);
+    const row = (index: number): boolean =>
+      this.columns !== false && (marked[index] === true || aligned[index] === true);
+    return lines.map((line, index) => (row(index) ? line : this.wrap(line))).join("\n");
   }
 
   private wrap(line: string): string {
@@ -137,9 +171,10 @@ export class Facts implements Renderable {
 
   private one(section: Section): string {
     const width = Math.max(0, ...section.facts.map(([label]) => label.length));
-    // One gap, wider than a column gap, in every row: the rows line up, which
-    // is what tells the layout they are columns rather than sentences.
-    const gap = " ".repeat(COLUMN_GAP + 1);
+    // One gap, wider than a column gap, in every row, and marked: a section of
+    // one fact is one line, so the alignment it is laid out with has nothing
+    // to agree with and only the mark tells the layout it is a row.
+    const gap = columnGap(COLUMN_GAP + 1);
     return [
       ...(section.heading === undefined ? [] : [pc.bold(section.heading)]),
       ...section.facts.map(([label, value]) => `${pc.dim(label.padEnd(width))}${gap}${value}`),
@@ -148,16 +183,71 @@ export class Facts implements Renderable {
 }
 
 /**
+ * Where a command may be broken across lines: at a space between two of its
+ * arguments. A space inside quotes is not one of them, because `\` before a
+ * newline is literal inside single quotes, so breaking there would change the
+ * argument rather than continue the command.
+ */
+const argumentBreaks = (command: string): number[] => {
+  const at: number[] = [];
+  let quote: string | undefined;
+  for (const [index, character] of [...command].entries()) {
+    if (quote !== undefined) {
+      quote = character === quote ? undefined : quote;
+    } else if (character === "'" || character === '"') {
+      quote = character;
+    } else if (character === " ") {
+      at.push(index);
+    }
+  }
+  return at;
+};
+
+/**
+ * One command as the lines a frame can hold, written the way a shell writes a
+ * command over several lines: every line but the last ends in `\`, which the
+ * shell removes together with the newline, so what is copied out of the box is
+ * still the one command it was and still runs.
+ *
+ * A break at a space between two arguments keeps `lead`, since the spaces that
+ * rejoins only separate arguments that were already separate. An argument too
+ * long to fit on a line of its own is broken where it must be and continued at
+ * the margin, since `\`-newline is all the shell removes and an indent would
+ * land inside the argument.
+ */
+export const wrapCommand = (command: string, width: number, lead = ""): string[] => {
+  const lines: string[] = [];
+  let rest = command;
+  let indent = lead;
+  while (indent.length + rest.length > width) {
+    const room = Math.max(1, width - indent.length - 2);
+    const cut = argumentBreaks(rest)
+      .filter((at) => at > 0 && at <= room)
+      .at(-1);
+    if (cut === undefined) {
+      lines.push(`${indent}${rest.slice(0, room + 1)}\\`);
+      rest = rest.slice(room + 1);
+      indent = "";
+    } else {
+      lines.push(`${indent}${rest.slice(0, cut)} \\`);
+      rest = rest.slice(cut + 1);
+      indent = lead;
+    }
+  }
+  return [...lines, indent + rest];
+};
+
+/**
  * The one box the CLI draws: a {@link WIDTH}-wide frame holding what the command
  * produced and, under it, what to do next. Every command's box is the same
  * width and lays its steps out the same way, so two commands are comparable at
  * a glance.
  *
- * A step's sentence is wrapped to fit; its commands are not, because a command
- * broken across lines cannot be copied, so one longer than the frame widens it.
- * That is the only thing allowed to: everything else a box holds is wrapped,
- * a table it happens to be handed included, so no report can make the frame
- * wider than {@link WIDTH}.
+ * Nothing in it is allowed to widen it past {@link WIDTH}: a step's sentence is
+ * folded, so is the report and any table the box happens to be handed. A
+ * command is never folded as prose, because a command broken across lines
+ * cannot be run — it is written over several lines the way a shell writes one,
+ * with {@link wrapCommand}, so it fits and still pastes back as itself.
  */
 export class Frame implements Renderable {
   private static readonly INNER = WIDTH - 7;
@@ -208,7 +298,10 @@ export class Frame implements Renderable {
       new Prose(step.text, Frame.INNER, false).render(),
       ...(step.command === undefined
         ? []
-        : step.command.split("\n").map((command) => `  ${pc.bold(pc.cyan(command))}`)),
+        : step.command
+            .split("\n")
+            .flatMap((command) => wrapCommand(command, Frame.INNER, "  "))
+            .map((line) => pc.bold(pc.cyan(line)))),
     ].join("\n");
   }
 }

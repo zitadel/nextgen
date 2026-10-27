@@ -1,12 +1,22 @@
 import { isObject } from "../../json";
-import { COLUMN_GAP } from "../../ui/layout";
+import { COLUMN_GAP, columnGap } from "../../ui/layout";
 
 /**
- * What separates two cells. Taken from the layout rather than written here, so
- * a row this builds is a row the layout recognises as columns and leaves whole
- * instead of folding it like a sentence.
+ * What separates two cells of a table. Taken from the layout rather than
+ * written here, so a row this builds is a row the layout recognises as columns
+ * and leaves whole instead of folding it like a sentence. A table draws a
+ * header and a rule above its first row, so its rows always have a neighbour
+ * whose gap they line up with and the alignment speaks for itself.
  */
 const GAP = " ".repeat(COLUMN_GAP);
+
+/**
+ * What separates a record's label from its value: the same gap, marked as one
+ * a column layout built. A record can be a single field, and one line has
+ * nothing to line up with, so without the mark the layout reads it as a
+ * sentence and folds the label away from the value.
+ */
+const FIELD_GAP = columnGap();
 
 /**
  * The machine form of a list: one record per line, fields separated by tabs,
@@ -145,6 +155,6 @@ export const renderDetail = (
     .map((field) => [headerOf(field), readCell(field, item)] as const)
     .filter(([, value]) => value !== "");
   const width = Math.max(0, ...rows.map(([label]) => label.length));
-  const body = rows.map(([label, value]) => `${label.padEnd(width)}${GAP}${value}`);
+  const body = rows.map(([label, value]) => `${label.padEnd(width)}${FIELD_GAP}${value}`);
   return [...(heading ? [heading, ""] : []), ...body].join("\n");
 };

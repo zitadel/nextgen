@@ -1,7 +1,15 @@
 import { stripAnsi } from "consola/utils";
 import { describe, expect, it } from "vitest";
 
-import { Facts, Frame, Prose, WIDTH } from "../../../../src/lib/ui/layout";
+import {
+  COLUMN_MARK,
+  columnGap,
+  Facts,
+  Frame,
+  Prose,
+  WIDTH,
+  wrapCommand,
+} from "../../../../src/lib/ui/layout";
 import { section } from "../../../../src/lib/ui/summary";
 
 const plain = (text: string): string => stripAnsi(text);
@@ -11,6 +19,20 @@ const widest = (text: string): number =>
       .split("\n")
       .map((line) => line.length),
   );
+
+/** The lines a box holds, without its border, its padding or its blanks. */
+const inside = (box: string): string[] =>
+  plain(box)
+    .split("\n")
+    .flatMap((line) => {
+      const held = /^\s*│(.*)│\s*$/.exec(line)?.[1];
+      return held === undefined ? [] : [held.slice(2).trimEnd()];
+    })
+    .filter((line) => line !== "");
+
+/** What a shell makes of the lines a command was written over. */
+const pasted = (lines: readonly string[]): string =>
+  lines.join("\n").replaceAll("\\\n", "").replace(/ +/g, " ").trim();
 
 describe("Prose", () => {
   it("leaves a line that already fits", () => {
@@ -71,6 +93,94 @@ describe("Prose", () => {
     const table = ["a   one of the values", "b   another of the values"].join("\n");
 
     expect(new Prose(table, 10, false).render()).not.toBe(table);
+  });
+
+  // A record of one field is one line, so the alignment its builder laid it
+  // out with has nothing to agree with. The mark in the gap is the builder
+  // saying so, and it is the only thing that separates this line from the
+  // sentence with a stray double space just above.
+  it("leaves a lone row whole when its builder marked the gap it aligned", () => {
+    const row = `value${columnGap()}${"x".repeat(120)}`;
+
+    expect(new Prose(row, 30).render()).toBe(`value  ${"x".repeat(120)}`);
+  });
+
+  it("takes the builder's mark back out of everything it renders", () => {
+    const row = `value${columnGap()}held`;
+
+    expect(new Prose(row, 30).render()).not.toContain(COLUMN_MARK);
+  });
+
+  it("takes the mark out of a row it folds as well, so no mark survives a fold", () => {
+    const row = `value${columnGap()}${"x".repeat(120)}`;
+
+    expect(new Prose(row, 30, false).render()).not.toContain(COLUMN_MARK);
+  });
+
+  it("folds a marked row when the caller says there are no columns", () => {
+    const row = `value${columnGap()}${"x".repeat(120)}`;
+
+    expect(new Prose(row, 30, false).render().split("\n").length).toBeGreaterThan(1);
+  });
+
+  it("does not count the mark as width, so a marked row fits where it reads as fitting", () => {
+    const row = `ab${columnGap()}cd`;
+
+    expect(new Prose(row, 6, false).render()).toBe("ab  cd");
+  });
+});
+
+describe("wrapCommand", () => {
+  it("leaves a command that already fits on one line", () => {
+    expect(wrapCommand("zitadel deploy", 40)).toEqual(["zitadel deploy"]);
+  });
+
+  it("breaks a long command at a space between two of its arguments", () => {
+    expect(wrapCommand("zitadel deploy --server http://localhost:9", 30)).toEqual([
+      "zitadel deploy --server \\",
+      "http://localhost:9",
+    ]);
+  });
+
+  it("ends every line but the last in the shell's own continuation", () => {
+    const lines = wrapCommand(`zitadel deploy ${"--flag value ".repeat(20)}`.trim(), 40);
+
+    expect(lines.slice(0, -1).every((line) => line.endsWith(" \\"))).toBe(true);
+    expect(lines.at(-1)?.endsWith("\\")).toBe(false);
+  });
+
+  // `\` before a newline is literal inside single quotes, so breaking there
+  // would change the argument rather than continue the command.
+  it("never breaks inside a quoted argument", () => {
+    const lines = wrapCommand("npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server x", 40);
+
+    expect(lines.every((line) => !/'<what$|^changed>'/.test(line))).toBe(true);
+  });
+
+  it("breaks an argument too long for a line of its own where it must", () => {
+    const lines = wrapCommand(`zitadel deploy ${"-".repeat(90)}`, 40);
+
+    expect(Math.max(...lines.map((line) => line.length))).toBeLessThanOrEqual(40);
+  });
+
+  // The shell removes `\`-newline and nothing else, so an indent on the
+  // continuation of a broken argument would land inside the argument.
+  it("continues a broken argument at the margin, so the argument rejoins exactly", () => {
+    const lines = wrapCommand(`zitadel deploy ${"-".repeat(90)}`, 40, "  ");
+
+    expect(lines.slice(2).every((line) => !line.startsWith(" "))).toBe(true);
+  });
+
+  it("keeps the lead on a line it began at an argument boundary", () => {
+    const lines = wrapCommand("zitadel deploy --server http://localhost:9", 30, "  ");
+
+    expect(lines.every((line) => line.startsWith("  "))).toBe(true);
+  });
+
+  it("pastes back as the command it was", () => {
+    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9 ${"-".repeat(90)}`;
+
+    expect(pasted(wrapCommand(command, 40, "  "))).toBe(command);
   });
 });
 
@@ -159,12 +269,28 @@ describe("Frame", () => {
     expect(widest(box)).toBe(WIDTH);
   });
 
-  it("keeps a command longer than the box whole, so it can still be copied", () => {
+  // A command is never folded as prose, because a command broken across lines
+  // cannot be run. It is written the way a shell writes one over several
+  // lines, so the box keeps its ceiling and what is copied out still runs.
+  it("never widens for a command longer than it is", () => {
+    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
+
+    expect(widest(new Frame("Summary", [], [{ text: "Run next:", command }]).render())).toBe(WIDTH);
+  });
+
+  it("never widens for a command that is one unbreakable argument", () => {
     const command = `zitadel deploy ${"-".repeat(200)}`;
 
-    expect(plain(new Frame("Next steps", [], [{ text: "Run next:", command }]).render())).toContain(
-      command,
+    expect(widest(new Frame("Next steps", [], [{ text: "Run next:", command }]).render())).toBe(
+      WIDTH,
     );
+  });
+
+  it("writes a command too long to fit as the one command it is", () => {
+    const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
+    const box = new Frame("Summary", [], [{ text: "Run next:", command }]).render();
+
+    expect(pasted(inside(box).filter((line) => line.trim() !== "Run next:"))).toBe(command);
   });
 
   it("puts each command on its own line under the sentence that asks for it", () => {
@@ -178,6 +304,16 @@ describe("Frame", () => {
 });
 
 describe("Facts", () => {
+  // A section of one fact is one line, so nothing lines up with it either.
+  it("marks the gap it aligned, so a section of one fact survives the wrap", () => {
+    const fact = new Facts([section("Project", ["Id", "x".repeat(120)])]).render();
+
+    expect(plain(new Prose(fact, WIDTH).render()).split("\n")).toEqual([
+      "Project",
+      `Id   ${"x".repeat(120)}`,
+    ]);
+  });
+
   it("aligns the values of a section's facts", () => {
     const [heading, first, second] = plain(
       new Facts([section("Project", ["Id", "proj-1"], ["Server", "api.zitadel.cloud"])]).render(),

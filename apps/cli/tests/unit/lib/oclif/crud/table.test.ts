@@ -9,6 +9,7 @@ import {
   renderRows,
   renderTable,
 } from "../../../../../src/lib/oclif/crud";
+import { COLUMN_MARK, stripColumnMarks } from "../../../../../src/lib/ui/layout";
 
 describe("headerOf", () => {
   it("takes the path's last segment", () => {
@@ -148,10 +149,14 @@ describe("renderDetail", () => {
     identifier: "ada@example.com",
     metadata: { status: "active", created_at: "2026-01-01T00:00:00Z", owner: null },
   };
+  /** What a record reads as, with the layout's own mark taken back out. */
+  const shown = (text: string): string => stripColumnMarks(text);
 
   it("heads the record and labels each field by its last path segment", () => {
     expect(
-      renderDetail("ada@example.com", ["id", "metadata.status", "metadata.created_at"], user),
+      shown(
+        renderDetail("ada@example.com", ["id", "metadata.status", "metadata.created_at"], user),
+      ),
     ).toBe(
       [
         "ada@example.com",
@@ -165,16 +170,37 @@ describe("renderDetail", () => {
 
   it("labels a camelCase field as the wire spells every other one", () => {
     expect(
-      renderDetail(undefined, ["schema.objectType"], { schema: { objectType: "human" } }),
+      shown(renderDetail(undefined, ["schema.objectType"], { schema: { objectType: "human" } })),
     ).toBe("object_type  human");
   });
 
   it("omits fields the record does not carry, rather than printing blanks", () => {
     const out = renderDetail(undefined, ["id", "metadata.owner", "nope"], user);
-    expect(out).toBe("id  user_1");
+    expect(shown(out)).toBe("id  user_1");
   });
 
   it("renders without a heading when the record has none", () => {
-    expect(renderDetail(undefined, ["id"], user)).toBe("id  user_1");
+    expect(shown(renderDetail(undefined, ["id"], user))).toBe("id  user_1");
+  });
+
+  // A record of one field is one line, so nothing lines up with the columns it
+  // was laid out in. The mark is how the layout is told they are columns, and
+  // without it the label is folded away from the value.
+  it("marks the gap it aligned, so the layout leaves a one-field record whole", () => {
+    expect(renderDetail(undefined, ["id"], user)).toContain(COLUMN_MARK);
+  });
+
+  it("marks every field of a record, not only the first", () => {
+    const marks = renderDetail(undefined, ["id", "metadata.status"], user)
+      .split("\n")
+      .map((line) => line.includes(COLUMN_MARK));
+
+    expect(marks).toEqual([true, true]);
+  });
+
+  it("leaves the heading unmarked, since it is a sentence and not a row", () => {
+    const [heading] = renderDetail("Set GREETING on the project", ["id"], user).split("\n");
+
+    expect(heading).toBe("Set GREETING on the project");
   });
 });
