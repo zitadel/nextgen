@@ -305,6 +305,22 @@ const AUTH_METHOD_LABELS: Record<string, string> = {
   otp: "One-time code",
 };
 
+/**
+ * The keyword that designates a leaf property (ADR 058): `x-identifier`, one
+ * of the `x-display` parts, or nothing. Both name a leaf by its dot-joined
+ * attribute path, so a nested one is found by its full path.
+ */
+export function schemaDesignation(
+  schema: UserSchema,
+  path: string[],
+): "x-identifier" | "x-display" | undefined {
+  const joined = path.join(".");
+  if (field(schema, "x-identifier") === joined) return "x-identifier";
+  const display = schema["x-display"];
+  if (Array.isArray(display) && display.includes(joined)) return "x-display";
+  return undefined;
+}
+
 function readProperties(schema: UserSchema): Record<string, Record<string, unknown>> {
   const properties = schema.properties;
   if (!properties || typeof properties !== "object") return {};

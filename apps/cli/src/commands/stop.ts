@@ -12,8 +12,8 @@ import { nextCommandsData } from "../lib/oclif/envelope";
 
 export default class Stop extends BaseCommand {
   static override description = "Stop the local Zitadel server.";
-  static override group = CommandGroups.localServer;
-  static override groupOrder = 2;
+  static override group = CommandGroups.localDevelopment;
+  static override groupOrder = 3;
   static override flags = {
     all: Flags.boolean({
       description: "Stop all discovered CLI-managed local Zitadel runtime processes.",

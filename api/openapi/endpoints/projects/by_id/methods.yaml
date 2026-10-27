@@ -25,7 +25,7 @@ get:
       content:
         application/json:
           schema:
-            $ref: ../project-response.yaml
+            $ref: ../project-detail-response.yaml
     '401':
       description: Missing or invalid credentials.
       content:
@@ -70,7 +70,7 @@ patch:
       content:
         application/json:
           schema:
-            $ref: ../project-response.yaml
+            $ref: ../project-detail-response.yaml
     '400':
       description: Invalid request body.
       content:

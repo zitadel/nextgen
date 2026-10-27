@@ -275,6 +275,13 @@ var dualSchemeRequests = []struct {
 	{"branding get", http.MethodGet, "/branding/brand_1?project_id=proj_1", ""},
 	{"idps query", http.MethodPost, "/idps/query?project_id=proj_1", `{}`},
 	{"idp get", http.MethodGet, "/idps/idp_1?project_id=proj_1", ""},
+	{"releases list", http.MethodGet, "/releases?project_id=proj_1", ""},
+	{"release get", http.MethodGet, "/releases/rel_1?project_id=proj_1", ""},
+	{"deployments list", http.MethodGet, "/deployments?project_id=proj_1", ""},
+	{"deployment get", http.MethodGet, "/deployments/dep_1?project_id=proj_1", ""},
+	{"deployment create", http.MethodPost, "/deployments?project_id=proj_1", `{"release_id":"rel_1","targets":["primary"]}`},
+	{"deployment rollback", http.MethodPost, "/deployments/dep_1/rollback?project_id=proj_1", `{}`},
+	{"release revoke", http.MethodPost, "/releases/rel_1/revoke?project_id=proj_1", ""},
 }
 
 func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testing.T) {
@@ -303,6 +310,13 @@ func TestOgenErrorHandlerDualSchemeInvalidCookieStaysCredentialNeutral(t *testin
 		api.GetBrandingByIdOperation,
 		api.QueryIdpsOperation,
 		api.GetIdpByIdOperation,
+		api.ListReleasesOperation,
+		api.GetReleaseByIdOperation,
+		api.ListDeploymentsOperation,
+		api.GetDeploymentByIdOperation,
+		api.CreateDeploymentOperation,
+		api.RollbackDeploymentOperation,
+		api.RevokeReleaseOperation,
 	} {
 		require.False(t, sessionCookieOperations[op], "%s must stay off the session-only 401 rewrite", op)
 	}

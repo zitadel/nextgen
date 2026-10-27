@@ -541,8 +541,8 @@ FLAGS
                               --env.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints
                               are found by OIDC discovery.
-      --provider=<option>     Identity provider to enable, or "custom" for any
-                              other OpenID Connect provider.
+      --provider=<option>     Identity provider to enable, or "custom" for a
+                              custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
       --schema=<value>        User schema to change. Required when the Project
                               has more than one.
