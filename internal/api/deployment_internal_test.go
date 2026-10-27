@@ -8,9 +8,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 )
 
 func TestDeploymentErrorResponseStatuses(t *testing.T) {
@@ -21,6 +24,7 @@ func TestDeploymentErrorResponseStatuses(t *testing.T) {
 		{domain.ErrDeploymentNotFound(), http.StatusNotFound},
 		{domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}), http.StatusConflict},
 		{domain.ErrDeploymentInvalid().WithMessage("bad"), http.StatusBadRequest},
+		{domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, []string{"GONE"}), http.StatusBadRequest},
 		{domain.ErrDeploymentPermissionDenied(), http.StatusForbidden},
 	}
 	for _, tc := range cases {
@@ -84,6 +88,26 @@ func TestDeploymentConflictRendersARevokedRelease(t *testing.T) {
 	assert.Equal(t, domain.ErrReleaseRevoked().Code, resp.ReleaseRevokedConflict.Code)
 }
 
+// The 400 names the kind and every missing variable on details, sorted.
+func TestDeploymentVariablesMissingResponse(t *testing.T) {
+	err := domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPreview, []string{"GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_ID"})
+	resp, ok := deploymentVariablesMissingResponse(err)
+	require.True(t, ok)
+	body, isMissing := resp.GetDeploymentVariablesMissing()
+	require.True(t, isMissing)
+	assert.Equal(t, err.Code, body.Code)
+	assert.Equal(t, err.Message, body.Message)
+	assert.Equal(t, api.DeploymentVariablesMissingDetails{
+		Kind:  api.DeploymentKindPreview,
+		Names: []string{"GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"},
+	}, body.Details)
+}
+
+func TestDeploymentVariablesMissingResponseIgnoresOtherErrors(t *testing.T) {
+	_, ok := deploymentVariablesMissingResponse(domain.ErrDeploymentInvalid())
+	assert.False(t, ok)
+}
+
 // Any other error is left to NewError.
 func TestDeploymentConflictResponseIgnoresOtherErrors(t *testing.T) {
 	_, ok := deploymentConflictResponse(domain.ErrDeploymentNotFound())
@@ -118,4 +142,46 @@ func TestDeploymentAccessRow(t *testing.T) {
 		domain.ErrEnvironmentProjectNotFound().Code)
 	assertDomainCode(t, requireProjectAccess(operator, stmts, "proj_b", deploymentAccess, opRead),
 		domain.ErrDeploymentNotFound().Code)
+
+	// A foothold without a project-wide read is Forbidden, which this gate
+	// answers as permission denied. The handler that chooses the gate is
+	// TestListPreviewsRefusesAPartialGrant.
+	member := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+	assertDomainCode(t,
+		requireProjectAccess(member, stubAuthzStmts{allowCheck: new(false), foothold: new(true)}, "proj_a", deploymentAccess, opRead),
+		domain.ErrDeploymentPermissionDenied().Code)
+}
+
+// A partial grant must not reach the preview list. The list cannot apply the
+// row filter requireProjectListAccess would attach, so the handler refuses
+// before it asks the service.
+func TestListPreviewsRefusesAPartialGrant(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	pool := servicemocks.NewMockPool(ctrl)
+	stmts := servicemocks.NewMockAllStatements(ctrl)
+	pool.EXPECT().Statements().Return(stmts).AnyTimes()
+	stmts.EXPECT().ActiveSystemCatalogID(gomock.Any()).Return(domain.SystemCatalogID, nil)
+	stmts.EXPECT().CheckAuthz(gomock.Any(), gomock.Any()).Return(false, true, nil)
+
+	svcPool := servicemocks.NewMockPool(ctrl)
+	svcStmts := servicemocks.NewMockAllStatements(ctrl)
+	svcPool.EXPECT().Statements().Return(svcStmts).AnyTimes()
+
+	db := service.NewPool(svcPool)
+	h := Handler{
+		pool:              service.NewPool(pool),
+		deploymentService: service.NewDeploymentService(db, service.NewVariableService(db, servicemocks.NewMockKeyService(ctrl))),
+	}
+	member := WithScopeContext(context.Background(), ScopeContext{
+		ProjectID:     "proj_platform",
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   "user_alice",
+	})
+
+	_, err := h.ListPreviews(member, api.ListPreviewsParams{ProjectID: "proj_a"})
+	assertDomainCode(t, err, domain.ErrDeploymentPermissionDenied().Code)
 }

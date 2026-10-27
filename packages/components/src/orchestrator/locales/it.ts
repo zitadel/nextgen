@@ -204,6 +204,14 @@ export const it: Locale = {
   "error.outcome_unhandled": "Non è stato possibile proseguire questo passaggio. Riprova.",
   "error.sign_in_first": "Accedi prima al tuo account.",
 
+  // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione ---
+  "notice.user_not_found":
+    "Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.",
+  "notice.user_already_exists":
+    "Esiste già un account per questo indirizzo e-mail. Accedi per continuare.",
+  "notice.sso_user_not_found":
+    "Non esiste ancora un account per questo accesso: puoi crearne uno ora.",
+
   // --- Errori campo / modulo ---
   "error.email_required": "Inserisci un indirizzo e-mail",
   "error.email_invalid": "Inserisci un indirizzo e-mail valido",
@@ -218,6 +226,8 @@ export const it: Locale = {
   "error.field_format": "Inserisci un valore valido per {0}.",
   "error.field_min_length": "{0} è troppo corto.",
   "error.field_max_length": "{0} è troppo lungo.",
+  "error.field_min_length_value": "{0} deve contenere almeno {1} caratteri.",
+  "error.field_max_length_value": "{0} può contenere al massimo {1} caratteri.",
   "error.field_invalid": "Controlla {0}.",
 
   // --- Alert a livello di modulo ---

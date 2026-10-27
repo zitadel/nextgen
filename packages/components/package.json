@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/components",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lit-based atomic web components and the <zitadel-login> orchestrator for the Zitadel auth UI.",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/components#readme",
   "bugs": {
@@ -57,6 +57,11 @@
       "types": "./dist/manifests.d.mts",
       "import": "./dist/manifests.mjs"
     },
+    "./avatar": {
+      "types": "./dist/avatar.d.mts",
+      "import": "./dist/avatar.mjs"
+    },
+    "./avatar.css": "./dist/avatar.css",
     "./events": {
       "types": "./dist/events.d.mts",
       "import": "./dist/events.mjs"
@@ -78,7 +83,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && attw --pack . --profile=esm-only --exclude-entrypoints=./avatar.css",
     "cem": "cem analyze",
     "test": "node ../../scripts/task-guard.mjs --retries 3 -- vitest run",
     "test:browser": "vitest run --project browser",

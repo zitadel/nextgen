@@ -26,7 +26,12 @@ type EmitSpec struct {
 // (no actor/project scope yet).
 func Emit(ctx context.Context, stmts EventInserter, spec EmitSpec) error {
 	ev := WithEntity(FromContext(ctx, spec.Type, spec.Category), spec.EntityType, spec.EntityID)
-	ev = WithProjectID(ev, spec.ProjectID)
+	// The event belongs to the project the change happened in. For a session
+	// acting on another project that is not the actor's own (ADR 053 §8), so
+	// the spec's project wins over the actor context's.
+	if spec.ProjectID != "" {
+		ev.ProjectID = spec.ProjectID
+	}
 	if spec.SessionID != nil {
 		ev.SessionID = spec.SessionID
 	}

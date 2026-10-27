@@ -49,12 +49,12 @@ root, so the console's API base is correct here by construction. That is what
 `console-embedded` is for.
 
 This lane boots the binary with its embedded console off (Vite serves the
-console here) but its hosted-login surface on: the mux mounts
-`/console/runtime.json` only alongside a UI surface, and that document carries
-the publishable key the login widget needs for the sign-in exchange (see
-[`moon.yml`](../moon.yml)). The proxy forwards it like any other request, and the
-same document names the project the console signs into: the instance's
-first-created project, the harness one. Nothing pins it on the client.
+console here; see [`moon.yml`](../moon.yml)). The mux serves
+`/console/runtime.json` either way, and that document carries the publishable
+key the login widget needs for the sign-in exchange. The proxy forwards it like
+any other request, and the same document names the project the console signs
+into: the instance's first-created project, the harness one. Nothing pins it on
+the client.
 
 ## Embedded-surface coverage
 
@@ -63,19 +63,10 @@ moon run e2e:console-embedded
 ```
 
 Boots the **built Go binary** and nothing else. It serves the console at
-`/ui/console/`, the hosted login shell at `/ui/login/`, and the API at the
-origin root — no Vite, no proxy, no rewrite. This is the only lane that
-exercises the request path a customer gets, and the one that would have caught
-both shipped bugs: the console calling `/api/*` at a mux that never served it,
-and the login shell defaulting to the project id `"demo"`.
-
-Its instance is provisioned, so the login shell's non-happy paths stub
-`/console/runtime.json` per test the way the preview lane does — Console
-ADR 0004 §3 holds for the shell too, and the states it separates ("no project
-yet" vs. a server that cannot answer) are exactly the ones this lane's own
-deployment state cannot produce. The stubbed retry falls through to the real
-server, so recovery is asserted against a genuine document rather than a
-fixture.
+`/ui/console/` and the API at the origin root — no Vite, no proxy, no rewrite.
+This is the only lane that exercises the request path a customer gets, and the
+one that would have caught the console calling `/api/*` at a mux that never
+served it.
 
 Keep feature coverage out of it — that is `console-real`'s job. This lane asserts
 that the surfaces reach the API at all. Management screens work here too: they

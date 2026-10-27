@@ -12,7 +12,7 @@ func (h *Harness) EnsureDeploymentService(t testing.TB) *service.DeploymentServi
 	defer h.deploymentService.mutex.Unlock()
 
 	if h.deploymentService.value == nil {
-		h.deploymentService.value = service.NewDeploymentService(h.EnsureServiceDB(t))
+		h.deploymentService.value = service.NewDeploymentService(h.EnsureServiceDB(t), h.EnsureVariableService(t))
 	}
 	return h.deploymentService.value
 }

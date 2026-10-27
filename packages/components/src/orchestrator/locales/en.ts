@@ -222,6 +222,13 @@ export const en: Record<string, string> = {
   "error.outcome_unhandled": "This step could not continue. Please try again.",
   "error.sign_in_first": "Please sign in to your account first.",
 
+  // --- Notices: why the flow moved between sign-in and sign-up by itself ---
+  "notice.user_not_found":
+    "We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.",
+  "notice.user_already_exists": "That email already has an account. Sign in to continue.",
+  "notice.sso_user_not_found":
+    "There's no account for this sign-in yet, so you can create one now.",
+
   // --- Field / form errors ---
   "error.email_required": "Please enter an email address",
   "error.email_invalid": "Please enter a valid email",
@@ -239,6 +246,8 @@ export const en: Record<string, string> = {
   "error.field_format": "Please enter a valid {0}.",
   "error.field_min_length": "{0} is too short.",
   "error.field_max_length": "{0} is too long.",
+  "error.field_min_length_value": "{0} must be at least {1} characters.",
+  "error.field_max_length_value": "{0} must be at most {1} characters.",
   "error.field_invalid": "Please check {0}.",
 
   // --- Sign-in form-level alert ---

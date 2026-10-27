@@ -683,6 +683,10 @@ describe("setup command pre-flight", () => {
       "--non-interactive",
       "--json",
       "--skip-install",
+      // Setup warns when the app's port is taken, and whatever holds 3000 on
+      // the machine running the tests must not decide what it reports.
+      "--dev-port",
+      "3000",
     ]);
 
     expect(res.exitCode).toBe(0);
@@ -986,11 +990,29 @@ describe("setup summary", () => {
       scaffoldRow({ scaffoldedFramework: false, scaffoldedBesideFiles: false }),
     ).toBeUndefined();
   });
+  it("points at each customizable folder setup wrote, the password policy included", () => {
+    const customize = buildSummary({
+      ...input,
+      scaffoldedFramework: false,
+      scaffoldedBesideFiles: false,
+      writtenRel: [
+        ".zitadel/schemas/default-human-user.json",
+        ".zitadel/flows/default-login.json",
+        ".zitadel/policies/auth.factor.password.set.json",
+      ],
+    }).find((section) => section.title === "Customize");
+
+    expect(customize?.rows.map((row) => row.label)).toEqual([
+      "User schema",
+      "Login flow",
+      "Password policy",
+    ]);
+  });
 });
 
 async function startHealthServer(): Promise<string> {
   const server = createServer((req, res) => {
-    if (req.url === "/healthz") {
+    if (req.url === "/readyz") {
       res.writeHead(200).end("ok");
       return;
     }
@@ -1084,6 +1106,20 @@ async function startCreateProjectCaptureServer(
         JSON.stringify({
           id: "flow_test",
           created_at: "2026-06-01T00:00:00.000Z",
+        }),
+      );
+      return;
+    }
+    if (req.method === "POST" && path === "/policies") {
+      res.writeHead(201, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          id: "pol_test",
+          revision_id: "polrev_test",
+          project_id: "proj_test",
+          operation: "auth.factor.password.set",
+          config: {},
+          created_at: "2026-06-01T00:00:00.000Z",
+          updated_at: "2026-06-01T00:00:00.000Z",
         }),
       );
       return;

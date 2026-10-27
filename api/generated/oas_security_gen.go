@@ -47,13 +47,16 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 
 // operationRolesNextgenSession is a private map storing roles per operation.
 var operationRolesNextgenSession = map[string][]string{
+	AddOriginOperation:             []string{},
 	CompleteClaimOperation:         []string{},
+	CreateDeploymentOperation:      []string{},
 	CreateGrantOperation:           []string{},
 	CreateTeamOperation:            []string{},
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
 	DeleteUserByIDOperation:        []string{},
 	GetBrandingByIdOperation:       []string{},
+	GetDeploymentByIdOperation:     []string{},
 	GetFlowDefinitionOperation:     []string{},
 	GetGrantOperation:              []string{},
 	GetIdpByIdOperation:            []string{},
@@ -63,17 +66,27 @@ var operationRolesNextgenSession = map[string][]string{
 	GetMySessionCsrfTokenOperation: []string{},
 	GetMyUserOperation:             []string{},
 	GetMyUserSchemaOperation:       []string{},
+	GetPolicyOperation:             []string{},
+	GetPolicyRevisionOperation:     []string{},
 	GetProjectOperation:            []string{},
+	GetReleaseByIdOperation:        []string{},
 	GetSchemaByIdOperation:         []string{},
 	GetTeamOperation:               []string{},
 	GetUserByIDOperation:           []string{},
 	GetUserPasswordStateOperation:  []string{},
+	GetVariableOperation:           []string{},
+	GetVariablesOperation:          []string{},
 	ListBrandingOperation:          []string{},
+	ListDeploymentsOperation:       []string{},
 	ListFlowDefinitionsOperation:   []string{},
 	ListMyIdentityLinksOperation:   []string{},
 	ListMyPasskeysOperation:        []string{},
 	ListMyProjectsOperation:        []string{},
 	ListMyTeamsOperation:           []string{},
+	ListPoliciesOperation:          []string{},
+	ListPolicyRevisionsOperation:   []string{},
+	ListProjectAdminsOperation:     []string{},
+	ListReleasesOperation:          []string{},
 	ListSchemasOperation:           []string{},
 	ListUserIdentityLinksOperation: []string{},
 	ListUserPasskeysOperation:      []string{},
@@ -85,7 +98,10 @@ var operationRolesNextgenSession = map[string][]string{
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
 	QueryUsersOperation:            []string{},
+	RemoveOriginOperation:          []string{},
 	RevokeMySessionOperation:       []string{},
+	RevokeReleaseOperation:         []string{},
+	RollbackDeploymentOperation:    []string{},
 	UpdateTeamOperation:            []string{},
 }
 
@@ -206,6 +222,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetPolicyOperation: []string{
+		"policy.read",
+	},
 	GetPolicyRevisionOperation: []string{
 		"policy.read",
 	},
@@ -257,8 +276,17 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	ListIdpRevisionsOperation: []string{
 		"idp.read",
 	},
+	ListPoliciesOperation: []string{
+		"policy.read",
+	},
+	ListPolicyRevisionsOperation: []string{
+		"policy.read",
+	},
 	ListPreviewsOperation: []string{
 		"deployment.read",
+	},
+	ListProjectAdminsOperation: []string{
+		"project.write",
 	},
 	ListReleasesOperation: []string{
 		"release.read",

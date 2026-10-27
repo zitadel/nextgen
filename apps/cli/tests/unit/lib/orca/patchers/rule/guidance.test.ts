@@ -142,10 +142,10 @@ describe("guidance content", () => {
 
   it("tells each framework how its own chrome reads session state", () => {
     // Next: the client helper (works on any page), plus the server-side
-    // auth() with its matcher precondition.
+    // auth(), which the every-route matcher lets read the session anywhere.
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain("@zitadel/sdk-next/session");
-    expect(agents).toContain("`matcher`");
+    expect(agents).toContain("`matcher` covers every route");
     expect(agents).toContain("no-store");
     expect(agents).toContain("401/auth.unauthorized");
     expect(agents).toContain("403/sess.project_mismatch");
@@ -194,6 +194,34 @@ describe("guidance content", () => {
     // The theme knob and (on Next) the JSX-types pointer survive both ways.
     expect(widget).toContain("(`light` | `dark` | `auto`)");
     expect(widget).toContain("@zitadel/sdk-next/jsx");
+  });
+
+  it("leaves the generated files to the app, as doctor does (ADR 042)", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("The app files setup generated are yours to change");
+    expect(agents).toContain("as `edited`, or as `adopted`");
+    expect(agents).toContain("`doctor --fix` restores only a missing file, never one you changed");
+    expect(agents).not.toContain("never change auth behavior");
+  });
+
+  it("points theming at the stable tokens and the forwarded parts, not a copy of them", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("the stable `--zl-*` design tokens");
+    expect(agents).toContain("`zitadel-login::part(<atom>-<part>)`");
+    expect(agents).toContain(
+      "https://preview.zitadel.com/docs/guides/customize-design#style-the-login-from-your-app",
+    );
+    expect(agents).not.toContain("`--zl-font-family-heading`");
+  });
+
+  it("has a heading that replaces the widget's follow the login's steps", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain("moves between sign-in and sign-up by itself");
+    expect(agents).toContain("must follow its `zitadel-flow-step` event");
+    expect(agents).toContain("`step.purpose` is `login` while it signs in");
   });
 
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {

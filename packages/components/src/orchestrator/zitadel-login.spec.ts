@@ -1569,6 +1569,43 @@ describe("<zitadel-login> against the typed Flow API", () => {
     expect(password?.invalid).toBe(true);
   });
 
+  it("says why sign-in moved to sign-up, and names the purpose in the step event", async () => {
+    const element = await mount(host);
+    const steps: unknown[] = [];
+    element.addEventListener("zitadel-flow-step", (event) => {
+      steps.push((event as CustomEvent<{ step: unknown }>).detail.step);
+    });
+    server.use(
+      http.post("*/flow/*/submit", () =>
+        HttpResponse.json({
+          id: "flow_test",
+          session_token: "st_test",
+          step: {
+            name: "register",
+            texts: { title_key: "register.title" },
+            purpose: "register",
+            notice: "notice.user_not_found",
+            fields: [
+              { name: "email", type: "email", text_key: "register.field.email", required: true },
+            ],
+            actions: [{ name: "submit", text_key: "register.action.password", primary: true }],
+            gates: {},
+          },
+          branding: {},
+        }),
+      ),
+    );
+
+    submit(element);
+
+    const notice = await waitFor(() =>
+      element.shadowRoot?.querySelector<ZlAlert>("zl-alert[data-zl-step-message]"),
+    );
+    expect(notice.severity).toBe("info");
+    expect(notice.textContent).toContain("We couldn't find an account for that email");
+    expect(steps.at(-1)).toMatchObject({ name: "register", purpose: "register" });
+  });
+
   it("does not resurrect a dismissed banner during the loading re-render", async () => {
     const element = await mountWithStepErrorBanner(host, "error.user_not_found");
     typeInto(element, "email", "fixed@acme.com");
@@ -1772,9 +1809,10 @@ describe("<zitadel-login> against the typed Flow API", () => {
       // wired to it is the contextual correction beside the account the step
       // names.
       expect(element.shadowRoot?.querySelector('[data-testid="zitadel-action-back"]')).toBeNull();
-      const wired = element.shadowRoot?.querySelectorAll('[data-action="back"]') ?? [];
+      const wired =
+        element.shadowRoot?.querySelectorAll('[data-action="back"], [action="back"]') ?? [];
       expect(Array.from(wired, (el) => el.getAttribute("data-testid"))).toEqual([
-        "zitadel-action-change-account",
+        "zitadel-account",
       ]);
     });
 

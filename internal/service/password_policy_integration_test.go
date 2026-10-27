@@ -29,6 +29,10 @@ func (plainHasher) VerifyHash(encoded, password string) error {
 	return crypto.ErrHashMismatch
 }
 
+func (h plainHasher) VerifyAndRehash(encoded, password string) (string, error) {
+	return "", h.VerifyHash(encoded, password)
+}
+
 // Two self-service changes to the same new password are both checked against
 // the history before either writes. The first lands; the second must not set
 // the password the first one just made current, whether it writes after the

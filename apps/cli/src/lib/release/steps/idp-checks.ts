@@ -1,9 +1,10 @@
 import { isVariableReference, missingEndpoints, referencedVariable } from "@zitadel/config/idp";
 import { idpConnectionConfigSchema } from "@zitadel/config/schemas";
+import { ApiError } from "@zitadel/api/runtime/fetch";
 
 import { ZitadelError } from "../../errors";
 import { IDPS_DIR, refuseResolvedSecret } from "../../idp";
-import { primaryValues } from "../../variables";
+import { valuesOfKind } from "../../variables";
 import type { StepContext } from "../pipeline";
 
 /**
@@ -16,6 +17,9 @@ import type { StepContext } from "../pipeline";
  * server cannot run for us: that a `client_secret` references a variable rather
  * than holding a value, which must fail before anything leaves the machine, and
  * that the variables a connection names are the kind the engine needs.
+ *
+ * A preview is checked the same way, except that its token may not read the
+ * project's variables; that check then belongs to the deploy that merges it.
  */
 export async function validateConnections(ctx: StepContext): Promise<void> {
   const files = ctx.idpFiles;
@@ -32,8 +36,11 @@ export async function validateConnections(ctx: StepContext): Promise<void> {
     return;
   }
   const held = await heldVariables(ctx);
+  if (held === undefined) {
+    return;
+  }
   for (const { body, file } of named) {
-    checkCredentialVariables(body, file, held, ctx.suggest);
+    checkCredentialVariables(body, file, held, ctx.suggest, ctx.mode === "preview");
   }
 }
 
@@ -58,7 +65,7 @@ function validateConnection(data: object, file: string, suggest: StepContext["su
         : "Connection file is not a valid identity provider connection",
       {
         hint: literalSecret
-          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variables set NAME --project-level --secret")}\`.`
+          ? `Use "client_secret": "\${{ NAME }}" and publish the value with \`${suggest("variable set NAME --secret")}\`.`
           : undefined,
         details: { issues: result.error.issues },
       },
@@ -97,12 +104,29 @@ function valueAt(data: object, path: ReadonlyArray<PropertyKey>): unknown {
   return current;
 }
 
-/** The project's variables, by name, and whether each is a secret. */
-async function heldVariables(ctx: StepContext): Promise<Map<string, boolean>> {
-  const held = await ctx.client.getVariables({ project_id: ctx.projectId, kind: "primary" });
+/**
+ * The variables the deploy would freeze, by name, and whether each is a secret:
+ * the primary kind's for a deploy and the preview kind's for a preview, with no
+ * fallback from one to the other (ADR 069). A preview's token may not read them,
+ * which leaves the check to the deploy that merges it.
+ */
+async function heldVariables(ctx: StepContext): Promise<Map<string, boolean> | undefined> {
+  const kind = ctx.mode === "preview" ? "preview" : "primary";
+  let held: Awaited<ReturnType<StepContext["client"]["getVariables"]>>;
+  try {
+    held = await ctx.client.getVariables({ project_id: ctx.projectId, kind });
+  } catch (error) {
+    if (ctx.mode === "preview" && error instanceof ApiError && error.status === 403) {
+      return undefined;
+    }
+    throw error;
+  }
   // A secret reads back as `{ secret: true }`, a plain value as the value.
   return new Map(
-    Object.entries(primaryValues(held)).map(([name, value]) => [name, typeof value === "object"]),
+    Object.entries(valuesOfKind(held, kind)).map(([name, value]) => [
+      name,
+      typeof value === "object",
+    ]),
   );
 }
 
@@ -116,7 +140,12 @@ function checkCredentialVariables(
   file: string,
   held: ReadonlyMap<string, boolean>,
   suggest: StepContext["suggest"],
+  preview: boolean,
 ): void {
+  // A preview freezes the preview kind alone, so the value it lacks is set for
+  // that kind.
+  const setCommand = (name: string, secret: boolean) =>
+    suggest(`variable set ${name}${secret ? " --secret" : ""}${preview ? " --preview" : ""}`);
   const body = connection as {
     oidc?: { client_id?: unknown; client_secret?: unknown };
   };
@@ -148,9 +177,7 @@ function checkCredentialVariables(
         `${file}: ${field} names the variable ${name}, which the project does not have`,
         {
           hint: "Publish it with the command below, then deploy again.",
-          nextCommands: [
-            suggest(`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}`),
-          ],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file },
         },
       );
@@ -163,9 +190,7 @@ function checkCredentialVariables(
           hint: wantsSecret
             ? "The client secret must be a secret variable: publish it with the command below."
             : "The client id must be a plain variable the engine can read back: publish it with the command below, without --secret.",
-          nextCommands: [
-            suggest(`variables set ${name} --project-level${wantsSecret ? " --secret" : ""}`),
-          ],
+          nextCommands: [setCommand(name, wantsSecret)],
           details: { variable: name, field, file, secret: isSecret },
         },
       );

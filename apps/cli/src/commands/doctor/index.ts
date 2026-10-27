@@ -15,9 +15,11 @@ import {
 import type { LocalServers, ManagedRuntimeProcess } from "../../lib/local-server/processes";
 import {
   DEFAULT_LOCAL_SERVER_PORT,
+  LOCAL_RUNTIME_FILE,
   assertLocalStateWritable,
   checkLocalServerHealth,
   defaultLocalServerImageForCliVersion,
+  findUpward,
   localServerUrl,
   readNearestRuntimeMetadata,
   type RuntimeBackend,
@@ -36,6 +38,7 @@ import {
   readZitadelSecret,
 } from "../../lib/project";
 import { listenersForPort } from "../../lib/prober/ports";
+import { isLoopbackUrl } from "../../lib/server";
 import { SANITY_CHECKS, type CheckContext, type CheckOutcome } from "./checks";
 import {
   type EnvironmentSelector,
@@ -72,8 +75,8 @@ const LOCAL_RUNTIME_CHECK_NAMES = new Set([
  */
 export default class Doctor extends BaseCommand {
   static override description = "Verify local runtime and project state.";
-  static override group = CommandGroups.project;
-  static override groupOrder = 3;
+  static override group = CommandGroups.diagnostics;
+  static override groupOrder = 1;
   static override flags = {
     fix: Flags.boolean({ description: "Repair missing files and stale managed wiring." }),
     image: nonBlankString({ description: "Container image to check." }),
@@ -98,7 +101,11 @@ export default class Doctor extends BaseCommand {
     const startDir = resolveCwd(typeof flags.cwd === "string" ? flags.cwd : undefined);
     const hint = await readNearestRuntimeMetadata(startDir).catch(() => undefined);
     const port = flags.port ?? hint?.runtime.port ?? DEFAULT_LOCAL_SERVER_PORT;
-    await this.toMeta(flags, { resolveServer: false, source: localServerUrl(port) });
+    const hostedServer = await hostedServerWithoutLocalRuntime(startDir, flags);
+    await this.toMeta(flags, {
+      resolveServer: false,
+      source: hostedServer ?? localServerUrl(port),
+    });
     const { cwd, dryRun } = this.meta;
     const nearest = await readNearestRuntimeMetadata(cwd);
     const existingRuntime = nearest?.runtime;
@@ -112,14 +119,17 @@ export default class Doctor extends BaseCommand {
       flags.image ??
       this.meta.env.ZITADEL_LOCAL_IMAGE ??
       defaultLocalServerImageForCliVersion(this.meta.cliVersion);
-    const runtimeChecks = await runLocalRuntimeChecks(
-      nearest?.dir ?? cwd,
-      existingRuntime,
-      runtimeBackend,
-      image,
-      port,
-      this.localServers(),
-    );
+    const runtimeChecks =
+      hostedServer === undefined
+        ? await runLocalRuntimeChecks(
+            nearest?.dir ?? cwd,
+            existingRuntime,
+            runtimeBackend,
+            image,
+            port,
+            this.localServers(),
+          )
+        : [];
     const hasConfig = await hasZitadelConfig(cwd);
     const ctx: CheckContext = { cwd, orca: createOrca(), cliVersion: this.meta.cliVersion, dryRun };
 
@@ -197,7 +207,12 @@ export default class Doctor extends BaseCommand {
       : bareResolves
         ? environmentSelectorSuffix({ cwd: cwdFlag, server: projectServer })
         : undefined;
-    const warningAdvice = advisoryForWarnings(warnings, this.meta.cliVersion, claimSelector);
+    const warningAdvice = advisoryForWarnings(
+      warnings,
+      this.meta.cliVersion,
+      claimSelector,
+      selector,
+    );
     // A server that is running is one a sign-in or a request can fail
     // against, and its log is where the reason is.
     const serving =
@@ -222,9 +237,9 @@ export default class Doctor extends BaseCommand {
             ? "Zitadel doctor passed with warnings."
             : "Zitadel doctor passed.",
       ok: failed.length === 0,
-      runtime: runtimeBackend,
-      ...(runtimeBackend === "docker" ? { image } : {}),
-      port,
+      ...(hostedServer === undefined
+        ? { runtime: runtimeBackend, ...(runtimeBackend === "docker" ? { image } : {}), port }
+        : {}),
       project: {
         lifecycle: hasConfig ? "configured" : "not-configured",
       },
@@ -384,7 +399,8 @@ export function failureAdvice(
 
 /**
  * The follow-ups doctor offers for its warnings: the Docker guidance, the claim
- * nudge, the managed-runtime review and a dependency remedy.
+ * nudge, the managed-runtime review, a dependency remedy, the primary issuer
+ * origin and the meta-schema refresh.
  */
 export function advisoryForWarnings(
   warnings: CheckOutcome[],
@@ -394,6 +410,8 @@ export function advisoryForWarnings(
    * reads, or nothing when no selector reaches it.
    */
   local: EnvironmentSelector | undefined,
+  /** This run's selection, which a suggested rerun of doctor carries. */
+  selector: EnvironmentSelector,
 ): { nextActions: string[]; nextCommands: SuggestedCommand[] } | undefined {
   const nextActions: string[] = [];
   const nextCommands: SuggestedCommand[] = [];
@@ -443,6 +461,20 @@ export function advisoryForWarnings(
       "Align the exactly-pinned @zitadel/* dependencies with the CLI version; scaffolded files and guidance target the CLI's train.",
     );
     nextCommands.push(dependencyRemedy);
+  }
+
+  if (warnings.some((check) => check.name === "issuer-origin")) {
+    nextActions.push(
+      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+    );
+    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
+  }
+
+  if (hasRepairableMetaSchemas(warnings.find((check) => check.name === "meta-schemas"))) {
+    nextActions.push(
+      "Write this CLI version's editor schemas into .zitadel/meta/; editors and agents read the dialect from there.",
+    );
+    nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }
 
   if (nextActions.length === 0 && nextCommands.length === 0) {
@@ -514,6 +546,28 @@ async function runEnvironmentChecks(input: {
       return `${server} is reachable and project ${projectId} matches`;
     }),
   ];
+}
+
+/**
+ * The server of a project set up against a hosted server, for which doctor
+ * checks no local runtime: no local server runs for it, so the runtime says
+ * nothing about it, and a port another app holds would fail it. `undefined`
+ * (check the runtime) before setup, for a project on a local server or with a
+ * `zitadel.json` that does not parse, where a server was started in the
+ * directory or a parent, and when a flag asks about the runtime.
+ */
+async function hostedServerWithoutLocalRuntime(
+  cwd: string,
+  flags: { port?: number; runtime?: string; image?: string },
+): Promise<string | undefined> {
+  if (flags.port !== undefined || flags.runtime !== undefined || flags.image !== undefined) {
+    return undefined;
+  }
+  if ((await findUpward(cwd, LOCAL_RUNTIME_FILE)) !== undefined || !(await hasZitadelConfig(cwd))) {
+    return undefined;
+  }
+  const server = await readZitadelConfig(cwd).then(readProjectServer, () => undefined);
+  return server === undefined || isLoopbackUrl(server) ? undefined : server;
 }
 
 /**
@@ -705,7 +759,7 @@ async function checkRuntime(
       );
     }
     if (!(await checkLocalServerHealth(runtime.server_url))) {
-      throw new Error(`${runtime.server_url} did not respond to /healthz`);
+      throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
     return `${runtime.server_url} is healthy`;
   });
@@ -752,6 +806,25 @@ function claimWindowClosed(check: CheckOutcome): boolean {
     typeof details === "object" &&
     details !== null &&
     (details as { claimable?: unknown }).claimable === false
+  );
+}
+
+/**
+ * Whether the meta-schemas warning lists a missing or outdated file that this
+ * CLI's `--fix` writes: not when the project pins a newer `@zitadel/*`
+ * version, whose own doctor writes them. A file behind a symlink, or one the
+ * CLI cannot read, only gets the warning's reason.
+ */
+function hasRepairableMetaSchemas(check: CheckOutcome | undefined): boolean {
+  if (check?.status !== "warn") {
+    return false;
+  }
+  const details = check.details as
+    | { missing?: unknown[]; outdated?: unknown[]; newer_pin?: unknown }
+    | undefined;
+  return (
+    details?.newer_pin === undefined &&
+    (details?.missing?.length ?? 0) + (details?.outdated?.length ?? 0) > 0
   );
 }
 

@@ -57,9 +57,11 @@ Run setup in the directory `start` ran in, or one inside it: setup looks there f
 
 When it scaffolds a new app, setup asks which framework to use. Scripted runs pass `--framework` with one of `next`, `nuxt`, `sveltekit`, `solid-start`, `qwik-router`, `tanstack-start`, `react`, `vue`, `angular`, `solid`, `svelte`, or `qwik`. Setup creates the app only once it has asked all its questions, so cancelling one leaves the directory as it was, and `--dry-run` previews setup without creating the app. If setup fails or you cancel it after it has created the app, it removes the app again, so you can run the same command once more.
 
-Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a one-tap passkey up front, with an email + password fallback). The preset only picks the starting point: the schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
+Setup also asks how users should sign in and scaffolds the matching schema and login flow: `--preset password-first` (the default: email + password) or `--preset passkey-first` (a passkey-led sign-in, with an email + password fallback). The preset only picks the starting point, and both presets enable password and passkey in the schema. A method enabled in the schema is not a credential a user has set up: each user still registers a password or a passkey themselves. The schema and login flow it writes to `.zitadel/schemas/` and `.zitadel/flows/` are yours to edit.
 
 Setup writes the app files, `.env.example`, `.env.local` (read by your app, with the project id and the project secret), `.env.development.local` (read by the CLI: the server, project and credentials), `zitadel.json`, and `.zitadel/**`, adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)), then installs dependencies with the detected package manager unless `--skip-install` is passed.
+
+The pages and the request boundary (Next.js's `proxy.ts`, for example) that setup writes are yours to change. Setup records each one, and `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` brings back only a file that is missing, never one you changed.
 
 Against a local server, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`: there is nothing to [claim](/docs/concepts/project-team-user#claim).
 
@@ -90,6 +92,16 @@ npx @zitadel/cli@latest console
 ```
 
 [Run Zitadel locally](/docs/guides/local-runtime#open-the-console) explains what that link does and how long it lasts.
+
+## Explore every command
+
+Run the CLI with no subcommand to see every command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. Each row is a command or a family of commands: `zitadel users --help` lists what you can do with users, and `zitadel <command> --help` lists a command's options. `zitadel commands` prints every command in one flat list.
 
 ## Customize the login
 

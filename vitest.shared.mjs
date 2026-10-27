@@ -33,7 +33,7 @@ export const baseTest = {
   fileParallelism: true,
   // Fail loud when a suite's include matches nothing (a broken glob or all tests
   // removed), restoring the pre-migration behavior. A genuinely test-less lane
-  // (login-ui) overrides this to `true` in its own config.
+  // overrides this to `true` in its own config.
   passWithNoTests: false,
   // Discover both suffixes under src/, so a package can't silently drop a whole
   // suite by matching only one of *.spec / *.test. Packages whose tests live

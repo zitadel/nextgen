@@ -33,14 +33,17 @@ var rejectedCredentialErrors = []struct {
 	{name: "mismatched token identifiers", err: domain.ErrInvalidTokenIdentifiers()},
 }
 
-// undecidedErrors are IntrospectToken failures that say nothing about the
-// credential, so the security handlers pass them on as internal.
-var undecidedErrors = []struct {
+// serverFaults are IntrospectToken failures that say nothing about the
+// credential because the server failed, so the security handlers pass them on
+// unchanged and the error handler answers each with its own status.
+var serverFaults = []struct {
 	name string
 	err  error
 }{
+	{name: "token store down", err: domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")},
+	{name: "token store unavailable", err: domain.ErrUnavailable().WithParent(errors.New("retry budget spent"))},
+	{name: "token store not implemented", err: domain.ErrNotImplemented()},
 	{name: "key decryption failure", err: domain.ErrDecryptionFailed(errors.New("bad master key"))},
-	{name: "unclassified error", err: errors.New("connection refused")},
 }
 
 func TestHandleOAuth2(t *testing.T) {
@@ -120,8 +123,8 @@ func TestHandleOAuth2(t *testing.T) {
 		require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 	})
 
-	for _, tc := range undecidedErrors {
-		t.Run(tc.name+" is an internal error", func(t *testing.T) {
+	for _, tc := range serverFaults {
+		t.Run(tc.name+" passes on unchanged", func(t *testing.T) {
 			t.Parallel()
 
 			mock := gomock.NewController(t)
@@ -130,10 +133,24 @@ func TestHandleOAuth2(t *testing.T) {
 
 			handler := NewSecurityHandler(tokenService)
 			_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
-			require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-			require.ErrorIs(t, err, domain.ErrInternal(nil))
+			require.Equal(t, tc.err, err)
 		})
 	}
+
+	t.Run("unclassified error is an internal error", func(t *testing.T) {
+		t.Parallel()
+
+		unclassified := errors.New("connection refused")
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, unclassified)
+
+		handler := NewSecurityHandler(tokenService)
+		_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
+		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
+		require.ErrorIs(t, err, unclassified)
+	})
 
 	for _, tc := range rejectedCredentialErrors {
 		t.Run(tc.name+" is an unsatisfied requirement", func(t *testing.T) {
@@ -148,20 +165,6 @@ func TestHandleOAuth2(t *testing.T) {
 			require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		})
 	}
-
-	t.Run("internal introspect error propagates", func(t *testing.T) {
-		t.Parallel()
-
-		storeDown := domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-bearer").Return(nil, storeDown)
-
-		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleOAuth2(t.Context(), api.GetProjectOperation, api.OAuth2{Token: "raw-bearer"})
-		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-		require.ErrorIs(t, err, storeDown)
-	})
 
 	for _, tc := range []struct {
 		name      string
@@ -304,6 +307,18 @@ func TestHandleNextgenSession(t *testing.T) {
 			api.ListMyProjectsOperation,
 			api.GetProjectOperation,
 			api.PatchProjectOperation,
+			api.ListProjectAdminsOperation,
+			// #2320: the project settings page's origin writes and variable
+			// reads, and the policy reads, which a session without a user
+			// answered with the resource's not found before they were listed.
+			api.AddOriginOperation,
+			api.RemoveOriginOperation,
+			api.GetVariablesOperation,
+			api.GetVariableOperation,
+			api.ListPoliciesOperation,
+			api.GetPolicyOperation,
+			api.ListPolicyRevisionsOperation,
+			api.GetPolicyRevisionOperation,
 		} {
 			t.Run(string(op), func(t *testing.T) {
 				t.Parallel()
@@ -328,20 +343,34 @@ func TestHandleNextgenSession(t *testing.T) {
 		}
 	})
 
-	for _, tc := range undecidedErrors {
-		t.Run(tc.name+" is an internal error", func(t *testing.T) {
+	for _, tc := range serverFaults {
+		t.Run(tc.name+" passes on unchanged", func(t *testing.T) {
 			t.Parallel()
 
 			mock := gomock.NewController(t)
 			tokenService := mocks.NewMockTokenService(mock)
-			tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, tc.err)
+			tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(nil, tc.err)
 
 			handler := NewSecurityHandler(tokenService)
-			_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
-			require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-			require.ErrorIs(t, err, domain.ErrInternal(nil))
+			_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+			require.Equal(t, tc.err, err)
 		})
 	}
+
+	t.Run("unclassified error is an internal error", func(t *testing.T) {
+		t.Parallel()
+
+		unclassified := errors.New("connection refused")
+		mock := gomock.NewController(t)
+		tokenService := mocks.NewMockTokenService(mock)
+		tokenService.EXPECT().IntrospectToken(gomock.Any(), "garbage").Return(nil, unclassified)
+
+		handler := NewSecurityHandler(tokenService)
+		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "garbage"})
+		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
+		require.ErrorIs(t, err, domain.ErrInternal(nil))
+		require.ErrorIs(t, err, unclassified)
+	})
 
 	for _, tc := range rejectedCredentialErrors {
 		t.Run(tc.name+" is an unsatisfied requirement", func(t *testing.T) {
@@ -356,20 +385,6 @@ func TestHandleNextgenSession(t *testing.T) {
 			require.ErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
 		})
 	}
-
-	t.Run("internal introspect error propagates", func(t *testing.T) {
-		t.Parallel()
-
-		storeDown := domain.ErrInternal(errors.New("connection refused")).WithMessage("failed to read token record")
-		mock := gomock.NewController(t)
-		tokenService := mocks.NewMockTokenService(mock)
-		tokenService.EXPECT().IntrospectToken(gomock.Any(), "raw-cookie").Return(nil, storeDown)
-
-		handler := NewSecurityHandler(tokenService)
-		_, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
-		require.NotErrorIs(t, err, ogenerrors.ErrSecurityRequirementIsNotSatisfied)
-		require.ErrorIs(t, err, storeDown)
-	})
 
 	t.Run("does not replace oauth2 ScopeContext", func(t *testing.T) {
 		t.Parallel()

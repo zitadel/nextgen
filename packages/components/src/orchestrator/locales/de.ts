@@ -211,6 +211,14 @@ export const de: Locale = {
     "Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.",
   "error.sign_in_first": "Bitte melde dich zuerst bei deinem Konto an.",
 
+  // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt ---
+  "notice.user_not_found":
+    "Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie im E-Mail-Feld unten.",
+  "notice.user_already_exists":
+    "Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich an, um fortzufahren.",
+  "notice.sso_user_not_found":
+    "Für diese Anmeldung gibt es noch kein Konto. Du kannst jetzt eins erstellen.",
+
   // --- Feld- / Formularfehler ---
   "error.email_required": "Bitte gib eine E-Mail-Adresse ein",
   "error.email_invalid": "Bitte gib eine gültige E-Mail-Adresse ein",
@@ -225,6 +233,8 @@ export const de: Locale = {
   "error.field_format": "Bitte gib einen gültigen Wert für {0} ein.",
   "error.field_min_length": "{0} ist zu kurz.",
   "error.field_max_length": "{0} ist zu lang.",
+  "error.field_min_length_value": "{0} muss mindestens {1} Zeichen lang sein.",
+  "error.field_max_length_value": "{0} darf höchstens {1} Zeichen lang sein.",
   "error.field_invalid": "Bitte überprüfe {0}.",
 
   // --- Formular-Alerts ---

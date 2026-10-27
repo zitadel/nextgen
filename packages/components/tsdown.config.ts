@@ -61,6 +61,8 @@ export default defineConfig([
       "atoms/index": "src/atoms/index.ts",
       manifests: "src/manifests.ts",
       events: "src/events.ts",
+      // Lit-free, so the console can share the avatar without the atoms.
+      avatar: "src/avatar.ts",
       "tokens/index": "src/tokens/index.ts",
       "orchestrator/index": "src/orchestrator/index.ts",
       // Not a public subpath. As its own entry it stays a separate file that
@@ -81,6 +83,8 @@ export default defineConfig([
     // (see src/jsx.d.ts).
     copy: [
       "src/jsx.d.ts",
+      // `./avatar.css`: the console paints its avatar with the atom's rules.
+      "src/styles/avatar.css",
       // The retired split/hero designs (#1039), exported as
       // `./legacy-designs/*` for Storybook, which shows them for review.
       { from: "src/orchestrator/__fixtures__/legacy-designs", to: "dist" },

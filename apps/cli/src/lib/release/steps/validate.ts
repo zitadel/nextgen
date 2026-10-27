@@ -8,6 +8,7 @@ import {
 import { assertNoLegacyTemplateKey, readDescriptorTemplate } from "../../branding";
 import { ZitadelError } from "../../errors";
 import { flowEnvRefs } from "../../flows";
+import { POLICIES_DIR, policyFileIssues } from "../../policies";
 import { reportWarning } from "../../warnings";
 import type { Step, StepContext } from "../pipeline";
 import { brandingAssetWarnings } from "./asset-probe";
@@ -46,8 +47,8 @@ export const validateStep: Step = {
 };
 
 /**
- * Parse every schema, flow and branding descriptor against the same Zod the
- * server enforces, before any writing step runs. Without this a malformed
+ * Parse every schema, flow, policy and branding descriptor against the same Zod
+ * the server enforces, before any writing step runs. Without this a malformed
  * schema, flow or branding only fails at `createRelease`, after the IdP-sync
  * step has already written — leaving a half-applied deploy. Errors across
  * every bundle kind aggregate into one `E_VALIDATION`. Branding is parsed from
@@ -74,6 +75,12 @@ function validateBundleShapes(ctx: StepContext): void {
         failures.push(`${handle}: ${issue.path.join(".") || "(root)"} ${issue.message}`);
       }
     }
+  });
+  // A policy file is reported by its path: its operation names it, and a
+  // file named after another operation is itself the problem.
+  (ctx.bundle.policies ?? []).forEach((policy, index) => {
+    const file = `${POLICIES_DIR}/${ctx.policyFiles[index] ?? "(unnamed)"}`;
+    failures.push(...policyFileIssues(policy, file));
   });
   ctx.brandingSources.forEach((descriptor, index) => {
     const handle = `branding #${index + 1}`;

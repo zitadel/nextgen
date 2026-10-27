@@ -1,3 +1,4 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
 import { describe, expect, it } from "vitest";
 
 import type { StepContext } from "../../../../../src/lib/release/pipeline";
@@ -39,9 +40,15 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
   return {
     cwd,
     client: {
-      // Variables read back keyed by kind; these tests hold primary values only.
-      getVariables: async () =>
-        Object.fromEntries(Object.entries(held).map(([name, value]) => [name, { primary: value }])),
+      // Variables read back keyed by kind: these tests hold the same values for
+      // whichever kind the run asks for, unless one stubs its own read.
+      getVariables: async (params: { kind?: string }) =>
+        Object.fromEntries(
+          Object.entries(held).map(([name, value]) => [
+            name,
+            { [params.kind ?? "primary"]: value },
+          ]),
+        ),
       ...(client as object | undefined),
     } as never,
     projectId: "proj_1",
@@ -54,9 +61,11 @@ function ctx(cwd: string, over: Partial<StepContext>, held: object = HELD): Step
       schemas: [],
       flow_definitions: [],
       idps: connections.map((entry) => entry.body),
+      policies: [],
     },
     brandingSources: [],
     idpFiles: connections.map((entry) => entry.name),
+    policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
     ...rest,
   };
@@ -77,6 +86,55 @@ describe("connection checks", () => {
     await expect(validateConnections(ctx(cwd, { dryRun: true }))).rejects.toThrow();
   });
 
+  it("refuses a connection a preview names with a variable the project lacks", async () => {
+    const cwd = project({ "google.json": googleBody() });
+
+    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      code: "E_CREDENTIAL_MISSING",
+    });
+  });
+
+  it("reads the preview kind for a preview, so a primary-only secret does not count", async () => {
+    const cwd = project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? {} : { GOOGLE_CLIENT_SECRET: { primary: { secret: true } } },
+    );
+
+    await expect(
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).rejects.toMatchObject({ code: "E_CREDENTIAL_MISSING" });
+  });
+
+  it("suggests setting the missing credential for the preview kind", async () => {
+    const cwd = project({ "google.json": googleBody() });
+
+    await expect(validateConnections(ctx(cwd, { mode: "preview" }, {}))).rejects.toMatchObject({
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --preview --env staging"],
+    });
+  });
+
+  it("counts a credential the preview kind holds", async () => {
+    const cwd = project({ "google.json": googleBody() });
+    const getVariables = vi.fn(async (params: { kind?: string }) =>
+      params.kind === "preview" ? { GOOGLE_CLIENT_SECRET: { preview: { secret: true } } } : {},
+    );
+
+    await expect(
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
+  });
+
+  it("leaves the variable check to the deploy when a preview's token may not read them", async () => {
+    const cwd = project({ "google.json": googleBody() });
+    const getVariables = vi
+      .fn()
+      .mockRejectedValue(new ApiError(403, "https://api.example/variables", {}, "Forbidden"));
+
+    await expect(
+      validateConnections(ctx(cwd, { mode: "preview", client: { getVariables } as never })),
+    ).resolves.toBeUndefined();
+  });
+
   it("names the deploy's environment in how to publish a literal client_secret", async () => {
     const cwd = project({
       "google.json": googleBody({
@@ -90,7 +148,7 @@ describe("connection checks", () => {
     });
 
     await expect(validateConnections(ctx(cwd, {}))).rejects.toMatchObject({
-      hint: expect.stringContaining("variables set NAME --project-level --secret --env staging"),
+      hint: expect.stringContaining("variable set NAME --secret --env staging"),
     });
   });
 
@@ -151,7 +209,7 @@ describe("connection checks", () => {
     const cwd = project({ "google.json": googleBody() });
 
     await expect(validateConnections(ctx(cwd, {}, {}))).rejects.toMatchObject({
-      nextCommands: ["variables set GOOGLE_CLIENT_SECRET --project-level --secret --env staging"],
+      nextCommands: ["variable set GOOGLE_CLIENT_SECRET --secret --env staging"],
     });
   });
 

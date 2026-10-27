@@ -11,10 +11,10 @@ post:
     also include session_id and that session's session_token to add factors to an existing session.
 
     The project comes from the project secret. A body `project_id` that disagrees
-    answers `403` with `proj.mismatch`. The attempt resolves a deployment the
-    same way as other runtime operations and seals it; with no browser `Origin`
-    and nothing deployed to the resolved target the response is `409` with
-    `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
+    answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
+    filled only when create runs with a runtime resolution already on the
+    context (the flow create path); this HTTP entry point does not resolve
+    Origin or refuse a revoked release itself.
   tags:
     - Authentication Attempts
   security:
@@ -47,24 +47,5 @@ post:
               value:
                 code: proj.mismatch
                 message: 'the project named in the request is not the one the credential belongs to'
-    '409':
-      description: |
-        Nothing is deployed to the resolved target (`rel.not_deployed`), or the
-        release of that deployment is revoked (`rel.revoked`).
-      content:
-        application/json:
-          schema:
-            $ref: ../../components/error-details.yaml
-          examples:
-            not_deployed:
-              summary: No deployment for the resolved target
-              value:
-                code: rel.not_deployed
-                message: 'nothing is deployed to this origin'
-            revoked:
-              summary: The release is revoked
-              value:
-                code: rel.revoked
-                message: 'the release this attempt runs on was revoked'
     default:
       $ref: createAuthAttempt-error-response.yaml

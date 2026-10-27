@@ -26,6 +26,7 @@ import { environmentFlags } from "./environment-flags";
 import { portableSuggestions, type SuggestedCommand } from "../suggestion";
 import { nonBlankString } from "./flags";
 import type { JsonEnvelope } from "./types";
+import { Promptable } from "./promptable";
 
 /** The message `deploy` needs, which only the caller can write. */
 const DEPLOY_MESSAGE = "<what changed>";
@@ -50,7 +51,7 @@ type Target = {
  * credentials. Every other edit is local, and `deploy` publishes it like any
  * configuration change.
  */
-export abstract class AuthMethodCommand extends EnvironmentCommand {
+export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
   // The environment flags are hidden here: most `auth-method` commands only
   // edit files and resolve no environment. The one that publishes credentials
   // to the project lists them among its own flags.
@@ -74,8 +75,10 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * @param options.resolveServer - Whether the command talks to a server.
    *   Off by default: a stopped local runtime must not block staging a change
    *   for a later `deploy`.
-   * @param options.preflight - Checks that must answer before the schema is
-   *   read, with whatever they read handed back as `preflight`.
+   * @param options.preflight - Checks of the flags that must answer before the
+   *   schema is read, with what they read handed back as `preflight`. It must
+   *   not ask a question, use the network or write anything: ask in the
+   *   command's own `run`, after `connect()`.
    */
   protected async target<T = undefined>(
     flags: { schema?: string; cwd?: string },
@@ -106,7 +109,7 @@ export abstract class AuthMethodCommand extends EnvironmentCommand {
    * nobody can be asked. The question goes through `input`, which `--force`
    * answers yes without asking.
    *
-   * A dry run answers before the guard, as it does `variables delete`'s: it
+   * A dry run answers before the guard, as it does `variable rm`'s: it
    * changes nothing, so there is nothing to confirm, and {@link reportOutcome}
    * still warns that the schema would have no way to sign in left.
    *

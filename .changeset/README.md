@@ -21,11 +21,10 @@ server or API change needs one (list `@zitadel/server`) — even from `internal/
 or `api/generated/**` — because it ships new server and SDK versions that belong
 in the release notes.
 
-The console (`apps/console/**`) and login UI (`apps/login-ui/**`) are embedded in
-the server container, so a user-visible change there ships too and needs a
-changeset listing `@zitadel/server`. They publish no npm package of their own —
-that is why they sit in the `ignore` list — but a customer still receives the
-change.
+The console (`apps/console/**`) is embedded in the server container, so a
+user-visible change there ships too and needs a changeset listing
+`@zitadel/server`. It publishes no npm package of its own — that is why it sits
+in the `ignore` list — but a customer still receives the change.
 
 Skip a changeset **only** when the change is *exclusively*:
 
@@ -50,7 +49,7 @@ a customer gets something. Full title rule:
 | If the PR… | Add `.changeset/*.md`? | **Release notes / changeset** | PR title type |
 | --- | --- | --- | --- |
 | Changes shipped product behavior (any path) | **Yes** — real changeset | Name the file; summarize the note. List `@zitadel/server` for server changes | `feat` / `fix` — never `docs` or `chore` |
-| Changes what the console or login UI does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(login)` |
+| Changes what the console does for a user | **Yes** — list `@zitadel/server` | Name the file; summarize the note | `feat(console)` / `fix(console)` |
 | Is *exclusively* tests, generated mocks, docs, CI, or a no-op refactor | **No** | `No changeset required — no shipped behavior changed.` | `test` / `docs` / `ci` / `build` / `chore` / `refactor` — never `feat` or `fix` |
 | Touches a publishable path but ships nothing (rare) | **Empty changeset** | Say why the path changed but nothing ships | Not `feat` or `fix` |
 
@@ -77,6 +76,10 @@ paragraph that starts with `**Breaking:**` ([preview versions](#preview-versions
 For the rare empty changeset (publishable path, nothing ships):
 `corepack pnpm changeset --empty`.
 
+A fix or follow-up to a change that still has a pending `.changeset/*.md` (it
+has not been released) edits that file instead of adding a new one: union the
+packages and keep the higher bump.
+
 ### The summary is the release note
 
 `@changesets/changelog-github` renders that summary **verbatim** into
@@ -85,6 +88,13 @@ there — only a link. So the summary is the copy a customer actually reads, and
 has to stand on its own for someone with no access to this repo.
 
 - Lead with what the reader can now do, or what stopped being broken.
+- A fix is one sentence on what stopped being broken.
+- A feature is a lead sentence naming the command, API or component, with a
+  link to its page under `https://preview.zitadel.com/docs/` rather than a list
+  of every flag.
+- Spend length only on the `**Breaking:**` paragraph (what breaks, what to do)
+  and on upgrade steps, in a paragraph that starts with `**Upgrading …:**`.
+  `scripts/check-changesets-status.mjs` warns when the rest passes 60 words.
 - Name the surface they touch: `zitadel setup`, `<zitadel-login>`,
   `@zitadel/sdk-react`, the console.
 - No ADR numbers, PR numbers, internal file paths, or words like "foundation",

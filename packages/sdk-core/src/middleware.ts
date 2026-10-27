@@ -583,16 +583,51 @@ async function retiresSharedSession(
     return false;
   }
   if (signsOut) {
-    // Logout needs no CSRF token (ADR 053 §5); a call without an Origin is no
-    // cross-site request. A failed revoke still clears the cookie: the
-    // browser no longer holds the session.
-    await fetch(joinURL(upstream.url, "/sessions/me"), {
-      method: "DELETE",
-      headers: { cookie },
-      signal: AbortSignal.timeout(upstream.timeoutMs),
-    }).catch(() => undefined);
+    // A failed revoke still clears the cookie: the browser no longer holds the
+    // session.
+    await revokeSession(cookie, projectId, upstream);
   }
   return true;
+}
+
+/** The header the session's CSRF token travels in (ADR 053 §5). */
+const CSRF_HEADER = "X-Zitadel-CSRF";
+
+/**
+ * Ends the session `cookie` carries, as `@zitadel/components` ends its own.
+ * Sign-out is a write, so it carries the session's CSRF token (ADR 053 §5),
+ * read first from `GET /sessions/me/csrf` in this project: a call without an
+ * Origin passes the server's cross-site check, but not its token check.
+ * Without a token it sends no revoke, which the server would refuse.
+ */
+async function revokeSession(
+  cookie: string,
+  projectId: string,
+  upstream: ProxyUpstream,
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `${joinURL(upstream.url, "/sessions/me/csrf")}?project_id=${encodeURIComponent(projectId)}`,
+      {
+        method: "GET",
+        headers: { cookie },
+        signal: AbortSignal.timeout(upstream.timeoutMs),
+      },
+    );
+    const answer = res.ok
+      ? (parsedJson(await res.text()) as { csrf_token?: unknown } | undefined)
+      : undefined;
+    if (typeof answer?.csrf_token !== "string") {
+      return;
+    }
+    await fetch(joinURL(upstream.url, "/sessions/me"), {
+      method: "DELETE",
+      headers: { cookie, [CSRF_HEADER]: answer.csrf_token },
+      signal: AbortSignal.timeout(upstream.timeoutMs),
+    });
+  } catch {
+    // No answer: the caller clears the cookie all the same.
+  }
 }
 
 /** `text` as JSON, or `undefined` when it is not JSON. */
@@ -1114,6 +1149,15 @@ export interface ResolveSessionOptions {
   readonly allowedTokenTypes: readonly string[];
   readonly jwksTimeoutMs: number | undefined;
   readonly opaqueTokenTimeoutMs: number;
+  /**
+   * Whether an opaque session cookie is checked with the backend, a call to
+   * the server on every request. `false` leaves it to a render layer that
+   * checks the session itself, as sdk-next's `auth()` does: the result hands
+   * the token on as {@link ResolvedSession.unchecked}. A JWT is judged either
+   * way, without a call.
+   * @default true
+   */
+  readonly checkOpaqueSession?: boolean;
 }
 
 /** A request's session, as {@link resolveSession} judged it. */
@@ -1138,6 +1182,13 @@ export interface ResolvedSession {
    * request in, which was never judged.
    */
   readonly cookies: readonly SessionCookie[];
+  /**
+   * The opaque session token the backend was not asked about, when
+   * {@link ResolveSessionOptions.checkOpaqueSession} is `false`. The request
+   * counts as signed out here and its cookie is left as it is: whatever reads
+   * the session next checks the token itself.
+   */
+  readonly unchecked?: string;
 }
 
 function signedOut(): UnauthState {
@@ -1248,7 +1299,8 @@ async function judgeJwt(
  *   re-check JWT claims.
  * - Any other session cookie is checked by the backend
  *   ({@link checkOpaqueSessionToken}) and signs its user in when the session
- *   is live in this project.
+ *   is live in this project. With `checkOpaqueSession: false` it is not: the
+ *   result hands it on unchecked, and touches no cookie.
  * - Only a cookie that held a dead session is cleared: one the backend refused,
  *   or a JWT that fails verification or names no user of this project. When
  *   the backend gives no verdict, the result says so
@@ -1293,6 +1345,10 @@ export async function resolveSession(
       return { auth: judged.auth, undecided: false, cookies: moved(judged.maxAge) };
     }
     return { auth: signedOut(), undecided: false, cookies: judged.dead ? cleared() : [] };
+  }
+
+  if (options.checkOpaqueSession === false) {
+    return { auth: signedOut(), undecided: false, cookies: [], unchecked: stored.token };
   }
 
   const check = await checkOpaqueSessionToken(stored.token, url, opaqueTokenTimeoutMs, projectId);

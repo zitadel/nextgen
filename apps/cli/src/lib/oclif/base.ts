@@ -7,7 +7,6 @@ import consola from "consola";
 
 import { toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
-import { type Asker, input as askInput } from "../input";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
 import { resolveCwd } from "../paths";
@@ -25,6 +24,7 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
+  VERCEL_EVENT_KEYS,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import type {
@@ -182,16 +182,6 @@ export abstract class BaseCommand extends Command {
   }
 
   /**
-   * Asks for a value, a choice or a confirmation: the one way a command takes
-   * input. It is {@link askInput} with this invocation's interactivity
-   * (`--non-interactive`, `--json`, no terminal) and `--force` filled in, so a
-   * command states only the question. See {@link askInput} for the order the
-   * answer is looked for in and what is thrown when there is none.
-   */
-  protected readonly input: Asker = (question) =>
-    askInput(question, { interactive: !this.meta.nonInteractive, force: this.meta.force });
-
-  /**
    * A `zitadel` command that does not target a project, in the public `npx`
    * form: `setup`, `start`, `doctor`, the local runtime. A command that talks
    * to a project suggests through `EnvironmentCommand.suggest` instead, which
@@ -284,8 +274,8 @@ export abstract class BaseCommand extends Command {
    * current {@link meta}. Guarded so a command that resolves meta more than once
    * does not double-count. Also called from {@link catch} so a failure thrown
    * before {@link toMeta} finished (e.g. server resolution, flag parsing) still
-   * records the run. Returns early for an inert (opted-out / no-token /
-   * test-runner) instance so a disabled run never builds the property bags —
+   * records the run. Returns early for an inert (opted-out / test-runner /
+   * nowhere to send) instance so a disabled run never builds the property bags —
    * no timezone→country resolution or URL parsing for users who opted out. The
    * anonymous device profile is install-level and stable, so it is written only
    * on first run rather than paying a `people.set` request on every command.
@@ -312,7 +302,12 @@ export abstract class BaseCommand extends Command {
     if (this.telemetry) {
       return;
     }
-    this.telemetry = this.createTelemetry({ env: process.env, flag, debug: this.meta.debug });
+    this.telemetry = this.createTelemetry({
+      env: process.env,
+      flag,
+      debug: this.meta.debug,
+      vercelKeys: VERCEL_EVENT_KEYS,
+    });
     if (!this.telemetry.enabled) {
       return;
     }
@@ -371,6 +366,9 @@ export abstract class BaseCommand extends Command {
     if (rendered !== "") {
       this.log(rendered);
     }
+    if (normalized.status === "ok" && normalized.footer !== undefined) {
+      this.log(`\n${normalized.footer}`);
+    }
     // Reported warnings were printed when they happened, so they join the
     // envelope only: printing them again here would show them twice.
     const reported = takeReportedWarnings();
@@ -406,7 +404,10 @@ export abstract class BaseCommand extends Command {
     }
     if (this.jsonEnabled()) {
       this.logJson(withWarnings(toErrorEnvelope(zitadelError, meta), takeReportedWarnings()));
-    } else {
+    } else if (zitadelError.code !== "E_CANCELLED") {
+      // Ctrl-C is the person's own decision, and the terminal already shows it
+      // (`^C`, or a cancelled prompt's "Cancelled."), so it gets no error
+      // block. The exit code still says the command did not finish.
       this.logToStderr(renderError(zitadelError, meta));
     }
     return this.exit(zitadelError.exitCode);

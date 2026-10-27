@@ -67,7 +67,7 @@ describe("nodeEnginesRange", () => {
     expect(nodeEnginesRange(CREATE_VITE_NODE_ENGINES, "/tmp/proj", "linux")).toBe(">=1.0.0");
     expect(mockSpawn.mock.calls[0]?.slice(0, 2)).toEqual([
       "npm",
-      ["view", "create-vite@latest", "engines.node"],
+      ["view", "create-vite@9.3.1", "engines.node"],
     ]);
   });
 });

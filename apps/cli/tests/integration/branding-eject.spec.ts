@@ -71,8 +71,9 @@ describe("branding eject", () => {
 
         const data = await app.deployData();
 
-        // The scaffold's schema and flow, plus the ejected branding.
-        expect(data.resources).toBe(3);
+        // The scaffold's schema, flow and password policy, plus the ejected
+        // branding.
+        expect(data.resources).toBe(4);
       });
 
       it("re-deploys the same release once the design is published", async () => {

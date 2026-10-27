@@ -227,6 +227,21 @@ describe("toZitadelError", () => {
     );
   });
 
+  it("tells a server without the operation from a wrong server", () => {
+    const err = new ApiError(
+      404,
+      "http://localhost:8080/widgets",
+      { code: "req.not_found", message: "No API operation matches this path." },
+      "GET http://localhost:8080/widgets returned 404",
+    );
+    const result = toZitadelError(err);
+    expect(result.code).toBe("E_NOT_FOUND");
+    expect(result.message).toBe(
+      "http://localhost:8080/widgets has no such endpoint on this Zitadel server",
+    );
+    expect(result.hint).toContain("different versions");
+  });
+
   it("falls back to the fetch-layer message when the body is not an envelope", () => {
     const err = new ApiError(
       502,

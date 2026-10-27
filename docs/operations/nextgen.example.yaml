@@ -24,8 +24,6 @@ server:
   #     #   -----END PRIVATE KEY-----
   console_enabled: true
   console_path: /ui/console
-  login_enabled: true
-  login_path: /ui/login
   # Public origin browsers reach this deployment at; feeds the claim and
   # dashboard URLs. Set to http://localhost:8080 when running the server
   # locally by hand (env: NEXTGEN_SERVER_PUBLIC_BASE).
@@ -43,8 +41,8 @@ server:
 password_hasher:
   # Algorithm used to hash new passwords/secrets. Defaults to argon2id
   # (RFC 9106). Existing hashes made with any of the verifiers below still
-  # validate and are transparently rehashed to the hasher algorithm on the
-  # next successful verification.
+  # validate. The next successful sign-in rehashes them to the project's
+  # method, or to this one when the project chose none.
   hasher:
     algorithm: argon2id
     # RFC 9106 second recommended option.

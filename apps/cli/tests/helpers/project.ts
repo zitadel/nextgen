@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { promisify } from "node:util";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
 
@@ -122,6 +122,16 @@ export interface RegisteredIdp {
   readonly id: string;
   readonly slug: string;
 }
+
+export interface PublishedPolicy {
+  readonly id: string;
+  readonly operation: string;
+  readonly revision_id: string;
+  readonly config: Readonly<Record<string, number>>;
+}
+
+/** The operation the password policy guards, and its file's name. */
+export const PASSWORD_POLICY = "auth.factor.password.set";
 
 /**
  * What a command did to the project, as a tree rather than as content.
@@ -617,6 +627,13 @@ export class ScaffoldedApp {
     return this.envelopeOf<DeployResult>(result).data;
   }
 
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
@@ -673,15 +690,19 @@ export class ScaffoldedApp {
   }
 
   /** Sets a project variable, whose value is piped rather than passed as a flag. */
-  setVariable(name: string, value: string, { secret = false } = {}): Promise<CliResult> {
+  setVariable(
+    name: string,
+    value: string,
+    { secret = false, preview = false } = {},
+  ): Promise<CliResult> {
     return this.pipingStdin(value, () =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--json",
         ...(secret ? ["--secret"] : []),
+        ...(preview ? ["--preview"] : []),
       ]),
     );
   }
@@ -693,10 +714,9 @@ export class ScaffoldedApp {
   setVariableWithNothingPiped(name: string, { secret = false } = {}): Promise<CliResult> {
     return this.withKeyboardOnStdin(() =>
       this.cli([
-        "variables",
+        "variable",
         "set",
         name,
-        "--project-level",
         "--non-interactive",
         "--json",
         ...(secret ? ["--secret"] : []),
@@ -729,8 +749,8 @@ export class ScaffoldedApp {
     return this.cli(["api", "ls", ...args, "--non-interactive"]);
   }
 
-  getVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "get", name, "--project-level", "--json"]);
+  getVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli(["variable", "get", name, "--json", ...(preview ? ["--preview"] : [])]);
   }
 
   /** Adds one origin pattern to the project. */
@@ -753,6 +773,23 @@ export class ScaffoldedApp {
     }
   }
 
+  /**
+   * Leaves the app's origins as `zitadel setup` 0.1.0 registered them: its
+   * issuer a preview origin and nothing primary, on the project and in
+   * `.zitadel/secret`.
+   */
+  async hasItsIssuerAsAPreviewOrigin(): Promise<void> {
+    expect(await this.removeOrigin(SETUP_ORIGIN.pattern), "removing the issuer").toSucceed();
+    expect(await this.addOrigin(SETUP_ORIGIN.pattern, "preview"), "adding it back").toSucceed();
+    await this.editDocument<{ primary_origins: string[]; preview_origins: string[] }>(
+      ".zitadel/secret",
+      (secret) => {
+        secret.primary_origins = [];
+        secret.preview_origins = [SETUP_ORIGIN.pattern];
+      },
+    );
+  }
+
   /** The origin patterns the project admits, read back through `origin list`. */
   async projectOrigins(): Promise<ProjectOrigin[]> {
     const result = await this.cli(["origin", "list", "--json"]);
@@ -760,13 +797,35 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ items: ProjectOrigin[] }>(result).data.items;
   }
 
-  deleteVariable(name: string): Promise<CliResult> {
-    return this.cli(["variables", "delete", name, "--project-level", "--force", "--json"]);
+  removeVariable(name: string, { preview = false } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "rm",
+      name,
+      "--force",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+  }
+
+  /** The variables a target's live deployment froze, read through `variable resolve`. */
+  resolveVariables({ origin }: { origin?: string } = {}): Promise<CliResult> {
+    return this.cli([
+      "variable",
+      "resolve",
+      "--json",
+      ...(origin === undefined ? [] : ["--origin", origin]),
+    ]);
   }
 
   /** The providers the platform has registered. */
   registeredIdps(): Promise<RegisteredIdp[]> {
     return this.listed<RegisteredIdp>("idps");
+  }
+
+  /** The policies the platform holds, each at its newest revision. */
+  publishedPolicies(): Promise<PublishedPolicy[]> {
+    return this.listed<PublishedPolicy>("policies");
   }
 
   publishedSchemas(): Promise<PublishedSchema[]> {
@@ -792,9 +851,14 @@ export class ScaffoldedApp {
    * than a ladder, so this is the project's own set and not a merge of
    * anything an environment holds.
    */
-  async projectVariables(): Promise<ProjectVariable[]> {
-    const result = await this.cli(["variables", "list", "--project-level", "--json"]);
-    expect(result, "variables list should have succeeded").toSucceed();
+  async projectVariables({ preview = false } = {}): Promise<ProjectVariable[]> {
+    const result = await this.cli([
+      "variable",
+      "list",
+      "--json",
+      ...(preview ? ["--preview"] : []),
+    ]);
+    expect(result, "variable list should have succeeded").toSucceed();
     return this.envelopeOf<{ items: ProjectVariable[] }>(result).data.items;
   }
 
@@ -931,6 +995,14 @@ export class ScaffoldedApp {
     await this.setVariable(`${prefix}_CLIENT_SECRET`, "a-client-secret", { secret: true });
   }
 
+  /**
+   * Removes one editor schema setup wrote, as a project set up by a CLI that
+   * did not ship that dialect yet would lack it.
+   */
+  lacksEditorSchema(dialect: string): Promise<void> {
+    return this.deleteProjectFile(`.zitadel/meta/${dialect}.json`);
+  }
+
   /** Removes a committed connection file, as the developer owning it would. */
   removeConnection(slug: string): Promise<void> {
     return this.deleteProjectFile(`.zitadel/idps/${slug}.json`);
@@ -940,6 +1012,31 @@ export class ScaffoldedApp {
   async renameConnection(slug: string, name: string): Promise<void> {
     await this.copyConnection(slug, name);
     await this.removeConnection(slug);
+  }
+
+  /**
+   * Writes the password policy file, as the developer owning it would: named
+   * after its operation unless `name` says otherwise.
+   */
+  async writePasswordPolicy(
+    config: Record<string, number>,
+    { name = PASSWORD_POLICY, extra = {} }: { name?: string; extra?: Record<string, unknown> } = {},
+  ): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      this.policyFile(name),
+      `${JSON.stringify({ $schema: "../meta/policy.json", operation: PASSWORD_POLICY, config, ...extra }, null, 2)}\n`,
+    );
+  }
+
+  /** Removes the committed password policy file, as the developer owning it would. */
+  removePasswordPolicy(): Promise<void> {
+    return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
+  }
+
+  /** The project-relative path of a policy file, as a command reports it. */
+  policyFile(name: string = PASSWORD_POLICY): string {
+    return `.zitadel/policies/${name}.json`;
   }
 
   /** Edits the committed login flow, as the developer owning it would. */
@@ -983,6 +1080,28 @@ export class ScaffoldedApp {
         created_at: "2026-01-01T00:00:00.000Z",
       }),
     );
+  }
+
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
+      project_id: string;
+      project_secret: string;
+      preview_secret: string;
+    };
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
   }
 
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */

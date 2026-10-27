@@ -6,6 +6,8 @@
 @import "fumadocs-ui/css/generated/spacious.css";
 @import "fumadocs-ui/css/preset.css";
 @import "fumadocs-openapi/css/preset.css";
+/* The live examples' controls (components/examples). */
+@import "@fumadocs/story/css/preset.css";
 /* The console's palette: the --zl-* variables, dark on :root and light under
    [data-theme="light"], which the theme switch sets (app/layout.tsx). */
 @import "@zitadel/design-tokens/css/tokens.css";

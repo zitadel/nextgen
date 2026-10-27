@@ -25,6 +25,10 @@ import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
 import OriginRm from "./commands/origin/rm";
+import Preview from "./commands/preview/index";
+import PreviewList from "./commands/preview/list";
+import PreviewRm from "./commands/preview/rm";
+import Pull from "./commands/pull";
 import ReleaseCreate from "./commands/release/create";
 import ReleaseRevoke from "./commands/release/revoke";
 import Reset from "./commands/reset";
@@ -34,10 +38,11 @@ import Setup from "./commands/setup/index";
 import Start from "./commands/start";
 import Status from "./commands/status";
 import Stop from "./commands/stop";
-import VariablesDelete from "./commands/variables/delete";
-import VariablesGet from "./commands/variables/get";
-import VariablesList from "./commands/variables/list";
-import VariablesSet from "./commands/variables/set";
+import VariableGet from "./commands/variable/get";
+import VariableList from "./commands/variable/list";
+import VariableResolve from "./commands/variable/resolve";
+import VariableRm from "./commands/variable/rm";
+import VariableSet from "./commands/variable/set";
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -57,6 +62,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   eject: Eject,
   env: Env,
   logs: Logs,
+  preview: Preview,
+  pull: Pull,
   reset: Reset,
   resources: ResourcesList,
   setup: Setup,
@@ -80,11 +87,14 @@ export const COMMANDS: Record<string, typeof Command> = {
   "origin:add": OriginAdd,
   "origin:list": OriginList,
   "origin:rm": OriginRm,
+  "preview:list": PreviewList,
+  "preview:rm": PreviewRm,
   "release:create": ReleaseCreate,
   "release:revoke": ReleaseRevoke,
-  "variables:list": VariablesList,
-  "variables:get": VariablesGet,
-  "variables:set": VariablesSet,
-  "variables:delete": VariablesDelete,
+  "variable:set": VariableSet,
+  "variable:get": VariableGet,
+  "variable:list": VariableList,
+  "variable:rm": VariableRm,
+  "variable:resolve": VariableResolve,
   ...RESOURCE_COMMANDS,
 };

@@ -24,8 +24,8 @@ type CreateBrandingInput struct {
 }
 
 // BrandingService publishes and resolves immutable branding revisions
-// (ADR 040). Revisions are create-only; flow responses resolve the latest
-// revision per project.
+// (ADR 040). Revisions are create-only. Flow responses resolve through
+// [ResolveFlowBranding].
 type BrandingService struct {
 	v2Pool *DB
 }
@@ -172,6 +172,28 @@ func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *d
 		return nil, nil
 	}
 	return result.Items[0], nil
+}
+
+// flowBrandingReader is the branding lookups a flow response needs.
+type flowBrandingReader interface {
+	Get(ctx context.Context, projectID, id string) (*domain.Branding, error)
+	GetLatest(ctx context.Context, projectID string) (*domain.Branding, error)
+}
+
+// ResolveFlowBranding returns the branding revision a flow response should
+// carry. A release that pins a flow returns the revision it pins, or nil
+// when it pins none. Otherwise it returns the newest revision, or nil when
+// the project has none. The caller serves the built-in default for a nil
+// revision or a failed read.
+func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) (*domain.Branding, error) {
+	if ReleasePinsFlow(ctx) {
+		id, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
+		if !ok {
+			return nil, nil
+		}
+		return reader.Get(ctx, projectID, id)
+	}
+	return reader.GetLatest(ctx, projectID)
 }
 
 // maxBrandingListRevisions caps the list response: revisions accumulate

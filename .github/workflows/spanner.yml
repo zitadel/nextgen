@@ -58,8 +58,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      # server:test-spanner depends on console:build and login-ui:build, which
-      # the Go //go:embed needs.
+      # server:test-spanner depends on console:build, which the Go //go:embed
+      # needs.
       - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 

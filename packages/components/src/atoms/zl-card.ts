@@ -24,9 +24,10 @@ import { baseHostStyles, surfaceStyles } from "../styles/index.js";
  *
  *   Internal gaps:
  *     header    6px — title → description stack
- *     body      28px — field group → action group. The groups carry their own
- *               tighter gaps (12px) from the orchestrator's layout chrome,
- *               because the card only sees a flat slot.
+ *     body      20px — account → field group → action group. The groups
+ *               carry their own gaps (20px between fields, 12px between
+ *               actions) from the orchestrator's layout chrome, because the
+ *               card only sees a flat slot.
  */
 @customElement("zl-card")
 export class ZlCard extends LitElement {

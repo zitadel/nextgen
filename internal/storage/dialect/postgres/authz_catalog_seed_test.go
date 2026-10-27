@@ -50,6 +50,10 @@ WHERE catalog_kind = 'system' AND owner_id = $1 AND status = 'active'`,
 			{"project", "viewer"},
 			{"project", "editor"},
 			{"project", "admin"},
+			// ADR 075: the platform operator and the implied tupleset it
+			// reaches every project through.
+			{"platform", "operator"},
+			{"project", "platform"},
 		}
 		rows, err := testPool.pool.Query(ctx, `
 SELECT object_type, relation FROM zitadel_nextgen.authz_relations
@@ -71,24 +75,27 @@ WHERE catalog_id = $1 ORDER BY object_type, relation`, domain.SystemCatalogID)
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
 SELECT COUNT(*) FROM zitadel_nextgen.authz_expression_edges
 WHERE catalog_id = $1`, domain.SystemCatalogID).Scan(&edgeCount))
-		// team.member and project.team direct, and direct + one rewrite on each
-		// of viewer (→ editor), editor (→ admin) and admin (TTU on project.team).
-		assert.Equal(t, 8, edgeCount)
+		// team.member, project.team, platform.operator and project.platform
+		// direct; direct + one rewrite on each of viewer (→ editor) and editor
+		// (→ admin); direct + two on admin (TTU on project.team and on
+		// project.platform).
+		assert.Equal(t, 11, edgeCount)
 
 		var refCount int
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
 SELECT COUNT(*) FROM zitadel_nextgen.authz_relation_references
 WHERE catalog_id = $1`, domain.SystemCatalogID).Scan(&refCount))
-		// team.member←user, project.team←team, and user + team#member on each
-		// of viewer, editor and admin.
-		assert.Equal(t, 8, refCount)
+		// team.member←user, project.team←team, platform.operator←user,
+		// project.platform←platform, and user + team#member on each of viewer,
+		// editor and admin.
+		assert.Equal(t, 10, refCount)
 
 		var identityCount int
 		require.NoError(t, testPool.pool.QueryRow(ctx, `
 SELECT COUNT(*) FROM zitadel_nextgen.authz_relation_closure
 WHERE catalog_id = $1 AND from_object_type = to_object_type AND from_relation = to_relation AND depth = 0`,
 			domain.SystemCatalogID).Scan(&identityCount))
-		assert.Equal(t, 5, identityCount)
+		assert.Equal(t, 7, identityCount)
 
 		// Roles are monotonic (ADR 054 §5): admin closes to editor and viewer,
 		// editor to viewer, and nothing closes upward. An exact match of the

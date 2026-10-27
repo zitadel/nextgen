@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, SETUP_ORIGIN } from "../helpers/project";
+import { aSetUpApp, PASSWORD_POLICY, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -57,6 +57,54 @@ describe("deploy", () => {
         expect(second.content_hash).toBe(first.content_hash);
       });
 
+      it("publishes a policy file, and an edit of it as a new revision of the same policy", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        expect(await app.publish()).toSucceed();
+        const [first] = await app.publishedPolicies();
+
+        await app.writePasswordPolicy({ min_length: 14 });
+        expect(await app.deploy()).toSucceed();
+
+        const [edited] = await app.publishedPolicies();
+        expect(first).toMatchObject({ operation: PASSWORD_POLICY, config: { min_length: 12 } });
+        expect(edited).toMatchObject({ id: first?.id, config: { min_length: 14 } });
+        expect(edited?.revision_id).not.toBe(first?.revision_id);
+      });
+
+      it("stops before sending a policy file with a value outside its bounds", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        const before = await app.publishedPolicies();
+        await app.writePasswordPolicy({ min_length: 0 });
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+        expect(await app.publishedPolicies()).toEqual(before);
+      });
+
+      it("stops before sending a policy file not named after its operation", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.writePasswordPolicy({ min_length: 12 }, { name: "password" });
+
+        const result = await app.deploy();
+
+        expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("is refused by the server for a policy whose settings contradict each other", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.writePasswordPolicy({ min_length: 20, max_length: 10 });
+
+        const result = await app.deploy();
+
+        expect(result).toFail();
+        expect(result.stdout + result.stderr).toContain("pol.invalid");
+      });
+
       it("requires -m when non-interactive", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
@@ -82,6 +130,15 @@ describe("deploy", () => {
         const result = await app.deploy();
 
         expect(result).toFailWith("E_VALIDATION");
+      });
+
+      it("points a project whose issuer setup 0.1.0 registered as a preview origin at doctor --fix", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest("doctor --fix");
       });
 
       it("checks for a primary origin before syncing IdP connections", async () => {
@@ -136,7 +193,7 @@ describe("deploy", () => {
           clientId: "1234-abc.apps.googleusercontent.com",
           secret: "the-client-secret",
         });
-        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.removeVariable("GOOGLE_CLIENT_SECRET");
         await app.removeOrigin(SETUP_ORIGIN.pattern);
 
         const result = await app.deploy();
@@ -152,7 +209,7 @@ describe("deploy", () => {
           clientId: "1234-abc.apps.googleusercontent.com",
           secret: "the-client-secret",
         });
-        await app.deleteVariable("GOOGLE_CLIENT_SECRET");
+        await app.removeVariable("GOOGLE_CLIENT_SECRET");
 
         const result = await app.deploy();
 

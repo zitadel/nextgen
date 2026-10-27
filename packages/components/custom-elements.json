@@ -15,6 +15,22 @@
       "exports": [
         {
           "kind": "js",
+          "name": "ZlAccount",
+          "declaration": {
+            "name": "ZlAccount",
+            "module": "./zl-account.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAccountManifest",
+          "declaration": {
+            "name": "zlAccountManifest",
+            "module": "./zl-account.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ZlAlert",
           "declaration": {
             "name": "ZlAlert",
@@ -27,6 +43,22 @@
           "declaration": {
             "name": "zlAlertManifest",
             "module": "./zl-alert.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "./zl-avatar.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
+            "module": "./zl-avatar.js"
           }
         },
         {
@@ -329,6 +361,144 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/atoms/zl-account.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Atom: `<zl-account>` — the account a step signs in to, as a full-width chip.\n\nValues:\n\n  height      36px (`--zl-spacing-9`), the height of a field\n  padding     6px start beside the avatar, 12px without it; 12px end\n  radius      `--zl-radius-md` × 2.25: a pill by default, following the\n              brand's radius (square with `none`)\n  gap         8px\n  border      1px `--zl-border`; `--zl-accent` behind it on hover\n  font        `--zl-text-sm-*`, the identifier at `--zl-font-weight-medium`\n\nThe template decides what it shows, per step:\n\n  identifier  what the visitor typed; never a user id, so the chip\n              confirms no account\n  avatar      the `<zl-avatar>` generated from `identifier`. Leave it off\n              where no account exists yet, such as a sign-up step.\n  action      the flow action the whole chip runs, typically the step's\n              `back`; it then shows a swap icon. Without one the chip is\n              static.\n  label       what the action does, for its accessible name and tooltip\n              (atoms do not translate)\n\nA long identifier ends in an ellipsis; the accessible name carries it whole.",
+          "name": "ZlAccount",
+          "members": [
+            {
+              "kind": "field",
+              "name": "identifier",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "attribute": "identifier"
+            },
+            {
+              "kind": "field",
+              "name": "action",
+              "type": {
+                "text": "string | undefined"
+              },
+              "default": "undefined",
+              "attribute": "action"
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "type": {
+                "text": "string | undefined"
+              },
+              "default": "undefined",
+              "attribute": "label"
+            },
+            {
+              "kind": "field",
+              "name": "avatar",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "attribute": "avatar",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "handleClick",
+              "privacy": "private"
+            }
+          ],
+          "events": [
+            {
+              "type": {
+                "text": "CustomEvent<ZlSubmitDetail>"
+              },
+              "description": "The chip was activated; carries its `action`.",
+              "name": "zl-submit"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "identifier",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "fieldName": "identifier"
+            },
+            {
+              "name": "action",
+              "type": {
+                "text": "string | undefined"
+              },
+              "default": "undefined",
+              "fieldName": "action"
+            },
+            {
+              "name": "label",
+              "type": {
+                "text": "string | undefined"
+              },
+              "default": "undefined",
+              "fieldName": "label"
+            },
+            {
+              "name": "avatar",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "fieldName": "avatar"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "zl-account",
+          "customElement": true
+        },
+        {
+          "kind": "variable",
+          "name": "zlAccountManifest",
+          "type": {
+            "text": "{\n  tag: \"zl-account\",\n  attrs: [\"identifier\", \"action\", \"label\", \"avatar\"],\n  parts: [\"chip\"],\n  slots: [],\n  events: [\"zl-submit\"],\n}"
+          },
+          "default": "{ tag: \"zl-account\", attrs: [\"identifier\", \"action\", \"label\", \"avatar\"], parts: [\"chip\"], slots: [], events: [\"zl-submit\"], }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ZlAccount",
+          "declaration": {
+            "name": "ZlAccount",
+            "module": "src/atoms/zl-account.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "zl-account",
+          "declaration": {
+            "name": "ZlAccount",
+            "module": "src/atoms/zl-account.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAccountManifest",
+          "declaration": {
+            "name": "zlAccountManifest",
+            "module": "src/atoms/zl-account.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/atoms/zl-alert.ts",
       "declarations": [
         {
@@ -445,6 +615,78 @@
           "declaration": {
             "name": "zlAlertManifest",
             "module": "src/atoms/zl-alert.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/atoms/zl-avatar.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Atom: `<zl-avatar>` — a person's generated avatar, the gradient the console\nshows for the same identifier (`src/avatar.ts`).\n\nValues:\n\n  size        24px (`--zl-spacing-6`); a template resizes the host\n  radius      full\n  surface     two `--zl-gradient-*-start` colours picked from `seed`\n\n`seed` is what the visitor typed, never a user id: the login must not\nconfirm that an account exists.\n\nDecorative: the identifier always sits beside it, so it is hidden from\nassistive technology.",
+          "name": "ZlAvatar",
+          "members": [
+            {
+              "kind": "field",
+              "name": "seed",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "attribute": "seed"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "seed",
+              "type": {
+                "text": "string"
+              },
+              "default": "\"\"",
+              "fieldName": "seed"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "zl-avatar",
+          "customElement": true
+        },
+        {
+          "kind": "variable",
+          "name": "zlAvatarManifest",
+          "type": {
+            "text": "{\n  tag: \"zl-avatar\",\n  attrs: [\"seed\"],\n  parts: [\"avatar\"],\n  slots: [],\n  events: [],\n}"
+          },
+          "default": "{ tag: \"zl-avatar\", attrs: [\"seed\"], parts: [\"avatar\"], slots: [], events: [], }"
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "src/atoms/zl-avatar.ts"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "zl-avatar",
+          "declaration": {
+            "name": "ZlAvatar",
+            "module": "src/atoms/zl-avatar.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
+            "module": "src/atoms/zl-avatar.ts"
           }
         }
       ]
@@ -853,7 +1095,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Atom: `<zl-card>` — the auth-card surface used by every flow screen.\n\nThe shadcn `Card`, re-skinned with our tokens. Geometry is constant across\nevery flow screen:\n\n  width       384px (container.auth-card); narrower viewports let it shrink\n              to the page shell's content width\n  background  --zl-card (filled)\n  border      1px --zl-border\n  radius      --zl-radius-xl (14px)\n  padding     24px block on the card, 24px inline on each region\n  gap         24px between header / body / footer\n  shadow      --zl-shadow-sm\n\n  Internal gaps:\n    header    6px — title → description stack\n    body      28px — field group → action group. The groups carry their own\n              tighter gaps (12px) from the orchestrator's layout chrome,\n              because the card only sees a flat slot.",
+          "description": "Atom: `<zl-card>` — the auth-card surface used by every flow screen.\n\nThe shadcn `Card`, re-skinned with our tokens. Geometry is constant across\nevery flow screen:\n\n  width       384px (container.auth-card); narrower viewports let it shrink\n              to the page shell's content width\n  background  --zl-card (filled)\n  border      1px --zl-border\n  radius      --zl-radius-xl (14px)\n  padding     24px block on the card, 24px inline on each region\n  gap         24px between header / body / footer\n  shadow      --zl-shadow-sm\n\n  Internal gaps:\n    header    6px — title → description stack\n    body      20px — account → field group → action group. The groups\n              carry their own gaps (20px between fields, 12px between\n              actions) from the orchestrator's layout chrome, because the\n              card only sees a flat slot.",
           "name": "ZlCard",
           "members": [
             {
@@ -2348,7 +2590,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Atom: `<zl-icon>` — renders a curated glyph from the Lucide icon library.\n\nThe design system's icon set is explicitly built on Lucide, at 16 and 24px.\nRather than redrawing every glyph as an\ninline `<path>` (which inevitably drifts), we curate the auth surface's\nsubset by importing each canonical Lucide node and exposing a stable\nkebab-case `name` API. To add a glyph: import it from `lucide`, add an\nentry to ICON_NODES, and extend the IconName union.\n\nColour: by default the icon inherits `currentColor`, which is what most\nusages want — the glyph takes the colour of the control it sits in. Set\n`tone` to pick up `--zl-destructive`, `--zl-success` or\n`--zl-muted-foreground` instead. Any other colour is a `color:` on the host.\n\nBrand marks (`brand-*`) are the exception to \"everything comes from\nLucide\": Lucide carries no vendor logos, and a provider's mark is fixed\nartwork, so it is inlined in BRAND_GLYPHS with its own viewBox and\nthe wrapper drops the stroke styling the Lucide set needs. Adding one —\nGitHub, Microsoft — is an entry there plus a name in the union.\n\nNot every vendor's mark is multi-coloured, and the wrapper already covers\nboth. The `<svg>` carries `fill=\"currentColor\"`, so a monochrome mark —\nGitHub, Apple — is added with no `fill` on its paths and follows the label\ncolour; a multi-coloured one — Google, Microsoft — states a fill per path\nand overrides it. Neither needs a flag on the entry.\n\nAccessibility: glyphs with an entry in DEFAULT_LABELS expose an\n`aria-label` so they're meaningful when used standalone. When the icon\nis purely decorative (e.g. sitting next to a visible button label),\npass `decorative` to force `aria-hidden=\"true\"` and `role=\"presentation\"`,\nwhich prevents the icon's name from leaking into the parent's\naccessible name (e.g. avoids \"Loading Loading\" on a loading button).",
+          "description": "Atom: `<zl-icon>` — renders a curated glyph from the Lucide icon library.\n\nThe design system's icon set is explicitly built on Lucide, at 16 and 24px.\nRather than redrawing every glyph as an\ninline `<path>` (which inevitably drifts), we curate the auth surface's\nsubset by importing each canonical Lucide node and exposing a stable\nkebab-case `name` API. To add a glyph: import it from `lucide`, add an\nentry to ICON_NODES, and extend the IconName union.\n\nColour: by default the icon inherits `currentColor`, which is what most\nusages want — the glyph takes the colour of the control it sits in. Set\n`tone` to pick up `--zl-destructive`, `--zl-success` or\n`--zl-muted-foreground` instead. Any other colour is a `color:` on the host.\n\nBrand marks (`brand-*`) are the exception to \"everything comes from\nLucide\": Lucide carries no vendor logos, and a provider's mark is fixed\nartwork, so it is inlined in BRAND_GLYPHS with its own viewBox and\nthe wrapper drops the stroke styling the Lucide set needs. Adding one —\nMicrosoft, Apple — is an entry there plus a name in the union and in\nSHIPPED_BRAND_ICON_NAMES.\n\nNot every vendor's mark is multi-coloured, and the wrapper already covers\nboth. The `<svg>` carries `fill=\"currentColor\"`, so a monochrome mark —\nGitHub, Apple — is added with no `fill` on its paths and follows the label\ncolour; a multi-coloured one — Google, Microsoft — states a fill per path\nand overrides it. Neither needs a flag on the entry.\n\nAccessibility: glyphs with an entry in DEFAULT_LABELS expose an\n`aria-label` so they're meaningful when used standalone. When the icon\nis purely decorative (e.g. sitting next to a visible button label),\npass `decorative` to force `aria-hidden=\"true\"` and `role=\"presentation\"`,\nwhich prevents the icon's name from leaking into the parent's\naccessible name (e.g. avoids \"Loading Loading\" on a loading button).",
           "name": "ZlIcon",
           "members": [
             {
@@ -2470,13 +2712,13 @@
         {
           "kind": "variable",
           "name": "SHIPPED_ICON_NAMES",
-          "default": "[ \"plus\", \"arrow-right\", \"arrow-left\", \"spinner\", \"check\", \"chevron-down\", \"cross\", \"warning\", \"alert-circle\", \"info\", \"passkey\", \"user\", \"eye\", \"eye-off\", \"brand-google\", ] as const satisfies readonly IconName[]",
+          "default": "[ \"plus\", \"arrow-right\", \"arrow-left\", \"arrow-left-right\", \"spinner\", \"check\", \"chevron-down\", \"cross\", \"warning\", \"alert-circle\", \"info\", \"passkey\", \"user\", \"eye\", \"eye-off\", \"brand-google\", \"brand-github\", ] as const satisfies readonly IconName[]",
           "description": "Auth-surface glyph list; every name maps to a glyph (zl-icon.spec.ts)."
         },
         {
           "kind": "variable",
           "name": "SHIPPED_BRAND_ICON_NAMES",
-          "default": "[ \"brand-google\", ] as const satisfies readonly BrandIconName[]",
+          "default": "[ \"brand-google\", \"brand-github\", ] as const satisfies readonly BrandIconName[]",
           "description": "Brand marks only. `<zl-sso-providers>` reads this to decide whether a\nconnection's template has a mark of its own, so adding one here is what\nmakes a new vendor's button carry its logo."
         },
         {
@@ -3786,7 +4028,7 @@
       "declarations": [
         {
           "kind": "class",
-          "description": "Atom: `<zl-sso-providers>` — one button per identity provider the step\noffers.\n\nDriven entirely by data. The step carries `sso_providers`, each entry a\n`{id, name, template}` the engine resolved from the connection, and this\natom renders one button each in the order given. Nothing here knows which\nvendors exist: Google ships today and GitHub, Microsoft and the rest arrive\nas catalog entries plus a mark in `<zl-icon>`, with no change to this file.\n\nA template with no mark of its own still gets a working button, labelled\nwith the vendor's name and no glyph. That is deliberate — a placeholder\nglyph would be a wrong logo, and a tenant's private OIDC connection is\nexactly the case that will never have artwork here.\n\nChoosing one emits `zl-sso-select`; the orchestrator submits\n`{action: \"sso\", sso_provider_id}` and follows the redirect the server\nanswers with. The atom does not navigate: the flow owns that, as it owns\nevery other transition.\n\nIt holds no in-flight state of its own. Submitting re-renders the step —\nthe orchestrator injects the rendered string with `unsafeHTML`, so this\nelement is replaced, not updated — and the template passes `disabled` while\nthe step is submitting. Any \"pending\" flag kept here would be thrown away\non that same frame, so the disabled attribute is the whole mechanism.",
+          "description": "Atom: `<zl-sso-providers>` — one button per identity provider the step\noffers.\n\nDriven entirely by data. The step carries `sso_providers`, each entry a\n`{id, name, template}` the engine resolved from the connection, and this\natom renders one button each in the order given. Nothing here knows which\nvendors exist: Google and GitHub ship today, and Microsoft and the rest\narrive as catalog entries plus a mark in `<zl-icon>`, with no change to this\nfile.\n\nA template with no mark of its own still gets a working button, labelled\nwith the vendor's name and no glyph. That is deliberate — a placeholder\nglyph would be a wrong logo, and a tenant's private OIDC connection is\nexactly the case that will never have artwork here.\n\nChoosing one emits `zl-sso-select`; the orchestrator submits\n`{action: \"sso\", sso_provider_id}` and follows the redirect the server\nanswers with. The atom does not navigate: the flow owns that, as it owns\nevery other transition.\n\nIt holds no in-flight state of its own. Submitting re-renders the step —\nthe orchestrator injects the rendered string with `unsafeHTML`, so this\nelement is replaced, not updated — and the template passes `disabled` while\nthe step is submitting. Any \"pending\" flag kept here would be thrown away\non that same frame, so the disabled attribute is the whole mechanism.",
           "name": "ZlSsoProviders",
           "members": [
             {
@@ -3967,6 +4209,66 @@
     },
     {
       "kind": "javascript-module",
+      "path": "src/avatar.ts",
+      "declarations": [
+        {
+          "kind": "function",
+          "name": "avatarVars",
+          "return": {
+            "type": {
+              "text": "AvatarVars"
+            }
+          },
+          "parameters": [
+            {
+              "name": "seed",
+              "type": {
+                "text": "string"
+              }
+            }
+          ],
+          "description": "The colours for a seed: two different design-system starts, the angle the\ngradient starts at and where in its motion it starts, all taken from the\nhash, so a person keeps theirs on every screen and device and two people\nrarely share one.\n\nThe seed is trimmed and lowercased first, so `Maya@Example.com ` as typed at\nsign-in paints the same as the stored `maya@example.com`. Set on a hover\nhost as well, the variables tint it with the same colours."
+        },
+        {
+          "kind": "function",
+          "name": "avatarSeed",
+          "return": {
+            "type": {
+              "text": "string"
+            }
+          },
+          "parameters": [
+            {
+              "name": "user",
+              "type": {
+                "text": "{ userId?: string; identifier?: string } | undefined"
+              }
+            }
+          ],
+          "description": "What a person's avatar is generated from: their identifier, because that is\nall the login widget can know. Its password step echoes what the visitor\ntyped whether or not the account exists, so a gradient from that string\nleaks nothing, where a user id would confirm the account and expose an\ninternal id. The cost: a changed email changes the avatar. The user id\nstands in only where no identifier is known."
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "avatarVars",
+          "declaration": {
+            "name": "avatarVars",
+            "module": "src/avatar.ts"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "avatarSeed",
+          "declaration": {
+            "name": "avatarSeed",
+            "module": "src/avatar.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
       "path": "src/events.ts",
       "declarations": [
         {
@@ -3997,9 +4299,25 @@
       "exports": [
         {
           "kind": "js",
+          "name": "ZlAccount",
+          "declaration": {
+            "name": "ZlAccount",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "ZlAlert",
           "declaration": {
             "name": "ZlAlert",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ZlAvatar",
+          "declaration": {
+            "name": "ZlAvatar",
             "module": "./atoms/index.js"
           }
         },
@@ -4221,9 +4539,25 @@
         },
         {
           "kind": "js",
+          "name": "zlAccountManifest",
+          "declaration": {
+            "name": "zlAccountManifest",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
           "name": "zlAlertManifest",
           "declaration": {
             "name": "zlAlertManifest",
+            "module": "./atoms/index.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "zlAvatarManifest",
+          "declaration": {
+            "name": "zlAvatarManifest",
             "module": "./atoms/index.js"
           }
         },
@@ -5400,9 +5734,9 @@
           "kind": "variable",
           "name": "manifestRegistry",
           "type": {
-            "text": "[\n  zlAlertManifest,\n  zlButtonManifest,\n  zlCardManifest,\n  zlCheckboxManifest,\n  zlFieldManifest,\n  zlIconManifest,\n  zlPageShellManifest,\n  zlPasskeyManifest,\n  zlPillManifest,\n  zlSelectManifest,\n  zlSsoProvidersManifest,\n]"
+            "text": "[\n  zlAccountManifest,\n  zlAlertManifest,\n  zlAvatarManifest,\n  zlButtonManifest,\n  zlCardManifest,\n  zlCheckboxManifest,\n  zlFieldManifest,\n  zlIconManifest,\n  zlPageShellManifest,\n  zlPasskeyManifest,\n  zlPillManifest,\n  zlSelectManifest,\n  zlSsoProvidersManifest,\n]"
           },
-          "default": "[ zlAlertManifest, zlButtonManifest, zlCardManifest, zlCheckboxManifest, zlFieldManifest, zlIconManifest, zlPageShellManifest, zlPasskeyManifest, zlPillManifest, zlSelectManifest, zlSsoProvidersManifest, ]"
+          "default": "[ zlAccountManifest, zlAlertManifest, zlAvatarManifest, zlButtonManifest, zlCardManifest, zlCheckboxManifest, zlFieldManifest, zlIconManifest, zlPageShellManifest, zlPasskeyManifest, zlPillManifest, zlSelectManifest, zlSsoProvidersManifest, ]"
         },
         {
           "kind": "function",
@@ -5789,7 +6123,7 @@
               }
             }
           ],
-          "description": "Standalone branding→theme resolution for callers outside the orchestrator\n(SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself\nuses ThemeController, which layers the element's `theme` property\nand a variant-derived fallback on top of the same branding input.\n\nDefaults to dark: the design system's primary surface, and the mode a\nhosted login page renders when a revision states no preference."
+          "description": "Standalone branding→theme resolution for callers outside the orchestrator\n(SSR, tests, embedders composing atoms by hand). `<zitadel-login>` itself\nuses ThemeController, which layers the element's `theme` property\nand a variant-derived fallback on top of the same branding input.\n\nDefaults to dark: the design system's primary surface, and the mode a\nlogin page renders when a revision states no preference."
         }
       ],
       "exports": [
@@ -6036,7 +6370,24 @@
     {
       "kind": "javascript-module",
       "path": "src/orchestrator/index.ts",
-      "declarations": [],
+      "declarations": [
+        {
+          "kind": "variable",
+          "name": "defaultTemplate",
+          "type": {
+            "text": "string"
+          },
+          "default": "defaultTemplateSource"
+        },
+        {
+          "kind": "variable",
+          "name": "layoutChromeCss",
+          "type": {
+            "text": "string"
+          },
+          "default": "layoutChromeCssSource"
+        }
+      ],
       "exports": [
         {
           "kind": "js",
@@ -6234,16 +6585,16 @@
           "kind": "js",
           "name": "defaultTemplate",
           "declaration": {
-            "name": "default",
-            "module": "./templates/default.liquid"
+            "name": "defaultTemplate",
+            "module": "src/orchestrator/index.ts"
           }
         },
         {
           "kind": "js",
           "name": "layoutChromeCss",
           "declaration": {
-            "name": "default",
-            "module": "./templates/layout-chrome.css?inline"
+            "name": "layoutChromeCss",
+            "module": "src/orchestrator/index.ts"
           }
         },
         {
@@ -6539,7 +6890,7 @@
           "type": {
             "text": "Locale"
           },
-          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (E-Mail-Eingabe — erster Bildschirm) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Anmelden\", \"identifier.description\": \"Gib deine E-Mail-Adresse ein, um fortzufahren\", \"identifier.field.email\": \"E-Mail\", \"identifier.field.email.placeholder\": \"du@beispiel.de\", \"identifier.field.password\": \"Passwort\", \"identifier.action.submit\": \"Anmelden\", \"identifier.action.continue\": \"Weiter\", \"identifier.action.passkey\": \"Mit Passkey anmelden\", \"identifier.action.register.lead\": \"Noch kein Konto? \", \"identifier.action.register.link\": \"Registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (Passwort-Eingabe — Anmeldefluss) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Anmelden\", \"authenticate.description\": \"Gib dein Passwort ein\", \"authenticate.field.password\": \"Passwort\", \"authenticate.action.submit\": \"Anmelden\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (Registrierungspfad-Auswahl — keine Felder) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Konto erstellen\", \"choose-register.description\": \"Wähle, wie du dich registrieren möchtest\", \"choose-register.action.register-with-password\": \"Mit Passwort registrieren\", \"choose-register.action.register-with-passkey\": \"Mit Passkey registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (E-Mail + Passwort — Passwort-Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Konto erstellen\", \"collect-credentials.description\": \"Richte E-Mail und Passwort ein\", \"collect-credentials.field.email\": \"E-Mail\", \"collect-credentials.field.email.placeholder\": \"du@beispiel.de\", \"collect-credentials.field.password\": \"Passwort\", \"collect-credentials.action.submit\": \"Registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (Passwort-Eingabe — Registrierungspfad) // Standard-Login-Flow: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Passwort erstellen\", \"register-password.description\": \"Wähle ein sicheres Passwort für dein Konto\", \"register-password.field.password\": \"Passwort\", \"register-password.action.submit\": \"Registrieren\", \"register-password.action.back\": \"Zurück\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (Passkey-Angebot — nach Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Nächstes Mal schneller anmelden\", \"passkey-upsell.description\": \"Kein Passwort mehr nötig.\", \"passkey-upsell.description.line1\": \"Kein Passwort mehr nötig.\", \"passkey-upsell.description.line2\": \"Melde dich mit Face ID, Touch ID oder PIN an.\", \"passkey-upsell.action.passkey_register\": \"Passkey einrichten\", \"passkey-upsell.action.skip\": \"Vorerst überspringen\", \"passkey-upsell.action.setup\": \"Passkey einrichten\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (nur E-Mail — Passkey-only-Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Konto erstellen\", \"collect-passkey-email.description\": \"Gib deine E-Mail-Adresse ein, um einen Passkey einzurichten\", \"collect-passkey-email.field.email\": \"E-Mail\", \"collect-passkey-email.field.email.placeholder\": \"du@beispiel.de\", \"collect-passkey-email.action.submit\": \"Weiter\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (Passkey-Zeremonie — Passkey-only-Pfad) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Passkey einrichten\", \"passkey-enroll.description\": \"Verwende Face ID, Touch ID oder die Geräte-PIN, um einen Passkey zu erstellen.\", \"passkey-enroll.action.passkey_register\": \"Passkey einrichten\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (Terminal — Anmeldebestätigung) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Du bist angemeldet\", \"done.description\": \"\", // --- Step-Name-Aliase für den Standard-Login-Flow --- \"password.title\": \"Anmelden\", \"password.description\": \"Gib dein Passwort ein\", \"password.description.sso\": \"Gib dein Passwort ein oder fahre mit deinem Anmeldeanbieter fort\", \"password.field.password\": \"Passwort\", \"password.action.signin\": \"Anmelden\", \"password.action.passkey\": \"Mit Passkey anmelden\", \"password.action.back\": \"Zurück\", \"password.action.register.lead\": \"Noch kein Konto? \", \"password.action.register.link\": \"Registrieren\", \"register.title\": \"Konto erstellen\", // Leer per Design — die Registrierungskarte hat keine Unterzeile. \"register.description\": \"Gib deine Daten ein, um loszulegen\", \"register.field.email\": \"E-Mail\", \"register.field.email.placeholder\": \"du@beispiel.de\", \"register.field.password\": \"Passwort\", \"register.field.givenName\": \"Vorname\", \"register.field.familyName\": \"Nachname\", \"register.field.companyName\": \"Firmenname\", // Natives <input type=\"date\"> lokalisiert sein Anzeigeformat anhand der Sprache // des Nutzers und übermittelt ISO YYYY-MM-DD – kein Platzhalter-/Format-Hinweis nötig. \"register.field.dateOfBirth\": \"Geburtsdatum\", \"register.field.country\": \"Land\", \"register.field.country.placeholder\": \"Land auswählen\", \"register.field.terms\": \"Ich stimme den Nutzungsbedingungen zu\", \"register.action.password\": \"Mit Passwort fortfahren\", \"register.action.passkey\": \"Weiter mit Passkey\", \"register.action.submit\": \"Registrieren\", \"register.action.back\": \"Zurück\", \"register.action.sign_in.lead\": \"Bereits ein Konto? \", \"register.action.sign_in.link\": \"Anmelden\", \"complete.title\": \"Du bist angemeldet\", \"signed-in.continue\": \"Weiter\", \"signed-in.logout\": \"Abmelden\", // --- Passkey-Anmeldung --- \"passkey-login.title\": \"Mit Passkey anmelden\", // --- Step: passkey-first (Einstiegsschritt des Passkey-first-Presets) --- \"passkey-first.title\": \"Anmelden\", \"passkey-first.description\": \"Verwende deinen Passkey, um fortzufahren\", \"passkey-first.action.passkey\": \"Weiter mit Passkey\", \"passkey-first.action.email_fallback\": \"Stattdessen E-Mail verwenden\", // --- Passwort-Wiederherstellung --- \"recover.title\": \"E-Mail prüfen\", \"recover.description\": \"Wir haben einen Link zum Zurücksetzen des Passworts an deine E-Mail-Adresse gesendet.\", \"recover.action.back\": \"Zurück zur Anmeldung\", // --- Gemeinsame Aktionen --- \"submit.continue\": \"Weiter\", \"submit.signin\": \"Anmelden\", \"action.forgot_password\": \"Passwort vergessen?\", \"action.show_password\": \"Passwort anzeigen\", \"action.cancel\": \"Abbrechen\", // Generische Rückfalloption für den von der Engine injizierten // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Zurück\", \"action.use_another_account\": \"Anderes Konto verwenden\", // --- SSO --- \"sso.continue_with\": \"Weiter mit {name}\", \"sso.divider\": \"oder\", \"register-sso.title\": \"Konto fertig einrichten\", \"register-sso.description\": \"Wir brauchen noch ein paar Angaben\", \"register-sso.field.email\": \"E-Mail\", \"register-sso.action.submit\": \"Konto erstellen\", \"sso-conflict.title\": \"Sie haben bereits ein Konto\", \"sso-conflict.description\": \"Melden Sie sich wie gewohnt an, um fortzufahren\", \"sso-conflict.field.password\": \"Passwort\", \"sso-conflict.action.submit\": \"Anmelden\", \"sso-conflict.action.passkey\": \"Passkey verwenden\", \"sso-conflict.action.sign_in\": \"Zurück zur Anmeldung\", \"sso.redirect.title\": \"Weiterleitung zum Anbieter…\", // --- Passkey-Vorgang --- \"passkey.pending.status\": \"Warten auf deinen Passkey…\", // --- Passkey-Fehler --- \"error.passkey_cancelled\": \"Die Passkey-Abfrage wurde vorzeitig geschlossen.\", \"error.passkey_timeout\": \"Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.\", \"error.passkey_not_registered\": \"Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.\", \"error.passkey_setup_failed\": \"Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.\", \"error.passkey_unsupported\": \"Dieses Gerät unterstützt keine Passkeys\", \"error.passkey_failed\": \"Etwas ist schiefgelaufen. Bitte versuche es erneut.\", \"error.passkey_invalid\": \"Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.\", \"error.sso_creation_disabled\": \"Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.\", \"error.flow_restart_required\": \"Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.\", \"error.passkey_registration_invalid\": \"Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.\", \"error.sso_unavailable\": \"Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.\", \"error.sso_verified_unique_value_changed\": \"Dein Anmeldeanbieter hat diesen Wert bestätigt, daher kann er hier nicht geändert werden.\", \"error.sso_user_invalid\": \"Einige Angaben passen nicht zusammen. Bitte prüfe sie und versuche es erneut.\", \"error.sso_user_cannot_be_created\": \"Mit dieser Anmeldemethode können wir dein Konto nicht erstellen. Bitte wende dich an den Support.\", \"error.user_already_exists\": \"Ein Konto mit diesen Angaben existiert bereits.\", \"error.user_not_found\": \"Wir konnten kein Konto mit diesen Angaben finden.\", \"error.sso_user_not_found\": \"Für diese Anmeldung gibt es noch kein Konto.\", \"error.outcome_unhandled\": \"Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.\", \"error.sign_in_first\": \"Bitte melde dich zuerst bei deinem Konto an.\", // --- Feld- / Formularfehler --- \"error.email_required\": \"Bitte gib eine E-Mail-Adresse ein\", \"error.email_invalid\": \"Bitte gib eine gültige E-Mail-Adresse ein\", \"error.password_required\": \"Bitte gib ein Passwort ein\", \"error.password_incorrect\": \"Falsche E-Mail oder falsches Passwort.\", \"error.email_exists\": \"Ein Konto mit dieser E-Mail-Adresse existiert bereits.\", \"error.invalid_credentials\": \"Falsche E-Mail oder falsches Passwort.\", \"error.required\": \"Dieses Feld ist erforderlich.\", // --- Generische Feldregel-Fallbacks ({0} = Feldbezeichnung) --- \"error.field_required\": \"{0} ist erforderlich.\", \"error.field_format\": \"Bitte gib einen gültigen Wert für {0} ein.\", \"error.field_min_length\": \"{0} ist zu kurz.\", \"error.field_max_length\": \"{0} ist zu lang.\", \"error.field_invalid\": \"Bitte überprüfe {0}.\", // --- Formular-Alerts --- \"error.sign_in_server.title\": \"Anmeldung konnte nicht abgeschlossen werden.\", \"error.sign_in_server.body\": \"Bitte versuche es in einigen Minuten erneut\", \"error.sso_cancelled.title\": \"Anmeldung abgebrochen\", \"error.sso_cancelled.body\": \"Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.\", \"error.sso_failed.title\": \"Anmeldung fehlgeschlagen\", \"error.sso_failed.body\": \"Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.\", \"error.more_info\": \"Weitere Informationen\", }"
+          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (E-Mail-Eingabe — erster Bildschirm) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Anmelden\", \"identifier.description\": \"Gib deine E-Mail-Adresse ein, um fortzufahren\", \"identifier.field.email\": \"E-Mail\", \"identifier.field.email.placeholder\": \"du@beispiel.de\", \"identifier.field.password\": \"Passwort\", \"identifier.action.submit\": \"Anmelden\", \"identifier.action.continue\": \"Weiter\", \"identifier.action.passkey\": \"Mit Passkey anmelden\", \"identifier.action.register.lead\": \"Noch kein Konto? \", \"identifier.action.register.link\": \"Registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (Passwort-Eingabe — Anmeldefluss) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Anmelden\", \"authenticate.description\": \"Gib dein Passwort ein\", \"authenticate.field.password\": \"Passwort\", \"authenticate.action.submit\": \"Anmelden\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (Registrierungspfad-Auswahl — keine Felder) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Konto erstellen\", \"choose-register.description\": \"Wähle, wie du dich registrieren möchtest\", \"choose-register.action.register-with-password\": \"Mit Passwort registrieren\", \"choose-register.action.register-with-passkey\": \"Mit Passkey registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (E-Mail + Passwort — Passwort-Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Konto erstellen\", \"collect-credentials.description\": \"Richte E-Mail und Passwort ein\", \"collect-credentials.field.email\": \"E-Mail\", \"collect-credentials.field.email.placeholder\": \"du@beispiel.de\", \"collect-credentials.field.password\": \"Passwort\", \"collect-credentials.action.submit\": \"Registrieren\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (Passwort-Eingabe — Registrierungspfad) // Standard-Login-Flow: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Passwort erstellen\", \"register-password.description\": \"Wähle ein sicheres Passwort für dein Konto\", \"register-password.field.password\": \"Passwort\", \"register-password.action.submit\": \"Registrieren\", \"register-password.action.back\": \"Zurück\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (Passkey-Angebot — nach Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Nächstes Mal schneller anmelden\", \"passkey-upsell.description\": \"Kein Passwort mehr nötig.\", \"passkey-upsell.description.line1\": \"Kein Passwort mehr nötig.\", \"passkey-upsell.description.line2\": \"Melde dich mit Face ID, Touch ID oder PIN an.\", \"passkey-upsell.action.passkey_register\": \"Passkey einrichten\", \"passkey-upsell.action.skip\": \"Vorerst überspringen\", \"passkey-upsell.action.setup\": \"Passkey einrichten\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (nur E-Mail — Passkey-only-Registrierung) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Konto erstellen\", \"collect-passkey-email.description\": \"Gib deine E-Mail-Adresse ein, um einen Passkey einzurichten\", \"collect-passkey-email.field.email\": \"E-Mail\", \"collect-passkey-email.field.email.placeholder\": \"du@beispiel.de\", \"collect-passkey-email.action.submit\": \"Weiter\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (Passkey-Zeremonie — Passkey-only-Pfad) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Passkey einrichten\", \"passkey-enroll.description\": \"Verwende Face ID, Touch ID oder die Geräte-PIN, um einen Passkey zu erstellen.\", \"passkey-enroll.action.passkey_register\": \"Passkey einrichten\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (Terminal — Anmeldebestätigung) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Du bist angemeldet\", \"done.description\": \"\", // --- Step-Name-Aliase für den Standard-Login-Flow --- \"password.title\": \"Anmelden\", \"password.description\": \"Gib dein Passwort ein\", \"password.description.sso\": \"Gib dein Passwort ein oder fahre mit deinem Anmeldeanbieter fort\", \"password.field.password\": \"Passwort\", \"password.action.signin\": \"Anmelden\", \"password.action.passkey\": \"Mit Passkey anmelden\", \"password.action.back\": \"Zurück\", \"password.action.register.lead\": \"Noch kein Konto? \", \"password.action.register.link\": \"Registrieren\", \"register.title\": \"Konto erstellen\", // Leer per Design — die Registrierungskarte hat keine Unterzeile. \"register.description\": \"Gib deine Daten ein, um loszulegen\", \"register.field.email\": \"E-Mail\", \"register.field.email.placeholder\": \"du@beispiel.de\", \"register.field.password\": \"Passwort\", \"register.field.givenName\": \"Vorname\", \"register.field.familyName\": \"Nachname\", \"register.field.companyName\": \"Firmenname\", // Natives <input type=\"date\"> lokalisiert sein Anzeigeformat anhand der Sprache // des Nutzers und übermittelt ISO YYYY-MM-DD – kein Platzhalter-/Format-Hinweis nötig. \"register.field.dateOfBirth\": \"Geburtsdatum\", \"register.field.country\": \"Land\", \"register.field.country.placeholder\": \"Land auswählen\", \"register.field.terms\": \"Ich stimme den Nutzungsbedingungen zu\", \"register.action.password\": \"Mit Passwort fortfahren\", \"register.action.passkey\": \"Weiter mit Passkey\", \"register.action.submit\": \"Registrieren\", \"register.action.back\": \"Zurück\", \"register.action.sign_in.lead\": \"Bereits ein Konto? \", \"register.action.sign_in.link\": \"Anmelden\", \"complete.title\": \"Du bist angemeldet\", \"signed-in.continue\": \"Weiter\", \"signed-in.logout\": \"Abmelden\", // --- Passkey-Anmeldung --- \"passkey-login.title\": \"Mit Passkey anmelden\", // --- Step: passkey-first (Einstiegsschritt des Passkey-first-Presets) --- \"passkey-first.title\": \"Anmelden\", \"passkey-first.description\": \"Verwende deinen Passkey, um fortzufahren\", \"passkey-first.action.passkey\": \"Weiter mit Passkey\", \"passkey-first.action.email_fallback\": \"Stattdessen E-Mail verwenden\", // --- Passwort-Wiederherstellung --- \"recover.title\": \"E-Mail prüfen\", \"recover.description\": \"Wir haben einen Link zum Zurücksetzen des Passworts an deine E-Mail-Adresse gesendet.\", \"recover.action.back\": \"Zurück zur Anmeldung\", // --- Gemeinsame Aktionen --- \"submit.continue\": \"Weiter\", \"submit.signin\": \"Anmelden\", \"action.forgot_password\": \"Passwort vergessen?\", \"action.show_password\": \"Passwort anzeigen\", \"action.cancel\": \"Abbrechen\", // Generische Rückfalloption für den von der Engine injizierten // `<step>.action.back`-Schlüssel (siehe INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Zurück\", \"action.use_another_account\": \"Anderes Konto verwenden\", // --- SSO --- \"sso.continue_with\": \"Weiter mit {name}\", \"sso.divider\": \"oder\", \"register-sso.title\": \"Konto fertig einrichten\", \"register-sso.description\": \"Wir brauchen noch ein paar Angaben\", \"register-sso.field.email\": \"E-Mail\", \"register-sso.action.submit\": \"Konto erstellen\", \"sso-conflict.title\": \"Sie haben bereits ein Konto\", \"sso-conflict.description\": \"Melden Sie sich wie gewohnt an, um fortzufahren\", \"sso-conflict.field.password\": \"Passwort\", \"sso-conflict.action.submit\": \"Anmelden\", \"sso-conflict.action.passkey\": \"Passkey verwenden\", \"sso-conflict.action.sign_in\": \"Zurück zur Anmeldung\", \"sso.redirect.title\": \"Weiterleitung zum Anbieter…\", // --- Passkey-Vorgang --- \"passkey.pending.status\": \"Warten auf deinen Passkey…\", // --- Passkey-Fehler --- \"error.passkey_cancelled\": \"Die Passkey-Abfrage wurde vorzeitig geschlossen.\", \"error.passkey_timeout\": \"Die Passkey-Anfrage hat zu lange gedauert. Bitte versuche es erneut.\", \"error.passkey_not_registered\": \"Dieser Passkey ist nicht registriert. Bitte melde dich mit E-Mail und Passwort an.\", \"error.passkey_setup_failed\": \"Passkey-Registrierung wurde nicht abgeschlossen. Bitte versuche es erneut.\", \"error.passkey_unsupported\": \"Dieses Gerät unterstützt keine Passkeys\", \"error.passkey_failed\": \"Etwas ist schiefgelaufen. Bitte versuche es erneut.\", \"error.passkey_invalid\": \"Dieser Passkey konnte nicht bestätigt werden. Bitte versuche es erneut.\", \"error.sso_creation_disabled\": \"Für diese Anmeldung gibt es kein Konto, und mit diesem Anbieter können keine neuen Konten erstellt werden.\", \"error.flow_restart_required\": \"Ihre Anmeldung konnte nicht fortgesetzt werden. Bitte beginnen Sie erneut.\", \"error.passkey_registration_invalid\": \"Der neue Passkey konnte nicht bestätigt werden. Bitte registriere ihn erneut.\", \"error.sso_unavailable\": \"Dieser Anmeldeanbieter ist gerade nicht verfügbar. Bitte wähle eine andere Anmeldemethode.\", \"error.sso_verified_unique_value_changed\": \"Dein Anmeldeanbieter hat diesen Wert bestätigt, daher kann er hier nicht geändert werden.\", \"error.sso_user_invalid\": \"Einige Angaben passen nicht zusammen. Bitte prüfe sie und versuche es erneut.\", \"error.sso_user_cannot_be_created\": \"Mit dieser Anmeldemethode können wir dein Konto nicht erstellen. Bitte wende dich an den Support.\", \"error.user_already_exists\": \"Ein Konto mit diesen Angaben existiert bereits.\", \"error.user_not_found\": \"Wir konnten kein Konto mit diesen Angaben finden.\", \"error.sso_user_not_found\": \"Für diese Anmeldung gibt es noch kein Konto.\", \"error.outcome_unhandled\": \"Dieser Schritt konnte nicht fortgesetzt werden. Bitte versuche es erneut.\", \"error.sign_in_first\": \"Bitte melde dich zuerst bei deinem Konto an.\", // --- Hinweise: warum der Ablauf von selbst zwischen Anmelden und Registrieren wechselt --- \"notice.user_not_found\": \"Zu dieser E-Mail-Adresse haben wir kein Konto gefunden. Du kannst jetzt eins erstellen. Vertippt? Korrigiere sie im E-Mail-Feld unten.\", \"notice.user_already_exists\": \"Zu dieser E-Mail-Adresse gibt es schon ein Konto. Melde dich an, um fortzufahren.\", \"notice.sso_user_not_found\": \"Für diese Anmeldung gibt es noch kein Konto. Du kannst jetzt eins erstellen.\", // --- Feld- / Formularfehler --- \"error.email_required\": \"Bitte gib eine E-Mail-Adresse ein\", \"error.email_invalid\": \"Bitte gib eine gültige E-Mail-Adresse ein\", \"error.password_required\": \"Bitte gib ein Passwort ein\", \"error.password_incorrect\": \"Falsche E-Mail oder falsches Passwort.\", \"error.email_exists\": \"Ein Konto mit dieser E-Mail-Adresse existiert bereits.\", \"error.invalid_credentials\": \"Falsche E-Mail oder falsches Passwort.\", \"error.required\": \"Dieses Feld ist erforderlich.\", // --- Generische Feldregel-Fallbacks ({0} = Feldbezeichnung) --- \"error.field_required\": \"{0} ist erforderlich.\", \"error.field_format\": \"Bitte gib einen gültigen Wert für {0} ein.\", \"error.field_min_length\": \"{0} ist zu kurz.\", \"error.field_max_length\": \"{0} ist zu lang.\", \"error.field_min_length_value\": \"{0} muss mindestens {1} Zeichen lang sein.\", \"error.field_max_length_value\": \"{0} darf höchstens {1} Zeichen lang sein.\", \"error.field_invalid\": \"Bitte überprüfe {0}.\", // --- Formular-Alerts --- \"error.sign_in_server.title\": \"Anmeldung konnte nicht abgeschlossen werden.\", \"error.sign_in_server.body\": \"Bitte versuche es in einigen Minuten erneut\", \"error.sso_cancelled.title\": \"Anmeldung abgebrochen\", \"error.sso_cancelled.body\": \"Du hast die Anmeldung beim Anbieter abgebrochen, oder er hat die Anfrage abgelehnt. Versuche es erneut oder nutze eine andere Methode.\", \"error.sso_failed.title\": \"Anmeldung fehlgeschlagen\", \"error.sso_failed.body\": \"Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.\", \"error.more_info\": \"Weitere Informationen\", }"
         }
       ],
       "exports": [
@@ -6563,7 +6914,7 @@
           "type": {
             "text": "Record<string, string>"
           },
-          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (email entry — first screen) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Sign in\", \"identifier.description\": \"Enter your email to continue\", \"identifier.field.email\": \"Email\", \"identifier.field.email.placeholder\": \"you@example.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Sign in\", \"identifier.action.continue\": \"Continue\", \"identifier.action.passkey\": \"Sign in with a passkey\", \"identifier.action.register.lead\": \"Don't have an account? \", \"identifier.action.register.link\": \"Sign up\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (password entry — sign-in flow) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Sign in\", \"authenticate.description\": \"Enter your password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Sign in\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (registration path selection — no fields) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Create your account\", \"choose-register.description\": \"Choose how you'd like to sign up\", \"choose-register.action.register-with-password\": \"Sign up with password\", \"choose-register.action.register-with-passkey\": \"Sign up with passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (email + password — password registration) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Create your account\", \"collect-credentials.description\": \"Set up your email and password\", \"collect-credentials.field.email\": \"Email\", \"collect-credentials.field.email.placeholder\": \"you@example.com\", \"collect-credentials.field.password\": \"Password\", // No static password rule hint: the only enforced rule is the schema's // minLength, and \"symbol + number\" was never enforced. The client will build // this hint dynamically from the API's per-field validation rules (#251). \"collect-credentials.action.submit\": \"Sign up\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (password entry — registration path) // Default login flow: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Create your password\", \"register-password.description\": \"Choose a secure password for your account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Sign up\", \"register-password.action.back\": \"Back\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (passkey enrollment offer — after registration) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Sign in faster next time\", \"passkey-upsell.description\": \"No password needed ever again.\", \"passkey-upsell.description.line1\": \"No password needed ever again.\", \"passkey-upsell.description.line2\": \"Sign in with Face ID, Touch ID, or PIN.\", \"passkey-upsell.action.passkey_register\": \"Set up passkey\", \"passkey-upsell.action.skip\": \"Skip for now\", // Setup-passkey copy — kept for backward compat. \"passkey-upsell.action.setup\": \"Set up passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (email only — passkey-only registration) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Create your account\", \"collect-passkey-email.description\": \"Enter your email to set up a passkey\", \"collect-passkey-email.field.email\": \"Email\", \"collect-passkey-email.field.email.placeholder\": \"you@example.com\", \"collect-passkey-email.action.submit\": \"Continue\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (mandatory passkey ceremony — passkey-only path) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Set up your passkey\", \"passkey-enroll.description\": \"Use Face ID, Touch ID, or your device PIN to create a passkey.\", \"passkey-enroll.action.passkey_register\": \"Set up passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminal — signed-in confirmation) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"You're signed in\", \"done.description\": \"\", // --- Step-name aliases used by the default login flow --- \"password.title\": \"Sign in\", \"password.description\": \"Enter your password\", \"password.description.sso\": \"Enter your password or continue with your sign-in provider\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Sign in\", \"password.action.passkey\": \"Sign in with a passkey\", \"password.action.back\": \"Back\", \"password.action.register.lead\": \"Don't have an account? \", \"password.action.register.link\": \"Sign up\", \"register.title\": \"Create your account\", \"register.description\": \"Enter your details to get started\", \"register.field.email\": \"Email\", \"register.field.email.placeholder\": \"you@example.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Given name\", \"register.field.familyName\": \"Family name\", \"register.field.companyName\": \"Company name\", // Native <input type=\"date\"> localizes its own display format to the user's // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed. \"register.field.dateOfBirth\": \"Date of birth\", \"register.field.country\": \"Country\", \"register.field.country.placeholder\": \"Select your country\", \"register.field.terms\": \"I agree to the terms of service\", \"register.action.password\": \"Continue with password\", \"register.action.passkey\": \"Continue with a passkey\", \"register.action.submit\": \"Sign up\", \"register.action.back\": \"Back\", \"register.action.sign_in.lead\": \"Already have an account? \", \"register.action.sign_in.link\": \"Sign in\", \"complete.title\": \"You're signed in\", \"signed-in.continue\": \"Continue\", \"signed-in.logout\": \"Sign out\", // --- Passkey login --- \"passkey-login.title\": \"Sign in with your passkey\", // --- Step: passkey-first (entry step of the passkey-first preset) --- \"passkey-first.title\": \"Sign in\", \"passkey-first.description\": \"Use your passkey to continue\", \"passkey-first.action.passkey\": \"Continue with passkey\", \"passkey-first.action.email_fallback\": \"Use email instead\", // --- Password recovery --- \"recover.title\": \"Check your email\", \"recover.description\": \"We sent a password reset link to your email address.\", \"recover.action.back\": \"Back to sign in\", // --- Shared actions --- \"submit.continue\": \"Continue\", \"submit.signin\": \"Sign in\", \"action.forgot_password\": \"Forgot password?\", // The password toggle's name, the same in both states: `aria-pressed` // carries whether the password is shown. \"action.show_password\": \"Show password\", \"action.cancel\": \"Cancel\", // Generic fallback for the engine-injected `<step>.action.back` key on // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Back\", // Beside the account a step signs in to (`step.identifier`): goes back to // the step that collects the identifier. \"action.use_another_account\": \"Use another account\", // --- SSO --- \"sso.redirect.title\": \"Redirecting to your provider…\", // `{name}` is replaced with the provider's own name by <zl-sso-providers>, // so one key covers every vendor the project enables. \"sso.continue_with\": \"Continue with {name}\", \"sso.divider\": \"or\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-sso (the provider returned someone new — collect the rest) // ═══════════════════════════════════════════════════════════════════════════ \"register-sso.title\": \"Finish creating your account\", \"register-sso.description\": \"We need a little more to set you up\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Create account\", // ═══════════════════════════════════════════════════════════════════════════ // Step: sso-conflict (that email already has an account here) // ═══════════════════════════════════════════════════════════════════════════ \"sso-conflict.title\": \"You already have an account\", \"sso-conflict.description\": \"Sign in the way you usually do to continue\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Sign in\", \"sso-conflict.action.passkey\": \"Use a passkey\", \"sso-conflict.action.sign_in\": \"Back to sign in\", // --- Passkey ceremony --- \"passkey.pending.status\": \"Waiting for your passkey…\", // --- Passkey errors --- // Covers both user dismissal and any close the browser reports as // NotAllowedError — it fires for login and registration ceremonies alike. \"error.passkey_cancelled\": \"The passkey prompt was closed before completing.\", \"error.passkey_timeout\": \"The passkey request timed out. Please try again.\", \"error.passkey_not_registered\": \"This passkey is not registered. Please sign in with your email and password.\", \"error.passkey_setup_failed\": \"Passkey registration did not complete. Please try again.\", \"error.passkey_unsupported\": \"This device does not support passkeys\", \"error.passkey_failed\": \"Something went wrong. Please try again.\", \"error.passkey_invalid\": \"This passkey could not be verified. Please try again.\", \"error.sso_creation_disabled\": \"There is no account for this sign-in, and new accounts cannot be created with this provider.\", \"error.flow_restart_required\": \"Your sign-in could not be continued. Please start again.\", \"error.passkey_registration_invalid\": \"The new passkey could not be verified. Please try registering it again.\", \"error.sso_unavailable\": \"This sign-in provider is not available right now. Please try another way to sign in.\", \"error.sso_verified_unique_value_changed\": \"Your sign-in provider confirmed this value, so it can't be changed here.\", \"error.sso_user_invalid\": \"Some details don't fit together. Please check them and try again.\", \"error.sso_user_cannot_be_created\": \"We can't create your account with this sign-in method. Please contact support.\", \"error.user_already_exists\": \"An account with these details already exists.\", \"error.user_not_found\": \"We couldn't find an account with these details.\", \"error.sso_user_not_found\": \"There is no account for this sign-in yet.\", \"error.outcome_unhandled\": \"This step could not continue. Please try again.\", \"error.sign_in_first\": \"Please sign in to your account first.\", // --- Field / form errors --- \"error.email_required\": \"Please enter an email address\", \"error.email_invalid\": \"Please enter a valid email\", \"error.password_required\": \"Please enter a password\", \"error.password_incorrect\": \"Wrong email or password.\", \"error.email_exists\": \"An account with this email already exists.\", /** Sign-in error, inline on the password field. */ \"error.invalid_credentials\": \"Wrong email or password.\", \"error.required\": \"This field is required.\", // --- Generic field-rule fallbacks ({0} = field label) --- // Used by `localiseFlowErrorKeys` (liquid.ts) when no field-specific // entry exists for a server-emitted `error.<field>_<rule>` key. \"error.field_required\": \"{0} is required.\", \"error.field_format\": \"Please enter a valid {0}.\", \"error.field_min_length\": \"{0} is too short.\", \"error.field_max_length\": \"{0} is too long.\", \"error.field_invalid\": \"Please check {0}.\", // --- Sign-in form-level alert --- \"error.sign_in_server.title\": \"We couldn't complete your sign in.\", \"error.sign_in_server.body\": \"Please try again in a few minutes\", \"error.sso_cancelled.title\": \"Sign-in cancelled\", \"error.sso_cancelled.body\": \"You cancelled signing in with the provider, or it declined the request. You can try again or use another method.\", \"error.sso_failed.title\": \"Sign-in failed\", \"error.sso_failed.body\": \"The sign-in could not be completed. Please try again.\", \"error.more_info\": \"More information\", }",
+          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (email entry — first screen) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Sign in\", \"identifier.description\": \"Enter your email to continue\", \"identifier.field.email\": \"Email\", \"identifier.field.email.placeholder\": \"you@example.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Sign in\", \"identifier.action.continue\": \"Continue\", \"identifier.action.passkey\": \"Sign in with a passkey\", \"identifier.action.register.lead\": \"Don't have an account? \", \"identifier.action.register.link\": \"Sign up\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (password entry — sign-in flow) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Sign in\", \"authenticate.description\": \"Enter your password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Sign in\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (registration path selection — no fields) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Create your account\", \"choose-register.description\": \"Choose how you'd like to sign up\", \"choose-register.action.register-with-password\": \"Sign up with password\", \"choose-register.action.register-with-passkey\": \"Sign up with passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (email + password — password registration) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Create your account\", \"collect-credentials.description\": \"Set up your email and password\", \"collect-credentials.field.email\": \"Email\", \"collect-credentials.field.email.placeholder\": \"you@example.com\", \"collect-credentials.field.password\": \"Password\", // No static password rule hint: the only enforced rule is the schema's // minLength, and \"symbol + number\" was never enforced. The client will build // this hint dynamically from the API's per-field validation rules (#251). \"collect-credentials.action.submit\": \"Sign up\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (password entry — registration path) // Default login flow: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Create your password\", \"register-password.description\": \"Choose a secure password for your account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Sign up\", \"register-password.action.back\": \"Back\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (passkey enrollment offer — after registration) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Sign in faster next time\", \"passkey-upsell.description\": \"No password needed ever again.\", \"passkey-upsell.description.line1\": \"No password needed ever again.\", \"passkey-upsell.description.line2\": \"Sign in with Face ID, Touch ID, or PIN.\", \"passkey-upsell.action.passkey_register\": \"Set up passkey\", \"passkey-upsell.action.skip\": \"Skip for now\", // Setup-passkey copy — kept for backward compat. \"passkey-upsell.action.setup\": \"Set up passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (email only — passkey-only registration) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Create your account\", \"collect-passkey-email.description\": \"Enter your email to set up a passkey\", \"collect-passkey-email.field.email\": \"Email\", \"collect-passkey-email.field.email.placeholder\": \"you@example.com\", \"collect-passkey-email.action.submit\": \"Continue\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (mandatory passkey ceremony — passkey-only path) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Set up your passkey\", \"passkey-enroll.description\": \"Use Face ID, Touch ID, or your device PIN to create a passkey.\", \"passkey-enroll.action.passkey_register\": \"Set up passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminal — signed-in confirmation) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"You're signed in\", \"done.description\": \"\", // --- Step-name aliases used by the default login flow --- \"password.title\": \"Sign in\", \"password.description\": \"Enter your password\", \"password.description.sso\": \"Enter your password or continue with your sign-in provider\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Sign in\", \"password.action.passkey\": \"Sign in with a passkey\", \"password.action.back\": \"Back\", \"password.action.register.lead\": \"Don't have an account? \", \"password.action.register.link\": \"Sign up\", \"register.title\": \"Create your account\", \"register.description\": \"Enter your details to get started\", \"register.field.email\": \"Email\", \"register.field.email.placeholder\": \"you@example.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Given name\", \"register.field.familyName\": \"Family name\", \"register.field.companyName\": \"Company name\", // Native <input type=\"date\"> localizes its own display format to the user's // locale and submits ISO YYYY-MM-DD — no placeholder/help format hint needed. \"register.field.dateOfBirth\": \"Date of birth\", \"register.field.country\": \"Country\", \"register.field.country.placeholder\": \"Select your country\", \"register.field.terms\": \"I agree to the terms of service\", \"register.action.password\": \"Continue with password\", \"register.action.passkey\": \"Continue with a passkey\", \"register.action.submit\": \"Sign up\", \"register.action.back\": \"Back\", \"register.action.sign_in.lead\": \"Already have an account? \", \"register.action.sign_in.link\": \"Sign in\", \"complete.title\": \"You're signed in\", \"signed-in.continue\": \"Continue\", \"signed-in.logout\": \"Sign out\", // --- Passkey login --- \"passkey-login.title\": \"Sign in with your passkey\", // --- Step: passkey-first (entry step of the passkey-first preset) --- \"passkey-first.title\": \"Sign in\", \"passkey-first.description\": \"Use your passkey to continue\", \"passkey-first.action.passkey\": \"Continue with passkey\", \"passkey-first.action.email_fallback\": \"Use email instead\", // --- Password recovery --- \"recover.title\": \"Check your email\", \"recover.description\": \"We sent a password reset link to your email address.\", \"recover.action.back\": \"Back to sign in\", // --- Shared actions --- \"submit.continue\": \"Continue\", \"submit.signin\": \"Sign in\", \"action.forgot_password\": \"Forgot password?\", // The password toggle's name, the same in both states: `aria-pressed` // carries whether the password is shown. \"action.show_password\": \"Show password\", \"action.cancel\": \"Cancel\", // Generic fallback for the engine-injected `<step>.action.back` key on // custom step names (see INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Back\", // Beside the account a step signs in to (`step.identifier`): goes back to // the step that collects the identifier. \"action.use_another_account\": \"Use another account\", // --- SSO --- \"sso.redirect.title\": \"Redirecting to your provider…\", // `{name}` is replaced with the provider's own name by <zl-sso-providers>, // so one key covers every vendor the project enables. \"sso.continue_with\": \"Continue with {name}\", \"sso.divider\": \"or\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-sso (the provider returned someone new — collect the rest) // ═══════════════════════════════════════════════════════════════════════════ \"register-sso.title\": \"Finish creating your account\", \"register-sso.description\": \"We need a little more to set you up\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Create account\", // ═══════════════════════════════════════════════════════════════════════════ // Step: sso-conflict (that email already has an account here) // ═══════════════════════════════════════════════════════════════════════════ \"sso-conflict.title\": \"You already have an account\", \"sso-conflict.description\": \"Sign in the way you usually do to continue\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Sign in\", \"sso-conflict.action.passkey\": \"Use a passkey\", \"sso-conflict.action.sign_in\": \"Back to sign in\", // --- Passkey ceremony --- \"passkey.pending.status\": \"Waiting for your passkey…\", // --- Passkey errors --- // Covers both user dismissal and any close the browser reports as // NotAllowedError — it fires for login and registration ceremonies alike. \"error.passkey_cancelled\": \"The passkey prompt was closed before completing.\", \"error.passkey_timeout\": \"The passkey request timed out. Please try again.\", \"error.passkey_not_registered\": \"This passkey is not registered. Please sign in with your email and password.\", \"error.passkey_setup_failed\": \"Passkey registration did not complete. Please try again.\", \"error.passkey_unsupported\": \"This device does not support passkeys\", \"error.passkey_failed\": \"Something went wrong. Please try again.\", \"error.passkey_invalid\": \"This passkey could not be verified. Please try again.\", \"error.sso_creation_disabled\": \"There is no account for this sign-in, and new accounts cannot be created with this provider.\", \"error.flow_restart_required\": \"Your sign-in could not be continued. Please start again.\", \"error.passkey_registration_invalid\": \"The new passkey could not be verified. Please try registering it again.\", \"error.sso_unavailable\": \"This sign-in provider is not available right now. Please try another way to sign in.\", \"error.sso_verified_unique_value_changed\": \"Your sign-in provider confirmed this value, so it can't be changed here.\", \"error.sso_user_invalid\": \"Some details don't fit together. Please check them and try again.\", \"error.sso_user_cannot_be_created\": \"We can't create your account with this sign-in method. Please contact support.\", \"error.user_already_exists\": \"An account with these details already exists.\", \"error.user_not_found\": \"We couldn't find an account with these details.\", \"error.sso_user_not_found\": \"There is no account for this sign-in yet.\", \"error.outcome_unhandled\": \"This step could not continue. Please try again.\", \"error.sign_in_first\": \"Please sign in to your account first.\", // --- Notices: why the flow moved between sign-in and sign-up by itself --- \"notice.user_not_found\": \"We couldn't find an account for that email, so you can create one now. Mistyped it? Fix it in the email field below.\", \"notice.user_already_exists\": \"That email already has an account. Sign in to continue.\", \"notice.sso_user_not_found\": \"There's no account for this sign-in yet, so you can create one now.\", // --- Field / form errors --- \"error.email_required\": \"Please enter an email address\", \"error.email_invalid\": \"Please enter a valid email\", \"error.password_required\": \"Please enter a password\", \"error.password_incorrect\": \"Wrong email or password.\", \"error.email_exists\": \"An account with this email already exists.\", /** Sign-in error, inline on the password field. */ \"error.invalid_credentials\": \"Wrong email or password.\", \"error.required\": \"This field is required.\", // --- Generic field-rule fallbacks ({0} = field label) --- // Used by `localiseFlowErrorKeys` (liquid.ts) when no field-specific // entry exists for a server-emitted `error.<field>_<rule>` key. \"error.field_required\": \"{0} is required.\", \"error.field_format\": \"Please enter a valid {0}.\", \"error.field_min_length\": \"{0} is too short.\", \"error.field_max_length\": \"{0} is too long.\", \"error.field_min_length_value\": \"{0} must be at least {1} characters.\", \"error.field_max_length_value\": \"{0} must be at most {1} characters.\", \"error.field_invalid\": \"Please check {0}.\", // --- Sign-in form-level alert --- \"error.sign_in_server.title\": \"We couldn't complete your sign in.\", \"error.sign_in_server.body\": \"Please try again in a few minutes\", \"error.sso_cancelled.title\": \"Sign-in cancelled\", \"error.sso_cancelled.body\": \"You cancelled signing in with the provider, or it declined the request. You can try again or use another method.\", \"error.sso_failed.title\": \"Sign-in failed\", \"error.sso_failed.body\": \"The sign-in could not be completed. Please try again.\", \"error.more_info\": \"More information\", }",
           "description": "Minimal English locale dictionary.\n\nThe `| t` filter looks up `text_key` strings here. Missing keys fall through\nto the raw key (matches the spec in\n`docs/design/flowengine/flow-engine-guide.md`).\n\nText keys are auto-generated by the server from the flow definition:\n  - Step titles:       `<step>.title`\n  - Step descriptions: `<step>.description`, or `<step>.description.sso`\n    when the step offers sign-in providers (falls back to the plain key)\n  - Field labels:      `<step>.field.<field>`\n  - Action labels:     `<step>.action.<action>`"
         }
       ],
@@ -6717,7 +7068,7 @@
           "type": {
             "text": "Locale"
           },
-          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (inserimento e-mail — prima schermata) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Accedi\", \"identifier.description\": \"Inserisci la tua e-mail per continuare\", \"identifier.field.email\": \"E-mail\", \"identifier.field.email.placeholder\": \"tu@esempio.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Accedi\", \"identifier.action.continue\": \"Continua\", \"identifier.action.passkey\": \"Accedi con passkey\", \"identifier.action.register.lead\": \"Non hai un account? \", \"identifier.action.register.link\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (inserimento password — flusso di accesso) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Accedi\", \"authenticate.description\": \"Inserisci la tua password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Accedi\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (scelta del percorso di registrazione — nessun campo) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Crea il tuo account\", \"choose-register.description\": \"Scegli come registrarti\", \"choose-register.action.register-with-password\": \"Registrati con password\", \"choose-register.action.register-with-passkey\": \"Registrati con passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (e-mail + password — registrazione con password) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Crea il tuo account\", \"collect-credentials.description\": \"Configura e-mail e password\", \"collect-credentials.field.email\": \"E-mail\", \"collect-credentials.field.email.placeholder\": \"tu@esempio.com\", \"collect-credentials.field.password\": \"Password\", \"collect-credentials.action.submit\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (inserimento password — percorso di registrazione) // Flusso login predefinito: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Crea la tua password\", \"register-password.description\": \"Scegli una password sicura per il tuo account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Registrati\", \"register-password.action.back\": \"Indietro\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (proposta passkey — dopo la registrazione) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Accedi più velocemente la prossima volta\", \"passkey-upsell.description\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line1\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line2\": \"Accedi con Face ID, Touch ID o PIN.\", \"passkey-upsell.action.passkey_register\": \"Configura passkey\", \"passkey-upsell.action.skip\": \"Salta per ora\", \"passkey-upsell.action.setup\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (solo e-mail — registrazione solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Crea il tuo account\", \"collect-passkey-email.description\": \"Inserisci la tua e-mail per configurare una passkey\", \"collect-passkey-email.field.email\": \"E-mail\", \"collect-passkey-email.field.email.placeholder\": \"tu@esempio.com\", \"collect-passkey-email.action.submit\": \"Continua\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (cerimonia passkey — percorso solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Configura la tua passkey\", \"passkey-enroll.description\": \"Usa Face ID, Touch ID o il PIN del dispositivo per creare una passkey.\", \"passkey-enroll.action.passkey_register\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminale — conferma accesso) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Sei connesso\", \"done.description\": \"\", // --- Alias dei nomi step per il flusso login predefinito --- \"password.title\": \"Accedi\", \"password.description\": \"Inserisci la tua password\", \"password.description.sso\": \"Inserisci la tua password o continua con il tuo provider di accesso\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Accedi\", \"password.action.passkey\": \"Accedi con passkey\", \"password.action.back\": \"Indietro\", \"password.action.register.lead\": \"Non hai un account? \", \"password.action.register.link\": \"Registrati\", \"register.title\": \"Crea il tuo account\", // Vuoto per design — la scheda di registrazione non ha sottotitolo. \"register.description\": \"Inserisci i tuoi dati per iniziare\", \"register.field.email\": \"E-mail\", \"register.field.email.placeholder\": \"tu@esempio.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Nome\", \"register.field.familyName\": \"Cognome\", \"register.field.companyName\": \"Nome azienda\", // L'<input type=\"date\"> nativo localizza il proprio formato di visualizzazione in base // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario. \"register.field.dateOfBirth\": \"Data di nascita\", \"register.field.country\": \"Paese\", \"register.field.country.placeholder\": \"Seleziona il tuo paese\", \"register.field.terms\": \"Accetto i termini di servizio\", \"register.action.password\": \"Continua con password\", \"register.action.passkey\": \"Continua con passkey\", \"register.action.submit\": \"Registrati\", \"register.action.back\": \"Indietro\", \"register.action.sign_in.lead\": \"Hai già un account? \", \"register.action.sign_in.link\": \"Accedi\", \"complete.title\": \"Sei connesso\", \"signed-in.continue\": \"Continua\", \"signed-in.logout\": \"Esci\", // --- Accesso con passkey --- \"passkey-login.title\": \"Accedi con la tua passkey\", // --- Step: passkey-first (passo iniziale del preset passkey-first) --- \"passkey-first.title\": \"Accedi\", \"passkey-first.description\": \"Usa la tua passkey per continuare\", \"passkey-first.action.passkey\": \"Continua con passkey\", \"passkey-first.action.email_fallback\": \"Usa invece l'email\", // --- Recupero password --- \"recover.title\": \"Controlla la tua e-mail\", \"recover.description\": \"Abbiamo inviato un link per reimpostare la password al tuo indirizzo e-mail.\", \"recover.action.back\": \"Torna all'accesso\", // --- Azioni condivise --- \"submit.continue\": \"Continua\", \"submit.signin\": \"Accedi\", \"action.forgot_password\": \"Password dimenticata?\", \"action.show_password\": \"Mostra password\", \"action.cancel\": \"Annulla\", // Fallback generico per la chiave `<step>.action.back` iniettata dal motore // (vedi INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Indietro\", \"action.use_another_account\": \"Usa un altro account\", // --- SSO --- \"sso.continue_with\": \"Continua con {name}\", \"sso.divider\": \"oppure\", \"register-sso.title\": \"Completa la creazione del tuo account\", \"register-sso.description\": \"Ci servono ancora pochi dati\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Crea account\", \"sso-conflict.title\": \"Hai già un account\", \"sso-conflict.description\": \"Accedi come fai di solito per continuare\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Accedi\", \"sso-conflict.action.passkey\": \"Usa una passkey\", \"sso-conflict.action.sign_in\": \"Torna all'accesso\", \"sso.redirect.title\": \"Reindirizzamento al provider…\", // --- Cerimonia passkey --- \"passkey.pending.status\": \"In attesa della tua passkey…\", // --- Errori passkey --- \"error.passkey_cancelled\": \"La richiesta della passkey è stata chiusa prima del completamento.\", \"error.passkey_timeout\": \"La richiesta della passkey è scaduta. Riprova.\", \"error.passkey_not_registered\": \"Questa passkey non è registrata. Accedi con e-mail e password.\", \"error.passkey_setup_failed\": \"La registrazione della passkey non è stata completata. Riprova.\", \"error.passkey_unsupported\": \"Questo dispositivo non supporta le passkey\", \"error.passkey_failed\": \"Qualcosa è andato storto. Riprova.\", \"error.passkey_invalid\": \"Non è stato possibile verificare questa passkey. Riprova.\", \"error.sso_creation_disabled\": \"Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.\", \"error.flow_restart_required\": \"Non è stato possibile proseguire l'accesso. Ricomincia da capo.\", \"error.passkey_registration_invalid\": \"Non è stato possibile verificare la nuova passkey. Riprova a registrarla.\", \"error.sso_unavailable\": \"Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.\", \"error.sso_verified_unique_value_changed\": \"Il tuo provider di accesso ha confermato questo valore, quindi non può essere modificato qui.\", \"error.sso_user_invalid\": \"Alcuni dati non sono coerenti tra loro. Controllali e riprova.\", \"error.sso_user_cannot_be_created\": \"Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.\", \"error.user_already_exists\": \"Esiste già un account con questi dati.\", \"error.user_not_found\": \"Non abbiamo trovato un account con questi dati.\", \"error.sso_user_not_found\": \"Non esiste ancora un account per questo accesso.\", \"error.outcome_unhandled\": \"Non è stato possibile proseguire questo passaggio. Riprova.\", \"error.sign_in_first\": \"Accedi prima al tuo account.\", // --- Errori campo / modulo --- \"error.email_required\": \"Inserisci un indirizzo e-mail\", \"error.email_invalid\": \"Inserisci un indirizzo e-mail valido\", \"error.password_required\": \"Inserisci una password\", \"error.password_incorrect\": \"E-mail o password errata.\", \"error.email_exists\": \"Esiste già un account con questo indirizzo e-mail.\", \"error.invalid_credentials\": \"E-mail o password errata.\", \"error.required\": \"Questo campo è obbligatorio.\", // --- Fallback generici per regole di campo ({0} = etichetta del campo) --- \"error.field_required\": \"{0} è obbligatorio.\", \"error.field_format\": \"Inserisci un valore valido per {0}.\", \"error.field_min_length\": \"{0} è troppo corto.\", \"error.field_max_length\": \"{0} è troppo lungo.\", \"error.field_invalid\": \"Controlla {0}.\", // --- Alert a livello di modulo --- \"error.sign_in_server.title\": \"Non è stato possibile completare l'accesso.\", \"error.sign_in_server.body\": \"Riprova tra qualche minuto\", \"error.sso_cancelled.title\": \"Accesso annullato\", \"error.sso_cancelled.body\": \"Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.\", \"error.sso_failed.title\": \"Accesso non riuscito\", \"error.sso_failed.body\": \"Non è stato possibile completare l'accesso. Riprova.\", \"error.more_info\": \"Maggiori informazioni\", }"
+          "default": "{ // ═══════════════════════════════════════════════════════════════════════════ // Step: identifier (inserimento e-mail — prima schermata) // ═══════════════════════════════════════════════════════════════════════════ \"identifier.title\": \"Accedi\", \"identifier.description\": \"Inserisci la tua e-mail per continuare\", \"identifier.field.email\": \"E-mail\", \"identifier.field.email.placeholder\": \"tu@esempio.com\", \"identifier.field.password\": \"Password\", \"identifier.action.submit\": \"Accedi\", \"identifier.action.continue\": \"Continua\", \"identifier.action.passkey\": \"Accedi con passkey\", \"identifier.action.register.lead\": \"Non hai un account? \", \"identifier.action.register.link\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: authenticate (inserimento password — flusso di accesso) // ═══════════════════════════════════════════════════════════════════════════ \"authenticate.title\": \"Accedi\", \"authenticate.description\": \"Inserisci la tua password\", \"authenticate.field.password\": \"Password\", \"authenticate.action.submit\": \"Accedi\", // ═══════════════════════════════════════════════════════════════════════════ // Step: choose-register (scelta del percorso di registrazione — nessun campo) // ═══════════════════════════════════════════════════════════════════════════ \"choose-register.title\": \"Crea il tuo account\", \"choose-register.description\": \"Scegli come registrarti\", \"choose-register.action.register-with-password\": \"Registrati con password\", \"choose-register.action.register-with-passkey\": \"Registrati con passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-credentials (e-mail + password — registrazione con password) // ═══════════════════════════════════════════════════════════════════════════ \"collect-credentials.title\": \"Crea il tuo account\", \"collect-credentials.description\": \"Configura e-mail e password\", \"collect-credentials.field.email\": \"E-mail\", \"collect-credentials.field.email.placeholder\": \"tu@esempio.com\", \"collect-credentials.field.password\": \"Password\", \"collect-credentials.action.submit\": \"Registrati\", // ═══════════════════════════════════════════════════════════════════════════ // Step: register-password (inserimento password — percorso di registrazione) // Flusso login predefinito: register → register-password → passkey-upsell → done // ═══════════════════════════════════════════════════════════════════════════ \"register-password.title\": \"Crea la tua password\", \"register-password.description\": \"Scegli una password sicura per il tuo account\", \"register-password.field.password\": \"Password\", \"register-password.action.submit\": \"Registrati\", \"register-password.action.back\": \"Indietro\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-upsell (proposta passkey — dopo la registrazione) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-upsell.title\": \"Accedi più velocemente la prossima volta\", \"passkey-upsell.description\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line1\": \"Nessuna password necessaria.\", \"passkey-upsell.description.line2\": \"Accedi con Face ID, Touch ID o PIN.\", \"passkey-upsell.action.passkey_register\": \"Configura passkey\", \"passkey-upsell.action.skip\": \"Salta per ora\", \"passkey-upsell.action.setup\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: collect-passkey-email (solo e-mail — registrazione solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"collect-passkey-email.title\": \"Crea il tuo account\", \"collect-passkey-email.description\": \"Inserisci la tua e-mail per configurare una passkey\", \"collect-passkey-email.field.email\": \"E-mail\", \"collect-passkey-email.field.email.placeholder\": \"tu@esempio.com\", \"collect-passkey-email.action.submit\": \"Continua\", // ═══════════════════════════════════════════════════════════════════════════ // Step: passkey-enroll (cerimonia passkey — percorso solo passkey) // ═══════════════════════════════════════════════════════════════════════════ \"passkey-enroll.title\": \"Configura la tua passkey\", \"passkey-enroll.description\": \"Usa Face ID, Touch ID o il PIN del dispositivo per creare una passkey.\", \"passkey-enroll.action.passkey_register\": \"Configura passkey\", // ═══════════════════════════════════════════════════════════════════════════ // Step: done (terminale — conferma accesso) // ═══════════════════════════════════════════════════════════════════════════ \"done.title\": \"Sei connesso\", \"done.description\": \"\", // --- Alias dei nomi step per il flusso login predefinito --- \"password.title\": \"Accedi\", \"password.description\": \"Inserisci la tua password\", \"password.description.sso\": \"Inserisci la tua password o continua con il tuo provider di accesso\", \"password.field.password\": \"Password\", \"password.action.signin\": \"Accedi\", \"password.action.passkey\": \"Accedi con passkey\", \"password.action.back\": \"Indietro\", \"password.action.register.lead\": \"Non hai un account? \", \"password.action.register.link\": \"Registrati\", \"register.title\": \"Crea il tuo account\", // Vuoto per design — la scheda di registrazione non ha sottotitolo. \"register.description\": \"Inserisci i tuoi dati per iniziare\", \"register.field.email\": \"E-mail\", \"register.field.email.placeholder\": \"tu@esempio.com\", \"register.field.password\": \"Password\", \"register.field.givenName\": \"Nome\", \"register.field.familyName\": \"Cognome\", \"register.field.companyName\": \"Nome azienda\", // L'<input type=\"date\"> nativo localizza il proprio formato di visualizzazione in base // alla lingua dell'utente e invia ISO YYYY-MM-DD — nessun segnaposto/suggerimento di formato necessario. \"register.field.dateOfBirth\": \"Data di nascita\", \"register.field.country\": \"Paese\", \"register.field.country.placeholder\": \"Seleziona il tuo paese\", \"register.field.terms\": \"Accetto i termini di servizio\", \"register.action.password\": \"Continua con password\", \"register.action.passkey\": \"Continua con passkey\", \"register.action.submit\": \"Registrati\", \"register.action.back\": \"Indietro\", \"register.action.sign_in.lead\": \"Hai già un account? \", \"register.action.sign_in.link\": \"Accedi\", \"complete.title\": \"Sei connesso\", \"signed-in.continue\": \"Continua\", \"signed-in.logout\": \"Esci\", // --- Accesso con passkey --- \"passkey-login.title\": \"Accedi con la tua passkey\", // --- Step: passkey-first (passo iniziale del preset passkey-first) --- \"passkey-first.title\": \"Accedi\", \"passkey-first.description\": \"Usa la tua passkey per continuare\", \"passkey-first.action.passkey\": \"Continua con passkey\", \"passkey-first.action.email_fallback\": \"Usa invece l'email\", // --- Recupero password --- \"recover.title\": \"Controlla la tua e-mail\", \"recover.description\": \"Abbiamo inviato un link per reimpostare la password al tuo indirizzo e-mail.\", \"recover.action.back\": \"Torna all'accesso\", // --- Azioni condivise --- \"submit.continue\": \"Continua\", \"submit.signin\": \"Accedi\", \"action.forgot_password\": \"Password dimenticata?\", \"action.show_password\": \"Mostra password\", \"action.cancel\": \"Annulla\", // Fallback generico per la chiave `<step>.action.back` iniettata dal motore // (vedi INJECTED_KEY_FALLBACKS in liquid.ts). \"action.back\": \"Indietro\", \"action.use_another_account\": \"Usa un altro account\", // --- SSO --- \"sso.continue_with\": \"Continua con {name}\", \"sso.divider\": \"oppure\", \"register-sso.title\": \"Completa la creazione del tuo account\", \"register-sso.description\": \"Ci servono ancora pochi dati\", \"register-sso.field.email\": \"Email\", \"register-sso.action.submit\": \"Crea account\", \"sso-conflict.title\": \"Hai già un account\", \"sso-conflict.description\": \"Accedi come fai di solito per continuare\", \"sso-conflict.field.password\": \"Password\", \"sso-conflict.action.submit\": \"Accedi\", \"sso-conflict.action.passkey\": \"Usa una passkey\", \"sso-conflict.action.sign_in\": \"Torna all'accesso\", \"sso.redirect.title\": \"Reindirizzamento al provider…\", // --- Cerimonia passkey --- \"passkey.pending.status\": \"In attesa della tua passkey…\", // --- Errori passkey --- \"error.passkey_cancelled\": \"La richiesta della passkey è stata chiusa prima del completamento.\", \"error.passkey_timeout\": \"La richiesta della passkey è scaduta. Riprova.\", \"error.passkey_not_registered\": \"Questa passkey non è registrata. Accedi con e-mail e password.\", \"error.passkey_setup_failed\": \"La registrazione della passkey non è stata completata. Riprova.\", \"error.passkey_unsupported\": \"Questo dispositivo non supporta le passkey\", \"error.passkey_failed\": \"Qualcosa è andato storto. Riprova.\", \"error.passkey_invalid\": \"Non è stato possibile verificare questa passkey. Riprova.\", \"error.sso_creation_disabled\": \"Non esiste un account per questo accesso e con questo provider non è possibile creare nuovi account.\", \"error.flow_restart_required\": \"Non è stato possibile proseguire l'accesso. Ricomincia da capo.\", \"error.passkey_registration_invalid\": \"Non è stato possibile verificare la nuova passkey. Riprova a registrarla.\", \"error.sso_unavailable\": \"Questo provider di accesso non è disponibile al momento. Prova un altro metodo di accesso.\", \"error.sso_verified_unique_value_changed\": \"Il tuo provider di accesso ha confermato questo valore, quindi non può essere modificato qui.\", \"error.sso_user_invalid\": \"Alcuni dati non sono coerenti tra loro. Controllali e riprova.\", \"error.sso_user_cannot_be_created\": \"Non possiamo creare il tuo account con questo metodo di accesso. Contatta l'assistenza.\", \"error.user_already_exists\": \"Esiste già un account con questi dati.\", \"error.user_not_found\": \"Non abbiamo trovato un account con questi dati.\", \"error.sso_user_not_found\": \"Non esiste ancora un account per questo accesso.\", \"error.outcome_unhandled\": \"Non è stato possibile proseguire questo passaggio. Riprova.\", \"error.sign_in_first\": \"Accedi prima al tuo account.\", // --- Avvisi: perché il flusso passa da solo tra accesso e registrazione --- \"notice.user_not_found\": \"Non abbiamo trovato un account per questo indirizzo e-mail: puoi crearne uno ora. Hai sbagliato a scriverlo? Correggilo nel campo E-mail qui sotto.\", \"notice.user_already_exists\": \"Esiste già un account per questo indirizzo e-mail. Accedi per continuare.\", \"notice.sso_user_not_found\": \"Non esiste ancora un account per questo accesso: puoi crearne uno ora.\", // --- Errori campo / modulo --- \"error.email_required\": \"Inserisci un indirizzo e-mail\", \"error.email_invalid\": \"Inserisci un indirizzo e-mail valido\", \"error.password_required\": \"Inserisci una password\", \"error.password_incorrect\": \"E-mail o password errata.\", \"error.email_exists\": \"Esiste già un account con questo indirizzo e-mail.\", \"error.invalid_credentials\": \"E-mail o password errata.\", \"error.required\": \"Questo campo è obbligatorio.\", // --- Fallback generici per regole di campo ({0} = etichetta del campo) --- \"error.field_required\": \"{0} è obbligatorio.\", \"error.field_format\": \"Inserisci un valore valido per {0}.\", \"error.field_min_length\": \"{0} è troppo corto.\", \"error.field_max_length\": \"{0} è troppo lungo.\", \"error.field_min_length_value\": \"{0} deve contenere almeno {1} caratteri.\", \"error.field_max_length_value\": \"{0} può contenere al massimo {1} caratteri.\", \"error.field_invalid\": \"Controlla {0}.\", // --- Alert a livello di modulo --- \"error.sign_in_server.title\": \"Non è stato possibile completare l'accesso.\", \"error.sign_in_server.body\": \"Riprova tra qualche minuto\", \"error.sso_cancelled.title\": \"Accesso annullato\", \"error.sso_cancelled.body\": \"Hai annullato l'accesso con il provider, oppure la richiesta è stata rifiutata. Riprova o usa un altro metodo.\", \"error.sso_failed.title\": \"Accesso non riuscito\", \"error.sso_failed.body\": \"Non è stato possibile completare l'accesso. Riprova.\", \"error.more_info\": \"Maggiori informazioni\", }"
         }
       ],
       "exports": [
@@ -7290,7 +7641,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true
             },
@@ -7431,7 +7782,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant"
             },
             {
@@ -8603,7 +8954,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true,
               "inheritedFrom": {
@@ -8880,7 +9231,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant",
               "inheritedFrom": {
                 "name": "ZitadelSurface",
@@ -9454,7 +9805,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "attribute": "variant",
               "reflects": true,
               "inheritedFrom": {
@@ -9642,7 +9993,7 @@
                 "text": "\"widget\" | \"page\""
               },
               "default": "\"widget\"",
-              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes — the hosted shell and\nthe scaffolded pages — opt into `page`, which claims the viewport, paints\nthe surface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
+              "description": "Sizing/chrome mode. Components size to content; pages compose them —\nso the default is `widget`: content-sized, transparent host, no\ndocument-level font injection. Dedicated routes, such as the scaffolded\nlogin pages, opt into `page`, which claims the viewport, paints the\nsurface background, and links the tenant's `font_url` when it has one.\nFine-grained height override in both modes: `--zl-page-min-height`.",
               "fieldName": "variant",
               "inheritedFrom": {
                 "name": "ZitadelSurface",

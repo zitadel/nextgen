@@ -1,6 +1,9 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@latest/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "zitadel/nextgen" }],
+  "changelog": [
+    "@changesets/changelog-github",
+    { "repo": "zitadel/nextgen", "disableThanks": true }
+  ],
   "commit": false,
   "fixed": [
     [
@@ -44,7 +47,8 @@
     "@zitadel/e2e",
     "@zitadel/demo-next",
     "@zitadel/demo-nuxt",
-    "@zitadel/login-ui",
-    "@zitadel/storybook"
+    "@zitadel/docs",
+    "@zitadel/storybook",
+    "@zitadel/website"
   ]
 }

@@ -59,6 +59,10 @@ SELECT object_type, relation FROM authz_relations WHERE catalog_id = @p1`, domai
 			{"project", "viewer"},
 			{"project", "editor"},
 			{"project", "admin"},
+			// ADR 075: the platform operator and the implied tupleset it
+			// reaches every project through.
+			{"platform", "operator"},
+			{"project", "platform"},
 		}, relations)
 
 		var identityCount int64
@@ -74,7 +78,7 @@ WHERE catalog_id = @p1
 			})
 		})
 		require.NoError(t, err)
-		assert.Equal(t, int64(5), identityCount)
+		assert.Equal(t, int64(7), identityCount)
 
 		var edgeCount int64
 		err = db.Query(ctx, buildStatement(`
@@ -85,9 +89,11 @@ SELECT COUNT(1) FROM authz_expression_edges WHERE catalog_id = @p1`, domain.Syst
 			})
 		})
 		require.NoError(t, err)
-		// team.member and project.team direct, and direct + one rewrite on each
-		// of viewer (→ editor), editor (→ admin) and admin (TTU on project.team).
-		assert.Equal(t, int64(8), edgeCount)
+		// team.member, project.team, platform.operator and project.platform
+		// direct; direct + one rewrite on each of viewer (→ editor) and editor
+		// (→ admin); direct + two on admin (TTU on project.team and on
+		// project.platform).
+		assert.Equal(t, int64(11), edgeCount)
 
 		// Roles are monotonic (ADR 054 §5): admin closes to editor and viewer,
 		// editor to viewer, and nothing closes upward. An exact match of the

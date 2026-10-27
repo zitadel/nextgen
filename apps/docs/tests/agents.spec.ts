@@ -19,6 +19,29 @@ test("search answers JSON hits under /docs", async ({ request }) => {
   expect(hits.filter((hit) => !hit.url.startsWith("/docs/"))).toEqual([]);
 });
 
+/**
+ * The feedback card's route turns a valid rating into a Web Analytics event,
+ * so the suite, which also runs against deployments, sends only ones it must
+ * refuse. The card's side is in site.browser.spec.ts.
+ */
+test("the feedback route refuses a rating it would not record", async ({ request }) => {
+  const valid = { opinion: "good", page: "/docs/get-started/quickstart", message: "" };
+  const invalid: [string, unknown][] = [
+    ["an opinion off the scale", { ...valid, opinion: "meh" }],
+    ["a page outside /docs", { ...valid, page: "/console" }],
+    ["a message Web Analytics would drop", { ...valid, message: "x".repeat(256) }],
+    ["no message", { opinion: valid.opinion, page: valid.page }],
+    ["a body that is not JSON", "good"],
+  ];
+  for (const [what, body] of invalid) {
+    const response = await request.post("/docs/api/feedback", {
+      headers: { "content-type": "application/json" },
+      data: typeof body === "string" ? body : JSON.stringify(body),
+    });
+    expect(response.status(), what).toBe(400);
+  }
+});
+
 test("the routes that are not pages answer an agent that asks for text", async ({ request }) => {
   // isMarkdownPreferred counts text/plain as Markdown: without the matcher's
   // exclusions the proxy would rewrite these to Markdown twins that do not exist.
@@ -27,6 +50,7 @@ test("the routes that are not pages answer an agent that asks for text", async (
     ["/docs/llms.txt", "text/plain"],
     ["/docs/llms-full.txt", "text/plain"],
     ["/docs/openapi.json", "application/json"],
+    ["/docs/mock-service-worker.js", "text/javascript"],
   ];
   for (const accept of ["text/plain", "text/markdown"]) {
     for (const [route, type] of routes) {

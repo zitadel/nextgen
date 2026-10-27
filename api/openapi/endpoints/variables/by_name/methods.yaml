@@ -1,6 +1,6 @@
 get:
   operationId: getVariable
-  x-zitadel-cli: variables get
+  x-zitadel-cli: variable get
   summary: Get a variable
   description: |
     Reads one variable by name, with its value per kind. A name with no
@@ -15,6 +15,7 @@ get:
   security:
     - oauth2:
         - variable.read
+    - nextgenSession: []
   responses:
     '200':
       description: The variable was retrieved successfully.
@@ -27,7 +28,7 @@ get:
 
 delete:
   operationId: deleteVariable
-  x-zitadel-cli: variables delete
+  x-zitadel-cli: variable rm
   summary: Delete a variable
   description: |
     Removes a variable for the requested kind, or for both kinds without

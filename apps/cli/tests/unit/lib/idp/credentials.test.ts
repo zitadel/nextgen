@@ -12,25 +12,17 @@ const PRODUCTION = environmentSelectorSuffix({ envName: "production" });
 const VERSION = "1.0.0-alpha.23";
 
 describe("the recovery command for a credential", () => {
-  it("names the owner, without which every variables command refuses", () => {
-    // `variables set NAME` alone fails with "Name the owner: --project-level"
-    // before making a request, so the recovery step would repair nothing.
-    expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, NO_SELECTOR)).toContain(
-      "--project-level",
-    );
-  });
-
   it("is runnable rather than a bare subcommand", () => {
     // A JSON result is read by agents, which execute these as shell commands.
     expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, NO_SELECTOR)).toMatch(
-      /^npx .+ variables set /,
+      /^npx .+ variable set /,
     );
   });
 
   it("marks a secret as one, so the value is not stored in the clear", () => {
     expect(
       republishCommand(secretVariable("GOOGLE_CLIENT_SECRET"), true, VERSION, NO_SELECTOR),
-    ).toContain("variables set GOOGLE_CLIENT_SECRET --project-level --secret");
+    ).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
     expect(
       republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, NO_SELECTOR),
     ).not.toContain("--secret");
@@ -40,7 +32,7 @@ describe("the recovery command for a credential", () => {
     // The selector reproduces the invocation's --env/--env-file/--server; a
     // retry without it would silently target the default project.
     expect(republishCommand(idVariable("GOOGLE_CLIENT_ID"), false, VERSION, PRODUCTION)).toContain(
-      "--project-level --env production",
+      "variable set GOOGLE_CLIENT_ID --env production",
     );
   });
 });
@@ -70,7 +62,7 @@ describe("the recovery commands a result carries", () => {
     );
 
     expect(commands).toHaveLength(1);
-    expect(commands[0]).toContain("variables set GOOGLE_CLIENT_SECRET --project-level --secret");
+    expect(commands[0]).toContain("variable set GOOGLE_CLIENT_SECRET --secret");
   });
 
   it("covers a deferred publish, not just a failed one", () => {
@@ -116,16 +108,8 @@ describe("the recovery commands as argument lists", () => {
         ["--cwd", "/home/dev/app"],
       ),
     ).toEqual([
-      ["variables", "set", "GOOGLE_CLIENT_ID", "--project-level", "--cwd", "/home/dev/app"],
-      [
-        "variables",
-        "set",
-        "GOOGLE_CLIENT_SECRET",
-        "--project-level",
-        "--secret",
-        "--cwd",
-        "/home/dev/app",
-      ],
+      ["variable", "set", "GOOGLE_CLIENT_ID", "--cwd", "/home/dev/app"],
+      ["variable", "set", "GOOGLE_CLIENT_SECRET", "--secret", "--cwd", "/home/dev/app"],
     ]);
   });
 

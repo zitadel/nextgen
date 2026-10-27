@@ -2,13 +2,14 @@ import { ZitadelError } from "./errors";
 import { LocalServer } from "./local-server/server";
 import type { Parsed } from "@zitadel/config/idp";
 import type { FlagVariable } from "./oclif/types";
+import { DEFAULT_SERVER } from "@zitadel/config/server";
 
 /**
- * Server URL `setup` connects to when `--server` is not given. Also surfaced
- * in hints and the interactive setup prompt as the suggested value, so it is
- * exported rather than kept private.
+ * Server URL used when nothing else resolves (`@zitadel/config/server`, which
+ * the console shares). Also surfaced in hints and the interactive setup
+ * prompt as the suggested value, so it is re-exported here.
  */
-export const DEFAULT_SERVER = "https://preview.zitadel.com";
+export { DEFAULT_SERVER } from "@zitadel/config/server";
 
 /** The variable {@link resolveServer} reads when `--server` is not given. */
 export const SERVER_VARIABLE: FlagVariable = {
@@ -86,4 +87,17 @@ export function serverOrigin(value: string): string {
     });
   }
   return url.origin;
+}
+
+/**
+ * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
+ * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+  } catch {
+    return false;
+  }
 }

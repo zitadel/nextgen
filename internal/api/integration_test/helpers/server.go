@@ -49,7 +49,7 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 			h.EnsureKeyService(t),
 			h.EnsureVariableService(t),
 			h.EnsureHttpClient(t),
-		)), "code", "state")
+		)))
 		// The same paths as the production mux (buildHTTPMux), not its
 		// middleware chain: the callback on both its spellings, ahead of the
 		// API catch-all.
@@ -64,11 +64,11 @@ func (h *Harness) EnsureTestServer(t testing.TB) *httptest.Server {
 
 // withServerLog hands every request a logger collecting into the harness, the
 // way the production middleware hands one writing to the process log, and runs
-// the production request logging on top so the buffer holds real log lines.
-// redactQuery is the mount's opt-in, as in production.
-func (h *Harness) withServerLog(next http.Handler, redactQuery ...string) http.Handler {
+// the production request logging and panic recovery on top so the buffer holds
+// real log lines.
+func (h *Harness) withServerLog(next http.Handler) http.Handler {
 	logger := slog.New(slog.NewTextHandler(&h.serverLog, nil))
-	logging := middleware.WithLogging(next, redactQuery...)
+	logging := middleware.WithLogging(api.WithRecover(next))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		logging.ServeHTTP(w, r.WithContext(zlog.WithLoggingContext(r.Context(), logger)))
 	})
@@ -85,12 +85,19 @@ func (h *Harness) EnsureGeneratedServer(t testing.TB) *generated.Server {
 			h.EnsureHandler(t),
 			h.EnsureSecurityHandler(t),
 			generated.WithErrorHandler(api.OgenErrorHandler),
+			generated.WithNotFound(api.OgenNotFound(nil)),
+			generated.WithMethodNotAllowed(api.OgenMethodNotAllowed),
 			generated.WithTracerProvider(api.NewOgenTracerProvider(otel.GetTracerProvider())),
 		)
 		require.NoError(t, err)
 	}
 	return h.generatedServer.value
 }
+
+// ConsoleOrigin is the test server's own origin, the one its
+// server.public_base would name: claim URLs point at its console, and the flow
+// gate admits it to open any project's flow.
+const ConsoleOrigin = "https://console.invalid"
 
 func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 	t.Helper()
@@ -121,12 +128,12 @@ func (h *Harness) EnsureHandler(t testing.TB) *api.Handler {
 			h.EnsureEventService(t),
 			h.EnsureTokenService(t),
 			h.EnsureKeyService(t),
-			service.NewClaimService(db, "https://console.invalid/ui/console", platform.ID),
+			service.NewClaimService(db, ConsoleOrigin+"/ui/console", platform.ID),
 			service.NewGrantService(db, service.StatementsUserRefResolver{Pool: db}, platform.ID),
 			service.NewVariableService(db, h.EnsureKeyService(t)),
 			db,
 			platform.ID,
-		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService)).WithPolicyService(h.EnsurePolicyService(t))
+		).WithBuiltinSchemaBases(BuiltinSchemaBases()).WithRuntimeResolver(service.NewRuntimeResolver(db, releaseService, ConsoleOrigin)).WithPolicyService(h.EnsurePolicyService(t))
 	}
 	return h.handler.value
 }
@@ -139,7 +146,7 @@ func (h *Harness) EnsureSecurityHandler(t testing.TB) *api.SecurityHandler {
 	if h.securityHandler.value == nil {
 		h.securityHandler.value = api.NewSecurityHandler(
 			h.EnsureTokenService(t),
-		)
+		).WithPlatformProject(h.EnsurePlatformProject(t).ID)
 	}
 	return h.securityHandler.value
 }

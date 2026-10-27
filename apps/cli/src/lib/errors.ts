@@ -1,4 +1,4 @@
-import { ApiError, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
 import type { SuggestedCommand } from "./suggestion";
 
 /**
@@ -107,8 +107,20 @@ export function toZitadelError(error: unknown): ZitadelError {
     if (error.status === 404) {
       // A 404 carrying the platform's error envelope (a `code` field) is a
       // domain-level miss from a real Zitadel API — an unknown schema or
-      // project id. Without the envelope the endpoint itself is missing:
-      // the CLI is pointed at a server that isn't a Zitadel platform API.
+      // project id — except `req.not_found`, which the server answers for a
+      // path no operation of its version has (ADR 076). Without the envelope
+      // the endpoint itself is missing: the CLI is pointed at a server that
+      // isn't a Zitadel platform API.
+      if (apiErrorCode(error) === "req.not_found") {
+        return new ZitadelError(
+          "E_NOT_FOUND",
+          `${error.url} has no such endpoint on this Zitadel server`,
+          {
+            hint: "The server and this CLI are different versions. Run the CLI release that matches the server, or upgrade the server.",
+            details,
+          },
+        );
+      }
       const wrongServer = !isPlatformErrorEnvelope(error.body);
       const message = wrongServer
         ? `${apiErrorMessage(error)} — ${error.url} has no such endpoint; is this a Zitadel platform API?`
@@ -238,6 +250,16 @@ function listedInDetails(body: unknown, key: "fields" | "missing"): string[] {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+/**
+ * Whether a request reached a server that has no such endpoint: a 404 without
+ * the platform's error envelope. A Zitadel API answers a miss it knows about
+ * with the envelope, so this is a route the server does not serve, such as one
+ * added in a later release.
+ */
+export function isMissingEndpoint(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 404 && !isPlatformErrorEnvelope(error.body);
 }
 
 function isPlatformErrorEnvelope(body: unknown): boolean {

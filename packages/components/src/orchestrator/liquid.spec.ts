@@ -343,6 +343,28 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain("invalid");
   });
 
+  it("opens the card with a notice, as information rather than an error", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const context = {
+      step: { name: "register", texts: { title_key: "register.title" } },
+      fields: [],
+      actions: toArray({ submit: { text_key: "register.action.password", primary: true } }),
+      branding: {},
+      loading: false,
+      errors: [],
+      gates: {},
+      sso_providers: [],
+      // <zitadel-login> lifts the step's `notice` into `messages`.
+      messages: [{ level: "info", text_key: "notice.user_not_found" }],
+      identity: null,
+    };
+    const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
+    expect(result).toContain('<zl-alert severity="info" data-zl-step-message>');
+    expect(result).toContain("We couldn&#39;t find an account for that email");
+    expect(result.indexOf("data-zl-step-message")).toBeLessThan(result.indexOf('action="submit"'));
+    expect(result).not.toContain("data-zl-step-error");
+  });
+
   it("renders the engine's passkey proof rejection as a localized alert", () => {
     const engine = createLiquidEngine({ locale: fullLocale });
     const a = toArray({
@@ -830,6 +852,30 @@ describe("localiseFlowErrorKeys", () => {
     expect(localiseFlowErrorKeys("error.x-auth-methods#password_min_length", ctx)).toEqual([
       { message: "Password is too short." },
     ]);
+  });
+
+  it("names the bound a length error's field carries", () => {
+    const validations = { "x-auth-methods#password": { min_length: 12, max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at least 12 characters." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_max_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password must be at most 64 characters." }]);
+  });
+
+  it("keeps the generic length message when the field carries no such bound", () => {
+    // A max_length bound does not name a min_length violation.
+    const validations = { "x-auth-methods#password": { max_length: 64 } };
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", { ...ctx, validations }),
+    ).toEqual([{ message: "Password is too short." }]);
+    expect(
+      localiseFlowErrorKeys("error.x-auth-methods#password_min_length", {
+        ...ctx,
+        validations: {},
+      }),
+    ).toEqual([{ message: "Password is too short." }]);
   });
 
   it("covers every rule suffix's generic fallback, including unknown_field", () => {

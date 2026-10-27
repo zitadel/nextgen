@@ -74,6 +74,12 @@ import {
   GetIdpByIdParams,
   GetIdpByIdQueryParams,
   GetIdpByIdResponse,
+  GetPolicyParams,
+  GetPolicyQueryParams,
+  GetPolicyResponse,
+  GetPolicyRevisionParams,
+  GetPolicyRevisionQueryParams,
+  GetPolicyRevisionResponse,
   GetProjectParams,
   GetProjectResponse,
   GetReleaseByIdParams,
@@ -89,14 +95,26 @@ import {
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListPreviewsParams,
+  ListPreviewsQueryParams,
+  ListPreviewsResponse,
   ListReleasesQueryParams,
+  ListPoliciesQueryParams,
+  ListPoliciesResponse,
+  ListPolicyRevisionsParams,
+  ListPolicyRevisionsQueryParams,
+  ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
+  PublishPolicyQueryParams,
+  PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
   QueryIdpsResponse,
   QueryUsersBody,
   RemoveOriginBody,
   RemoveOriginParams,
+  RemovePreviewBody,
+  RemovePreviewParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
@@ -109,6 +127,7 @@ import {
 import { validateFlowDefinition } from "@zitadel/config/validate";
 import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/defaults";
 import { missingEndpoints } from "@zitadel/config/idp";
+import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
 
@@ -198,10 +217,47 @@ function queryRecord(request: Request): Record<string, string> {
 }
 
 /**
- * Server-side record for a project. Strict superset of the spec response
- * types (`CreateProject201`, `GetProject200`): includes the server-only
- * secrets and `updatedAt`. Handlers project from this record to the right
- * wire shape at the boundary.
+ * A `GET` list's query record with `limit` as a number: URLs carry strings and
+ * the generated zod does not coerce, so an out-of-range limit is refused by the
+ * schema rather than silently normalised.
+ */
+function listQueryRecord(request: Request): Record<string, unknown> {
+  const { limit, ...rest } = queryRecord(request);
+  return { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
+}
+
+/**
+ * One page of a `GET` list. The real cursor is opaque; the mock's is the next
+ * start index, and a token it never minted is refused with `req.invalid`, like
+ * the real server.
+ */
+function pageOf<T>(
+  records: readonly T[],
+  limit: number,
+  pageToken: string | undefined,
+):
+  | { ok: true; page: T[]; next: string | undefined }
+  | { ok: false; response: HttpResponse<ErrorBody> } {
+  const start = pageToken === undefined ? 0 : Number(pageToken);
+  if (!Number.isInteger(start) || start < 0) {
+    return {
+      ok: false,
+      response: HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 }),
+    };
+  }
+  const page = records.slice(start, start + limit);
+  return {
+    ok: true,
+    page,
+    next: start + limit < records.length ? String(start + limit) : undefined,
+  };
+}
+
+/**
+ * Server-side record for a project: the server-only secrets and `updatedAt`
+ * on top of the spec's project fields. It does not hold `owning_team_id`,
+ * which `GetProject200` requires: the handlers derive that from the claims at
+ * the boundary, where they project this record to the right wire shape.
  */
 type ProjectRecord = {
   id: string;
@@ -286,6 +342,23 @@ type IdpConnectionRecord = {
 };
 
 /**
+ * One operation policy (ADR 066), as the CLI's policy syncer publishes it.
+ *
+ * Keyed by `id`; `operation` is what dedupes a write. A project has one policy
+ * per operation, and every publish appends a revision beneath its id, so a
+ * second `POST /policies` for the same operation revises it — which is what
+ * keeps the CLI's `plan`/`apply` idempotent. Revisions are oldest first.
+ */
+type PolicyRecord = {
+  id: string;
+  projectId: string;
+  operation: string;
+  createdAt: string;
+  seq: number;
+  revisions: Array<{ revisionId: string; config: Record<string, unknown>; createdAt: string }>;
+};
+
+/**
  * One variable at the project level, which is the only owner the API addresses
  * today. `secret` decides what a read may say: a secret reports that a value is
  * held and withholds it (ADR 062 §7), so the stored value is only ever resolved
@@ -341,6 +414,21 @@ type DeploymentRecord = {
   seq: number;
 };
 
+/**
+ * A live preview: an origin matching one of the project's preview patterns
+ * that a preview deployment wrote. `createdAt` is set by the first deployment
+ * to the URL and kept across renewals; `expiresAt` is reset from each
+ * deployment's `ttl`. Removed outright by `POST /previews/remove` and treated
+ * as gone once past `expiresAt`. Keyed by {@link previewKey}.
+ */
+type PreviewRecord = {
+  projectId: string;
+  origin: string;
+  expiresAt: string;
+  createdAt: string;
+  seq: number;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
@@ -348,6 +436,8 @@ type Store = {
   idps: Map<string, IdpConnectionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
+  previews: Map<string, PreviewRecord>;
+  policies: Map<string, PolicyRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
    * environment are separate owners: the project does not see into its
@@ -372,6 +462,8 @@ function makeStore(): Store {
     idps: new Map(),
     releases: new Map(),
     deployments: new Map(),
+    previews: new Map(),
+    policies: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
     claims: new Map(),
@@ -566,6 +658,89 @@ function idpResponse(record: IdpConnectionRecord): Record<string, unknown> {
   };
 }
 
+/** One policy revision, in the wire shape every policy endpoint answers with. */
+function policyResponse(
+  record: PolicyRecord,
+  revision: PolicyRecord["revisions"][number],
+): Record<string, unknown> {
+  return {
+    id: record.id,
+    revision_id: revision.revisionId,
+    project_id: record.projectId,
+    operation: record.operation,
+    config: revision.config,
+    created_at: record.createdAt,
+    updated_at: revision.createdAt,
+  };
+}
+
+/** The newest revision of a policy; a stored policy always has one. */
+/**
+ * The violation the template's config rule `min_length_not_above_max_length`
+ * (internal/policy/templates/auth.factor.password.set.json) reports.
+ */
+const MIN_ABOVE_MAX_VIOLATION = {
+  config_rule: "min_length_not_above_max_length",
+  settings: ["max_length", "min_length"],
+};
+
+/**
+ * Whether a config breaks the template's config rule, which the server checks
+ * on publish and on a release build. A rule the template gains must be added
+ * here.
+ */
+function policyRuleViolated(config: Record<string, unknown>): boolean {
+  const { min_length: min, max_length: max } = config;
+  return typeof min === "number" && typeof max === "number" && min > max;
+}
+
+/**
+ * Publish config as the operation's newest revision, creating the policy on
+ * the first publish. With `reuseUnchanged`, a config equal to the newest
+ * revision's reuses it, as a release build does.
+ */
+function publishPolicyRevision(
+  projectId: string,
+  operation: string,
+  config: Record<string, unknown>,
+  { reuseUnchanged = false }: { reuseUnchanged?: boolean } = {},
+): { record: PolicyRecord; revision: PolicyRecord["revisions"][number] } {
+  const existing = [...store.policies.values()].find(
+    (record) => record.projectId === projectId && record.operation === operation,
+  );
+  if (reuseUnchanged && existing) {
+    const newest = newestRevision(existing);
+    if (JSON.stringify(sortedKeys(newest.config)) === JSON.stringify(sortedKeys(config))) {
+      return { record: existing, revision: newest };
+    }
+  }
+  const now = nowIso();
+  const revision = { revisionId: `polrev_${shortId()}`, config, createdAt: now };
+  const record: PolicyRecord = existing
+    ? { ...existing, revisions: [...existing.revisions, revision] }
+    : {
+        id: `pol_${shortId()}`,
+        projectId,
+        operation,
+        createdAt: now,
+        seq: ++store.lastSeq,
+        revisions: [revision],
+      };
+  store.policies.set(record.id, record);
+  return { record, revision };
+}
+
+/** A shallow copy with its keys in order, so two configs compare by value. */
+function sortedKeys(config: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(config).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function newestRevision(record: PolicyRecord): PolicyRecord["revisions"][number] {
+  return record.revisions[record.revisions.length - 1] as PolicyRecord["revisions"][number];
+}
+
+const POLICY_NOT_FOUND = errorBody("pol.not_found", "policy: not found");
+
 function compareNewestFirst(
   a: { createdAt: string; seq: number },
   b: { createdAt: string; seq: number },
@@ -646,6 +821,7 @@ export type PlatformStoreSnapshot = {
   schemas: number;
   flowDefinitions: number;
   idps: number;
+  policies: number;
   claimChallenges: number;
   claims: number;
   projectIds: string[];
@@ -680,6 +856,7 @@ export function snapshotPlatformStore(): PlatformStoreSnapshot {
     schemas: store.schemas.size,
     flowDefinitions: store.flowDefinitions.size,
     idps: store.idps.size,
+    policies: store.policies.size,
     claimChallenges: store.claimChallenges.size,
     claims: store.claims.size,
     projectIds: [...store.projects.keys()],
@@ -877,6 +1054,9 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
   if (kind === "idp") {
     return typeof resource.slug === "string" ? resource.slug : "idp";
   }
+  if (kind === "policy") {
+    return typeof resource.operation === "string" ? resource.operation : "policy";
+  }
   return "default";
 }
 
@@ -888,8 +1068,12 @@ function bundleResourceHandle(kind: string, resource: Record<string, unknown>): 
  * flow observable through `schemas list` / `flow-definitions list`. Branding has
  * no store here, so it keeps a synthesised revision id.
  */
-function materializeBundle(projectId: string, bundle: Record<string, unknown>): ReleasePointer[] {
-  const pointers: ReleasePointer[] = [];
+function materializeBundle(
+  projectId: string,
+  bundle: Record<string, unknown>,
+  policyPointers: ReleasePointer[],
+): ReleasePointer[] {
+  const pointers: ReleasePointer[] = [...policyPointers];
   for (const item of asArray(bundle.schemas)) {
     const resource = isObject(item) ? item : {};
     const handle = bundleResourceHandle("schema", resource);
@@ -1006,6 +1190,65 @@ function bundleIdpClash(
   return undefined;
 }
 
+/**
+ * Publish a bundle's policies the way the service does inside a build, before
+ * the release is looked up: an unchanged config reuses the operation's newest
+ * revision, any other adds one. They run first because the revision a policy
+ * gets decides the release's content, as it does on the server: going back to
+ * an earlier config adds a revision and so builds a new release.
+ */
+function publishBundlePolicies(
+  projectId: string,
+  bundle: Record<string, unknown>,
+): ReleasePointer[] {
+  return asArray(bundle.policies).map((item) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const config = isObject(resource.config) ? resource.config : {};
+    const { revision } = publishPolicyRevision(projectId, handle, config, { reuseUnchanged: true });
+    return { kind: "policy", handle, revision_id: revision.revisionId };
+  });
+}
+
+/**
+ * The `details.resources` entries a bundle's policies earn: a config the
+ * template's rule refuses (`pol.invalid`), and both of two policies for one
+ * operation (`rel.invalid`).
+ */
+function bundlePolicyFailures(bundle: Record<string, unknown>): Record<string, unknown>[] {
+  const failures: Record<string, unknown>[] = [];
+  const seen = new Map<string, number>();
+  asArray(bundle.policies).forEach((item, index) => {
+    const resource = isObject(item) ? item : {};
+    const handle = bundleResourceHandle("policy", resource);
+    const earlier = seen.get(handle);
+    if (earlier !== undefined) {
+      for (const at of [earlier, index]) {
+        failures.push({
+          kind: "policy",
+          index: at,
+          handle,
+          code: "rel.invalid",
+          message: `policy "${handle}" appears twice`,
+        });
+      }
+      return;
+    }
+    seen.set(handle, index);
+    if (policyRuleViolated(isObject(resource.config) ? resource.config : {})) {
+      failures.push({
+        kind: "policy",
+        index,
+        handle,
+        code: "pol.invalid",
+        message: "policy: invalid",
+        details: { details: { violations: [MIN_ABOVE_MAX_VIOLATION] } },
+      });
+    }
+  });
+  return failures;
+}
+
 /** The array at a bundle field, or an empty one when the field is absent. */
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
@@ -1066,15 +1309,43 @@ function pointerHandle(kind: string, revisionId: string): string {
   return revisionId;
 }
 
-/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
-function ttlToExpiry(ttl: string): string {
-  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+/**
+ * The project's default preview lifetime, applied when a preview deployment
+ * omits `ttl`. A real project configures this; the mock stands in one value
+ * for every project, matching the spec's "omitted, the project's default
+ * applies" (create-deployment-request.yaml).
+ */
+const DEFAULT_PREVIEW_TTL = "P7D";
+
+/** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
+function isoDurationMs(ttl: string): number | undefined {
+  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // and a time part in hours, minutes or fractional seconds. Weeks, months and
+  // years are not among them, so the mock refuses what the server would.
+  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
   if (!match) {
+    return undefined;
+  }
+  const [, days, hours, minutes, seconds] = match;
+  // A bare `P` or `PT` carries no components and is not a duration.
+  if ([days, hours, minutes, seconds].every((part) => part === undefined)) {
+    return undefined;
+  }
+  return (
+    Number(days ?? 0) * 86_400_000 +
+    Number(hours ?? 0) * 3_600_000 +
+    Number(minutes ?? 0) * 60_000 +
+    Number(seconds ?? 0) * 1_000
+  );
+}
+
+/** Turn a `ttl` (`PT30M`, `PT168H`, `P7D`) into an ISO expiry counted from now. */
+function ttlToExpiry(ttl: string): string {
+  const ms = isoDurationMs(ttl);
+  if (ms === undefined) {
     return new Date().toISOString();
   }
-  const amount = Number(match[1]);
-  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
-  return new Date(Date.now() + amount * unitMs).toISOString();
+  return new Date(Date.now() + ms).toISOString();
 }
 
 /** The project's primary origins, as exact URLs, sorted. */
@@ -1105,19 +1376,32 @@ function matchesPreviewPattern(project: ProjectRecord, origin: string): boolean 
   return false;
 }
 
-/** The newest deployment to an origin, treating an expired preview as gone. */
+/** The store key for a preview: unique per `(project, origin)`. */
+function previewKey(projectId: string, origin: string): string {
+  return `${projectId}\u0000${origin}`;
+}
+
+/** Whether a preview is still live: it exists and has not passed its expiry. */
+function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRecord {
+  return preview !== undefined && new Date(preview.expiresAt).getTime() > Date.now();
+}
+
+/**
+ * The newest deployment to an origin, treating a preview that is gone as gone.
+ * A preview's liveness is its preview row, not the expiry frozen onto the
+ * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
+ * every endpoint has to agree on which previews are live.
+ */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const now = Date.now();
+  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
   return [...store.deployments.values()]
     .filter((deployment) => deployment.projectId === projectId)
     .filter((deployment) =>
       deployment.targets.some(
-        (target) =>
-          target.origin === origin &&
-          (target.expiresAt === null || new Date(target.expiresAt).getTime() > now),
+        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
       ),
     )
     .sort((a, b) => b.seq - a.seq)[0];
@@ -1239,14 +1523,6 @@ function upsertRelease(
   return HttpResponse.json(releaseResponse(record), { status: 201 });
 }
 
-/**
- * The project's default preview lifetime, applied when a preview deployment
- * omits `ttl`. A real project configures this; the mock stands in one value
- * for every project, matching the spec's "omitted, the project's default
- * applies" (create-deployment-request.yaml).
- */
-const DEFAULT_PREVIEW_TTL = "7d";
-
 export function setupPlatformHandlers() {
   return [
     http.post("*/projects", async ({ request }) => {
@@ -1301,6 +1577,9 @@ export function setupPlatformHandlers() {
         origins: project.origins,
         created_at: project.createdAt,
         updated_at: project.updatedAt,
+        // The claim's team owns the project, as the server's owning-team
+        // assignment does; null until the project is claimed.
+        owning_team_id: store.claims.get(project.id)?.teamId ?? null,
       };
       const out = parse(GetProjectResponse, responseBody, "mock_response_invalid");
       if (!out.ok) {
@@ -1438,19 +1717,38 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
+      // The service validates each policy against its template and refuses two
+      // for one operation, reporting every refused resource under
+      // `rel.invalid`.
+      const refused = bundlePolicyFailures(bundle);
+      if (refused.length > 0) {
+        return HttpResponse.json(
+          errorBody("rel.invalid", "release: the bundle has invalid resources", {
+            resources: refused,
+          }),
+          { status: 400 },
+        );
+      }
       const entries = bundleDigestEntries(bundle);
-      if (entries.length === 0 || entries.length > 50) {
+      const total = entries.length + asArray(bundle.policies).length;
+      if (total === 0 || total > 50) {
         return HttpResponse.json(
           errorBody("rel.invalid", "release: a bundle carries between 1 and 50 resources"),
           { status: 400 },
         );
       }
-      // `makePointers` is deferred so a bundle only materialises revisions when
-      // the release is new, not on a deduped resubmission.
+      // Policies are published before the lookup, and the digest takes their
+      // revision ids: see publishBundlePolicies.
+      const policyPointers = publishBundlePolicies(project.id, bundle);
+      for (const pointer of policyPointers) {
+        entries.push({ kind: "policy", handle: pointer.handle, content: pointer.revision_id });
+      }
+      // `makePointers` is deferred so a bundle only materialises the other
+      // revisions when the release is new, not on a deduped resubmission.
       return upsertRelease(
         project.id,
         contentDigest(entries),
-        () => materializeBundle(project.id, bundle),
+        () => materializeBundle(project.id, bundle, policyPointers),
         data,
       );
     }),
@@ -1636,6 +1934,13 @@ export function setupPlatformHandlers() {
       }
 
       const requested = data.targets as string[];
+      // The contract's targets are unique items: a repeated one is a malformed
+      // request, not something to fold quietly.
+      if (new Set(requested).size !== requested.length) {
+        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+          status: 400,
+        });
+      }
       const primaries = primaryOrigins(project);
       const resolved = new Set<string>();
       let sawPreview = false;
@@ -1679,13 +1984,21 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const ttl = typeof data.ttl === "string" ? data.ttl : undefined;
-      if (ttl !== undefined && !sawPreview) {
+      const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;
+      if (requestedTtl !== undefined && !sawPreview) {
         return HttpResponse.json(
           errorBody("dep.invalid", "deployment: ttl is only valid for preview URLs"),
           { status: 400 },
         );
       }
+      // A preview URL expires, so a deployment to one always gets a ttl. An
+      // omitted ttl is not refused: the project's default applies, per
+      // create-deployment-request.yaml, so a caller (the CLI included) need not
+      // pin a lifetime of its own. A primary-only deployment keeps none.
+      const ttl = sawPreview ? (requestedTtl ?? DEFAULT_PREVIEW_TTL) : undefined;
+      // Resolved up here: the preview rows are renewed from this ttl before the
+      // new deployment, which carries the same expiry, is written below.
+      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
 
       const targets = [...resolved].sort();
       const expectedId =
@@ -1705,6 +2018,29 @@ export function setupPlatformHandlers() {
             ),
             { status: 409 },
           );
+        }
+      }
+
+      // A preview deploy always renews its targets' previews — writing a new one
+      // or extending the live one's expiry from this deploy's ttl — so
+      // re-deploying unchanged content keeps the preview URL alive rather than
+      // letting it expire on its old clock.
+      if (sawPreview && expiresAt !== null) {
+        for (const origin of targets) {
+          const key = previewKey(project.id, origin);
+          const existing = store.previews.get(key);
+          // Renew a still-live preview in place (keep its creation time and
+          // order); but an expired one is gone, so redeploying it is a new
+          // preview and gets a fresh createdAt/seq rather than resurrecting
+          // stale metadata that would missort it in `preview list`.
+          const live = previewIsLive(existing);
+          store.previews.set(key, {
+            projectId: project.id,
+            origin,
+            expiresAt,
+            createdAt: live ? existing.createdAt : nowIso(),
+            seq: live ? existing.seq : ++store.lastSeq,
+          });
         }
       }
 
@@ -1729,8 +2065,8 @@ export function setupPlatformHandlers() {
         }
       }
 
-      const expiresAt = sawPreview ? ttlToExpiry(ttl ?? DEFAULT_PREVIEW_TTL) : null;
       const id = `dep_${shortId()}`;
+      const createdAt = nowIso();
       const record: DeploymentRecord = {
         id,
         projectId: project.id,
@@ -1739,7 +2075,7 @@ export function setupPlatformHandlers() {
         reason: data.reason === "rollback" ? "rollback" : "deploy",
         message: typeof data.message === "string" ? data.message : null,
         rollbackTo: null,
-        deployedAt: nowIso(),
+        deployedAt: createdAt,
         seq: ++store.lastSeq,
       };
       store.deployments.set(id, record);
@@ -1783,7 +2119,6 @@ export function setupPlatformHandlers() {
         // What each target serves now: the newest deployment per origin, each
         // carrying only the targets it still serves.
         const serving = new Map<string, DeploymentTargetRow[]>();
-        const now = Date.now();
         const liveOrigins = new Set(
           deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
         );
@@ -1791,20 +2126,37 @@ export function setupPlatformHandlers() {
           if (origin !== undefined && target !== origin) {
             continue;
           }
-          const newest = newestDeploymentForOrigin(query.data.project_id, target);
+          // Pick the newest deployment targeting this origin by sequence,
+          // without applying the target's frozen historical expiry: a renewed
+          // preview extends its own row's clock (checked below), so filtering on
+          // the deployment's stale expiry here would wrongly drop a live preview.
+          const newest = [...store.deployments.values()]
+            .filter((deployment) => deployment.projectId === query.data.project_id)
+            .filter((deployment) => deployment.targets.some((t) => t.origin === target))
+            .sort((a, b) => b.seq - a.seq)[0];
           if (!newest) {
             continue;
           }
-          const row = newest.targets.find(
-            (candidate) =>
-              candidate.origin === target &&
-              (candidate.expiresAt === null || new Date(candidate.expiresAt).getTime() > now),
-          );
+          const row = newest.targets.find((candidate) => candidate.origin === target);
           if (!row) {
             continue;
           }
+          // A preview-origin target (one with an expiry) is admitted by its
+          // preview row, not by the expiry frozen onto the deployment: removing
+          // the preview drops the URL from this live view without the historical
+          // deployment being rewritten, and a renewed preview is reported on the
+          // clock it now runs on. A primary target has no preview row and stands
+          // on the deployment alone.
+          let served = row;
+          if (row.expiresAt !== null) {
+            const preview = store.previews.get(previewKey(query.data.project_id, target));
+            if (!previewIsLive(preview)) {
+              continue;
+            }
+            served = { origin: row.origin, expiresAt: preview.expiresAt };
+          }
           const rows = serving.get(newest.id) ?? [];
-          rows.push(row);
+          rows.push(served);
           serving.set(newest.id, rows);
         }
         items = [...serving.entries()]
@@ -1969,6 +2321,86 @@ export function setupPlatformHandlers() {
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
+    }),
+
+    // --- previews --------------------------------------------------------
+    // A preview is written by a preview deployment above and lives until it
+    // expires or is removed here. There is no create endpoint. Kept in its own
+    // block so parallel PRs do not collide. Auth matches the deployments
+    // endpoints: no bearer check, so the narrower preview token the CLI uses
+    // works — the Go handlers are unimplemented stubs regardless.
+
+    http.get("*/projects/:project_id/previews", ({ params, request }) => {
+      const path = parse(ListPreviewsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      // `limit` arrives as a string on the URL and the generated zod does not
+      // coerce, so build it before validating, as the deployments list does.
+      const record = queryRecord(request);
+      const { limit, ...rest } = record;
+      const query = parse(
+        ListPreviewsQueryParams,
+        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const live = [...store.previews.values()]
+        .filter((preview) => preview.projectId === path.data.project_id && previewIsLive(preview))
+        .sort(compareNewestFirst)
+        .map((preview) => ({
+          origin: preview.origin,
+          expires_at: preview.expiresAt,
+          created_at: preview.createdAt,
+        }));
+
+      // Offset paging, like the schemas list: the opaque real cursor is the next
+      // start index here, a page is `limit` rows from it, and a token the mock
+      // never minted is rejected with req.invalid. `next_page_token` is the next
+      // start when more rows remain, else null.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const previews = live.slice(start, start + query.data.limit);
+      const nextPageToken =
+        start + query.data.limit < live.length ? String(start + query.data.limit) : null;
+      const out = parse(
+        ListPreviewsResponse,
+        { previews, next_page_token: nextPageToken },
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
+      const path = parse(RemovePreviewParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      // Idempotent: a URL with no live preview answers 204 too. The preview row
+      // is what admits the URL, so deleting it is the whole removal: the live
+      // previews list and the live deployments view both stop showing the URL
+      // because its preview is gone. The deployments that served it keep their
+      // real target timestamps — removing a preview ends it, it does not rewrite
+      // the history of what ran where and when.
+      store.previews.delete(previewKey(path.data.project_id, body.data.origin));
+      return new HttpResponse(null, { status: 204 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -2217,12 +2649,7 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      // Same `limit` coercion caveat as `GET /users` above: URLs carry strings
-      // and the generated zod does not coerce, so out-of-range limits are
-      // rejected by the schema (1-100) rather than silently normalised.
-      const { limit, ...rest } = queryRecord(request);
-      const raw = { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) };
-      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
+      const query = parse(ListSchemasQueryParams, listQueryRecord(request), "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2240,15 +2667,11 @@ export function setupPlatformHandlers() {
       const records = current.filter(
         (r) => !query.data.kind || schemaKind(r.body) === query.data.kind,
       );
-      // The real cursor is opaque; the mock's is the next start index. A token
-      // it never minted is rejected with req.invalid, like the real server.
-      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
-      if (!Number.isInteger(start) || start < 0) {
-        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
       }
-      const page = records.slice(start, start + query.data.limit);
-      const next =
-        start + query.data.limit < records.length ? String(start + query.data.limit) : undefined;
+      const { page, next } = paged;
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
@@ -2528,6 +2951,155 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data);
+    }),
+
+    // --- operation policies ---------------------------------------------------
+    // `setup` publishes the password policy here, a release build publishes
+    // `.zitadel/policies/*.json` through the same revision helper, and
+    // `policies list|get` read them back. They mirror the server's answers: an
+    // unknown setting is malformed (`req.invalid` there), and a minimum above
+    // the maximum fails the template's config rule (`pol.invalid`).
+
+    http.post("*/policies", async ({ request }) => {
+      const query = parse(PublishPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      // Like the server's decoder: unknown settings are refused, while an
+      // extra top-level key (the file's `$schema`) is ignored.
+      const body = parse(policyConfigSchema.loose(), raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      const { operation, config } = body.data;
+      if (policyRuleViolated(config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const { record, revision } = publishPolicyRevision(query.data.project_id, operation, config);
+
+      const out = parse(
+        PublishPolicyResponse,
+        policyResponse(record, revision),
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    http.get("*/policies", ({ request }) => {
+      const query = parse(ListPoliciesQueryParams, listQueryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      // First published first; `seq` stands in for created_at.
+      const records = [...store.policies.values()]
+        .filter((record) => record.projectId === query.data.project_id)
+        .filter((record) => !query.data.operation || record.operation === query.data.operation)
+        .sort((a, b) => a.seq - b.seq);
+      const paged = pageOf(records, query.data.limit, query.data.page_token);
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        policies: paged.page.map((record) => policyResponse(record, newestRevision(record))),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPoliciesResponse, responseBody, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    // Ahead of `*/policies/:policy_id`, which would otherwise read "revisions"
+    // as a policy id.
+    http.get("*/policies/revisions/:revision_id", ({ params, request }) => {
+      const path = parse(GetPolicyRevisionParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyRevisionQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      for (const record of store.policies.values()) {
+        if (record.projectId !== query.data.project_id) continue;
+        const revision = record.revisions.find((r) => r.revisionId === path.data.revision_id);
+        if (revision) {
+          const out = parse(
+            GetPolicyRevisionResponse,
+            policyResponse(record, revision),
+            "mock_response_invalid",
+          );
+          return out.ok ? HttpResponse.json(out.data) : out.response;
+        }
+      }
+      return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+    }),
+
+    http.get("*/policies/:policy_id", ({ params, request }) => {
+      const path = parse(GetPolicyParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetPolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const out = parse(
+        GetPolicyResponse,
+        policyResponse(record, newestRevision(record)),
+        "mock_response_invalid",
+      );
+      return out.ok ? HttpResponse.json(out.data) : out.response;
+    }),
+
+    http.get("*/policies/:policy_id/revisions", ({ params, request }) => {
+      const path = parse(ListPolicyRevisionsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(
+        ListPolicyRevisionsQueryParams,
+        listQueryRecord(request),
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+      const record = store.policies.get(path.data.policy_id);
+      if (!record || record.projectId !== query.data.project_id) {
+        return HttpResponse.json(POLICY_NOT_FOUND, { status: 404 });
+      }
+      const paged = pageOf(
+        [...record.revisions].reverse(),
+        query.data.limit,
+        query.data.page_token,
+      );
+      if (!paged.ok) {
+        return paged.response;
+      }
+      const responseBody = {
+        revisions: paged.page.map((revision) => policyResponse(record, revision)),
+        next_page_token: paged.next ?? null,
+      };
+      const out = parse(ListPolicyRevisionsResponse, responseBody, "mock_response_invalid");
+      return out.ok ? HttpResponse.json(out.data) : out.response;
     }),
 
     // --- variables ---------------------------------------------------------

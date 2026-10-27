@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { FieldTitle } from "@/components/ui/field";
-import { MetaItem } from "@/components/ui/meta-item";
+import { FieldOptionalIndicator } from "@/components/ui/field-optional-indicator";
 import {
   Combobox,
   ComboboxAnchor,
@@ -80,7 +80,7 @@ export function ProjectAccess({
     <fieldset className={`${SECTION} min-w-0`} aria-labelledby={labelId}>
       <div className={LABEL_ROW}>
         <FieldTitle id={labelId}>Projects</FieldTitle>
-        <MetaItem>Optional</MetaItem>
+        <FieldOptionalIndicator />
       </div>
 
       {rows.length > 0 && (

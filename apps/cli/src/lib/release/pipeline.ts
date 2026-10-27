@@ -32,6 +32,8 @@ export interface StepContext {
    * name the file a bad connection came from.
    */
   readonly idpFiles: readonly string[];
+  /** The policy files' names, positional with `bundle.policies`, likewise. */
+  readonly policyFiles: readonly string[];
   /**
    * A command against the project this run addresses, carrying its
    * environment selector, for a step's error to suggest its own fix.

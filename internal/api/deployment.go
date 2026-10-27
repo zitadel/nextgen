@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -28,7 +29,9 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 		ProjectID: string(params.ProjectID),
 		ReleaseID: string(req.ReleaseID.Value),
 		Targets:   req.Targets,
-		HasTTL:    req.TTL.Set,
+	}
+	if ttl, ok := req.TTL.Get(); ok {
+		input.TTL = new(time.Duration(ttl))
 	}
 	if reason, ok := req.Reason.Get(); ok {
 		parsed, err := domain.DeploymentReasonString(string(reason))
@@ -48,10 +51,13 @@ func (h *Handler) CreateDeployment(ctx context.Context, req *api.CreateDeploymen
 	if conflict, ok := deploymentConflictResponse(err); ok {
 		return conflict, nil
 	}
+	if missing, ok := deploymentVariablesMissingResponse(err); ok {
+		return missing, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	// Created or not, the deployment is the project's newest primary one.
+	// Created or not, the deployment is the newest to its targets.
 	resp := toAPIDeployment(result.Deployment, api.DeploymentStatusLive)
 	if result.Created {
 		created := api.CreateDeploymentCreated(resp)
@@ -115,16 +121,33 @@ func (h *Handler) GetDeploymentVariables(ctx context.Context, params api.GetDepl
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), variableAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	set, err := h.deploymentService.Variables(ctx, string(params.ProjectID), string(params.DeploymentID))
+	if err != nil {
+		return nil, err
+	}
+	out := make(api.Variables, len(set.Entries))
+	for _, variable := range set.Variables() {
+		rendered, err := toAPIVariable(variable)
+		if err != nil {
+			return nil, err
+		}
+		out[variable.Name] = rendered
+	}
+	return &out, nil
 }
 
 func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeploymentsParams) (api.ListDeploymentsRes, error) {
-	ctx, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
+	ctx, projectWide, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment)
 	if err != nil {
 		return nil, err
 	}
 	includeReleases := slices.Contains(params.Expand, api.DeploymentExpandRelease)
-	if includeReleases {
+	// A Console session mints no scopes, so the list check's project-wide
+	// decision stands in for release.read (#1300 §4, as the users list does
+	// for its expands): a session that reads the project reads its releases.
+	scopeCtx, _ := GetScopeContext(ctx)
+	sessionReads := projectWide && scopeCtx.PrincipalType == domain.AuthzPrincipalTypeUser
+	if includeReleases && !sessionReads {
 		if err := requireReleaseRead(ctx); err != nil {
 			return nil, err
 		}
@@ -158,21 +181,44 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 	return &resp, nil
 }
 
-// The preview operations answer 501 like the deployment ones: a preview
-// exists only through a deployment to it.
-
 func (h *Handler) ListPreviews(ctx context.Context, params api.ListPreviewsParams) (api.ListPreviewsRes, error) {
-	if _, _, err := h.requireProjectListAccess(ctx, string(params.ProjectID), deploymentAccess, domain.ResourceKindDeployment); err != nil {
+	// A preview has no id for a list filter to scope, so access is
+	// project-wide or nothing.
+	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opRead); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+
+	result, err := h.deploymentService.ListPreviews(ctx, service.ListPreviewsInput{
+		ProjectID: string(params.ProjectID),
+		PageToken: string(params.PageToken.Value),
+		Limit:     int(params.Limit.Value),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	resp := api.ListPreviewsResponse{Previews: make([]api.Preview, len(result.Items))}
+	for i, entity := range result.Items {
+		resp.Previews[i] = api.Preview{
+			Origin:    api.Origin(entity.Origin),
+			ExpiresAt: entity.ExpiresAt,
+			CreatedAt: entity.CreatedAt,
+		}
+	}
+	if result.NextPageToken != "" {
+		resp.NextPageToken = api.NewOptNilPageToken(api.PageToken(result.NextPageToken))
+	}
+	return &resp, nil
 }
 
-func (h *Handler) RemovePreview(ctx context.Context, _ *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
+func (h *Handler) RemovePreview(ctx context.Context, req *api.RemovePreviewRequest, params api.RemovePreviewParams) (api.RemovePreviewRes, error) {
 	if err := h.requireProjectAccess(ctx, string(params.ProjectID), deploymentAccess, opWrite); err != nil {
 		return nil, err
 	}
-	return nil, domain.ErrNotImplemented()
+	if err := h.deploymentService.RemovePreview(ctx, string(params.ProjectID), string(req.Origin)); err != nil {
+		return nil, err
+	}
+	return &api.RemovePreviewNoContent{}, nil
 }
 
 // deploymentConflictResponse answers dep.conflict with the typed 409, whose
@@ -201,6 +247,29 @@ func deploymentConflictResponse(err error) (*api.DeploymentConflict, bool) {
 	return &resp, true
 }
 
+// deploymentVariablesMissingResponse answers dep.variables_missing with the
+// typed 400, whose details.kind and details.names sit on the body. Through
+// NewError the details would nest under details.details.
+func deploymentVariablesMissingResponse(err error) (*api.CreateDeploymentBadRequest, bool) {
+	de, ok := errors.AsType[domain.Error](err)
+	if !ok || de.Code != domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code {
+		return nil, false
+	}
+	details, ok := de.Details.(domain.DeploymentVariablesMissingDetails)
+	if !ok {
+		return nil, false
+	}
+	resp := api.NewDeploymentVariablesMissingCreateDeploymentBadRequest(api.DeploymentVariablesMissing{
+		Code:    de.Code,
+		Message: de.Message,
+		Details: api.DeploymentVariablesMissingDetails{
+			Kind:  api.DeploymentKind(details.Kind),
+			Names: details.Names,
+		},
+	})
+	return &resp, true
+}
+
 // deploymentErrorResponse maps the deployment error codes onto statuses.
 // dep.conflict is the failed expected_deployment_id check: the 409 details
 // carry the deployment the write would replace.
@@ -210,7 +279,7 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		return errorResponseWithStatusCode(http.StatusNotFound, err)
 	case domain.ErrDeploymentConflict(domain.DeploymentConflictDetails{}).Code:
 		return errorResponseWithStatusCode(http.StatusConflict, err)
-	case domain.ErrDeploymentInvalid().Code:
+	case domain.ErrDeploymentInvalid().Code, domain.ErrDeploymentVariablesMissing(domain.DeploymentOriginKindPrimary, nil).Code:
 		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case domain.ErrDeploymentPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)

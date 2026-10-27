@@ -196,6 +196,31 @@ tasks:
       cache: false
       runInCI: false
 
+  # The packed CLI against a deployment of the hosted cloud, which CLOUD_URL
+  # names: setup from an empty directory, deploy, variables, origins,
+  # deployment list and rollback, and a claim a browser finishes. It packs
+  # @zitadel/cli and the packages it depends on (pnpm pack reruns the CLI's
+  # build into its dist), installs them outside the repo, and reaches a
+  # protected deployment through a local proxy that adds the bypass secret.
+  # Each run leaves a project in the deployment's database, so the
+  # deployment-checks workflow runs it on previews only, and it skips the
+  # production domain. testing:build also builds config and api, which the
+  # pack reads. Not a dependency of `all`: the config refuses to run without
+  # CLOUD_URL.
+  cli-deployment:
+    command: "corepack pnpm exec playwright test --config cli/playwright.deployment.config.mts"
+    inputs:
+      - "cli/**/*"
+      - "@group(laneShared)"
+      - "/scripts/release-artifacts.mjs"
+      - "/scripts/release-manifest.mjs"
+    deps:
+      - "cli:build"
+      - "testing:build"
+    options:
+      cache: false
+      runInCI: false
+
   # ── demo-next lanes (former @zitadel/demo-next-e2e) ──────────────────────────
 
   # Mock lane: the demo against the standalone @zitadel/api-mock TCP server.
@@ -229,7 +254,6 @@ tasks:
       - "server:build"
     env:
       ZITADEL_SERVER_BINARY: "$workspaceRoot/dist/server/nextgen"
-      NEXTGEN_SERVER_LOGIN_ENABLED: "false"
       NEXTGEN_SERVER_CONSOLE_ENABLED: "false"
       NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT: "false"
     options:

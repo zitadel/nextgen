@@ -93,6 +93,11 @@ func (s *keyService) GetEncryptionKey(ctx context.Context, keyID string, algorit
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
 			return nil, domain.ErrEncryptionKeyNotFound()
 		}
+		// Every credential is decrypted through here, so a key store that is
+		// unavailable keeps its code and the request answers 503, not 500.
+		if mapped := mapStorageError(err); mapped != err {
+			return nil, mapped
+		}
 		return nil, domain.ErrInternal(err).WithMessage("failed to get encryption key from the database")
 	}
 	return key, nil

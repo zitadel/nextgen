@@ -313,3 +313,26 @@ func hasValidationRule(t *testing.T, err error, field string, rule domain.FlowFi
 	}
 	return false
 }
+
+// A password is counted after NFC normalization, as the password policy
+// counts it: a decomposed "é" is one code point, not two.
+func TestSchemaFieldResolver_Validate_PasswordCountsNormalized(t *testing.T) {
+	t.Parallel()
+	resolver := domain.NewSchemaFieldResolver()
+	fields := resolveDefaultFields(t)
+	for i := range fields.Fields {
+		if fields.Fields[i].Name == "x-auth-methods#password" {
+			fields.Fields[i].Validation = &domain.FlowFieldValidation{MinLength: 12, MaxLength: 20}
+		}
+	}
+
+	decomposed := strings.Repeat("é", 12) // 24 code points before NFC, 12 after
+	if err := resolver.Validate(fields, map[string]any{"x-auth-methods#password": decomposed}); err != nil {
+		t.Fatalf("Validate err = %v, want none: 12 code points after NFC fit 12 to 20", err)
+	}
+	short := strings.Repeat("é", 11)
+	err := resolver.Validate(fields, map[string]any{"x-auth-methods#password": short})
+	if !hasValidationRule(t, err, "x-auth-methods#password", domain.FlowFieldValidationRuleMinLength) {
+		t.Fatalf("Validate err = %v, want min_length violation for the password", err)
+	}
+}

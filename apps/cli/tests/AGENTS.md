@@ -73,7 +73,7 @@ Three rules make that shape hold:
 2. **Observe by running a command.** A spec's subject is how the CLI behaves,
    not how it stores things, so what a command did is checked by running
    another one: `idps list`, `schemas list`, `flow-definitions list`,
-   `variables list --project-level`, `deployment list`. Never `.zitadel/state.json` and
+   `variable list`, `deployment list`. Never `.zitadel/state.json` and
    never the mock's own store — a corrupt file matters only insofar as a later
    command surfaces it, and that surfacing is the assertion.
 
@@ -159,6 +159,8 @@ it stays here deliberately rather than by oversight.
   ([`helpers/ports.ts`](helpers/ports.ts)), never a bind-and-close probe:
   another worker's outbound connection can take it first (`E_PORT_IN_USE`).
   Never retry on that. A listener held for the whole test may bind port 0.
+- `runCliForTest` runs the built CLI, out of reach of any spy on `src/`: pin
+  the machine state it reads, like a free port, with a flag or a held listener.
 - No test leaves the machine: [`helpers/offline.ts`](helpers/offline.ts) fails
   any connection off loopback.
 - A unit test answers the platform with

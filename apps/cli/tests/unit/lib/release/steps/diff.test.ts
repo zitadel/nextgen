@@ -54,9 +54,10 @@ function ctx(live: Live[], json = false, env: Record<string, string> = {}): Step
     dryRun: false,
     json,
     color: false,
-    bundle: { schemas: [], flow_definitions: [], idps: [] },
+    bundle: { schemas: [], flow_definitions: [], idps: [], policies: [] },
     brandingSources: [],
     idpFiles: [],
+    policyFiles: [],
     suggest: (args) => `${args} --env staging` as SuggestedCommand,
   };
 }

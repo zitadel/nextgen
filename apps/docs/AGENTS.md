@@ -81,6 +81,30 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   (`scripts/sdk-samples.ts`). A new security scheme fails it until
   `lib/sdk-sample.ts` can authenticate with it.
 
+## Live examples
+
+The pages that document the login's components render them live, as
+Fumadocs stories (`components/examples/`).
+
+- A story's controls come from its component's prop types: give a control a
+  prop, never a hand-written control.
+- A `*.story.tsx` runs on the server: import only components and types from a
+  client module, never a value (hence `flat-look.ts`).
+- Run `<zitadel-login>` over the mock (`mock.ts`), never a server, and at most
+  once per page: every login on a page walks the same mock flow.
+- Never widen the mock's worker's scope beyond `/docs/`: on the cloud's host
+  it would answer for the console.
+- A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
+  around one so it reads without it.
+- Type an atom an example renders in `elements.d.ts`, from the example's props.
+
+## Page feedback
+
+- `app/docs/api/feedback` posts ratings to the deployment's own URL, which
+  deployment protection covers: keep the `cloud` project's automation bypass.
+- Never send that route a valid rating from `tests/`: the suite runs against
+  deployments, where it becomes a real event.
+
 ## Checks and tests
 
 ```sh

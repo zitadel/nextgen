@@ -42,7 +42,6 @@ const queryCollections = (operations: ClientOperations): ReadonlySet<string> =>
 
 /** Collections with no resource commands at all, and why. */
 const NOT_RESOURCES: Readonly<Record<string, string>> = {
-  healthz: "liveness probe, not a resource",
   livez: "liveness probe, not a resource",
   readyz: "readiness probe, not a resource",
   flow: "the runtime login flow protocol, driven by the login UI and the SDKs",
@@ -52,11 +51,6 @@ const NOT_RESOURCES: Readonly<Record<string, string>> = {
   // history is that command's to read. Registry CRUD would offer a `create`
   // that skips the release construction the command exists to do.
   deployments: "created and read through `zitadel deploy` orchestration, not registry CRUD (#529)",
-  // Operation policies are configuration, written from .zitadel/policies/ by
-  // the declarative path; their syncer and `policies list|get` are the CLI
-  // follow-up (ADR 066, #1444).
-  policies:
-    "configuration written from .zitadel/ by the declarative path; CLI support is a follow-up (#1444)",
 };
 
 /**
@@ -75,10 +69,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // generated surface; recorded as a question rather than implied to be owned.
   completeClaim: "part of the claim flow, but currently called by no command — unresolved",
   getClaimWindow: "part of the claim flow, but currently called by no command — unresolved",
-  // The frozen variable set of one deployment is read where a variable is
-  // resolved, which is a later change.
-  getDeploymentVariables:
-    "read by `zitadel variable resolve`, which arrives with the variable commands",
   // A preview exists only through a deployment to it, so it has no create to
   // offer; listing and removing it are `zitadel preview`'s.
   listPreviews: "previews are listed by `zitadel preview` (#1312)",
@@ -124,6 +114,10 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
+  // Policies are written from .zitadel/policies/ by `apply` (ADR 066).
+  publishPolicy: "configuration: `apply` publishes .zitadel/policies/ through the policy syncer",
+  listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
+  getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
@@ -136,6 +130,7 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   addOrigin: "not yet exposed — `zitadel origin add` lands with the origins CLI surface (#1578)",
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
+  listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
@@ -175,7 +170,7 @@ const clientOperations = (): ClientOperations => {
  * Placeholder arguments covering the shapes a positional can take: a plain
  * name, a prefixed resource id, and a URI id.
  */
-const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as const;
+const REFS = ["ID", "sch_1", "flowdef_1", "pol_1", "https://example.com/schema.json"] as const;
 
 /**
  * Collections served by hand-written commands rather than the registry, with
@@ -185,9 +180,11 @@ const REFS = ["ID", "sch_1", "flowdef_1", "https://example.com/schema.json"] as 
  * is a map keyed by name rather than rows, and the write is one RFC 7386 merge
  * where `null` removes — an upsert, which is why the commands use `set` rather
  * than create and update, as `gh variable set` does (ADR 062, ADR 064).
+ * `variable resolve` reads a deployment's frozen map, which is a deployment
+ * operation served by a variable command.
  */
 const STANDALONE: Readonly<Record<string, readonly string[]>> = {
-  variables: ["variables/list", "variables/get", "variables/set", "variables/delete"],
+  variables: ["variable/set", "variable/get", "variable/list", "variable/rm", "variable/resolve"],
   // Origins are nested under a project rather than a root collection, so they
   // have no `/origins/query` grammar; the hand-written commands add, list (off
   // the project) and remove one pattern at a time.
@@ -201,6 +198,11 @@ const STANDALONE: Readonly<Record<string, readonly string[]>> = {
   // rollback` re-applies one. The operations live in the `lib/release` wrappers
   // these commands call, which {@link standaloneOperations} scans too.
   deployments: ["deployment/create", "deployment/list", "deployment/get", "deployment/rollback"],
+  // A preview is written by a preview deployment, not created directly: `preview`
+  // deploys to the preview URLs, `preview list` reads the live ones and
+  // `preview rm` removes one. `preview` reaches the release/deployment
+  // operations through the `lib/release` wrappers scanned above.
+  previews: ["preview/index", "preview/list", "preview/rm"],
 };
 
 /**
@@ -426,6 +428,9 @@ describe("the CLI covers the API client", () => {
  * entry cannot outlive the sharing that justifies it.
  */
 const SHARES_OPERATION: Readonly<Record<string, string>> = {
+  // Reads the project to resolve the preview URLs it deploys to; the deploy
+  // itself is `POST /deployments`, which names `deployment create`.
+  "preview index": "projects get",
   // Builds a release from `.zitadel/` exactly as `deploy` does, without
   // deploying it, so `POST /releases/build` names `deploy`.
   "release create": "deploy",

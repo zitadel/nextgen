@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { MetaCard } from "./detail-meta";
-import { EYEBROW, PAGE_TITLE } from "./typography";
+import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource detail screens (Users, Teams,
@@ -34,9 +34,9 @@ export const ICON_PLATE =
 export const DETAIL_CARD = "gap-0 py-0";
 
 /**
- * A body card with a titled section: the eyebrow, an optional action beside it,
- * an optional note under them, a rule, then `children`. Inset 24px, 20px top
- * and bottom, 16px between parts.
+ * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
+ * optional action beside it, an optional note under them, a rule, then
+ * `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
 export function DetailSection({
   title,
@@ -48,27 +48,27 @@ export function DetailSection({
   ...props
 }: Omit<React.ComponentProps<typeof Card>, "title"> & {
   title: string;
-  /** Sets the eyebrow's id, for a card labelled by it. */
+  /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
   action?: ReactNode;
   /** A line between the header and the rule. */
   note?: ReactNode;
 }) {
-  const eyebrow = (
-    <span id={titleId} className={EYEBROW}>
+  const heading = (
+    <h2 id={titleId} className={SECTION_HEADING}>
       {title}
-    </span>
+    </h2>
   );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
         {action ? (
           <div className="flex items-center justify-between gap-4">
-            {eyebrow}
+            {heading}
             {action}
           </div>
         ) : (
-          eyebrow
+          heading
         )}
         {note}
         <Separator />

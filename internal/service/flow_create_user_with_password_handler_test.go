@@ -37,7 +37,7 @@ type passwordHandlerFixture struct {
 	schemaStore *domainmock.MockJSONSchemaStore
 	v2Pool      *servicemocks.MockPool
 	stmts       *servicemocks.MockAllStatements
-	hasher      *cryptomock.MockHasher
+	hasher      *cryptomock.MockPasswordHasher
 }
 
 func newPasswordHandlerFixture(t *testing.T, gate ...service.PasswordGate) *passwordHandlerFixture {
@@ -50,7 +50,7 @@ func newPasswordHandlerFixture(t *testing.T, gate ...service.PasswordGate) *pass
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
 	v2Pool := servicemocks.NewMockPool(ctrl)
 	stmts := servicemocks.NewMockAllStatements(ctrl)
-	hasher := cryptomock.NewMockHasher(ctrl)
+	hasher := cryptomock.NewMockPasswordHasher(ctrl)
 
 	v2Pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	svcPool := service.NewPool(v2Pool)
