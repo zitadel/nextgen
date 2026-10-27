@@ -17,11 +17,11 @@ import {
   CUSTOM_PROVIDER,
   IDP_PROVIDERS,
   parseClientId,
+  parseClientSecret,
   type ProviderSelection,
   providerOf,
   selectionName,
   type ConnectionSlug,
-  parseClientSecret,
 } from "@zitadel/config/idp";
 import { consola } from "consola";
 import semver from "semver";

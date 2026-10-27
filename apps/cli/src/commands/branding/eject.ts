@@ -147,7 +147,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     return this.input({
       kind: "select",
       name: "design",
-      message: "Which design do you want to start from?",
+      message: "Which design would you like to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
         value: design as string,

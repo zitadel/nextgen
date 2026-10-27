@@ -9,6 +9,8 @@ import {
   RESERVED_SLUGS,
   type IdpProvider,
   type Issuer,
+  parseClientId,
+  parseClientSecret,
   parseConnectionSlug,
   parseDisplayName,
   parseIssuer,
@@ -18,8 +20,6 @@ import {
   providerOf,
   selectionName,
   validated,
-  parseClientId,
-  parseClientSecret,
 } from "@zitadel/config/idp";
 
 import {
