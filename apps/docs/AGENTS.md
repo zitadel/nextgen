@@ -98,6 +98,13 @@ Fumadocs stories (`components/examples/`).
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
 
+## Page feedback
+
+- `app/docs/api/feedback` posts ratings to the deployment's own URL, which
+  deployment protection covers: keep the `cloud` project's automation bypass.
+- Never send that route a valid rating from `tests/`: the suite runs against
+  deployments, where it becomes a real event.
+
 ## Checks and tests
 
 ```sh

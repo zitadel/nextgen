@@ -3,4 +3,6 @@
 "@zitadel/sdk-next": patch
 ---
 
-`zitadel setup` now writes a Next.js `proxy.ts` (`middleware.ts` on Next.js 15) whose `matcher` covers every route but Next.js's build files, so adding a route to `protectedRoutes` is all it takes to require a sign-in. Before, a route added to `protectedRoutes` but not to the `matcher` stayed public, without a warning. The `@zitadel/sdk-next` README and skill show the same `matcher`. `auth()` now sees the session on every page too. Apps set up earlier keep their `matcher`: replace it with `["/((?!_next/static|_next/image|favicon.ico).*)"]`, or add each protected route to it.
+Adding a route to `protectedRoutes` alone now requires a sign-in on it: `zitadel setup` writes a Next.js `proxy.ts` (`middleware.ts` on Next.js 15) whose `matcher` covers every route but Next.js's build files; before, a route missing from the `matcher` stayed public without a warning.
+
+**Upgrading an app set up earlier:** it keeps its `matcher`; replace it with `["/((?!_next/static|_next/image|favicon.ico).*)"]`, or add each protected route to it.

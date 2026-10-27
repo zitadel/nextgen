@@ -2,11 +2,4 @@
 "@zitadel/server": patch
 ---
 
-The console's Users table keeps its width bounded however many properties a
-schema has. The User column and the row menu stay in view while the table
-scrolls, schema properties are hidden until you pin them from the Columns menu
-that right-clicking the table opens (remembered in your browser), and
-everything else reads in one Attributes column that opens the user's full
-attributes as labelled fields, JSON or YAML. The User cell names the property each user signs in
-with (`email`, `username`), hovering a user explains their identity, and the
-Team column is now "Member of", tagging pending and inactive memberships.
+The console's Users table stays within its width however many properties a schema has: the User column and row menu stay in view while it scrolls, schema properties appear once pinned from the Columns menu, and the rest read in one Attributes column that opens them as fields, JSON or YAML. The Team column is now "Member of".
