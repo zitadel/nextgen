@@ -153,8 +153,7 @@ export default class Eject extends Promptable(BaseCommand) {
     // A dry run removes nothing, so it has nothing to confirm (as in `reset`).
     const confirmed =
       dryRun ||
-      (await this.input({
-        kind: "confirm",
+      (await this.ask.confirm({
         name: "remove the managed files and local state",
         message: "Remove the managed files and local Zitadel state?",
         retry: this.suggestUnscoped("eject --force"),

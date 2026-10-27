@@ -43,7 +43,7 @@ import {
   ssoFromFlags,
 } from "../../../src/commands/setup";
 import { askCustomSettings } from "../../../src/commands/setup/prompts";
-import type { Asker } from "../../../src/lib/input";
+import type { Questions } from "../../../src/lib/ui";
 import { writeRuntimeMetadata } from "../../../src/lib/local-server/runtime";
 import { LocalServer } from "../../../src/lib/local-server/server";
 import { unscopedCommand } from "../../../src/lib/suggestion";
@@ -1161,7 +1161,7 @@ describe("a retry after a failure before the wizard", () => {
 
 describe("a custom provider named with --sso", () => {
   const partial = { sso: "custom", "sso-slug": "acme-sso" };
-  const ask = vi.fn() as unknown as Asker;
+  const ask = {} as Questions;
 
   it("has the settings it was not given asked for when a person is there", async () => {
     vi.mocked(askCustomSettings).mockResolvedValueOnce({

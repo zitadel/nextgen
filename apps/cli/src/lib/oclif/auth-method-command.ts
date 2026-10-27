@@ -136,8 +136,7 @@ export abstract class AuthMethodCommand extends Promptable(EnvironmentCommand) {
       // instead, as argument lists an agent can run whatever the quoting.
       refuseLastMethod({ schema: input.schema, retryArgs, cwdArgs: input.cwdArgs, cliVersion });
     }
-    return this.input({
-      kind: "confirm",
+    return this.ask.confirm({
       name: `disable ${input.disabling}, the last way to sign in to ${input.schema.name}`,
       message: `Disable ${input.disabling} anyway? Nobody will be able to sign in to ${input.schema.name}.`,
       retry: portableSuggestions([retryArgs], cliVersion)[0],

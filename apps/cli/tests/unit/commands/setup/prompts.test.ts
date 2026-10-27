@@ -43,7 +43,7 @@ import {
   googleSelection,
 } from "../../../helpers/idp-values";
 
-import { type Asker, input } from "../../../../src/lib/input";
+import { asker } from "../../../../src/lib/input";
 import { environmentSelectorSuffix } from "../../../../src/lib/oclif/environment-flags";
 import { projectCommand } from "../../../../src/lib/suggestion";
 import { takeReportedWarnings } from "../../../../src/lib/warnings";
@@ -77,7 +77,7 @@ function baseAnswers(over: Partial<SetupAnswers> = {}): SetupAnswers {
   };
 }
 
-const ask: Asker = (question) => input(question, { interactive: true, force: false });
+const ask = asker({ interactive: true, force: false });
 
 /** What a prompt drew, as setup's own context would have drawn it. */
 const noted = vi.fn<(title: string, lines: readonly string[]) => void>();
@@ -89,7 +89,7 @@ const noteShown = (call = 0): { title?: string; body: string } => {
 };
 
 const ctx: PromptContext = {
-  input: ask,
+  ask,
   note: noted,
   say: said,
   spinner: () => ({ message: vi.fn(), stop: vi.fn(), clear: vi.fn() }),

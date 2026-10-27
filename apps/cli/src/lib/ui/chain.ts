@@ -3,24 +3,17 @@ import { consola } from "consola";
 import pc from "picocolors";
 
 import { ZitadelError } from "../errors";
-import { input } from "../input";
+import { asker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { GUTTER, Prose, WIDTH } from "./layout";
 import { MARK } from "./marks";
 import type { Narratable } from "./narration";
-import { type Drawing, Progress } from "./progress";
-import type {
-  ConfirmQuestion,
-  MultiselectQuestion,
-  SecretQuestion,
-  SelectQuestion,
-  TextQuestion,
-} from "./questions";
+import { type Drawing, Progress, type Report, type Step } from "./progress";
+import type { Questions } from "./questions";
 import { DrawnSpinner, QuietSpinner, type Spinner } from "./spinner";
 import type { Summary } from "./summary";
 import { Where } from "./where";
-import type { Report, Step, Wizard } from "./wizard";
 
 /**
  * The chain: one command's output from its first line to its last (the package
@@ -32,11 +25,11 @@ import type { Report, Step, Wizard } from "./wizard";
  * or {@link Chain.abort}. With a non-interactive {@link Audience} it draws
  * nothing at all and narration falls back to plain `consola` lines.
  *
- * It implements {@link Wizard}, which is all a command is given of it: a
- * command asks, notes and reports work, and never opens or closes the chain
- * it is drawing into.
+ * A command never opens or closes it: it asks ({@link Chain.questions}), notes
+ * what the person must act on, reports its work, and the base command closes
+ * the chain on the result the command returned.
  */
-export class Chain implements Wizard, Drawing, Narratable {
+export class Chain implements Drawing, Narratable {
   private opened = false;
   private ended = false;
   private title = "zitadel";
@@ -46,15 +39,9 @@ export class Chain implements Wizard, Drawing, Narratable {
   private gap = false;
   private readonly audience: Audience;
   private readonly progress = new Progress(this);
-  /**
-   * Whether this command's `--force` may answer its confirmations. Separate from
-   * the audience, which is the invocation's and not one command's to change.
-   */
-  private forcing: boolean;
 
   constructor(audience: Audience) {
     this.audience = audience;
-    this.forcing = audience.force;
   }
 
   describe(title: string): void {
@@ -65,10 +52,6 @@ export class Chain implements Wizard, Drawing, Narratable {
   ranAgainst(project: string | undefined, server: string | undefined): void {
     this.project = project ?? this.project;
     this.server = server ?? this.server;
-  }
-
-  honorForce(honor: boolean): void {
-    this.forcing = honor && this.audience.force;
   }
 
   get interactive(): boolean {
@@ -141,50 +124,44 @@ export class Chain implements Wizard, Drawing, Narratable {
   }
 
   /**
-   * Closes a chain the run never finished.
+   * Closes a chain the run never finished, which is only ever a cancellation.
    *
    * A question the person cancelled has already closed it (`└  Cancelled.`),
    * so that one is left alone. An interrupt in the middle of the work has
    * not: without this the run ends on a bare `┌` and the shell prompt is
    * drawn inside the gutter.
+   *
+   * A failure is left open on purpose, so that the error block the base
+   * command renders through {@link finish} is what closes the chain. Closing
+   * it here would make {@link finish} return early and swallow the error,
+   * leaving a run that failed showing nothing but its closing line.
    */
   abort(error: unknown): void {
+    const cancelled = error instanceof ZitadelError && error.code === "E_CANCELLED";
     const closedItself = error instanceof ZitadelError && error.message === "Cancelled by user";
-    if (!this.audience.interactive || !this.opened || this.ended || closedItself) {
+    if (!cancelled || closedItself || !this.audience.interactive || !this.opened || this.ended) {
       return;
     }
     this.ended = true;
-    const cancelled = error instanceof ZitadelError && error.code === "E_CANCELLED";
-    outro(pc.red(cancelled ? "Cancelled" : "Stopped"));
+    outro(pc.red("Cancelled"));
   }
 
-  text<T>(question: TextQuestion<T> & { optional: true }): Promise<T | undefined>;
-  text<T>(question: TextQuestion<T>): Promise<T>;
-  text<T>(question: TextQuestion<T> & { optional?: true }): Promise<T | undefined> {
-    this.open();
-    return input({ kind: "text", ...question }, this.asking()) as Promise<T | undefined>;
-  }
-
-  secret<T>(question: SecretQuestion<T> & { optional: true }): Promise<T | undefined>;
-  secret<T>(question: SecretQuestion<T>): Promise<T>;
-  secret<T>(question: SecretQuestion<T> & { optional?: true }): Promise<T | undefined> {
-    this.open();
-    return input({ kind: "secret", ...question }, this.asking()) as Promise<T | undefined>;
-  }
-
-  select<V>(question: SelectQuestion<V>): Promise<V> {
-    this.open();
-    return input({ kind: "select", ...question }, this.asking()) as Promise<V>;
-  }
-
-  multiselect<V>(question: MultiselectQuestion<V>): Promise<V[]> {
-    this.open();
-    return input({ kind: "multiselect", ...question }, this.asking()) as Promise<V[]>;
-  }
-
-  confirm(question: ConfirmQuestion): Promise<boolean> {
-    this.open();
-    return input({ kind: "confirm", ...question }, this.asking());
+  /**
+   * The five questions, bound to this chain: each one opens the chain before
+   * its prompt is drawn and leaves the blank guide line it needs after it.
+   *
+   * `honorForce` false drops this command's `--force` as an answer, for
+   * `setup`, whose `--force` means "overwrite files" and so must never answer
+   * a question. It is settled per asker rather than kept on the chain, so the
+   * command that drops it cannot leave another question dropping it too.
+   */
+  questions(honorForce: boolean): Questions {
+    return asker({
+      interactive: this.audience.interactive,
+      force: honorForce && this.audience.force,
+      before: () => this.open(),
+      after: () => this.answered(),
+    });
   }
 
   say(text: string): void {
@@ -236,19 +213,5 @@ export class Chain implements Wizard, Drawing, Narratable {
   /** Where this command ran, from what it reported and what its summary knew. */
   private where(ran?: string): Where {
     return new Where(this.project, this.server ?? ran);
-  }
-
-  /**
-   * The audience a question is asked of: this command's `--force` rather than
-   * the invocation's, with the hooks that open the chain before a prompt is
-   * drawn and leave the blank guide line it needs after it.
-   */
-  private asking(): Audience & { before: () => void; after: () => void } {
-    return {
-      ...this.audience,
-      force: this.forcing,
-      before: () => this.open(),
-      after: () => this.answered(),
-    };
   }
 }

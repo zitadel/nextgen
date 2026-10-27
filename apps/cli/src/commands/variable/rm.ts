@@ -63,8 +63,7 @@ export default class VariableRm extends Promptable(EnvironmentCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `remove ${name} from the project`,
       message: `Remove ${name} from the project?`,
       retry: this.suggest(`variable rm ${name}${flags.preview ? " --preview" : ""} --force`),

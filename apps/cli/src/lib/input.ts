@@ -3,105 +3,49 @@ import { cancel, confirm, isCancel, multiselect, password, select, text } from "
 import type { Parsed } from "@zitadel/config/idp";
 
 import { ZitadelError } from "./errors";
-import { readStdin } from "./variables";
+import type {
+  Choice,
+  ConfirmQuestion,
+  MultiselectQuestion,
+  Optional,
+  Questions,
+  SecretQuestion,
+  SelectQuestion,
+  TextQuestion,
+} from "./ui/questions";
 import type { SuggestedCommand } from "./suggestion";
+import { readStdin } from "./variables";
 
 /**
- * One option of a `select` or `multiselect`. A `disabled` one is shown, with
- * its hint always visible, but cannot be chosen: for a choice that exists but
- * is not available yet, such as a server that is not running.
+ * Which of the five questions is being asked. It is an argument of the engine
+ * below and never a field of a question: a command picks the kind by calling
+ * {@link Questions.text} or one of its siblings, so there is no string to get
+ * wrong and no answer type to cast.
  */
-type Choice<V> = { value: V; label: string; hint?: string; disabled?: boolean };
+type Kind = "text" | "secret" | "select" | "multiselect" | "confirm";
 
-/** What every question says about itself, whatever it asks for. */
-type Common = {
-  /**
-   * What is being asked for, as a lowercase noun phrase ("client id"). It is
-   * required because any question can meet a run with nobody to ask, and the
-   * refusal names it: "No client id supplied". For a `confirm` it is the
-   * action instead ("delete the variable"), which completes "Cannot delete the
-   * variable without --force". A question that is only ever asked in a
-   * terminal never shows it.
-   */
+/**
+ * Every field any of the five questions can carry, which is what the engine
+ * reads. The types in `ui/questions.ts` are the ones a command writes, and
+ * each of them is assignable to this.
+ */
+type AnyQuestion = {
   name: string;
-  /** The question as the prompt shows it. */
   message: string;
-  /**
-   * The flag that carries this value (`--client-id`), when there is one. The
-   * refusal tells a scripted caller to pass it. Leave it out for a question a
-   * script cannot answer with a flag. It is ignored for a `secret`, which is
-   * never a flag.
-   */
   flag?: string;
-  /**
-   * The command to run again with the missing input, written for an agent to
-   * run. It becomes the refusal's `nextCommands`, and for a value it is also
-   * quoted in the hint as an example.
-   */
   retry?: SuggestedCommand;
-};
-
-/** A question whose answer is text that must parse. */
-type TextQuestion = Common & {
-  kind: "text" | "secret";
-  /**
-   * Turns the text into the value that is returned, or says what is wrong
-   * with it. It runs on the value from every source, and in the prompt it is
-   * what refuses an answer as it is typed. Use the parser the flag for this
-   * value uses and the flag and the prompt cannot disagree.
-   */
-  parse: (value: string) => Parsed<unknown>;
-  /** The value from a flag, if the command line gave one. */
+  parse?: (raw: string) => Parsed<unknown>;
   given?: string;
-  /** Whether piped stdin may answer, for a value a script supplies. */
   stdin?: boolean;
-  /**
-   * Whether having no answer is acceptable, for a value a rerun may replace
-   * but does not need. The question then never prompts and never refuses for
-   * want of a value: it returns `undefined` when nothing was given and
-   * nothing, or only an empty pipe, was piped in. A pipe that has content that
-   * does not parse is still an `E_VALIDATION` error, like any other source.
-   */
   optional?: boolean;
-  initialValue?: string;
-  placeholder?: string;
-};
-
-type SelectQuestion = Common & {
-  kind: "select";
-  options: Choice<unknown>[];
   initialValue?: unknown;
-};
-
-type MultiselectQuestion = Common & {
-  kind: "multiselect";
-  options: Choice<unknown>[];
-  /** Whether at least one option must be ticked. */
+  placeholder?: string;
+  options?: Choice<unknown>[];
   required?: boolean;
 };
 
-type ConfirmQuestion = Common & {
-  kind: "confirm";
-  initialValue?: boolean;
-};
-
-type Question = TextQuestion | SelectQuestion | MultiselectQuestion | ConfirmQuestion;
-
-/** What `input` returns for a question: it follows the question's kind. */
-type Answer<Q extends Question> = Q extends { kind: "confirm" }
-  ? boolean
-  : Q extends { kind: "multiselect"; options: Choice<infer V>[] }
-    ? V[]
-    : Q extends { kind: "select"; options: Choice<infer V>[] }
-      ? V
-      : Q extends { optional: true; parse: (value: string) => Parsed<infer T> }
-        ? T | undefined
-        : Q extends { parse: (value: string) => Parsed<infer T> }
-          ? T
-          : never;
-
 /** What the session says about who can answer, beyond the question itself. */
-type Session = {
+export type Session = {
   /** Whether a person is at a terminal to be asked. */
   interactive: boolean;
   /** The command's `--force`: it answers a `confirm` without asking. */
@@ -113,12 +57,6 @@ type Session = {
   /** Called when a prompt has been answered, so the caller can space what follows it. */
   after?: () => void;
 };
-
-/**
- * `input` with the session already filled in, which is what a command's
- * `this.input` and the setup wizard's prompt context hand out.
- */
-export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
 
 /**
  * The one way the CLI takes input from a person or a script. Every command
@@ -138,7 +76,7 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *    built from the question's `flag`, whether stdin is accepted and, as an
  *    example, its `retry`; and `retry` as `nextCommands` for an agent to run.
  *
- * What comes back follows the `kind`:
+ * What comes back follows the method that was called:
  *
  * - `text` and `secret` return what `parse` produced. `parse` runs on the
  *   value from every source, so a flag, a pipe and a typed answer are held to
@@ -146,36 +84,21 @@ export type Asker = <Q extends Question>(question: Q) => Promise<Answer<Q>>;
  *   validator that refuses an answer as it is typed. A value from a flag or a
  *   pipe that does not parse is an `E_VALIDATION` error saying why. `secret`
  *   masks what is typed, is never a flag, and is never echoed or put in an
- *   error. With `optional`, the answer may be `undefined` (see its docs).
+ *   error. With `optional`, the answer may be `undefined`.
  * - `select` returns the chosen option's `value`.
  * - `multiselect` returns the chosen options' `value`s.
  * - `confirm` returns a boolean. The session's `force` (the command's
  *   `--force`) answers it yes without asking. With no one to ask and no
  *   `force`, it throws an `E_VALIDATION` error saying `--force` is required.
- *   A command whose `--force` means something else must not hand out a
- *   session with `force` set.
+ *   A command whose `--force` means something else asks through a session
+ *   with `force` unset (`Ui.questions({ honorForce: false })`).
  *
  * Cancelling a prompt (Ctrl-C) throws `E_CANCELLED` instead of returning a
  * sentinel, so a command never carries on with a missing answer, and exits
  * 130 like Ctrl-C anywhere else. The prompt closes with "Cancelled.", which is
  * all a person is shown: a cancel is their own decision, not an error.
- *
- * Commands call this through `this.input(...)` on `BaseCommand`, which fills in
- * `session` from the command's own flags. It takes the session as an argument
- * so it can be tested without a terminal.
- *
- * @example
- * const clientId = await this.input({
- *   kind: "text",
- *   name: "client id",
- *   message: "What is the client ID of your Google OAuth app?",
- *   flag: "--client-id",
- *   parse: parseClientId,
- *   given: flags["client-id"],
- * });
  */
-export async function input<Q extends Question>(question: Q, session: Session): Promise<Answer<Q>> {
-  const q: Question = question;
+async function askOne(kind: Kind, q: AnyQuestion, session: Session): Promise<unknown> {
   const stdin = session.stdin ?? process.stdin;
   const refusal = (message: string, hint?: string): ZitadelError =>
     new ZitadelError("E_VALIDATION", message, {
@@ -187,10 +110,10 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     return new ZitadelError("E_CANCELLED", "Cancelled by user");
   };
   const unsupplied = (): ZitadelError => {
-    const isText = q.kind === "text" || q.kind === "secret";
+    const isText = kind === "text" || kind === "secret";
     // A secret is never a flag, whatever the question says, because that would
     // put it in shell history, a process listing and CI logs.
-    const secret = q.kind === "secret";
+    const secret = kind === "secret";
     const ways = [
       ...(q.flag === undefined || secret ? [] : [`pass ${q.flag}`]),
       ...(isText && q.stdin === true ? ["pipe it in on stdin"] : []),
@@ -207,102 +130,176 @@ export async function input<Q extends Question>(question: Q, session: Session): 
     return refusal(`No ${q.name} supplied`, hint === "" ? undefined : hint);
   };
 
-  const answer = async (): Promise<unknown> => {
-    if (q.kind === "confirm") {
-      if (session.force) {
-        return true;
-      }
-      if (!session.interactive) {
-        throw refusal(
-          `Cannot ${q.name} without --force in non-interactive mode`,
-          `Pass --force to ${q.name}.`,
-        );
-      }
-      session.before?.();
-      const confirmed = await confirm({
-        message: q.message,
-        initialValue: q.initialValue ?? false,
-      });
-      session.after?.();
-      if (isCancel(confirmed)) {
-        throw cancelled();
-      }
-      return confirmed;
+  if (kind === "confirm") {
+    if (session.force) {
+      return true;
     }
+    if (!session.interactive) {
+      throw refusal(
+        `Cannot ${q.name} without --force in non-interactive mode`,
+        `Pass --force to ${q.name}.`,
+      );
+    }
+    session.before?.();
+    const confirmed = await confirm({
+      message: q.message,
+      initialValue: (q.initialValue as boolean | undefined) ?? false,
+    });
+    session.after?.();
+    if (isCancel(confirmed)) {
+      throw cancelled();
+    }
+    return confirmed;
+  }
 
-    if (q.kind === "select" || q.kind === "multiselect") {
-      if (!session.interactive) {
-        throw unsupplied();
-      }
-      session.before?.();
-      const chosen =
-        q.kind === "select"
-          ? await select({
-              message: q.message,
-              options: q.options,
-              initialValue: q.initialValue,
-            })
-          : await multiselect({
-              message: q.message,
-              options: q.options,
-              required: q.required,
-            });
-      session.after?.();
-      if (isCancel(chosen)) {
-        throw cancelled();
-      }
-      return chosen;
-    }
-
-    const accept = (raw: string): unknown => {
-      const parsed = q.parse(raw);
-      if (!parsed.ok) {
-        throw refusal(parsed.problem);
-      }
-      return parsed.value;
-    };
-    if (q.given !== undefined) {
-      return accept(q.given);
-    }
-    if (q.stdin === true && !stdin.isTTY) {
-      const piped = await readStdin(stdin);
-      const parsed = q.parse(piped);
-      if (parsed.ok) {
-        return parsed.value;
-      }
-      if (piped.trim() !== "") {
-        throw refusal(parsed.problem);
-      }
-    }
-    if (q.optional === true) {
-      return undefined;
-    }
+  if (kind === "select" || kind === "multiselect") {
     if (!session.interactive) {
       throw unsupplied();
     }
-    const validate = (value: string | undefined): string | undefined => {
-      const parsed = q.parse(value ?? "");
-      return parsed.ok ? undefined : parsed.problem;
-    };
     session.before?.();
-    const typed =
-      q.kind === "secret"
-        ? await password({ message: q.message, validate })
-        : await text({
-            message: q.message,
-            validate,
-            initialValue: q.initialValue,
-            placeholder: q.placeholder,
-          });
+    const options = q.options ?? [];
+    const chosen =
+      kind === "select"
+        ? await select({ message: q.message, options, initialValue: q.initialValue })
+        : await multiselect({ message: q.message, options, required: q.required });
     session.after?.();
-    if (isCancel(typed)) {
+    if (isCancel(chosen)) {
       throw cancelled();
     }
-    return accept(String(typed ?? ""));
-  };
+    return chosen;
+  }
 
-  // The one cast: `Answer<Q>` is computed from the question's type, which the
-  // branches above cannot see, so each branch returns `unknown` and this is
-  // where the kind-to-type mapping the question's type promises is trusted.
-  return (await answer()) as Answer<Q>;
+  // Only `text` and `secret` are left, and both carry a parser.
+  const parse = q.parse ?? ((raw: string): Parsed<unknown> => ({ ok: true, value: raw }));
+  const accept = (raw: string): unknown => {
+    const parsed = parse(raw);
+    if (!parsed.ok) {
+      throw refusal(parsed.problem);
+    }
+    return parsed.value;
+  };
+  if (q.given !== undefined) {
+    return accept(q.given);
+  }
+  if (q.stdin === true && !stdin.isTTY) {
+    const piped = await readStdin(stdin);
+    const parsed = parse(piped);
+    if (parsed.ok) {
+      return parsed.value;
+    }
+    if (piped.trim() !== "") {
+      throw refusal(parsed.problem);
+    }
+  }
+  if (q.optional === true) {
+    return undefined;
+  }
+  if (!session.interactive) {
+    throw unsupplied();
+  }
+  const validate = (value: string | undefined): string | undefined => {
+    const parsed = parse(value ?? "");
+    return parsed.ok ? undefined : parsed.problem;
+  };
+  session.before?.();
+  const typed =
+    kind === "secret"
+      ? await password({ message: q.message, validate })
+      : await text({
+          message: q.message,
+          validate,
+          initialValue: q.initialValue as string | undefined,
+          placeholder: q.placeholder,
+        });
+  session.after?.();
+  if (isCancel(typed)) {
+    throw cancelled();
+  }
+  return accept(String(typed ?? ""));
+}
+
+/**
+ * {@link Questions} bound to one session. Each method is the engine above with
+ * its kind already chosen, which is the only cast in the module: the branches
+ * of {@link askOne} cannot see the question's type, so each returns `unknown`
+ * and the kind-to-type mapping the overloads promise is trusted here.
+ */
+class SessionQuestions implements Questions {
+  private readonly session: Session;
+
+  constructor(session: Session) {
+    this.session = session;
+  }
+
+  text<T>(question: TextQuestion<T> & Optional): Promise<T | undefined>;
+  text<T>(question: TextQuestion<T>): Promise<T>;
+  text<T>(question: TextQuestion<T> & { optional?: boolean }): Promise<T | undefined> {
+    return askOne("text", question, this.session) as Promise<T | undefined>;
+  }
+
+  secret<T>(question: SecretQuestion<T> & Optional): Promise<T | undefined>;
+  secret<T>(question: SecretQuestion<T>): Promise<T>;
+  secret<T>(question: SecretQuestion<T> & { optional?: boolean }): Promise<T | undefined> {
+    return askOne("secret", question, this.session) as Promise<T | undefined>;
+  }
+
+  select<V>(question: SelectQuestion<V>): Promise<V> {
+    return askOne("select", question, this.session) as Promise<V>;
+  }
+
+  multiselect<V>(question: MultiselectQuestion<V>): Promise<V[]> {
+    return askOne("multiselect", question, this.session) as Promise<V[]>;
+  }
+
+  confirm(question: ConfirmQuestion): Promise<boolean> {
+    return askOne("confirm", question, this.session) as Promise<boolean>;
+  }
+}
+
+/**
+ * The five questions, bound to who can answer them. Commands get one from
+ * `this.ask`, which the UI package builds from the run's audience; it takes
+ * the session as an argument so it can be tested without a terminal.
+ *
+ * @example
+ * const clientId = await this.ask.text({
+ *   name: "client id",
+ *   message: "What is the client ID of your Google OAuth app?",
+ *   flag: "--client-id",
+ *   parse: parseClientId,
+ *   given: flags["client-id"],
+ * });
+ */
+export function asker(session: Session): Questions {
+  return new SessionQuestions(session);
+}
+
+/**
+ * A command's `this.input`: a question with its kind written out as a string.
+ *
+ * @deprecated The typed methods of {@link Questions} replaced it, and
+ * `Promptable` hands them out as `this.ask`. The last caller is
+ * `commands/env/add.ts`; this, `this.input` and {@link input} go with it.
+ */
+export type Asker = {
+  <T>(question: TextQuestion<T> & { kind: "text" | "secret" }): Promise<T>;
+  (question: ConfirmQuestion & { kind: "confirm" }): Promise<boolean>;
+};
+
+/**
+ * {@link asker} for a caller that still names the kind in the question.
+ *
+ * @deprecated See {@link Asker}.
+ */
+export function input<T>(
+  question: TextQuestion<T> & { kind: "text" | "secret" },
+  session: Session,
+): Promise<T>;
+export function input(
+  question: ConfirmQuestion & { kind: "confirm" },
+  session: Session,
+): Promise<boolean>;
+export function input(question: AnyQuestion & { kind: Kind }, session: Session): Promise<unknown> {
+  const { kind, ...rest } = question;
+  return askOne(kind, rest, session);
 }

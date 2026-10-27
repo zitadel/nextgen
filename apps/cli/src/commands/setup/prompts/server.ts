@@ -37,8 +37,7 @@ export class ServerPrompt implements SetupPrompt {
     }
     const detected = await detectLocalServer(ctx);
 
-    const choice = await ctx.input({
-      kind: "select",
+    const choice = await ctx.ask.select({
       name: "server",
       message: "Which Zitadel server should your app use?",
       options: [
@@ -65,8 +64,7 @@ export class ServerPrompt implements SetupPrompt {
     if (choice !== CUSTOM) {
       return { ...answers, server: choice };
     }
-    const custom = await ctx.input({
-      kind: "text",
+    const custom = await ctx.ask.text({
       name: "server URL",
       message: "What is the URL of your Zitadel server?",
       placeholder: "https://zitadel.internal",

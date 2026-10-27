@@ -39,9 +39,11 @@
 - Report a warning through `reportWarning` (`src/lib/warnings.ts`) or a
   result's `warnings`, never `consola.warn`: `--json` silences consola. A unit
   test fails on any other `consola.warn`.
-- Ask for input through `this.input(...)` (`src/lib/input.ts`), never clack's
-  prompts and never a hand-written flag-or-stdin-or-prompt rule. A unit test
-  fails on a clack import elsewhere.
+- Ask for input through `this.ask` — `this.ask.text/secret/select/multiselect/confirm`
+  (`src/lib/ui/questions.ts`, engine in `src/lib/input.ts`) — never clack's
+  prompts and never a hand-written flag-or-stdin-or-prompt rule. One method per
+  kind of question and no `kind` string: a unit test fails on a clack import
+  elsewhere and on a `kind:` question outside the engine.
 - Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
   `consola` or a write to `process.stdout`/`process.stderr` in a new file.
   `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.
@@ -49,7 +51,7 @@
   first question, and each one that does as soon as its answer is given.
 - A command that asks anything extends `Promptable(...)`
   (`src/lib/oclif/promptable.ts`), as in `Promptable(BaseCommand)` or
-  `Promptable(EnvironmentCommand)`. Only such a command has `this.input`, so
+  `Promptable(EnvironmentCommand)`. Only such a command has `this.ask`, so
   what can prompt is visible from its class, and the compiler rejects a
   command that asks without it.
 - Word every prompt as a polite question to a person, never a field label or a

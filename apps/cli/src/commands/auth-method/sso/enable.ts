@@ -330,8 +330,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // Reuse never demands a secret: the project may already hold it, and
       // refusing an unattended rerun for a credential that has not changed
       // would be noise. It is only read so that a rerun can replace it.
-      const piped = await this.input({
-        kind: "secret",
+      const piped = await this.ask.secret({
         name: "client secret",
         message: `What is the client secret of your ${entry.displayName} OAuth app?`,
         parse: parseClientSecret,
@@ -368,11 +367,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           ? await askConnectionEndpoints({
               provider: selection.id,
               developmentBuild: isDevelopmentBuild() && !nonInteractive,
-              ask: this.input,
+              ask: this.ask,
             })
           : undefined;
-      const clientId = await this.input({
-        kind: "text",
+      const clientId = await this.ask.text({
         name: `client id for ${entry.displayName}`,
         message: `What is the client ID of your ${entry.displayName} OAuth app?`,
         flag: "--client-id",
@@ -385,8 +383,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // variables, so enabling a provider without one writes a sign-in button
       // that fails at the token endpoint with `invalid_client` -- a failure
       // that surfaces in a browser, not here. Refusing now is the cheaper answer.
-      const secretValue = await this.input({
-        kind: "secret",
+      const secretValue = await this.ask.secret({
         name: `client secret for ${scaffolded.clientSecret}`,
         message: `What is the client secret of your ${entry.displayName} OAuth app? It will be stored on the project as ${scaffolded.clientSecret}.`,
         parse: parseClientSecret,
@@ -582,8 +579,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     files: readonly ConnectionFile[],
     beforeAsking: (slug: ConnectionSlug) => void,
   ): Promise<Required<CustomFlagValues>> {
-    const slug = await this.input({
-      kind: "text",
+    const slug = await this.ask.text({
       name: "connection name",
       message:
         "What would you like to call this connection? It is used in your configuration, for example acme-sso.",
@@ -601,22 +597,19 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     if (existing !== undefined && givenIssuer?.ok) {
       refuseChangedIssuer(existing, slug, givenIssuer.value, ENABLE_FLAG_NAMES.slug);
     }
-    const displayName = await this.input({
-      kind: "text",
+    const displayName = await this.ask.text({
       name: "display name",
       message: "What name should the sign-in button show? For example Acme SSO.",
       parse: parseDisplayName,
       given: given.displayName ?? stored?.displayName,
     });
-    const issuer = await this.input({
-      kind: "text",
+    const issuer = await this.ask.text({
       name: "issuer",
       message: "What is the issuer URL of the provider?",
       parse: parseIssuer,
       given: given.issuer ?? stored?.issuer,
     });
-    const scopes = await this.input({
-      kind: "text",
+    const scopes = await this.ask.text({
       name: "scopes",
       message: "Which scopes should we request? Separate them with spaces.",
       parse: parseScopes,

@@ -5,7 +5,7 @@ import { spinner } from "@clack/prompts";
  * and is then either replaced by a line that says how it ended, or cleared,
  * leaving nothing behind.
  *
- * Prefer `wizard.task(...)`, which cannot be left spinning. This is for work
+ * Prefer `this.ui.task(...)`, which cannot be left spinning. This is for work
  * the surrounding code cannot wrap in a callback: a probe whose result is the
  * options of the next question, or a page loop that renames itself as it goes.
  *

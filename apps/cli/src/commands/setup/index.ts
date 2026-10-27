@@ -86,7 +86,6 @@ import {
   RENDERER_IDS,
 } from "../../lib/orca/patchers/rule/next/renderers/registry";
 import type { PatchContext } from "../../lib/orca/patchers/types";
-import { type Asker, input } from "../../lib/input";
 import { hasZitadelConfig, hasZitadelSecret } from "../../lib/project";
 import {
   PASSWORD_POLICY_PATH,
@@ -124,7 +123,7 @@ import {
   type Section,
 } from "./summary";
 import { shellOption } from "../../lib/shell";
-import type { Step, Summary } from "../../lib/ui";
+import type { Questions, Step, Summary } from "../../lib/ui";
 import { reportWarning } from "../../lib/warnings";
 import {
   type EnvironmentSelector,
@@ -328,22 +327,15 @@ export default class Setup extends Promptable(BaseCommand) {
     // inconsistent set of --sso flags is a mistake in the command line, and
     // reporting it after a project has been created would leave the developer
     // to clean up.
-    // Not `this.input`: that one answers a confirm when `--force` is given, and
+    // Not `this.ask`: that one answers a confirm when `--force` is given, and
     // here `--force` permits overwriting files, so it must never answer a
-    // question. Interactive only when a person is there, which is also the only
-    // time the wizard runs.
-    const wizardInput: Asker = (question) =>
-      input(question, {
-        interactive: !nonInteractive,
-        force: false,
-        before: () => this.ui.open(),
-        after: () => this.ui.answered(),
-      });
+    // question.
+    const wizardQuestions = this.ui.questions({ honorForce: false });
     const ssoFromCommandLine = await ssoFromFlags(
       flags,
       nonInteractive,
       dryRun,
-      wizardInput,
+      wizardQuestions,
       this.config.version,
     );
 
@@ -384,7 +376,7 @@ export default class Setup extends Promptable(BaseCommand) {
             retry: retryOptionsFromFlags(flags),
             serverFlag: this.meta.serverFlag,
             cliVersion: this.config.version,
-            ask: wizardInput,
+            ask: wizardQuestions,
           }),
         );
         scaffoldedBesideFiles = !target.scaffoldable;
@@ -434,7 +426,7 @@ export default class Setup extends Promptable(BaseCommand) {
 
     if (!nonInteractive && !dryRun) {
       const promptCtx: PromptContext = {
-        input: wizardInput,
+        ask: wizardQuestions,
         note: (title, lines) => this.ui.note(title, lines),
         say: (text) => this.ui.say(text),
         spinner: (label, options) => this.ui.spinner(label, options),
@@ -1153,7 +1145,7 @@ async function resolveScaffoldFramework(
   framework: string | undefined,
   nonInteractive: boolean,
   orca: Orca,
-  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Asker },
+  guidance: { retry: SetupRetryOptions; serverFlag?: string; cliVersion: string; ask: Questions },
 ): Promise<string> {
   if (framework) {
     return framework;
@@ -1338,7 +1330,7 @@ export async function ssoFromFlags(
   },
   nonInteractive: boolean,
   dryRun: boolean,
-  ask: Asker,
+  ask: Questions,
   cliVersion: string,
 ): Promise<SsoDraft | undefined> {
   const customValues = customFlagValues(flags, SETUP_FLAG_KEYS);
@@ -1402,8 +1394,7 @@ export async function ssoFromFlags(
   // sign-in button that fails at the provider with `invalid_client`, long
   // after setup reports success. It is never a flag — that would put it in
   // shell history, a process listing and CI logs.
-  const secret = await ask({
-    kind: "secret",
+  const secret = await ask.secret({
     name: "client secret",
     message: `What is the client secret of your ${providerOf(selection).displayName} OAuth app?`,
     parse: parseClientSecret,

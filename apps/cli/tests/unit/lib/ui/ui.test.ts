@@ -7,7 +7,6 @@ import { confirm, intro, outro, spinner } from "@clack/prompts";
 import { consola } from "consola";
 
 import { ZitadelError } from "../../../../src/lib/errors";
-import { outcome } from "../../../../src/lib/ui/summary";
 import { Ui } from "../../../../src/lib/ui/ui";
 
 const watched = () => new Ui({ interactive: true, force: false });
@@ -35,68 +34,31 @@ afterEach(() => {
 });
 
 const printed = () => written.join("");
-const done = <D>(data: D, title: string) => outcome(data, { title, sections: [] });
 
 describe("Ui", () => {
-  describe("a command run as one chain", () => {
-    it("returns the data the command produced", async () => {
+  describe("the questions a command may ask", () => {
+    it("opens the chain the question is drawn in", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(true as never);
+      const ui = watched();
+      ui.describe("Removing an origin");
+
+      await ui.questions().confirm({ name: "remove the origin", message: "Remove it?" });
+
+      expect(intro).toHaveBeenCalledWith("Removing an origin");
+    });
+
+    it("is never asked when nobody is watching", async () => {
       await expect(
-        watched().wizard("Listing origins", async () => done({ count: 1 }, "Found 1 origin")),
-      ).resolves.toEqual({ count: 1 });
-    });
-
-    it("closes the chain on the summary the command returned", async () => {
-      await watched().wizard("Enabling single sign-on", async (w) => {
-        w.say("configuring it");
-        return done(null, "Enabled it");
-      });
-
-      expect(intro).toHaveBeenCalledWith("Enabling single sign-on");
-      expect(outro).toHaveBeenCalledWith("Enabled it");
-    });
-
-    it("draws no chain for a command that answered without asking anything", async () => {
-      await watched().wizard("Listing origins", async () => done(null, "Found 1 origin"));
-
-      expect(intro).not.toHaveBeenCalled();
-      expect(outro).not.toHaveBeenCalled();
-    });
-
-    it("draws nothing at all when nobody is watching", async () => {
-      await scripted().wizard("Listing origins", async () => done(null, "Found 1 origin"));
-
-      expect(intro).not.toHaveBeenCalled();
-      expect(outro).not.toHaveBeenCalled();
+        scripted().questions().confirm({ name: "remove the origin", message: "Remove it?" }),
+      ).rejects.toMatchObject({ code: "E_VALIDATION" });
+      expect(confirm).not.toHaveBeenCalled();
       expect(printed()).toBe("");
     });
 
-    it("says the run stopped, and lets the error through, when the work threw", async () => {
-      const boom = new Error("boom");
-
-      await expect(
-        watched().wizard("Listing origins", async (w) => {
-          w.say("Looking for a project");
-          throw boom;
-        }),
-      ).rejects.toBe(boom);
-      expect(outro).toHaveBeenCalledWith(expect.stringContaining("Stopped"));
-    });
-
-    it("stays quiet when the person cancelled, because the prompt already said so", async () => {
-      await watched()
-        .wizard("Listing origins", async (w) => {
-          w.say("Looking for a project");
-          throw new ZitadelError("E_CANCELLED", "Cancelled by user");
-        })
-        .catch(() => undefined);
-
-      expect(outro).not.toHaveBeenCalled();
-    });
-
     it("lets the command's --force answer its confirmations", async () => {
-      const answer = await forced().wizard("Removing an origin", async (w) =>
-        done(await w.confirm({ name: "remove the origin", message: "Remove it?" }), "Removed"),
-      );
+      const answer = await forced()
+        .questions()
+        .confirm({ name: "remove the origin", message: "Remove it?" });
 
       expect(answer).toBe(true);
       expect(confirm).not.toHaveBeenCalled();
@@ -105,15 +67,51 @@ describe("Ui", () => {
     it("asks anyway when the command's --force means something else", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-      const answer = await forced().wizard(
-        "Setting up",
-        async (w) =>
-          done(await w.confirm({ name: "scaffold the app", message: "Scaffold?" }), "Set up"),
-        { honorForce: false },
-      );
+      const answer = await forced()
+        .questions({ honorForce: false })
+        .confirm({ name: "scaffold the app", message: "Scaffold?" });
 
       expect(answer).toBe(false);
       expect(confirm).toHaveBeenCalled();
+    });
+
+    // The force policy belongs to the asker, not to the chain it draws in, so
+    // asking for another asker cannot change what an existing one answers.
+    it("settles --force per asker, so one of them never changes another", async () => {
+      vi.mocked(confirm).mockResolvedValueOnce(false as never);
+      const ui = forced();
+      const scaffolding = ui.questions({ honorForce: false });
+      ui.questions();
+
+      const answer = await scaffolding.confirm({
+        name: "scaffold the app",
+        message: "Scaffold?",
+      });
+
+      expect(answer).toBe(false);
+      expect(confirm).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("a run that never finished", () => {
+    it("stays quiet when the person cancelled, because the prompt already said so", () => {
+      const ui = watched();
+      ui.describe("Listing origins");
+      ui.open();
+
+      ui.stop(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+
+      expect(outro).not.toHaveBeenCalled();
+    });
+
+    it("closes the chain when the person interrupted the work", () => {
+      const ui = watched();
+      ui.describe("Listing origins");
+      ui.open();
+
+      ui.stop(new ZitadelError("E_CANCELLED", "Cancelled"));
+
+      expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
     });
   });
 
@@ -134,7 +132,7 @@ describe("Ui", () => {
     });
   });
 
-  describe("drawing outside a wizard callback", () => {
+  describe("drawing outside a question", () => {
     it("names the chain by what the command is doing", () => {
       const ui = watched();
       ui.describe("Listing origins");

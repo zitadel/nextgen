@@ -108,8 +108,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // when nothing is live there, which an optional id cannot stand in for.
     const expectedDeploymentId = bareGuard ?? (await liveGuard(client, projectId));
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `re-apply ${targetId}`,
       message: `Re-apply ${targetId}? Its release goes live again.`,
       retry: this.suggest(`deployment rollback ${targetId} --force`),

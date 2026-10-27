@@ -152,8 +152,7 @@ export default class BrandingEject extends Promptable(BaseCommand) {
     if (nonInteractive) {
       return DEFAULT_BRANDING_DESIGN;
     }
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "design",
       message: "Which design would you like to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN,

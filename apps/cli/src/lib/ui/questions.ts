@@ -3,10 +3,10 @@ import type { Parsed } from "@zitadel/config/idp";
 import type { SuggestedCommand } from "../suggestion";
 
 /**
- * The questions a command may ask, as types. There is one method per kind of
- * question rather than a `kind: "text"` string, so a command cannot ask for a
- * select and read back a boolean, and so the answer's type follows from the
- * question's `parse` without a cast at the call site.
+ * The questions a command may ask, as types. {@link Questions} has one method
+ * per kind of question rather than a kind written out as a string, so a
+ * command cannot ask for a select and read back a boolean, and so the answer's
+ * type follows from the question's `parse` without a cast at the call site.
  *
  * Every question is worded as a polite question to a person (`apps/cli/AGENTS.md`),
  * and the same question is asked the same way by every command that asks it.
@@ -63,6 +63,19 @@ export type TextQuestion<T> = Question & {
 };
 
 /**
+ * Whether having no answer is acceptable, for a value a rerun may replace but
+ * does not need. Such a question never prompts and never refuses for want of a
+ * value: it answers `undefined` when nothing was given and nothing, or only an
+ * empty pipe, was piped in. A pipe carrying content that does not parse is
+ * still an `E_VALIDATION` error, like any other source.
+ *
+ * It is spelled `optional: true` rather than `optional?: boolean` so the
+ * asker's overloads can tell the two apart and the answer's type follows the
+ * question: a question that may answer `undefined` says so at the call site.
+ */
+export type Optional = { optional: true };
+
+/**
  * The same, masked. A secret is never a flag and never `given`: that would put
  * it in shell history, a process listing and CI logs.
  */
@@ -73,3 +86,27 @@ export type SelectQuestion<V> = Question & { options: Choice<V>[]; initialValue?
 export type MultiselectQuestion<V> = Question & { options: Choice<V>[]; required?: boolean };
 
 export type ConfirmQuestion = Question & { initialValue?: boolean };
+
+/**
+ * The one way the CLI takes input from a person or a script: one method per
+ * kind of question, so a command cannot ask for a select and read back a
+ * boolean, and the answer's type follows from the question's own `parse`.
+ *
+ * A command reaches it as `this.ask` (`Promptable`), which binds it to the
+ * run's audience; `setup`'s prompts take it as `ctx.ask`. The sources are
+ * tried in a fixed order, and the first that applies answers — a flag, piped
+ * stdin, a prompt, and otherwise a refusal naming what was missing. See
+ * `lib/input.ts` for the whole rule.
+ */
+export interface Questions {
+  /** Free text. With `optional`, `undefined` when nothing was given. */
+  text<T>(question: TextQuestion<T> & Optional): Promise<T | undefined>;
+  text<T>(question: TextQuestion<T>): Promise<T>;
+  /** Masked text, never a flag, never echoed. */
+  secret<T>(question: SecretQuestion<T> & Optional): Promise<T | undefined>;
+  secret<T>(question: SecretQuestion<T>): Promise<T>;
+  select<V>(question: SelectQuestion<V>): Promise<V>;
+  multiselect<V>(question: MultiselectQuestion<V>): Promise<V[]>;
+  /** Yes or no. The command's `--force` answers it yes without asking. */
+  confirm(question: ConfirmQuestion): Promise<boolean>;
+}

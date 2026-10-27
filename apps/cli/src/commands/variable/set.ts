@@ -172,18 +172,22 @@ export default class VariableSet extends Promptable(EnvironmentCommand) {
     // when the value is to be stored as a secret, so it does not stay on screen
     // or in a scrollback buffer. An empty string is a value the scalar schema
     // accepts; only an absent input is an error.
-    const value = await this.input({
-      kind: flags.secret ? "secret" : "text",
+    const question = {
       name: `value for ${name}`,
       message: `What should the value of ${name} be?`,
-      ...(flags.secret || args.value === undefined ? {} : { given: args.value }),
       stdin: true,
       // The selector this.suggest appends must precede the stdin redirection.
       retry: inShell(this.suggest(pipeArgs(name, flags.secret, type, flags.preview)), {
         after: " < value.txt",
       }),
       parse: (raw: string) => parseVariableValue(raw, type),
-    });
+    };
+    const value = flags.secret
+      ? await this.ask.secret(question)
+      : await this.ask.text({
+          ...question,
+          ...(args.value === undefined ? {} : { given: args.value }),
+        });
 
     // The write answers with the kind it wrote, so a secret says only that a
     // value is held (ADR 062 §7), never the value itself. The kind this write

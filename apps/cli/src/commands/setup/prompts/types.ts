@@ -7,10 +7,9 @@ import {
   providerOf,
 } from "@zitadel/config/idp";
 
-import type { Asker } from "../../../lib/input";
 import type { FrameworkChoice } from "../../../lib/orca";
 import type { SuggestedCommand } from "../../../lib/suggestion";
-import type { Spinner } from "../../../lib/ui";
+import type { Questions, Spinner } from "../../../lib/ui";
 
 /**
  * The collected wizard state, threaded through every {@link SetupPrompt}. A
@@ -104,19 +103,21 @@ export type SetupAnswers = {
 /** Read-only facts a prompt may need. */
 export type PromptContext = {
   /**
-   * How a prompt asks its question: `input`, so every question the wizard
-   * asks behaves like every other question the CLI asks.
+   * How a prompt asks its question: the typed questions every other command
+   * asks through, so every question the wizard asks behaves like every other
+   * question the CLI asks.
    *
-   * Deliberately not the command's `this.input`. That one answers a `confirm`
+   * Deliberately not the command's `this.ask`. That one answers a `confirm`
    * when the command's `--force` is given, and setup's `--force` means "overwrite
    * files", so with it a prompt such as "Would you like to set up Zitadel in
-   * this Next.js app?" would be answered yes without asking. This one never is.
+   * this Next.js app?" would be answered yes without asking. This one never is
+   * (`Ui.questions({ honorForce: false })`).
    */
-  readonly input: Asker;
+  readonly ask: Questions;
   /**
    * Something the person must read or go and do outside the terminal, such as
    * registering an OAuth application, as the one boxed thing a prompt draws.
-   * It goes through the UI package for the same reason `input` does: a prompt
+   * It goes through the UI package for the same reason `ask` does: a prompt
    * that drew its own box would draw one that matches nothing else.
    */
   readonly note: (title: string, lines: readonly string[]) => void;

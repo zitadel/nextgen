@@ -115,14 +115,19 @@ describe("Chain", () => {
     ).toBeLessThanOrEqual(72);
   });
 
-  it("says a run stopped when it failed partway", () => {
+  // The base command renders a failure as an error block through `finish`, so
+  // closing the chain on the failure itself would make that call return early
+  // and the run would end showing nothing but its closing line.
+  it("leaves a failure for the error block to close", () => {
     const chain = watching();
     chain.describe("Removing an origin");
     chain.narrate("i", "asked");
 
     chain.abort(new Error("boom"));
+    chain.finish({ title: "Could not remove the origin", sections: [] });
 
-    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Stopped"));
+    expect(outro).toHaveBeenCalledOnce();
+    expect(outro).toHaveBeenCalledWith("Could not remove the origin");
   });
 
   it("stays quiet when the person cancelled, because the prompt already said so", () => {
@@ -130,7 +135,7 @@ describe("Chain", () => {
     chain.describe("Removing an origin");
     chain.narrate("i", "asked");
 
-    chain.abort(new ZitadelError("E_VALIDATION", "Cancelled by user"));
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
     expect(outro).not.toHaveBeenCalled();
   });

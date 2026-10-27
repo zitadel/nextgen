@@ -1,38 +1,42 @@
 import type { Audience } from "./audience";
 import { Chain } from "./chain";
 import { Narration } from "./narration";
+import type { Report, Step } from "./progress";
+import type { Questions } from "./questions";
 import type { Spinner } from "./spinner";
-import type { Outcome, Summary } from "./summary";
-import type { Report, Step, Wizard } from "./wizard";
+import type { Summary } from "./summary";
 
 /**
  * What a command is given as `this.ui`: one chain, and the ways to draw in it.
  *
- * A command names what it is doing (`static heading`), asks its questions and
- * does its work inside `wizard(...)`, and returns an {@link Outcome}. The base
- * command closes the chain on that outcome's summary, so the ending looks the
- * same in every command and no command has to remember to print one.
+ * A command names what it is doing (`static heading`), asks its questions
+ * through {@link Questions} and reports its work as {@link task}s and
+ * {@link note}s. The base command closes the chain on the result the command
+ * returned, so the ending looks the same in every command and no command has
+ * to remember to print one.
  *
  * ```ts
  * export default class OriginRm extends Promptable(EnvironmentCommand) {
  *   static override heading = "Removing an origin";
  *
  *   override async execute() {
- *     return this.ui.wizard("Removing an origin", async (w) => {
- *       if (!(await w.confirm({ name: "remove the origin", message: `Remove ${pattern}?` }))) {
- *         return outcome({ removed: false }, { title: "Nothing was removed", sections: [] });
- *       }
- *       await w.task("Removing the origin", () => remove(pattern));
- *       return outcome({ removed: true }, { title: `Removed ${pattern}`, sections: [] });
+ *     const remove = await this.ask.confirm({
+ *       name: "remove the origin",
+ *       message: `Remove ${pattern}?`,
  *     });
+ *     if (!remove) {
+ *       return this.emit({ status: "skipped", reason: "remove-cancelled" });
+ *     }
+ *     await this.ui.task("Removing the origin", () => remove(pattern));
+ *     return this.emit({ status: "ok", pretty: `Removed ${pattern}` });
  *   }
  * }
  * ```
  *
- * The members below `wizard` are the base command's, not a command's: they
- * name the chain, bridge `consola` into it and close it on the result the
- * command returned. A command that reaches for them is a command drawing
- * outside its own chain.
+ * {@link describe}, {@link bridgeNarration}, {@link open} and {@link finish}
+ * are the base command's, not a command's: they name the chain, bridge
+ * `consola` into it and close it on the result the command returned. A command
+ * that reaches for them is a command drawing outside its own chain.
  */
 export class Ui {
   private readonly chain: Chain;
@@ -54,29 +58,16 @@ export class Ui {
   }
 
   /**
-   * Runs a whole command as one chain and returns its data. The chain opens at
-   * the first thing the person sees and closes on the summary. When nobody is
-   * there, questions are answered from flags and stdin only and nothing is
-   * drawn, so `--json` stays one envelope.
+   * The questions this command may ask, drawn inside its chain. A command
+   * reaches them as `this.ask` (`Promptable`). When nobody is there they are
+   * answered from flags and piped stdin only and nothing is drawn, so `--json`
+   * stays one envelope.
    *
    * `honorForce: false` is for `setup`, whose `--force` means "overwrite files"
    * and so must never answer a question.
    */
-  async wizard<D>(
-    title: string,
-    steps: (wizard: Wizard) => Promise<Outcome<D>>,
-    options: { honorForce?: boolean } = {},
-  ): Promise<D> {
-    this.chain.describe(title);
-    this.chain.honorForce(options.honorForce !== false);
-    try {
-      const result = await steps(this.chain);
-      this.chain.finish(result.summary);
-      return result.data;
-    } catch (error) {
-      this.chain.abort(error);
-      throw error;
-    }
+  questions(options: { honorForce?: boolean } = {}): Questions {
+    return this.chain.questions(options.honorForce !== false);
   }
 
   /**
@@ -131,8 +122,9 @@ export class Ui {
   }
 
   /**
-   * Work that takes a moment, outside a `wizard` callback (see {@link Wizard.task}).
-   * With nobody at a terminal it is narrated as plain lines, which `--json` silences.
+   * Work that takes a moment, as a callback: a spinner while it runs, then its
+   * result as one line with whatever it reported under it. With nobody at a
+   * terminal it is narrated as plain lines, which `--json` silences.
    */
   task<T>(
     label: string,
@@ -142,12 +134,22 @@ export class Ui {
     return this.chain.task(label, work, done);
   }
 
-  /** One line that states a fact, outside a `wizard` callback (see {@link Wizard.say}). */
+  /**
+   * One line in the chain that states something the run has settled, such as
+   * what happens now that a provider was skipped. It is not a question, not a
+   * {@link task} that did work and not something to go and do ({@link note});
+   * with nobody watching it is a plain `consola` line.
+   */
   say(text: string): void {
     this.chain.say(text);
   }
 
-  /** Something the person must read or do (see {@link Wizard.note}). */
+  /**
+   * Something the person must read or go and do outside the terminal, such as
+   * registering an OAuth app. It is the only boxed thing inside a chain; what
+   * merely happened is a {@link task}'s line, and what is left to do is the
+   * summary's next steps.
+   */
   note(title: string, lines: readonly string[]): void {
     this.chain.note(title, lines);
   }

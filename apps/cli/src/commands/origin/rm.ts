@@ -57,8 +57,7 @@ export default class OriginRm extends Promptable(EnvironmentCommand) {
     // A preview pattern can carry a `*`, so the retry is copy-pasteable only if
     // the shell will not expand it: `shellArg` single-quotes any pattern holding
     // a glob or other special character before interpolating it.
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `remove ${pattern} from the project`,
       message: `Remove ${pattern} from the project?`,
       retry: this.suggest(`origin rm ${shellArg(pattern)} --force`),

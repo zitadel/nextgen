@@ -70,8 +70,7 @@ export class DeleteOperation<Ctx> extends ResourceCommand<Ctx, DeleteSpec<Ctx>> 
       return dryRunResult(verb, topic, id);
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `${verb} ${resource.singular} ${id}`,
       message: `${capitalize(verb)} ${resource.singular} ${id}?`,
       retry: this.suggest(`${topic} ${verb} ${id} --force`),

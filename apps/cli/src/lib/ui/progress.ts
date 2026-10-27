@@ -4,7 +4,6 @@ import { consola } from "consola";
 import { GUTTER, Prose, WIDTH } from "./layout";
 import { GUIDE, MARK } from "./marks";
 import { DrawnSpinner } from "./spinner";
-import type { Report, Step } from "./wizard";
 
 /**
  * Work in progress, drawn as one line. A spinner runs while the work runs and
@@ -12,9 +11,29 @@ import type { Report, Step } from "./wizard";
  * reported underneath. With nobody at a terminal the same thing is narrated as
  * plain `consola` lines, which `--json` silences.
  *
- * Only the chain builds one; a command reaches it through `wizard.task(...)`
- * or `wizard.begin(...)`.
+ * Only the chain builds one; a command reaches it through `this.ui.task(...)`
+ * or `this.ui.begin(...)`.
  */
+
+/** What a {@link Progress.run} task reports, one line each, under its result. */
+export interface Report {
+  /** Something was done: `Wrote  .zitadel/idps/google.json`. */
+  done(verb: string, subject: string): void;
+  /** Something was left alone on purpose: `– Left  flows/default-login.json`. */
+  skipped(verb: string, subject: string): void;
+  /** Something to look at: `! Check  no claim_mapping`. */
+  warning(verb: string, subject: string): void;
+}
+
+/** One stretch of work, begun with {@link Progress.begin}, ended once. */
+export interface Step {
+  /** A line of detail, such as one file written, listed under the result. */
+  detail(text: string): void;
+  /** Ends the step, with its result as the line. */
+  done(text?: string): void;
+  /** Ends the step as failed. The error itself is shown by the ending. */
+  fail(text?: string): void;
+}
 
 /**
  * What the chain lends its progress lines: how to draw them in it. The chain

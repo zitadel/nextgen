@@ -21,7 +21,7 @@ import type { ZitadelError } from "../../../src/lib/errors";
 
 import { clackInputImports } from "../../helpers/drawing-boundary";
 import { sourceFiles } from "../../helpers/source-files";
-import { input } from "../../../src/lib/input";
+import { asker, type Session } from "../../../src/lib/input";
 import { unscopedCommand } from "../../../src/lib/suggestion";
 
 const SRC = join(import.meta.dirname, "../../../src");
@@ -48,15 +48,15 @@ const upper = (value: string): Parsed<string> =>
 const refuseBad = (value: string): Parsed<string> =>
   value === "bad" ? { ok: false, problem: "Not that one." } : { ok: true, value };
 
-const ask = { interactive: true, force: false };
-const scripted = { interactive: false, force: false };
+const ask: Session = { interactive: true, force: false };
+const scripted: Session = { interactive: false, force: false };
 
-const typed = (name = "client id") => ({
-  kind: "text" as const,
-  name,
-  message: "Client ID",
-  parse: parseClientId,
-});
+const typed = (name = "client id") => ({ name, message: "Client ID", parse: parseClientId });
+
+const options = [
+  { value: "a", label: "A" },
+  { value: "b", label: "B" },
+];
 
 beforeEach(() => {
   vi.mocked(text).mockReset();
@@ -69,29 +69,34 @@ beforeEach(() => {
   vi.mocked(isCancel).mockReturnValue(false);
 });
 
-describe("input", () => {
+describe("asker", () => {
   describe("the order of sources", () => {
     it("prefers the given value to piped stdin", async () => {
-      const answer = await input(
-        { kind: "text", name: "value", message: "Value", parse: upper, given: "flag", stdin: true },
-        { ...scripted, stdin: piped("pipe") },
-      );
+      const answer = await asker({ ...scripted, stdin: piped("pipe") }).text({
+        name: "value",
+        message: "Value",
+        parse: upper,
+        given: "flag",
+        stdin: true,
+      });
 
       expect(answer).toBe("FLAG");
     });
 
     it("prefers piped stdin to a prompt", async () => {
-      const answer = await input(
-        { kind: "text", name: "value", message: "Value", parse: upper, stdin: true },
-        { ...ask, stdin: piped("pipe\n") },
-      );
+      const answer = await asker({ ...ask, stdin: piped("pipe\n") }).text({
+        name: "value",
+        message: "Value",
+        parse: upper,
+        stdin: true,
+      });
 
       expect(answer).toBe("PIPE");
       expect(text).not.toHaveBeenCalled();
     });
 
     it("prefers the given value to a prompt", async () => {
-      await input({ ...typed(), given: "abc" }, ask);
+      await asker(ask).text({ ...typed(), given: "abc" });
 
       expect(text).not.toHaveBeenCalled();
     });
@@ -99,34 +104,30 @@ describe("input", () => {
     it("prompts when nothing else answered and a person is there", async () => {
       vi.mocked(text).mockResolvedValueOnce("typed" as never);
 
-      const answer = await input({ ...typed(), parse: upper }, ask);
+      const answer = await asker(ask).text({ ...typed(), parse: upper });
 
       expect(answer).toBe("TYPED");
     });
 
     it("does not read stdin when the question does not accept it", async () => {
       await expect(
-        input({ ...typed(), parse: upper }, { ...scripted, stdin: piped("pipe") }),
+        asker({ ...scripted, stdin: piped("pipe") }).text({ ...typed(), parse: upper }),
       ).rejects.toMatchObject({ code: "E_VALIDATION", message: "No client id supplied" });
     });
 
     it("does not read a terminal on stdin", async () => {
       await expect(
-        input({ ...typed(), stdin: true }, { ...scripted, stdin: keyboard() }),
+        asker({ ...scripted, stdin: keyboard() }).text({ ...typed(), stdin: true }),
       ).rejects.toMatchObject({ message: "No client id supplied" });
     });
 
     it("keeps an empty pipe as a value for parse to judge", async () => {
-      const answer = await input(
-        {
-          kind: "text",
-          name: "value",
-          message: "Value",
-          stdin: true,
-          parse: (value): Parsed<string> => ({ ok: true, value }),
-        },
-        { ...scripted, stdin: piped("") },
-      );
+      const answer = await asker({ ...scripted, stdin: piped("") }).text({
+        name: "value",
+        message: "Value",
+        stdin: true,
+        parse: (value): Parsed<string> => ({ ok: true, value }),
+      });
 
       expect(answer).toBe("");
     });
@@ -139,7 +140,7 @@ describe("input", () => {
     ])(
       "runs on the value from %s and returns what it produced",
       async (_source, extra, session) => {
-        const answer = await input({ ...typed(), ...extra }, session);
+        const answer = await asker(session).text({ ...typed(), ...extra });
 
         expect(answer).toBe("abc");
       },
@@ -148,7 +149,7 @@ describe("input", () => {
     it("runs on what was typed and returns what it produced", async () => {
       vi.mocked(text).mockResolvedValueOnce("  abc  " as never);
 
-      const answer = await input(typed(), ask);
+      const answer = await asker(ask).text(typed());
 
       expect(answer).toBe("abc");
     });
@@ -160,21 +161,21 @@ describe("input", () => {
       "refuses a value from %s that does not parse, saying why",
       async (_source, extra, session) => {
         await expect(
-          input({ ...typed(), parse: refuseBad, ...extra }, session),
+          asker(session).text({ ...typed(), parse: refuseBad, ...extra }),
         ).rejects.toMatchObject({ code: "E_VALIDATION", message: "Not that one." });
       },
     );
 
     it("treats an empty pipe that does not parse as nothing supplied", async () => {
       await expect(
-        input({ ...typed(), stdin: true }, { ...scripted, stdin: piped("\n") }),
+        asker({ ...scripted, stdin: piped("\n") }).text({ ...typed(), stdin: true }),
       ).rejects.toMatchObject({ message: "No client id supplied" });
     });
 
     it("is what refuses an answer as it is typed", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
-      await input(typed(), ask);
+      await asker(ask).text(typed());
 
       const validate = vi.mocked(text).mock.calls[0]?.[0]?.validate as
         | ((value: string | undefined) => string | undefined)
@@ -187,7 +188,7 @@ describe("input", () => {
     it("shows the placeholder in the prompt", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
-      await input({ ...typed(), placeholder: "3000" }, ask);
+      await asker(ask).text({ ...typed(), placeholder: "3000" });
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({ placeholder: "3000" });
     });
@@ -195,7 +196,7 @@ describe("input", () => {
     it("starts the prompt from the initial value", async () => {
       vi.mocked(text).mockResolvedValueOnce("x" as never);
 
-      await input({ ...typed(), initialValue: "https://a.example" }, ask);
+      await asker(ask).text({ ...typed(), initialValue: "https://a.example" });
 
       expect(vi.mocked(text).mock.calls[0]?.[0]).toMatchObject({
         initialValue: "https://a.example",
@@ -207,42 +208,33 @@ describe("input", () => {
     it("is typed into a masked prompt", async () => {
       vi.mocked(password).mockResolvedValueOnce("s3cret" as never);
 
-      const answer = await input({ ...typed("client secret"), kind: "secret" }, ask);
+      const answer = await asker(ask).secret(typed("client secret"));
 
       expect(answer).toBe("s3cret");
       expect(text).not.toHaveBeenCalled();
     });
 
     it("is never put in the error for a value that does not parse", async () => {
-      const error = await input(
-        {
-          kind: "secret",
+      const error = await asker({ ...scripted, stdin: piped("hunter2") })
+        .secret({
           name: "client secret",
           message: "Secret",
           stdin: true,
           retry: unscopedCommand("x"),
           parse: (): Parsed<string> => ({ ok: false, problem: "Too short." }),
-        },
-        { ...scripted, stdin: piped("hunter2") },
-      ).catch((caught: ZitadelError) => caught);
+        })
+        .catch((caught: ZitadelError) => caught);
 
       const { message, hint, details, nextCommands } = error as ZitadelError;
       expect(JSON.stringify({ message, hint, details, nextCommands })).not.toContain("hunter2");
     });
 
     it("is refused with a reminder that it is never a flag", async () => {
-      const error = await input(
-        { ...typed("client secret"), kind: "secret", stdin: true },
-        { ...scripted, stdin: keyboard() },
-      ).catch((caught: ZitadelError) => caught);
+      const error = await asker({ ...scripted, stdin: keyboard() })
+        .secret({ ...typed("client secret"), stdin: true })
+        .catch((caught: ZitadelError) => caught);
 
       expect((error as ZitadelError).hint).toContain("It is never a flag");
-    });
-
-    it("is not offered a flag, even when the question names one", async () => {
-      await expect(
-        input({ ...typed("client secret"), kind: "secret", flag: "--secret" }, scripted),
-      ).rejects.toMatchObject({ hint: expect.not.stringContaining("--secret") });
     });
   });
 
@@ -259,27 +251,25 @@ describe("input", () => {
       ],
     ])("says what to do given %s", async (_case, extra, message, hint) => {
       await expect(
-        input({ ...typed(), ...extra }, { ...scripted, stdin: keyboard() }),
+        asker({ ...scripted, stdin: keyboard() }).text({ ...typed(), ...extra }),
       ).rejects.toMatchObject({ code: "E_VALIDATION", message, hint });
     });
 
     it("says a secret is never a flag", async () => {
       await expect(
-        input(
-          { ...typed("client secret"), kind: "secret", stdin: true },
-          { ...scripted, stdin: keyboard() },
-        ),
-      ).rejects.toMatchObject({
-        hint: expect.stringContaining("It is never a flag"),
-      });
+        asker({ ...scripted, stdin: keyboard() }).secret({
+          ...typed("client secret"),
+          stdin: true,
+        }),
+      ).rejects.toMatchObject({ hint: expect.stringContaining("It is never a flag") });
     });
 
     it("offers the command to run again as the next command", async () => {
       await expect(
-        input(
-          { ...typed(), retry: unscopedCommand("auth-method sso enable --client-id <id>") },
-          scripted,
-        ),
+        asker(scripted).text({
+          ...typed(),
+          retry: unscopedCommand("auth-method sso enable --client-id <id>"),
+        }),
       ).rejects.toMatchObject({
         nextCommands: ["zitadel auth-method sso enable --client-id <id>"],
       });
@@ -287,30 +277,40 @@ describe("input", () => {
 
     it("quotes the command to run again in the hint as an example", async () => {
       await expect(
-        input(
-          { ...typed(), retry: unscopedCommand("auth-method sso enable --client-id <id>") },
-          scripted,
-        ),
+        asker(scripted).text({
+          ...typed(),
+          retry: unscopedCommand("auth-method sso enable --client-id <id>"),
+        }),
       ).rejects.toMatchObject({
         hint: "For example: zitadel auth-method sso enable --client-id <id>",
       });
     });
 
     it.each([
-      ["a select", { kind: "select" as const, options: [{ value: "a", label: "A" }] }],
-      ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
-    ])("offers the command to run again for %s too", async (_kind, extra) => {
+      ["a select", "select" as const],
+      ["a multiselect", "multiselect" as const],
+    ])("offers the command to run again for %s too", async (_kind, method) => {
       await expect(
-        input({ name: "x", message: "X", retry: unscopedCommand("x --y"), ...extra }, scripted),
+        asker(scripted)[method]({
+          name: "x",
+          message: "X",
+          retry: unscopedCommand("x --y"),
+          options,
+        }),
       ).rejects.toMatchObject({ nextCommands: ["zitadel x --y"] });
     });
 
     it.each([
-      ["a select", { kind: "select" as const, options: [{ value: "a", label: "A" }] }],
-      ["a multiselect", { kind: "multiselect" as const, options: [{ value: "a", label: "A" }] }],
-    ])("refuses %s the same way", async (_kind, extra) => {
+      ["a select", "select" as const],
+      ["a multiselect", "multiselect" as const],
+    ])("refuses %s the same way", async (_kind, method) => {
       await expect(
-        input({ name: "framework", message: "Framework", flag: "--framework", ...extra }, scripted),
+        asker(scripted)[method]({
+          name: "framework",
+          message: "Framework",
+          flag: "--framework",
+          options,
+        }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "No framework supplied",
@@ -320,57 +320,47 @@ describe("input", () => {
   });
 
   describe("an optional value", () => {
-    const optional = {
-      ...typed("client secret"),
-      kind: "secret" as const,
-      stdin: true,
-      optional: true as const,
-    };
+    const optional = { ...typed("client secret"), stdin: true, optional: true as const };
 
     it("is returned when piped in", async () => {
-      expect(await input(optional, { ...scripted, stdin: piped("abc\n") })).toBe("abc");
+      expect(await asker({ ...scripted, stdin: piped("abc\n") }).secret(optional)).toBe("abc");
     });
 
     it("is undefined when nothing was piped in", async () => {
-      expect(await input(optional, { ...scripted, stdin: keyboard() })).toBeUndefined();
+      expect(await asker({ ...scripted, stdin: keyboard() }).secret(optional)).toBeUndefined();
     });
 
     it("is undefined when the pipe was empty", async () => {
-      expect(await input(optional, { ...scripted, stdin: piped("\n") })).toBeUndefined();
+      expect(await asker({ ...scripted, stdin: piped("\n") }).secret(optional)).toBeUndefined();
     });
 
     it("is refused when what was piped in does not parse", async () => {
       await expect(
-        input(
-          { ...optional, parse: (): Parsed<string> => ({ ok: false, problem: "Not that." }) },
-          { ...scripted, stdin: piped("abc") },
-        ),
+        asker({ ...scripted, stdin: piped("abc") }).secret({
+          ...optional,
+          parse: (): Parsed<string> => ({ ok: false, problem: "Not that." }),
+        }),
       ).rejects.toMatchObject({ code: "E_VALIDATION", message: "Not that." });
     });
 
     it("is never prompted for", async () => {
-      await input(optional, { ...ask, stdin: keyboard() });
+      await asker({ ...ask, stdin: keyboard() }).secret(optional);
 
       expect(password).not.toHaveBeenCalled();
     });
   });
 
   describe("select", () => {
-    const options = [
-      { value: "a", label: "A" },
-      { value: "b", label: "B" },
-    ];
-
     it("returns the value of the chosen option", async () => {
       vi.mocked(select).mockResolvedValueOnce("b" as never);
 
-      expect(await input({ kind: "select", name: "x", message: "X", options }, ask)).toBe("b");
+      expect(await asker(ask).select({ name: "x", message: "X", options })).toBe("b");
     });
 
     it("starts on the initial value", async () => {
       vi.mocked(select).mockResolvedValueOnce("a" as never);
 
-      await input({ kind: "select", name: "x", message: "X", options, initialValue: "b" }, ask);
+      await asker(ask).select({ name: "x", message: "X", options, initialValue: "b" });
 
       expect(vi.mocked(select).mock.calls[0]?.[0]).toMatchObject({
         message: "X",
@@ -381,22 +371,17 @@ describe("input", () => {
 
     it("is never asked when nobody is there", async () => {
       await expect(
-        input({ kind: "select", name: "x", message: "X", options }, scripted),
+        asker(scripted).select({ name: "x", message: "X", options }),
       ).rejects.toMatchObject({ message: "No x supplied" });
       expect(select).not.toHaveBeenCalled();
     });
   });
 
   describe("multiselect", () => {
-    const options = [
-      { value: "a", label: "A" },
-      { value: "b", label: "B" },
-    ];
-
     it("returns the values of the chosen options", async () => {
       vi.mocked(multiselect).mockResolvedValueOnce(["a", "b"] as never);
 
-      expect(await input({ kind: "multiselect", name: "x", message: "X", options }, ask)).toEqual([
+      expect(await asker(ask).multiselect({ name: "x", message: "X", options })).toEqual([
         "a",
         "b",
       ]);
@@ -406,51 +391,48 @@ describe("input", () => {
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
       expect(
-        await input(
-          { kind: "multiselect", name: "x", message: "X", options, required: false },
-          ask,
-        ),
+        await asker(ask).multiselect({ name: "x", message: "X", options, required: false }),
       ).toEqual([]);
     });
 
     it.each([true, false])("passes required=%s on to the prompt", async (required) => {
       vi.mocked(multiselect).mockResolvedValueOnce([] as never);
 
-      await input({ kind: "multiselect", name: "x", message: "X", options, required }, ask);
+      await asker(ask).multiselect({ name: "x", message: "X", options, required });
 
       expect(vi.mocked(multiselect).mock.calls[0]?.[0]).toMatchObject({ message: "X", required });
     });
   });
 
   describe("confirm", () => {
-    const question = { kind: "confirm" as const, name: "delete the thing", message: "Delete?" };
+    const question = { name: "delete the thing", message: "Delete?" };
 
     it.each([true, false])("returns %s as answered", async (answer) => {
       vi.mocked(confirm).mockResolvedValueOnce(answer as never);
 
-      expect(await input(question, ask)).toBe(answer);
+      expect(await asker(ask).confirm(question)).toBe(answer);
     });
 
     it("is answered by force, without asking", async () => {
-      expect(await input(question, { interactive: true, force: true })).toBe(true);
+      expect(await asker({ interactive: true, force: true }).confirm(question)).toBe(true);
       expect(confirm).not.toHaveBeenCalled();
     });
 
     it("is answered by force when nobody is there to ask", async () => {
-      expect(await input(question, { interactive: false, force: true })).toBe(true);
+      expect(await asker({ interactive: false, force: true }).confirm(question)).toBe(true);
     });
 
     it("defaults to no", async () => {
       vi.mocked(confirm).mockResolvedValueOnce(false as never);
 
-      await input(question, ask);
+      await asker(ask).confirm(question);
 
       expect(vi.mocked(confirm).mock.calls[0]?.[0]).toMatchObject({ initialValue: false });
     });
 
     it("requires --force when nobody is there to ask", async () => {
       await expect(
-        input({ ...question, retry: unscopedCommand("x --force") }, scripted),
+        asker(scripted).confirm({ ...question, retry: unscopedCommand("x --force") }),
       ).rejects.toMatchObject({
         code: "E_VALIDATION",
         message: "Cannot delete the thing without --force in non-interactive mode",
@@ -461,28 +443,23 @@ describe("input", () => {
   });
 
   describe("cancelling", () => {
-    const prompts: Array<[string, () => unknown, Parameters<typeof input>[0]]> = [
-      ["a text prompt", () => vi.mocked(text), typed()],
-      ["a secret prompt", () => vi.mocked(password), { ...typed(), kind: "secret" as const }],
+    const prompts: Array<[string, () => unknown, () => Promise<unknown>]> = [
+      ["a text prompt", () => vi.mocked(text), () => asker(ask).text(typed())],
+      ["a secret prompt", () => vi.mocked(password), () => asker(ask).secret(typed())],
       [
         "a select",
         () => vi.mocked(select),
-        { kind: "select" as const, name: "x", message: "X", options: [{ value: "a", label: "A" }] },
+        () => asker(ask).select({ name: "x", message: "X", options }),
       ],
       [
         "a multiselect",
         () => vi.mocked(multiselect),
-        {
-          kind: "multiselect" as const,
-          name: "x",
-          message: "X",
-          options: [{ value: "a", label: "A" }],
-        },
+        () => asker(ask).multiselect({ name: "x", message: "X", options }),
       ],
       [
         "a confirm",
         () => vi.mocked(confirm),
-        { kind: "confirm" as const, name: "x", message: "X" },
+        () => asker(ask).confirm({ name: "x", message: "X" }),
       ],
     ];
 
@@ -492,7 +469,7 @@ describe("input", () => {
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
-      await expect(input(question, ask)).rejects.toMatchObject({
+      await expect(question()).rejects.toMatchObject({
         code: "E_CANCELLED",
         exitCode: 130,
         message: "Cancelled by user",
@@ -503,7 +480,7 @@ describe("input", () => {
       vi.mocked(isCancel).mockReturnValue(true);
       (prompt() as ReturnType<typeof vi.fn>).mockResolvedValueOnce(Symbol("cancel"));
 
-      await input(question, ask).catch(() => undefined);
+      await question().catch(() => undefined);
 
       expect(cancel).toHaveBeenCalledWith("Cancelled.");
     });
@@ -523,6 +500,24 @@ describe("the source tree", () => {
     }
 
     expect(importers).toEqual(["lib/input.ts"]);
+  });
+
+  // The typed methods are the whole point: a command names the question it is
+  // asking by the method it calls, so there is no kind string left to get
+  // wrong. Only `lib/input.ts` writes one, because it is the engine behind all
+  // five and the home of the deprecated asker.
+  it("names no question by a kind string outside the engine", async () => {
+    const tagged: string[] = [];
+    for (const file of await sourceFiles(SRC)) {
+      const source = await readFile(file, "utf8");
+      const path = relative(SRC, file).split(sep).join("/");
+      if (path !== "lib/input.ts" && /kind: ["'](text|secret|confirm)["']/.test(source)) {
+        tagged.push(path);
+      }
+    }
+
+    // `commands/env/add.ts` is the last caller of the deprecated `this.input`.
+    expect(tagged).toEqual(["commands/env/add.ts"]);
   });
 });
 

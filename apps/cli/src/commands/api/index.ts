@@ -167,8 +167,7 @@ export default class Api extends Promptable(BaseCommand) {
   private async chooseOperation(): Promise<string> {
     const callable = OPERATIONS.filter((operation) => uncallable(operation) === undefined);
     const retry = this.suggestUnscoped("api ls --json");
-    const tag = await this.input({
-      kind: "select",
+    const tag = await this.ask.select({
       name: "operation",
       message: "Which part of the API would you like to use?",
       retry,
@@ -177,8 +176,7 @@ export default class Api extends Promptable(BaseCommand) {
         label: value,
       })),
     });
-    return this.input({
-      kind: "select",
+    return this.ask.select({
       name: "operation",
       message: "Which operation would you like to run?",
       retry,
@@ -201,8 +199,7 @@ export default class Api extends Promptable(BaseCommand) {
     const { values, missing } = pathValuesOf(target, positionals, projectId);
     const filled: Record<string, string> = { ...values };
     for (const name of missing) {
-      filled[name] = await this.input({
-        kind: "text",
+      filled[name] = await this.ask.text({
         name,
         message: `What is the value of ${name}?`,
         retry: this.suggestUnscoped(

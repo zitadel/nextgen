@@ -54,8 +54,7 @@ export default class Reset extends Promptable(BaseCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: "delete the local runtime and its data",
       message: "Delete the local Zitadel runtime and .zitadel/local/nextgen-data?",
       retry: this.suggestUnscoped("reset --force"),

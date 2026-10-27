@@ -27,11 +27,12 @@
  * The parts, in the order a command meets them:
  *
  * - {@link Audience} — who is watching, which decides whether anything is drawn.
- * - {@link Ui} — the chain for one command, and `wizard(...)`, which is the
- *   only way in.
- * - {@link Wizard} — what a command may do while its chain is open: ask
- *   ({@link TextQuestion} and the other question types), {@link Wizard.note}
- *   something the person must act on, and run work as a {@link Wizard.task}.
+ * - {@link Ui} — the chain for one command, which is the only way in.
+ * - {@link Questions} — the one way a command asks a person something, one
+ *   method per kind of question ({@link TextQuestion} and its siblings) and
+ *   never a `kind` string. A command reaches it as `this.ask`.
+ * - {@link Ui.note} something the person must act on, and {@link Ui.task} for
+ *   work that takes a moment.
  * - {@link Outcome} — what the command returns: the `--json` payload and the
  *   {@link Summary} the chain closes on.
  *
@@ -41,10 +42,13 @@
  * could render a frame itself could render one that does not match.
  */
 export type { Audience } from "./audience";
+export type { Report, Step } from "./progress";
 export type {
   Choice,
   ConfirmQuestion,
   MultiselectQuestion,
+  Optional,
+  Questions,
   SecretQuestion,
   SelectQuestion,
   TextQuestion,
@@ -53,4 +57,3 @@ export type { Spinner } from "./spinner";
 export type { Fact, Outcome, Section, Summary } from "./summary";
 export { outcome, section } from "./summary";
 export { Ui } from "./ui";
-export type { Report, Step, Wizard } from "./wizard";

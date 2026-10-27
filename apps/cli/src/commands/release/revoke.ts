@@ -51,8 +51,7 @@ export default class ReleaseRevoke extends Promptable(EnvironmentCommand) {
       });
     }
 
-    const confirmed = await this.input({
-      kind: "confirm",
+    const confirmed = await this.ask.confirm({
       name: `revoke ${releaseId}`,
       message: `Revoke ${releaseId}? Its content can never be served again.`,
       retry: this.suggest(`release revoke ${releaseId} --force`),
