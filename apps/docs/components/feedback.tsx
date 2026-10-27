@@ -149,7 +149,7 @@ export function Feedback() {
           </div>
         ) : (
           <form onSubmit={submit}>
-            <div className="px-3 pb-3">
+            <div className="px-3 pt-1 pb-3">
               <textarea
                 // biome-ignore lint/a11y/noAutofocus: it opens on the reader's own click, as in Fumadocs.
                 autoFocus
