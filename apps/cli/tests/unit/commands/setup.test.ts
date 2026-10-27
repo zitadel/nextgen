@@ -1148,7 +1148,9 @@ describe("setup asked on a terminal", () => {
     await settingUp(cwd, "--force").catch(() => undefined);
 
     expect(confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: "Detected next. Proceed?" }),
+      expect.objectContaining({
+        message: "We detected next. Would you like to set up Zitadel for it?",
+      }),
     );
   });
 
@@ -1191,7 +1193,7 @@ describe("setup asked on a terminal", () => {
 
       expect(text).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: expect.stringContaining("Which port should your app run on?"),
+          message: expect.stringContaining("Which port should your app's local dev server run on?"),
         }),
       );
       expect(await readdir(cwd)).toEqual([]);

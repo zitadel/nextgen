@@ -1358,7 +1358,7 @@
       "flags": [
         {
           "name": "provider",
-          "description": "Identity provider to enable, or \"custom\" for any other OpenID Connect provider.",
+          "description": "Identity provider to enable, or \"custom\" for a custom OpenID Connect (OIDC) provider.",
           "type": "option",
           "options": [
             "google",

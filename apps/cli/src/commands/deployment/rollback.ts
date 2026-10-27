@@ -6,6 +6,7 @@ import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } fro
 import { collectPages } from "../../lib/oclif/crud/paging";
 import { listLiveDeployments, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { ZitadelError } from "../../lib/errors";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel deployment rollback [<deployment_id>]` — re-apply an earlier
@@ -16,7 +17,7 @@ import { ZitadelError } from "../../lib/errors";
  * one. A rollback re-serves an earlier release, so it takes the `--force`-or-confirm
  * gate the destructive commands use.
  */
-export default class DeploymentRollback extends EnvironmentCommand {
+export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
   static override description = "Roll back to an earlier deployment.";
   static override group = CommandGroups.configuration;
   static override examples = [

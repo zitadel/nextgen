@@ -11,9 +11,12 @@ import { clientId, displayName, googleSelection, issuer, slug } from "../../../h
 import {
   type ConnectionFile,
   IDPS_DIR,
+  checkCustomSlug,
   credentialVariablesOf,
   planConnection,
   readConnectionFiles,
+  refuseChangedIssuer,
+  storedCustomSettings,
 } from "../../../../src/lib/idp";
 
 const googleBody = (over: Record<string, unknown> = {}) => ({
@@ -93,6 +96,79 @@ describe("credentialVariablesOf", () => {
       clientId: "ACME_CLIENT_ID",
       clientSecret: "ACME_CLIENT_SECRET",
     });
+  });
+});
+
+const acmeFile = file("acme-sso.json", {
+  slug: "acme-sso",
+  display_name: "Acme SSO",
+  oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
+});
+
+describe("checkCustomSlug", () => {
+  const check = (files: readonly ConnectionFile[], given = "acme-sso") =>
+    checkCustomSlug(files, slug(given), "--slug");
+
+  it("returns the single file that declares the slug", () => {
+    expect(check([acmeFile])).toBe(acmeFile);
+  });
+
+  it("returns nothing for a slug that is free", () => {
+    expect(check([acmeFile], "other-sso")).toBeUndefined();
+  });
+
+  it("refuses two files that declare the same slug", () => {
+    const twin = file("acme-sso-copy.json", acmeFile.body);
+
+    expect(() => check([acmeFile, twin])).toThrow(/More than one connection is named acme-sso/);
+  });
+
+  it("refuses a slug whose file name holds another connection", () => {
+    const squatter = file("acme-sso.json", { slug: "something-else" });
+
+    expect(() => check([squatter])).toThrow(/already exists and is not the acme-sso connection/);
+  });
+});
+
+describe("storedCustomSettings", () => {
+  it("reads the display name and issuer as the file holds them, and not the scopes", () => {
+    expect(storedCustomSettings(acmeFile)).toEqual({
+      displayName: "Acme SSO",
+      issuer: "https://sso.acme.example",
+    });
+  });
+
+  it("reads only what the file has", () => {
+    expect(storedCustomSettings(file("acme-sso.json", { slug: "acme-sso" }))).toEqual({});
+    expect(
+      storedCustomSettings(file("acme-sso.json", { slug: "acme-sso", oidc: { issuer: 3 } })),
+    ).toEqual({});
+  });
+});
+
+describe("refuseChangedIssuer", () => {
+  const refuse = (given: string) =>
+    refuseChangedIssuer(acmeFile, slug("acme-sso"), given, "--slug");
+
+  it("accepts the issuer the connection was written with", () => {
+    expect(() => refuse("https://sso.acme.example")).not.toThrow();
+  });
+
+  it("refuses another issuer, even one that differs by a trailing slash", () => {
+    expect(() => refuse("https://sso.acme.example/")).toThrow(
+      /connects to https:\/\/sso.acme.example, not https:\/\/sso.acme.example\//,
+    );
+  });
+
+  it("refuses a file that has no issuer at all", () => {
+    expect(() =>
+      refuseChangedIssuer(
+        file("acme-sso.json", { slug: "acme-sso" }),
+        slug("acme-sso"),
+        "https://a.example",
+        "--slug",
+      ),
+    ).toThrow(/is not an OIDC connection to https:\/\/a.example/);
   });
 });
 

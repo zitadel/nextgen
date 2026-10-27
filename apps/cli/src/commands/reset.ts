@@ -9,8 +9,9 @@ import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { nextCommandsData } from "../lib/oclif/envelope";
+import { Promptable } from "../lib/oclif/promptable";
 
-export default class Reset extends BaseCommand {
+export default class Reset extends Promptable(BaseCommand) {
   static override description = "Delete the local Zitadel server runtime and data.";
   static override group = CommandGroups.localDevelopment;
   static override groupOrder = 4;

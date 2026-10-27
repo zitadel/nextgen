@@ -392,6 +392,10 @@ no local admin for that server on the way up, it says so in the envelope's
 `warnings` and the project stays unattached, so the local console does not
 list it.
 
+For a project set up against a hosted server, `doctor` checks no local
+runtime, unless a local server was started in its directory or a parent, or
+`--port`, `--runtime` or `--image` asks about one.
+
 When `setup --sso` or `auth-method sso enable` adds a social sign-in provider, the user
 must register the connection's redirect URI with the provider themselves: give
 them `data.sso[].callback_uri` from `setup`, or `data.callback_uri` from
@@ -436,6 +440,13 @@ than one:
   stdin when non-interactive. Any other OpenID Connect provider is
   `--provider custom` with `--slug`, `--display-name`, `--issuer` and optionally
   `--scopes` (default `openid profile email`).
+  In a terminal, a custom provider's settings you leave out are asked for, after
+  the checks that need no answer; a connection that already has that slug
+  supplies its own. A scripted, `--json`, `--dry-run` or `--non-interactive`
+  run must pass all three and gets an error naming the missing ones. After
+  writing a new connection the text output prints the claim mappings and names
+  the file to edit them in; `--json` does not carry them, so read the
+  connection file.
   An issuer on `http://localhost:<port>` (a test provider on this machine)
   works against a server `zitadel start` runs as a process: `start` sets
   `NEXTGEN_HTTPCLIENT_ALLOW_LIST=localhost,127.0.0.0/8,::1/128` unless

@@ -24,6 +24,7 @@ import { metaSchemaState, projectMetaSchemas } from "../../lib/meta-schemas";
 import { normalizePublicCliProse } from "../../lib/public-cli";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { DEPLOY_ARGS } from "../../lib/release";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * The `branding eject` command — take ownership of the login template.
@@ -37,7 +38,7 @@ import { DEPLOY_ARGS } from "../../lib/release";
  * override ladder (docs/design/branding/override-ladder.md); unrelated to
  * `zitadel eject`, which removes the Zitadel integration.
  */
-export default class BrandingEject extends BaseCommand {
+export default class BrandingEject extends Promptable(BaseCommand) {
   static override description =
     "Take ownership of the login template: scaffold .zitadel/branding/ from a shipped design.";
   static override group = CommandGroups.configuration;
@@ -146,7 +147,7 @@ export default class BrandingEject extends BaseCommand {
     return this.input({
       kind: "select",
       name: "design",
-      message: "Which design do you want to start from?",
+      message: "Which design would you like to start from?",
       initialValue: DEFAULT_BRANDING_DESIGN as string,
       options: BRANDING_DESIGNS.map((design) => ({
         value: design as string,
