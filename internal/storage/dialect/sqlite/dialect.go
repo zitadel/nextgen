@@ -61,6 +61,7 @@ func (c Config) Connect(ctx context.Context) (database.Pool, error) {
 	}
 	pool, err := newPool(sqlDB)
 	if err != nil {
+		// pool is nil here: close the database it would have wrapped.
 		_ = sqlDB.Close()
 		return nil, err
 	}
