@@ -31,9 +31,14 @@ export class Ending {
    * A command that only answers something, and asked nothing on the way, draws
    * no chain at all: its answer starts at the left margin, with one dim footer
    * line under it saying what the answer amounts to and where it came from.
+   *
+   * Never a failure. The footer is dim and unmarked, which is right for an
+   * answer and wrong for an error: it would make `Error E_NOT_FOUND: …` read
+   * exactly like `No variables on the project`. A failure always closes a
+   * chain, so it ends on a red line with a mark against it.
    */
   get standalone(): boolean {
-    return !this.inChain && !this.boxed();
+    return !this.inChain && !this.boxed() && this.summary.failed !== true;
   }
 
   /** The answer and its footer, for a command that drew no chain. */

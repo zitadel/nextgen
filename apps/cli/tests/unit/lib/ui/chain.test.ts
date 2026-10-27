@@ -132,4 +132,40 @@ describe("Chain", () => {
 
     expect(outro).not.toHaveBeenCalled();
   });
+
+  // Ctrl-C in the middle of the work closes nothing by itself, so without
+  // this the run ends on a bare `┌` and the shell prompt lands in the gutter.
+  it("closes the chain when the person interrupted the work", () => {
+    const chain = watching();
+    chain.describe("Listing variables");
+    chain.narrate("!", "a warning");
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+
+    expect(outro).toHaveBeenCalledWith(expect.stringContaining("Cancelled"));
+  });
+
+  it("closes nothing when the interrupt arrived before anything was drawn", () => {
+    const chain = watching();
+    chain.describe("Listing variables");
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+
+    expect(outro).not.toHaveBeenCalled();
+  });
+
+  it("wraps a bridged line, which obeys no width of its own", () => {
+    const chain = watching();
+    chain.describe("Listing variables");
+
+    chain.narrate("!", `a warning ${"that keeps going ".repeat(12)}`);
+
+    expect(
+      Math.max(
+        ...printed()
+          .split("\n")
+          .map((line) => line.length),
+      ),
+    ).toBeLessThanOrEqual(80);
+  });
 });

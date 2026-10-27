@@ -22,6 +22,9 @@ import type { Summary } from "./summary";
 import { Where } from "./where";
 import type { Report, Step, Wizard } from "./wizard";
 
+/** What the chain's own gutter (`│  `) costs a line drawn inside it. */
+const GUTTER = 3;
+
 /**
  * The chain: one command's output from its first line to its last (the package
  * overview in `index.ts` draws one), and the only place `@clack/prompts` is
@@ -90,7 +93,12 @@ export class Chain implements Wizard, Drawing, Narratable {
   /** One line in the chain: its mark, then the text. A blank guide line first after a prompt. */
   narrate(symbol: string, text: string): void {
     this.open();
-    log.message(text, { symbol, spacing: this.gap ? 1 : 0 });
+    // A bridged line is whatever the caller passed `consola`, so it obeys no
+    // width of its own: wrapped here, or a long warning runs past the gutter.
+    log.message(new Prose(text, WIDTH - GUTTER).render(), {
+      symbol,
+      spacing: this.gap ? 1 : 0,
+    });
     this.gap = false;
   }
 
@@ -127,13 +135,22 @@ export class Chain implements Wizard, Drawing, Narratable {
     }
   }
 
-  /** A failure or a cancel. Cancelling already closed the chain (`└  Cancelled.`). */
+  /**
+   * Closes a chain the run never finished.
+   *
+   * A question the person cancelled has already closed it (`└  Cancelled.`),
+   * so that one is left alone. An interrupt in the middle of the work has
+   * not: without this the run ends on a bare `┌` and the shell prompt is
+   * drawn inside the gutter.
+   */
   abort(error: unknown): void {
-    const cancelled = error instanceof ZitadelError && error.message === "Cancelled by user";
-    if (this.opened && !this.ended && !cancelled) {
-      this.ended = true;
-      outro(pc.red("Stopped"));
+    const closedItself = error instanceof ZitadelError && error.message === "Cancelled by user";
+    if (!this.audience.interactive || !this.opened || this.ended || closedItself) {
+      return;
     }
+    this.ended = true;
+    const cancelled = error instanceof ZitadelError && error.code === "E_CANCELLED";
+    outro(pc.red(cancelled ? "Cancelled" : "Stopped"));
   }
 
   text<T>(question: TextQuestion<T> & { optional: true }): Promise<T | undefined>;

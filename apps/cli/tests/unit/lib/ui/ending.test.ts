@@ -88,6 +88,25 @@ describe("Ending", () => {
       expect(below).toContain("Resolved now: development");
     });
 
+    // A dim unmarked footer is right for an answer and wrong for an error:
+    // it would make "Error E_NOT_FOUND: …" read exactly like "No variables
+    // on the project".
+    it("never lets a failure take the footer shape an answer takes", () => {
+      const failure = new Ending(
+        { title: "Error E_NOT_FOUND: variable not found", sections: [], failed: true },
+        nowhere,
+        false,
+      );
+
+      expect(failure.standalone).toBe(false);
+    });
+
+    it("lets an answer that asked nothing take it", () => {
+      const answer = new Ending({ title: "No variables", sections: [] }, nowhere, false);
+
+      expect(answer.standalone).toBe(true);
+    });
+
     it("does not repeat those extras in the footer of a standalone ending", () => {
       const standalone = new Ending(
         { title: "Found 1 environment", sections: [], extras: ["Resolved now: development"] },

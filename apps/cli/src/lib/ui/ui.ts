@@ -79,6 +79,15 @@ export class Ui {
     }
   }
 
+  /**
+   * Closes a chain the command never got to finish, so an interrupted run
+   * does not leave the shell prompt inside the gutter. A question the person
+   * cancelled has already closed itself and is left alone.
+   */
+  stop(error: unknown): void {
+    this.chain.abort(error);
+  }
+
   /** Names the chain by what the command is doing: `Listing origins`. */
   describe(title: string): void {
     this.chain.describe(title);
