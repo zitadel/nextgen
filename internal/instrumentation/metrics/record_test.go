@@ -200,7 +200,7 @@ func TestCatalogue_ClosedValuesAreTheConstants(t *testing.T) {
 			metrics.ResultKey: {string(metrics.RevocationActive), string(metrics.RevocationRevoked), string(metrics.RevocationError)},
 		},
 		metrics.PasswordVerificationDuration: {
-			metrics.ResultKey: {string(metrics.PasswordMatch), string(metrics.PasswordMismatch), string(metrics.PasswordError)},
+			metrics.ResultKey: {string(metrics.PasswordMatch), string(metrics.PasswordUpdated), string(metrics.PasswordMismatch), string(metrics.PasswordError)},
 		},
 		metrics.AuthAttemptOutcomes: {
 			metrics.CheckKey:  {string(metrics.CheckUser), string(metrics.CheckPassword), string(metrics.CheckPasskey), string(metrics.CheckPasskeyRegistration)},

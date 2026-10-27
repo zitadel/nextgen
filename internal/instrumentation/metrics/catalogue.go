@@ -86,7 +86,9 @@ type Attribute struct {
 }
 
 // Closed reports whether the attribute has a fixed value set.
-func (a Attribute) Closed() bool { return len(a.Values) > 0 }
+func (a Attribute) Closed() bool {
+	return len(a.Values) > 0
+}
 
 // Instrument describes one instrument: what it measures and every attribute
 // it may carry.
@@ -167,6 +169,12 @@ type PasswordResult string
 const (
 	PasswordMatch    PasswordResult = "match"
 	PasswordMismatch PasswordResult = "mismatch"
+	// PasswordUpdated is a match on a hash written with another algorithm or
+	// other cost parameters than the current hasher's, so the verify also
+	// computed a new hash: two hashes for one sign-in. Not recorded until the
+	// password verifier reports the rehash; it is declared now so dashboards
+	// can be built against the final value set.
+	PasswordUpdated PasswordResult = "updated"
 	// PasswordError is a hash that could not be verified at all, such as one
 	// in an algorithm the server no longer carries.
 	PasswordError PasswordResult = "error"
@@ -301,9 +309,9 @@ func Catalogue() []Instrument {
 		},
 		{
 			Name: PasswordVerificationDuration, Kind: KindHistogram, Unit: "s",
-			Description: "Duration of verifying a password against its stored hash.",
+			Description: "Duration of verifying a password against its stored hash. `updated` is a match that also computed a new hash (another algorithm or other cost parameters than the current hasher's); it is not reported yet.",
 			Attributes: []Attribute{
-				{Key: ResultKey, Description: "Outcome.", Values: values(PasswordMatch, PasswordMismatch, PasswordError)},
+				{Key: ResultKey, Description: "Outcome.", Values: values(PasswordMatch, PasswordUpdated, PasswordMismatch, PasswordError)},
 			},
 		},
 		{

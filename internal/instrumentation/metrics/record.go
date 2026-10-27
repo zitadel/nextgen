@@ -11,9 +11,11 @@ import (
 )
 
 // durationBuckets are the histogram boundaries every duration instrument
-// uses, in seconds: from a cached lookup to a hung statement.
+// uses, in seconds: from a cached lookup to a hung statement. The 30 and 60
+// second buckets keep very slow operations apart until benchmarks say where
+// the top end really is.
 var durationBuckets = []float64{
-	0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10,
+	0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60,
 }
 
 // The catalogue's instruments are created once, from the global meter, the

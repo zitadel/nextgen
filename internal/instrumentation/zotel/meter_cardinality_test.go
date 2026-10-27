@@ -20,8 +20,13 @@ import (
 // something request-shaped, the provider's cardinality limit is what keeps
 // the series count bounded: past the limit, new values share one overflow
 // series instead of each becoming their own.
+//
+// The limit is the SDK's default, which the SDK does not export. This test pins
+// it: if an SDK upgrade changes the default, it fails and the docs need the new
+// number.
 func TestNewMeterProvider_BoundsSeriesPerInstrument(t *testing.T) {
-	t.Parallel()
+	const sdkDefaultCardinalityLimit = 2000
+	t.Setenv("OTEL_GO_X_CARDINALITY_LIMIT", "")
 	reader := sdkmetric.NewManualReader()
 	provider := sdkmetric.NewMeterProvider(append(meterProviderOptions(resource.Empty()), sdkmetric.WithReader(reader))...)
 
@@ -55,6 +60,6 @@ func TestNewMeterProvider_BoundsSeriesPerInstrument(t *testing.T) {
 			}
 		}
 	}
-	assert.LessOrEqual(t, series, metricCardinalityLimit, "%d distinct values must not become %d series", distinct, series)
+	assert.LessOrEqual(t, series, sdkDefaultCardinalityLimit, "%d distinct values must not become %d series", distinct, series)
 	assert.True(t, overflowed, "values past the limit land on the overflow series")
 }

@@ -21,14 +21,6 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
-// metricCardinalityLimit is the most series one instrument may hold. Past
-// it, a new attribute combination is aggregated into one overflow series
-// (`otel.metric.overflow=true`) instead of becoming a series of its own, so
-// an attribute that unexpectedly follows the data costs one series, not one
-// per value. It is the SDK's default, written out so the bound is a decision
-// and not a default nobody chose.
-const metricCardinalityLimit = 2000
-
 // ogenAttributes are the attributes the generated server's request
 // instruments may carry: the operation, and the method, route template and
 // status it served. http.route is the template (`/users/{user_id}`), never
@@ -81,13 +73,17 @@ func allowAttributes(scope instrumentation.Scope, name string, keys []attribute.
 }
 
 // meterProviderOptions are the options every meter provider of the server is
-// built with, before its reader: the resource, the views and the series
-// bound.
+// built with, before its reader: the resource and the views.
+//
+// The series bound is the SDK's cardinality limit, left at its default (2000
+// series per instrument, OTEL_GO_X_CARDINALITY_LIMIT to change it): past it,
+// a new attribute combination is aggregated into one overflow series
+// (`otel.metric.overflow=true`), so an attribute that unexpectedly follows
+// the data costs one series, not one per value.
 func meterProviderOptions(resource *resource.Resource) []sdkmetric.Option {
 	return []sdkmetric.Option{
 		sdkmetric.WithResource(resource),
 		sdkmetric.WithView(MeterViews()...),
-		sdkmetric.WithCardinalityLimit(metricCardinalityLimit),
 	}
 }
 

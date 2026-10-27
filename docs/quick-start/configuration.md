@@ -254,10 +254,12 @@ route template (`http.route`, as in `/users/{user_id}`) and the status
 (`http.response.status_code`), never the request path. Should an attribute
 ever follow the data anyway, each instrument holds at most 2000 series: past
 that, new attribute combinations land on one series marked
-`otel.metric.overflow=true` instead of becoming series of their own.
+`otel.metric.overflow=true` instead of becoming series of their own. The
+limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`
+changes it.
 
 The instruments below record durations in seconds, with buckets from 100µs
-to 10s; ogen keeps its own millisecond buckets. In
+to 60s; ogen keeps its own millisecond buckets. In
 Prometheus, a dot becomes an underscore, a duration gets a `_seconds` suffix
 and a counter a `_total` suffix: `db.client.operation.duration` is
 `db_client_operation_duration_seconds`, and `zitadel.auth.attempt.outcomes`
@@ -270,7 +272,7 @@ is `zitadel_auth_attempt_outcomes_total`.
 | `db.client.connection.max` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite` | The most connections a database pool will open. |
 | `zitadel.auth.credential.validation.duration` | histogram | `s` | `result`: `valid`, `revoked`, `invalid`, `error` | Duration of validating a bearer credential: decrypting it, checking its claims and, for a revocable one, reading its token record. |
 | `zitadel.auth.token.revocation_checks` | counter | `{check}` | `result`: `active`, `revoked`, `error` | Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked are not checked and not counted. |
-| `zitadel.auth.password.verification.duration` | histogram | `s` | `result`: `match`, `mismatch`, `error` | Duration of verifying a password against its stored hash. |
+| `zitadel.auth.password.verification.duration` | histogram | `s` | `result`: `match`, `updated`, `mismatch`, `error` | Duration of verifying a password against its stored hash. `updated` is a match that also computed a new hash (another algorithm or other cost parameters than the current hasher's); it is not reported yet. |
 | `zitadel.auth.attempt.outcomes` | counter | `{proof}` | `check`: `user`, `password`, `passkey`, `passkey_registration`; `result`: `success`, `rejected`, `error` | Authentication proofs verified, by kind of proof and outcome. |
 | `zitadel.crypto.key_chain.resolution.duration` | histogram | `s` | `key.kind`: `master`, `project` | Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Reading the key row is a storage statement and is part of db.client.operation.duration. |
 | `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
