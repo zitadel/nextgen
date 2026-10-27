@@ -19678,6 +19678,118 @@ func (s CreateAuthAttemptErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjNotFoundCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjOriginNotAllowedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNoDefaultCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+		{
+			s := s.RelNoDefault
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedCreateAuthAttemptErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -19773,6 +19885,27 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.mismatch":
 					s.Type = ProjMismatchCreateAuthAttemptErrorResponse
 					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundCreateAuthAttemptErrorResponse
+					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedCreateAuthAttemptErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.no_default":
+					s.Type = RelNoDefaultCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundCreateAuthAttemptErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedCreateAuthAttemptErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidCreateAuthAttemptErrorResponse
 					found = true
@@ -19822,6 +19955,34 @@ func (s *CreateAuthAttemptErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjMismatchCreateAuthAttemptErrorResponse:
 		if err := s.ProjMismatch.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedCreateAuthAttemptErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveCreateAuthAttemptErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNoDefaultCreateAuthAttemptErrorResponse:
+		if err := s.RelNoDefault.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedCreateAuthAttemptErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundCreateAuthAttemptErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedCreateAuthAttemptErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidCreateAuthAttemptErrorResponse:
@@ -54407,6 +54568,22 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotDeployedGetFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundGetFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -54700,6 +54877,9 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedGetFlowStepErrorResponse
 					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedGetFlowStepErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundGetFlowStepErrorResponse
 					found = true
@@ -54848,6 +55028,10 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedGetFlowStepErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedGetFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundGetFlowStepErrorResponse:
@@ -123593,6 +123777,118 @@ func (s SetUserPasswordErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case ProjNotFoundSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.not_found")
+		{
+			s := s.ProjNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjOriginNotAllowedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.origin_not_allowed")
+		{
+			s := s.ProjOriginNotAllowed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case ProjPreviewNotLiveSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("proj.preview_not_live")
+		{
+			s := s.ProjPreviewNotLive
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNoDefaultSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.no_default")
+		{
+			s := s.RelNoDefault
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotDeployedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelNotFoundSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_found")
+		{
+			s := s.RelNotFound
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
+	case RelRevokedSetUserPasswordErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.revoked")
+		{
+			s := s.RelRevoked
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case ReqInvalidSetUserPasswordErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -123775,6 +124071,27 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedSetUserPasswordErrorResponse
 					found = true
+				case "proj.not_found":
+					s.Type = ProjNotFoundSetUserPasswordErrorResponse
+					found = true
+				case "proj.origin_not_allowed":
+					s.Type = ProjOriginNotAllowedSetUserPasswordErrorResponse
+					found = true
+				case "proj.preview_not_live":
+					s.Type = ProjPreviewNotLiveSetUserPasswordErrorResponse
+					found = true
+				case "rel.no_default":
+					s.Type = RelNoDefaultSetUserPasswordErrorResponse
+					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedSetUserPasswordErrorResponse
+					found = true
+				case "rel.not_found":
+					s.Type = RelNotFoundSetUserPasswordErrorResponse
+					found = true
+				case "rel.revoked":
+					s.Type = RelRevokedSetUserPasswordErrorResponse
+					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidSetUserPasswordErrorResponse
 					found = true
@@ -123830,6 +124147,34 @@ func (s *SetUserPasswordErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedSetUserPasswordErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
+			return err
+		}
+	case ProjNotFoundSetUserPasswordErrorResponse:
+		if err := s.ProjNotFound.Decode(d); err != nil {
+			return err
+		}
+	case ProjOriginNotAllowedSetUserPasswordErrorResponse:
+		if err := s.ProjOriginNotAllowed.Decode(d); err != nil {
+			return err
+		}
+	case ProjPreviewNotLiveSetUserPasswordErrorResponse:
+		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNoDefaultSetUserPasswordErrorResponse:
+		if err := s.RelNoDefault.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedSetUserPasswordErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
+			return err
+		}
+	case RelNotFoundSetUserPasswordErrorResponse:
+		if err := s.RelNotFound.Decode(d); err != nil {
+			return err
+		}
+	case RelRevokedSetUserPasswordErrorResponse:
+		if err := s.RelRevoked.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidSetUserPasswordErrorResponse:
@@ -124810,6 +125155,22 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
+	case RelNotDeployedSubmitFlowStepErrorResponse:
+		e.FieldStart("code")
+		e.Str("rel.not_deployed")
+		{
+			s := s.RelNotDeployed
+			{
+				e.FieldStart("message")
+				e.Str(s.Message)
+			}
+			{
+				if s.Details.Set {
+					e.FieldStart("details")
+					s.Details.Encode(e)
+				}
+			}
+		}
 	case RelNotFoundSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
 		e.Str("rel.not_found")
@@ -125109,6 +125470,9 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "proj.preview_not_live":
 					s.Type = ProjPreviewNotLiveSubmitFlowStepErrorResponse
 					found = true
+				case "rel.not_deployed":
+					s.Type = RelNotDeployedSubmitFlowStepErrorResponse
+					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundSubmitFlowStepErrorResponse
 					found = true
@@ -125265,6 +125629,10 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case ProjPreviewNotLiveSubmitFlowStepErrorResponse:
 		if err := s.ProjPreviewNotLive.Decode(d); err != nil {
+			return err
+		}
+	case RelNotDeployedSubmitFlowStepErrorResponse:
+		if err := s.RelNotDeployed.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundSubmitFlowStepErrorResponse:

@@ -174,26 +174,25 @@ func (s *BrandingService) GetLatest(ctx context.Context, projectID string) (_ *d
 	return result.Items[0], nil
 }
 
-// flowBrandingReader is the branding lookups a flow response needs.
+// flowBrandingReader is the branding lookup a flow response needs.
 type flowBrandingReader interface {
 	Get(ctx context.Context, projectID, id string) (*domain.Branding, error)
-	GetLatest(ctx context.Context, projectID string) (*domain.Branding, error)
 }
 
 // ResolveFlowBranding returns the branding revision a flow response should
-// carry. A release that pins a flow returns the revision it pins, or nil
-// when it pins none. Otherwise it returns the newest revision, or nil when
-// the project has none. The caller serves the built-in default for a nil
-// revision or a failed read.
+// carry. The request's release is the only source: the revision it pins, or
+// nil when it pins none. A request with no release is not deployed. The
+// caller serves the built-in default for a nil revision or a failed read.
 func ResolveFlowBranding(ctx context.Context, reader flowBrandingReader, projectID string) (*domain.Branding, error) {
-	if ReleasePinsFlow(ctx) {
-		id, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
-		if !ok {
-			return nil, nil
-		}
-		return reader.Get(ctx, projectID, id)
+	release := ReleaseFromContext(ctx)
+	if release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	return reader.GetLatest(ctx, projectID)
+	id, ok := PinsFor(release, domain.ReleasePointerKindBranding)[domain.ReleaseBrandingHandle]
+	if !ok {
+		return nil, nil
+	}
+	return reader.Get(ctx, projectID, id)
 }
 
 // maxBrandingListRevisions caps the list response: revisions accumulate

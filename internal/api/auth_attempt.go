@@ -19,8 +19,12 @@ func (h Handler) CreateAuthAttempt(ctx context.Context, req *api.CreateAuthAttem
 		return nil, domain.ErrProjectMismatch()
 	}
 
-	// TODO(#1616): never resolves, so the seal stays empty and later revoke
-	// checks no-op. Resolve the project default and answer rel.not_deployed when nothing is deployed.
+	// The caller may send the console's Origin. The attempt follows the
+	// default target, not that host, and keeps the seal for later checks.
+	ctx, err := h.resolveRuntime(ctx, scopeCtx.ProjectID, "")
+	if err != nil {
+		return nil, err
+	}
 	input := service.CreateAuthAttemptInput{
 		ProjectID: scopeCtx.ProjectID,
 	}

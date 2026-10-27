@@ -201,21 +201,8 @@ func TestPolicyService_ConcurrentFirstPublishIsAConflict(t *testing.T) {
 func TestPolicyService_ResolvePolicy(t *testing.T) {
 	f := newPolicyFixture(t)
 
-	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_none", service.OperationPasswordSet)).Return(nil, new(database.NoRowFoundError))
-	none, err := f.svc.ResolvePolicy(t.Context(), "proj_none", service.OperationPasswordSet)
-	require.NoError(t, err)
-	assert.Nil(t, none, "no stored policy means no policy")
-
-	f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).
-		Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":12}`)}, nil)
-	inst, err := f.svc.ResolvePolicy(t.Context(), "proj_1", service.OperationPasswordSet)
-	require.NoError(t, err)
-	require.NotNil(t, inst)
-	assert.Equal(t, json.Number("12"), inst.Config["min_length"])
-
-	f.statements.EXPECT().GetPolicy(gomock.Any(), gomock.Any()).Return(nil, errors.New("down"))
-	_, err = f.svc.ResolvePolicy(t.Context(), "proj_err", service.OperationPasswordSet)
-	assert.Error(t, err, "a storage failure is an error, so the gate fails closed")
+	_, err := f.svc.ResolvePolicy(t.Context(), "proj_1", service.OperationPasswordSet)
+	assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
 }
 
 func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
@@ -253,13 +240,14 @@ func TestPolicyService_ResolvePolicyFollowsTheRelease(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrInternal(nil))
 	})
 
-	t.Run("a release that pins no flow reads the newest revision", func(t *testing.T) {
+	t.Run("a release that pins no flow serves the policy revision it pins", func(t *testing.T) {
 		f := newPolicyFixture(t)
-		f.statements.EXPECT().GetPolicy(gomock.Any(), policystore.ByOperation("proj_1", service.OperationPasswordSet)).
+		f.statements.EXPECT().GetPolicyRevision(gomock.Any(), "proj_1", "polrev_1").
 			Return(&domain.Policy{Operation: service.OperationPasswordSet, Config: []byte(`{"min_length":12}`)}, nil)
 
 		inst, err := f.svc.ResolvePolicy(served(t, pinned), "proj_1", service.OperationPasswordSet)
 		require.NoError(t, err)
+		require.NotNil(t, inst)
 		assert.Equal(t, json.Number("12"), inst.Config["min_length"])
 	})
 }

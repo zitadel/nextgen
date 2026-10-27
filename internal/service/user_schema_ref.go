@@ -24,19 +24,18 @@ type userSchemaStatements interface {
 // its objectType. A `$id` under one of the built-in bases resolves under
 // every base bases knows (domain.BuiltinSchemaBases).
 //
-// When the request's release pins a flow definition, the revision is the one
-// that release pins for the handle. Otherwise it is the project's newest
-// revision. A handle that release's closure required and does not pin is an
-// internal error.
+// The request's release is the only source: the revision it pins for the
+// handle. A handle that release does not pin is an internal error. A request
+// with no release is not deployed.
 func resolveUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
 	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
 	if err != nil {
 		return nil, err
 	}
-	if ReleasePinsFlow(ctx) {
-		return pinnedUserSchema(ctx, stmts, projectID, handle)
+	if ReleaseFromContext(ctx) == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	return newestUserSchema(ctx, stmts, projectID, handle)
+	return pinnedUserSchema(ctx, stmts, projectID, handle)
 }
 
 func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (string, error) {
@@ -46,7 +45,14 @@ func userSchemaHandle(ctx context.Context, stmts userSchemaStatements, bases dom
 	return schemaObjectType(bases.GetJSONSchema(ctx, stmts, projectID, ref))
 }
 
-func newestUserSchema(ctx context.Context, stmts userSchemaStatements, projectID, handle string) (*domain.JSONSchema, error) {
+// newestUserSchema is the catalog read: flow-definition create and release
+// build name a schema that is not yet pinned by a release. A request that is
+// serving a release does not use it.
+func newestUserSchema(ctx context.Context, stmts userSchemaStatements, bases domain.BuiltinSchemaBases, projectID, ref string) (*domain.JSONSchema, error) {
+	handle, err := userSchemaHandle(ctx, stmts, bases, projectID, ref)
+	if err != nil {
+		return nil, err
+	}
 	result, err := stmts.ListJSONSchemas(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),

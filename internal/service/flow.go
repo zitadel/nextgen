@@ -60,10 +60,10 @@ type ResolveFlowRequest struct {
 	ProjectID     string
 	Purpose       domain.FlowDefinitionPurpose
 	Name          *string // direct-lookup slug
-	SchemaVersion *string // nil = latest active
+	SchemaVersion *string // nil = the revision the release pins
 	AuthRequestID *string
 	// Hint scopes audience resolution (ignored when Name is set) — see
-	// resolveByAudience for the scoring rules.
+	// resolvePinned for the scoring rules.
 	Hint ResolveFlowHint
 }
 
@@ -95,25 +95,20 @@ type flowService struct {
 
 var _ FlowService = (*flowService)(nil)
 
-// Resolve picks the definition that serves the request. When the request
-// resolved to a release (WithRuntimeResolution), only the revisions that
-// release pins are candidates: by name, the one pinned under that handle; by
-// audience, the pinned set scored as usual. A release pinning no flow
-// definition, and a request without a release, read the newest revisions.
+// Resolve picks the definition that serves the request. The request's release
+// (WithRuntimeResolution) is the only source: by name, the revision pinned
+// under that handle; by audience, the pinned set scored as usual. A release
+// that pins no flow definition has no definition to serve. A request with no
+// release is not deployed.
 func (s *flowService) Resolve(ctx context.Context, req ResolveFlowRequest) (_ *domain.FlowDefinition, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Resolve")
 	defer end(&err)
 
-	pinned := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindFlowDefinition)
-	if len(pinned) > 0 {
-		return s.resolvePinned(ctx, req, pinned)
+	release := ReleaseFromContext(ctx)
+	if release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	// TODO(#1616): a request with no release still reads the newest revisions.
-	// A release that pins no flow definition keeps this path.
-	if req.Name != nil {
-		return s.resolveByName(ctx, req)
-	}
-	return s.resolveByAudience(ctx, req)
+	return s.resolvePinned(ctx, req, PinsFor(release, domain.ReleasePointerKindFlowDefinition))
 }
 
 func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest, pinned PinnedRevisions) (*domain.FlowDefinition, error) {
@@ -158,78 +153,6 @@ func (s *flowService) resolvePinned(ctx context.Context, req ResolveFlowRequest,
 		if !flowServesPurpose(def, req.Purpose) {
 			continue
 		}
-		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
-			continue
-		}
-		score := flowAudienceScore(def, req.Hint)
-		if score > bestScore || (score == bestScore && flowCreatedAfter(def, best)) {
-			best, bestScore = def, score
-		}
-	}
-	if best == nil {
-		return nil, domain.ErrFlowDefinitionNotFound()
-	}
-	return best, nil
-}
-
-func (s *flowService) resolveByName(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []database.Filter[domain.FlowDefinitionField]{
-		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		database.Equal(database.Col(domain.FlowDefinitionFieldName), *req.Name),
-		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-	}
-	if req.SchemaVersion != nil {
-		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
-	}
-
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(filters...),
-	}, FlowDefinitionQueryOptions{})
-	if err != nil {
-		return nil, err
-	}
-	if len(result.Items) == 0 {
-		return nil, domain.ErrFlowDefinitionNotFound()
-	}
-
-	def := pickNewestFlowRevision(result.Items)
-	if !flowServesPurpose(def, req.Purpose) {
-		return nil, domain.ErrFlowDefinitionPurposeMismatch()
-	}
-	return def, nil
-}
-
-// resolveByAudience picks the active definition whose audience most
-// specifically matches the request hint.
-//
-// A user_schema_id hint is a hard filter: only definitions operating on
-// that schema stay candidates. The remaining candidates are scored
-// app match > team match > project-wide (unscoped); definitions scoped
-// to other apps/teams rank below unscoped so a targeted flow never
-// captures the project default. Hints are client-supplied routing
-// suggestions, not a security boundary — with no eligible tier above
-// them, scoped definitions still resolve rather than failing the login.
-// Ties break newest-first (created_at, then id, so one bulk apply with
-// colliding timestamps still yields a stable pick).
-func (s *flowService) resolveByAudience(ctx context.Context, req ResolveFlowRequest) (*domain.FlowDefinition, error) {
-	filters := []database.Filter[domain.FlowDefinitionField]{
-		database.Equal(database.Col(domain.FlowDefinitionFieldProjectID), req.ProjectID),
-		database.Equal(database.Col(domain.FlowDefinitionFieldStatus), domain.FlowDefinitionStatusActive.String()),
-		database.ArrayContains(database.Col(domain.FlowDefinitionFieldPurposes), req.Purpose.String()),
-	}
-	if req.SchemaVersion != nil {
-		filters = append(filters, database.Equal(database.Col(domain.FlowDefinitionFieldSchemaVersion), *req.SchemaVersion))
-	}
-
-	result, err := s.v2Pool.Statements().ListFlowDefinitions(WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.FlowDefinitionField]{
-		Filter: database.And(filters...),
-	}, FlowDefinitionQueryOptions{})
-	if err != nil {
-		return nil, err
-	}
-	var best *domain.FlowDefinition
-	bestScore := -1
-	for _, def := range result.Items {
 		if req.Hint.UserSchemaID != nil && def.UserSchema != *req.Hint.UserSchemaID {
 			continue
 		}
@@ -427,23 +350,4 @@ func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ do
 func flowServesPurpose(def *domain.FlowDefinition, purpose domain.FlowDefinitionPurpose) bool {
 	_, ok := def.Purposes[purpose]
 	return ok
-}
-
-// pickNewestFlowRevision prefers the highest schema version (a lexicographic
-// compare, sufficient while versions stay zero-padded MAJOR.MINOR.PATCH) and,
-// among revisions of one version, the newest created. Revisions of a name
-// share a version, so the pick must not depend on list order. This differs
-// from GET /flow_definitions, which orders by creation time alone.
-func pickNewestFlowRevision(defs []*domain.FlowDefinition) *domain.FlowDefinition {
-	if len(defs) == 0 {
-		return nil
-	}
-	winner := defs[0]
-	for _, def := range defs[1:] {
-		if def.SchemaVersion > winner.SchemaVersion ||
-			(def.SchemaVersion == winner.SchemaVersion && flowCreatedAfter(def, winner)) {
-			winner = def
-		}
-	}
-	return winner
 }

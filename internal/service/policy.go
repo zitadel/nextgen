@@ -364,14 +364,11 @@ func (s *PolicyService) GetRevision(ctx context.Context, projectID, revisionID s
 }
 
 // ResolvePolicy implements [PolicyResolver]: the policy revision that applies
-// to the request for the operation, or nil when there is none.
+// to the request for the operation, or nil when the release pins none.
 //
-// A request whose release pins a flow reads the revision that release pins
-// for the operation, like the user schema, branding and identity providers
-// it serves; a release that pins none means no policy, never the newest
-// stored revision (ADR 066). Any other request, which resolved no release or
-// one that pins no flow, reads the newest revision until it resolves one
-// (#1616).
+// The request's release is the only source. A release that does not pin the
+// operation means no policy, never the newest stored revision (ADR 066). A
+// request with no release is not deployed.
 //
 // It reads through the pool, outside any transaction: the password gate runs
 // in Prepare, before the write transaction begins.
@@ -379,28 +376,20 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 	ctx, end := startSpan(ctx, "PolicyService.ResolvePolicy")
 	defer end(&err)
 
-	stmts := s.v2Pool.Statements()
-	var entity *domain.Policy
-	if ReleasePinsFlow(ctx) {
-		revisionID, ok := PinsFor(ReleaseFromContext(ctx), domain.ReleasePointerKindPolicy)[operation]
-		if !ok {
-			return nil, nil
-		}
-		entity, err = stmts.GetPolicyRevision(ctx, projectID, revisionID)
-		if isNoRowFound(err) {
-			return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing policy revision for %q", operation))
-		}
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		entity, err = stmts.GetPolicy(ctx, policystore.ByOperation(projectID, operation))
-		if err != nil {
-			if isNoRowFound(err) {
-				return nil, nil
-			}
-			return nil, err
-		}
+	release := ReleaseFromContext(ctx)
+	if release == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
+	}
+	revisionID, ok := PinsFor(release, domain.ReleasePointerKindPolicy)[operation]
+	if !ok {
+		return nil, nil
+	}
+	entity, err := s.v2Pool.Statements().GetPolicyRevision(ctx, projectID, revisionID)
+	if isNoRowFound(err) {
+		return nil, domain.ErrInternal(err).WithMessage(fmt.Sprintf("release pins a missing policy revision for %q", operation))
+	}
+	if err != nil {
+		return nil, err
 	}
 	dec := json.NewDecoder(bytes.NewReader(entity.Config))
 	dec.UseNumber()

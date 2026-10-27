@@ -51,6 +51,7 @@ func TestFlowSSOSubmitRedirectsToProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 
+	deployDefaultTarget(t, string(f.projectID()))
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

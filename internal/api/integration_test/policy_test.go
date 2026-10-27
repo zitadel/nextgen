@@ -321,6 +321,9 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
 	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+	// Publishing does not change the password gate. The default deployment
+	// has to pin the revision before setUserPassword or registration serves it.
+	deployDefaultTarget(t, project.ID)
 
 	t.Run("admin API", func(t *testing.T) {
 		user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
@@ -352,6 +355,7 @@ func TestPasswordPolicyEnforced(t *testing.T) {
 		require.NoError(t, err)
 		require.IsType(t, &api.FlowDefinitionResponse{}, defResp)
 
+		deployDefaultTarget(t, project.ID)
 		createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 			ProjectID: api.ProjectID(project.ID),
 			Purpose:   api.CreateFlowRequestPurposeRegister,
@@ -470,11 +474,90 @@ func TestPasswordPolicyFollowsTheRelease(t *testing.T) {
 	require.NoError(t, err)
 	passwordSetPolicy(t, publishPolicy(t, client, project.ID, api.PasswordSetConfig{MinLength: api.NewOptInt(20)}))
 	assert.Equal(t, 12, shownMinimum(t, origin), "a release that was only built does not apply")
-	assert.Equal(t, 20, shownMinimum(t, ""), "a request that resolves no release gets the newest revision")
+	body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
+	require.NoError(t, err)
+	noOrigin, raw := postFlow(t, "/flow", body, "", nil)
+	require.Equal(t, http.StatusCreated, noOrigin.StatusCode, string(raw))
+	var opened api.FlowResponse
+	require.NoError(t, opened.UnmarshalJSON(raw), string(raw))
+	assert.Equal(t, "register", opened.Step.Name, "no origin serves the default deployment, not the unpublished register flow")
 
 	deploy(t)
 	assert.Equal(t, 0, shownMinimum(t, origin), "a release without the policy means no policy, not the newest")
 
 	deploy(t, minimum(12))
 	assert.Equal(t, 12, shownMinimum(t, origin), "deploying it again brings it back")
+}
+
+// TestPasswordPolicyDefaultTargetIgnoresOrigin deploys one release to the
+// default target with a flow and no password policy, and another to the
+// project's origin with the policy. setUserPassword follows the default
+// target. A flow opened at the origin follows that origin's release.
+func TestPasswordPolicyDefaultTargetIgnoresOrigin(t *testing.T) {
+	t.Parallel()
+
+	const origin = "https://password-default.acme.test"
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, err = harness.EnsureProjectService(t).AddOrigin(t.Context(), project.ID, domain.Origin{Pattern: origin, Kind: domain.OriginKindPrimary})
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+
+	deployTo := func(t *testing.T, targets []string, policies ...api.PublishPolicyRequest) {
+		t.Helper()
+		built, err := client.BuildRelease(t.Context(), &api.BuildReleaseRequest{
+			Bundle: api.ConfigurationBundle{
+				FlowDefinitions: []api.FlowDefinition{passwordRegisterFlowDefinition("human-user")},
+				Policies:        policies,
+			},
+		}, api.BuildReleaseParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		var releaseID api.ReleaseID
+		switch r := built.(type) {
+		case *api.BuildReleaseCreated:
+			releaseID = r.ID
+		case *api.BuildReleaseOK:
+			releaseID = r.ID
+		default:
+			require.Fail(t, "build refused", helpers.MustMarshal(t, built))
+		}
+		resp, err := client.CreateDeployment(t.Context(), &api.CreateDeploymentRequest{
+			ReleaseID: api.NewOptReleaseID(releaseID),
+			Targets:   targets,
+		}, api.CreateDeploymentParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		switch resp.(type) {
+		case *api.CreateDeploymentCreated, *api.CreateDeploymentOK:
+		default:
+			require.Fail(t, "deploy refused", helpers.MustMarshal(t, resp))
+		}
+	}
+	deployTo(t, []string{"primary"}, passwordPolicyRequest(api.PasswordSetConfig{MinLength: api.NewOptInt(12)}))
+	deployTo(t, []string{"default"})
+
+	user, err := harness.EnsureUserService(t).CreateUser(t.Context(), service.CreateUserInput{
+		ProjectID:  project.ID,
+		SchemaURL:  test_data.UserSchemaURL,
+		Attributes: harness.EnsureTestData(t).Generator.GenerateUser(t, "default-target-policy@example.com"),
+	})
+	require.NoError(t, err)
+	set, err := client.SetUserPassword(t.Context(), &api.SetUserPasswordRequest{Password: "short-pass"}, api.SetUserPasswordParams{UserID: api.UserID(user.ID)})
+	require.NoError(t, err)
+	assert.IsType(t, &api.SetUserPasswordNoContent{}, set, helpers.MustMarshal(t, set))
+
+	body, err := json.Marshal(map[string]string{"project_id": project.ID, "purpose": "register"})
+	require.NoError(t, err)
+	resp, raw := postFlow(t, "/flow", body, origin, nil)
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(raw))
+	var opened api.FlowResponse
+	require.NoError(t, opened.UnmarshalJSON(raw), string(raw))
+	var shown api.FieldValidation
+	for _, field := range opened.Step.Fields {
+		if field.Name == "x-auth-methods#password" {
+			shown = field.Validation.Or(api.FieldValidation{})
+		}
+	}
+	assert.Equal(t, api.NewOptInt(12), shown.MinLength, "the origin's release still applies its policy")
 }

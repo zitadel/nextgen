@@ -171,6 +171,7 @@ func TestClaimHappyPath(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployDefaultTarget(t, platform.ID)
 	createResp, err := platClient.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(platform.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

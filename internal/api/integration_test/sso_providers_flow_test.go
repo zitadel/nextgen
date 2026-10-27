@@ -28,6 +28,7 @@ func TestFlowStepRendersSSOProvidersFromConnection(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition: %s", helpers.MustMarshal(t, defResp))
 	definitionID := defResp.(*api.FlowDefinitionResponse).ID
 
+	deployDefaultTarget(t, string(f.projectID()))
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: f.projectID(),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

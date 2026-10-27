@@ -164,6 +164,7 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, "create flow definition failed: %s", helpers.MustMarshal(t, defResp))
 
 	// --- Start flow -----------------------------------------------------------
+	deployDefaultTarget(t, project.ID)
 	createResp, err := client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

@@ -65,6 +65,7 @@ func TestStepUpRequiresSessionProof(t *testing.T) {
 		if token != nil {
 			req.SessionToken = api.NewOptSessionProofToken(api.SessionProofToken(*token))
 		}
+		deployDefaultTarget(t, project.ID)
 		resp, err := client.CreateFlow(t.Context(), req, api.CreateFlowParams{})
 		require.NoError(t, err)
 		return resp

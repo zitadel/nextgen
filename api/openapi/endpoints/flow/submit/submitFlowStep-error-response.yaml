@@ -31,6 +31,7 @@ content:
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
         - $ref: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
         - $ref: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+        - $ref: '../../../components/schemas/errors/rel-not_deployed.yaml'
         - $ref: '../../../components/schemas/errors/rel-not_found.yaml'
         - $ref: '../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
@@ -73,6 +74,7 @@ content:
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
           proj.origin_not_allowed: '../../../components/schemas/errors/proj-origin_not_allowed.yaml'
           proj.preview_not_live: '../../../components/schemas/errors/proj-preview_not_live.yaml'
+          rel.not_deployed: '../../../components/schemas/errors/rel-not_deployed.yaml'
           rel.not_found: '../../../components/schemas/errors/rel-not_found.yaml'
           rel.revoked: '../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
@@ -221,6 +223,11 @@ content:
         value:
           code: proj.preview_not_live
           message: 'no live preview for this origin; run zitadel preview on this branch'
+      rel.not_deployed:
+        summary: rel.not_deployed
+        value:
+          code: rel.not_deployed
+          message: 'nothing is deployed to this origin'
       rel.not_found:
         summary: rel.not_found
         value:

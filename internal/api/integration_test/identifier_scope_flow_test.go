@@ -101,6 +101,7 @@ func (f *identifierScopeFixture) submitIdentifier(t *testing.T, definition api.F
 	require.NoError(t, err)
 	require.IsType(t, &api.FlowDefinitionResponse{}, defResp, helpers.MustMarshal(t, defResp))
 
+	deployDefaultTarget(t, f.project.ID)
 	createResp, err := f.client.CreateFlow(t.Context(), &api.CreateFlowRequest{
 		ProjectID: api.ProjectID(f.project.ID),
 		Purpose:   api.CreateFlowRequestPurposeLogin,

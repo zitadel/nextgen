@@ -66,21 +66,22 @@ func TestResolveFlowBranding(t *testing.T) {
 		assert.False(t, reader.gotLatest)
 	})
 
-	t.Run("no release serves the newest revision", func(t *testing.T) {
+	t.Run("no release is not deployed", func(t *testing.T) {
 		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}, latest: v2}
 		got, err := service.ResolveFlowBranding(t.Context(), reader, "proj")
-		require.NoError(t, err)
-		assert.Equal(t, v2, got)
-		assert.True(t, reader.gotLatest)
+		require.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
+		assert.Nil(t, got)
+		assert.False(t, reader.gotLatest)
 		assert.Empty(t, reader.gotGetID)
 	})
 
-	t.Run("a release that pins no flow serves the newest revision", func(t *testing.T) {
-		reader := &fakeBrandingReader{latest: v2}
+	t.Run("a release that pins no flow serves the branding it pins", func(t *testing.T) {
+		reader := &fakeBrandingReader{byID: map[string]*domain.Branding{v1.ID: v1}, latest: v2}
 		got, err := service.ResolveFlowBranding(brandingContext(t, brandingV1), reader, "proj")
 		require.NoError(t, err)
-		assert.Equal(t, v2, got)
-		assert.True(t, reader.gotLatest)
+		assert.Equal(t, v1, got)
+		assert.Equal(t, v1.ID, reader.gotGetID)
+		assert.False(t, reader.gotLatest)
 	})
 }
 

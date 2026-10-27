@@ -4,17 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
 // FlowSSOProviderResolver implements [domain.FlowSSOProviderResolver] over
-// the connection service. When the request's release pins a flow, each slug
-// is the revision that release pins, and a slug it does not pin is an
-// internal error. Otherwise the step's slugs are read in one lookup, each at
-// its newest revision, and a slug with no connection is dropped and logged
-// with the step it came from.
+// the connection service. Each slug is the revision the request's release
+// pins, and a slug it does not pin is an internal error. A request with no
+// release is not deployed.
 type FlowSSOProviderResolver struct {
 	connections IDPConnectionService
 }
@@ -25,33 +22,11 @@ func NewFlowSSOProviderResolver(connections IDPConnectionService) *FlowSSOProvid
 
 var _ domain.FlowSSOProviderResolver = (*FlowSSOProviderResolver)(nil)
 
-func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, stepName string, slugs []string) ([]domain.FlowSSOProvider, error) {
-	if ReleasePinsFlow(ctx) {
-		return r.resolvePinned(ctx, projectID, slugs)
+func (r *FlowSSOProviderResolver) Resolve(ctx context.Context, projectID, _ string, slugs []string) ([]domain.FlowSSOProvider, error) {
+	if ReleaseFromContext(ctx) == nil {
+		return nil, domain.ErrReleaseNotDeployed(nil)
 	}
-	connections, err := r.connections.GetBySlugs(ctx, projectID, slugs)
-	if err != nil {
-		return nil, domain.ErrInternal(err).WithMessage("failed to read identity provider connections")
-	}
-	bySlug := indexByID(connections, func(c *domain.IDPConnection) string { return c.Slug })
-	providers := make([]domain.FlowSSOProvider, 0, len(slugs))
-	for _, slug := range slugs {
-		connection, ok := bySlug[slug]
-		if !ok {
-			getLoggingContext(ctx, "flow").Warn("sso provider dropped from step: no connection has the slug",
-				slog.String("project_id", projectID),
-				slog.String("step", stepName),
-				slog.String("slug", slug),
-			)
-			continue
-		}
-		provider, err := flowSSOProvider(connection)
-		if err != nil {
-			return nil, err
-		}
-		providers = append(providers, provider)
-	}
-	return providers, nil
+	return r.resolvePinned(ctx, projectID, slugs)
 }
 
 func (r *FlowSSOProviderResolver) resolvePinned(ctx context.Context, projectID string, slugs []string) ([]domain.FlowSSOProvider, error) {

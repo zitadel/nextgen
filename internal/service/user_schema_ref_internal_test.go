@@ -62,13 +62,18 @@ func TestResolveUserSchema(t *testing.T) {
 		{name: "objectType", ref: "human-user", want: human},
 		{name: "$id URL", ref: human.URL, want: human},
 		{name: "minted id", ref: machine.URL, want: machine},
-		{name: "unknown objectType", ref: "visitor", wantErr: domain.ErrJSONSchemaNotFound()},
+		{name: "unknown objectType", ref: "visitor", wantErr: domain.ErrInternal(nil)},
 		{name: "unknown id", ref: "sch_unknown", wantErr: domain.ErrJSONSchemaNotFound()},
 		{name: "schema declaring no objectType", ref: unparsed.URL, wantErr: domain.ErrJSONSchemaNotFound()},
 	}
+	// The release pins both schemas. A request with no release is not deployed.
+	ctx := withPins(t,
+		domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: human.URL},
+		domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "machine-user", RevisionID: machine.URL},
+	)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", tt.ref)
+			got, err := resolveUserSchema(ctx, schemas, domain.BuiltinSchemaBases{}, "proj", tt.ref)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				return
@@ -87,11 +92,12 @@ func TestResolveUserSchemaUnderAnotherBuiltinBase(t *testing.T) {
 	stored := &domain.JSONSchema{URL: "https://schemas.test/builtin/v1/default-human-user.json", ObjectType: new("human-user")}
 	schemas := fakeUserSchemas{stored}
 
-	got, err := resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/default-human-user.json")
+	ctx := withPins(t, domain.ReleasePointer{Kind: domain.ReleasePointerKindSchema, Handle: "human-user", RevisionID: stored.URL})
+	got, err := resolveUserSchema(ctx, schemas, bases, "proj", "https://schemas.test/builtin/v0/default-human-user.json")
 	require.NoError(t, err)
 	assert.Same(t, stored, got)
 
-	_, err = resolveUserSchema(t.Context(), schemas, bases, "proj", "https://schemas.test/builtin/v0/other.json")
+	_, err = resolveUserSchema(ctx, schemas, bases, "proj", "https://schemas.test/builtin/v0/other.json")
 	assert.ErrorIs(t, err, domain.ErrJSONSchemaNotFound())
 }
 
@@ -113,13 +119,12 @@ func TestResolveUserSchemaPinnedRevision(t *testing.T) {
 	require.NoError(t, err)
 	assert.Same(t, v1, got)
 
-	got, err = resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
-	require.NoError(t, err)
-	assert.Same(t, v2, got)
+	_, err = resolveUserSchema(t.Context(), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
+	assert.ErrorIs(t, err, domain.ErrReleaseNotDeployed(nil))
 
 	got, err = resolveUserSchema(withPins(t, schemaV1), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
 	require.NoError(t, err)
-	assert.Same(t, v2, got, "a release that pins no flow keeps the newest schema")
+	assert.Same(t, v1, got, "a release that pins no flow serves the schema it pins")
 
 	_, err = resolveUserSchema(withPins(t, flow), schemas, domain.BuiltinSchemaBases{}, "proj", "human-user")
 	assert.ErrorIs(t, err, domain.ErrInternal(nil))
