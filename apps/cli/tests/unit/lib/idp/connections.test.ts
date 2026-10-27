@@ -12,7 +12,6 @@ import {
   type ConnectionFile,
   IDPS_DIR,
   credentialVariablesOf,
-  existingCustomSettings,
   planConnection,
   readConnectionFiles,
 } from "../../../../src/lib/idp";
@@ -94,36 +93,6 @@ describe("credentialVariablesOf", () => {
       clientId: "ACME_CLIENT_ID",
       clientSecret: "ACME_CLIENT_SECRET",
     });
-  });
-});
-
-describe("existingCustomSettings", () => {
-  const file = (body: Record<string, unknown>): ConnectionFile => ({
-    name: `${String(body.slug)}.json`,
-    path: `${IDPS_DIR}/${String(body.slug)}.json`,
-    body,
-  });
-  const acme = file({
-    slug: "acme-sso",
-    display_name: "Acme SSO",
-    oidc: { issuer: "https://sso.acme.example", scopes: ["openid", "email"] },
-  });
-
-  it("reads the display name, issuer and scopes of the connection the slug names", () => {
-    expect(existingCustomSettings([acme], { slug: "acme-sso" })).toEqual({
-      slug: "acme-sso",
-      displayName: "Acme SSO",
-      issuer: "https://sso.acme.example",
-      scopes: "openid email",
-    });
-  });
-
-  it.each([
-    ["no slug was given", [acme], {}],
-    ["no connection has that slug", [acme], { slug: "other" }],
-    ["two connections have that slug", [acme, file({ ...acme.body })], { slug: "acme-sso" }],
-  ] as const)("knows nothing when %s", (_name, files, given) => {
-    expect(existingCustomSettings(files, given)).toBeUndefined();
   });
 });
 

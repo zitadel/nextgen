@@ -15,15 +15,12 @@
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
-export { mappingNotes } from "./mapping-notes";
-
 export {
   CONNECTION_SCHEMA_REF,
   IDPS_DIR,
   type ConnectionFile,
   type ConnectionPlan,
   credentialVariablesOf,
-  existingCustomSettings,
   type StoredVariables,
   planConnection,
   refuseResolvedSecret,

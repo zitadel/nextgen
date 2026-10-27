@@ -131,40 +131,6 @@ describe("auth-method sso enable --provider custom on a terminal", () => {
     expect(password).not.toHaveBeenCalled();
   });
 
-  it("does not ask for what a connection of that name already holds", async () => {
-    const cwd = await setUpProject();
-    await withStdin("acme-secret", () =>
-      runCliForTest([
-        "auth-method",
-        "sso",
-        "enable",
-        "--cwd",
-        cwd,
-        "--non-interactive",
-        "--provider",
-        "custom",
-        "--slug",
-        ACME.slug,
-        "--display-name",
-        ACME.displayName,
-        "--issuer",
-        ACME.issuer,
-        "--client-id",
-        "acme-client-id",
-      ]),
-    );
-    vi.mocked(text).mockResolvedValue("acme-client-id" as never);
-
-    await enableCustom(cwd, "--slug", ACME.slug);
-
-    const asked = vi.mocked(text).mock.calls.map(([question]) => question.message);
-    expect(
-      asked.filter((message) =>
-        /call this connection|sign-in button|issuer URL|scopes/.test(message),
-      ),
-    ).toEqual([]);
-  });
-
   it("explains the claim mappings it wrote for a custom connection", async () => {
     const cwd = await setUpProject();
 

@@ -45,11 +45,9 @@ import {
   type CustomFlagValues,
   customExample,
   customFlagValues,
-  existingCustomSettings,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
   loopbackIssuerWarning,
-  mappingNotes,
   planConnection,
   publishClientId,
   type PublishState,
@@ -151,17 +149,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     // Resolved before anything is asked for: being turned away after typing a
     // secret would mean typing it again.
     const { client, projectId, server } = await this.connect({ quiet: true });
-    const connections = await readConnectionFiles(cwd);
     // The first question of the run, so every check that can fail has passed.
-    // A custom connection that is already in the Project is described by its
-    // file, so only what is missing from both the flags and the file is asked.
     const selection =
       project.selection ??
       selectionFromFlags(
         CUSTOM_PROVIDER,
-        await this.askCustomSettings(
-          customSettingsToAsk(project.values, existingCustomSettings(connections, project.values)),
-        ),
+        await this.askCustomSettings(project.values),
         ENABLE_FLAG_NAMES,
         customExample(ENABLE_FLAG_NAMES),
       );
@@ -186,6 +179,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
           )
         : undefined;
 
+    const connections = await readConnectionFiles(cwd);
     // `nonBlankString` has already refused a blank one.
     const clientIdFlag =
       flags["client-id"] === undefined ? undefined : validated(parseClientId(flags["client-id"]));
@@ -704,22 +698,6 @@ async function readProject(
   return { selection, values, issuer };
 }
 
-/**
- * The settings to ask for: each one the flags gave, else the one the connection
- * of that name already holds, else none, so only what is in neither is asked.
- */
-function customSettingsToAsk(
-  given: CustomFlagValues,
-  stored: CustomFlagValues | undefined,
-): CustomFlagValues {
-  return {
-    slug: given.slug ?? stored?.slug,
-    displayName: given.displayName ?? stored?.displayName,
-    issuer: given.issuer ?? stored?.issuer,
-    scopes: given.scopes ?? stored?.scopes,
-  };
-}
-
 /** Whether a custom connection's name, button text and issuer were all given. */
 function hasAllCustomSettings(values: CustomFlagValues): boolean {
   return (
@@ -794,5 +772,34 @@ function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
   return [
     ...(edits.schema.changed ? [schema.path] : []),
     ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
+  ];
+}
+
+/**
+ * What a person needs to know about the claim mappings a custom connection was
+ * written with: where they are, which side of each line is their user schema's
+ * and which is the claim the provider must return, and that mapping a value
+ * does not by itself verify it. Nothing here edits a mapping; the connection
+ * file is where that happens.
+ */
+function mappingNotes(options: { file: string; provider: string; connection: object }): string[] {
+  const { file, provider, connection } = options;
+  const document = connection as {
+    claim_mapping?: Readonly<Record<string, string>>;
+    verified_claims?: Readonly<Record<string, string | true>>;
+  };
+  const mappings = Object.entries(document.claim_mapping ?? {});
+  if (mappings.length === 0) {
+    return [];
+  }
+  return [
+    `Claim mappings in ${file}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
+    ...mappings.map(([attribute, claim]) => `  ${attribute} ← ${claim}`),
+    ...Object.entries(document.verified_claims ?? {}).map(([attribute, how]) =>
+      how === true
+        ? `${attribute} is treated as verified.`
+        : `${attribute} is treated as verified only when ${provider} says so in the ${how} claim.`,
+    ),
+    "Mapping a value does not by itself mark it verified. Edit the mappings in that file if your provider returns other claims.",
   ];
 }
