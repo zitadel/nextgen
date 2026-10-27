@@ -36,6 +36,14 @@ describe("claimDeadline", () => {
     }
   });
 
+  it("falls back to the documented TTL for a resumed wait, which has no expires_at", () => {
+    expect(claimDeadline({ now: NOW })).toBe(NOW + TEN_MINUTES);
+  });
+
+  it("honours a timeout on a resumed wait", () => {
+    expect(claimDeadline({ timeoutSeconds: 5, now: NOW })).toBe(NOW + 5000);
+  });
+
   it("still honours a timeout when expires_at is unparseable", () => {
     expect(claimDeadline({ expiresAt: "garbage", timeoutSeconds: 5, now: NOW })).toBe(NOW + 5000);
   });

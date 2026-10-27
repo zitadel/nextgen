@@ -295,6 +295,20 @@
           "min": 1
         },
         {
+          "name": "no-wait",
+          "description": "Print the link and exit, without opening a browser or waiting for the browser step. The result names the command that waits for it.",
+          "type": "boolean",
+          "exclusive": [
+            "challenge-id",
+            "timeout"
+          ]
+        },
+        {
+          "name": "challenge-id",
+          "description": "Wait for the link a --no-wait run printed, instead of creating a new one.",
+          "type": "option"
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -315,6 +329,12 @@
         },
         {
           "command": "claim --timeout 120"
+        },
+        {
+          "command": "claim --no-wait"
+        },
+        {
+          "command": "claim --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C"
         }
       ]
     },
