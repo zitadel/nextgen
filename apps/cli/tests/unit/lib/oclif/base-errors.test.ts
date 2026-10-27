@@ -94,6 +94,72 @@ describe("BaseCommand errors", () => {
   });
 });
 
+// Every failure is shown as one block, however it arose. The platform writes
+// fragments and oclif writes a rendering of its own; the person reads one
+// grammar, and `--json` still carries the message exactly as it was thrown.
+describe("the one block every failure is shown as", () => {
+  const refused = (message: string) => Object.assign(new Error(message), { oclif: { exit: 2 } });
+
+  it("states a server's lowercase fragment as a sentence", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+
+    expect(cmd.stderr).toEqual(["Error E_NOT_FOUND: Variable not found"]);
+  });
+
+  it("leaves the thrown message alone in the envelope", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(new ZitadelError("E_NOT_FOUND", "variable not found"));
+
+    expect(cmd.json).toEqual([expect.objectContaining({ message: "variable not found" })]);
+  });
+
+  it("says why oclif refused the command line in the CLI's own words", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]?.split("\n")[0]).toBe("Error E_VALIDATION: Missing required flag kind");
+  });
+
+  it("offers that command's help under Next:, not under oclif's own label", async () => {
+    const cmd = new FailingCommand(false);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.stderr[0]).toBe(
+      "Error E_VALIDATION: Missing required flag kind\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
+    );
+  });
+
+  it("keeps oclif's rendering whole in the envelope", async () => {
+    const cmd = new FailingCommand(true);
+
+    await cmd.fail(
+      refused(
+        "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      ),
+    );
+
+    expect(cmd.json).toEqual([
+      expect.objectContaining({
+        message:
+          "The following error occurred:\n  Missing required flag kind\nSee more help with --help",
+      }),
+    ]);
+  });
+});
+
 // Ctrl-C closes nothing by itself. Without `catch` telling the chain to stop,
 // an interrupted run ends on a bare opening line and the shell prompt is
 // drawn inside the gutter.

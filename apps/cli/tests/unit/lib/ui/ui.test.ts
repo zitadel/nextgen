@@ -98,7 +98,7 @@ describe("Ui", () => {
     it("stays quiet when the person cancelled, because the prompt already said so", () => {
       const ui = watched();
       ui.describe("Listing origins");
-      ui.open();
+      ui.say("something happened");
 
       ui.stop(new ZitadelError("E_CANCELLED", "Cancelled by user"));
 
@@ -108,7 +108,7 @@ describe("Ui", () => {
     it("closes the chain when the person interrupted the work", () => {
       const ui = watched();
       ui.describe("Listing origins");
-      ui.open();
+      ui.say("something happened");
 
       ui.stop(new ZitadelError("E_CANCELLED", "Cancelled"));
 
@@ -127,7 +127,7 @@ describe("Ui", () => {
 
       expect(ui.opened).toBe(false);
 
-      ui.open();
+      ui.say("something happened");
 
       expect(ui.opened).toBe(true);
     });
@@ -137,7 +137,7 @@ describe("Ui", () => {
     it("names the chain by what the command is doing", () => {
       const ui = watched();
       ui.describe("Listing origins");
-      ui.open();
+      ui.say("something happened");
 
       expect(intro).toHaveBeenCalledWith("Listing origins");
     });

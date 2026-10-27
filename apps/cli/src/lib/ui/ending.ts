@@ -1,6 +1,6 @@
 import pc from "picocolors";
 
-import { Facts, Frame, Prose, WIDTH } from "./layout";
+import { Facts, Frame, GUTTER, Prose, WIDTH } from "./layout";
 import type { Presentation } from "./presentation";
 import type { Summary } from "./summary";
 import type { Where } from "./where";
@@ -50,15 +50,24 @@ export class Ending {
    * A failure says so in red above what it has to say, rather than in the
    * footer: the footer is dim and unmarked, which is right for an answer and
    * wrong for an error — it would make `Error E_NOT_FOUND: …` read exactly
-   * like `No variables on the project`.
+   * like `No variables on the project`. It is folded to the same width as
+   * everything else, which a server message pasted into it needs most of all,
+   * and it keeps the dim place footer: which project, on which server, is
+   * what a run that failed against the wrong one is read for.
    */
   renderStandalone(): string {
     const body = this.body(false);
+    const place = this.where.known ? [this.where.plain] : [];
     if (this.summary.failed === true) {
-      return `${[pc.red(this.summary.title), ...body].join("\n")}\n`;
+      const stated = new Prose(this.summary.title, WIDTH, false)
+        .render()
+        .split("\n")
+        .map((line) => pc.red(line));
+      const under = body.length === 0 ? [] : [new Prose(body.join("\n"), WIDTH).render()];
+      const footer = place.length === 0 ? [] : ["", pc.dim(place.join(" · "))];
+      return `${[...stated, ...under, ...footer].join("\n")}\n`;
     }
     const said = this.summary.title === "Done" ? [] : [this.summary.title];
-    const place = this.where.known ? [this.where.plain] : [];
     const footer = [...said, ...(this.summary.extras ?? []), ...place]
       .map((part) => part.trim())
       .filter((part) => part !== "")
@@ -70,9 +79,22 @@ export class Ending {
     ].join("\n");
   }
 
-  /** The one line that closes the chain, red when the headline is a failure. */
+  /**
+   * The line that closes the chain, red when the headline is a failure.
+   *
+   * A success's headline is a short label and is one line by construction. A
+   * failure's is the whole sentence, and a URL or a server message can make it
+   * longer than the terminal: it is folded to what the chain's gutter leaves,
+   * and the folded lines are indented to sit under the first, so the sentence
+   * is said once, in one place, and still fits.
+   */
   get line(): string {
-    return this.summary.failed === true ? pc.red(this.summary.title) : this.summary.title;
+    return new Prose(this.summary.title, WIDTH - GUTTER, false)
+      .render()
+      .split("\n")
+      .map((part, index) => (index === 0 ? part : " ".repeat(GUTTER) + part))
+      .map((part) => (this.summary.failed === true ? pc.red(part) : part))
+      .join("\n");
   }
 
   /**
@@ -143,9 +165,18 @@ export class Ending {
    * around it helps nobody and breaks copying a wide one. A summary that asks
    * for a box it is not entitled to is refused here rather than anywhere
    * else, so one marker decides the whole shape.
+   *
+   * Steps bring their own frame. A wizard writes none of them out as lines,
+   * so a summary carrying steps but no `boxed` would lose them in silence —
+   * the overview and the skills offer the base command appends included.
+   * `boxed` therefore means what it says it means: draw the box even with no
+   * steps.
    */
   private boxed(): boolean {
-    return this.summary.boxed === true && this.presentation === "wizard";
+    if (this.presentation !== "wizard") {
+      return false;
+    }
+    return this.summary.boxed === true || (this.summary.next ?? []).length > 0;
   }
 }
 

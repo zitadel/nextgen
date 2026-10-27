@@ -9,8 +9,12 @@ import { consola } from "consola";
 import { type Drawing, Progress } from "../../../../src/lib/ui/progress";
 
 /** A chain that remembers what progress asked of it, and draws nothing. */
-const chain = (interactive: boolean): Drawing & { opened: number; gaps: number } => ({
+const chain = (
+  interactive: boolean,
+  chained = true,
+): Drawing & { opened: number; gaps: number } => ({
   interactive,
+  chained,
   opened: 0,
   gaps: 0,
   open() {
@@ -201,5 +205,55 @@ describe("Progress", () => {
       expect(consola.success).toHaveBeenCalledTimes(1);
       expect(consola.error).not.toHaveBeenCalled();
     });
+  });
+});
+
+// `Chain.spinner` was taught to keep out of the gutter a normal command does
+// not have; `task` and `begin` were not, so either one drew a `│` above that
+// command's answer and made it look like a wizard that happened to do work.
+describe("progress for a command that draws no chain", () => {
+  const said = (): string[] =>
+    vi.mocked(consola.log).mock.calls.map(([text]) => stripAnsi(String(text)));
+
+  beforeEach(() => {
+    vi.spyOn(consola, "log").mockImplementation(() => undefined);
+  });
+
+  it("draws no gutter for work as a callback", async () => {
+    await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
+
+    expect(log.message).not.toHaveBeenCalled();
+  });
+
+  it("says what the work ended on, as a plain line", async () => {
+    await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
+
+    expect(said()).toEqual(["Fetching variables"]);
+  });
+
+  it("keeps its spinner out of the gutter too", async () => {
+    await new Progress(chain(true, false)).run("Fetching variables", async () => undefined);
+
+    expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+  });
+
+  it("indents what the work reported under its result", async () => {
+    await new Progress(chain(true, false)).run("Fetching variables", async (report) => {
+      report.done("Read", "two variables");
+    });
+
+    expect(said()).toEqual(["Fetching variables", "    Read  two variables"]);
+  });
+
+  it("draws no gutter for a hand-ended step either", () => {
+    new Progress(chain(true, false)).begin("Fetching variables").done();
+
+    expect(log.message).not.toHaveBeenCalled();
+  });
+
+  it("still narrates with nobody watching, whatever the shape", async () => {
+    await new Progress(chain(false, false)).run("Fetching variables", async () => undefined);
+
+    expect(spinner).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import type { BoxAction } from "../box";
+import { CANCELLED } from "../errors";
 import type { Summary } from "../ui";
 
 /** The lines that say what a command did, as opposed to the detail under them. */
@@ -35,7 +36,7 @@ function sentence(id: string | undefined, title: string): string {
   }
   const cancelled = /^Skipped: \w+-cancelled/.exec(title);
   if (cancelled !== null) {
-    return "Cancelled, nothing was changed";
+    return CANCELLED;
   }
   if (id === "variable:get" && /^[A-Za-z0-9_.-]+$/.test(title)) {
     return `Read ${title}`;
@@ -188,14 +189,17 @@ export function summaryOfText(
   }
   title = sentence(id, title.replace(/\.$/, ""));
 
-  // A title too long to read as one line is replaced by a short one and said
-  // in full underneath. A failure keeps its code, which is the part a person
-  // acts on and the only part of a long server message that is predictable;
-  // a success has nothing worth keeping, so it says "Done".
+  // A success too long to read as one line is replaced by "Done" and said in
+  // full underneath: its headline is a label, and a label nobody can read is
+  // worth nothing. A failure is not a label but the answer, so it keeps its
+  // whole sentence and is said exactly once — cutting it down to its code and
+  // then repeating the sentence underneath gave the same failure two shapes
+  // depending on how long the server's message happened to be. The ending
+  // folds it to the width it has.
   const overflow: string[] = [];
-  if (title.length > HEADLINE_WIDTH) {
+  if (!failed && title.length > HEADLINE_WIDTH) {
     overflow.push(title);
-    title = failed ? (/^(Error\s+[A-Z0-9_]+)\b/.exec(title)?.[1] ?? "The command failed") : "Done";
+    title = "Done";
   }
   const headline = title;
 

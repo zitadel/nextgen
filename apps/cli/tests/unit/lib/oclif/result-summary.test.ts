@@ -137,17 +137,20 @@ describe("nextSteps", () => {
   });
 });
 
-describe("a failure too long to close a chain on", () => {
+// Every failure reads the same way, whatever its message happens to measure.
+// Cutting a long one down to its code and then repeating the whole message
+// underneath gave one failure two shapes — `Error E_NETWORK: POST … got no
+// response` for a short URL and `Error E_NETWORK` plus the same sentence again
+// for a long one — so the sentence is the headline and is said once.
+describe("a failure whose message is longer than a line", () => {
   const long = `Error E_NOT_FOUND: GET ${"http://host/deployments?project_id=x&live=true".repeat(3)} returned 404`;
 
-  // The closing line is one line. A server message pasted into it runs off
-  // the screen, and the code is the part a person acts on.
-  it("closes on the code alone", () => {
-    expect(summaryOfText(long, true).title).toBe("Error E_NOT_FOUND");
+  it("closes on the whole sentence, as a short failure does", () => {
+    expect(summaryOfText(long, true).title).toBe(long);
   });
 
-  it("still says the whole thing underneath", () => {
-    expect(summaryOfText(long, true).lines?.[0]).toBe(long);
+  it("does not say it a second time underneath", () => {
+    expect(summaryOfText(long, true).lines ?? []).toEqual([]);
   });
 
   it("leaves a failure that already fits alone", () => {
@@ -156,9 +159,21 @@ describe("a failure too long to close a chain on", () => {
     );
   });
 
-  it("falls back to plain words when the text names no code", () => {
-    expect(summaryOfText(`Something went wrong ${"and on ".repeat(20)}`, true).title).toBe(
-      "The command failed",
-    );
+  // A success's headline is a label, and a label nobody can read is worth
+  // nothing, so that one is still replaced and said in full underneath.
+  it("still shortens a success nobody could read", () => {
+    const wordy = `Deployed ${"and on ".repeat(20)}`;
+
+    expect(summaryOfText(wordy).title).toBe("Done");
+    expect(summaryOfText(wordy).lines?.[0]).toBe(wordy.trimEnd());
+  });
+});
+
+// One sentence for every cancellation, so a declined confirmation and an
+// interrupted wizard end on the same words. It claims nothing about what was
+// changed, because a `*-cancelled` skip and a Ctrl-C land in different places.
+describe("a run the person stopped", () => {
+  it("closes on the one cancellation sentence", () => {
+    expect(summaryOfText("Skipped: remove-cancelled").title).toBe("Cancelled");
   });
 });

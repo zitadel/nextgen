@@ -42,6 +42,18 @@ describe("Chain", () => {
     expect(printed()).toBe("");
   });
 
+  // Narration used to reach clack whenever the chain was not plain-and-watched,
+  // so a run nobody was watching put a `│` on stdout — clack draws the gutter
+  // whether or not anything opened it.
+  it.each([
+    ["a wizard", () => new Chain({ interactive: false, force: false })],
+    ["a normal command", () => new Chain({ interactive: false, force: false }, "plain")],
+  ])("draws no gutter for %s nobody is watching", (_shape, make) => {
+    make().narrate("i", "something happened");
+
+    expect(log.message).not.toHaveBeenCalled();
+  });
+
   it("opens on the first thing drawn, not when it is named", () => {
     const chain = watching();
     chain.describe("Listing origins");
@@ -162,6 +174,16 @@ describe("Chain", () => {
     expect(outro).not.toHaveBeenCalled();
   });
 
+  it("closes on the one cancellation sentence, which claims nothing about what changed", () => {
+    const chain = watching();
+    chain.describe("Listing variables");
+    chain.narrate("!", "a warning");
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled"));
+
+    expect(stripAnsi(String(vi.mocked(outro).mock.calls[0]?.[0]))).toBe("Cancelled");
+  });
+
   // Read off `log.message`, not stdout: the clack double writes nothing, so
   // asserting on what was written passes however wide the line is.
   it("wraps a bridged line, which obeys no width of its own", () => {
@@ -245,6 +267,33 @@ describe("a normal command's chain, which is no chain at all", () => {
 
     expect(intro).not.toHaveBeenCalled();
     expect(spinner).toHaveBeenCalledWith({ withGuide: false });
+  });
+
+  // `task` and `begin` got the gutter that `spinner` was taught to keep out
+  // of, so a normal command that reported a step drew a `│` above its answer.
+  it("keeps a step out of the gutter it does not have", async () => {
+    await normally().task("Fetching variables", async () => undefined);
+
+    expect(intro).not.toHaveBeenCalled();
+    expect(log.message).not.toHaveBeenCalled();
+  });
+
+  it("keeps a hand-ended step out of it too", () => {
+    normally().begin("Fetching variables").done();
+
+    expect(log.message).not.toHaveBeenCalled();
+  });
+
+  // Ctrl-C at a plain prompt left the line it was typing on, with nothing but
+  // the terminal's own `^C`, so the shell prompt continued that line. The same
+  // sentence a wizard closes on says the run stopped.
+  it("says the one cancellation sentence where there is no chain to close", () => {
+    const chain = normally();
+    removing(chain);
+
+    chain.abort(new ZitadelError("E_CANCELLED", "Cancelled by user"));
+
+    expect(printed()).toBe("\nCancelled\n");
   });
 
   // `--force` is a flag about whether to ask. The only difference it may make

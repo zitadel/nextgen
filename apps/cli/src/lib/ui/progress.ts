@@ -43,6 +43,12 @@ export interface Step {
 export interface Drawing {
   /** Whether a person is watching. When false nothing is drawn, only narrated. */
   readonly interactive: boolean;
+  /**
+   * Whether this command's output is a chain, so progress belongs in its
+   * gutter. A normal command's is a spinner and a plain line: it has no chain,
+   * and a `│` above its answer would make it look like a wizard.
+   */
+  readonly chained: boolean;
   /** Opens the chain, so the first thing drawn is under its heading. */
   open(): void;
   /** The chain's spacing is settled; what follows needs no blank guide line. */
@@ -87,18 +93,18 @@ export class Progress {
       return result;
     }
     this.drawing.open();
-    const progress = new DrawnSpinner(label);
+    const progress = new DrawnSpinner(label, this.drawing.chained);
     try {
       const result = await work(report);
       progress.clear();
       this.drawing.closeGap();
       // The spinner already drew the blank guide line above the title.
-      Progress.line(MARK.done, done?.(result) ?? label);
-      Progress.draw(lines);
+      this.line(MARK.done, done?.(result) ?? label);
+      this.draw(lines);
       return result;
     } catch (error) {
       progress.clear();
-      Progress.line(MARK.failed, `${label} failed`);
+      this.line(MARK.failed, `${label} failed`);
       throw error;
     }
   }
@@ -130,7 +136,7 @@ export class Progress {
     }
     this.drawing.open();
     const details: string[] = [];
-    const progress = new DrawnSpinner(label);
+    const progress = new DrawnSpinner(label, this.drawing.chained);
     let ended = false;
     const end = (symbol: string, text: string) => {
       if (ended) {
@@ -139,9 +145,9 @@ export class Progress {
       ended = true;
       progress.clear();
       this.drawing.closeGap();
-      Progress.line(symbol, text);
+      this.line(symbol, text);
       for (const line of details) {
-        Progress.detail(line);
+        this.detail(line);
       }
     };
     return {
@@ -160,31 +166,42 @@ export class Progress {
   }
 
   /** What a task reported, under its result, with the verbs in one column. */
-  private static draw(lines: readonly Line[]): void {
+  private draw(lines: readonly Line[]): void {
     const width = Math.max(0, ...lines.map((entry) => entry.verb.length));
     for (const { mark, verb, subject } of lines) {
-      Progress.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`, true);
+      this.detail(`${mark === "" ? "  " : `${mark} `}${verb.padEnd(width)}  ${subject}`, true);
     }
   }
 
   /**
-   * Writes one line under a result, in the chain's gutter. {@link draw} draws
-   * its rows one at a time and says so, since a row on its own has nothing to
-   * line up with; what a caller reported through {@link Step.detail} is a
-   * sentence and folds like one.
+   * Writes one line under a result, in the chain's gutter, or indented under
+   * it for a normal command. {@link draw} draws its rows one at a time and
+   * says so, since a row on its own has nothing to line up with; what a caller
+   * reported through {@link Step.detail} is a sentence and folds like one.
    */
-  private static detail(text: string, columns = false): void {
-    Progress.line(GUIDE, text, columns);
+  private detail(text: string, columns = false): void {
+    if (!this.drawing.chained) {
+      consola.log(new Prose(`  ${text}`, WIDTH, columns).render());
+      return;
+    }
+    this.line(GUIDE, text, columns);
   }
 
   /**
-   * One line in the chain, wrapped to what the gutter leaves of the terminal.
-   * A step names whatever it did — a sentence and a path, say — so without
-   * this a long one runs past the chain instead of folding under it. A caller
-   * drawing a row of a column layout passes `columns`, and {@link Prose}
-   * leaves it whole.
+   * One line of progress, wrapped to what is left of the terminal. A step
+   * names whatever it did — a sentence and a path, say — so without this a
+   * long one runs past the chain instead of folding under it. A caller drawing
+   * a row of a column layout passes `columns`, and {@link Prose} leaves it
+   * whole.
+   *
+   * A normal command has no gutter and no marks: its step is a plain line,
+   * like the answer it is working towards.
    */
-  private static line(symbol: string, text: string, columns = false): void {
+  private line(symbol: string, text: string, columns = false): void {
+    if (!this.drawing.chained) {
+      consola.log(new Prose(text, WIDTH, columns).render());
+      return;
+    }
     log.message(new Prose(text, WIDTH - GUTTER, columns).render(), { symbol, spacing: 0 });
   }
 }

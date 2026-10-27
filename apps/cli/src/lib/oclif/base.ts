@@ -5,7 +5,7 @@ import { Command, Flags } from "@oclif/core";
 import { nonBlankString } from "./flags";
 import consola from "consola";
 
-import { toZitadelError, type ZitadelError } from "../errors";
+import { failureText, toZitadelError, type ZitadelError } from "../errors";
 import { listenForInterrupt, stopListeningForInterrupt } from "../interrupt";
 import { isObject } from "../json";
 import { type LocalServers, PsLocalServers } from "../local-server/processes";
@@ -694,22 +694,35 @@ function renderPretty(result: CommandResult, meta: GlobalOptions): string {
 }
 
 /**
- * Renders a {@link ZitadelError} as a human-readable block for stderr: the
- * coded message, an optional hint, and any suggested next commands.
+ * Renders a {@link ZitadelError} as the one block every failure is shown as:
+ * the coded sentence, an optional hint, and any commands to run next. It is
+ * the only place a failure becomes words for a person, so there is one grammar
+ * however the failure arose — the CLI's own refusal, the platform's, a socket
+ * that never answered, or oclif refusing the command line.
  */
 function renderError(error: ZitadelError, meta: GlobalOptions): string {
-  const lines = [`Error ${error.code}: ${error.message}`];
+  const { sentence, misuse } = failureText(error.message);
+  const lines = [`Error ${error.code}: ${sentence}`];
   if (error.hint) {
     lines.push(error.hint);
   }
-  const nextCommands = normalizePublicCliCommands(error.nextCommands, meta.cliVersion);
-  if (nextCommands && nextCommands.length > 0) {
+  const suggested = normalizePublicCliCommands(error.nextCommands, meta.cliVersion) ?? [];
+  // A refused command line is told where its own help is, under the same label
+  // as every other suggestion, rather than under oclif's "See more help with".
+  const nextCommands = suggested.length > 0 ? suggested : misuse ? [helpFor(meta)] : [];
+  if (nextCommands.length > 0) {
     lines.push("Next:");
     for (const cmd of nextCommands) {
       lines.push(`  $ ${cmd}`);
     }
   }
   return lines.join("\n");
+}
+
+/** `zitadel <command> --help`: the step a refused command line ends on. */
+function helpFor(meta: GlobalOptions): string {
+  const command = meta.command.replaceAll(":", " ").trim();
+  return publicCliCommand(command === "" ? "--help" : `${command} --help`, meta.cliVersion);
 }
 
 function formatData(data: unknown, warnings: string[], opts: GlobalOptions): string {

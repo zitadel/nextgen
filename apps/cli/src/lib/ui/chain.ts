@@ -2,7 +2,7 @@ import { intro, log, note, outro } from "@clack/prompts";
 import { consola } from "consola";
 import pc from "picocolors";
 
-import { ZitadelError } from "../errors";
+import { CANCELLED, ZitadelError } from "../errors";
 import { asker, plainAsker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
@@ -68,6 +68,17 @@ export class Chain implements Drawing, Narratable {
     return this.audience.interactive;
   }
 
+  /**
+   * Whether this command's output is a chain, so what is drawn into it is
+   * drawn in its gutter. It follows the command's {@link Presentation}, as
+   * every other shape decision does: a normal command's step is a spinner and
+   * a plain line, because a `│` under its answer would make it look like a
+   * wizard that happened to do some work.
+   */
+  get chained(): boolean {
+    return this.presentation === "wizard";
+  }
+
   get isOpen(): boolean {
     return this.opened;
   }
@@ -82,11 +93,18 @@ export class Chain implements Drawing, Narratable {
 
   /**
    * One line in the chain: its mark, then the text. A blank guide line first
-   * after a prompt. A command with no chain to draw it in says it plainly, so
-   * a line of narration cannot grow a gutter around a normal command.
+   * after a prompt.
+   *
+   * Nothing is drawn with nobody watching, as nothing else is; a normal
+   * command says it plainly, so a line of narration cannot grow a gutter
+   * around one. Only a chain that is actually being drawn reaches clack —
+   * without that, a wizard nobody is watching put a `│` on stdout.
    */
   narrate(symbol: string, text: string): void {
-    if (this.presentation === "plain" && this.audience.interactive) {
+    if (!this.audience.interactive) {
+      return;
+    }
+    if (!this.chained) {
       consola.log(text);
       return;
     }
@@ -142,12 +160,19 @@ export class Chain implements Drawing, Narratable {
   }
 
   /**
-   * Closes a chain the run never finished, which is only ever a cancellation.
+   * Ends a run the person stopped, on the one sentence every cancellation
+   * ends on ({@link CANCELLED}).
    *
-   * A question the person cancelled has already closed it (`└  Cancelled.`),
-   * so that one is left alone. An interrupt in the middle of the work has
-   * not: without this the run ends on a bare `┌` and the shell prompt is
-   * drawn inside the gutter.
+   * A wizard closes its chain: a question the person cancelled has already
+   * closed it, so that one is left alone, but an interrupt in the middle of
+   * the work has not, and without this the run ends on a bare `┌` and the
+   * shell prompt is drawn inside the gutter.
+   *
+   * A normal command has no chain, and its prompt was left mid-line with the
+   * terminal's own `^C` on it, so the shell prompt would otherwise continue
+   * that line. It says the same sentence on a line of its own, which is both
+   * what makes the two shapes read alike and what makes the plain prompt's
+   * silence a decision rather than an omission.
    *
    * A failure is left open on purpose, so that the error block the base
    * command renders through {@link finish} is what closes the chain. Closing
@@ -156,12 +181,20 @@ export class Chain implements Drawing, Narratable {
    */
   abort(error: unknown): void {
     const cancelled = error instanceof ZitadelError && error.code === "E_CANCELLED";
+    if (!cancelled || !this.audience.interactive || this.ended) {
+      return;
+    }
+    if (!this.chained) {
+      this.ended = true;
+      process.stdout.write(`\n${pc.red(CANCELLED)}\n`);
+      return;
+    }
     const closedItself = error instanceof ZitadelError && error.message === "Cancelled by user";
-    if (!cancelled || closedItself || !this.audience.interactive || !this.opened || this.ended) {
+    if (closedItself || !this.opened) {
       return;
     }
     this.ended = true;
-    outro(pc.red("Cancelled"));
+    outro(pc.red(CANCELLED));
   }
 
   /**

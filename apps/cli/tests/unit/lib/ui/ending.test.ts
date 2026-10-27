@@ -21,6 +21,33 @@ describe("Ending", () => {
     it("is red when the headline is a failure", () => {
       expect(ending({ title: "Stopped", failed: true }).line).toBe(pc.red("Stopped"));
     });
+
+    // The sentence is said once, in one place, so a long one is folded here
+    // rather than swapped for its code and repeated underneath.
+    describe("a failure whose sentence does not fit on one line", () => {
+      const long = `Error E_NETWORK: GET http://localhost:9/deployments?project_id=${"x".repeat(20)}&live=true got no response`;
+      const folded = () => plain(ending({ title: long, failed: true }).line).split("\n");
+
+      // The first line is drawn after the chain's own `└  `, and the rest are
+      // indented to start in the same column, so the screen is 80 either way.
+      it("folds it to what the chain's gutter leaves", () => {
+        const onScreen = folded().map((line, index) => (index === 0 ? 3 : 0) + line.length);
+
+        expect(Math.max(...onScreen)).toBeLessThanOrEqual(80);
+      });
+
+      it("indents what it folded, so it sits under the first line", () => {
+        expect(
+          folded()
+            .slice(1)
+            .map((line) => /^ {3}\S/.test(line)),
+        ).toEqual([true, true]);
+      });
+
+      it("says the whole sentence, with nothing dropped", () => {
+        expect(folded().join(" ").replace(/\s+/g, " ").trim()).toBe(long);
+      });
+    });
   });
 
   describe("what goes under it", () => {
@@ -176,6 +203,17 @@ describe("which shape an ending takes", () => {
     expect(plain(ending({ boxed: true, lines: ["a detail"] }).render())).toContain("╭");
   });
 
+  // A wizard writes none of its steps out as lines, so without this a summary
+  // that carried steps and forgot to ask for a box lost them in silence — the
+  // overview and the skills offer the base command appends included.
+  it("frames a wizard's steps even when the summary never asked for a box", () => {
+    const shown = plain(
+      ending({ next: [{ text: "Deploy it:", command: "zitadel deploy" }] }).render(),
+    );
+
+    expect(shown).toContain("zitadel deploy");
+  });
+
   // With no box to hold them, dropping the steps would lose the command the
   // person is meant to run next, which is what an ending is read for.
   it("writes a normal command's next steps out as lines", () => {
@@ -203,12 +241,44 @@ describe("which shape an ending takes", () => {
     expect(plain(shown)).toContain("Check the name.");
   });
 
-  it("keeps where it ran out of a failure, which is not an answer", () => {
+  // Which project, on which server, is the thing a run that failed is read
+  // for: a `-e production` run that failed against staging looks identical
+  // without it. It is the same dim footer an answer gets, under the failure
+  // rather than beside it, because the failure is already said in red above.
+  it("says where a normal command's failure happened, under it", () => {
     const shown = plain(
       normally({ title: "Error E_NOT_FOUND: nope", failed: true }, somewhere).renderStandalone(),
     );
 
-    expect(shown).not.toContain("proj-1");
+    expect(shown).toContain("project proj-1 on api.zitadel.cloud");
+  });
+
+  // The one width every other line obeys. Without it a failure was the only
+  // thing the CLI printed that ran off the right of the screen.
+  describe("a normal command's failure that does not fit on one line", () => {
+    const hint = `Check your connection and the server URL ${"and on ".repeat(12)}`.trimEnd();
+    const shown = () =>
+      plain(
+        normally({
+          title: `Error E_NETWORK: POST http://localhost:9/teams/query?project_id=${"x".repeat(12)} got no response`,
+          lines: [hint],
+          failed: true,
+        }).renderStandalone(),
+      );
+
+    it("folds the sentence to the same width as everything else", () => {
+      expect(
+        Math.max(
+          ...shown()
+            .split("\n")
+            .map((line) => line.length),
+        ),
+      ).toBeLessThanOrEqual(80);
+    });
+
+    it("folds what it has to say under it too", () => {
+      expect(shown()).not.toContain(hint);
+    });
   });
 });
 

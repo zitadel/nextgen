@@ -1,0 +1,5 @@
+---
+"@zitadel/cli": patch
+---
+
+Every failure now reads the same way: `Error <code>: <sentence>`, the sentence said once, the hint under it, and the commands to run next under `Next:`. A long message is no longer swapped for its bare code and then repeated underneath, so `zitadel release list` and `zitadel users list` fail in the same shape however long the server's message is, and a failure outside a box now folds to 80 columns like everything else instead of running off the screen. A refused command line is answered in the CLI's own words rather than oclif's, with that command's help offered under `Next:` instead of "See more help with --help". A message the platform wrote as a lowercase fragment is said as a sentence, while one that opens on a URL, a path or an id is left exactly as it came. A failing command now also says which project and server it failed against, which is what you need when a run went to the wrong one. Cancelling says one thing, `Cancelled`, in a wizard and at a plain prompt alike. `--json` is unchanged: its `code`, `message`, `hint` and `next_commands` are exactly what they were, and so are the exit codes.

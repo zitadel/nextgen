@@ -34,10 +34,11 @@ import type { Summary } from "./summary";
  * }
  * ```
  *
- * {@link describe}, {@link bridgeNarration}, {@link open} and {@link finish}
- * are the base command's, not a command's: they name the chain, bridge
- * `consola` into it and close it on the result the command returned. A command
- * that reaches for them is a command drawing outside its own chain.
+ * {@link describe}, {@link bridgeNarration} and {@link finish} are the base
+ * command's, not a command's: they name the chain, bridge `consola` into it
+ * and close it on the result the command returned. A command that reaches for
+ * them is a command drawing outside its own chain. The chain opens itself at
+ * the first thing a person sees, so nothing opens it by hand.
  */
 export class Ui {
   private readonly chain: Chain;
@@ -114,16 +115,6 @@ export class Ui {
    */
   releaseNarration(): void {
     this.narration.restore();
-  }
-
-  /** Opens the chain if it is not open. Called before anything is drawn. */
-  open(): void {
-    this.chain.open();
-  }
-
-  /** A prompt was just answered, so the next thing drawn leaves a blank guide line first. */
-  answered(): void {
-    this.chain.answered();
   }
 
   /**

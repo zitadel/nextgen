@@ -1,5 +1,18 @@
 import { ApiError, apiErrorCode, apiErrorMessage, NetworkError } from "@zitadel/api/runtime/fetch";
+import { stripAnsi } from "consola/utils";
+
 import type { SuggestedCommand } from "./suggestion";
+
+/**
+ * The one sentence a cancellation ends on, wherever it is reported.
+ *
+ * One word, in the past tense and without a full stop, like every other
+ * closing line. It says nothing about what was or was not changed, because
+ * Ctrl-C can land after the work as easily as before it, and a sentence that
+ * is sometimes a lie is worse than a short one that is always true. A command
+ * that does know says so on a line under this one.
+ */
+export const CANCELLED = "Cancelled";
 
 /**
  * Closed set of failure categories the CLI can surface. Every error the
@@ -81,6 +94,76 @@ export class ZitadelError extends Error {
   get exitCode(): number {
     return EXIT_CODES[this.code] ?? 1;
   }
+}
+
+/**
+ * oclif's footer under a command line it refused. It is oclif's own name for
+ * what this CLI calls `Next:`, and finding it is the only way to tell one of
+ * its parse errors from an ordinary failure: they arrive as plain `Error`s
+ * carrying a rendered block rather than a type of their own.
+ */
+const OCLIF_HELP = /\n *See more help with --help\s*$/;
+
+/** The heading oclif puts over the flags it rejected, which nothing else writes. */
+const OCLIF_PREAMBLE = /^The following errors? occurred:\n/;
+
+/**
+ * The first word of a message, when it is a plain one: letters, and at most a
+ * comma or colon after them. A message that opens on a URL, a path, a flag, an
+ * id or a verbatim HTTP verb is left exactly as its source wrote it, because
+ * capitalising `http://…` or `usr_1` would change what it names.
+ */
+const PLAIN_WORD = /^[a-z]+[:,]?(\s|$)/;
+
+/** A failure's message as one sentence, which is how a person is shown it. */
+export type FailureText = {
+  /** What `Error <code>: ` introduces. Said once, wherever the failure is drawn. */
+  readonly sentence: string;
+  /** The command line itself was refused, so `--help` is what to run next. */
+  readonly misuse: boolean;
+};
+
+/**
+ * A failure's message as the CLI says it to a person.
+ *
+ * It is the human rendering alone: `--json` carries `message` exactly as it
+ * was thrown, so a script that matches on it is unaffected by anything here.
+ *
+ * Two things are settled. A message that opens on a plain lowercase word is a
+ * sentence, so it starts with a capital: the platform writes fragments
+ * (`variable not found`, `release: still served by an origin`) and the CLI
+ * writes sentences, and the reader should not be able to tell which one
+ * answered. And oclif's own rendering of a refused command line — a heading,
+ * an indented reason and a `--help` footer — is folded back into the one
+ * sentence the CLI states every other failure as, with the footer handed to
+ * the caller as {@link FailureText.misuse} so it can be offered under `Next:`
+ * like any other command the CLI suggests.
+ */
+export function failureText(message: string): FailureText {
+  if (!OCLIF_HELP.test(message)) {
+    return { sentence: capitalised(message), misuse: false };
+  }
+  const [head = "", ...rest] = stripAnsi(message.replace(OCLIF_HELP, ""))
+    .replace(OCLIF_PREAMBLE, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+  // oclif lists what it rejected under a heading, in the aligned columns it
+  // lists everything in. Named after the heading they belong to they read as
+  // one sentence; a column of descriptions under a closing line does not.
+  const listed = rest.map((line) => line.split(/\s{2,}/)[0] ?? line);
+  return {
+    sentence: capitalised(
+      head.endsWith(":") ? `${head} ${listed.join(", ")}`.trim() : [head, ...rest].join("; "),
+    ),
+    misuse: true,
+  };
+}
+
+function capitalised(message: string): string {
+  return PLAIN_WORD.test(message)
+    ? `${message[0]?.toUpperCase() ?? ""}${message.slice(1)}`
+    : message;
 }
 
 /**
