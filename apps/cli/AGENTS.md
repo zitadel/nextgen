@@ -61,6 +61,13 @@
   the summary box; every other command draws neither chain nor box, asks on a
   plain line, and ends on its answer and one dim footer. Adding a question, a
   warning or a `--force` to a command must not change its shape.
+  - The shape holds off a terminal: a run nothing can be drawn into has its
+    ending written out in the same words (`Ui.written`), so only the gutter
+    and the frame are missing. There is no third rendering.
+  - The exception is a machine's: `--json`, and the form a normal command
+    already chooses off a terminal (`--plain` is implied, so a list is
+    tab-separated rows and a record is the record). The ending never
+    decorates one, or `cut`, `awk` and `wc -l` stop working.
 - Draw through `this.ui` (`src/lib/ui/`) alone: never `@clack/prompts`,
   `consola` or a write to `process.stdout`/`process.stderr` in a new file.
   `tests/unit/lib/ui/index.test.ts` lists every file that still does; add none.

@@ -44,6 +44,8 @@ export class Ui {
   private readonly chain: Chain;
   private readonly narration: Narration;
   private readonly presentation: Presentation;
+  /** Whether a command took its own ending away as text ({@link ending}). */
+  private handedOver = false;
 
   constructor(audience: Audience, presentation: Presentation = "wizard") {
     this.presentation = presentation;
@@ -59,6 +61,16 @@ export class Ui {
   /** Whether the chain has been drawn into. */
   get opened(): boolean {
     return this.chain.isOpen;
+  }
+
+  /**
+   * Whether the command rendered its own ending with {@link ending}, and so
+   * has already said everything an ending says. The base command writes what
+   * such a command returned as it is, rather than ending a run that has
+   * ended.
+   */
+  get reported(): boolean {
+    return this.handedOver;
   }
 
   /**
@@ -98,13 +110,18 @@ export class Ui {
   }
 
   /**
-   * Draws the narration the CLI still writes with `consola` inside the chain,
-   * until {@link releaseNarration}. A normal command has no chain to draw it
+   * Takes the narration the CLI still writes with `consola` into the chain,
+   * until {@link releaseNarration}. A normal command has no chain to put it
    * in, so its `consola` lines stay its own: a warning must not be what turns
    * a normal command into a wizard.
+   *
+   * It is installed whether or not anybody is watching, because what a line
+   * of narration says belongs to the command: a run nothing is drawn into
+   * gets the same marks written out rather than `consola`'s own ` WARN `
+   * badge. `--json` silences `consola` outright, so nothing reaches it there.
    */
   bridgeNarration(): void {
-    if (this.interactive && this.presentation === "wizard") {
+    if (this.presentation === "wizard") {
       this.narration.install();
     }
   }
@@ -175,12 +192,25 @@ export class Ui {
   }
 
   /**
-   * The ending as text, for a command whose report is the whole point of the
+   * The report as text, for a command whose report is the whole point of the
    * run and which therefore has to show one with nobody at a terminal, where
    * {@link finish} draws nothing. The command returns it as its own rendering;
-   * it is laid out here so that the two endings cannot drift apart.
+   * it is laid out here so that the two endings cannot drift apart, and the
+   * run is marked as {@link reported} so the base command does not end it a
+   * second time.
    */
   ending(summary: Summary): string {
+    this.handedOver = true;
     return this.chain.ending(summary);
+  }
+
+  /**
+   * The whole ending as text, for a run nothing can be drawn into: the line
+   * the chain would have closed on and everything that would have sat under
+   * it, in the same words. The caller writes it where it belongs — stdout for
+   * an answer, stderr for a failure — so that `--json` stays one envelope.
+   */
+  written(summary: Summary): string {
+    return this.chain.written(summary);
   }
 }

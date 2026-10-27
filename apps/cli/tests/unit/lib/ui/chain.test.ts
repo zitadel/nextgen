@@ -7,6 +7,7 @@ import { intro, log, note, outro, spinner } from "@clack/prompts";
 
 import { ZitadelError } from "../../../../src/lib/errors";
 import { Chain } from "../../../../src/lib/ui/chain";
+import { GUIDE } from "../../../../src/lib/ui/marks";
 import { asTerminalTyping } from "../../../helpers/terminal";
 
 const watching = () => new Chain({ interactive: true, force: false });
@@ -34,12 +35,31 @@ describe("Chain", () => {
   it("draws nothing at all when nobody is watching", () => {
     const chain = scripted();
     chain.describe("Listing origins");
-    chain.narrate("i", "something happened");
     chain.finish({ title: "Found 1 origin", sections: [] });
 
     expect(intro).not.toHaveBeenCalled();
     expect(outro).not.toHaveBeenCalled();
     expect(printed()).toBe("");
+  });
+
+  // The gutter is the only part of a narrated line that needs a terminal, so
+  // a run nobody is watching is told the same thing with the same mark. Said
+  // through `consola` instead, a warning arrived as its ` WARN ` badge and a
+  // step as a glyph of consola's choosing, which is the chain's marks in name
+  // only.
+  it("writes a wizard's narration, with the mark it would have drawn", () => {
+    scripted().narrate("!", "the flow was edited by hand");
+
+    expect(printed()).toBe("!  the flow was edited by hand\n");
+  });
+
+  // `│` is what a line that carries no mark of its own is given, and off a
+  // terminal a lone gutter is a stray glyph: the line is indented to the same
+  // column instead, so the marks above and below it still line up.
+  it("writes a line that carries no mark as an indent, not as a gutter", () => {
+    scripted().narrate(GUIDE, "and this is why");
+
+    expect(printed()).toBe("   and this is why\n");
   });
 
   // Narration used to reach clack whenever the chain was not plain-and-watched,
@@ -318,5 +338,57 @@ describe("a normal command's chain, which is no chain at all", () => {
     expect(stripAnsi(answered.shown)).toBe(
       `Remove B from the project? [y/N] ${stripAnsi(forced.shown)}`,
     );
+  });
+
+  // A run nothing can be drawn into used to fall through to a third rendering
+  // that was neither shape: `Next:` for `Run next:`, `(server: host)` at the
+  // top for the place at the end, and no box at all. The words are the
+  // command's, so they are the same written as drawn.
+  describe("the ending written out, for a run nothing is drawn into", () => {
+    const summary = {
+      title: "Checked the status of the project",
+      sections: [],
+      lines: ["Project proj-1, lifecycle configured"],
+      next: [{ text: "Run next:", command: "npx @zitadel/cli@0.1.0 start" }],
+      boxed: true,
+    };
+
+    it("says the line a wizard would have closed on", () => {
+      const chain = scripted();
+      chain.ranAgainst("proj-1", "localhost:8111");
+
+      expect(stripAnsi(chain.written(summary))).toContain("Checked the status of the project");
+    });
+
+    it("introduces a command under the label every box uses", () => {
+      const text = stripAnsi(scripted().written(summary));
+
+      expect(text).toContain("Run next:");
+      expect(text).not.toContain("\nNext:");
+    });
+
+    it("ends a wizard on where it ran, in the sentence the box ends on", () => {
+      const chain = scripted();
+      chain.ranAgainst("proj-1", "localhost:8111");
+
+      expect(stripAnsi(chain.written(summary))).toContain(
+        "Using project proj-1 on your local Zitadel server at localhost:8111.",
+      );
+    });
+
+    it("ends a normal command on its answer and the one footer", () => {
+      const chain = new Chain({ interactive: false, force: false }, "plain");
+      chain.ranAgainst("proj-1", "localhost:8111");
+
+      expect(stripAnsi(chain.written(removed))).toBe(
+        "Removed B from the project · project proj-1 on localhost:8111\n",
+      );
+    });
+
+    it("writes nothing of its own: the caller decides where it goes", () => {
+      scripted().written(summary);
+
+      expect(printed()).toBe("");
+    });
   });
 });

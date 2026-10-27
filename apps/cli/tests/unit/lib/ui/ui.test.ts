@@ -216,14 +216,56 @@ describe("Ui", () => {
       expect(intro).toHaveBeenCalledWith("Listing origins");
     });
 
-    it("is never installed when nobody is watching", () => {
-      const before = [...consola.options.reporters];
+    // What a line of narration says belongs to the command, so a wizard's
+    // goes through the chain whether or not it can be drawn: written, it
+    // carries the chain's mark instead of consola's ` WARN ` badge.
+    it("takes a wizard's consola lines even when nobody is watching", () => {
       const ui = scripted();
+
+      ui.bridgeNarration();
+      consola.warn("the flow was edited by hand");
+      ui.releaseNarration();
+
+      expect(printed()).toContain("!  the flow was edited by hand");
+    });
+
+    it("is never installed for a normal command, which has no chain to take them into", () => {
+      const before = [...consola.options.reporters];
+      const ui = new Ui({ interactive: false, force: false }, "plain");
 
       ui.bridgeNarration();
 
       expect(consola.options.reporters).toEqual(before);
       ui.releaseNarration();
+    });
+  });
+
+  describe("the ending it hands back as text", () => {
+    const summary = {
+      title: "Checked the status of the project",
+      sections: [],
+      next: [{ text: "Run next:", command: "npx @zitadel/cli@0.1.0 start" }],
+      boxed: true,
+    };
+
+    // `setup` renders its own report, so the run has already ended: a second
+    // ending from the base command would say the whole thing twice.
+    it("remembers that the command took its own ending away", () => {
+      const ui = scripted();
+
+      expect(ui.reported).toBe(false);
+
+      ui.ending(summary);
+
+      expect(ui.reported).toBe(true);
+    });
+
+    it("is not reported by a command that only had its ending written for it", () => {
+      const ui = scripted();
+
+      ui.written(summary);
+
+      expect(ui.reported).toBe(false);
     });
   });
 });

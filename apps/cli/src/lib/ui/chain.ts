@@ -7,7 +7,7 @@ import { asker, plainAsker } from "../input";
 import type { Audience } from "./audience";
 import { Ending } from "./ending";
 import { GUTTER, Prose, WIDTH } from "./layout";
-import { MARK } from "./marks";
+import { GUIDE, MARK } from "./marks";
 import type { Narratable } from "./narration";
 import type { Presentation } from "./presentation";
 import { type Drawing, Progress, type Report, type Step } from "./progress";
@@ -95,26 +95,31 @@ export class Chain implements Drawing, Narratable {
    * One line in the chain: its mark, then the text. A blank guide line first
    * after a prompt.
    *
-   * Nothing is drawn with nobody watching, as nothing else is; a normal
-   * command says it plainly, so a line of narration cannot grow a gutter
-   * around one. Only a chain that is actually being drawn reaches clack —
-   * without that, a wizard nobody is watching put a `│` on stdout.
+   * A normal command says it plainly, so a line of narration cannot grow a
+   * gutter around one, and only a chain that is actually being drawn reaches
+   * clack — without that, a wizard nobody is watching put a `│` on stdout.
+   *
+   * A wizard with nobody watching writes the line instead of drawing it: the
+   * same mark and the same words, without the gutter, which is the one part
+   * of a chain that needs a terminal. A line that carries no mark of its own
+   * is indented to the same column, so the marks still line up.
    */
   narrate(symbol: string, text: string): void {
-    if (!this.audience.interactive) {
+    if (!this.chained) {
+      if (this.audience.interactive) {
+        consola.log(text);
+      }
       return;
     }
-    if (!this.chained) {
-      consola.log(text);
+    // A bridged line is whatever the caller passed `consola`, so it obeys no
+    // width of its own: wrapped here, or a long warning runs past the gutter.
+    const body = new Prose(text, WIDTH - GUTTER).render();
+    if (!this.audience.interactive) {
+      process.stdout.write(`${symbol === GUIDE ? " " : symbol}  ${body}\n`);
       return;
     }
     this.open();
-    // A bridged line is whatever the caller passed `consola`, so it obeys no
-    // width of its own: wrapped here, or a long warning runs past the gutter.
-    log.message(new Prose(text, WIDTH - GUTTER).render(), {
-      symbol,
-      spacing: this.gap ? 1 : 0,
-    });
+    log.message(body, { symbol, spacing: this.gap ? 1 : 0 });
     this.gap = false;
   }
 
@@ -152,11 +157,28 @@ export class Chain implements Drawing, Narratable {
   }
 
   /**
-   * The same ending as text instead of drawn, for a run nothing is drawn into.
-   * The caller decides where it goes, so the chain's own state is left alone.
+   * The report as text instead of drawn, for a run nothing is drawn into. The
+   * caller decides where it goes, so the chain's own state is left alone.
    */
   ending(summary: Summary): string {
     return new Ending(summary, this.where(summary.ran), this.presentation).render() ?? "";
+  }
+
+  /**
+   * The whole ending as text: the line the chain would have closed on, and
+   * everything that would have been drawn under it.
+   *
+   * It is what a run with nobody watching is shown in place of
+   * {@link Chain.finish}, so the words a command ends on are the command's
+   * either way and only the drawing — the gutter and the frame, both of which
+   * need a terminal — is left out.
+   */
+  written(summary: Summary): string {
+    const ending = new Ending(summary, this.where(summary.ran), this.presentation);
+    if (ending.standalone) {
+      return ending.renderStandalone();
+    }
+    return `${ending.line}\n${ending.render() ?? ""}`;
   }
 
   /**

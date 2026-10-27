@@ -24,6 +24,7 @@ import { claimSkills, eligibleForSkills } from "../skills-hint";
 import { takeReportedWarnings } from "../warnings";
 import type { Presentation, Summary } from "../ui";
 import { Ui } from "../ui";
+import { stripColumnMarks } from "../ui/layout";
 import { summaryOfText } from "./result-summary";
 import {
   CLI_COMMAND_COMPLETED,
@@ -417,35 +418,33 @@ export abstract class BaseCommand extends Command {
     // list of no records must leave stdout empty, so `wc -l` reports 0.
     const rendered = renderPretty(normalized, this.meta);
     const footer = normalized.status === "ok" ? normalized.footer : undefined;
+    // A skip ends on its own summary too, so a deliberate no-op reads like
+    // every other ending instead of as the reason token the envelope carries.
+    const ending = this.endingOf(normalized, rendered, footer);
     if (this.ui.interactive) {
       // A person at a terminal: the result closes the chain the questions began.
       // A command that said everything itself returns nothing, and draws nothing.
-      // A skip ends on its own summary too, so a deliberate no-op reads like
-      // every other ending instead of as the reason token the envelope carries.
-      const own = normalized.summary;
-      if (own !== undefined) {
-        this.ui.finish(this.withOverview(own));
-      } else if (rendered !== "" || footer !== undefined || this.ui.opened) {
-        this.ui.finish(
-          this.withOverview(
-            summaryOfText(
-              this.summarises() && footer !== undefined ? `${rendered}\n\n${footer}` : rendered,
-              false,
-              this.summarises(),
-              this.id,
-              // A command that answers keeps its own trailing line for the
-              // footer, rather than letting it become another body line.
-              this.summarises() || footer === undefined ? [] : footer.split("\n"),
-            ),
-          ),
-        );
+      if (ending !== undefined) {
+        this.ui.finish(ending);
       }
-    } else {
+    } else if (this.rendersForAMachine()) {
+      // Nothing folds this text, so nothing takes the mark a builder puts at
+      // the head of a row it aligned (`COLUMN_MARK`): it is invisible on
+      // screen but it is in the bytes, and it would travel with anything
+      // copied or parsed out of them.
       if (rendered !== "") {
-        this.log(rendered);
+        this.log(stripColumnMarks(rendered));
       }
       if (footer !== undefined) {
-        this.log(`\n${footer}`);
+        this.log(`\n${stripColumnMarks(footer)}`);
+      }
+    } else if (ending !== undefined) {
+      // Nothing can be drawn, so the same ending is written out instead. It
+      // goes through `log`, which `--json` silences, so the envelope still
+      // travels alone on stdout.
+      const text = this.ui.written(ending).replace(/\n+$/, "");
+      if (text !== "") {
+        this.log(text);
       }
     }
     // Reported warnings were printed when they happened, so they join the
@@ -453,6 +452,57 @@ export abstract class BaseCommand extends Command {
     const reported = takeReportedWarnings();
     const envelope = toEnvelope(withReportedWarnings(normalized, reported), this.meta);
     return envelope.status === "skipped" ? withWarnings(envelope, reported) : envelope;
+  }
+
+  /**
+   * How this command ends, as the one {@link Summary} both renderings are
+   * built from: the command's own, or the one split out of what it printed.
+   * It is settled here rather than per rendering, so a run that is drawn and
+   * a run that is written cannot end on different words.
+   *
+   * Nothing at all is an ending only when the command said nothing: no
+   * rendering, no footer, and nothing drawn into the chain on the way.
+   */
+  private endingOf(
+    result: CommandResult,
+    rendered: string,
+    footer: string | undefined,
+  ): Summary | undefined {
+    const own = result.summary;
+    if (own !== undefined) {
+      return this.withOverview(own);
+    }
+    if (rendered === "" && footer === undefined && !this.ui.opened) {
+      return undefined;
+    }
+    return this.withOverview(
+      summaryOfText(
+        this.summarises() && footer !== undefined ? `${rendered}\n\n${footer}` : rendered,
+        false,
+        this.summarises(),
+        this.id,
+        // A command that answers keeps its own trailing line for the footer,
+        // rather than letting it become another body line.
+        this.summarises() || footer === undefined ? [] : footer.split("\n"),
+      ),
+    );
+  }
+
+  /**
+   * Whether what this command rendered is for a machine rather than a person,
+   * in which case it is written as it is and the ending never decorates it.
+   *
+   * Two things make it so. A command that took its own ending away as text
+   * (`setup`, through `Ui.ending`) has already said everything an ending
+   * says. And off a terminal a normal command's answer is the machine form it
+   * chose for itself — `--plain` is implied there, so a list is tab-separated
+   * rows and a record is the record — which `cut`, `awk` and `wc -l` read and
+   * which a count or a footer under it would break. A wizard has no such
+   * form: what it writes is prose for a person however it is read, so it ends
+   * the way it always ends.
+   */
+  private rendersForAMachine(): boolean {
+    return this.ui.reported || (!this.summarises() && !process.stdout.isTTY);
   }
 
   /**
@@ -525,10 +575,17 @@ export abstract class BaseCommand extends Command {
       // it interrupted still has to be closed, or the shell prompt is drawn
       // inside the gutter.
       this.ui.stop(zitadelError);
-    } else if (this.ui.interactive) {
-      this.ui.finish(summaryOfText(renderError(zitadelError, meta), true, false, this.id));
     } else {
-      this.logToStderr(renderError(zitadelError, meta));
+      // A failure has no machine form — `--json` is where a machine reads one
+      // — so it is said in the command's own shape either way, drawn when
+      // there is a terminal and written when there is not. It stays on
+      // stderr off a terminal, where a script expects to find it.
+      const ending = summaryOfText(renderError(zitadelError, meta), true, false, this.id);
+      if (this.ui.interactive) {
+        this.ui.finish(ending);
+      } else {
+        this.logToStderr(this.ui.written(ending).replace(/\n+$/, ""));
+      }
     }
     return this.exit(zitadelError.exitCode);
   }

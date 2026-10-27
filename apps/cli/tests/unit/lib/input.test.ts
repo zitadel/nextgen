@@ -710,6 +710,20 @@ describe("plainAsker", () => {
       expect(answer).toBe("cloud");
       expect(talk.shown()).toContain("  -)  Local — not running\n  1)  Cloud\n");
     });
+
+    // With every option unnumbered the prompt reads `[1-0]` and no answer
+    // satisfies it, so the question asked itself for ever.
+    it("refuses a choice where nothing is available, rather than asking for ever", async () => {
+      const talk = typing("1", "2", "3");
+
+      await expect(
+        plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout }).select({
+          name: "server",
+          message: "Which server?",
+          options: [{ value: "local", label: "Local", hint: "not running", disabled: true }],
+        }),
+      ).rejects.toMatchObject({ code: "E_VALIDATION", message: "No server to choose from" });
+    });
   });
 
   describe("several choices", () => {
@@ -855,6 +869,45 @@ describe("plainAsker", () => {
         .catch(() => undefined);
 
       expect(talk.shown()).toBe("Client ID ");
+    });
+
+    // Readline raises `SIGINT` itself only while it holds the terminal, which
+    // an unmasked question never does: the signal reaches the process instead,
+    // and until the question listened for it there the Ctrl-C settled nothing
+    // — the question went on waiting and the run was killed a second later,
+    // with no word for the person and no `finally` for the command.
+    it("is a cancellation when the Ctrl-C is left to the process", async () => {
+      const stdin = Object.assign(new Readable({ read() {} }), { isTTY: true });
+      const stdout = new Writable({
+        write(_chunk: unknown, _encoding: unknown, done: (error?: Error | null) => void) {
+          setImmediate(() => process.emit("SIGINT"));
+          done();
+        },
+      });
+      const others = process.listeners("SIGINT");
+      process.removeAllListeners("SIGINT");
+
+      try {
+        await expect(plainAsker({ ...ask, stdin, stdout }).text(typed())).rejects.toMatchObject({
+          code: "E_CANCELLED",
+          exitCode: 130,
+        });
+      } finally {
+        for (const listener of others) {
+          process.on("SIGINT", listener);
+        }
+      }
+    });
+
+    it("leaves the process's own interrupt handlers as it found them", async () => {
+      const talk = typing();
+      const before = process.listenerCount("SIGINT");
+
+      await plainAsker({ ...ask, stdin: talk.stdin, stdout: talk.stdout })
+        .text(typed())
+        .catch(() => undefined);
+
+      expect(process.listenerCount("SIGINT")).toBe(before);
     });
   });
 

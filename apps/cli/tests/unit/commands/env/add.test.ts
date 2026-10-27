@@ -18,7 +18,7 @@ import {
   runCliForTest,
   stripAnsi,
 } from "../../../helpers/run-cli";
-import { asTerminal } from "../../../helpers/terminal";
+import { asOneLine, asTerminal } from "../../../helpers/terminal";
 
 const SERVER = "https://api.zitadel.example";
 const server = setupServer();
@@ -136,7 +136,7 @@ async function addRendered(cwd: string, ...extra: string[]): Promise<string> {
     "--non-interactive",
     ...extra,
   ]);
-  return result.stdout;
+  return asOneLine(result.stdout);
 }
 
 const names = (variables: Added["platform"]["production"]): string[] =>
@@ -205,7 +205,7 @@ describe("env add", () => {
     it("tells a person to give the environment an origin before deploying to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
         `Give it an origin first: ${expectedPublicCliCommand(
@@ -217,7 +217,7 @@ describe("env add", () => {
     it("closes on the environment it added, not on the file it happened to write", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain("Added the production environment, bound to proj_new");
       expect(out).not.toContain("\nWrote .env.production.local\n");
@@ -226,7 +226,7 @@ describe("env add", () => {
     it("names the file whose variables it lists, rather than calling it 'it'", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(".env.production.local holds ZITADEL_URL,");
     });
@@ -250,7 +250,7 @@ describe("env add", () => {
     it("says what the environment serves until something is deployed to it", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd));
+      const out = await addRendered(cwd);
 
       expect(out).toContain(
         "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
@@ -260,7 +260,7 @@ describe("env add", () => {
     it("names the deploy a person should run, against the new environment", async () => {
       const cwd = await makeProject("next");
 
-      const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
+      const out = await addRendered(cwd, "--app-url", "https://app.acme.com");
 
       expect(out).toContain(
         `Deploy to it: ${expectedPublicCliCommand(
@@ -652,7 +652,7 @@ describe("env add", () => {
         "--non-interactive",
       ]);
 
-      const out = stripAnsi(result.stdout);
+      const out = asOneLine(result.stdout);
       expect(out).not.toContain("copy it from .env.production.local");
       expect(out).toContain("copy it from wherever you got this project");
     });

@@ -18,7 +18,7 @@ import {
   runCliForTest,
   stripAnsi,
 } from "../../helpers/run-cli";
-import { asTerminal } from "../../helpers/terminal";
+import { asOneLine, asTerminal } from "../../helpers/terminal";
 
 // The platform is unreachable unless a test says otherwise — a network error,
 // not an HTTP status — so the user-presence probe reads as "unknown" and
@@ -101,7 +101,7 @@ describe("status command", () => {
     );
   });
 
-  it("ends with where to find every command, in the text only", async () => {
+  it("names where to find every command, in the text only", async () => {
     const cwd = await configuredProject();
 
     const text = await runCliForTest([
@@ -113,10 +113,9 @@ describe("status command", () => {
     ]);
     const json = await status(cwd);
 
-    expect(text.stdout.trimEnd().split("\n").slice(-2)).toEqual([
-      "Explore all commands:",
-      `  ${expectedPublicCliCommand("")}`,
-    ]);
+    expect(asOneLine(text.stdout)).toContain(
+      `Explore all commands: ${expectedPublicCliCommand("")}`,
+    );
     expect(json.stdout).not.toContain("Explore all commands");
   });
 

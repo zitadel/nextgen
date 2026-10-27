@@ -260,6 +260,14 @@ class PlainPrompter implements Prompter {
   private list(question: AnyQuestion): Choice<unknown>[] {
     const options = question.options ?? [];
     const choosable = options.filter((option) => option.disabled !== true);
+    if (choosable.length === 0) {
+      // Nothing is numbered, so no answer can satisfy the prompt and asking
+      // would loop for ever. It is refused the way an unanswerable question
+      // is refused everywhere else, by the question's own name.
+      throw new ZitadelError("E_VALIDATION", `No ${question.name} to choose from`, {
+        hint: "Every option is unavailable.",
+      });
+    }
     this.say(question.message);
     for (const option of options) {
       const at = choosable.indexOf(option);
@@ -289,6 +297,15 @@ class PlainPrompter implements Prompter {
    * that one line is read with the terminal taken over and everything after
    * the question swallowed. Either way, an input that ends without an answer
    * is the person walking away, not an empty answer.
+   *
+   * Both ways of ending the question therefore have to close the interface,
+   * and they come from different places. Readline raises `SIGINT` itself only
+   * when it holds the terminal, which is the masked question alone; an
+   * unmasked one leaves the signal with the process, so the question listens
+   * for it there. Without that the Ctrl-C settled nothing: the question went
+   * on waiting, the interrupt's grace lapsed a second later and the run was
+   * killed where it stood, with no word for the person and no `finally` for
+   * the command.
    */
   private async read(query: string, masked = false): Promise<string> {
     const input = this.session.stdin ?? process.stdin;
@@ -298,13 +315,18 @@ class PlainPrompter implements Prompter {
       output: masked ? new Swallowing(out, query) : out,
       terminal: masked,
     });
-    rl.on("SIGINT", () => rl.close());
+    const stop = (): void => rl.close();
+    rl.on("SIGINT", stop);
+    if (!masked) {
+      process.on("SIGINT", stop);
+    }
     try {
       return await new Promise<string>((resolve, reject) => {
         rl.once("close", () => reject(cancelledByUser()));
         rl.question(query).then(resolve, reject);
       });
     } finally {
+      process.off("SIGINT", stop);
       rl.close();
       if (masked) {
         out.write("\n");

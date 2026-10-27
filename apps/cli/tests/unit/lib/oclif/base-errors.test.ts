@@ -128,7 +128,10 @@ describe("the one block every failure is shown as", () => {
     expect(cmd.stderr[0]?.split("\n")[0]).toBe("Error E_VALIDATION: Missing required flag kind");
   });
 
-  it("offers that command's help under Next:, not under oclif's own label", async () => {
+  // The label is the one every ending introduces a command under, whether the
+  // ending is drawn or written: oclif's "See more help with" is not it, and
+  // neither is the bare `Next:` a run off a terminal used to fall through to.
+  it("offers that command's help under Run next:, not under oclif's own label", async () => {
     const cmd = new FailingCommand(false);
 
     await cmd.fail(
@@ -138,7 +141,7 @@ describe("the one block every failure is shown as", () => {
     );
 
     expect(cmd.stderr[0]).toBe(
-      "Error E_VALIDATION: Missing required flag kind\nNext:\n  $ npx @zitadel/cli@test errors-test --help",
+      "Error E_VALIDATION: Missing required flag kind\nRun next:\n  $ npx @zitadel/cli@test errors-test --help",
     );
   });
 
