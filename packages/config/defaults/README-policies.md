@@ -70,21 +70,23 @@ reports the ones that do not hold. Your editor validates the file against
       "expect": { "allowed": false, "violations": ["min_length"] }
     },
     {
-      "name": "reusing the previous password",
-      "input": { "password": "a-long-enough-one" },
-      "facts": { "history_matches": [false, true] },
-      "expect": { "allowed": false, "violations": ["history_depth"] }
+      "name": "15 characters, counted as written",
+      "input": { "password": "Passwört-sicher" },
+      "expect": { "allowed": true }
     }
   ]
 }
 ```
 
 - `input` is what the operation receives: the password itself, so the
-  test also covers how it is counted (`Passwört` is 8 characters, not 9).
+  test also covers how it is counted (`Passwört-sicher` is 15 characters,
+  though 16 bytes).
 - `facts` is what a real password set would look up: `self_service`
   (default `true`, a user setting their own password) and `history_matches`
   (default `[]`, whether the password matches each of the user's kept ones,
-  current first).
+  current first). With `history_depth` set, a case with
+  `"facts": { "history_matches": [false, true] }` checks that reusing the
+  previous password is refused.
 - `expect` takes `allowed`, and optionally the `code` the operation answers
   with (such as `user.password_empty`) and exactly the `violations` it reports.
 

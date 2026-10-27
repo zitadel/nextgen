@@ -123,6 +123,17 @@ describe("policies test", () => {
 
         expect(result).toPrint("2 passed");
       });
+
+      it("shows the failing case with the error", async () => {
+        const app = await aSetUpApp();
+        await app.writePasswordPolicy({ min_length: 12 });
+        await app.writePolicyTest([{ ...TOO_SHORT, expect: { allowed: true } }]);
+
+        const result = await app.testPolicies();
+
+        expect(result.exitCode).toBe(3);
+        expect(result.stderr).toContain(`✗ ${TOO_SHORT.name}: expected allowed, got refused`);
+      });
     });
   });
 });

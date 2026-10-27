@@ -4,12 +4,16 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import type { ZitadelClient } from "../../../../src/lib/api-client";
+
 import {
+  type PolicyTestSuite,
   caseHolds,
   policiesFromFiles,
   policyTestFileIssues,
   readPolicyTests,
   renderPolicyTestResults,
+  runPolicyTests,
 } from "../../../../src/lib/policies/tests";
 
 const OPERATION = "auth.factor.password.set";
@@ -124,6 +128,18 @@ describe("policiesFromFiles", () => {
     expect(policies.size).toBe(0);
     expect(issues).toHaveLength(1);
   });
+
+  it("never reads another operation's policy file when one is asked for", async () => {
+    const cwd = await project({
+      [`${OPERATION}.json`]: { operation: OPERATION, config: { min_length: 12 } },
+      "scratch.json": { operation: "auth.unknown", config: { nope: true } },
+    });
+
+    const { policies, issues } = await policiesFromFiles(cwd, [OPERATION]);
+
+    expect(issues).toEqual([]);
+    expect([...policies.keys()]).toEqual([OPERATION]);
+  });
 });
 
 describe("caseHolds", () => {
@@ -231,5 +247,43 @@ describe("renderPolicyTestResults", () => {
     expect(renderPolicyTestResults([suite])).toContain(
       "  ✗ wrong code: expected refused (user.password_empty: min_length), got refused (user.password_policy_violation: min_length)",
     );
+  });
+});
+
+describe("runPolicyTests", () => {
+  it("keeps file and case order when the answers arrive out of order", async () => {
+    const passwords = ["a", "bb", "ccc", "dddd", "eeeee"];
+    // The shorter the password, the later its answer.
+    const client = {
+      evaluatePolicy: async (body: { input: { password: string } }) => {
+        await new Promise((resolve) => setTimeout(resolve, 10 * (6 - body.input.password.length)));
+        return { allowed: body.input.password.length > 2 };
+      },
+    } as unknown as ZitadelClient;
+    const suite = (file: string, cases: string[]): PolicyTestSuite => ({
+      file,
+      test: {
+        operation: OPERATION as PolicyTestSuite["test"]["operation"],
+        cases: cases.map((password) => ({
+          name: password,
+          input: { password },
+          expect: { allowed: true },
+        })),
+      },
+    });
+
+    const results = await runPolicyTests(
+      client,
+      "proj_1",
+      [suite("one.test.json", passwords.slice(0, 3)), suite("two.test.json", passwords.slice(3))],
+      new Map(),
+    );
+
+    expect(results.map((result) => result.file)).toEqual(["one.test.json", "two.test.json"]);
+    expect(results.map((result) => result.cases.map((testCase) => testCase.name))).toEqual([
+      ["a", "bb", "ccc"],
+      ["dddd", "eeeee"],
+    ]);
+    expect(results[0]?.cases.map((testCase) => testCase.passed)).toEqual([false, false, true]);
   });
 });

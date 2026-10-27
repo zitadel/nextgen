@@ -236,6 +236,14 @@ describe("policyTestFileSchema", () => {
     ["an unnamed case", { ...file, cases: [{ ...testCase, name: "" }] }],
     ["no expectation", { ...file, cases: [{ name: "x", input: { password: "x" } }] }],
     ["an unknown top-level key", { ...file, config: {} }],
+    [
+      "an allowed case with violations",
+      { ...file, cases: [{ ...testCase, expect: { allowed: true, violations: ["min_length"] } }] },
+    ],
+    [
+      "an allowed case with a code",
+      { ...file, cases: [{ ...testCase, expect: { allowed: true, code: "user.password_empty" } }] },
+    ],
   ])("refuses %s", (_, value) => {
     expect(parses(value)).toBe(false);
   });

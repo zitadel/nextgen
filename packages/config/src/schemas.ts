@@ -58,11 +58,19 @@ export const policyTestFileSchema = z.strictObject({
         name: z.string().min(1),
         input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
         facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
-        expect: z.strictObject({
-          allowed: z.boolean(),
-          code: z.string().min(1).optional(),
-          violations: z.array(z.string().min(1)).optional(),
-        }),
+        expect: z
+          .strictObject({
+            allowed: z.boolean(),
+            code: z.string().min(1).optional(),
+            violations: z.array(z.string().min(1)).optional(),
+          })
+          // Only a refusal carries a code or violations, so an allowed case
+          // that names one could never pass.
+          .refine(
+            (expect) =>
+              !expect.allowed || (expect.code === undefined && expect.violations === undefined),
+            "an allowed case names no code or violations",
+          ),
       }),
     )
     .min(1),

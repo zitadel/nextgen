@@ -50,10 +50,8 @@ export default class PoliciesTest extends EnvironmentCommand {
     await this.toMeta(flags);
     const { cwd } = this.meta;
 
-    const { suites, issues } = await readPolicyTests(
-      cwd,
-      args.operation === undefined ? [] : [args.operation],
-    );
+    const operations = args.operation === undefined ? [] : [args.operation];
+    const { suites, issues } = await readPolicyTests(cwd, operations);
     if (issues.length > 0) {
       throw new ZitadelError("E_VALIDATION", "The policy test files are not valid", {
         details: { issues },
@@ -71,7 +69,7 @@ export default class PoliciesTest extends EnvironmentCommand {
     const { client, projectId } = await this.connect();
     let policies: Map<string, PolicyUnderTest>;
     if (flags.release === undefined) {
-      const fromFiles = await policiesFromFiles(cwd);
+      const fromFiles = await policiesFromFiles(cwd, operations);
       if (fromFiles.issues.length > 0) {
         throw new ZitadelError("E_VALIDATION", "The policy files are not valid", {
           details: { issues: fromFiles.issues },
@@ -111,15 +109,12 @@ export default class PoliciesTest extends EnvironmentCommand {
     };
     const pretty = renderPolicyTestResults(results, flags.release);
     if (failed > 0) {
-      // The results are the explanation, so a terminal sees them before the
-      // error; under --json they travel in the error's details.
-      this.log(pretty);
+      // The results are the explanation: the hint shows them on a terminal,
+      // and under --json they travel in the error's details.
       throw new ZitadelError(
         "E_VALIDATION",
         `${failed} of ${cases.length} policy test cases failed`,
-        {
-          details: data,
-        },
+        { details: data, hint: pretty },
       );
     }
     return this.emit({ status: "ok", data, pretty });

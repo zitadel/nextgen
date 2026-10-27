@@ -198,6 +198,18 @@ describe("meta-schemas", () => {
       "unknown fact": { ...file, cases: [{ ...testCase, facts: { admin: true } }] },
       "no expectation": { ...file, cases: [{ name: "x", input: { password: "x" } }] },
       "unknown top-level key": { ...file, config: {} },
+      "allowed with violations": {
+        ...file,
+        cases: [{ ...testCase, expect: { allowed: true, violations: ["min_length"] } }],
+      },
+      "allowed with a code": {
+        ...file,
+        cases: [{ ...testCase, expect: { allowed: true, code: "user.password_empty" } }],
+      },
+      "a password above the bound": {
+        ...file,
+        cases: [{ ...testCase, input: { password: "a".repeat(4097) } }],
+      },
     })) {
       expect(check(bad), name).toBe(false);
     }

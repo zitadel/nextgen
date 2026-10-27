@@ -19,7 +19,13 @@ import type { z } from "zod";
 
 import type { ZitadelClient } from "../api-client";
 import { readJsonDirEntries } from "../json-dir";
-import { isPolicyTestFile, POLICIES_DIR, POLICY_TEST_SUFFIX, policyFileIssues } from "./index";
+import {
+  isPolicyTestFile,
+  POLICIES_DIR,
+  POLICY_TEST_SUFFIX,
+  policyFileIssues,
+  policyFileName,
+} from "./index";
 
 /** A policy test file as `policyTestFileSchema` accepts it. */
 export type PolicyTestFile = z.infer<typeof policyTestFileSchema>;
@@ -100,11 +106,17 @@ export type PolicyUnderTest = { config: Record<string, unknown>; source: PolicyS
  * The policies in `.zitadel/policies/`, by operation, and the problems found.
  * A policy file that fails its own check is a problem rather than "no
  * policy": testing `{}` in its place would report on a policy nobody wrote.
+ * `operations` narrows them to those operations' files, by name and before
+ * anything is parsed, as {@link readPolicyTests} does.
  */
 export async function policiesFromFiles(
   cwd: string,
+  operations: readonly string[] = [],
 ): Promise<{ policies: Map<string, PolicyUnderTest>; issues: string[] }> {
-  const entries = await readJsonDirEntries(join(cwd, POLICIES_DIR), { skip: isPolicyTestFile });
+  const wanted = new Set(operations.map(policyFileName));
+  const entries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
+    skip: (name) => isPolicyTestFile(name) || (wanted.size > 0 && !wanted.has(name)),
+  });
   const policies = new Map<string, PolicyUnderTest>();
   const issues: string[] = [];
   for (const entry of entries) {
@@ -141,19 +153,21 @@ export async function policiesFromRelease(
   releaseId: string,
 ): Promise<ReleasePolicies> {
   const release = await client.getReleaseById(releaseId, { project_id: projectId });
-  const policies = new Map<string, PolicyUnderTest>();
-  for (const pointer of release.pointers) {
-    if (pointer.kind !== "policy") {
-      continue;
-    }
-    const revision = await client.getPolicyRevision(pointer.revision_id, {
-      project_id: projectId,
-    });
-    policies.set(pointer.handle, {
-      config: revision.config as Record<string, unknown>,
-      source: { revision_id: pointer.revision_id },
-    });
-  }
+  const pinned = release.pointers.filter((pointer) => pointer.kind === "policy");
+  const revisions = await Promise.all(
+    pinned.map((pointer) =>
+      client.getPolicyRevision(pointer.revision_id, { project_id: projectId }),
+    ),
+  );
+  const policies = new Map<string, PolicyUnderTest>(
+    pinned.map((pointer, index) => [
+      pointer.handle,
+      {
+        config: revisions[index]?.config as Record<string, unknown>,
+        source: { revision_id: pointer.revision_id },
+      },
+    ]),
+  );
   return {
     policies,
     revoked: release.revoked_at !== null,
@@ -199,9 +213,31 @@ export function caseHolds(expected: PolicyTestExpect, actual: EvaluatePolicy200)
   return true;
 }
 
+/** How many evaluate requests a run keeps in flight at once. */
+const EVALUATE_CONCURRENCY = 8;
+
+/** `fn` over `items` with at most `limit` calls in flight, results in item order. */
+async function mapBounded<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const index = next++;
+      out[index] = await fn(items[index] as T);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 /**
  * Evaluates every case of every suite against its operation's policy, or `{}`
- * when there is none, one request per case.
+ * when there is none: one request per case, a few in flight at once, the
+ * results in file and case order.
  */
 export async function runPolicyTests(
   client: ZitadelClient,
@@ -209,30 +245,37 @@ export async function runPolicyTests(
   suites: readonly PolicyTestSuite[],
   policies: ReadonlyMap<string, PolicyUnderTest>,
 ): Promise<PolicySuiteResult[]> {
-  const results: PolicySuiteResult[] = [];
-  for (const { file, test } of suites) {
-    const policy = policies.get(test.operation);
-    const cases: PolicyCaseResult[] = [];
-    for (const testCase of test.cases) {
+  const runs = suites.flatMap(({ test }, suite) =>
+    test.cases.map((testCase) => ({ suite, operation: test.operation, testCase })),
+  );
+  const outcomes = await mapBounded(
+    runs,
+    EVALUATE_CONCURRENCY,
+    async ({ suite, operation, testCase }) => {
       const actual = await client.evaluatePolicy(
         {
-          operation: test.operation,
-          config: policy?.config ?? {},
+          operation,
+          config: policies.get(operation)?.config ?? {},
           input: testCase.input,
           ...(testCase.facts === undefined ? {} : { facts: testCase.facts }),
         },
         { project_id: projectId },
       );
-      cases.push({
+      const result: PolicyCaseResult = {
         name: testCase.name,
         passed: caseHolds(testCase.expect, actual),
         expected: testCase.expect,
         actual,
-      });
-    }
-    results.push({ operation: test.operation, file, policy: policy?.source ?? null, cases });
-  }
-  return results;
+      };
+      return { suite, result };
+    },
+  );
+  return suites.map(({ file, test }, suite) => ({
+    operation: test.operation,
+    file,
+    policy: policies.get(test.operation)?.source ?? null,
+    cases: outcomes.filter((outcome) => outcome.suite === suite).map(({ result }) => result),
+  }));
 }
 
 /**
