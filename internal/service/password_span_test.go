@@ -45,7 +45,7 @@ func spanNamed(t *testing.T, name string) tracetest.SpanStub {
 
 func TestSetPasswordAction_Prepare_span(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	hasher := cryptomock.NewMockHasher(ctrl)
+	hasher := cryptomock.NewMockPasswordHasher(ctrl)
 	hasher.EXPECT().Hash("s3cret").Return("hash", nil)
 
 	action := service.NewSetUserPasswordAction(service.SetPasswordInput{
@@ -64,7 +64,7 @@ func TestSetPasswordAction_Prepare_span(t *testing.T) {
 // span says which error it was and keeps its status unset.
 func TestAuthAttemptService_VerifyProof_Password_wrongPasswordSpan(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	verifier := cryptomock.NewMockHashVerifier(ctrl)
+	verifier := cryptomock.NewMockPasswordHasher(ctrl)
 	stmts := mocks.NewMockAllStatements(ctrl)
 	stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).Return(&domain.AuthAttempt{
 		ProjectID: "proj",
@@ -75,10 +75,10 @@ func TestAuthAttemptService_VerifyProof_Password_wrongPasswordSpan(t *testing.T)
 		},
 	}, nil)
 	stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
-	verifier.EXPECT().VerifyHash("encoded", "wrong").Return(errors.New("mismatch"))
+	verifier.EXPECT().VerifyAndRehash("encoded", "wrong").Return("", errors.New("mismatch"))
 	stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
-	svc := newAuthAttemptSvcWithVerifier(ctrl, stmts, nil, nil, verifier)
+	svc := newAuthAttemptSvcWithHashers(ctrl, stmts, nil, nil, service.FixedProjectHasherResolver{Hasher: verifier}, nil)
 	_, err := svc.VerifyProof(sampledRequest(t), service.VerifyProofInput{
 		ProjectID: "proj", AttemptID: "att-1", ChallengeID: "ch-pass",
 		Proof: service.PasswordProof{Password: "wrong"},

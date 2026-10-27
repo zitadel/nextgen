@@ -10,14 +10,18 @@ import {
 } from "./releases";
 
 // One change as @changesets/changelog-github writes it into each package's
-// CHANGELOG.md, and so into every package section of the release body.
-const SESSION_CHANGE = `- [#2076](https://github.com/zitadel/nextgen/pull/2076) [\`12b3226\`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
+// CHANGELOG.md, after the item's `- `.
+const SESSION_CHANGE = `[#2076](https://github.com/zitadel/nextgen/pull/2076) [\`12b3226\`](https://github.com/zitadel/nextgen/commit/12b3226ca941e51534d834c23eea01a872153d9f) Thanks [@fforootd](https://github.com/fforootd)! - The server SDKs now count a session as signed in only when it belongs to the
   app's own project.
 
   The project comes from the new \`projectId\` middleware option.`;
 
+const TYPO_CHANGE =
+  "[#2201](https://github.com/zitadel/nextgen/pull/2201) Thanks [@livio-a](https://github.com/livio-a)! - Fixes a typo in the `zitadel.yaml` schema.";
+
 // A body as scripts/release-github.mjs writes it, after GitHub's API has
-// turned its line ends into CRLF.
+// turned its line ends into CRLF: each change once, after its packages, and
+// the line that stands in for the changes that did not fit.
 const BODY =
   `<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->
 
@@ -32,14 +36,43 @@ Release commit: \`5983d4b581e6\`
 
 | Image | Reference |
 |---|---|
-| container | \`ghcr.io/zitadel/nextgen:1.0.0-alpha.28\` |
+| container | \`ghcr.io/zitadel/nextgen:0.2.0\` |
 
 ### npm Packages
 
 | Package | Version |
 |---|---|
-| \`@zitadel/cli\` | \`1.0.0-alpha.28\` |
+| \`@zitadel/cli\` | \`0.2.0\` |
+| \`@zitadel/server\` | \`0.2.0\` |
+| \`@zitadel/config\` | \`0.2.0\` |
+| \`@zitadel/api\` | \`0.2.0\` |
 
+### Package Changes
+
+#### Minor Changes
+
+- \`@zitadel/cli\`: [#2157](https://github.com/zitadel/nextgen/pull/2157) [\`adf6453\`](https://github.com/zitadel/nextgen/commit/adf64530b8a647465ae80888fb52232d05107809) Thanks [@fforootd](https://github.com/fforootd)! - \`zitadel setup --dev-port <port>\` now moves an app that's already set up to another port.
+
+- \`@zitadel/cli\`, \`@zitadel/server\`: ${SESSION_CHANGE}
+
+- \`@zitadel/server\`: [#1386](https://github.com/zitadel/nextgen/pull/1386) [\`6821cc6\`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d2a0bdb7ff1a5d5e) Thanks [@peintnermax](https://github.com/peintnermax), [@fforootd](https://github.com/fforootd)! - \`POST /flows/{flow_id}\` with \`{action: "sso",
+  sso_provider_id}\` on a step that offers \`sso_providers\`
+  pins the connection at its newest revision.
+
+  - \`@zitadel/sdk-core\`: \`NextgenSession\` becomes \`{userId,
+  identifier}\`.
+
+#### Patch Changes
+
+- \`@zitadel/config\`: ${TYPO_CHANGE}
+
+_1 patch change omitted to keep this release body under GitHub's 125000-character limit; see \`packages/api/CHANGELOG.md\` at tag \`v0.2.0\`._
+<!-- nextgen-release-facts:end -->`.replace(/\n/g, "\r\n");
+
+// The same changes as scripts/release-github.mjs wrote them up to 0.1.0, each
+// package's CHANGELOG.md section in turn: rewrapped where a formatter wrapped
+// one, and a pointer where a package's section did not fit.
+const PER_PACKAGE_BODY = `<!-- nextgen-release-facts:start -->
 ### Package Changes
 
 #### \`@zitadel/cli\`
@@ -50,13 +83,13 @@ Release commit: \`5983d4b581e6\`
 
 ### Patch Changes
 
-${SESSION_CHANGE}
+- ${SESSION_CHANGE}
 
 #### \`@zitadel/server\`
 
 ### Minor Changes
 
-${SESSION_CHANGE}
+- ${SESSION_CHANGE}
 
 - [#1386](https://github.com/zitadel/nextgen/pull/1386) [\`6821cc6\`](https://github.com/zitadel/nextgen/commit/6821cc62356ef75cce936907d2a0bdb7ff1a5d5e) Thanks [@peintnermax](https://github.com/peintnermax), [@fforootd](https://github.com/fforootd)! - \`POST /flows/{flow_id}\` with \`{action: "sso",
 sso_provider_id}\` on a step that offers \`sso_providers\`
@@ -65,9 +98,15 @@ sso_provider_id}\` on a step that offers \`sso_providers\`
   - \`@zitadel/sdk-core\`: \`NextgenSession\` becomes \`{userId,
 identifier}\`.
 
+#### \`@zitadel/config\`
+
+### Patch Changes
+
+- ${TYPO_CHANGE}
+
 #### \`@zitadel/api\`
 
-_Changelog omitted to keep this release body under GitHub's 125000-character limit; see \`packages/api/CHANGELOG.md\` at tag \`v1.0.0-alpha.28\`._
+_Changelog omitted to keep this release body under GitHub's 125000-character limit; see \`packages/api/CHANGELOG.md\` at tag \`v0.1.0\`._
 <!-- nextgen-release-facts:end -->`.replace(/\n/g, "\r\n");
 
 function release(tag: string, fields: Partial<GitHubRelease> = {}): GitHubRelease {
@@ -82,8 +121,8 @@ function release(tag: string, fields: Partial<GitHubRelease> = {}): GitHubReleas
 }
 
 describe("parseRelease", () => {
-  it("lists a change that ships in several packages once, with each package and its highest bump", () => {
-    const { changes } = parseRelease(release("v1.0.0-alpha.28", { body: BODY }));
+  it("reads each change with the packages it changes and its bump", () => {
+    const { changes } = parseRelease(release("v0.2.0", { body: BODY }));
 
     expect(changes.map(({ source, bump, packages }) => ({ source, bump, packages }))).toEqual([
       {
@@ -101,33 +140,50 @@ describe("parseRelease", () => {
         bump: "minor",
         packages: ["@zitadel/server"],
       },
+      {
+        source: { label: "#2201", href: "https://github.com/zitadel/nextgen/pull/2201" },
+        bump: "patch",
+        packages: ["@zitadel/config"],
+      },
     ]);
   });
 
-  it("keeps a change's summary as Markdown, without what precedes it or the list's indent", () => {
-    const [, session, sso] = parseRelease(release("v1.0.0-alpha.28", { body: BODY })).changes;
+  it("keeps a change's summary as Markdown, without its packages, what precedes it or the list's indent", () => {
+    const [, session, sso] = parseRelease(release("v0.2.0", { body: BODY })).changes;
 
     expect(session?.summary).toBe(
       "The server SDKs now count a session as signed in only when it belongs to the\napp's own project.\n\nThe project comes from the new `projectId` middleware option.",
     );
     expect(session?.authors).toEqual([{ label: "@fforootd", href: "https://github.com/fforootd" }]);
-    // The unindented lines continue their paragraphs, as Markdown reads them.
     expect(sso?.summary).toBe(
       '`POST /flows/{flow_id}` with `{action: "sso",\nsso_provider_id}` on a step that offers `sso_providers`\npins the connection at its newest revision.\n\n- `@zitadel/sdk-core`: `NextgenSession` becomes `{userId,\nidentifier}`.',
     );
     expect(sso?.authors.map(({ label }) => label)).toEqual(["@peintnermax", "@fforootd"]);
   });
 
-  it("keeps the pointer that stands in for a package's changes, and no placeholder as notes", () => {
-    const parsed = parseRelease(release("v1.0.0-alpha.28", { body: BODY }));
+  it("keeps the line that stands in for the changes that did not fit, and no placeholder as notes", () => {
+    const parsed = parseRelease(release("v0.2.0", { body: BODY }));
 
     expect(parsed.notices).toEqual([
       {
-        package: "@zitadel/api",
-        text: "_Changelog omitted to keep this release body under GitHub's 125000-character limit; see `packages/api/CHANGELOG.md` at tag `v1.0.0-alpha.28`._",
+        text: "_1 patch change omitted to keep this release body under GitHub's 125000-character limit; see `packages/api/CHANGELOG.md` at tag `v0.2.0`._",
       },
     ]);
     expect(parsed.notes).toBe("");
+  });
+
+  it("reads a body that repeats each package's changes, up to 0.1.0, into the same changes", () => {
+    const parsed = parseRelease(release("v0.1.0", { body: PER_PACKAGE_BODY }));
+
+    // Each change once, with each of its packages and its highest bump; a
+    // rewrapped line continues its paragraph, as Markdown reads it.
+    expect(parsed.changes).toEqual(parseRelease(release("v0.2.0", { body: BODY })).changes);
+    expect(parsed.notices).toEqual([
+      {
+        package: "@zitadel/api",
+        text: "_Changelog omitted to keep this release body under GitHub's 125000-character limit; see `packages/api/CHANGELOG.md` at tag `v0.1.0`._",
+      },
+    ]);
   });
 
   it("reads the maintainers' notes on both sides of the generated block, without the placeholder", () => {
@@ -169,12 +225,10 @@ describe("parseRelease", () => {
       "<!-- nextgen-release-facts:start -->",
       "### Package Changes",
       "",
-      "#### `@zitadel/cli`",
+      "#### Major Changes",
       "",
-      "### Major Changes",
-      "",
-      "- [`abc1234`](https://github.com/zitadel/nextgen/commit/abc1234) Thanks [@livio-a](https://github.com/livio-a)! - Drops the old flag.",
-      "- Updates the help text.",
+      "- `@zitadel/cli`: [`abc1234`](https://github.com/zitadel/nextgen/commit/abc1234) Thanks [@livio-a](https://github.com/livio-a)! - Drops the old flag.",
+      "- `@zitadel/cli`, `@zitadel/server`: `zitadel help`: Updates the help text.",
       "<!-- nextgen-release-facts:end -->",
     ].join("\n");
 
@@ -188,10 +242,10 @@ describe("parseRelease", () => {
         authors: [{ label: "@livio-a", href: "https://github.com/livio-a" }],
       },
       {
-        summary: "Updates the help text.",
+        summary: "`zitadel help`: Updates the help text.",
         bump: "major",
         markedBreaking: false,
-        packages: ["@zitadel/cli"],
+        packages: ["@zitadel/cli", "@zitadel/server"],
         authors: [],
       },
     ]);
@@ -202,16 +256,14 @@ describe("parseRelease", () => {
       "<!-- nextgen-release-facts:start -->",
       "### Package Changes",
       "",
-      "#### `@zitadel/server`",
+      "#### Minor Changes",
       "",
-      "### Minor Changes",
-      "",
-      "- [#2175](https://github.com/zitadel/nextgen/pull/2175) Thanks [@fforootd](https://github.com/fforootd)! - **Breaking:** Drops the old flag.",
-      "- Signing out now needs the CSRF token.",
+      "- `@zitadel/server`: [#2175](https://github.com/zitadel/nextgen/pull/2175) Thanks [@fforootd](https://github.com/fforootd)! - **Breaking:** Drops the old flag.",
+      "- `@zitadel/server`: Signing out now needs the CSRF token.",
       "",
       "  **Breaking:** an older `@zitadel/components` cannot sign out.",
       "",
-      "- Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
+      "- `@zitadel/server`: Adds a flag; nothing here is **Breaking:** in the middle of a sentence.",
       "<!-- nextgen-release-facts:end -->",
     ].join("\n");
 

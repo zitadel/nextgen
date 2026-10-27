@@ -134,11 +134,14 @@ gh release view v<version> --repo zitadel/nextgen --json body -q .body > notes.m
 gh release edit v<version> --repo zitadel/nextgen --notes-file notes.md
 ```
 
-GitHub rejects release bodies over 125000 characters, so the generated facts
-block replaces its largest package changelog sections with pointers to the
-per-package `CHANGELOG.md` when the body would not fit. If the human-written
-product notes alone push past the limit, the facts update fails loudly instead
-of truncating maintainer prose — shorten the notes and rerun.
+The block lists each change once, after the packages it changes. GitHub
+rejects release bodies over 125000 characters, so when the body would not fit,
+the block omits patch changes, then minor ones, and names the `CHANGELOG.md`
+files that hold them; it never omits a breaking change
+([`release-github.mjs`](../../scripts/release-github.mjs)). If the
+human-written product notes and the breaking changes alone push past the
+limit, the facts update fails loudly instead of truncating maintainer prose —
+shorten the notes and rerun.
 
 ## Local checks
 
