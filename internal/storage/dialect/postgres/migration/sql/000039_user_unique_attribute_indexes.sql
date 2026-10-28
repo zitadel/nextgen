@@ -15,48 +15,74 @@
 -- registry index is created invalid ON ONLY the parent, built concurrently on
 -- each partition, and attached; the parent turns valid with the last attach.
 -- The partition names and count come from 000004_users.sql (hash modulus 2).
--- A failed build leaves an INVALID index, so each group starts with drops:
--- dropping the parent removes attached children, the child drops remove an
--- unattached leftover.
+--
+-- A rerun must converge wherever the last run stopped, as in 000038. A failed
+-- or cancelled build leaves an INVALID index behind, so an unattached
+-- partition index or an invalid tokens index is dropped and rebuilt. An
+-- attached partition index or a valid tokens index is complete and kept.
 
 -- Serves the lookup without a team scope. With a team scope the primary key
 -- already seeks.
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_lookup;
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_lookup_part_0;
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_lookup_part_1;
-CREATE INDEX idx_user_unique_attributes_lookup
-    ON ONLY zitadel_nextgen.user_unique_attributes (project_id, key, value_hash)
-    INCLUDE (user_id);
-CREATE INDEX CONCURRENTLY idx_user_unique_attributes_lookup_part_0
-    ON zitadel_nextgen.user_unique_attributes_part_0 (project_id, key, value_hash)
-    INCLUDE (user_id);
-CREATE INDEX CONCURRENTLY idx_user_unique_attributes_lookup_part_1
-    ON zitadel_nextgen.user_unique_attributes_part_1 (project_id, key, value_hash)
-    INCLUDE (user_id);
+CREATE INDEX IF NOT EXISTS idx_user_unique_attributes_lookup
+    ON ONLY zitadel_nextgen.user_unique_attributes (project_id, key, value_hash);
+
+-- Serves the cascade from users.
+CREATE INDEX IF NOT EXISTS idx_user_unique_attributes_user
+    ON ONLY zitadel_nextgen.user_unique_attributes (project_id, user_id);
+
+-- +goose StatementBegin
+DO $$
+DECLARE
+    leftover text;
+BEGIN
+    FOREACH leftover IN ARRAY ARRAY[
+        'zitadel_nextgen.idx_user_unique_attributes_lookup_part_0',
+        'zitadel_nextgen.idx_user_unique_attributes_lookup_part_1',
+        'zitadel_nextgen.idx_user_unique_attributes_user_part_0',
+        'zitadel_nextgen.idx_user_unique_attributes_user_part_1'
+    ] LOOP
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_class
+            WHERE oid = to_regclass(leftover)
+              AND relispartition
+        ) THEN
+            EXECUTE 'DROP INDEX IF EXISTS ' || leftover;
+        END IF;
+    END LOOP;
+    IF EXISTS (
+        SELECT 1 FROM pg_index
+        WHERE indexrelid = to_regclass('zitadel_nextgen.idx_tokens_user')
+          AND NOT indisvalid
+    ) THEN
+        DROP INDEX zitadel_nextgen.idx_tokens_user;
+    END IF;
+END
+$$;
+-- +goose StatementEnd
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_unique_attributes_lookup_part_0
+    ON zitadel_nextgen.user_unique_attributes_part_0 (project_id, key, value_hash);
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_unique_attributes_lookup_part_1
+    ON zitadel_nextgen.user_unique_attributes_part_1 (project_id, key, value_hash);
 ALTER INDEX zitadel_nextgen.idx_user_unique_attributes_lookup
     ATTACH PARTITION zitadel_nextgen.idx_user_unique_attributes_lookup_part_0;
 ALTER INDEX zitadel_nextgen.idx_user_unique_attributes_lookup
     ATTACH PARTITION zitadel_nextgen.idx_user_unique_attributes_lookup_part_1;
 
--- Serves the cascade from users.
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_user;
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_user_part_0;
-DROP INDEX IF EXISTS zitadel_nextgen.idx_user_unique_attributes_user_part_1;
-CREATE INDEX idx_user_unique_attributes_user
-    ON ONLY zitadel_nextgen.user_unique_attributes (project_id, user_id);
-CREATE INDEX CONCURRENTLY idx_user_unique_attributes_user_part_0
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_unique_attributes_user_part_0
     ON zitadel_nextgen.user_unique_attributes_part_0 (project_id, user_id);
-CREATE INDEX CONCURRENTLY idx_user_unique_attributes_user_part_1
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_user_unique_attributes_user_part_1
     ON zitadel_nextgen.user_unique_attributes_part_1 (project_id, user_id);
 ALTER INDEX zitadel_nextgen.idx_user_unique_attributes_user
     ATTACH PARTITION zitadel_nextgen.idx_user_unique_attributes_user_part_0;
 ALTER INDEX zitadel_nextgen.idx_user_unique_attributes_user
     ATTACH PARTITION zitadel_nextgen.idx_user_unique_attributes_user_part_1;
 
--- Serves the cascade from users.
-DROP INDEX IF EXISTS zitadel_nextgen.idx_tokens_user;
-CREATE INDEX CONCURRENTLY idx_tokens_user
-    ON zitadel_nextgen.tokens (project_id, user_id);
+-- Serves the cascade from users. Partial: every session starts with an
+-- anonymous token whose user_id is NULL, and the cascade never looks for one.
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tokens_user
+    ON zitadel_nextgen.tokens (project_id, user_id)
+    WHERE user_id IS NOT NULL;
 
 -- +goose Down
 DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_tokens_user;
