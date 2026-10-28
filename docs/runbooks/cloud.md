@@ -395,8 +395,7 @@ the deployment as the CLI's does, a status in `production-checks.yml`'s
 
 ## Running the cloud locally
 
-`pnpm run cloud` (`moon run workspace:cloud`; turbo's is
-`turbo run dev --filter=@zitadel/cloud`) runs this deployment at
+`pnpm run cloud` (`moon run workspace:cloud`) runs this deployment at
 http://localhost:3000: `vercel dev -L` over `vercel.json`, every service behind
 the deployment's own routes on one origin, the server on SQLite. No Vercel
 account, link or secret is involved, and Go need not be installed: Vercel's Go
@@ -418,8 +417,8 @@ not use:
 
 - The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
   Vercel's Go builder builds that package and starts it on `$PORT`; a
-  deployment runs `build.sh`, which builds the same package through turbo,
-  and the builder takes the build command's binary instead. Without
+  deployment runs `build.sh`, which compiles the same package, and the
+  builder takes the build command's binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
 - The `console` service's `devCommand` builds it and serves the build behind

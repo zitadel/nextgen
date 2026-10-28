@@ -70,10 +70,6 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   and lists `["$TURBO_DEFAULT$", ".env*"]`; without them, a changed
   `.env.local` would restore a build made without it. Moon hashes only what
   git sees, listed or not ([.moon/AGENTS.md](../../../.moon/AGENTS.md)).
-- A listed glob matches ignored files too: `$TURBO_ROOT$/**/*.go` hashes
-  `node_modules`, agents' worktrees (`.claude/`, …) and, on Vercel, the Go
-  toolchain and module cache in `.vercel/cache/golang`. Exclude them
-  (`@zitadel/cloud#build`).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
