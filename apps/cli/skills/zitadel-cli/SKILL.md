@@ -547,6 +547,17 @@ change. When a path or schema name would need shell quoting, `next_commands` is
 empty and `data.next_args` (or `details.suggested_args` on a refusal) holds the
 same commands as argument lists.
 
+After enabling a provider, `test sign-in` checks the setup without a browser. It
+checks every connection the project has, one block each, and `--provider google`
+checks just one: the provider's discovery document (and the endpoints the runtime needs
+from it), the scopes and claims the connection asks for, and whether the provider accepts the client and the
+callback URI. It never needs the client secret, which the platform stores
+write-only. Each entry of `data.providers[].checks` has a `status` of `pass`,
+`warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the
+check could not tell. A failure exits `E_VALIDATION` naming the providers that
+failed, with the one thing to do in `hint`. The checks cannot prove a sign-in
+works end to end: only a person signing in does.
+
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `deploy`. See the reference below for driving the login UI
 and the config-sync details. The editor schemas in `.zitadel/meta/` are

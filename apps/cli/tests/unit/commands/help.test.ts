@@ -61,6 +61,7 @@ Configuration and releases
   projects          View and update projects
   release           Build and manage releases
   schemas           View user schemas
+  test              Check that parts of the project are set up correctly
   variable          Manage project variables
 
 Diagnostics and utilities

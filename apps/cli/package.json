@@ -72,6 +72,9 @@
       "branding": {
         "description": "Manage the login branding."
       },
+      "test": {
+        "description": "Check that parts of the project are set up correctly."
+      },
       "auth-method": {
         "description": "Configure how users sign in."
       },
