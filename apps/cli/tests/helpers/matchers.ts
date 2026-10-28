@@ -11,11 +11,6 @@ import { asOneLine } from "./terminal";
  * where its own length puts the fold and a step's command sits on a line
  * under the sentence that introduces it. A spec asserts the words a command
  * said; where they were broken is the layout's, and its unit tests'.
- */
-/**
- * Whether the output said this, as a person reads it: the box, the gutter and
- * the line it was folded over do not count, so an expectation is written as
- * one sentence however the terminal happened to break it.
  *
  * Text that names a tab is matched exactly instead. A tab is not spacing in
  * what a normal command prints — it is the separator `cut` and `awk` read the

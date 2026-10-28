@@ -130,7 +130,7 @@ export default class Claim extends EnvironmentCommand {
     if (challengeId !== undefined && !isChallengeId(challengeId)) {
       throw new ZitadelError(
         "E_VALIDATION",
-        `--challenge-id takes the challenge_id that ${this.suggest("claim --no-wait")} returned, which starts with ch_.`,
+        "--challenge-id takes the challenge_id that the --no-wait run returned, which starts with ch_.",
         { nextCommands: [this.suggest("claim --no-wait")] },
       );
     }

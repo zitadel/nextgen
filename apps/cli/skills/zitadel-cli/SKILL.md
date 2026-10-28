@@ -380,7 +380,7 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 
 `setup` commits the project it scaffolds: `git init` first when the directory
 is not yet a repository, then one commit, `chore: scaffold the project with
-zitadel setup`. A release records the commit it was built from and `deploy`
+Zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
