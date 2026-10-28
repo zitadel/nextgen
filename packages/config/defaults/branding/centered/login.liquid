@@ -47,7 +47,7 @@
     <div class="zl-field-group">
     {% for f in fields %}
       {% assign field_placeholder = f.text_key | fieldPlaceholder %}
-      {% assign field_help = f.text_key | fieldHelp %}
+      {% assign field_help = f.text_key | fieldHelp | fieldRuleHint: f %}
       {% assign field_err = f.name | fieldError: errors %}
       {% case f.type %}
       {% when 'checkbox' %}
