@@ -132,6 +132,7 @@ export default class Doctor extends BaseCommand {
             image,
             port,
             this.localServers(),
+            nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined,
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
@@ -351,19 +352,25 @@ export function failureAdvice(
     // in a parent is named explicitly. The directory comes from the file
     // system and quoting differs between POSIX shells, PowerShell and cmd.exe,
     // so a path that needs quoting leaves the strings out and the argument
-    // lists in `details.suggested_args` carry the recovery.
-    const at = runtimeDir === undefined ? [] : ["--cwd", runtimeDir];
-    const suggestedArgs = [
-      ["start", ...at],
-      ["reset", "--force", ...at],
-    ];
+    // lists in `details.suggested_args` carry the recovery. A plain `start`
+    // gives the current folder a server of its own: `start` does not look in
+    // parents.
+    const suggestedArgs =
+      runtimeDir === undefined
+        ? [["start"], ["reset", "--force"]]
+        : [["start", "--cwd", runtimeDir], ["start"], ["reset", "--force", "--cwd", runtimeDir]];
     const nextCommands = portableSuggestions(suggestedArgs, cliVersion);
+    const quotingNote =
+      nextCommands.length === 0
+        ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
+        : "";
     return {
       hint:
-        "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
-        (nextCommands.length === 0
-          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
-          : ""),
+        runtimeDir === undefined
+          ? "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
+            quotingNote
+          : `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${runtimeDir}. That server isn't running properly.\n\n` +
+            `To keep using it, start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${runtimeDir}, not in this folder.${quotingNote}\n`,
       nextCommands,
       suggestedArgs,
     };
@@ -586,6 +593,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  inheritedFrom?: string,
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
   if (runtimeBackend === "binary") {
@@ -608,7 +616,7 @@ async function runLocalRuntimeChecks(
       await check("port", `Port ${String(port)} is available`, () =>
         checkPortAvailability(runtime, port),
       ),
-      await checkRuntime(runtime, runtimeBackend),
+      await checkRuntime(runtime, runtimeBackend, inheritedFrom),
       managedRuntimeCheck,
     ];
   }
@@ -671,7 +679,7 @@ async function runLocalRuntimeChecks(
     await check("port", `Port ${String(port)} is available`, () =>
       checkPortAvailability(runtime, port),
     ),
-    await checkRuntime(runtime, runtimeBackend),
+    await checkRuntime(runtime, runtimeBackend, inheritedFrom),
     managedRuntimeCheck,
   ];
 }
@@ -752,6 +760,7 @@ function additionalManagedRuntimeProcesses(
 async function checkRuntime(
   runtime: { backend: RuntimeBackend; server_url: string } | undefined,
   runtimeBackend: RuntimeBackend,
+  inheritedFrom?: string,
 ): Promise<CheckOutcome> {
   return check("runtime", "Existing local runtime is healthy", async () => {
     if (!runtime) {
@@ -765,7 +774,9 @@ async function checkRuntime(
     if (!(await checkLocalServerHealth(runtime.server_url))) {
       throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
-    return `${runtime.server_url} is healthy`;
+    return inheritedFrom === undefined
+      ? `${runtime.server_url} is healthy`
+      : `${runtime.server_url} is healthy (server started in the parent folder ${inheritedFrom})`;
   });
 }
 
