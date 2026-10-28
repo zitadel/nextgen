@@ -236,6 +236,12 @@ Each invocation prints one JSON object:
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.
+- `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
+  shows, against the live release's commit (`diff.against`): `diff.files` holds
+  one `{path, status, previous_path?, patch}` per changed file (`status` is
+  `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
+  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
