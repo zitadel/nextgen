@@ -1893,13 +1893,15 @@ describe("flow definitions list the current flows", () => {
 });
 
 describe("the release resource", () => {
-  it("lists whether each release is revoked", () => {
-    expect(RESOURCES.release.columns).toContain("revoked_at");
+  it("lists whether each release is revoked, and when it was created", () => {
+    expect(RESOURCES.release.columns).toEqual(
+      expect.arrayContaining(["revoked_at", "metadata.created_at"]),
+    );
   });
 
-  it("shows a release's content hash and revocation", () => {
+  it("shows a release's content hash, revocation and pointers", () => {
     expect(RESOURCES.release.detail).toEqual(
-      expect.arrayContaining(["content_hash", "revoked_at"]),
+      expect.arrayContaining(["content_hash", "revoked_at", "pointers"]),
     );
   });
 });

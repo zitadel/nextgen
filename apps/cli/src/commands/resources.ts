@@ -437,7 +437,7 @@ export const RESOURCES = {
     group: CommandGroups.configuration,
     singular: "release",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
     detail: [
       "id",
@@ -447,6 +447,7 @@ export const RESOURCES = {
       "metadata.message",
       "metadata.git_sha",
       "metadata.git_dirty",
+      "pointers",
     ],
     list: {
       items: "releases",

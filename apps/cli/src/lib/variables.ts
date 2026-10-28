@@ -94,6 +94,16 @@ export function toVariableRows(values: Record<string, VariableValue>): VariableR
 /** Stands in for a secret's value, which the platform never discloses. */
 const SECRET_MARKER = "(secret)";
 
+/**
+ * The names a deployment froze, secrets marked, for one line of `deployment
+ * get`. Values stay out: `variable resolve` shows them.
+ */
+export function frozenNames(rows: readonly VariableRow[]): string {
+  return rows.length === 0
+    ? "none"
+    : rows.map((row) => (row.secret ? `${row.name} ${SECRET_MARKER}` : row.name)).join(", ");
+}
+
 /** Stands in for a kind the name holds no value for at all. */
 const NO_VALUE = "-";
 

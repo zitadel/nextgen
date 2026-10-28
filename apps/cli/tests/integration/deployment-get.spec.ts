@@ -52,5 +52,19 @@ describe("deployment get", () => {
         expect(result).toFail();
       });
     });
+
+    describe("without --json", () => {
+      it("names the variables the deployment froze", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        const deployed = await app.deployData();
+
+        const result = await app.run(["deployment", "get", deployed.deployment_id ?? ""]);
+
+        expect(result).toSucceed();
+        expect(result.stdout).toContain("HOST");
+      });
+    });
   });
 });

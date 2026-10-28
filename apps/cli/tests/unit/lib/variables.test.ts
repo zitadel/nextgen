@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   assertVariableName,
+  frozenNames,
   parseVariableValue,
   readStdin,
   renderScalar,
@@ -77,6 +78,16 @@ describe("variableCells", () => {
       { name: "B", value: "false" },
       { name: "N", value: "5" },
     ]);
+  });
+});
+
+describe("frozenNames", () => {
+  it("names each frozen variable, marking secrets, without their values", () => {
+    expect(frozenNames(toVariableRows({ S: { secret: true }, V: "plain" }))).toBe("S (secret), V");
+  });
+
+  it("says none when the deployment froze nothing", () => {
+    expect(frozenNames([])).toBe("none");
   });
 });
 
