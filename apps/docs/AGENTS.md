@@ -115,8 +115,10 @@ moon run docs:e2e     # tests/ against the local build
 CLOUD_URL=https://cloud-….vercel.app moon run docs:e2e-deployment
 ```
 
-- Vercel builds with `pnpm run build`, never moon: moon cannot archive the
-  symlinks Vercel's Next.js adapter writes into `.next/output`.
+- Vercel builds with `turbo run build --filter=@zitadel/docs`, never moon:
+  moon cannot archive the symlinks Vercel's Next.js adapter writes into
+  `.next/output`. The build's key holds the deployment's ID, so Vercel never
+  restores it ([turborepo.md](../../docs/design/build/turborepo.md)).
 - `tests/` is a contract suite written against a URL, so the same specs check
   the local build and any deployment. A deployment run needs
   `VERCEL_AUTOMATION_BYPASS_SECRET`.

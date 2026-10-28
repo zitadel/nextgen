@@ -26,11 +26,11 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then migrates | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
-| `docs` | Next.js; `turbo run build` for `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, then `apps/docs`' own `pnpm run build`, without a task runner: moon cannot archive the symlinks Vercel's Next.js adapter writes, and turbo could never reuse a build, whose cache key holds the deployment's ID under Skew Protection | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
-| `website` | Next.js; `turbo run build --filter=@zitadel/components`, for the atoms its showcase renders, then `apps/website`'s own `pnpm run build`, without a task runner, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
-| `schemas` | Static files: Node runs [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs), which needs no install, into `dist/cloud-schemas`. The service is rooted at `apps/cloud`, which holds no `package.json`, so Vercel detects no framework | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
+| `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
+| `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
 self-hosted server's `/ui/console/`. The server's own console is switched
@@ -38,7 +38,7 @@ off and its console path set to `/console`, so the console links it derives
 (claim, dashboard) point there; the session cookie and CSRF protection work
 as in a self-hosted install. The function does not carry the console either:
 the console service's build lands in the server's embed directory of the
-same checkout, so `build.sh` compiles the launcher with `-tags noconsole`.
+same checkout, so `build-launcher.sh` compiles the launcher with `-tags noconsole`.
 The server's `/console/runtime.json` lies under the console's path, so its
 rewrite comes first in `vercel.json`, and a launcher test holds the mount,
 the build's base and the console path together.
@@ -417,8 +417,8 @@ not use:
 
 - The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
   Vercel's Go builder builds that package and starts it on `$PORT`; a
-  deployment runs `build.sh`, which compiles the same package, and the
-  builder takes the build command's binary instead. Without
+  deployment's build command compiles the same package through turbo, and
+  the builder takes that binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
 - The `console` service's `devCommand` builds it and serves the build behind
@@ -562,11 +562,14 @@ project and imports the root admin.
 - **Signing in:** `/console/` with the environment's root admin from
   1Password (production and preview have different passwords). Anyone else
   registers through the console's sign-in page.
-- **Turbo's remote cache:** the console's build, and the package builds the
-  docs and the website start with, read and write the team's remote cache,
-  production and previews in separate entries; each build's log shows
-  `cache hit` or `cache miss` per task, and
-  the deployment's Run Summary shows why a task missed. A build with a
+- **Turbo's remote cache:** every service builds through turbo and reads and
+  writes the team's remote cache, production and previews in separate
+  entries: the console, the schemas and the packages the docs and the
+  website render. The docs' and the website's own builds never come from it:
+  their keys hold the deployment's ID. The launcher is never cached: it runs
+  with the deployment's secrets, and any branch's build can write the cache. Each build's log shows `cache hit` or
+  `cache miss` per task, and the deployment's Run Summary shows why a task
+  missed. A build with a
   result that is wrong although its inputs are right (a broken or planted
   entry) is fixed by a team owner clearing the cache (team Settings → Build
   and Deployment → Remote Caching); a redeploy without the build cache
@@ -594,8 +597,8 @@ project and imports the root admin.
   blindly: a fresh checkout's manifests are newer than its last install, so
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
-  packages for five days, so `build.sh` drops those no build used in the
-  last two hours. A new Go version starts the Go caches over: when the
+  packages for five days, so `build-launcher.sh` drops those no build used
+  in the last two hours. A new Go version starts the Go caches over: when the
   toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
   restored one, its Go builder downloads it and deletes
   `.vercel/cache/golang`, module cache included. The next build of each

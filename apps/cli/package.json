@@ -109,7 +109,7 @@
         "description": "View login flows."
       },
       "policies": {
-        "description": "View policies."
+        "description": "View and test policies."
       },
       "env": {
         "description": "Show and bind environments."
@@ -165,6 +165,7 @@
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",

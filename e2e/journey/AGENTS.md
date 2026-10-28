@@ -63,9 +63,9 @@ the repo root.
   lane, so one process shares one port allocator. A new variant joins the
   runner's `--ci` set, never a new workflow step. How the lane reaches CI:
   [`packages/testing/AGENTS.md`](../../packages/testing/AGENTS.md#moon-and-the-e2e-lanes).
-- `scripts/ci-mode.mjs` gates the tarball snapshot and collapses the
-  fresh-app matrix to one framework (`JOURNEY_MATRIX=single`) when no SDK, CLI
-  or journey surface changed.
+- `scripts/ci-mode.mjs` (in ci-turbo.yml, `turbo query affected`) gates the
+  tarball snapshot and collapses the fresh-app matrix to one framework
+  (`JOURNEY_MATRIX=single`) when no SDK, CLI or journey surface changed.
 - Every option CI sets has a `JOURNEY_*` variable (`journeyArgsFromEnv` in
   `e2e/journey/scripts/run-options.mjs`): turbo puts arguments after `--` into
   every task's cache key.

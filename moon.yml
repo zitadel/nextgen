@@ -94,6 +94,7 @@ tasks:
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
+      - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"
       - "scripts/dev-process.test.mjs"
       - "scripts/shims/pnpm"
@@ -107,8 +108,10 @@ tasks:
       - "scripts/render-builtin-schemas.test.mjs"
       # Read by that test: it renders every built-in schema.
       - "api/openapi/endpoints/schemas/*.json"
-      # The server's default schema namespace, which the renderer must match.
+      # The server's default schema namespace, which the renderer must match,
+      # and the defaults it reads it from.
       - "packages/config/src/defaults.ts"
+      - "packages/config/defaults/**/*"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
@@ -116,8 +119,8 @@ tasks:
       # Shared Vitest config these tests run under (root project is not covered
       # by the TypeScript implicitInputs).
       - "vitest.config.ts"
-      - "vitest.shared.mjs"
-      - "vitest.shared.d.mts"
+      - "packages/vitest-config/vitest.shared.mjs"
+      - "packages/vitest-config/vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true
@@ -143,8 +146,8 @@ tasks:
       - "e2e/package.json"
       - "e2e/tsconfig*.json"
       - "vitest.config.ts"
-      - "vitest.shared.mjs"
-      - "vitest.shared.d.mts"
+      - "packages/vitest-config/vitest.shared.mjs"
+      - "packages/vitest-config/vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true
@@ -166,8 +169,8 @@ tasks:
       - "/redocly.yaml"
       - "/.redocly.lint-ignore.yaml"
       - "vitest.config.ts"
-      - "vitest.shared.mjs"
-      - "vitest.shared.d.mts"
+      - "packages/vitest-config/vitest.shared.mjs"
+      - "packages/vitest-config/vitest.shared.d.mts"
     options:
       cache: true
       runInCI: true

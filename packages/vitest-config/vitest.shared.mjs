@@ -2,10 +2,11 @@ import { globSync } from "node:fs";
 import { builtinModules } from "node:module";
 
 /**
- * Shared Vitest `test` defaults, spread into every project's own config:
+ * Shared Vitest `test` defaults, spread into every project's own config, which
+ * lists this package in its devDependencies:
  *
  *   import { defineConfig } from "vitest/config";
- *   import { baseTest } from "../../vitest.shared.mjs";
+ *   import { baseTest } from "@zitadel/vitest-config";
  *   export default defineConfig({
  *     test: { ...baseTest, name: "@zitadel/x", environment: "node" },
  *   });

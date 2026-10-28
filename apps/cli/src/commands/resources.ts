@@ -132,6 +132,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
         { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: FILTER_OPERATIONS },
         { field: "team_id", operations: FILTER_OPERATIONS },
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
@@ -536,8 +537,9 @@ export const RESOURCES = {
     },
   },
 
-  // Operation policies (ADR 066). Configuration: written from
-  // .zitadel/policies/ by `apply`, so only read here. A project has one
+  // Operation policies (ADR 066). Configuration: carried from
+  // .zitadel/policies/ by `deploy`, so only read here (`policies test` is a
+  // hand-written command). A project has one
   // policy per operation, and the list shows each at its newest revision.
   // The revision routes are not modelled, for the reason `idps` gives.
   policies: {
