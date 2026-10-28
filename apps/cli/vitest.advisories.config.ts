@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, sourceConditions } from "@zitadel/vitest-config";
 
 /**
  * `cli:check-advisories`: asks the npm advisory database about the package

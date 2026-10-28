@@ -51,6 +51,16 @@ export async function readServerRelease(repoRoot = defaultRepoRoot) {
   };
 }
 
+/** The public packages at the versions the checkout holds, `{ name, version, path }`. */
+export async function readReleasePackages(repoRoot = defaultRepoRoot) {
+  const packages = [];
+  for (const dir of PUBLIC_PACKAGE_DIRS) {
+    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
+    packages.push({ name: manifest.name, version: manifest.version, path: dir });
+  }
+  return packages;
+}
+
 export function validateSemver(version) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`invalid release version: ${version}`);
@@ -330,11 +340,7 @@ export async function writeReleaseMetadata(options = {}) {
   const release = options.release ?? (await readServerRelease(repoRoot));
   const outDir = options.outDir ?? releaseDir(repoRoot, release.version);
   const info = options.gitInfo ?? (await gitInfo({ repoRoot }));
-  const packages = [];
-  for (const dir of PUBLIC_PACKAGE_DIRS) {
-    const manifest = await readPackageManifest(repoRoot, join(dir, "package.json"));
-    packages.push({ name: manifest.name, version: manifest.version, path: dir });
-  }
+  const packages = await readReleasePackages(repoRoot);
   const metadata = {
     version: release.version,
     tag: release.tag,

@@ -4,11 +4,13 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../../components/schemas/errors/auth-csrf_invalid.yaml'
         - $ref: '../../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../../components/schemas/errors/dep-conflict.yaml'
         - $ref: '../../../../components/schemas/errors/dep-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/dep-not_found.yaml'
         - $ref: '../../../../components/schemas/errors/dep-permission_denied.yaml'
+        - $ref: '../../../../components/schemas/errors/dep-variables_missing.yaml'
         - $ref: '../../../../components/schemas/errors/env-project_not_found.yaml'
         - $ref: '../../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/internal.yaml'
@@ -19,14 +21,17 @@ content:
         - $ref: '../../../../components/schemas/errors/rel-revoked.yaml'
         - $ref: '../../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../../components/schemas/errors/unavailable.yaml'
+        - $ref: '../../../../components/schemas/errors/var-document_too_deep.yaml'
       discriminator:
         propertyName: code
         mapping:
+          auth.csrf_invalid: '../../../../components/schemas/errors/auth-csrf_invalid.yaml'
           auth.unauthorized: '../../../../components/schemas/errors/auth-unauthorized.yaml'
           dep.conflict: '../../../../components/schemas/errors/dep-conflict.yaml'
           dep.invalid: '../../../../components/schemas/errors/dep-invalid.yaml'
           dep.not_found: '../../../../components/schemas/errors/dep-not_found.yaml'
           dep.permission_denied: '../../../../components/schemas/errors/dep-permission_denied.yaml'
+          dep.variables_missing: '../../../../components/schemas/errors/dep-variables_missing.yaml'
           env.project_not_found: '../../../../components/schemas/errors/env-project_not_found.yaml'
           evt.invalid: '../../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../../components/schemas/errors/internal.yaml'
@@ -37,7 +42,13 @@ content:
           rel.revoked: '../../../../components/schemas/errors/rel-revoked.yaml'
           req.invalid: '../../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../../components/schemas/errors/unavailable.yaml'
+          var.document_too_deep: '../../../../components/schemas/errors/var-document_too_deep.yaml'
     examples:
+      auth.csrf_invalid:
+        summary: auth.csrf_invalid
+        value:
+          code: auth.csrf_invalid
+          message: 'The request failed cross-site request forgery validation.'
       auth.unauthorized:
         summary: auth.unauthorized
         value:
@@ -63,6 +74,11 @@ content:
         value:
           code: dep.permission_denied
           message: 'deployment: requires an operator-grade token bound to the project (project.write or a deployment.* scope)'
+      dep.variables_missing:
+        summary: dep.variables_missing
+        value:
+          code: dep.variables_missing
+          message: 'deployment: the release references variables its kind has no value for'
       env.project_not_found:
         summary: env.project_not_found
         value:
@@ -113,3 +129,8 @@ content:
         value:
           code: unavailable
           message: 'The service could not complete the request right now. Try again.'
+      var.document_too_deep:
+        summary: var.document_too_deep
+        value:
+          code: var.document_too_deep
+          message: 'variable: document nests too deeply'

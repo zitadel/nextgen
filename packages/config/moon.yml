@@ -57,3 +57,17 @@ tasks:
   test:
     deps:
       - "build"
+    inputs:
+      - "**/*"
+      # Read by the tests: the IdP design docs' Markdown and example schemas,
+      # and every file their relative links name, which the test checks exist
+      # (src/idp/design-docs.test.ts); the orchestrator's default template
+      # (src/template.test.ts) and the Go flow model the validator mirrors
+      # (src/validation/flow.test.ts).
+      - "/docs/design/idp/**/*"
+      - "/docs/**/*.md"
+      - "/apps/cli/src/lib/local-server/internal/*-launcher.ts"
+      - "/packages/components/src/orchestrator/templates/default.liquid"
+      - "/internal/domain/flow_definition.go"
+      - "/internal/domain/flow_definition_validator.go"
+      - "/internal/domain/flow_on_success.go"

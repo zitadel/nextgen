@@ -67,7 +67,8 @@ export function flowDisplayName(definition: FlowDefinition): string {
   return humanise(definition.name);
 }
 
-function humanise(value: string): string {
+/** `default-login` → `Default login`: a slug as a label. Shared with the release screens. */
+export function humanise(value: string): string {
   const spaced = value.replace(/[-_]/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

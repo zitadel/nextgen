@@ -755,12 +755,23 @@ describe("proxySessionCookies", () => {
     const SIGN_OUT = { method: "DELETE", path: "/sessions/me", search: "" };
     const SIGN_IN = { method: "POST", path: "/sessions/exchange", search: "" };
     const CLEARED_SHARED = "__nextgen_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax";
+    const CSRF_TOKEN = "csrf-of-earlier";
 
-    /** Answers the proxy's own calls: the session check with `check`, a revoke with 204. */
-    function server(check: () => Response) {
-      const fetchMock = vi.fn(async (_url: string | URL, init?: RequestInit) =>
-        init?.method === "DELETE" ? new Response(null, { status: 204 }) : check(),
-      );
+    /**
+     * Answers the proxy's own calls: the session check with `check`, the CSRF
+     * token read with `csrf`, a revoke with `revoke`.
+     */
+    function server(
+      check: () => Response,
+      csrf: () => Response = () => Response.json({ csrf_token: CSRF_TOKEN }),
+      revoke: () => Response = () => new Response(null, { status: 204 }),
+    ) {
+      const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
+        if (init?.method === "DELETE") {
+          return revoke();
+        }
+        return new URL(url).pathname === "/sessions/me/csrf" ? csrf() : check();
+      });
       vi.stubGlobal("fetch", fetchMock);
       return fetchMock;
     }
@@ -797,9 +808,65 @@ describe("proxySessionCookies", () => {
         "http://auth.test/sessions/me",
         expect.objectContaining({
           method: "DELETE",
+          headers: expect.objectContaining({ cookie: "__nextgen_session=earlier" }),
+        }),
+      );
+    });
+
+    // The server refuses a sign-out without the session's token (ADR 053 §5).
+    it("ends the second session with the CSRF token the server gives for it", async () => {
+      const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `http://auth.test/sessions/me/csrf?project_id=${PROJECT}`,
+        expect.objectContaining({
+          method: "GET",
           headers: { cookie: "__nextgen_session=earlier" },
         }),
       );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        "http://auth.test/sessions/me",
+        expect.objectContaining({
+          method: "DELETE",
+          headers: { cookie: "__nextgen_session=earlier", "X-Zitadel-CSRF": CSRF_TOKEN },
+        }),
+      );
+    });
+
+    it.each([
+      ["the token read is refused", () => new Response(null, { status: 401 }), undefined],
+      [
+        "the token read gets no answer",
+        () => {
+          throw new TypeError("fetch failed");
+        },
+        undefined,
+      ],
+      [
+        "the revoke is refused",
+        undefined,
+        () => Response.json({ code: "auth.csrf_invalid" }, { status: 403 }),
+      ],
+    ])("clears the second session's cookie even when %s", async (_label, csrf, revoke) => {
+      server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }), csrf, revoke);
+      const cookies = proxySessionCookies(
+        proxied({ ...SIGN_OUT, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+        PROJECT,
+        UPSTREAM,
+      );
+
+      const { setCookies } = await cookies.toBrowser(answer(204, null, [CLEARED_SHARED]));
+
+      expect(setCookies).toContain(CLEARED_SHARED);
     });
 
     it("asks for and ends the second session at an address given with a trailing slash", async () => {
@@ -814,6 +881,7 @@ describe("proxySessionCookies", () => {
 
       expect(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
         [`http://auth.test/sessions/me?project_id=${PROJECT}`, "GET"],
+        [`http://auth.test/sessions/me/csrf?project_id=${PROJECT}`, "GET"],
         ["http://auth.test/sessions/me", "DELETE"],
       ]);
     });
@@ -1122,6 +1190,29 @@ describe("resolveSession", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  // A render layer that checks the session itself, sdk-next's auth(), is
+  // handed the token instead: nothing is asked, so nothing is known to clear or
+  // copy.
+  it.each([
+    ["the project's own cookie", { [OWN]: "opaque-token" }],
+    ["the server's cookie", { [SERVER_SESSION_COOKIE]: "opaque-token" }],
+  ])("hands an opaque session in %s on unchecked when told to", async (_label, cookies) => {
+    const fetchMock = backend(() => new Response(null, { status: 401 }));
+
+    const resolved = await resolveSession(request(cookies), {
+      ...OPTIONS,
+      checkOpaqueSession: false,
+    });
+
+    expect(resolved).toEqual({
+      auth: SIGNED_OUT,
+      undecided: false,
+      cookies: [],
+      unchecked: "opaque-token",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   describe("with JWTs", () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const jwk = {
@@ -1174,6 +1265,27 @@ describe("resolveSession", () => {
         undecided: false,
       });
     });
+
+    // Judging a JWT takes no call to the backend, so it is judged either way.
+    it.each([
+      ["a JWT of this project", {}, { signedIn: true, cookies: [] }],
+      ["an expired JWT", { exp: 1 }, { signedIn: false, cookies: [CLEARED] }],
+    ])(
+      "judges a cookie holding %s when told not to check an opaque one",
+      async (_label, claims, expected) => {
+        keysAnd();
+
+        const { auth, cookies, unchecked } = await resolveSession(request({ [OWN]: jwt(claims) }), {
+          ...OPTIONS,
+          checkOpaqueSession: false,
+        });
+
+        expect({ signedIn: auth.isAuthenticated, cookies, unchecked }).toEqual({
+          ...expected,
+          unchecked: undefined,
+        });
+      },
+    );
 
     it("copies a JWT of this project out of the server's cookie, for as long as it lives", async () => {
       backend(() => Response.json({ keys: [jwk] }));

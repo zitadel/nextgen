@@ -1,7 +1,7 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs, sourceConditions } from "@zitadel/vitest-config";
 import { liquidRaw } from "./vite-liquid-plugin.ts";
 
 /** Shared plugins for every project in this config. */

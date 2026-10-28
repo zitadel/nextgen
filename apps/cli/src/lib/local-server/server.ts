@@ -204,6 +204,29 @@ export class LocalServer {
     }
   }
 
+  /**
+   * Whether nothing on this machine holds `port`, decided the way `start`
+   * decides it for a server (connect and bind, never `lsof`). For setup, which
+   * asks for an app port, or warns when it cannot ask, only when the detected
+   * one is taken.
+   */
+  static isPortFree(port: number): Promise<boolean> {
+    return new TcpPorts().isFree(port);
+  }
+
+  /**
+   * The first free port among the 20 after `port`, for setup to suggest in
+   * place of a taken one, or `undefined` when they are all taken too.
+   */
+  static async nextFreePort(port: number): Promise<number | undefined> {
+    for (let next = port + 1; next <= Math.min(port + 20, 65535); next += 1) {
+      if (await LocalServer.isPortFree(next)) {
+        return next;
+      }
+    }
+    return undefined;
+  }
+
   /** Whether the server a record names is running (see the identity checks in the launchers) and answering. */
   private static async isServing(runtime: RuntimeMetadata): Promise<boolean> {
     const alive =

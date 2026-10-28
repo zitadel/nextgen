@@ -41,6 +41,16 @@ export function serverLogAction(cliVersion: string): string {
 }
 
 /**
+ * Where the list of every command is: the CLI run with no subcommand. Setup,
+ * status and every command's help end with it, after their own next steps, so
+ * the overview can be found without already knowing it exists. The command is on
+ * a line of its own, with nothing around it, so it can be copied as written.
+ */
+export function exploreAllCommands(cliVersion: string): string {
+  return ["Explore all commands:", `  ${publicCliCommand("", cliVersion)}`].join("\n");
+}
+
+/**
  * The customize/publish pair, in Elina's tested wording. `selector` is the
  * run's environment selection, so the quoted commands publish to the project
  * the run was about.
@@ -54,7 +64,9 @@ export function customizeAndPublishActions(
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
     `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
-      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish. Nothing is ` +
+      "released yet, so publishing is what pins this configuration rather than leaving the project " +
+      "on whatever its newest revisions happen to be.",
   ];
 }
 

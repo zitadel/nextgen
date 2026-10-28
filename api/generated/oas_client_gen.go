@@ -385,6 +385,28 @@ type Invoker interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// EvaluatePolicy invokes evaluatePolicy operation.
+	//
+	// Evaluates a policy config against one request, without side effects, and
+	// answers the decision the operation would reach. Nothing is read from or
+	// written to the project: the config is the one in the body, checked
+	// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+	// with the same violations.
+	// `input` is what the operation's request carries, in the operation's own
+	// terms (a password, not its length): the server derives what the policy
+	// checks with the code the live operation runs, guards included. `facts`
+	// states what the operation would look up at runtime, such as whether the
+	// candidate matches one of the user's kept passwords.
+	// The decision and the names of the failed rules hold wherever the
+	// operation runs. `code` and `violations` are what an API call answers; a
+	// login flow shows the same rules as field errors on the password field
+	// (`error.x-auth-methods#password_<rule>` in `step.error`).
+	// Which policy a project or release applies is not decided here: read it
+	// and pass its config.
+	// The caller needs read access to the project in `project_id`.
+	//
+	// POST /policies/evaluate
+	EvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error)
 	// ExchangeHandoff invokes exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -1376,11 +1398,23 @@ func (c *Client) sendAddOrigin(ctx context.Context, request *ProjectOrigin, para
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, AddOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -2271,11 +2305,23 @@ func (c *Client) sendCreateDeployment(ctx context.Context, request *CreateDeploy
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, CreateDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -4536,6 +4582,174 @@ func (c *Client) sendDeleteVariable(ctx context.Context, params DeleteVariablePa
 	return result, nil
 }
 
+// EvaluatePolicy invokes evaluatePolicy operation.
+//
+// Evaluates a policy config against one request, without side effects, and
+// answers the decision the operation would reach. Nothing is read from or
+// written to the project: the config is the one in the body, checked
+// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+// with the same violations.
+// `input` is what the operation's request carries, in the operation's own
+// terms (a password, not its length): the server derives what the policy
+// checks with the code the live operation runs, guards included. `facts`
+// states what the operation would look up at runtime, such as whether the
+// candidate matches one of the user's kept passwords.
+// The decision and the names of the failed rules hold wherever the
+// operation runs. `code` and `violations` are what an API call answers; a
+// login flow shows the same rules as field errors on the password field
+// (`error.x-auth-methods#password_<rule>` in `step.error`).
+// Which policy a project or release applies is not decided here: read it
+// and pass its config.
+// The caller needs read access to the project in `project_id`.
+//
+// POST /policies/evaluate
+func (c *Client) EvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error) {
+	res, err := c.sendEvaluatePolicy(ctx, request, params)
+	return res, err
+}
+
+func (c *Client) sendEvaluatePolicy(ctx context.Context, request EvaluatePolicyRequest, params EvaluatePolicyParams) (res EvaluatePolicyRes, err error) {
+	// Validate request before sending.
+	if err := func() error {
+		if err := request.Validate(); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return res, errors.Wrap(err, "validate")
+	}
+	otelAttrs := []attribute.KeyValue{
+		otelogen.OperationID("evaluatePolicy"),
+		semconv.HTTPRequestMethodKey.String("POST"),
+		semconv.URLTemplateKey.String("/policies/evaluate"),
+	}
+	otelAttrs = append(otelAttrs, c.cfg.Attributes...)
+
+	// Run stopwatch.
+	startTime := time.Now()
+	defer func() {
+		// Use floating point division here for higher precision (instead of Millisecond method).
+		elapsedDuration := time.Since(startTime)
+		c.duration.Record(ctx, float64(elapsedDuration)/float64(time.Millisecond), metric.WithAttributes(otelAttrs...))
+	}()
+
+	// Increment request counter.
+	c.requests.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+
+	// Start a span for this request.
+	ctx, span := c.cfg.Tracer.Start(ctx, EvaluatePolicyOperation,
+		trace.WithAttributes(otelAttrs...),
+		clientSpanKind,
+	)
+	// Track stage for error reporting.
+	var stage string
+	defer func() {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, stage)
+			c.errors.Add(ctx, 1, metric.WithAttributes(otelAttrs...))
+		}
+		span.End()
+	}()
+
+	stage = "BuildURL"
+	u := uri.Clone(c.requestURL(ctx))
+	var pathParts [1]string
+	pathParts[0] = "/policies/evaluate"
+	uri.AddPathParts(u, pathParts[:]...)
+
+	stage = "EncodeQueryParams"
+	q := uri.NewQueryEncoder()
+	{
+		// Encode "project_id" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "project_id",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if unwrapped := string(params.ProjectID); true {
+				return e.EncodeValue(conv.StringToString(unwrapped))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	u.RawQuery = q.Values().Encode()
+
+	stage = "EncodeRequest"
+	r, err := ht.NewRequest(ctx, "POST", u)
+	if err != nil {
+		return res, errors.Wrap(err, "create request")
+	}
+	if err := encodeEvaluatePolicyRequest(request, r); err != nil {
+		return res, errors.Wrap(err, "encode request")
+	}
+
+	{
+		type bitset = [1]uint8
+		var satisfied bitset
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, EvaluatePolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 0
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, EvaluatePolicyOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
+
+		if ok := func() bool {
+		nextRequirement:
+			for _, requirement := range []bitset{
+				{0b00000001},
+				{0b00000010},
+			} {
+				for i, mask := range requirement {
+					if satisfied[i]&mask != mask {
+						continue nextRequirement
+					}
+				}
+				return true
+			}
+			return false
+		}(); !ok {
+			return res, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+		}
+	}
+
+	stage = "SendRequest"
+	resp, err := c.cfg.Client.Do(r)
+	if err != nil {
+		return res, errors.Wrap(err, "do request")
+	}
+	body := resp.Body
+	defer body.Close()
+
+	stage = "DecodeResponse"
+	result, err := decodeEvaluatePolicyResponse(resp)
+	if err != nil {
+		return res, errors.Wrap(err, "decode response")
+	}
+
+	return result, nil
+}
+
 // ExchangeHandoff invokes exchangeHandoff operation.
 //
 // Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
@@ -5523,11 +5737,23 @@ func (c *Client) sendGetDeploymentById(ctx context.Context, params GetDeployment
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetDeploymentByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8048,11 +8274,23 @@ func (c *Client) sendGetReleaseById(ctx context.Context, params GetReleaseByIdPa
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetReleaseByIdOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -8986,11 +9224,23 @@ func (c *Client) sendGetVariable(ctx context.Context, params GetVariableParams) 
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetVariableOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9134,11 +9384,23 @@ func (c *Client) sendGetVariables(ctx context.Context, params GetVariablesParams
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, GetVariablesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -9798,11 +10060,23 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListDeploymentsOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -12385,11 +12659,23 @@ func (c *Client) sendListReleases(ctx context.Context, params ListReleasesParams
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, ListReleasesOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -14847,11 +15133,23 @@ func (c *Client) sendRemoveOrigin(ctx context.Context, request *RemoveOriginReq,
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, RemoveOriginOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15297,11 +15595,23 @@ func (c *Client) sendRevokeRelease(ctx context.Context, params RevokeReleasePara
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, RevokeReleaseOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
@@ -15612,11 +15922,23 @@ func (c *Client) sendRollbackDeployment(ctx context.Context, request OptRollback
 				return res, errors.Wrap(err, "security \"OAuth2\"")
 			}
 		}
+		{
+			stage = "Security:NextgenSession"
+			switch err := c.securityNextgenSession(ctx, RollbackDeploymentOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"NextgenSession\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

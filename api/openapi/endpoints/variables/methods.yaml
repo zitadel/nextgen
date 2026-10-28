@@ -16,6 +16,7 @@ get:
   security:
     - oauth2:
         - variable.read
+    - nextgenSession: []
   responses:
     '200':
       description: The variables were retrieved successfully.

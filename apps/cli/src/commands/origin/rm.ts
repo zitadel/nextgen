@@ -5,6 +5,7 @@ import { dryRunResult } from "../../lib/oclif/crud/shared";
 import { deletedData } from "../../lib/oclif/envelope";
 import { shellArg } from "../../lib/shell";
 import { reportWarning } from "../../lib/warnings";
+import { Promptable } from "../../lib/oclif/promptable";
 
 /**
  * `zitadel origin rm <pattern>` — remove one origin pattern from the project.
@@ -13,7 +14,7 @@ import { reportWarning } from "../../lib/warnings";
  * previews to expire on their own. Destructive, so it takes the same
  * `--force`-or-confirm gate the resource commands' `delete` uses.
  */
-export default class OriginRm extends EnvironmentCommand {
+export default class OriginRm extends Promptable(EnvironmentCommand) {
   static override description = "Remove an origin pattern from the project.";
   static override group = CommandGroups.configuration;
   static override examples = [

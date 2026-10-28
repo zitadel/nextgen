@@ -88,3 +88,16 @@ export function serverOrigin(value: string): string {
   }
   return url.origin;
 }
+
+/**
+ * Loopback check on the URL's hostname: `localhost`, the whole `127.0.0.0/8`
+ * block, or `[::1]` (how WHATWG URLs spell IPv6 loopback).
+ */
+export function isLoopbackUrl(value: string): boolean {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "[::1]" || /^127(\.\d{1,3}){3}$/.test(hostname);
+  } catch {
+    return false;
+  }
+}

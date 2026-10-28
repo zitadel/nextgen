@@ -72,9 +72,9 @@ export function runnerLabel(targets, env = process.env) {
 /**
  * The command that runs the named tasks across the whole workspace, as `moon
  * ci :lint ...` does. Moon selects the affected tasks itself; turbo runs every
- * task and lets the cache skip the unchanged ones, because its own
- * `--affected` only follows package.json edges and would miss the artifact
- * edges (the server embeds the UI builds) that scripts/ci-mode.mjs resolves.
+ * task and lets the cache skip the unchanged ones. CI scopes its turbo gate
+ * with `--affected` from the pull request's base (ci-turbo.yml), which a
+ * local run has no reliable equivalent of.
  */
 export function workspaceCommand(tasks, env = process.env) {
   if (taskRunner(env) === "moon") {

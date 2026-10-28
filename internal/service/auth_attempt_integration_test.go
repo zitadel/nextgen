@@ -13,13 +13,14 @@ import (
 )
 
 // newAuthAttemptServiceForIntegration wires the service with real statement pools.
-// The password verifier is nil because these tests exercise only the
-// user-proof path, which never touches it.
+// The password hashers and verifier are nil because these tests exercise only
+// the user-proof path, which never touches them.
 func newAuthAttemptServiceForIntegration(v2Pool service.StatementPool) service.AuthAttemptService {
 	return service.NewAuthAttemptService(
 		v2Pool,
 		service.SessionStatementsResolver{Pool: v2Pool},
 		service.UserStatementsLookup{Pool: v2Pool},
+		nil,
 		nil,
 	)
 }

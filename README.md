@@ -73,6 +73,8 @@ cd myapp
 npx @zitadel/cli@latest doctor
 ```
 
+`doctor`, `setup` and `console` use the local server started in the current folder or in the nearest parent folder that has one, and `doctor` says which folder that is. A new, empty folder inside a folder where `start` ran therefore uses that server. To give the new folder a server of its own, run `npx @zitadel/cli@latest start` in it. `reset --force` deletes the local data of the folder it names, so check the folder `doctor` printed first.
+
 Pick a server before running `setup`. It cannot be changed on this app
 afterwards. Use `--server local` for local development, or point at a hosted
 Zitadel Cloud instance if you want the project to belong to your team there.
@@ -115,6 +117,16 @@ case) and writes the app into the current directory; pass `--skip-install` if
 you want to install dependencies yourself. The managed Zitadel runtime stores
 its metadata and data under `.zitadel/local/`; `stop` preserves that data and
 `reset --force` deletes it.
+
+Once you have signed in to your app, run the CLI with no subcommand to see every
+command, grouped by what you want to do:
+
+```sh
+npx @zitadel/cli@latest
+```
+
+With a global install, run `zitadel`. `zitadel <command> --help` lists a command's
+options, and the help of a command or a family of commands points back to this list.
 
 ### Zitadel Cloud
 

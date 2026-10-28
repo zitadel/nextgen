@@ -860,7 +860,7 @@ const edgeConfigProblems = (source: string): string[] => {
   const found: string[] = [];
   if (
     !lines.some((line) =>
-      /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/.test(line),
+      /^import \{[^}]*\bedgeProject\b[^}]*\} from "@zitadel\/vitest-config";$/.test(line),
     )
   ) {
     found.push("does not import edgeProject from the shared module");
@@ -936,7 +936,7 @@ describe("client SDK edge specs", () => {
   });
 
   describe("the config guard", () => {
-    const good = `import { baseTest, edgeProject } from "../../vitest.shared.mjs";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
+    const good = `import { baseTest, edgeProject } from "@zitadel/vitest-config";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
 
     it("accepts the shared import and comment", () => {
       expect(edgeConfigProblems(good)).toEqual([]);
@@ -1059,7 +1059,7 @@ describe("server SDK test titles", () => {
     "keeps an anonymous session's cookie, since its sign-in may still complete",
     "treats a 200 session without a user as anonymous on a public route",
     "redirects a session whose answer has a null user id to login on a protected route",
-    "clears a dead session cookie on a public page",
+    "reads a dead session cookie as signed out on a public page",
     "clears a dead session cookie and redirects on a protected route",
     "clears the cookie of a session that is gone",
     "when the session check gets %s",

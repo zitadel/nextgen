@@ -36,7 +36,7 @@ describe("SvelteScaffolder", () => {
 
     const [command, args, opts] = scaffoldingCalls()[0] ?? [];
     expect(command).toBe("npm");
-    expect(args).toEqual(["create", "vite@latest", ".", "--", "--template", "svelte-ts"]);
+    expect(args).toEqual(["create", "vite@9.3.1", ".", "--", "--template", "svelte-ts"]);
     expect(opts).toMatchObject({ cwd: "/tmp/proj" });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/App.svelte"), { force: true });
     expect(mockRm).toHaveBeenCalledWith(join("/tmp/proj", "src/lib/Counter.svelte"), {
@@ -48,7 +48,7 @@ describe("SvelteScaffolder", () => {
     make: (node, platform) => new SvelteScaffolder(node, platform),
     framework: "svelte",
     label: "create-vite",
-    spec: "create-vite@latest",
+    spec: "create-vite@9.3.1",
     fallback: "^20.19.0 || >=22.12.0",
     enforcement: "warn",
     supported: ["24.15.0", "20.19.0", "22.12.0"],

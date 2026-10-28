@@ -76,6 +76,10 @@ paragraph that starts with `**Breaking:**` ([preview versions](#preview-versions
 For the rare empty changeset (publishable path, nothing ships):
 `corepack pnpm changeset --empty`.
 
+A fix or follow-up to a change that still has a pending `.changeset/*.md` (it
+has not been released) edits that file instead of adding a new one: union the
+packages and keep the higher bump.
+
 ### The summary is the release note
 
 `@changesets/changelog-github` renders that summary **verbatim** into
@@ -84,6 +88,13 @@ there — only a link. So the summary is the copy a customer actually reads, and
 has to stand on its own for someone with no access to this repo.
 
 - Lead with what the reader can now do, or what stopped being broken.
+- A fix is one sentence on what stopped being broken.
+- A feature is a lead sentence naming the command, API or component, with a
+  link to its page under `https://preview.zitadel.com/docs/` rather than a list
+  of every flag.
+- Spend length only on the `**Breaking:**` paragraph (what breaks, what to do)
+  and on upgrade steps, in a paragraph that starts with `**Upgrading …:**`.
+  `scripts/check-changesets-status.mjs` warns when the rest passes 60 words.
 - Name the surface they touch: `zitadel setup`, `<zitadel-login>`,
   `@zitadel/sdk-react`, the console.
 - No ADR numbers, PR numbers, internal file paths, or words like "foundation",

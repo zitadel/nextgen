@@ -9,7 +9,7 @@ import { DETAIL_BODY, DETAIL_CARD, DetailHeader, DetailSection } from "@/compone
 import { FormError } from "@/components/form-error";
 import { Page } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
-import { FIELD_LABEL_TYPOGRAPHY } from "@/components/typography";
+import { FIELD_LABEL_TYPOGRAPHY, SECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -388,9 +388,7 @@ function ProfileCard({
           with the fields' inset and gap, so the title takes the label column
           at the fields' breakpoint. */}
       <div className="@container/field-group flex flex-wrap items-center gap-x-3 gap-y-2 px-6 pt-5 pb-4">
-        <h2 className={`text-foreground font-serif text-base leading-5 ${LABEL_COLUMN}`}>
-          User schema
-        </h2>
+        <h2 className={`${SECTION_HEADING} ${LABEL_COLUMN}`}>User schema</h2>
         {schema && schemaId && (
           <div className="flex max-w-full min-w-0 flex-wrap items-center gap-x-3">
             {name !== schemaId && (
@@ -528,8 +526,10 @@ function ProfileField({
   return (
     <Field orientation="responsive">
       {/* As in the add-user sheet: the marker is a sibling of the label, not
-          part of it, so the accessible name stays the field name. */}
-      <div className={`flex items-center gap-2 ${LABEL_COLUMN}`}>
+          part of it, so the accessible name stays the field name. On a wide
+          row the column is the control's 36px, so a one-line label centres
+          on it while an error under the control leaves it in place. */}
+      <div className={`flex items-center gap-2 @md/field-group:min-h-9 ${LABEL_COLUMN}`}>
         <FieldLabel htmlFor={id} className={FIELD_LABEL}>
           {entry.label}
         </FieldLabel>
@@ -537,7 +537,7 @@ function ProfileField({
       </div>
       <FieldContent>
         {entry.inputType === "boolean" ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 @md/field-group:min-h-9">
             {/* A switch cannot be read-only, so a locked value disables it. */}
             <Switch
               id={id}
