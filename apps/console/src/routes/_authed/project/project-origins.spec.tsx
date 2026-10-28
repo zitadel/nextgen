@@ -315,15 +315,19 @@ describe("project origins", () => {
       expect(writes).toEqual([`remove ${PRIMARY.pattern}`, `add preview ${PRIMARY.pattern}`]);
     });
 
-    it("writes nothing when nothing changed", async () => {
+    it("holds Save while nothing changed", async () => {
       stubProject([PRIMARY]);
       const writes = recordWrites();
       await renderProject();
 
       const form = await openEdit(PRIMARY.pattern);
-      await userEvent.click(form.save);
+      expect(form.save).toBeDisabled();
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      // A change frees it; undoing the change holds it again.
+      await userEvent.type(form.url, "x");
+      expect(form.save).toBeEnabled();
+      await userEvent.type(form.url, "{backspace}");
+      expect(form.save).toBeDisabled();
       expect(writes).toEqual([]);
     });
 

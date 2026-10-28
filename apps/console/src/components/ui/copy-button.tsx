@@ -4,8 +4,17 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** Icon size per button size — the design draws 14px in a toolbar, 12px inline. */
-const ICON_SIZE = { sm: "size-3.5", "icon-xs": "size-3" } as const;
+/**
+ * The button and its glyph per size: the design draws a 14px glyph in a
+ * toolbar, 12px in a 24px box beside a field, and 12px in a 16px box beside
+ * a value in a row or a cell, where the button must not drive the line
+ * height.
+ */
+const SIZE = {
+  sm: { button: "sm", icon: "size-3.5", className: "" },
+  "icon-xs": { button: "icon-xs", icon: "size-3", className: "" },
+  inline: { button: "icon-xs", icon: "size-3", className: "size-4 shrink-0" },
+} as const;
 
 /** How long the tick stays before the button returns to its resting state. */
 const CONFIRM_MS = 2000;
@@ -33,8 +42,7 @@ export function CopyButton({
   value: string;
   /** The button's full accessible name, e.g. `Copy User ID`. */
   label: string;
-  size?: keyof typeof ICON_SIZE;
-  /** Escape hatch for call sites where the button must not drive row height. */
+  size?: keyof typeof SIZE;
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
@@ -50,8 +58,8 @@ export function CopyButton({
       <Button
         type="button"
         variant="ghost"
-        size={size}
-        className={cn(className)}
+        size={SIZE[size].button}
+        className={cn(SIZE[size].className, className)}
         aria-label={label}
         onClick={() => {
           // `navigator.clipboard` is absent on an insecure origin. Guarded
@@ -67,9 +75,9 @@ export function CopyButton({
         }}
       >
         {copied ? (
-          <Check className={`${ICON_SIZE[size]} text-foreground`} aria-hidden />
+          <Check className={`${SIZE[size].icon} text-foreground`} aria-hidden />
         ) : (
-          <Copy className={ICON_SIZE[size]} aria-hidden />
+          <Copy className={SIZE[size].icon} aria-hidden />
         )}
       </Button>
       <span role="status" aria-live="polite" className="sr-only">

@@ -99,7 +99,8 @@ function ProjectDetail() {
           {tab === "admins" && <AddAdminButton projectId={project.id} onAdded={reload} />}
         </div>
 
-        <TabsContent value="overview">
+        {/* The page owns the 16px between its cards. */}
+        <TabsContent value="overview" className="flex flex-col gap-4">
           <RenameCard
             id="project-name"
             title="Project Detail"
