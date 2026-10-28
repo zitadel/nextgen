@@ -21,6 +21,7 @@ import brandingMetaSchema from "../meta-schemas/branding.json" with { type: "jso
 import flowDefinitionMetaSchema from "../meta-schemas/flow-definition.json" with { type: "json" };
 import idpConnectionMetaSchema from "../meta-schemas/idp-connection.json" with { type: "json" };
 import policyMetaSchema from "../meta-schemas/policy.json" with { type: "json" };
+import policyTestMetaSchema from "../meta-schemas/policy-test.json" with { type: "json" };
 import propertyNameMetaSchema from "../meta-schemas/property-name.json" with { type: "json" };
 import ssoAuthMethodMetaSchema from "../meta-schemas/sso-auth-method.json" with { type: "json" };
 import userPropertyMetaSchema from "../meta-schemas/user-property.json" with { type: "json" };
@@ -49,6 +50,12 @@ export const BRANDING_FILE_SCHEMA_REF = "../meta/branding.json";
 export const POLICY_FILE_SCHEMA_REF = "../meta/policy.json";
 
 /**
+ * The `$schema` value policy test files carry, relative to
+ * `.zitadel/policies/` — resolves to `{@link META_SCHEMA_DIR}/policy-test.json`.
+ */
+export const POLICY_TEST_FILE_SCHEMA_REF = "../meta/policy-test.json";
+
+/**
  * The `$schema` value `zitadel.json` carries, relative to the project root —
  * resolves to `{@link META_SCHEMA_DIR}/project.json`.
  */
@@ -74,6 +81,7 @@ export function metaSchemaFiles(): ReadonlyArray<MetaSchemaFile> {
     { name: "idp-connection.json", body: idpConnectionMetaSchema as object },
     { name: "branding.json", body: brandingMetaSchema as object },
     { name: "policy.json", body: policyMetaSchema as object },
+    { name: "policy-test.json", body: policyTestMetaSchema as object },
     { name: "project.json", body: projectConfigSchema as object },
   ];
 }

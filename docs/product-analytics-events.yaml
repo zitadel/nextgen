@@ -356,6 +356,16 @@ properties:
   origin_count:
     type: number
     description: How many origins a deployment went live on; never an origin.
+  policy_source:
+    type: string
+    values: [files, release]
+    description: What `policies test` evaluated its cases against, the policy files or a release.
+  case_count:
+    type: number
+    description: How many cases `policies test` ran; never a case name or an input.
+  failed_count:
+    type: number
+    description: How many of those cases did not hold.
   is_secret:
     type: boolean
     description: Whether a variable is secret; never its name or value.
@@ -496,6 +506,7 @@ components:
       branding:eject: [design]
       deploy: [resources, origin_count]
       doctor: [runtime, checks_total, checks_failed, checks_warn, failed_checks]
+      policies:test: [policy_source, case_count, failed_count]
       start: [runtime]
       variable:get: [is_secret]
       variable:list: [variable_count]

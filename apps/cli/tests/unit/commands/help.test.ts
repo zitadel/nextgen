@@ -57,7 +57,7 @@ Configuration and releases
   env               Show and bind environments
   flow-definitions  View login flows
   origin            Manage the project's allowed origins
-  policies          View policies
+  policies          View and test policies
   projects          View and update projects
   release           Build and manage releases
   schemas           View user schemas

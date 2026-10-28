@@ -66,6 +66,22 @@ tasks:
       # The real-instance configs and src-real specs import
       # @zitadel/testing/playwright.
       - "testing:build"
+    inputs:
+      - "**/*"
+      # The packed-CLI helpers and the journey's registry scripts import the
+      # root release scripts.
+      - "/scripts/*.mjs"
+      - "/scripts/*.d.mts"
+
+  # The journey harness's unit tests, which also read the CLI's skill, the
+  # mock OIDC provider's users and the built-in schemas.
+  test:
+    inputs:
+      - "**/*"
+      - "/scripts/*.mjs"
+      - "/apps/cli/skills/**/*"
+      - "/tools/oidc-mock/users.json"
+      - "/api/openapi/endpoints/schemas/*.json"
 
   # The whole suite: moon counts `e2e:all` affected whenever a lane is (a lane's
   # dependency changed, or a file the lane lists), and running it runs every

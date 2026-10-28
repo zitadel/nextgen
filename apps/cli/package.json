@@ -106,7 +106,7 @@
         "description": "View login flows."
       },
       "policies": {
-        "description": "View policies."
+        "description": "View and test policies."
       },
       "env": {
         "description": "Show and bind environments."

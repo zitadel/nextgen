@@ -55,6 +55,7 @@ var operationRolesNextgenSession = map[string][]string{
 	CreateUserOperation:            []string{},
 	DeleteGrantOperation:           []string{},
 	DeleteUserByIDOperation:        []string{},
+	EvaluatePolicyOperation:        []string{},
 	GetBrandingByIdOperation:       []string{},
 	GetDeploymentByIdOperation:     []string{},
 	GetFlowDefinitionOperation:     []string{},
@@ -184,6 +185,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	DeleteVariableOperation: []string{
 		"variable.write",
+	},
+	EvaluatePolicyOperation: []string{
+		"policy.read",
 	},
 	ExchangeHandoffOperation: []string{
 		"session.write",

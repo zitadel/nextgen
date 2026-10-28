@@ -271,9 +271,10 @@ its own files and the packages it declares, then picks one of two modes via
   port, wait for each other.
 
 Within full mode the `moon ci` graph selects only the tasks the diff affects
-(`--downstream deep --include-relations`): a lane is skipped when the diff
-provably cannot reach it — a docs-only PR runs almost nothing, a frontend-only
-PR skips the Go suites. The e2e lanes run, all together, whenever one of them
+(`--downstream deep --include-relations`), measured from the pull request's
+base or, in the merge queue, from the commit the group is built on: a lane is
+skipped when the diff provably cannot reach it — a docs-only PR runs almost
+nothing, a frontend-only PR skips the Go suites. The e2e lanes run, all together, whenever one of them
 is affected (its folder, a demo app it serves, or something it depends on: the
 server, CLI, console, SDKs, api-mock or testing kit), so most code PRs run
 them.
@@ -285,9 +286,8 @@ unless an SDK, the CLI, the test kit or the journey's own files moved; even the
 full matrix skips the frameworks in `ciExcludedFrameworkIds`
 ([`frameworks.mjs`](e2e/journey/scripts/frameworks.mjs)). It asks
 moon as a local run would: in CI, moon leaves `runInCI: "skip"` tasks such as
-the lanes out of its affected set when only their own files changed.
-ci-turbo.yml uses the same gates for its per-lane steps. The gates fail
-open: known repo-wide
+the lanes out of its affected set when only their own files changed. The
+gates fail open: known repo-wide
 files no moon task claims (workflow definitions, `scripts/`, moon config,
 root manifests and compiler/release inputs such as `tsconfig.base.json`), an
 empty diff, or a failed query all force the
@@ -304,6 +304,15 @@ where it still starts the Spanner emulator.
 The PR title check is not part of `full-pr` either. It runs in the separate
 `pr-title` workflow, which a title edit starts on its own; see
 [Title format](#title-format).
+
+`ci-turbo / full-pr-turbo` is not required either: it runs the same checks
+under Turborepo, the dual run of the
+[migration plan](docs/design/build/turborepo-migration.md). Turbo selects what
+runs (`--affected`, from the same base as `full-pr`), so a change no task
+reads, such as a workflow edit, runs nothing there; every night it runs every
+task and lane without the cache. Run it by hand with `gh workflow run
+ci-turbo.yml --ref <branch>`, which on a branch runs every task through the
+cache, or add `-f force=true` for the nightly run.
 
 **Version-only mode** (Changesets version PRs) runs `release:version`, the
 publish preflight's npm check (`node scripts/release.mjs check-npm`: npm must

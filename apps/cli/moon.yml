@@ -13,6 +13,12 @@ tasks:
     deps:
       - "api-mock:build"
       - "sdk-next:build"
+    inputs:
+      - "**/*"
+      # The root and journey scripts tests/unit/scripts imports.
+      - "/scripts/**/*.mjs"
+      - "/scripts/**/*.d.mts"
+      - "/e2e/journey/scripts/*.mjs"
 
   build:
     deps:
@@ -55,6 +61,23 @@ tasks:
       - "/docs/product-analytics-events.yaml"
       # The cloud's rewrite the CLI's Mixpanel endpoint has to match.
       - "/vercel.json"
+      # tests/unit/scripts tests the root scripts and the journey scripts they
+      # import; the release manifest's test reads the Changesets config, the
+      # moon workspace and every package's package.json and moon.yml.
+      - "/scripts/**/*.mjs"
+      - "/e2e/journey/scripts/*.mjs"
+      - "/.changeset/config.json"
+      - "/.moon/workspace.yml"
+      - "/apps/*/package.json"
+      - "/packages/*/package.json"
+      - "/apps/*/moon.yml"
+      - "/packages/*/moon.yml"
+      # check-pr-title reads the semantic-PR config, the local runtime's
+      # launcher test the Dockerfile, the IdP document tests the design docs'
+      # scaffold schemas.
+      - "/.github/semantic.yml"
+      - "/Dockerfile"
+      - "/docs/design/idp/schemas/**/*"
     options:
       # The built oclif commands import @zitadel/{api,config,sdk-next} from
       # those packages' dist/ at runtime. Their build-release tasks rewrite

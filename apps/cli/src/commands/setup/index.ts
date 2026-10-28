@@ -101,6 +101,11 @@ import {
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
 import { installDependenciesForSetup } from "./install";
+import {
+  assertCleanWorktree,
+  ensureInitialCommit,
+  type InitialCommitOutcome,
+} from "./initial-commit";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -235,6 +240,12 @@ export default class Setup extends Promptable(BaseCommand) {
     "skip-install": Flags.boolean({
       description: "Do not install dependencies after setup updates package.json.",
     }),
+    git: Flags.boolean({
+      allowNo: true,
+      default: true,
+      description:
+        "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
+    }),
     preset: Flags.string({
       description:
         "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
@@ -325,6 +336,14 @@ export default class Setup extends Promptable(BaseCommand) {
       throw new ZitadelError("E_CONFLICT", ".zitadel/secret exists without zitadel.json", {
         hint: "Move the secret aside or restore zitadel.json before running setup.",
       });
+    }
+    // Before anything is written: setup commits what it writes, and it can
+    // only tell its own files from the developer's when the tree starts clean.
+    // A dirty repository is refused here, where nothing has happened yet.
+    // A dry run too: the check only reads, and previewing success on a
+    // repository the real run would refuse is a worse lie than refusing early.
+    if (flags.git !== false) {
+      await assertCleanWorktree(cwd);
     }
     // Before anything is detected, created or written: a server another CLI
     // release left running fails setup halfway, after the project exists.
@@ -829,6 +848,11 @@ export default class Setup extends Promptable(BaseCommand) {
       package_manager: installOutcome.install.package_manager,
     });
 
+    // The commit exists so that the release a later `deploy` builds records
+    // the commit it came from; without it that deploy has no baseline and the
+    // one after it can show no diff (#1651).
+    const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
+
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
@@ -1015,6 +1039,14 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
+        // Whether setup created the repository, and the commit it made.
+        // `initialized` is false when the project was already in one, which it
+        // is still committed into; the commit is `null` only under `--no-git`
+        // or when git could not be used.
+        git: {
+          initialized: commit.kind === "created",
+          commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
+        },
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1079,6 +1111,51 @@ export default class Setup extends Promptable(BaseCommand) {
       },
     });
     return envelope;
+  }
+
+  /**
+   * Put the scaffolded project under version control, unless it already is or
+   * `--no-git` said not to. Narrated but never fatal: without the commit the
+   * first release simply records no provenance, which is what setup did before.
+   */
+  private async makeInitialCommit(
+    cwd: string,
+    dryRun: boolean,
+    enabled: boolean,
+  ): Promise<InitialCommitOutcome> {
+    if (!enabled) {
+      return { kind: "skipped" };
+    }
+    if (dryRun) {
+      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      return { kind: "skipped" };
+    }
+    const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind === "created" || outcome.kind === "committed") {
+      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      // git guesses an author from the machine when none is configured and
+      // commits anyway, so the commit exists but carries a name the developer
+      // did not choose. Said out loud, with the one command that fixes it.
+      if (outcome.invented) {
+        reportWarning(
+          "git could build no author identity on this machine, so the commit was made as " +
+            "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
+            "`git commit --amend --reset-author` to put your own name on it.",
+        );
+      } else if (outcome.guessedIdentity) {
+        reportWarning(
+          "This machine has no git user.name/user.email, so git guessed the author from your " +
+            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "to put your own name on the commit.",
+        );
+      }
+    }
+    if (outcome.kind === "unavailable") {
+      reportWarning(
+        `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
+      );
+    }
+    return outcome;
   }
 
   /**

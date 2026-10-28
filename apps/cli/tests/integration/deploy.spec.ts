@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, PASSWORD_POLICY, SETUP_ORIGIN } from "../helpers/project";
+import { aCommittedApp, aSetUpApp, PASSWORD_POLICY, SETUP_ORIGIN } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -367,6 +367,36 @@ describe("deploy", () => {
         const result = await app.deployRendered();
 
         expect(result).toPrint("is now live on http://localhost:3000 and https://app.acme.com.");
+      });
+
+      it("has no baseline to diff against on the first deploy", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("No diff available");
+      });
+
+      it("diffs against the commit the live release was built from", async () => {
+        const app = await aCommittedApp();
+        await app.deployRendered();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.commitEverything();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("nickname");
+      });
+
+      it("reports a clean tree as no change rather than no diff", async () => {
+        const app = await aCommittedApp();
+        await app.deployRendered();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("No changes to .zitadel/ since");
       });
     });
   });
