@@ -218,9 +218,9 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await expectNoErrorBoundary(colleaguePage);
 
     await row.getByRole("button", { name: `Actions for ${colleague.email}` }).click();
-    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    await page.getByRole("menuitem", { name: "Remove grant" }).click();
     const confirm = page.getByRole("alertdialog");
-    await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+    await confirm.getByRole("button", { name: "Remove grant", exact: true }).click();
 
     // Gone from the list, which leaves the instance as this test found it.
     await expect(page.getByRole("row").filter({ hasText: colleague.email })).toHaveCount(0);
@@ -262,13 +262,16 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     await page.getByRole("tab", { name: "Admins" }).click();
     const row = page.getByRole("row").filter({ hasText: team.name });
     await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+    await expect(row.getByText("Team", { exact: true })).toBeVisible();
 
     await row.getByRole("button", { name: `Actions for ${team.name}` }).click();
-    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    await page.getByRole("menuitem", { name: "Remove grant" }).click();
     const confirm = page.getByRole("alertdialog");
     // A team's grant, so the copy is about its members.
-    await expect(confirm.getByText(/Everyone in this team loses the access/)).toBeVisible();
-    await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+    await expect(
+      confirm.getByText(/Team members will lose access provided by this grant/),
+    ).toBeVisible();
+    await confirm.getByRole("button", { name: "Remove grant", exact: true }).click();
 
     await expect(page.getByRole("row").filter({ hasText: team.name })).toHaveCount(0);
     // The operator's own grant is untouched.

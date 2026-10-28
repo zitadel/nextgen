@@ -1,4 +1,4 @@
-import { Plus, User, Users } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { AddAdminDialog } from "@/components/add-admin-dialog";
@@ -7,7 +7,6 @@ import { type Removable, RemoveAdminDialog } from "@/components/remove-admin-dia
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -16,6 +15,7 @@ import {
   ResourceRow,
   RowMenu,
 } from "@/components/resource-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
@@ -91,11 +91,6 @@ export function ProjectAdmins({
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <section aria-label="Admins" className="flex flex-col gap-4">
-      {!rows.some((row) => row.self) && (
-        <p className="text-muted-foreground text-sm">
-          Your access to this Project isn’t a grant of your own, so you aren’t listed here.
-        </p>
-      )}
       <div className={RESOURCE_TABLE_WRAP}>
         <Table className="text-xs">
           <TableHeader>
@@ -116,13 +111,11 @@ export function ProjectAdmins({
               rows.map((row) => (
                 <ResourceRow key={row.key}>
                   <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
-                    <span className="flex items-center gap-2.5">
-                      {row.kind === "team" ? (
-                        <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-                      ) : (
-                        <User aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-                      )}
+                    {/* No person/team glyph: the two look alike at 16px, so a team
+                        row carries a label instead. */}
+                    <span className="flex min-w-0 items-center gap-1.5">
                       <span className="truncate">{row.name}</span>
+                      {row.kind === "team" && <Badge variant="secondary">Team</Badge>}
                       {row.self && <span className="text-muted-foreground shrink-0">(you)</span>}
                     </span>
                   </TableCell>
@@ -215,7 +208,6 @@ function toPersonRow(admin: Admin, viewerUserId?: string): AdminRow {
         ? {
             grantId: direct.grant_id,
             principal: "user",
-            level: "admin",
             keeps: sources.filter((source) => source !== direct).map(describeKept),
           }
         : undefined,
@@ -276,7 +268,6 @@ function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: str
     removable: {
       grantId: grant.id,
       principal,
-      level,
       keeps: admin ? admin.sources.map(describeKept) : [],
       unresolved: principal === "user" && !grant.user?.display && !grant.user?.identifier,
     },
@@ -284,12 +275,8 @@ function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: str
 }
 
 /**
- * The row menu carries only the revoke.
- *
- * It names the relation the grant actually holds. This section only ever
- * creates `admin`, but the list shows whatever a grant carries, and a row
- * saying "Remove admin" over a `viewer` grant would misdescribe what the click
- * revokes.
+ * The row menu carries only the revoke. It says "grant" whatever relation the
+ * grant holds: the row's `Access` cell already names it.
  *
  * The design's `Revoke invite` and `Resend invite` belong to an invite flow that
  * does not exist, and changing a grant's relation has no endpoint (#1021):
@@ -313,13 +300,12 @@ function RowActions({
     <>
       <RowMenu name={name} contentClassName="w-auto">
         <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
-          Remove {removable.level}
+          Remove grant
         </DropdownMenuItem>
       </RowMenu>
 
       <RemoveAdminDialog
         projectId={projectId}
-        name={name}
         removable={removable}
         open={removeOpen}
         onOpenChange={setRemoveOpen}

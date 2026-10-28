@@ -195,10 +195,10 @@ function row(name: string) {
 }
 
 /** From any tab: opens Admins, then the row's menu, then its confirmation. */
-async function openRemove(name: string, level = "admin") {
+async function openRemove(name: string) {
   await openAdmins();
   await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
-  await userEvent.click(await screen.findByRole("menuitem", { name: `Remove ${level}` }));
+  await userEvent.click(await screen.findByRole("menuitem", { name: "Remove grant" }));
   return within(await screen.findByRole("alertdialog"));
 }
 
@@ -297,14 +297,14 @@ describe("project admins", () => {
       row("Maya Patel").getByText("Owning team, via team Operations and admin grant"),
     ).toBeInTheDocument();
     const dialog = await openRemove("Maya Patel");
-    expect(dialog.getByText("Remove admin?")).toBeInTheDocument();
+    expect(dialog.getByText("Remove grant?")).toBeInTheDocument();
     expect(
       dialog.getByText(
-        "This removes only the grant made to them directly. They keep admin access through the owning team and team Operations, so they can still manage this project.",
+        "The user will keep admin access through the owning team and team Operations.",
       ),
     ).toBeInTheDocument();
-    expect(dialog.queryByText(/immediately lose access/)).not.toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    expect(dialog.queryByText(/direct access grant/)).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
 
     // The direct grant, not the team's.
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_maya", projectId: PROJECT_ID }]));
@@ -351,10 +351,16 @@ describe("project admins", () => {
 
     await openAdmins();
     expect(row("Operations").getByText("Admin grant")).toBeInTheDocument();
+    // The team label is what tells a team row from a person's.
+    expect(row("Operations").getByText("Team")).toBeInTheDocument();
     const dialog = await openRemove("Operations");
     // A team's grant, so the copy is about its members, not "their account".
-    expect(dialog.getByText(/Everyone in this team loses the access/)).toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    expect(
+      dialog.getByText(
+        "Team members will lose access provided by this grant. Other access is unaffected.",
+      ),
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_team", projectId: PROJECT_ID }]));
   });
 
@@ -368,12 +374,17 @@ describe("project admins", () => {
 
     await openAdmins();
     expect(row("user_1").getByText("Admin grant")).toBeInTheDocument();
+    expect(row("user_1").queryByText("Team")).not.toBeInTheDocument();
     const dialog = await openRemove("user_1");
     // A deleted user and one outside the viewer's read look the same, so the
     // copy claims neither that the account exists nor that it is gone.
-    expect(dialog.getByText(/Nothing about this user can be read/)).toBeInTheDocument();
-    expect(dialog.queryByText(/user account isn't deleted/)).not.toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    expect(
+      dialog.getByText(
+        "User details are unavailable. Removing this grant revokes the access it provides.",
+      ),
+    ).toBeInTheDocument();
+    expect(dialog.queryByText(/direct access grant/)).not.toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });
 
@@ -388,14 +399,13 @@ describe("project admins", () => {
     });
     await renderProject();
 
-    const dialog = await openRemove("Maya Patel", "viewer");
-    expect(dialog.getByText(/They keep admin access through the owning team/)).toBeInTheDocument();
+    const dialog = await openRemove("Maya Patel");
+    expect(
+      dialog.getByText("The user will keep admin access through the owning team."),
+    ).toBeInTheDocument();
   });
 
-  const NOT_LISTED_LINE =
-    "Your access to this Project isn’t a grant of your own, so you aren’t listed here.";
-
-  it("tells a viewer with no row of their own why they are not listed", async () => {
+  it("marks no row for a viewer with no grant of their own", async () => {
     // A platform operator (ADR 075) reaches the project through neither a grant
     // nor the owning team, so nothing here is theirs.
     stubProject({
@@ -404,11 +414,10 @@ describe("project admins", () => {
     await renderProject();
 
     await openAdmins();
-    expect(admins().getByText(NOT_LISTED_LINE)).toBeInTheDocument();
     expect(admins().queryByText("(you)")).not.toBeInTheDocument();
   });
 
-  it("marks the viewer's own lower grant instead", async () => {
+  it("marks the viewer's own lower grant", async () => {
     // The session fixture signs in as `user_test`.
     stubProject({
       grants: [
@@ -419,7 +428,6 @@ describe("project admins", () => {
 
     await openAdmins();
     expect(row(SELF).getByText("(you)")).toBeInTheDocument();
-    expect(admins().queryByText(NOT_LISTED_LINE)).not.toBeInTheDocument();
   });
 
   it("renders whatever relation a grant carries, not just admin", async () => {
@@ -565,19 +573,6 @@ describe("project admins", () => {
     );
   });
 
-  it("names the relation the row holds, not always admin", async () => {
-    // The section only creates `admin`, but the list shows whatever a grant
-    // carries, and "Remove admin" over a `viewer` row would misdescribe the
-    // click.
-    stubProject({
-      grants: [grant({ relation: "viewer", user: grantUser({ display: "Sasha Kim" }) })],
-    });
-    await renderProject();
-
-    const dialog = await openRemove("Sasha Kim", "viewer");
-    expect(dialog.getByText("Remove viewer?")).toBeInTheDocument();
-  });
-
   it("removes an admin from the route's project after confirming", async () => {
     // The revoke is scoped like the read: `DELETE /grants/{id}` carries the
     // route's project, not the console's own.
@@ -588,9 +583,12 @@ describe("project admins", () => {
     await renderProject();
 
     const dialog = await openRemove("Maya Patel");
-    expect(dialog.getByText("Remove admin?")).toBeInTheDocument();
-    expect(dialog.getByText(/immediately lose access/)).toBeInTheDocument();
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    expect(dialog.getByText("Remove grant?")).toBeInTheDocument();
+    expect(
+      dialog.getByText("This removes the user's direct access grant to this project."),
+    ).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
+    expect(await screen.findByText("Grant removed")).toBeInTheDocument();
 
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });
@@ -609,7 +607,7 @@ describe("project admins", () => {
     await renderProject();
 
     const dialog = await openRemove("Maya Patel");
-    await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
+    await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     expect(await screen.findByText("no such grant")).toBeInTheDocument();
 
     await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
