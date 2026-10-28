@@ -629,7 +629,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
       }
       // A catalog provider's scopes are vendor knowledge the CLI scaffolded, so
       // a missing one is an error; a custom connection's are the developer's, so
-      // it only warns and `apply` carries on.
+      // it only warns and `deploy` carries on.
       const scopeSeverity: ProjectIssue["severity"] = isCatalog(body) ? "error" : "warning";
       for (const { field, scope, claims } of missingScope.values()) {
         add({

@@ -10,7 +10,7 @@ export type StandardClaim = {
 /**
  * The claims OpenID Connect Core 5.4 defines, with the scope that returns each
  * and the type of its value. What a connection maps by default is drawn from
- * here, and `plan` judges a mapping against it: a standard claim is the one
+ * here, and `deploy` judges a mapping against it: a standard claim is the one
  * kind whose scope and type are known without signing in.
  *
  * A claim not listed here (anything a provider adds) is unknowable until a
