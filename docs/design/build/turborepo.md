@@ -8,8 +8,9 @@ twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
 is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
 turbo version runs in CI as the non-required `ci-turbo` job (on pull
 requests, in the merge queue, on pushes to main and nightly), on Vercel for
-the hosted cloud's builds, and locally with `turbo run` (the contributor
-scripts run directly build through turbo with `NEXTGEN_TASK_RUNNER=turbo`).
+the hosted cloud's builds, and locally with `turbo run`. Run directly, the
+contributor scripts build through moon, or through turbo with
+`NEXTGEN_TASK_RUNNER=turbo`.
 
 ## Layout
 
