@@ -2706,6 +2706,49 @@
       ]
     },
     {
+      "id": "policies test",
+      "group": "Configuration and releases",
+      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "args": [
+        {
+          "name": "operation",
+          "description": "Test only this operation's policy, such as auth.factor.password.set."
+        }
+      ],
+      "flags": [
+        {
+          "name": "release",
+          "description": "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "policies test"
+        },
+        {
+          "command": "policies test auth.factor.password.set"
+        },
+        {
+          "command": "policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7"
+        },
+        {
+          "command": "policies test --json"
+        }
+      ]
+    },
+    {
       "id": "preview list",
       "group": "Configuration and releases",
       "description": "List the project's live previews, newest first.",

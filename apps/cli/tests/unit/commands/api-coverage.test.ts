@@ -119,6 +119,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+  evaluatePolicy:
+    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.
@@ -131,8 +133,6 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
-  evaluatePolicy:
-    "not yet exposed — `zitadel policies test` lands with the policy-test CLI (#1445)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;

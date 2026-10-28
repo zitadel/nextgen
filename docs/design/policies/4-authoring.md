@@ -33,6 +33,9 @@ one per guarded operation and named after it. A file is the publish body
   publishes a changed config as a new revision of the operation's policy and
   pins it; an unchanged one reuses the newest revision. Like an IdP
   connection, a policy keeps one id while the server keeps its revisions.
+- `zitadel policies test [operation]` evaluates the cases in
+  `<operation>.test.json` against the sibling policy file, or with
+  `--release <id>` against the revision a release pins (see [Testing](#testing)).
 - `zitadel policies list` and `zitadel policies get <id|operation>` read
   policies back at their newest revision. Per
   [ADR 064](../../adrs/064-cli-resource-commands.md) a configuration resource

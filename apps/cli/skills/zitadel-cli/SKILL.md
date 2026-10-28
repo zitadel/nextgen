@@ -574,4 +574,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding, policies).
+  workflow (schemas, flows, branding, policies and their tests).
