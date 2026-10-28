@@ -162,6 +162,7 @@
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/sdk-next": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "oclif": "catalog:",
     "tsdown": "catalog:",

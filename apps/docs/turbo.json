@@ -7,7 +7,15 @@
     // lib/error-reference.ts imports, and the CLI's command reference, which
     // its reference test writes and lib/cli-reference.ts imports, with the
     // CLI's release notes, which Changesets writes on every release.
+    //
+    // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
+    // and on Vercel each deployment brings its own: NEXT_DEPLOYMENT_ID (see
+    // build), and Vercel's own variables under NEXT_PUBLIC_VERCEL_ (the
+    // deployment's URL, its commit), which the docs service's builds hash
+    // too: a preview missed both tasks with their inputs unchanged. Neither
+    // reads one, so both drop them all and hit the cache there.
     "generate": {
+      "env": ["!NEXT_*"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/api/openapi/**/*.yaml",
@@ -30,6 +38,7 @@
     // The live examples (components/examples) import the components, the
     // mock and the client the mock calls, each from its dist/.
     "typecheck": {
+      "env": ["!NEXT_*"],
       "dependsOn": [
         "generate",
         "@zitadel/api#generate",
@@ -39,8 +48,6 @@
       ],
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
     },
-    // The build script bundles again before `next build`, because the
-    // hosted cloud's docs service runs the script without a task runner.
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.
     //
@@ -48,7 +55,17 @@
     // .next/types, where tsc reads the route types, so side by side
     // typecheck failed with TS2304. A task-guard mutex would leave a gap: a
     // cache hit restores .next without running the script.
+    //
+    // The hosted cloud's docs service builds through this task. A Next.js
+    // build on Vercel bakes its deployment in: Skew Protection's ID into
+    // every asset URL (`?dpl=`, from NEXT_DEPLOYMENT_ID) and Vercel's URLs
+    // into the metadata, which turbo passes through unhashed. Keyed by the
+    // deployment's ID, a build is never restored into another deployment: on
+    // Vercel it never hits, elsewhere the variable is unset. The Speed
+    // Insights sample rate is read at build time (next.config.mjs,
+    // app/layout.tsx), and strict mode would hide it.
     "build": {
+      "env": ["VERCEL_DEPLOYMENT_ID", "DOCS_SPEED_INSIGHTS_SAMPLE_RATE"],
       "dependsOn": [
         "typecheck",
         "generate",

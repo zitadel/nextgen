@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest, sourceConditions } from "../../vitest.shared.mjs";
+import { baseTest, sourceConditions } from "@zitadel/vitest-config";
 
 /**
  * Single Node project. Tokens never run in a browser; the snapshot test
