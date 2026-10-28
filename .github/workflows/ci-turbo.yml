@@ -93,9 +93,6 @@ jobs:
       # test output is left in the log.
       NO_COLOR: ""
       TURBO_TELEMETRY_DISABLED: "1"
-      # The contributor scripts (run-cli, local-registry, check) build through
-      # turbo instead of moon.
-      NEXTGEN_TASK_RUNNER: turbo
       # Depot runners point TURBO_API at Depot's own turbo cache. This job uses
       # Vercel's instead (one cache shared with the cloud deployments); delete
       # this line and the remote-cache step to use Depot's, which needs no
