@@ -340,10 +340,10 @@ jobs:
       # write, so they run in a turbo run of their own. It runs whenever the
       # journey does, so it takes no `--affected`: a change to the journey's
       # own specs reaches no release task. Its graph holds the server's and
-      # the CLI's tests, which this job runs too when the gate has not yet
-      # written them to the remote cache. No `env -u CI`: turbo has no
-      # runInCI, so nothing hides these tasks. RELEASE_SKIP_CONTAINER=1 is
-      # `--skip-container` (see the top).
+      # the CLI's tests: whichever job reaches such a task first runs it, and
+      # the other restores it from the remote cache, unless both start it at
+      # once. No `env -u CI`: turbo has no runInCI, so nothing hides these
+      # tasks. RELEASE_SKIP_CONTAINER=1 is `--skip-container` (see the top).
       - name: Build release snapshot without container
         if: ${{ steps.affected.outputs.run == 'true' }}
         env:
@@ -378,7 +378,7 @@ jobs:
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local --filter=@zitadel/e2e --log-order=stream
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local --filter=@zitadel/e2e $AFFECTED --log-order=stream
 
       # After the journey and only once it passed, as in ci.yml.
       - name: Look for journey registry changes

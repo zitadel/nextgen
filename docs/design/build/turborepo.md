@@ -215,14 +215,15 @@ ci-turbo.yml runs three jobs side by side, each on a runner of its own: the
 gate, with the Go database lanes in its `turbo run`; the journey, the release
 snapshot and then its lane; and the other e2e lanes. On its own runner the
 snapshot rewrites no `dist/` the gate or the other lanes read, so the journey
-does not wait for the gate. The jobs share results through the remote cache,
-and a prerequisite that two jobs need before either has cached it runs in
-both: the snapshot's graph holds the server's and the CLI's tests. Each job
-first asks `turbo query affected --exit-code` about its own tasks, before it
-installs anything, and skips its other steps when none is affected; every
-`turbo run` passes `--affected`, from the pull request's base, the merge
-group's or the commit a push to main replaced. A change no task reads, such
-as a workflow edit, runs nothing there. `full-pr-turbo` needs the three jobs:
+does not wait for the gate. The jobs share results through the remote cache:
+a task two jobs need, such as the server's and the CLI's tests in the
+snapshot's graph, runs in the job that reaches it first and is restored in
+the other, unless both start it at once. Each job first asks `turbo query
+affected --exit-code` about its own tasks, before it installs anything, and
+skips its other steps when none is affected; within a job, `--affected` from
+the pull request's base, the merge group's or the commit a push to main
+replaced picks the tasks the change reaches. A change no task reads, such as
+a workflow edit, runs nothing there. `full-pr-turbo` needs the three jobs:
 it is the one check name to require. Nightly every job runs every task and
 lane with `TURBO_FORCE` instead.
 `--filter=…[ref]` still selects packages: do not use it for the gate. In
