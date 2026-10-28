@@ -136,8 +136,16 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
  */
 export function failOnDiagnostics(diagnostics) {
   if (diagnostics.length === 0) return;
+  // A message chain's head says what failed and each link under it why, as tsc prints it.
+  const flatten = (message, depth = 0) =>
+    typeof message === "string"
+      ? message
+      : [
+          `${"  ".repeat(depth)}${message.messageText}`,
+          ...(message.next ?? []).map((next) => flatten(next, depth + 1)),
+        ].join("\n");
   const lines = diagnostics.map(({ file, start, messageText }) => {
-    const text = typeof messageText === "string" ? messageText : messageText.messageText;
+    const text = flatten(messageText);
     if (!file) return text;
     const { line, character } = file.getLineAndCharacterOfPosition(start ?? 0);
     return `${file.fileName}:${line + 1}:${character + 1}: ${text}`;

@@ -305,4 +305,26 @@ describe("failOnDiagnostics", () => {
         "Cannot find module './x'.",
     );
   });
+
+  it("fails with every link of a message chain, each indented under the one it explains", () => {
+    expect(() =>
+      failOnDiagnostics([
+        {
+          messageText: {
+            messageText: "Type 'A' is not assignable to type 'B'.",
+            next: [
+              {
+                messageText: "Types of property 'x' are incompatible.",
+                next: [{ messageText: "Type 'string' is not assignable to type 'number'." }],
+              },
+            ],
+          },
+        },
+      ]),
+    ).toThrow(
+      "Type 'A' is not assignable to type 'B'.\n" +
+        "  Types of property 'x' are incompatible.\n" +
+        "    Type 'string' is not assignable to type 'number'.",
+    );
+  });
 });
