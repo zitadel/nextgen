@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/service"
@@ -21,8 +20,8 @@ type Pool struct {
 	statements
 }
 
-func newPool(sqlDB *sql.DB) (*Pool, error) {
-	stopMetrics, err := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
+func newPool(sqlDB *sql.DB) *Pool {
+	stopMetrics := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
 		stats := sqlDB.Stats()
 		return metrics.PoolStats{
 			Used: stats.InUse,
@@ -30,14 +29,11 @@ func newPool(sqlDB *sql.DB) (*Pool, error) {
 			Max:  stats.MaxOpenConnections,
 		}
 	})
-	if err != nil {
-		return nil, fmt.Errorf("sqlite: report pool metrics: %w", err)
-	}
 	return &Pool{
 		sqlDB:       sqlDB,
 		stopMetrics: stopMetrics,
 		statements:  newStatements(db{sqlDB: sqlDB}),
-	}, nil
+	}
 }
 
 // Transaction implements [service.Transactioner].

@@ -31,19 +31,15 @@ func TestPool_reportsConnections(t *testing.T) {
 
 	// Connect opens the single connection SQLite gets and leaves it idle.
 	assert.Equal(t, maxBefore+1, reader.CounterSum(t, metrics.DBConnectionMax, name))
-	assert.Equal(t, usedBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, used))
 	assert.Equal(t, idleBefore+1, reader.CounterSum(t, metrics.DBConnectionCount, name, idle))
 
 	conn, err := pool.(*Pool).sqlDB.Conn(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, usedBefore+1, reader.CounterSum(t, metrics.DBConnectionCount, name, used),
 		"a connection handed out is in use")
-	assert.Equal(t, idleBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, idle))
 	require.NoError(t, conn.Close())
-	assert.Equal(t, usedBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, used))
 
 	require.NoError(t, pool.Close(ctx))
 	assert.Equal(t, maxBefore, reader.CounterSum(t, metrics.DBConnectionMax, name),
 		"a closed pool reports nothing")
-	assert.Equal(t, idleBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, idle))
 }

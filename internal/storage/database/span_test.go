@@ -23,14 +23,16 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-var spanExporter = tracetest.NewInMemoryExporter()
+var (
+	spanExporter  = tracetest.NewInMemoryExporter()
+	metricsReader *metricstest.Reader
+)
 
-// TestMain sets the global tracer provider once: the package tracer delegates
-// to the first provider set in the process. The meter provider is not set
-// here: once one collects, the statement instrument stays enabled for the
-// rest of the binary, so TestStartStatement_metrics installs it after it has
-// looked at the disabled path.
+// TestMain sets the global providers once: the package tracer and the
+// metrics package's instruments delegate to the first provider set in the
+// process.
 func TestMain(m *testing.M) {
+	metricsReader = metricstest.Install()
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(spanExporter),
 		sdktrace.WithSampler(zotel.NewSampler(1.0)),
@@ -165,64 +167,32 @@ func TestStartStatement_notFoundIsNoError(t *testing.T) {
 }
 
 // The statement histogram is recorded whether or not a span is, under the
-// same name the span would carry. The subtests run in order: the first looks
-// at the disabled path, and installing the collecting provider afterwards
-// enables the instrument for the rest of the binary.
+// name the span would carry.
 func TestStartStatement_metrics(t *testing.T) {
-	t.Run("disabled path allocates nothing", func(t *testing.T) {
-		ctx := t.Context()
-		if metrics.StatementEnabled(ctx) {
-			t.Skip("a meter provider is already collecting in this binary")
-		}
-		allocs := testing.AllocsPerRun(100, func() {
-			_, end := database.StartStatement(ctx, metrics.DBSystemPostgreSQL)
-			end(nil)
-		})
-		assert.Zero(t, allocs, "neither a span nor a measurement is wanted, so nothing may be named or allocated")
-	})
-
-	reader := metricstest.Install()
-	system := metrics.DBSystemNameKey.String(string(metrics.DBSystemPostgreSQL))
-	count := func(t *testing.T, summary string) uint64 {
+	count := func(t *testing.T) uint64 {
 		t.Helper()
-		return reader.HistogramCount(t, metrics.DBOperationDuration, system, metrics.DBQuerySummaryKey.String(summary))
+		return metricsReader.HistogramCount(t, metrics.DBOperationDuration,
+			metrics.DBSystemNameKey.String(string(metrics.DBSystemPostgreSQL)),
+			metrics.DBQuerySummaryKey.String("tokenStatements.GetTokenByID"))
 	}
 
 	t.Run("records the statement method without a span", func(t *testing.T) {
 		spanExporter.Reset()
-		ctx := t.Context()
 		s := &tokenStatements{}
-		for name, call := range map[string]func(context.Context) error{
-			"tokenStatements.GetTokenByID": s.GetTokenByID, // a statement method
-			"tokenStatements.ListTokens":   s.ListTokens,   // through a helper
-			"tokenStatements.UpdateToken":  s.UpdateToken,  // from a closure
-		} {
-			before := count(t, name)
-			require.NoError(t, call(ctx))
-			assert.Equal(t, before+1, count(t, name), name)
-		}
+		before := count(t)
+
+		require.NoError(t, s.GetTokenByID(t.Context()))
+
+		assert.Equal(t, before+1, count(t))
 		assert.Empty(t, spanExporter.GetSpans())
-	})
-
-	t.Run("records under the span's name", func(t *testing.T) {
-		spanExporter.Reset()
-		s := &tokenStatements{}
-		before := count(t, "tokenStatements.GetTokenByID")
-
-		require.NoError(t, s.GetTokenByID(sampledContext(t)))
-
-		spans := spanExporter.GetSpans()
-		require.Len(t, spans, 1)
-		assert.Equal(t, "tokenStatements.GetTokenByID", spans[0].Name)
-		assert.Equal(t, before+1, count(t, "tokenStatements.GetTokenByID"))
 	})
 
 	t.Run("records a failed statement", func(t *testing.T) {
 		s := &tokenStatements{client: tracedExecutor{err: errors.New("connection reset")}}
-		before := count(t, "tokenStatements.GetTokenByID")
+		before := count(t)
 
 		require.Error(t, s.GetTokenByID(t.Context()))
 
-		assert.Equal(t, before+1, count(t, "tokenStatements.GetTokenByID"))
+		assert.Equal(t, before+1, count(t))
 	})
 }

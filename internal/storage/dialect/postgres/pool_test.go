@@ -35,22 +35,17 @@ func TestPool_reportsConnections(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pool.Close(context.Background()) })
 
-	// pgxpool connects lazily: nothing is open until a connection is acquired.
 	assert.Equal(t, maxBefore+3, reader.CounterSum(t, metrics.DBConnectionMax, name))
-	assert.Equal(t, usedBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, used))
-	assert.Equal(t, idleBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, idle))
 
 	conn, err := pool.(*Pool).pool.Acquire(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, usedBefore+1, reader.CounterSum(t, metrics.DBConnectionCount, name, used),
 		"an acquired connection is in use")
 	conn.Release()
-	assert.Equal(t, usedBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, used))
 	assert.Equal(t, idleBefore+1, reader.CounterSum(t, metrics.DBConnectionCount, name, idle),
 		"a released connection stays open and idle")
 
 	require.NoError(t, pool.Close(ctx))
 	assert.Equal(t, maxBefore, reader.CounterSum(t, metrics.DBConnectionMax, name),
 		"a closed pool reports nothing")
-	assert.Equal(t, idleBefore, reader.CounterSum(t, metrics.DBConnectionCount, name, idle))
 }

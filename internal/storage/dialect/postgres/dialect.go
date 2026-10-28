@@ -28,13 +28,7 @@ func (p Config) Connect(ctx context.Context) (database.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	pool, err := newPool(pgxPool)
-	if err != nil {
-		// pool is nil here: close the pgx pool it would have wrapped.
-		pgxPool.Close()
-		return nil, err
-	}
-	return pool, nil
+	return newPool(pgxPool), nil
 }
 
 // Name implements [database.Dialect].
@@ -48,7 +42,7 @@ type PoolConfig struct {
 
 // Connect implements [database.Dialect].
 func (p *PoolConfig) Connect(ctx context.Context) (database.Pool, error) {
-	return newPool(p.Pool)
+	return newPool(p.Pool), nil
 }
 
 // Name implements [database.Dialect].

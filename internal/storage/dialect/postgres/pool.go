@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -20,8 +19,8 @@ type Pool struct {
 	statements
 }
 
-func newPool(pool *pgxpool.Pool) (*Pool, error) {
-	stopMetrics, err := metrics.RegisterPool(metrics.PoolPostgres, func() metrics.PoolStats {
+func newPool(pool *pgxpool.Pool) *Pool {
+	stopMetrics := metrics.RegisterPool(metrics.PoolPostgres, func() metrics.PoolStats {
 		stat := pool.Stat()
 		return metrics.PoolStats{
 			Used: int(stat.AcquiredConns()),
@@ -29,14 +28,11 @@ func newPool(pool *pgxpool.Pool) (*Pool, error) {
 			Max:  int(stat.MaxConns()),
 		}
 	})
-	if err != nil {
-		return nil, fmt.Errorf("postgres: report pool metrics: %w", err)
-	}
 	return &Pool{
 		pool:        pool,
 		stopMetrics: stopMetrics,
 		statements:  newStatements(pool),
-	}, nil
+	}
 }
 
 // Transaction implements [database.Pool].
