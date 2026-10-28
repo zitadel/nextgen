@@ -140,7 +140,7 @@ describe("uncallable", () => {
   });
 
   it("refuses what only an end user's session authenticates", () => {
-    expect(uncallable(byId("getMyUser"))).toMatch(/session cookie/);
+    expect(uncallable(byId("getMySession"))).toMatch(/session cookie/);
   });
 
   it("refuses what reads a cookie only a browser carries", () => {

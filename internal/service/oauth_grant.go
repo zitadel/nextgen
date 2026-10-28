@@ -32,7 +32,7 @@ type OAuthGrantToken struct {
 // it. Each write emits its event in the same transaction.
 type OAuthGrantService interface {
 	// NewGrantID mints the id a new grant's records share.
-	NewGrantID() (string, error)
+	NewGrantID(ctx context.Context) (string, error)
 	// Issue writes the record of a new code or refresh token and returns its id.
 	Issue(ctx context.Context, token OAuthGrantToken) (string, error)
 	// Redeem uses a code's record up. ErrOAuthGrantTokenSpent means it was
@@ -54,7 +54,10 @@ func NewOAuthGrantService(pool StatementPool) OAuthGrantService {
 	return &oauthGrantService{pool: pool}
 }
 
-func (s *oauthGrantService) NewGrantID() (string, error) {
+func (s *oauthGrantService) NewGrantID(ctx context.Context) (_ string, err error) {
+	_, end := startSpan(ctx, "OAuthGrantService.NewGrantID")
+	defer end(&err)
+
 	return s.pool.Statements().NewManagedID(string(domain.PrefixOAuthGrant))
 }
 

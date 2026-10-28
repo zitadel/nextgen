@@ -295,7 +295,7 @@ func (s *Server) issueCode(w http.ResponseWriter, r *http.Request, req authoriza
 }
 
 func (s *Server) newCode(ctx context.Context, req authorizationRequest, user string) (string, error) {
-	grantID, err := s.grants.NewGrantID()
+	grantID, err := s.grants.NewGrantID(ctx)
 	if err != nil {
 		return "", domain.ErrInternal(err).WithMessage("failed to mint grant id")
 	}

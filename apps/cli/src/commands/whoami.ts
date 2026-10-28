@@ -13,7 +13,7 @@ import { DEFAULT_SERVER } from "../lib/server";
  */
 export default class Whoami extends EnvironmentCommand {
   static override description =
-    "Show who you are signed in as at a server, as the server answers with your `zitadel login` token.";
+    "Show who you are signed in as at a server. It asks the server with your `zitadel login` token.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 6;
 

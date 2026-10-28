@@ -11,7 +11,7 @@ import { DEFAULT_SERVER } from "../lib/server";
  */
 export default class Logout extends EnvironmentCommand {
   static override description =
-    "Sign out of a server: revoke the `zitadel login` refresh token there and forget the sign-in.";
+    "Sign out of a server. It revokes the `zitadel login` refresh token there and forgets the sign-in.";
   static override group = CommandGroups.gettingStarted;
   static override groupOrder = 7;
 
