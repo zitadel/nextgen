@@ -158,7 +158,13 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
       <TableCell className={RESOURCE_CELL_MUTED}>
         {schemaName &&
           (schemaId ? (
-            <EntityLink to="/schemas/$schemaId" params={{ schemaId }}>
+            // Truncates inside its own box, so the focus ring sits in the
+            // cell's padding rather than past the cell's clipped edge.
+            <EntityLink
+              to="/schemas/$schemaId"
+              params={{ schemaId }}
+              className="inline-block max-w-full truncate align-middle"
+            >
               {schemaName}
             </EntityLink>
           ) : (

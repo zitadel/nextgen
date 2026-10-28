@@ -218,7 +218,9 @@ function SchemaNames({ items }: { items: IdpReference[] }) {
   const shown = items.slice(0, SHOWN_SCHEMAS);
   const rest = items.slice(SHOWN_SCHEMAS);
   return (
-    <span className="block truncate">
+    // The 4px padding, taken back by the margin, keeps the links' 3px focus
+    // ring inside the box that clips the truncated text.
+    <span className="-m-1 block truncate p-1">
       {shown.map((item, index) => (
         <Fragment key={item.id}>
           {index > 0 && ", "}
