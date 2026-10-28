@@ -142,7 +142,11 @@ export function ResourceIdCell({ id, name }: { id: string; name: string }) {
   );
 }
 
-/** A row's leading glyph — the design draws Lucide at stroke 1.5, not the default 2. */
+/**
+ * A row's leading glyph — the design draws Lucide at stroke 1.5, not the
+ * default 2. Resource directories only; configuration directories (User
+ * schemas, Login flows, Branding, Authentication) name their rows as text.
+ */
 export const RESOURCE_ROW_ICON = "text-muted-foreground size-4 shrink-0";
 
 /** The link in a row's first cell, with the design's 10px icon gap. */

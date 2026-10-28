@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Braces, Shield } from "lucide-react";
-import { useEffect } from "react";
+import { Shield } from "lucide-react";
+import { Fragment, useEffect } from "react";
+
+import { EntityLink } from "@/components/entity-link";
 
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_WRAP,
@@ -27,7 +28,6 @@ import {
   fetchAllIdps,
   type IdpConnection,
   type IdpReference,
-  nameSummary,
   schemasBySsoProvider,
   type SignInMethodRow,
   signInMethodRows,
@@ -205,16 +205,33 @@ function MethodRow({ row }: { row: SignInMethodRow }) {
   );
 }
 
+/** How many schemas a cell names before it counts the rest. */
+const SHOWN_SCHEMAS = 2;
+
 /**
- * The user schemas a row concerns, behind the User schemas glyph: the first two by
- * name and a count for the rest, as the design truncates them.
+ * The user schemas a row concerns: the first two by name, each opening its
+ * schema, and a count for the rest, as the design truncates them. The count
+ * names the rest in its tooltip.
  */
 function SchemaNames({ items }: { items: IdpReference[] }) {
   if (items.length === 0) return <>Not used</>;
+  const shown = items.slice(0, SHOWN_SCHEMAS);
+  const rest = items.slice(SHOWN_SCHEMAS);
   return (
-    <span className="inline-flex max-w-full items-center gap-2">
-      <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
-      <span className="truncate">{nameSummary(items.map((item) => item.name))}</span>
+    // The 4px padding, taken back by the margin, keeps the links' 3px focus
+    // ring inside the box that clips the truncated text.
+    <span className="-m-1 block truncate p-1">
+      {shown.map((item, index) => (
+        <Fragment key={item.id}>
+          {index > 0 && ", "}
+          <EntityLink to="/schemas/$schemaId" params={{ schemaId: item.id }}>
+            {item.name}
+          </EntityLink>
+        </Fragment>
+      ))}
+      {rest.length > 0 && (
+        <span title={rest.map((item) => item.name).join(", ")}> ... +{rest.length}</span>
+      )}
     </span>
   );
 }
@@ -266,7 +283,6 @@ function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
           params={{ idpId: idp.id }}
           className={RESOURCE_ROW_LINK}
         >
-          <Shield aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>

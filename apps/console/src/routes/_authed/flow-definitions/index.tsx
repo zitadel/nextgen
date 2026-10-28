@@ -5,7 +5,6 @@ import { api } from "@/api/zitadel";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
@@ -18,6 +17,7 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { EntityLink } from "@/components/entity-link";
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
@@ -139,7 +139,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
             params={{ definitionId: id }}
             className={RESOURCE_ROW_LINK}
           >
-            <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
           {/* Drafts only: the engine never selects one, and the design draws
@@ -155,18 +154,21 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
           ))}
         </div>
       </TableCell>
-      <TableCell className={`${RESOURCE_CELL} truncate text-sm`}>
+      {/* A reference to another configuration, not the row's own name. */}
+      <TableCell className={RESOURCE_CELL_MUTED}>
         {schemaName &&
           (schemaId ? (
-            <Link
+            // Truncates inside its own box, so the focus ring sits in the
+            // cell's padding rather than past the cell's clipped edge.
+            <EntityLink
               to="/schemas/$schemaId"
               params={{ schemaId }}
-              className="text-foreground font-medium underline-offset-2 hover:underline"
+              className="inline-block max-w-full truncate align-middle"
             >
               {schemaName}
-            </Link>
+            </EntityLink>
           ) : (
-            <span className="text-foreground font-medium">{schemaName}</span>
+            schemaName
           ))}
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(updatedAt)}</TableCell>

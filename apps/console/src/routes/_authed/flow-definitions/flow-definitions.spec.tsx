@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { scopedPath } from "@/test/project-scope.fixture";
@@ -100,6 +101,20 @@ describe("login flows list", () => {
     // and links to the schema it names.
     const schema = screen.getByRole("link", { name: "Minimal" });
     expect(schema).toHaveAttribute("href", scopedPath("/schemas/sch_1"));
+  });
+
+  it("opens the schema, not the flow, from the row's schema link", async () => {
+    server.use(
+      http.get(FLOWS_URL, () => HttpResponse.json(listResponse())),
+      http.get(SCHEMAS_URL, () => HttpResponse.json(schemasResponse())),
+      http.get(`${SCHEMAS_URL}/sch_1`, () => HttpResponse.json(SCHEMA_EMBED)),
+    );
+    const router = await renderAt("/flow-definitions");
+
+    // The reference sits inside a clickable row; the row must leave the click
+    // to the link rather than open the flow on top of it.
+    await userEvent.click(await screen.findByRole("link", { name: "Minimal" }));
+    await vi.waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas/sch_1"));
   });
 
   it("marks a draft flow and leaves an active one unmarked", async () => {
