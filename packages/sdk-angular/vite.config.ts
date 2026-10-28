@@ -12,7 +12,9 @@ import { libraryBuild } from "@zitadel/vite";
 // `strictTemplates` instead.
 export default defineConfig({
   plugins: [
-    libraryBuild(import.meta.dirname),
+    // The Angular Package Format ships unminified: an app's linker reads the `ɵɵngDeclare*`
+    // metadata and accepts only plain literals there, not minified `!0` or template strings.
+    libraryBuild(import.meta.dirname, { minify: false }),
     angular({
       jit: false,
       tsconfig: fileURLToPath(new URL("./tsconfig.lib.json", import.meta.url)),
