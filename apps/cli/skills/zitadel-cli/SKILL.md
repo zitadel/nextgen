@@ -416,7 +416,11 @@ server and its port, but runs its project checks in the working directory, so ru
 it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). A
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are).
+The hint says the server is the parent's and that `reset --force` deletes the data in that
+directory, and it adds a plain `start`, which gives the working directory a server of its own
+because `start` does not look in parents; a healthy parent server is reported in the `runtime`
+check as started in the parent folder. A
 local server is healthy once its `/readyz` answers, which takes its database
 answering too: `start` waits for that, and the commands that read a server
 treat one whose database does not answer as unhealthy. `stop`,

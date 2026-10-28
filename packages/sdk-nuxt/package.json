@@ -59,6 +59,7 @@
     "@nuxt/schema": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "h3": "^1.15.3",
     "nuxt": "catalog:",
     "tsup": "catalog:",

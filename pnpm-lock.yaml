@@ -578,6 +578,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:packages/vitest-config
       publint:
         specifier: 'catalog:'
         version: 0.3.25
@@ -696,6 +699,9 @@ importers:
       '@zitadel/sdk-next':
         specifier: workspace:*
         version: link:../../packages/sdk-next
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -841,6 +847,9 @@ importers:
       '@zitadel/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1095,6 +1104,9 @@ importers:
       '@zitadel/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       dompurify:
         specifier: 'catalog:'
         version: 3.4.17
@@ -1174,6 +1186,9 @@ importers:
       '@types/semver':
         specifier: 'catalog:'
         version: 7.8.0
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
       tailwindcss:
         specifier: 'catalog:'
         version: 4.2.4
@@ -1207,6 +1222,9 @@ importers:
       '@zitadel/testing':
         specifier: workspace:*
         version: link:../packages/testing
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../packages/vitest-config
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
@@ -1229,6 +1247,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -1287,6 +1308,9 @@ importers:
       '@vitest/browser-playwright':
         specifier: 'catalog:'
         version: 4.1.11(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(playwright@1.60.0)(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -1357,6 +1381,9 @@ importers:
       '@zitadel/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1409,6 +1436,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
@@ -1430,6 +1460,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       tsdown:
         specifier: 'catalog:'
         version: 0.23.0(@arethetypeswrong/core@0.18.5)(@tsdown/css@0.23.0)(@volar/typescript@2.4.28(typescript@6.0.3))(@vue/language-core@3.2.8)(oxc-resolver@11.20.0)(publint@0.3.25)(tsx@4.21.0)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.12))(vue-tsc@3.2.8(typescript@6.0.3))
@@ -1506,6 +1539,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1546,6 +1582,9 @@ importers:
       '@zitadel/components':
         specifier: workspace:*
         version: link:../components
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1604,6 +1643,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1653,6 +1695,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       h3:
         specifier: ^1.15.3
         version: 1.15.11
@@ -1702,6 +1747,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -1745,6 +1793,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       tsup:
         specifier: 'catalog:'
         version: 8.5.1(@microsoft/api-extractor@7.58.9(@types/node@24.19.1))(@swc/core@1.15.8(@swc/helpers@0.5.23))(jiti@2.7.0)(postcss@8.5.30)(supports-color@10.2.2)(tsx@4.21.0)(typescript@6.0.3)(yaml@2.9.1)
@@ -1794,6 +1845,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1849,6 +1903,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1898,6 +1955,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       solid-js:
         specifier: ^1.9.12
         version: 1.9.17
@@ -1944,6 +2004,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -1990,6 +2053,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       svelte:
         specifier: ^5.57.2
         version: 5.57.2(@typescript-eslint/types@8.59.3)
@@ -2039,6 +2105,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -2082,6 +2151,9 @@ importers:
       '@zitadel/api-mock':
         specifier: workspace:*
         version: link:../api-mock
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       jsdom:
         specifier: 'catalog:'
         version: 29.0.2(@noble/hashes@1.8.0)
@@ -2122,6 +2194,9 @@ importers:
       '@types/node':
         specifier: ^24.19.1
         version: 24.19.1
+      '@zitadel/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
       msw:
         specifier: 'catalog:'
         version: 2.14.6(@types/node@24.19.1)(typescript@6.0.3)
@@ -2137,6 +2212,8 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 4.1.11(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@4.1.11)(@vitest/coverage-v8@4.1.11)(happy-dom@20.14.5)(jsdom@29.0.2(@noble/hashes@1.8.0))(msw@2.14.6(@types/node@24.19.1)(typescript@6.0.3))(vite@8.3.1(@types/node@24.19.1)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass-embedded@1.104.1)(sass@1.104.1)(terser@5.49.0)(tsx@4.21.0)(yaml@2.9.1))
+
+  packages/vitest-config: {}
 
   tools/bench: {}
 

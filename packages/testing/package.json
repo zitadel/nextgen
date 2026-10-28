@@ -62,6 +62,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",
