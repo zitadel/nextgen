@@ -126,7 +126,9 @@ describe("setup", () => {
 
         const result = await app.setup();
 
-        expect(result).toSuggest("deploy -m '<what changed>'");
+        expect(
+          app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
+        ).toContain("deploy -m '<what changed>'");
       });
 
       it("says the configuration is not live yet", async () => {
@@ -136,7 +138,7 @@ describe("setup", () => {
 
         expect(
           app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
-        ).toContain("nothing is deployed yet");
+        ).toContain("Nothing is released yet");
       });
 
       it("reports the commit it made", async () => {

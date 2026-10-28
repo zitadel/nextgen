@@ -176,6 +176,23 @@ describe("ensureInitialCommit", () => {
       expect(await trackedFiles(cwd)).toContain(".env.example");
     });
 
+    it("commits where git can build no identity at all, as a bare CI runner cannot", async () => {
+      const cwd = await aProject();
+      // An empty inherited identity is what a bare runner leaves, and git
+      // refuses it outright rather than guessing.
+      vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
+      vi.stubEnv("GIT_CONFIG_SYSTEM", "/dev/null");
+      vi.stubEnv("GIT_AUTHOR_NAME", "");
+      vi.stubEnv("GIT_AUTHOR_EMAIL", "");
+      try {
+        const outcome = await ensureInitialCommit(cwd);
+
+        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("commits even when the machine has no git identity configured", async () => {
       const cwd = await aProject();
       vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");

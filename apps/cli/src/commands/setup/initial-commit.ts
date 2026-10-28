@@ -70,10 +70,11 @@ function isCliOwned(path: string): boolean {
  * no pathspec and no suffix test, so a secret under such a name would be
  * neither recognised nor unstaged.
  */
-async function git(cwd: string, args: string[]): Promise<string> {
+async function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
   const { stdout } = await run("git", ["-c", "core.quotePath=false", ...args], {
     cwd,
     maxBuffer: 16 * 1024 * 1024,
+    ...(env ? { env: { ...process.env, ...env } } : {}),
   });
   return stdout;
 }
@@ -117,6 +118,38 @@ async function hasOwnIdentity(cwd: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Whether git can produce any identity at all, its own guess included.
+ *
+ * A bare CI container has no configured identity and often no passwd entry or
+ * hostname to guess from, and there git refuses to commit. Only then is an
+ * identity supplied, because no commit means no `git_sha` and the next deploy
+ * has nothing to diff against.
+ */
+async function canBuildIdentity(cwd: string): Promise<boolean> {
+  try {
+    await git(cwd, ["var", "GIT_AUTHOR_IDENT"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Last resort, used only where git can build no identity of its own.
+ *
+ * Passed as environment variables rather than `-c user.*`, because an
+ * inherited `GIT_AUTHOR_NAME=` (empty, as some runners leave it) outranks
+ * `-c` and git then refuses with "empty ident name". The environment beats
+ * both the config and whatever was inherited.
+ */
+const FALLBACK_IDENTITY: NodeJS.ProcessEnv = {
+  GIT_AUTHOR_NAME: "Zitadel Setup",
+  GIT_AUTHOR_EMAIL: "setup@zitadel.local",
+  GIT_COMMITTER_NAME: "Zitadel Setup",
+  GIT_COMMITTER_EMAIL: "setup@zitadel.local",
+};
 
 /**
  * Everything git considers a change under the project directory, untracked
@@ -286,6 +319,7 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
       return { kind: "unavailable", reason: "there was nothing to commit" };
     }
     const guessedIdentity = !(await hasOwnIdentity(cwd));
+    const identity = (await canBuildIdentity(cwd)) ? undefined : FALLBACK_IDENTITY;
     // Signing is disabled for this commit alone: a configured GPG key would
     // otherwise block setup on a passphrase prompt it never asked for.
     //
@@ -293,16 +327,20 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     // commit takes the whole index, and the clean-tree check is scoped to the
     // project, so a sibling package's already-staged work would pass the check
     // and then land in a commit under setup's subject.
-    await git(cwd, [
-      "-c",
-      "commit.gpgsign=false",
-      "commit",
-      "--quiet",
-      "--no-verify",
-      `--message=${INITIAL_COMMIT_SUBJECT}`,
-      "--",
-      ".",
-    ]);
+    await git(
+      cwd,
+      [
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        `--message=${INITIAL_COMMIT_SUBJECT}`,
+        "--",
+        ".",
+      ],
+      identity,
+    );
     return {
       kind: existing ? "committed" : "created",
       sha: (await headSha(cwd)) ?? "",

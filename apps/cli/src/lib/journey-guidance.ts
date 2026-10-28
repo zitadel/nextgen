@@ -1,5 +1,5 @@
 import { publicCliCommand } from "./public-cli";
-import { type EnvironmentSelector, projectCommand, type SuggestedCommand } from "./suggestion";
+import { type EnvironmentSelector, projectCommand } from "./suggestion";
 import { DEPLOY_ARGS } from "./release";
 
 /**
