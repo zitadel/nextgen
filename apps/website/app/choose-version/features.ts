@@ -244,6 +244,37 @@ export const AREAS: Area[] = [
     ],
   },
   {
+    id: "policies",
+    title: "Security policies",
+    features: [
+      {
+        name: "Password policy",
+        preview: { status: "partial", note: "Length and history" },
+        v4: { status: "available" },
+      },
+      {
+        name: "Sign-in methods per project",
+        preview: { status: "available" },
+        v4: { status: "available" },
+      },
+      {
+        name: "Session lifetime",
+        preview: { status: "partial", note: "Server-wide, when you host it yourself" },
+        v4: { status: "available" },
+      },
+      {
+        name: "Lockout after failed attempts",
+        preview: { status: "roadmap" },
+        v4: { status: "available" },
+      },
+      {
+        name: "Require multi-factor authentication",
+        preview: { status: "roadmap" },
+        v4: { status: "available" },
+      },
+    ],
+  },
+  {
     id: "login",
     title: "Login and branding",
     features: [
