@@ -164,7 +164,8 @@ describe("libraryBuild entries", () => {
 });
 
 describe("libraryBuild output", () => {
-  const root = () => packageOf({ exports: { ".": { import: "./dist/index.js" } } }, ["src/index.ts"]);
+  const root = () =>
+    packageOf({ exports: { ".": { import: "./dist/index.js" } } }, ["src/index.ts"]);
 
   it("minifies the JavaScript", () => {
     expect(buildOf(root()).minify).toBe(true);
