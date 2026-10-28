@@ -9,10 +9,10 @@ export default defineConfig({
       // The exports map names `.js` files (a `"type": "module"` package) and `.d.ts` declarations.
       extension: ".js",
       entry: { index: "src/index.ts", server: "src/server.ts" },
-      // The other SDKs ship a source map beside each module too.
-      sourcemap: true,
     }),
   ],
-  // Minified like the other SDKs. The runtime directory is left as is: Nuxt compiles it inside the app.
+  // Minified like the other SDKs. No source maps: the plugin maps the declarations along with
+  // the JavaScript, to sources the package does not ship. The runtime directory is left as is:
+  // Nuxt compiles it inside the app.
   build: { minify: true, rolldownOptions: { output: { minify } } },
 });
