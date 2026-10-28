@@ -38,6 +38,38 @@ export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]>
   }));
 }
 
+/** One revision of a user schema: its own id, and when it was minted. */
+export interface SchemaRevision {
+  id: string;
+  createdAt: string;
+}
+
+/**
+ * Every revision of one schema, newest first. Schemas are immutable, so a
+ * revision is a schema of its own sharing the `objectType`; the history is the
+ * list filtered to that type with `revisions: all`. The server lists newest
+ * first, and the sort keeps that order should a page land out of step.
+ */
+export async function fetchSchemaRevisions(
+  projectId: string,
+  objectType: string,
+): Promise<SchemaRevision[]> {
+  const entries = await readAllPages(async (pageToken) => {
+    const page = await api.listSchemas({
+      project_id: projectId,
+      kind: "user-schema",
+      object_type: objectType,
+      revisions: "all",
+      limit: 100,
+      page_token: pageToken,
+    });
+    return { items: page.schemas, next: page.next_page_token };
+  });
+  return entries
+    .map((entry) => ({ id: entry.id, createdAt: entry.metadata.created_at }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 /** One rendered form control, derived from a single schema property. */
 export interface SchemaField {
   /** Property key — also the attribute name sent in the `POST /users` body. */

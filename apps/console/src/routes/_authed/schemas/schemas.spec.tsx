@@ -2,7 +2,7 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -59,8 +59,8 @@ const DEEP = {
 const CREATED_AT = "2026-07-12T16:59:04Z";
 
 /** One `{id, schema, metadata}` wire envelope around a document. */
-function envelope(id: string, doc: object) {
-  return { id, schema: doc, metadata: { created_at: CREATED_AT } };
+function envelope(id: string, doc: object, createdAt = CREATED_AT) {
+  return { id, schema: doc, metadata: { created_at: createdAt } };
 }
 
 /**
@@ -367,10 +367,74 @@ describe("user schema detail", () => {
     await screen.findByRole("heading", { name: "Business" });
 
     expect(screen.getByText("Schema ID")).toBeInTheDocument();
-    expect(screen.getByText("sch_business")).toBeInTheDocument();
+    // Once in the card, once in the revision picker.
+    expect(screen.getAllByText("sch_business")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Copy Schema ID" })).toBeInTheDocument();
     expect(screen.getByText("Created")).toBeInTheDocument();
     expect(screen.getByText(formatDate(CREATED_AT))).toBeInTheDocument();
+  });
+
+  it("lists every revision of the schema, newest marked latest, and opens the chosen one", async () => {
+    // Revisions share an `objectType` and are listed by it, each named by its
+    // id and creation time (decisions log D10: several can be minted minutes
+    // apart). None is called active: which revision serves new registrations
+    // is the release's choice. An older one says users stay on it until they
+    // are migrated.
+    const NEWER_AT = "2026-08-01T09:30:00Z";
+    const newer = envelope("sch_business_2", BUSINESS, NEWER_AT);
+    const lists: URLSearchParams[] = [];
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        lists.push(new URL(request.url).searchParams);
+        return HttpResponse.json({ schemas: [newer, envelope("sch_business", BUSINESS)] });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business_2`, () => HttpResponse.json(newer)),
+    );
+    const router = await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(lists.at(-1)?.get("object_type")).toBe("human-user");
+    expect(lists.at(-1)?.get("revisions")).toBe("all");
+    const picker = screen.getByRole("combobox", { name: "Schema revision" });
+    expect(picker).toHaveTextContent("sch_business");
+    expect(picker).not.toHaveTextContent("latest");
+    expect(screen.getByText(/Not the newest revision/)).toBeInTheDocument();
+
+    await userEvent.click(picker);
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      `sch_business_2${formatDateTime(NEWER_AT)}latest`,
+      `sch_business${formatDateTime(CREATED_AT)}`,
+    ]);
+    await userEvent.click(options[0] as HTMLElement);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/schemas/sch_business_2"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent("latest"),
+    );
+    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
+  });
+
+  it("offers no revision picker for a schema with no object type", async () => {
+    // Stored without `objectType`, a schema is a revision of nothing: there is
+    // no history to list, so nothing is read for one.
+    let lists = 0;
+    server.use(
+      http.get(SCHEMAS_URL, () => {
+        lists += 1;
+        return HttpResponse.json({ schemas: [envelope("sch_deep", DEEP)] });
+      }),
+      http.get(`${SCHEMAS_URL}/sch_deep`, () => HttpResponse.json(envelope("sch_deep", DEEP))),
+    );
+    await renderAt("/schemas/sch_deep");
+    await screen.findByRole("heading", { name: "Deep" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
+    expect(lists).toBe(0);
   });
 
   it("reads the schema in the selected project", async () => {
@@ -385,11 +449,16 @@ describe("user schema detail", () => {
         projects.push(new URL(request.url).searchParams.get("project_id"));
         return HttpResponse.json(envelope("sch_business", BUSINESS));
       }),
+      // The history read is scoped the same way.
+      http.get(SCHEMAS_URL, ({ request }) => {
+        projects.push(new URL(request.url).searchParams.get("project_id"));
+        return HttpResponse.json({ schemas: [envelope("sch_business", BUSINESS)] });
+      }),
     );
     await renderAt("/schemas/sch_business", "proj_other");
 
     expect(await screen.findByRole("heading", { name: "Business" })).toBeInTheDocument();
-    expect(projects).toEqual(["proj_other"]);
+    expect(projects).toEqual(["proj_other", "proj_other"]);
   });
 
   it("elides the middle of a deep path, keeping the last two levels", async () => {
@@ -446,6 +515,7 @@ describe("user schema detail", () => {
         sso: { enabled: true, providers: ["google", "github"] },
       },
     };
+    serveBusiness();
     server.use(
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json(envelope("sch_business", withSso)),
@@ -471,6 +541,7 @@ describe("user schema detail", () => {
         sso: { enabled: false, providers: ["google"] },
       },
     };
+    serveBusiness();
     server.use(
       http.get(`${SCHEMAS_URL}/sch_business`, () =>
         HttpResponse.json(envelope("sch_business", disabled)),

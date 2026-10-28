@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Braces } from "lucide-react";
 import { Fragment } from "react";
 
@@ -11,11 +11,24 @@ import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
 import { SECTION_HEADING, SUBSECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatDateTime } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
-import { type UserSchema, schemaAuthMethods, schemaDisplayName } from "@/lib/schema";
+import {
+  type SchemaRevision,
+  type UserSchema,
+  fetchSchemaRevisions,
+  schemaAuthMethods,
+  schemaDisplayName,
+} from "@/lib/schema";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project", resource: "user schema" },
@@ -23,18 +36,35 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   // Schema ids are unique per project only (the seeded default carries the same
   // `$id` everywhere), and an ambiguous id resolves in the caller's own project
   // unless `project_id` names the selected one.
-  loader: ({ params, deps }) =>
-    api
-      .getSchemaById(params.schemaId, { project_id: requireProjectScope(deps.project) })
-      .then((body) => ({ schema: body.schema as UserSchema, createdAt: body.metadata.created_at })),
+  loader: async ({ params, deps }) => {
+    const projectId = requireProjectScope(deps.project);
+    const body = await api.getSchemaById(params.schemaId, { project_id: projectId });
+    const schema = body.schema as UserSchema;
+    // The history is keyed by the document's own `objectType`, so it is read
+    // after the document. A schema stored without one is a revision of
+    // nothing, and has no history to list.
+    const objectType = typeof schema.objectType === "string" ? schema.objectType : undefined;
+    const revisions = objectType ? await fetchSchemaRevisions(projectId, objectType) : [];
+    return { schema, createdAt: body.metadata.created_at, revisions };
+  },
   component: SchemaDetail,
 });
 
+/**
+ * The schema at one of its revisions, with every other revision a pick away
+ * (#1670). A revision is identified by its id and its creation time (decisions
+ * log D10), and the newest is marked `latest`; none is called active, because
+ * which revision serves new registrations is the release's choice, not the
+ * schema's. Users stay on the revision they were created on until they are
+ * migrated through the API, which an older revision says under the tab row.
+ */
+
 function SchemaDetail() {
-  const { schema, createdAt } = Route.useLoaderData();
+  const { schema, createdAt, revisions } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
+  const older = revisions.length > 0 && revisions[0]?.id !== schemaId;
 
   return (
     <Page inset="panel">
@@ -57,14 +87,26 @@ function SchemaDetail() {
               what puts the first trigger's box flush with the card's content
               edge and its label in line with `SCHEMA` below. (The viewer's own
               JSON/YAML strip does use `p-[3px]`.) */}
-          <TabsList className="h-10 px-0 py-[3px]">
-            <TabsTrigger value="fields" variant="muted">
-              Fields
-            </TabsTrigger>
-            <TabsTrigger value="authentication" variant="muted">
-              Authentication
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <TabsList className="h-10 px-0 py-[3px]">
+              <TabsTrigger value="fields" variant="muted">
+                Fields
+              </TabsTrigger>
+              <TabsTrigger value="authentication" variant="muted">
+                Authentication
+              </TabsTrigger>
+            </TabsList>
+            {/* On the tab row, as the design draws it: the revision applies to
+                both tabs. */}
+            {revisions.length > 0 && <RevisionSelect revisions={revisions} current={schemaId} />}
+          </div>
+
+          {older && (
+            <p className="text-muted-foreground px-2 text-sm">
+              Not the newest revision. Users stay on the revision they were created on until they
+              are migrated through the API.
+            </p>
+          )}
 
           <TabsContent value="fields">
             {/* The field table is a fixed 468px and the viewer takes the rest,
@@ -123,6 +165,54 @@ function SchemaDetail() {
         </Tabs>
       </DetailPanel>
     </Page>
+  );
+}
+
+/**
+ * The revision picker: each revision by its id and creation time, newest first
+ * and marked `latest`. Picking one opens that revision's own page, since each
+ * is a schema of its own; the project scope rides along in the search.
+ */
+function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; current: string }) {
+  const navigate = useNavigate({ from: Route.fullPath });
+  const latest = revisions[0]?.id;
+  return (
+    <Select
+      value={current}
+      onValueChange={(schemaId) =>
+        void navigate({ to: "/schemas/$schemaId", params: { schemaId } })
+      }
+    >
+      {/* The design's 36px trigger with the id in the 12px medium sans, not
+          the meta card's mono. */}
+      <SelectTrigger aria-label="Schema revision" className="max-w-full">
+        {/* Custom content: the id alone, without the item's timestamp, keeps
+            the trigger to the design's one id and badge. */}
+        <SelectValue>
+          <span className="truncate text-xs font-medium">{current}</span>
+          {current === latest && <LatestBadge />}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent position="popper" sideOffset={4} align="end">
+        {revisions.map((revision) => (
+          <SelectItem key={revision.id} value={revision.id} className="gap-2">
+            <span className="text-xs font-medium">{revision.id}</span>
+            <span className="text-muted-foreground text-xs">
+              {formatDateTime(revision.createdAt)}
+            </span>
+            {revision.id === latest && <LatestBadge />}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function LatestBadge() {
+  return (
+    <Badge variant="secondary" className="h-5">
+      latest
+    </Badge>
   );
 }
 
