@@ -8,6 +8,7 @@
     "lint": "biome check .",
     "test": "vitest run --config journey/vitest.config.ts",
     "test:all": "pnpm run test",
+    "install-browsers": "playwright install chromium",
     "console-smoke": "playwright test --config console/playwright.config.mts",
     "console-real": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} playwright test --config console/playwright.real.config.mts",
     "console-embedded": "NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT=${NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT-false} playwright test --config console/playwright.embedded.config.mts",

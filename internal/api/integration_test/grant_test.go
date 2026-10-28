@@ -698,7 +698,14 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.NoError(t, err)
 	deletedGrant, ok := deletedGrantResp.(*api.Grant)
 	require.True(t, ok, helpers.MustMarshal(t, deletedGrantResp))
-	delUser, err := platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(deletedUserID)})
+	require.NoError(t, harness.EnsureServiceDB(t).Statements().DeleteUserByID(t.Context(), platform.ID, deletedUserID))
+
+	revokedUserID := harness.CreateUserWithTeam(t, platform.ID)
+	revokedGrantResp, err := client.CreateGrant(t.Context(), userIDGrant(revokedUserID, api.CreateGrantRequestRelationAdmin), createParams)
+	require.NoError(t, err)
+	revokedGrant, ok := revokedGrantResp.(*api.Grant)
+	require.True(t, ok, helpers.MustMarshal(t, revokedGrantResp))
+	delUser, err := platformClient.DeleteUserByID(t.Context(), api.DeleteUserByIDParams{UserID: api.UserID(revokedUserID)})
 	require.NoError(t, err)
 	require.IsType(t, &api.DeleteUserByIDNoContent{}, delUser, helpers.MustMarshal(t, delUser))
 
@@ -722,6 +729,7 @@ func TestGrantQueryExpand(t *testing.T) {
 	require.Contains(t, got, userGrant.ID)
 	require.Contains(t, got, teamGrant.ID)
 	require.Contains(t, got, deletedGrant.ID)
+	assert.NotContains(t, got, revokedGrant.ID, "deleting the user through the API revokes their grant")
 
 	listedUser := got[userGrant.ID]
 	require.True(t, listedUser.User.IsSet())
