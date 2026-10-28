@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 
 import { DeploymentStatusBadge } from "@/components/deployment-status-badge";
-import { DetailSection } from "@/components/detail-page";
+import { DetailRow, DetailSection } from "@/components/detail-page";
 import { OriginLink } from "@/components/origin-link";
 import { Separator } from "@/components/ui/separator";
 import { formatDateTime } from "@/lib/date";
@@ -35,15 +35,14 @@ export function ReleaseDeployments({ deployments }: { deployments: Deployment[] 
 
 function DeploymentRow({ deployment }: { deployment: Deployment }) {
   return (
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-6">
-      {/* 216px, less the gap: the origins start on the column the pointer
-          groups' lists use. */}
-      <div className="flex shrink-0 items-center gap-2 sm:w-48">
-        <span className="text-sm leading-5 text-muted-foreground">
-          {KIND_LABEL[deployment.kind]}
-        </span>
-        <DeploymentStatusBadge status={deployment.status} />
-      </div>
+    <DetailRow
+      label={
+        <>
+          <span>{KIND_LABEL[deployment.kind]}</span>
+          <DeploymentStatusBadge status={deployment.status} />
+        </>
+      }
+    >
       <ul className="flex min-w-0 flex-1 flex-col gap-1">
         {deployment.targets.map((target) => (
           <li key={target.origin} className="flex min-w-0">
@@ -63,6 +62,6 @@ function DeploymentRow({ deployment }: { deployment: Deployment }) {
       >
         {formatDateTime(deployment.deployed_at)}
       </time>
-    </div>
+    </DetailRow>
   );
 }

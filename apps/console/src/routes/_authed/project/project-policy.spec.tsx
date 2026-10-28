@@ -84,7 +84,7 @@ describe("project policies", () => {
 
     expect(policies.getByText("Password policy")).toBeInTheDocument();
     expect(policies.getByText("15 characters")).toBeInTheDocument();
-    expect(policies.getByText("Prevent reuse of last 4 passwords")).toBeInTheDocument();
+    expect(policies.getByText("Prevent reuse of the last 4 passwords")).toBeInTheDocument();
     expect(policies.queryByText("Warning")).not.toBeInTheDocument();
     expect(queries[0]?.get("project_id")).toBe(PROJECT_ID);
     expect(queries[0]?.get("operation")).toBe("auth.factor.password.set");
@@ -117,7 +117,7 @@ describe("project policies", () => {
     expect(note).not.toHaveTextContent("configured minimum");
   });
 
-  it("keeps the page when the policy cannot be read, and says so in the card", async () => {
+  it("keeps the page when the policy cannot be read, and shows the refusal in the card", async () => {
     server.use(
       http.get("http://localhost/api/policies", () =>
         HttpResponse.json(
@@ -130,7 +130,7 @@ describe("project policies", () => {
 
     expect(screen.getByRole("heading", { name: "River" })).toBeInTheDocument();
     expect(policies.getByText("Password policy")).toBeInTheDocument();
-    expect(policies.getByText("The password policy could not be read.")).toBeInTheDocument();
+    expect(policies.getByText("policy store unavailable")).toBeInTheDocument();
     expect(policies.queryByText("Warning")).not.toBeInTheDocument();
   });
 });

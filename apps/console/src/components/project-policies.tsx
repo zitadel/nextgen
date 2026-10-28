@@ -1,24 +1,29 @@
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import { type RefObject, useRef } from "react";
 
-import { DetailSection } from "@/components/detail-page";
+import { DetailRow, DetailSection } from "@/components/detail-page";
 import { IssueMarker } from "@/components/issue-marker";
 import { Badge } from "@/components/ui/badge";
 import { PopoverDescription, PopoverHeader, PopoverTitle } from "@/components/ui/popover";
-import {
-  type PasswordPolicyConfig,
-  RECOMMENDED_MIN_LENGTH,
-  passwordRequirements,
-} from "@/lib/password-policy";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { type PasswordPolicyConfig, passwordRequirements } from "@/lib/password-policy";
 
 /** Where the recommendation comes from: the password verifier rules of NIST SP 800-63B. */
 const RECOMMENDATION_URL = "https://pages.nist.gov/800-63-4/sp800-63b.html#passwordver";
 
 /**
- * The outcome of reading the project's password policy: its config, `config`
- * undefined when the project never published one, or `undefined` as a whole
- * when the read failed.
+ * The note is 320px wide and opens 16px past the list. Under `xl` the list's
+ * end plus that overruns the viewport with the sidebar open, and Radix would
+ * flip the note over the label column, so it opens below the list instead.
  */
-export type PasswordPolicyRead = { config: PasswordPolicyConfig | undefined } | undefined;
+const NOTE_BESIDE_LIST = "(min-width: 1280px)";
+
+/**
+ * The outcome of reading the project's password policy: its config, `config`
+ * undefined when the project never published one, or the API's message when
+ * the read failed.
+ */
+export type PasswordPolicyRead = { config: PasswordPolicyConfig | undefined } | { error: string };
 
 /**
  * The project's policies, read-only: one row per policy the catalog lists,
@@ -30,24 +35,26 @@ export type PasswordPolicyRead = { config: PasswordPolicyConfig | undefined } | 
  * configuration (ADR 066), so there is nothing to edit here.
  */
 export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) {
-  const rules = password && passwordRequirements(password.config);
+  const rules = "config" in password ? passwordRequirements(password.config) : undefined;
+  const error = "error" in password ? password.error : undefined;
   const warn = rules?.belowRecommended ?? false;
   const list = useRef<HTMLDListElement>(null);
   return (
     <DetailSection
       title="Policies"
       titleId="project-policies"
-      className="mt-4"
       role="region"
       aria-labelledby="project-policies"
     >
-      {/* The label column and the gap the origins rows above use, so both
-          cards' values start on one edge. */}
-      <div className="flex flex-col gap-1 border-b border-border py-3 sm:flex-row sm:items-start sm:gap-6">
-        <div className="flex shrink-0 items-center gap-1.5 sm:w-48">
-          <span className="text-sm leading-5 text-foreground">Password policy</span>
-          {warn && <Badge variant="warning">Warning</Badge>}
-        </div>
+      <DetailRow
+        divider
+        label={
+          <>
+            Password policy
+            {warn && <Badge variant="warning">Warning</Badge>}
+          </>
+        }
+      >
         {rules ? (
           <dl
             ref={list}
@@ -59,12 +66,7 @@ export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) 
                   detail's rows: the two sit 6px apart with nothing between them. */}
               <dd className="flex items-center gap-1.5 text-foreground">
                 {rules.minimumLength}
-                {warn && (
-                  <BelowRecommendedNote
-                    configured={password.config?.min_length !== undefined}
-                    anchor={list}
-                  />
-                )}
+                {warn && <BelowRecommendedNote configured={rules.minimumSet} anchor={list} />}
               </dd>
             </div>
             <div className="flex items-center gap-1.5">
@@ -73,11 +75,9 @@ export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) 
             </div>
           </dl>
         ) : (
-          <p className="text-sm leading-5 text-muted-foreground">
-            The password policy could not be read.
-          </p>
+          <p className="text-sm leading-5 text-muted-foreground">{error}</p>
         )}
-      </div>
+      </DetailRow>
     </DetailSection>
   );
 }
@@ -85,8 +85,9 @@ export function ProjectPolicies({ password }: { password: PasswordPolicyRead }) 
 /**
  * Why the minimum is a warning, with where the recommendation comes from. A
  * minimum the policy sets reads as below it; none at all reads as unset,
- * since nothing was configured. The note opens to the right of the whole
- * list, past its longest line, so it covers none of the values.
+ * since nothing was configured. The note opens beside the whole list, past
+ * its longest line, so it covers none of the values, or below it where there
+ * is no room beside.
  */
 function BelowRecommendedNote({
   configured,
@@ -96,12 +97,13 @@ function BelowRecommendedNote({
   anchor: RefObject<HTMLElement | null>;
 }) {
   const title = configured ? "Below recommended minimum" : "No minimum set";
+  const beside = useMediaQuery(NOTE_BESIDE_LIST);
   return (
     <IssueMarker
       tone="warning"
       label={title}
-      side="right"
-      sideOffset={16}
+      side={beside ? "right" : "bottom"}
+      sideOffset={beside ? 16 : 8}
       align="start"
       anchor={anchor}
       contentClassName="w-80"
@@ -110,8 +112,8 @@ function BelowRecommendedNote({
         <PopoverTitle>{title}</PopoverTitle>
         <PopoverDescription>
           {configured
-            ? `The configured minimum password length is below the recommended ${RECOMMENDED_MIN_LENGTH} characters for single-factor authentication.`
-            : `No minimum password length is set. The recommended minimum is ${RECOMMENDED_MIN_LENGTH} characters for single-factor authentication.`}{" "}
+            ? `The configured minimum password length is below the recommended ${RECOMMENDED_PASSWORD_MIN_LENGTH} characters for single-factor authentication.`
+            : `No minimum password length is set. The recommended minimum is ${RECOMMENDED_PASSWORD_MIN_LENGTH} characters for single-factor authentication.`}{" "}
           <a
             href={RECOMMENDATION_URL}
             target="_blank"

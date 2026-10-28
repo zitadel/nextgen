@@ -12,6 +12,7 @@ import { type PasswordPolicyRead, ProjectPolicies } from "@/components/project-p
 import { ProjectVariables } from "@/components/project-variables";
 import { RenameCard } from "@/components/rename-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { describeError } from "@/lib/api-error";
 import { formatDate } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 
@@ -65,7 +66,9 @@ export const Route = createFileRoute("/_authed/project/")({
         .listPolicies({ project_id: projectId, operation: "auth.factor.password.set", limit: 1 })
         .then(
           (page): PasswordPolicyRead => ({ config: page.policies[0]?.config }),
-          (): PasswordPolicyRead => undefined,
+          (cause): PasswordPolicyRead => ({
+            error: describeError(cause, "The password policy could not be read."),
+          }),
         ),
     ]);
     return { project, grants: grants.grants, variables, passwordPolicy: policies };

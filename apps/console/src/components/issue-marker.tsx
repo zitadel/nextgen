@@ -17,7 +17,8 @@ const TONE: Record<Tone, string> = {
  * has room for the glyph alone, so the detail lives in a popover rather than
  * a title attribute a keyboard or a touch device never sees. `children` are
  * the note's `PopoverHeader`s. The note opens off the glyph, or off `anchor`
- * where the glyph sits inside something the note must not cover.
+ * where the glyph sits inside something the note must not cover, and keeps
+ * the page's 16px gutter when a narrow viewport pushes it to an edge.
  */
 export function IssueMarker({
   tone,
@@ -55,6 +56,7 @@ export function IssueMarker({
         side={side}
         sideOffset={sideOffset}
         align={align}
+        collisionPadding={16}
         className={cn("flex w-auto flex-col gap-2.5 border-foreground/10 p-2", contentClassName)}
       >
         {children}

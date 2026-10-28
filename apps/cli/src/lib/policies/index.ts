@@ -86,15 +86,6 @@ export const PASSWORD_POLICY_OPERATION = "auth.factor.password.set";
 export const PASSWORD_POLICY_PATH = `${POLICIES_DIR}/${policyFileName(PASSWORD_POLICY_OPERATION)}`;
 
 /**
- * The minimum password length `setup` recommends, and writes when it is given
- * none (8 is NIST's minimum for one only ever used with a second factor). The
- * wizard preselects it and a run with nobody to ask gets it, so a project
- * starts with the same policy whoever set it up. Shared with the console,
- * which warns on a policy under it.
- */
-export { RECOMMENDED_PASSWORD_MIN_LENGTH };
-
-/**
  * A minimum password length as `setup` was given it: a number, or `null` for
  * an explicit "none" (an empty answer, or 0), which is not the same as not
  * being asked: a new policy file gets {@link RECOMMENDED_PASSWORD_MIN_LENGTH}
