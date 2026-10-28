@@ -113,6 +113,7 @@
   "devDependencies": {
     "@types/culori": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

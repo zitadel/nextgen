@@ -113,6 +113,7 @@
     "@zitadel/api": "workspace:*",
     "@zitadel/api-mock": "workspace:*",
     "@zitadel/design-tokens": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "lightningcss": "catalog:",
     "msw": "catalog:",

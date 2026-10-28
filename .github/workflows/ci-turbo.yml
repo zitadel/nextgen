@@ -178,6 +178,10 @@ jobs:
       - name: Put workspace binaries on PATH
         run: echo "$PWD/node_modules/.bin" >> "$GITHUB_PATH"
 
+      # As in ci.yml.
+      - name: Check package boundaries
+        run: turbo boundaries
+
       # Vercel Remote Cache over OIDC: needs the repository variable
       # TURBO_TEAM (the Vercel team slug) and a "Turborepo CLI" OIDC policy
       # for this repository in the Vercel team's settings (Build and

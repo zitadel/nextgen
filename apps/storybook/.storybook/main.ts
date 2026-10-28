@@ -9,6 +9,7 @@ import type { StorybookConfig } from "@storybook/web-components-vite";
 // (the package ships only `dist/`), so it is imported by source path here —
 // mirroring how the package's own `vitest.config.ts` imports it — rather than
 // through a package export that would resolve to an unpublished `.ts` file.
+// @boundaries-ignore build tooling @zitadel/components does not publish, imported by path as said above
 import { liquidRaw } from "../../../packages/components/vite-liquid-plugin.js";
 
 import { optimizeDepsExclude, optimizeDepsInclude } from "./optimize-deps.ts";

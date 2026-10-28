@@ -61,9 +61,11 @@
     // listed here (it checks the file); the cloud's builds run its `pnpm`.
     "COREPACK_HOME"
   ],
-  // The root files moon's .moon/tasks/*.yml list as implicitInputs: a change
-  // to any of them re-runs every task. Turbo hashes each package's slice of
-  // pnpm-lock.yaml on its own, so the lockfile is not listed.
+  // The files moon's .moon/tasks/*.yml list as implicitInputs: a change to
+  // any of them re-runs every task. Turbo hashes each package's slice of
+  // pnpm-lock.yaml on its own, so the lockfile is not listed. Every test
+  // config spreads @zitadel/vitest-config, but no task edge reaches that
+  // package, so its files are listed here.
   "globalDependencies": [
     ".nvmrc",
     ".npmrc",
@@ -73,8 +75,8 @@
     "devbox.lock",
     "tsconfig.base.json",
     "biome.json",
-    "vitest.shared.mjs",
-    "vitest.shared.d.mts"
+    "packages/vitest-config/vitest.shared.mjs",
+    "packages/vitest-config/vitest.shared.d.mts"
   ],
   "tasks": {
     // ---- The standard tasks of every TypeScript package (.moon/tasks/

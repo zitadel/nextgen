@@ -56,6 +56,7 @@
     "@sveltejs/kit": "^3.0.1",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "svelte": "^5.57.2",
     "tsup": "catalog:",
     "typescript": "catalog:",

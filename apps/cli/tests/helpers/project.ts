@@ -4,7 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
-import { parseEnv } from "node:util";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
 
@@ -62,6 +62,16 @@ export interface DeployResult {
   readonly resources?: number;
   readonly origins?: string[];
   readonly dry_run?: boolean;
+  readonly diff?: {
+    readonly against: string | null;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly status: string;
+      readonly previous_path?: string;
+      readonly patch: string;
+    }> | null;
+    readonly note?: string;
+  };
 }
 
 export interface FlowStep {
@@ -627,6 +637,33 @@ export class ScaffoldedApp {
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** The envelope data of a dry run expected to succeed (its diff). */
+  async deployDryRunData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deployDryRun(extraArgs);
+    expect(result, "deploy --dry-run should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /**
+   * Commits the whole app to git, making it a repository the first time, as a
+   * developer does before they deploy: a deploy records the commit it was built
+   * from, and the next one diffs `.zitadel/` against it.
+   */
+  async commit(): Promise<void> {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: this.path });
+    await git(["init", "-q"]);
+    await git(["add", "-A"]);
+    await git([
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "wip",
+    ]);
   }
 
   /** `deploy` without `--json`, for a spec asserting what the developer reads. */
@@ -1371,6 +1408,15 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   const path = join(parent, "my-app");
   await mkdir(path);
   return new ScaffoldedApp(path);
+}
+
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
 }
 
 /** An app already through `setup`, for specs about the commands after it. */

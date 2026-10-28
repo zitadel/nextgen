@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { HOSTED_BASE, renderBuiltinSchemas } from "../../../scripts/render-builtin-schemas.mjs";
 
 /**

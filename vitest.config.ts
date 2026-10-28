@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "./vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 
 /**
  * Root workspace-tooling tests (all Vitest, run in Node). This is not a project
