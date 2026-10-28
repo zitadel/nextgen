@@ -29,7 +29,9 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      // Deploys and rolls back too, and leaves no password policy, so it runs last.
+      // Needs no state from the specs before it: it reads the minimum setup
+      // wrote and rolls back only its own deploy. The dependency only orders it
+      // last, because it leaves the app with no password policy.
       name: "password-policy",
       testMatch: /password-policy\.spec\.ts/,
       dependencies: ["schema-revisions"],

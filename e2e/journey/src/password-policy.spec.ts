@@ -28,8 +28,10 @@ import {
  * writes `.zitadel/policies/auth.factor.password.set.json` and deploys it, so
  * a fresh app refuses a password below its minimum. `zitadel policies test`
  * answers as the live sign-up does and refuses an expectation that cannot
- * pass. Deploying a higher minimum raises the bar for new passwords and
- * leaves existing ones signing in; a release that is built but not deployed
+ * pass. Deploying a higher minimum and a maximum bounds new passwords from
+ * both sides, and leaves existing ones signing in; `policies test` checks the
+ * history depth deployed with them, which no sign-up can reach because a new
+ * user has no history; a release that is built but not deployed
  * changes nothing; rolling back brings the earlier minimum back; deploying
  * without the file switches the policy off.
  * Its own Playwright project runs it last, because it leaves the app with no
@@ -45,6 +47,9 @@ let metadata: JourneyMetadata & { localRuntimeUrl: string };
 /** The minimum setup published; the release that serves it is live when the spec starts. */
 let setupMinimum: number;
 let raisedMinimum: number;
+let maximum: number;
+/** How many earlier passwords a user may not set again, once deployed. */
+const HISTORY_DEPTH = 2;
 /** A user who registered under the setup minimum, with a password exactly that long. */
 const earlyUser = { email: identity().email, password: "" };
 
@@ -54,6 +59,7 @@ test.beforeAll(async () => {
   setupMinimum = policy.config.min_length ?? 0;
   expect(setupMinimum, "setup publishes a minimum length").toBeGreaterThan(1);
   raisedMinimum = setupMinimum + 5;
+  maximum = raisedMinimum + 5;
   earlyUser.password = passwordOf(setupMinimum);
 });
 
@@ -104,21 +110,63 @@ test("policies test refuses an expectation the policy cannot meet", async () => 
 });
 
 test("sign-up refuses a password below the setup minimum and takes one at it", async ({ page }) => {
-  await expectRefused(page, earlyUser.email, passwordOf(setupMinimum - 1), setupMinimum);
+  await expectRefused(page, earlyUser.email, passwordOf(setupMinimum - 1), tooShort(setupMinimum));
   await submitPassword(page, earlyUser.password);
   await expectSignedIn(page);
   await logout(page);
 });
 
-test("a deployed higher minimum applies to new passwords", async ({ page }) => {
-  await setMinimum(raisedMinimum);
-  await deploy("raise the password minimum");
+test("a deployed higher minimum and a maximum apply to new passwords", async ({ page }) => {
+  await setPolicy({
+    min_length: raisedMinimum,
+    max_length: maximum,
+    history_depth: HISTORY_DEPTH,
+  });
+  await deploy("raise the password minimum, cap the length and keep a history");
 
   const { email } = identity();
-  await expectRefused(page, email, passwordOf(setupMinimum), raisedMinimum);
-  await submitPassword(page, passwordOf(raisedMinimum));
+  await expectRefused(page, email, passwordOf(setupMinimum), tooShort(raisedMinimum));
+  await submitPassword(page, passwordOf(maximum + 1));
+  await expect(page.getByText(tooLong(maximum)).first()).toBeVisible();
+  await submitPassword(page, passwordOf(maximum));
   await expectSignedIn(page);
   await logout(page);
+});
+
+test("policies test refuses a password reused within the deployed history depth", async () => {
+  const password = passwordOf(raisedMinimum);
+  await writePolicyTest([
+    {
+      name: "the password before the current one is refused",
+      input: { password },
+      facts: { self_service: true, history_matches: [false, true] },
+      expect: { allowed: false, violations: ["history_depth"] },
+    },
+    {
+      name: "a password older than the history depth is allowed",
+      input: { password },
+      facts: { self_service: true, history_matches: [false, false, true] },
+      expect: { allowed: true },
+    },
+    {
+      name: "an administrator's set skips the history",
+      input: { password },
+      facts: { self_service: false, history_matches: [true] },
+      expect: { allowed: true },
+    },
+  ]);
+
+  const envelope = (await runCli(metadata, [
+    "policies",
+    "test",
+    "--non-interactive",
+    "--json",
+  ])) as {
+    data: { passed: number; failed: number };
+  };
+  expect(envelope.data).toMatchObject({ passed: 3, failed: 0 });
+
+  await rm(join(metadata.appDir, POLICY_TEST));
 });
 
 test("a password set under the earlier minimum still signs in", async ({ page }) => {
@@ -129,7 +177,7 @@ test("a password set under the earlier minimum still signs in", async ({ page })
 });
 
 test("a released but undeployed minimum does not apply", async ({ page }) => {
-  await setMinimum(setupMinimum - 1);
+  await setPolicy({ min_length: setupMinimum - 1 });
   await runCli(metadata, [
     "release",
     "create",
@@ -139,7 +187,7 @@ test("a released but undeployed minimum does not apply", async ({ page }) => {
     "--json",
   ]);
 
-  await expectRefused(page, identity().email, passwordOf(setupMinimum), raisedMinimum);
+  await expectRefused(page, identity().email, passwordOf(setupMinimum), tooShort(raisedMinimum));
 });
 
 test("rolling back brings the setup minimum back", async ({ page }) => {
@@ -147,7 +195,7 @@ test("rolling back brings the setup minimum back", async ({ page }) => {
   await runCli(metadata, ["deployment", "rollback", "--force", "--non-interactive", "--json"]);
 
   const { email } = identity();
-  await expectRefused(page, email, passwordOf(setupMinimum - 1), setupMinimum);
+  await expectRefused(page, email, passwordOf(setupMinimum - 1), tooShort(setupMinimum));
   await submitPassword(page, passwordOf(setupMinimum));
   await expectSignedIn(page);
   await logout(page);
@@ -173,16 +221,18 @@ function passwordOf(length: number): string {
   return unique.padEnd(length, "x").slice(0, length);
 }
 
-async function readPolicy(): Promise<{ config: { min_length?: number } }> {
+type PasswordPolicyConfig = { min_length?: number; max_length?: number; history_depth?: number };
+
+async function readPolicy(): Promise<{ config: PasswordPolicyConfig }> {
   return JSON.parse(await readFile(join(metadata.appDir, POLICY), "utf8")) as {
-    config: { min_length?: number };
+    config: PasswordPolicyConfig;
   };
 }
 
-/** Sets the policy file's minimum length, as a developer edits `.zitadel/`. */
-async function setMinimum(minLength: number): Promise<void> {
+/** Sets settings in the policy file, keeping the others, as a developer edits `.zitadel/`. */
+async function setPolicy(config: PasswordPolicyConfig): Promise<void> {
   const policy = await readPolicy();
-  policy.config.min_length = minLength;
+  Object.assign(policy.config, config);
   await writeFile(join(metadata.appDir, POLICY), `${JSON.stringify(policy, null, 2)}\n`);
 }
 
@@ -197,17 +247,26 @@ async function deploy(message: string): Promise<void> {
 }
 
 /**
- * Starts a password registration with a password the policy refuses, and
- * checks the step stays, naming the minimum. The page is left on that step.
+ * The refusal "Password must be at least N characters.", not the field's hint
+ * "At least N characters.", which shows before anything is submitted.
  */
-async function expectRefused(page: Page, email: string, password: string, minimum: number) {
+function tooShort(minimum: number): RegExp {
+  return new RegExp(`must be at least ${minimum} characters`, "i");
+}
+
+/** The refusal "Password must be at most N characters." */
+function tooLong(maximum: number): RegExp {
+  return new RegExp(`must be at most ${maximum} characters`, "i");
+}
+
+/**
+ * Starts a password registration with a password the policy refuses, and
+ * checks the step stays, showing the refusal. The page is left on that step.
+ */
+async function expectRefused(page: Page, email: string, password: string, refusal: RegExp) {
   await gotoLogin(page);
   await registerWithPassword(page, { email, password, profile: registrationProfile });
-  // The refusal, "Password must be at least N characters.", not the field's
-  // hint "At least N characters.", which shows before anything is submitted.
-  await expect(
-    page.getByText(new RegExp(`must be at least ${minimum} characters`, "i")).first(),
-  ).toBeVisible();
+  await expect(page.getByText(refusal).first()).toBeVisible();
   // Still on the password step: the refusal kept the user from signing up.
   await expect(flowField(page, "password", { label: /password/i })).toBeVisible();
   await expect(page).not.toHaveURL(/\/profile(?:[/?#]|$)/);
