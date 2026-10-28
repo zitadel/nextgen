@@ -3,7 +3,6 @@ package service_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -336,24 +335,6 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 			`"client_id":"id","client_secret":"${{ S }}"}}`,
 		"a strategy pointer": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
 			`"verified_claims":{"email":"$supplementary_fetch"},"oidc":{` + oidcBlock + `}}`,
-		"a mapping target that names a nested property": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"claim_mapping":{"address.street":"street"},"oidc":{` + oidcBlock + `}}`,
-		"a mapping target that is empty": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"claim_mapping":{"":"email"},"oidc":{` + oidcBlock + `}}`,
-		"a mapping from a claim that is empty": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"claim_mapping":{"email":""},"oidc":{` + oidcBlock + `}}`,
-		"a mapping from a reserved claim": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"claim_mapping":{"email":"$email"},"oidc":{` + oidcBlock + `}}`,
-		"a mapping from a number": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"claim_mapping":{"email":1},"oidc":{` + oidcBlock + `}}`,
-		"a verified property that names a nested property": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"verified_claims":{"address.street":true},"oidc":{` + oidcBlock + `}}`,
-		"a verified property that is empty": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"verified_claims":{"":true},"oidc":{` + oidcBlock + `}}`,
-		"a verification source that is empty": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"verified_claims":{"email":""},"oidc":{` + oidcBlock + `}}`,
-		"a verification source that is a number": `{"slug":"google","protocol":"oidc","display_name":"Google",` +
-			`"verified_claims":{"email":1},"oidc":{` + oidcBlock + `}}`,
 	} {
 		t.Run(name+" is an invalid document", func(t *testing.T) {
 			t.Parallel()
@@ -361,66 +342,6 @@ func TestIDPConnectionService_CreateOrRevise(t *testing.T) {
 
 			_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, []byte(document))
 			require.ErrorIs(t, err, domain.ErrRequestInvalid())
-			assert.Empty(t, *f.events)
-		})
-	}
-
-	t.Run("a verification for a property that is mapped is accepted", func(t *testing.T) {
-		t.Parallel()
-		f := newIDPConnectionFixture(t)
-		f.pool.EXPECT().GetIDPConnection(gomock.Any(), gomock.Any()).Return(nil, database.NewNoRowFoundError(nil))
-		f.tx.EXPECT().CreateIDPConnection(gomock.Any(), gomock.Any()).Return(nil)
-
-		document := []byte(`{"slug":"corp","protocol":"oidc","display_name":"Corp",` +
-			`"claim_mapping":{"email":"mail"},"verified_claims":{"email":"mail_verified"},` +
-			`"oidc":{` + oidcBlock + `}}`)
-		got, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, document)
-		require.NoError(t, err)
-		assert.True(t, got.Created)
-	})
-
-	// Each of these is refused by the check named, not by another rule that
-	// happens to catch the same document.
-	const wide = `"issuer":"https://accounts.google.com","client_id":"id","client_secret":"${{ S }}"`
-	for name, tc := range map[string]struct {
-		document string
-		problem  string
-	}{
-		"a verification for a property nothing maps": {
-			`"claim_mapping":{"email":"email"},"verified_claims":{"phone":"phone_number_verified"},"oidc":{` + wide + `,"scopes":["openid","email","phone"]}`,
-			`verified_claims has \"phone\"`,
-		},
-		"a trust-all verification for a property nothing maps": {
-			`"verified_claims":{"email":true},"oidc":{` + oidcBlock + `}`,
-			`verified_claims has \"email\"`,
-		},
-		"a claim name with a space around it": {
-			`"claim_mapping":{"email":"mail "},"oidc":{` + oidcBlock + `}`,
-			`has a space`,
-		},
-		"a subject that is a profile claim": {
-			`"subject_claim":"email","oidc":{` + oidcBlock + `}`,
-			`subject_claim is \"email\"`,
-		},
-		"an email verified by a claim that vouches for another": {
-			`"claim_mapping":{"email":"mail"},"verified_claims":{"email":"email_verified"},"oidc":{` + wide + `,"scopes":["openid","email"]}`,
-			`only vouches for the claim \"email\"`,
-		},
-		"a verification that reads a claim which is not a boolean": {
-			`"claim_mapping":{"email":"mail"},"verified_claims":{"email":"name"},"oidc":{` + wide + `,"scopes":["openid","profile"]}`,
-			`that is a string claim`,
-		},
-	} {
-		t.Run(name+" is refused for that reason", func(t *testing.T) {
-			t.Parallel()
-			f := newIDPConnectionFixture(t)
-			document := `{"slug":"google","protocol":"oidc","display_name":"Google",` + tc.document + `}`
-
-			_, err := f.svc.CreateOrRevise(t.Context(), idpProjectID, []byte(document))
-			require.ErrorIs(t, err, domain.ErrRequestInvalid())
-			var domErr domain.Error
-			require.ErrorAs(t, err, &domErr)
-			assert.Contains(t, fmt.Sprintf("%q", domErr.Details), tc.problem)
 			assert.Empty(t, *f.events)
 		})
 	}

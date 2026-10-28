@@ -1,6 +1,4 @@
 ---
-"@zitadel/server": minor
-"@zitadel/api": minor
 "@zitadel/config": minor
 "@zitadel/cli": minor
 ---
