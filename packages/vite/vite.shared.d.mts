@@ -8,6 +8,8 @@ export interface LibraryBuildOptions {
   src?: string;
   /** Rolldown warning codes that do not fail the build; comment each one where it is passed. */
   allow?: string[];
+  /** Whether to minify the JavaScript (default `true`); comment where it is turned off. */
+  minify?: boolean;
 }
 
 /** Rolldown's minify for an ES library, whitespace included; see the implementation. */

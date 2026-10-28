@@ -51,7 +51,7 @@ const leaves = (value) =>
  * @param {import("./vite.shared.d.mts").LibraryBuildOptions} [options]
  * @returns {import("vite").Plugin}
  */
-export function libraryBuild(root, { src = "src", allow = [] } = {}) {
+export function libraryBuild(root, { src = "src", allow = [], minify: minified = true } = {}) {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const sourceOf = (name) => SOURCE_EXTENSIONS.map((ext) => `${src}/${name}${ext}`);
   const find = (name) => sourceOf(name).find((file) => existsSync(join(root, file)));
@@ -105,7 +105,7 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
       build: {
         outDir: "dist",
         sourcemap: true,
-        minify: true,
+        minify: minified,
         lib: {
           entry,
           formats: ["es"],
@@ -113,7 +113,7 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
         },
         rolldownOptions: {
           external: [new RegExp(`^(${external.join("|")})($|/)`), /^node:/],
-          output: { minify },
+          ...(minified && { output: { minify } }),
           onwarn: (warning) => {
             // Whether a slow plugin (type generation) is reported depends on the machine's load.
             if (warning.code === "PLUGIN_TIMINGS" || keptDirective(warning)) return;

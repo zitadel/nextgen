@@ -179,6 +179,12 @@ describe("libraryBuild output", () => {
     });
   });
 
+  it("leaves the JavaScript unminified when told to", () => {
+    const build = buildOf(root(), { minify: false });
+    expect(build.minify).toBe(false);
+    expect(build.rolldownOptions.output).toBeUndefined();
+  });
+
   it("is the minify a build outside it can reuse", () => {
     expect(buildOf(root()).rolldownOptions.output.minify).toBe(minify);
   });

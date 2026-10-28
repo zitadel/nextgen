@@ -17,7 +17,9 @@ const qwik = [qwikVite()]
 export default defineConfig({
   build: { target: "es2020" },
   plugins: [
-    libraryBuild(import.meta.dirname),
+    // Qwik ships its libraries unminified, and its plugin turns minify off for them: the app's
+    // optimizer splits the inlined QRLs out of `.qwik.mjs` and needs their closures as written.
+    libraryBuild(import.meta.dirname, { minify: false }),
     qwik,
     dts({
       tsconfigPath: "./tsconfig.lib.json",
