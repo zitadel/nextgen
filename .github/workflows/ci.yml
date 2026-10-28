@@ -21,6 +21,11 @@ jobs:
     permissions:
       contents: read
     env:
+      # What the change is measured against: a pull request's base, or the
+      # commit a merge group is built on. Against origin/main, an entry queued
+      # behind others re-tested every entry ahead of it, which its own group
+      # tests (docs/design/build/turborepo-graph.md).
+      CI_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
       # Moon marks failed tasks by color alone, so a failed `moon ci` can end at
       # "Tasks: 1 failed" with no named target. The summary names them in plain
       # text and replays each failed task's own output. Green runs pay only a
@@ -137,7 +142,7 @@ jobs:
       # tests: scripts/ci-mode.mjs.
       - name: Detect CI mode
         id: ci-mode
-        run: node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+        run: node scripts/ci-mode.mjs "$CI_BASE"
 
       # Pruning variant: deletes every generated file before regenerating, so
       # output that no directive produces any more fails here instead of
@@ -186,7 +191,11 @@ jobs:
         # moon ci only selects tasks whose own inputs changed. --downstream deep
         # with --include-relations also runs the tasks of every project that
         # depends on a changed one, so an api change re-tests its consumers.
-        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations
+        # It compares with the same base as ci-mode; without one, a merge
+        # group fell back to origin/main.
+        env:
+          MOON_BASE: ${{ env.CI_BASE }}
+        run: moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph :check-turbo-graph --downstream deep --include-relations
 
       # The graph step above runs the Go database lanes whenever moon finds
       # them affected, as dependents of the console and login UI builds their

@@ -243,8 +243,9 @@ dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
 - Playwright Chromium install for the e2e lanes. Browser test lanes pull in
   their own Chromium through a moon `install-browsers` dep on their `:test`
   task.
-- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph` —
-  builds, lint, typecheck and unit tests, and the Go database lanes
+- `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph
+  :check-turbo-graph` — builds, lint, typecheck and unit tests, the checks of
+  both task graphs, and the Go database lanes
   (`server:test-postgres`, `server:test-sqlite`) whenever moon finds them
   affected, as dependents of the UI builds their binary embeds.
 - `moon run server:test-postgres`, then `moon run server:test-sqlite` — only

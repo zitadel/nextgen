@@ -28,6 +28,10 @@ Where the two differ on purpose:
 - Turbo's console `build` lists the git-ignored `.env*` files as inputs. Moon
   hashes only the files git sees, listed or not, so `moon.yml` does not list
   them: under moon a changed `.env.local` still restores the old build.
+- Turbo's inputs follow file classes: no task hashes its package's docs, and
+  no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
+  Moon keeps the whole folder (below). A file read outside the folder goes
+  into both; `workspace:check-turbo-graph` finds the ones turbo misses.
 
 ## Shared tasks live in `.moon/tasks`
 

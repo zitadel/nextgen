@@ -3,7 +3,9 @@
 > **Status:** accepted for phase 1 (dual run) on 2026-10-12; the decisions
 > are recorded at the end. Since 2026-10-14 pull requests no longer run
 > `ci-turbo`, which pauses the dual run's comparison (decision 9).
-> Turborepo 2.11.7 against moon 2.6.1. The research
+> Turborepo 2.11.7 against moon 2.6.1. The task graph's inputs, its
+> task-level affected selection and the checks that keep it complete are in
+> [turborepo-graph.md](turborepo-graph.md) (2026-10-27). The research
 > and the reasons to consider the switch are in
 > [turborepo-pilot.md](turborepo-pilot.md); this document is the how, and
 > [turborepo.md](turborepo.md) is the contributor-facing description of the
@@ -327,8 +329,11 @@ write somewhere other than the dev `dist/` (open decision 5). The order check
 | `scripts/go-generate.mjs`, `check-pr-title.mjs`, `clean-generated.mjs`, `generated-outputs.mjs`, `assert-file.mjs` | mention moon in skip lists or hints | `.turbo` is already skipped; hints say `moon run server:generate` → runner-neutral wording | cutover |
 | `scripts/release.mjs` | none (its deps came from the task graph) | reads `RELEASE_SKIP_CONTAINER=1` as `--skip-container`: under turbo, arguments after `--` would put new cache keys on the whole release graph (turborepo.md, Commands) | done |
 
-Why no `--affected` for the gate: turbo's `--affected` and `--filter=…[ref]`
-select packages, following `package.json` edges only. The artifact edges
+Why no `--affected` for the gate (superseded on 2026-10-27:
+`futureFlags.affectedUsingTaskInputs` makes `--affected` follow task inputs
+and task edges, and CI uses it, [turborepo-graph.md](turborepo-graph.md)):
+turbo's `--affected` and `--filter=…[ref]` select packages, following
+`package.json` edges only. The artifact edges
 (server embeds the UIs, e2e suites run the binary) are task edges, so a
 console-only change would skip the server's tests. Running the whole gate
 costs nothing when the remote cache holds the unchanged results, which is

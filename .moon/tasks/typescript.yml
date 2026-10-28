@@ -22,6 +22,8 @@ implicitInputs:
   # config change would leave every project's lint task cache-hit (and
   # unselected by `moon ci`), running stale rules.
   - "/biome.json"
+  # The GritQL rules biome.json loads as plugins: rules too.
+  - "/biome-plugins/*.grit"
   # Spread into every project's vitest config's `test` block. Without these a
   # change to the shared base would leave every project's test task cache-hit
   # (and unselected by `moon ci`), running stale config.

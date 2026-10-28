@@ -9,7 +9,7 @@
     // CLI's release notes, which Changesets writes on every release.
     "generate": {
       "inputs": [
-        "$TURBO_DEFAULT$",
+        "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/api/openapi/**/*.yaml",
         "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/apps/cli/command-reference.json",
@@ -37,7 +37,7 @@
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**"]
     },
     // The build script bundles again before `next build`, because the
     // hosted cloud's docs service runs the script without a task runner.

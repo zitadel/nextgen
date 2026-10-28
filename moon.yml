@@ -94,6 +94,12 @@ tasks:
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
+      - "scripts/check-turbo-graph.mjs"
+      - "scripts/check-turbo-graph.test.mjs"
+      - "scripts/check-turbo-hermetic.mjs"
+      - "scripts/check-turbo-hermetic.test.mjs"
+      - "scripts/task-runner.mjs"
+      - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"
       - "scripts/dev-process.test.mjs"
       - "scripts/shims/pnpm"
@@ -107,8 +113,10 @@ tasks:
       - "scripts/render-builtin-schemas.test.mjs"
       # Read by that test: it renders every built-in schema.
       - "api/openapi/endpoints/schemas/*.json"
-      # The server's default schema namespace, which the renderer must match.
+      # The server's default schema namespace, which the renderer must match,
+      # and the defaults it reads it from.
       - "packages/config/src/defaults.ts"
+      - "packages/config/defaults/**/*"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
@@ -186,6 +194,21 @@ tasks:
       - "apps/*/package.json"
       - "packages/*/package.json"
       - "e2e/package.json"
+    options:
+      cache: true
+      runInCI: true
+
+  # The turbo graph rules in docs/design/build/turborepo.md: every file a
+  # task's code reads is hashed, every declared package is built first, no
+  # ignored tree is hashed. It reads every code file, manifest and turbo.json.
+  check-turbo-graph:
+    command: "node scripts/check-turbo-graph.mjs"
+    inputs:
+      - "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,go}"
+      - "**/turbo.json"
+      - "**/package.json"
+      - "**/go.mod"
+      - "**/.gitignore"
     options:
       cache: true
       runInCI: true

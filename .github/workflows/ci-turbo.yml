@@ -51,6 +51,9 @@ jobs:
       # Depot-cache alternative, see that step.
       id-token: write
     env:
+      # As in ci.yml: a pull request's base, or the commit a merge group is
+      # built on, so a queued entry does not re-test the entries ahead of it.
+      CI_BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || 'origin/main' }}
       DO_NOT_TRACK: "1"
       # Playwright forces FORCE_COLOR=1 on its workers and web servers, and Node
       # warns on every process that also sees NO_COLOR. Blank it so only the
@@ -184,7 +187,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = push ]; then
             echo "mode=full" >> "$GITHUB_OUTPUT"
           else
-            node scripts/ci-mode.mjs "${{ github.event.pull_request.base.sha || 'origin/main' }}"
+            node scripts/ci-mode.mjs "$CI_BASE"
           fi
 
       # Main runs it too, only to put its result in the remote cache: a pull
@@ -213,16 +216,24 @@ jobs:
             sudo sysctl -w net.ipv6.conf.docker0.disable_ipv6=1
           fi
 
-      # The gate. No `--affected`: turbo's package-level selection would miss
-      # the artifact edges (a console change must re-run the server's tests,
-      # which embed it), so every task runs and the cache skips the unchanged
-      # ones. `--continue=dependencies-successful` is moon's behaviour: a
-      # failure skips its dependents and nothing else. The summary feeds the
-      # report step.
+      # The gate. On a pull request or merge group whose affected set ci-mode
+      # trusts (gate=affected), `--affected` runs the tasks the change reaches
+      # and the prerequisites they need: turbo matches the diff against each
+      # task's inputs and follows task edges, so a console change still
+      # re-runs the server's tests, which embed it
+      # (futureFlags.affectedUsingTaskInputs, turbo.json). Any fail-open case
+      # and every push to main run the whole gate, which the cache skips
+      # through; main's run keeps the remote cache filled and checks
+      # whatever the selection missed. `--continue=dependencies-successful` is
+      # moon's behaviour: a failure skips its dependents and nothing else. The
+      # summary feeds the report step.
       - name: Run turbo build and test graph
         id: turbo-gate
         if: ${{ steps.ci-mode.outputs.mode == 'full' }}
-        run: turbo run lint typecheck build test check-adrs check-moon-graph --continue=dependencies-successful --summarize
+        env:
+          TURBO_SCM_BASE: ${{ env.CI_BASE }}
+          AFFECTED: ${{ steps.ci-mode.outputs.gate == 'affected' && '--affected' || '' }}
+        run: turbo run lint typecheck build test check-adrs check-moon-graph check-turbo-graph $AFFECTED --continue=dependencies-successful --summarize
 
       - name: Report turbo failures
         if: ${{ failure() && steps.turbo-gate.conclusion == 'failure' }}

@@ -57,22 +57,39 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
 
 ## Inputs and outputs
 
-- The default inputs are the package's files (tracked, or untracked and not
-  ignored) plus the global dependencies. A task that reads files outside its
-  package lists them with `$TURBO_DEFAULT$` first:
-  `["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`. The Go tasks
-  list the server's inputs in full (`apps/server/turbo.json`); turbo has no
-  file groups, so the list is repeated per task.
+- Inputs follow file classes, not folders
+  ([turborepo-graph.md](turborepo-graph.md)): the root shapes of `lint`,
+  `typecheck`, `build`, `test` and `generate` start from `$TURBO_DEFAULT$`
+  (the package's files) and leave out its docs (`README.md`, `AGENTS.md`,
+  `CHANGELOG.md`, `docs/`, `skills/**/*.md`, …), and `build` and `generate`
+  also its tests. A task that reads more lists it after `$TURBO_EXTENDS$`:
+  `["$TURBO_EXTENDS$", "$TURBO_ROOT$/api/openapi/**/*.yaml"]`.
+- A negation wins over every inclusion, wherever it stands, and matches
+  package-relative paths only. A task that reads a file of an excluded class
+  replaces `inputs` instead of extending them (`cli#test` reads its
+  `README.md`). Release tasks keep every file: the tarballs ship the docs.
+- The Go tasks list the server's inputs in full (`apps/server/turbo.json`);
+  turbo has no file groups, so the list is repeated per task.
+- An explicit glob matches ignored files too. A repository-wide one
+  (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
+  otherwise walk: `node_modules`, build output, `.claude/`.
+- `//#check-turbo-graph` (`scripts/check-turbo-graph.mjs`) fails when a task's
+  code reads a file neither it nor a task it depends on hashes, when a
+  declared workspace package is not built first, or when a task hashes an
+  ignored tree. Fix the inputs or the edge; an exception takes its reason.
+  `turbo-canary.yml` runs `scripts/check-turbo-hermetic.mjs` nightly: the
+  gate without a cache, in a tree without the files no task claims.
 - An ignored file a task reads is not a default input either, so the task
   lists it. The console's build reads its `.env*` files (Vite's `loadEnv`)
-  and lists `["$TURBO_DEFAULT$", ".env*"]`; without them, a changed
+  and lists `["$TURBO_EXTENDS$", ".env*"]`; without them, a changed
   `.env.local` would restore a build made without it. Moon hashes only what
   git sees, listed or not ([.moon/AGENTS.md](../../../.moon/AGENTS.md)).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
   e2e lanes, the database lanes, `install-browsers`, the release builds, dev
-  servers.
+  servers. Their inputs still decide when they count as affected, which
+  gates the CI lanes.
 
 ## Environment
 
@@ -133,10 +150,12 @@ packages calls Vitest without the guard, so no suite retries under both.
 | | |
 |---|---|
 | the default gate | `turbo run lint typecheck build test` |
+| only what a branch changed | `TURBO_SCM_BASE=origin/main turbo run lint typecheck build test --affected` |
 | one task | `turbo run test --filter=@zitadel/cli` |
 | pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
 | what would run | `turbo run build --dry` |
-| affected tasks, task-level | `turbo query '{ affectedTasks(base: "origin/main", tasks: ["test"]) { items { name package { name } } } }'` |
+| affected tasks, task-level | `turbo query affected --base origin/main --tasks test` (its prerequisites carry the reason "required by an affected task") |
+| check the graph | `pnpm run check-turbo-graph`; nightly `pnpm run check-turbo-hermetic` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
@@ -149,11 +168,13 @@ environment, listed in the task's `passThroughEnv`: `RELEASE_SKIP_CONTAINER=1`
 for the release snapshot, `JOURNEY_CI=1`, `JOURNEY_MATRIX`, … for the journey
 runner (`e2e/journey/README.md`).
 
-Do not select the gate with `--affected` or `--filter=…[ref]`: both follow
-`package.json` edges only and would skip the server's tests on a console
-change (the server embeds the console through a task edge). Run the whole
-gate; the cache skips the unchanged tasks. `scripts/ci-mode.mjs` computes the
-task-level affected set for the CI lanes.
+`--affected` and `turbo query affected` match the diff against each task's
+`inputs` and follow task edges, so a console change still reaches the
+server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`). CI
+runs the gate with `--affected` from the pull request's or merge group's
+base when ci-mode trusts the affected set (`gate=affected`), and the whole
+gate otherwise and on main. `--filter=…[ref]` still selects packages: do not
+use it for the gate.
 
 Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). A checkout has no
 `turbo` on `PATH`: install it globally (`npm install --global turbo`), which

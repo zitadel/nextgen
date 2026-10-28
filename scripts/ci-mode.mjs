@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { appendFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectRun } from "./dev-process.mjs";
@@ -22,6 +21,11 @@ import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 //    moved: the scaffolded flow widget is framework-independent, so a
 //    server-only change proves as much on one framework as on the full
 //    matrix (e2e/journey/scripts/frameworks.mjs owns the list).
+// 4. Gate scope — `gate=affected` when the affected set is the answer (no
+//    fail-open reason below): ci-turbo.yml then runs its gate with
+//    `--affected` against the same base, which turbo resolves from the same
+//    task inputs. Any fail-open reason makes it `full`: the whole gate, which
+//    the cache skips through.
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
@@ -173,6 +177,7 @@ export function resolveGates({ mode, files, targets }) {
     return {
       gates: Object.fromEntries(ALL_GATES.map((g) => [g, false])),
       matrix: "full",
+      gate: "full",
       reason: "version-only",
     };
   }
@@ -186,6 +191,7 @@ export function resolveGates({ mode, files, targets }) {
     return {
       gates: Object.fromEntries(ALL_GATES.map((g) => [g, true])),
       matrix: "full",
+      gate: "full",
       reason: forced,
     };
   }
@@ -230,22 +236,17 @@ export function resolveGates({ mode, files, targets }) {
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
-  return { gates, matrix, reason: null };
+  return { gates, matrix, gate: "affected", reason: null };
 }
 
 /**
  * The affected task set as moon `project:task` targets, from whichever task
  * runner is selected (scripts/task-runner.mjs): moon's own affected query, or
- * the same walk over turbo's task graph. `files` is the diff, which only the
- * turbo form needs. Returns null when the query failed — which fails open.
+ * turbo's. Returns null when the query failed — which fails open.
  */
-export function queryAffectedTargets(
-  base,
-  spawn = spawnSync,
-  { runner = taskRunner(), files = [] } = {},
-) {
+export function queryAffectedTargets(base, spawn = spawnSync, { runner = taskRunner() } = {}) {
   return runner === "turbo"
-    ? queryTurboAffectedTargets(files, spawn)
+    ? queryTurboAffectedTargets(base, spawn)
     : queryMoonAffectedTargets(base, spawn);
 }
 
@@ -287,9 +288,9 @@ function queryMoonAffectedTargets(base, spawn) {
   }
 }
 
-// Every non-persistent task name in turbo.json: a `--dry=json` over all of
-// them is the whole task graph, with each task's hashed inputs and dependents.
-const TURBO_GRAPH_TASKS = [
+// Every non-persistent task name in turbo.json: the affected query asks about
+// all of them, and scripts/check-turbo-graph.mjs checks them all.
+export const TURBO_GRAPH_TASKS = [
   "lint",
   "typecheck",
   "build",
@@ -334,6 +335,7 @@ const TURBO_GRAPH_TASKS = [
   "summarize",
   "check-adrs",
   "check-moon-graph",
+  "check-turbo-graph",
   "check-typecheck",
   "check-openapi-rules",
   "doctor",
@@ -342,59 +344,52 @@ const TURBO_GRAPH_TASKS = [
   "check",
 ];
 
+// The reason `turbo query affected` gives a task it lists only because an
+// affected task needs it to run first.
+const TURBO_PREREQUISITE = "required by an affected task";
+
 /**
- * moon's `--affected --downstream deep` over turbo's graph: the tasks whose
- * hashed inputs include a changed file are the roots, and everything that
- * depends on a root, transitively, is affected. Dependencies of a root are
- * not — `turbo query affectedTasks` lists them, but the gates key on upstream
- * builds (`api:build`), so that answer would run every lane on every change.
- * A changed global input (root manifests, the shared configs) affects every
- * task, as moon's implicitInputs do.
+ * moon's `--affected --downstream deep`, from turbo's answer. With
+ * futureFlags.affectedUsingTaskInputs (turbo.json), turbo matches the diff
+ * against each task's `inputs`, deleted and renamed files included, and
+ * follows task edges to every dependent, the artifact edges that are no
+ * package.json dependency included (the server embeds the console). It also
+ * lists the prerequisites of those tasks, which moon does not; the gates key on
+ * upstream builds (`api:build`), so counting them would run every lane on
+ * every change. A changed global input affects every task, as moon's
+ * implicitInputs do. Returns null for an answer without the affected list.
  */
-export function affectedTurboTargets(graph, files) {
-  if (!Array.isArray(graph?.tasks)) {
+export function affectedTurboTargets(answer) {
+  const items = answer?.data?.affectedTasks?.items;
+  if (!Array.isArray(items)) {
     return null;
   }
-  const changed = new Set(files);
-  const globalChanged = Object.keys(graph.globalCacheInputs?.files ?? {}).some((file) =>
-    changed.has(file),
-  );
-  const tasks = graph.tasks.filter((task) => task.command !== "<NONEXISTENT>");
-  const byId = new Map(tasks.map((task) => [task.taskId, task]));
-  const roots = tasks.filter(
-    (task) =>
-      globalChanged ||
-      Object.keys(task.inputs ?? {}).some((input) =>
-        changed.has(posix.normalize(posix.join(task.directory ?? "", input))),
-      ),
-  );
-  const affected = new Set();
-  const pending = roots.map((task) => task.taskId);
-  while (pending.length > 0) {
-    const id = pending.pop();
-    if (affected.has(id)) continue;
-    affected.add(id);
-    for (const dependent of byId.get(id)?.dependents ?? []) pending.push(dependent);
-  }
-  return [...affected].map((id) => {
-    const [packageName, taskName] = id.split("#");
-    return moonTargetOf(packageName, taskName);
-  });
+  return items
+    .filter((item) => item?.reason?.description !== TURBO_PREREQUISITE)
+    .map((item) => moonTargetOf(item.package?.name ?? "", item.name));
 }
 
-function queryTurboAffectedTargets(files, spawn) {
-  const result = spawn("turbo", ["run", ...TURBO_GRAPH_TASKS, "--dry=json"], {
+function queryTurboAffectedTargets(base, spawn) {
+  const query = `query { affectedTasks(base: ${JSON.stringify(base)}, head: "HEAD", tasks: ${JSON.stringify(TURBO_GRAPH_TASKS)}) { items { name package { name } reason { __typename ... on TaskAllChanged { description } } } } }`;
+  const result = spawn("turbo", ["query", query], {
     encoding: "utf8",
     env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
-    maxBuffer: 256 * 1024 * 1024,
+    maxBuffer: 64 * 1024 * 1024,
   });
   if (result.status !== 0) {
     process.stderr.write(result.stderr ?? "");
-    console.error(`# turbo dry run failed (exit ${result.status})`);
+    console.error(`# turbo query failed (exit ${result.status})`);
     return null;
   }
   try {
-    return affectedTurboTargets(JSON.parse(result.stdout), files);
+    const answer = JSON.parse(result.stdout);
+    if (answer?.errors?.length) {
+      console.error(
+        `# turbo query answered with errors: ${JSON.stringify(answer.errors).slice(0, 400)}`,
+      );
+      return null;
+    }
+    return affectedTurboTargets(answer);
   } catch {
     console.error(`# turbo returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
@@ -480,13 +475,14 @@ function main() {
   const mode = computeMode(files);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
-  const targets = needsQuery ? queryAffectedTargets(base, spawnSync, { files }) : [];
-  const { gates, matrix, reason } = resolveGates({ mode, files, targets });
+  const targets = needsQuery ? queryAffectedTargets(base, spawnSync) : [];
+  const { gates, matrix, gate, reason } = resolveGates({ mode, files, targets });
 
   const lines = [
     `mode=${mode}`,
     ...ALL_GATES.map((g) => `${g}=${gates[g]}`),
     `journey_matrix=${matrix}`,
+    `gate=${gate}`,
   ];
   for (const line of lines) {
     console.log(line);

@@ -20,6 +20,11 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
@@ -28,7 +33,7 @@
     },
     // The JavaScript k6 scenarios go through Biome like the server launcher.
     "lint": {
-      "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json"]
+      "inputs": ["scripts/**/*.js", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
     "build": {
       "dependsOn": ["vet"],
@@ -36,6 +41,11 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
@@ -49,6 +59,11 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
