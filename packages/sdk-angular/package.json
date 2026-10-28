@@ -62,6 +62,7 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "typescript": "catalog:",

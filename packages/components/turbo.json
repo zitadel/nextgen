@@ -21,7 +21,8 @@
     // standalone-artifact.spec.ts reads dist/standalone.mjs, so the dev build
     // runs first. The script retries a failed suite (#1490).
     "test": {
-      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "build"]
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/task-guard.mjs"]
     }
   }
 }

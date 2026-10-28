@@ -35,9 +35,9 @@ const (
 )
 
 // buildRef is the Git branch the binary was built from, stamped in by
-// build.sh. A CLI deployment carries no Git metadata at runtime, so the
-// serving function would otherwise not know its preview database; with the
-// stamp, the build and the function always agree on it.
+// build-launcher.sh. A CLI deployment carries no Git metadata at runtime,
+// so the serving function would otherwise not know its preview database;
+// with the stamp, the build and the function always agree on it.
 var buildRef string
 
 // gitRef is the branch this deployment was built from.

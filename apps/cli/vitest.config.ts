@@ -2,7 +2,7 @@ import { availableParallelism } from "node:os";
 
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
 export default defineConfig({

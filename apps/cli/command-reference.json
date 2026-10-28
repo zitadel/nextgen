@@ -162,6 +162,13 @@
           "type": "boolean"
         },
         {
+          "name": "git",
+          "description": "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
+        },
+        {
           "name": "preset",
           "description": "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
           "type": "option",
@@ -625,7 +632,7 @@
         },
         {
           "name": "filter",
-          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), schema_object_type (equals|not_equals|contains), status (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), lifecycle_owner_team_id (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
           "type": "option",
           "multiple": true
         },
@@ -2695,6 +2702,49 @@
         },
         {
           "command": "policies list --filter operation=equals:<value>"
+        }
+      ]
+    },
+    {
+      "id": "policies test",
+      "group": "Configuration and releases",
+      "description": "Run the test cases in .zitadel/policies/ against the policies",
+      "args": [
+        {
+          "name": "operation",
+          "description": "Test only this operation's policy, such as auth.factor.password.set."
+        }
+      ],
+      "flags": [
+        {
+          "name": "release",
+          "description": "Test the policies a release pins (rel_…) instead of the files in .zitadel/policies/.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "policies test"
+        },
+        {
+          "command": "policies test auth.factor.password.set"
+        },
+        {
+          "command": "policies test --release rel_01KXB7C2M4N7F0N9WD3P2E4YM7"
+        },
+        {
+          "command": "policies test --json"
         }
       ]
     },

@@ -28,6 +28,7 @@ const (
 	DeleteTeamOperation                    OperationName = "DeleteTeam"
 	DeleteUserByIDOperation                OperationName = "DeleteUserByID"
 	DeleteVariableOperation                OperationName = "DeleteVariable"
+	EvaluatePolicyOperation                OperationName = "EvaluatePolicy"
 	ExchangeHandoffOperation               OperationName = "ExchangeHandoff"
 	FinishUserPasskeyRegistrationOperation OperationName = "FinishUserPasskeyRegistration"
 	GetAuthAttemptOperation                OperationName = "GetAuthAttempt"

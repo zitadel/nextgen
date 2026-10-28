@@ -25,6 +25,8 @@ import { nextPort } from "./ports";
 import { aBinaryRecord } from "./runtime-record";
 import { parseJson, runCliForTest } from "./run-cli";
 
+const execFileAsync = promisify(execFile);
+
 const SCHEMA_FILE = ".zitadel/schemas/default-human-user.json";
 const FLOW_FILE = ".zitadel/flows/default-login.json";
 
@@ -282,6 +284,90 @@ export class ScaffoldedApp {
       PACKAGE_MANAGER_LOG: npm.logPath,
       PATH: `${npm.binDir}:${process.env.PATH ?? ""}`,
     });
+  }
+
+  /**
+   * Puts the app under version control with everything committed, the state a
+   * developer who already uses git is in before they run setup.
+   */
+  async underVersionControl(): Promise<void> {
+    await execFileAsync("git", ["init", "--quiet"], { cwd: this.path });
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: the developer's own work",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** Leaves a file nobody has committed, as a developer mid-change would. */
+  async withUncommittedWork(): Promise<void> {
+    await writeFile(join(this.path, "notes.md"), "a note to self\n");
+  }
+
+  /**
+   * The paths setup's commit put under version control. Read from git because
+   * that is the behaviour: a secret that reaches version control cannot be
+   * scrubbed later, so what is tracked is the claim being made.
+   */
+  async trackedFiles(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["-c", "core.quotePath=false", "ls-files", "-z"],
+        { cwd: this.path },
+      );
+      return stdout.split("\0").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** Commits everything outstanding, as the developer would before deploying. */
+  async commitEverything(): Promise<void> {
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--quiet",
+        "--no-verify",
+        "--message=feat: change the configuration",
+      ],
+      { cwd: this.path },
+    );
+  }
+
+  /** The subjects of the project's commits, newest first, or [] without a repo. */
+  async commitSubjects(): Promise<string[]> {
+    try {
+      const { stdout } = await execFileAsync("git", ["log", "--format=%s"], { cwd: this.path });
+      return stdout.split("\n").filter((line) => line !== "");
+    } catch {
+      return [];
+    }
+  }
+
+  /** `setup` without `--json`, for a spec asserting what the developer reads. */
+  setupRendered(extraArgs: string[] = []): Promise<CliResult> {
+    return this.cli(["setup", "--non-interactive", "--skip-install", ...extraArgs]);
   }
 
   /**
@@ -638,6 +724,13 @@ export class ScaffoldedApp {
       "--json",
     ]);
     expect(result, "origin add should have succeeded").toSucceed();
+  }
+
+  /** How many deployments the project serves, as `deployment list` reports them. */
+  async liveDeploymentCount(): Promise<number> {
+    const result = await this.cli(["deployment", "list", "--json"]);
+    expect(result, "deployment list should have succeeded").toSucceed();
+    return this.envelopeOf<{ count: number }>(result).data.count;
   }
 
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
@@ -1069,6 +1162,20 @@ export class ScaffoldedApp {
     );
   }
 
+  /** Writes the password policy's test file with `cases`, as the developer owning it would. */
+  async writePolicyTest(cases: ReadonlyArray<Record<string, unknown>>): Promise<void> {
+    await mkdir(join(this.path, ".zitadel/policies"), { recursive: true });
+    await this.writeProjectFile(
+      `.zitadel/policies/${PASSWORD_POLICY}.test.json`,
+      `${JSON.stringify({ $schema: "../meta/policy-test.json", operation: PASSWORD_POLICY, cases }, null, 2)}\n`,
+    );
+  }
+
+  /** Runs `zitadel policies test` with `args`. */
+  testPolicies(args: string[] = []): Promise<CliResult> {
+    return this.run(["policies", "test", "--non-interactive", ...args]);
+  }
+
   /** Removes the committed password policy file, as the developer owning it would. */
   removePasswordPolicy(): Promise<void> {
     return this.deleteProjectFile(this.policyFile(PASSWORD_POLICY));
@@ -1459,10 +1566,27 @@ export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
   return new ScaffoldedApp(join(parent, "my-app"));
 }
 
-/** An app already through `setup`, for specs about the commands after it. */
+/**
+ * An app already through `setup`, for specs about the commands after it.
+ *
+ * Setup's git commit is turned off here: this is the arrange for every other
+ * command's spec, and a repository of setup's making is not what they are
+ * about. Setup's spec drives setup with it on, and owns what it does.
+ */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(extraArgs);
+  const result = await app.setup(["--no-git", ...extraArgs]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * An app through `setup` with its commit kept, so a release built from it
+ * records a git sha and a later deploy has a baseline to diff against.
+ */
+export async function aCommittedApp(): Promise<ScaffoldedApp> {
+  const app = await anApp();
+  const result = await app.setup();
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }
