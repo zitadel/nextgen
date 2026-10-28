@@ -476,8 +476,8 @@ FLAGS
       --debug                 Debug logging.
       --display-name=<value>  Name shown on the custom connection's sign-in button.
       --dry-run               Preview without mutating files or the platform.
-      --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                              with --env.
+      --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                              read from the current directory, not from --cwd. Cannot be combined with --env.
       --issuer=<value>        Issuer URL of the custom provider. Its endpoints are found by OIDC discovery.
       --provider=<option>     Identity provider to enable, or "custom" for a custom OpenID Connect (OIDC) provider.
                               <options: google|custom>
@@ -583,8 +583,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -620,8 +620,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                           resource's own columns; `--json` is unaffected.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -657,8 +657,8 @@ FLAGS
       --[no-]color            Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug                 Debug logging.
       --dry-run               Preview without mutating files or the platform.
-      --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                              with --env.
+      --env-file=<value>      Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                              read from the current directory, not from --cwd. Cannot be combined with --env.
       --no-open               Print the link instead of opening a browser.
       --no-wait               Print the link and exit, without opening a browser or waiting for the browser step. The
                               result names the command that waits for it.
@@ -767,8 +767,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -805,8 +805,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --release=<value>   (required) The release id to deploy.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -842,8 +842,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -877,8 +877,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --limit=<value>       Page size (server default 20, max 100).
       --live                What each target serves now, not the full history.
       --origin=<value>      Only deployments that targeted this origin.
@@ -925,8 +925,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -962,8 +962,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fix               Repair missing files and stale managed wiring.
       --image=<value>     Container image to check.
       --port=<value>      Local HTTP port to check. Defaults to the port this directory's server uses.
@@ -1027,8 +1027,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1103,8 +1103,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -1142,8 +1142,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1181,8 +1181,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: category (equals;
@@ -1232,8 +1232,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1271,8 +1271,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: name (equals),
@@ -1317,8 +1317,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -1381,8 +1381,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1417,8 +1417,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1475,7 +1475,8 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current
+      directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
@@ -1564,8 +1565,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 OPTIONAL FIELD FLAGS
@@ -1651,8 +1652,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1690,8 +1691,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equ
@@ -1778,8 +1779,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --kind=<option>     (required) What the pattern is for.
                           <options: primary|preview>
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1815,8 +1816,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -1855,8 +1856,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -1893,8 +1894,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -1932,8 +1933,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: operation (equals).
@@ -1975,8 +1976,8 @@ FLAGS
       --[no-]color         Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug              Debug logging.
       --dry-run            Preview without mutating files or the platform.
-      --env-file=<value>   Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                           with --env.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                           read from the current directory, not from --cwd. Cannot be combined with --env.
       --origin=<value>...  A preview URL to deploy to, instead of detecting them from the platform build. Repeatable.
       --strict             Fail instead of warning when no preview credential (ZITADEL_PROJECT_SECRET) is set.
       --[no-]telemetry     Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2017,8 +2018,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --limit=<value>       Page size (server default 20, max 100).
       --page-token=<value>  Continue from a previous page's next_page_token.
       --plain               Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
@@ -2061,8 +2062,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2099,8 +2100,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2138,8 +2139,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: created_at
@@ -2191,8 +2192,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -2251,8 +2252,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2291,8 +2292,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2329,8 +2330,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2368,8 +2369,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --limit=<value>       Page size (server default 20, max 100).
@@ -2412,8 +2413,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2513,8 +2514,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2552,8 +2553,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: object_type
@@ -2615,8 +2616,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -2673,7 +2674,8 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current
+      directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
@@ -2739,8 +2741,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2872,8 +2874,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -2930,8 +2932,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -2981,8 +2983,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3017,8 +3019,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3056,8 +3058,8 @@ FLAGS
       --[no-]color          Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug               Debug logging.
       --dry-run             Preview without mutating files or the platform.
-      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined
-                            with --env.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the process environment. A relative path is
+                            read from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>      Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the
                             resource's own columns; `--json` is unaffected.
       --filter=<value>...   Filter as field=operation:value (operation defaults to equals). Fields: created_at
@@ -3108,8 +3110,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 RAW BODY FLAGS
@@ -3153,8 +3155,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --provider=<value>  Connection to check. Defaults to every connection the Project has.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -3218,8 +3220,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 REQUIRED FIELD FLAGS
@@ -3271,8 +3273,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 GLOBAL FLAGS
@@ -3307,8 +3309,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --fields=<value>    Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is
                           unaffected.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3365,7 +3367,8 @@ FLAGS
       Preview without mutating files or the platform.
 
   --env-file=<value>
-      Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.
+      Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current
+      directory, not from --cwd. Cannot be combined with --env.
 
   --fields=<value>
       Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns;
@@ -3433,8 +3436,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
 OPTIONAL FIELD FLAGS
@@ -3483,8 +3486,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --preview           Read the preview value instead of the primary one.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -3521,8 +3524,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --preview           List the preview values instead of the primary ones.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3560,8 +3563,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --origin=<value>    The origin whose live deployment to read.
       --plain             Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
@@ -3603,8 +3606,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --preview           Remove the preview value alone, leaving the primary one standing.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
 
@@ -3647,8 +3650,8 @@ FLAGS
       --[no-]color        Colorize human output. Disable with --no-color; NO_COLOR and FORCE_COLOR are honored too.
       --debug             Debug logging.
       --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with
-                          --env.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
+                          from the current directory, not from --cwd. Cannot be combined with --env.
       --preview           Write the preview value alone, leaving the primary one as it is.
       --secret            Store the value encrypted. It can be replaced later but never read back.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.

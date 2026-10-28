@@ -71,7 +71,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
-  working directory.
+  working directory. A relative `--env-file` path is still read from the
+  current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
+  Node reads `--env-file` itself before the CLI starts and exits 9 with
+  `node: <path>: not found`, and no envelope, when the file is not there.
 - **Server and project.** A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
@@ -236,6 +239,12 @@ Each invocation prints one JSON object:
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.
+- `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
+  shows, against the live release's commit (`diff.against`): `diff.files` holds
+  one `{path, status, previous_path?, patch}` per changed file (`status` is
+  `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
+  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -364,8 +373,11 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 where it detects a framework. What `start` leaves in a directory —
 `.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
 empty, so the golden path runs `setup` right after `start` in the same
-directory. Any other non-empty directory stops setup with a hint to pass
-`--force`. Pass it only for a directory whose contents may be replaced: files
+directory. A `--cwd` that does not exist yet counts as empty too: setup creates
+it with the app, and removes it again when setup fails before the app is kept.
+A `--cwd` that is a file fails with `E_VALIDATION`. Any other non-empty
+directory stops setup with a hint to pass `--force`. Pass it only for a
+directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
