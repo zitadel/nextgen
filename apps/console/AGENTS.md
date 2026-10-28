@@ -34,6 +34,14 @@ decides the surface (shadcn with unprefixed utilities here; Lit atoms belong to
 the login surface) and owns the token rules. The atom recipe is in
 [`apps/storybook/AGENTS.md`](../storybook/AGENTS.md).
 
+Compose from the console's shared components before the primitives. A shape
+the console already draws (a confirmation, a row menu, a choice card, a dialog
+frame, a detail card) has one component under `src/components`; use it, and
+when it lacks something add a prop rather than re-creating it with class
+overrides. When no shared component exists yet, the screen that needs the
+shape makes it shared, and the next copy is a bug. Spacing constants copied
+between files are the sign the component is missing.
+
 ## Screens
 
 - A list screen composes `src/components/resource-list.tsx` and a detail

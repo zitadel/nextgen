@@ -9,8 +9,8 @@ package migration
 // go-sql-spanner accepts START BATCH DDL and RUN BATCH as client-side
 // statements on an ordinary Exec, and sends everything buffered between them as
 // a single UpdateDatabaseDdl. batchDDLFS brackets each *run of consecutive DDL*
-// in a migration's Up section with that pair, so goose executes the pair without
-// knowing it exists.
+// in each section of a migration, Up and Down, with that pair, so goose executes
+// the pair without knowing it exists.
 //
 // Consecutive, not whole-file: 000011_user_team_lifecycle.sql interleaves an
 // UPDATE and an INSERT between its ALTERs and CREATEs, and DML inside a DDL
@@ -27,9 +27,9 @@ package migration
 // SQL and fail to parse, so migrations break loudly rather than quietly
 // reverting to one operation per statement.
 //
-// Only the Up section is rewritten. Down migrations are not part of any
-// automated path here, and leaving them alone keeps this to the case that has a
-// measured cost.
+// The server never runs a Down, but TestMigrationsRoundTrip runs every one, on
+// whatever instance the Spanner lane points it at. A run never crosses the
+// Down marker: goose executes the sections separately.
 
 import (
 	"bytes"
@@ -66,23 +66,23 @@ func (f batchDDLFS) Open(name string) (fs.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	body := batchUpDDL(string(src))
+	body := batchDDL(string(src))
 	return &memFile{
 		Reader: bytes.NewReader([]byte(body)),
 		info:   rewrittenInfo{FileInfo: info, size: int64(len(body))},
 	}, nil
 }
 
-// batchUpDDL brackets each run of consecutive DDL statements in src's Up
-// section with START BATCH DDL / RUN BATCH. Input that does not look like a
-// goose migration is returned unchanged.
-func batchUpDDL(src string) string {
+// batchDDL brackets each run of consecutive DDL statements in src's Up and
+// Down sections with START BATCH DDL / RUN BATCH. Input that does not look
+// like a goose migration is returned unchanged.
+func batchDDL(src string) string {
 	if !strings.Contains(src, gooseUp) || !strings.Contains(src, stmtBegin) {
 		return src
 	}
 
 	var out []string
-	inUp, inBatch, inStatement := false, false, false
+	inSection, inBatch, inStatement := false, false, false
 	statement := make([]string, 0, 16)
 
 	closeBatch := func() {
@@ -95,20 +95,15 @@ func batchUpDDL(src string) string {
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
 
-		switch {
-		case trimmed == gooseUp:
-			inUp = true
-			out = append(out, line)
-			continue
-		case trimmed == gooseDown:
-			// Leaving the Up section: any open run ends here, before the marker.
+		if trimmed == gooseUp || trimmed == gooseDown {
+			// A section boundary: any open run ends here, before the marker.
 			closeBatch()
-			inUp = false
+			inSection = true
 			out = append(out, line)
 			continue
 		}
 
-		if !inUp {
+		if !inSection {
 			out = append(out, line)
 			continue
 		}
@@ -145,7 +140,7 @@ func batchUpDDL(src string) string {
 			out = append(out, line)
 		}
 	}
-	// A file whose Up section runs to EOF without a Down marker.
+	// The last section runs to EOF.
 	closeBatch()
 
 	return strings.Join(out, "\n")

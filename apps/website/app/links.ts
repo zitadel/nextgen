@@ -9,5 +9,6 @@ export const links = {
   github: "https://github.com/zitadel/nextgen",
   issues: "https://github.com/zitadel/nextgen/issues",
   releases: "https://github.com/zitadel/nextgen/releases",
+  changelogFeed: "/changelog/feed.xml",
   zitadel: "https://zitadel.com",
 } as const;

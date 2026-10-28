@@ -38,7 +38,7 @@ const NAV_ORDER = [
   "Branding",
   "Deployments",
   "Authentication",
-  "Project settings",
+  "Settings",
 ];
 // Absent for two different reasons, both deliberate:
 //   - the first four have no endpoint at all
@@ -920,8 +920,11 @@ describe("search", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Search" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Go to" }));
 
+    // The project's own page is called Settings too, under the project's
+    // pages; the group heading is what tells them apart.
     await userEvent.type(dialog.getByPlaceholderText("Go to a page, project or team"), "sett");
-    await userEvent.click(await dialog.findByRole("option", { name: "Settings" }));
+    const you = within(await dialog.findByRole("group", { name: "You" }));
+    await userEvent.click(you.getByRole("option", { name: "Settings" }));
 
     await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/settings/profile"));
   });

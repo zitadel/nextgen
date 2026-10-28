@@ -15,13 +15,14 @@ routine credential lifecycle events.
 
 ### 1. Password Rehashing and Migration
 
-The system leverages `passwap.Swapper` combined with the `password_hasher` configuration to handle
-both parameter upgrades (rehashing) and complete algorithmic switches (migration).
+The system uses passwap's verifiers, the `password_hasher` configuration and the project's password
+hash policy to handle both parameter upgrades (rehashing) and complete algorithmic switches
+(migration).
 
-When a user logs in, the provided password is verified against the stored hash.
-`(*passwap.Swapper).Verify` returns `(upgradedEncodedHash, error)`; when it returns an upgraded hash
-for parameter upgrades or algorithm migration, the server will persist that upgraded hash to the
-database. It returns an empty string otherwise.
+When a user logs in, the provided password is verified against the stored hash with the project's
+hasher. When the stored hash was written with another method or other parameters, verification also
+returns a new hash written with the project's method, and the server stores it in place of the old
+one. It returns an empty string otherwise.
 
 Persisting the upgraded hash is not part of the login's critical path. The user has already
 authenticated by the time it is available, so a failed write is logged, and the login succeeds; the
@@ -149,8 +150,7 @@ Adopting these consolidated migration and recovery strategies introduces the fol
 
 ## Follow-up work
 
-1. Password rehash persistence ([Section 1](#1-password-rehashing-and-migration)).
-2. Recovery code generation / consumption flow ([Recovery Codes](#recovery-codes)).
-3. Email magic-link / one-time-code flow for both authentication and recovery, including the
+1. Recovery code generation / consumption flow ([Recovery Codes](#recovery-codes)).
+2. Email magic-link / one-time-code flow for both authentication and recovery, including the
    email-sending infrastructure it depends on
    ([Magic Links and Email Codes](#magic-links-and-email-codes)).

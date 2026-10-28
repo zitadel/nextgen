@@ -48,7 +48,7 @@ func startPGXSpan(ctx context.Context, name string, kind trace.SpanKind) context
 	if !trace.SpanFromContext(ctx).IsRecording() {
 		return ctx
 	}
-	ctx, _ = tracer.Start(ctx, name, trace.WithSpanKind(kind), trace.WithAttributes(semconv.DBSystemNameKey.String(dbSystem)))
+	ctx, _ = tracer.Start(ctx, name, trace.WithSpanKind(kind), trace.WithAttributes(semconv.DBSystemNameKey.String(string(dbSystem))))
 	return ctx
 }
 

@@ -54,7 +54,7 @@ func TestPasswordHasher_EncodingSupported(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			h := &PasswapHasher{
-				Prefixes: []string{bcrypt.Prefix, argon2.Prefix},
+				prefixes: []string{bcrypt.Prefix, argon2.Prefix},
 			}
 			got := h.EncodingSupported(tt.encodedHash)
 			assert.Equal(t, tt.want, got)
@@ -452,7 +452,7 @@ func TestPasswordHashConfig_PasswordHasher(t *testing.T) {
 			require.NoError(t, err)
 			if tt.wantPrefixes != nil {
 				require.NotNil(t, got)
-				assert.Equal(t, tt.wantPrefixes, got.Prefixes)
+				assert.Equal(t, tt.wantPrefixes, got.prefixes)
 				encoded, err := got.Hash("password")
 				require.NoError(t, err)
 				assert.NotEmpty(t, encoded)
@@ -496,20 +496,30 @@ func TestPasswordHasher_Argon2idRehashesBcrypt(t *testing.T) {
 	require.True(t, strings.HasPrefix(legacy, bcrypt.Prefix))
 
 	// The legacy bcrypt hash still verifies...
-	updated, err := hasher.Verify(legacy, password)
+	updated, err := hasher.VerifyAndRehash(legacy, password)
 	require.NoError(t, err)
 	// ...and passwap returns a rehashed argon2id encoding to persist.
 	require.NotEmpty(t, updated, "expected a rehash to be returned for a legacy bcrypt hash")
 	assert.True(t, strings.HasPrefix(updated, argon2.Prefix), "rehash should be argon2id, got %q", updated)
 
 	// A wrong password against the legacy hash still fails.
-	_, err = hasher.Verify(legacy, "wrong")
-	assert.Error(t, err)
+	_, err = hasher.VerifyAndRehash(legacy, "wrong")
+	assert.ErrorIs(t, err, ErrHashMismatch)
 
 	// Verifying an already-argon2id hash needs no rehash.
-	updated, err = hasher.Verify(fresh, password)
+	updated, err = hasher.VerifyAndRehash(fresh, password)
 	require.NoError(t, err)
 	assert.Empty(t, updated, "argon2id hash at target params should not be rehashed")
+
+	// An argon2id hash at other params is rehashed to the target params.
+	outdated, err := argon2.NewArgon2id(argon2.Params{Time: 1, Memory: 32 * 1024, Threads: 1, KeyLen: 32, SaltLen: 16}, nil).Hash(password)
+	require.NoError(t, err)
+	updated, err = hasher.VerifyAndRehash(outdated, password)
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(updated, argon2.Prefix), "rehash should be argon2id, got %q", updated)
+	again, err := hasher.VerifyAndRehash(updated, password)
+	require.NoError(t, err)
+	assert.Empty(t, again, "the rehash should be written at the target params")
 }
 
 func TestHasher_ValidateEncodedHash(t *testing.T) {
@@ -1059,6 +1069,22 @@ func TestHasherFactory(t *testing.T) {
 
 		assert.NoError(t, factory.Default().VerifyHash(writtenWithBcrypt, password))
 		assert.NoError(t, bcryptHasher.VerifyHash(writtenWithArgon2, password))
+
+		// The default need not be a configured verifier, and passwords it wrote
+		// still have to verify once a project picks another method.
+		unlisted, err := (&HashConfig{
+			Verifiers: []HashName{HashNameBcrypt},
+			Hasher:    HasherConfig{Algorithm: HashNameArgon2id, Params: map[string]any{"Time": 1, "Memory": 32 * 1024, "Threads": 1}},
+		}).NewHasherFactory()
+		require.NoError(t, err)
+		unlistedBcrypt, err := unlisted.New(HasherConfig{Algorithm: HashNameBcrypt, Params: map[string]any{"Cost": 10}})
+		require.NoError(t, err)
+		fromDefault, err := unlisted.Default().Hash(password)
+		require.NoError(t, err)
+		updated, err := unlistedBcrypt.VerifyAndRehash(fromDefault, password)
+		require.NoError(t, err)
+		assert.True(t, strings.HasPrefix(updated, bcrypt.Prefix), "got %q", updated)
+		assert.True(t, unlistedBcrypt.EncodingSupported(fromDefault))
 	})
 
 	// A mismatch is told apart from a hash the verifier cannot read, so a
@@ -1070,6 +1096,9 @@ func TestHasherFactory(t *testing.T) {
 
 		assert.ErrorIs(t, factory.Default().VerifyHash(encoded, password+"x"), ErrHashMismatch)
 		err = factory.Default().VerifyHash("$unknown$hash", password)
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrHashMismatch)
+		err = factory.Default().VerifyHash("$2a$10$short", password)
 		require.Error(t, err)
 		assert.NotErrorIs(t, err, ErrHashMismatch)
 	})
@@ -1150,10 +1179,13 @@ func TestHasherFactory(t *testing.T) {
 }
 
 func TestPasswapHasher_HashRejectsWhatBcryptCannotTake(t *testing.T) {
-	config := &HashConfig{Hasher: HasherConfig{
-		Algorithm: HashNameBcrypt,
-		Params:    map[string]any{"cost": 4},
-	}}
+	config := &HashConfig{
+		Verifiers: []HashName{HashNameArgon2},
+		Hasher: HasherConfig{
+			Algorithm: HashNameBcrypt,
+			Params:    map[string]any{"cost": 4},
+		},
+	}
 	h, err := config.NewHasher()
 	require.NoError(t, err)
 
@@ -1162,4 +1194,11 @@ func TestPasswapHasher_HashRejectsWhatBcryptCannotTake(t *testing.T) {
 
 	_, err = h.Hash(strings.Repeat("a", 73))
 	assert.ErrorIs(t, err, ErrPasswordTooLong)
+
+	// The password matched, so a failed rehash must not read as a mismatch.
+	encoded, err := argon2.NewArgon2id(argon2.RecommendedIDParams, nil).Hash(strings.Repeat("a", 73))
+	require.NoError(t, err)
+	_, err = h.VerifyAndRehash(encoded, strings.Repeat("a", 73))
+	assert.ErrorIs(t, err, ErrRehashFailed)
+	assert.NotErrorIs(t, err, ErrHashMismatch)
 }
