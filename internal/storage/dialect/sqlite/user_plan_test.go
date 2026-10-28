@@ -17,9 +17,12 @@ import (
 )
 
 // recordingExecutor keeps the users query ListUsers compiles, so the test
-// explains the real statement instead of a copy of it.
+// explains the real statement instead of a copy of it. It embeds db, not
+// queryExecutor, so BeginTx stays visible and withTransaction still opens a
+// transaction. Statements inside a transaction run on the transaction's
+// executor and are not recorded. ListUsers runs none.
 type recordingExecutor struct {
-	queryExecutor
+	db
 	query string
 	args  []any
 }
@@ -28,7 +31,7 @@ func (r *recordingExecutor) Query(ctx context.Context, query string, args ...any
 	if strings.HasPrefix(query, userQuery) {
 		r.query, r.args = query, args
 	}
-	return r.queryExecutor.Query(ctx, query, args...)
+	return r.db.Query(ctx, query, args...)
 }
 
 // The unique attribute lookup must seek users by primary key from the
@@ -68,7 +71,7 @@ func TestListUsers_UniqueAttributeLookupPlan(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			rec := &recordingExecutor{queryExecutor: db{sqlDB: testPool.sqlDB}}
+			rec := &recordingExecutor{db: db{sqlDB: testPool.sqlDB}}
 			// Unrestricted, as the login lookups run.
 			ctx := service.WithAuthzListUnrestricted(t.Context())
 			_, err := newUserStatements(rec).ListUsers(ctx,

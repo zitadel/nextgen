@@ -3,8 +3,6 @@
 package stmttest
 
 import (
-	"context"
-	"crypto/rand"
 	"fmt"
 	"testing"
 
@@ -31,22 +29,15 @@ func BenchmarkUserStatements_10kUsers(b *testing.B) {
 				b.Skip("seeding 10k users on the emulator is too slow")
 			}
 			ctx := b.Context()
-			project := newTestProject("proj-bench-" + rand.Text())
-			require.NoError(b, d.stmts.CreateProject(ctx, project))
-			b.Cleanup(func() { _, _ = d.stmts.DeleteProjectByID(context.Background(), project.ID) })
-			schemaURL := "https://example.com/schemas/bench-user"
-			require.NoError(b, d.stmts.CreateJSONSchema(ctx, &domain.JSONSchema{
-				ProjectID: project.ID,
-				URL:       schemaURL,
-				Schema:    []byte(`{"type":"object"}`),
-			}))
+			projectID, schemaURL := ensureUserTestProject(b, d.stmts)
 
-			createUser := func(i int) string {
-				userID := fmt.Sprintf("usr-bench-%05d", i)
-				require.NoError(b, d.stmts.CreateUser(ctx, newTestUser(b, project.ID, schemaURL, userID, userID+"@example.com", userID)))
+			benchUserID := func(i int) string { return fmt.Sprintf("usr-bench-%05d", i) }
+			createUser := func(b *testing.B, i int) string {
+				userID := benchUserID(i)
+				require.NoError(b, d.stmts.CreateUser(ctx, newTestUser(b, projectID, schemaURL, userID, userID+"@example.com", userID)))
 				oidcSession := "oidc-" + userID
 				require.NoError(b, d.stmts.CreateToken(ctx, &domain.Token{
-					ProjectID:     project.ID,
+					ProjectID:     projectID,
 					UserID:        userID,
 					Type:          domain.TokenTypeOIDCAccessToken,
 					OIDCSessionID: &oidcSession,
@@ -55,17 +46,17 @@ func BenchmarkUserStatements_10kUsers(b *testing.B) {
 				return userID
 			}
 			for i := range benchUsers {
-				createUser(i)
+				createUser(b, i)
 			}
 
 			b.Run("lookup", func(b *testing.B) {
 				// The identifier step's filter, as GetByAttributes builds it.
 				loginFilter := database.And(
-					database.Equal(database.Col(domain.UserFieldProjectID), project.ID),
+					database.Equal(database.Col(domain.UserFieldProjectID), projectID),
 					database.Or(database.Equal(database.Col(domain.UserFieldSchemaURL), schemaURL)),
 				)
 				opts := service.UserQueryOptions{
-					Attributes:           []domain.Attribute{{Key: "email", Value: "usr-bench-05000@example.com"}},
+					Attributes:           []domain.Attribute{{Key: "email", Value: benchUserID(benchUsers/2) + "@example.com"}},
 					UniqueAttributesOnly: true,
 				}
 				for b.Loop() {
@@ -77,9 +68,9 @@ func BenchmarkUserStatements_10kUsers(b *testing.B) {
 			b.Run("delete", func(b *testing.B) {
 				for b.Loop() {
 					b.StopTimer()
-					userID := createUser(benchUsers)
+					userID := createUser(b, benchUsers)
 					b.StartTimer()
-					require.NoError(b, d.stmts.DeleteUserByID(ctx, project.ID, userID))
+					require.NoError(b, d.stmts.DeleteUserByID(ctx, projectID, userID))
 				}
 			})
 		})

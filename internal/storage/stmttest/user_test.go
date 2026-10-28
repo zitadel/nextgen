@@ -17,7 +17,7 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-func ensureUserTestProject(t *testing.T, stmts service.AllStatements) (projectID, schemaURL string) {
+func ensureUserTestProject(t testing.TB, stmts service.AllStatements) (projectID, schemaURL string) {
 	t.Helper()
 
 	project := newTestProject(uniqueProjectID(t))
