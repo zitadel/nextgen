@@ -18,7 +18,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /schema-revisions\.spec\.ts/,
+      testIgnore: /(schema-revisions|password-policy)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -26,6 +26,13 @@ export default defineConfig({
       name: "schema-revisions",
       testMatch: /schema-revisions\.spec\.ts/,
       dependencies: ["chromium"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // Deploys and rolls back too, and leaves no password policy, so it runs last.
+      name: "password-policy",
+      testMatch: /password-policy\.spec\.ts/,
+      dependencies: ["schema-revisions"],
       use: { ...devices["Desktop Chrome"] },
     },
   ],

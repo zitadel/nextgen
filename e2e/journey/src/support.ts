@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { sessionCookieName } from "@zitadel/testing/playwright";
+import { type ProfileEntry, sessionCookieName } from "@zitadel/testing/playwright";
 
 import { frameworkForId } from "../scripts/frameworks.mjs";
 
@@ -68,6 +68,34 @@ export async function runCli(
   args: string[],
   stdin?: string,
 ): Promise<unknown> {
+  const { stdout } = await execCli(metadata, args, stdin);
+  return JSON.parse(stdout) as unknown;
+}
+
+/**
+ * Runs a command that must fail and returns its `--json` error envelope, which
+ * the CLI prints on stdout with a non-zero exit.
+ */
+export async function runCliFailing(
+  metadata: JourneyMetadata,
+  args: string[],
+): Promise<{ status: string; code: string; details?: unknown }> {
+  const stdout = await execCli(metadata, args).then(
+    () => {
+      throw new Error(`zitadel ${args.join(" ")} succeeded; it should have failed`);
+    },
+    (error: { stdout?: string }) => error.stdout ?? "",
+  );
+  const envelope = JSON.parse(stdout) as { status: string; code: string; details?: unknown };
+  expect(envelope.status).toBe("error");
+  return envelope;
+}
+
+function execCli(
+  metadata: JourneyMetadata,
+  args: string[],
+  stdin?: string,
+): Promise<{ stdout: string }> {
   const run = promisify(execFile)(
     "npx",
     ["--yes", `${metadata.cliPackage}@latest`, ...args, "--cwd", metadata.appDir],
@@ -87,9 +115,16 @@ export async function runCli(
   // Closed even with nothing to pipe: the CLI reads stdin whenever it is not
   // a TTY, and would wait on an open pipe.
   run.child.stdin?.end(stdin);
-  const { stdout } = await run;
-  return JSON.parse(stdout) as unknown;
+  return run;
 }
+
+// Fields some presets require at registration; the kit fills them only when
+// the flow renders them.
+export const registrationProfile: ProfileEntry[] = [
+  { field: "givenName", value: "Ada", label: /given.?name/i },
+  { field: "familyName", value: "Lovelace", label: /family.?name/i },
+  { field: "dateOfBirth", value: "1990-01-15", label: /date.?of.?birth/i },
+];
 
 // Frameworks whose server SDK guards /profile (the registry's flag) must
 // redirect a signed-out visit to /login; the SPA families have no server.
