@@ -106,6 +106,9 @@ import {
   ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
   PublishPolicyQueryParams,
+  EvaluatePolicyBody,
+  EvaluatePolicyQueryParams,
+  EvaluatePolicyResponse,
   PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
@@ -129,7 +132,7 @@ import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/
 import { missingEndpoints } from "@zitadel/config/idp";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
-import type { z } from "zod";
+import { z } from "zod";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -728,6 +731,64 @@ function publishPolicyRevision(
       };
   store.policies.set(record.id, record);
   return { record, revision };
+}
+
+/**
+ * The evaluate body as the server decodes it. The generated schema is not
+ * strict (orval's `strict.body: false`), so it would drop an unknown key the
+ * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
+ * here, while an extra top-level key is ignored, as on publish.
+ */
+const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
+  config: policyConfigSchema.shape.config,
+  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+});
+
+/** The server's length cap on a password (`domain.MaxPasswordLength`). */
+const MAX_PASSWORD_LENGTH = 64;
+
+/**
+ * What `POST /policies/evaluate` answers for a password set: the server's
+ * `CheckPassword` (internal/service/password_policy.go) on the given config.
+ * The empty guard comes first, then the template's rules on the length in
+ * code points after NFC, the history only for a user's own set within the
+ * cap, and the cap as `max_length`. A rule the template gains must be added
+ * here.
+ */
+function evaluatePasswordSet(
+  config: Record<string, unknown>,
+  password: string,
+  facts: { self_service: boolean; history_matches: boolean[] },
+): { allowed: boolean; code?: string; violations?: Record<string, unknown> } {
+  const normalized = password.normalize("NFC");
+  if (normalized === "") {
+    return { allowed: false, code: "user.password_empty" };
+  }
+  const length = [...normalized].length;
+  const { min_length: min, max_length: max, history_depth: depth } = config;
+  const violations: Record<string, unknown> = {};
+  if (typeof min === "number" && length < min) {
+    violations.min_length = min;
+  }
+  if (typeof max === "number" && length > max) {
+    violations.max_length = max;
+  }
+  if (
+    typeof depth === "number" &&
+    facts.self_service &&
+    length <= MAX_PASSWORD_LENGTH &&
+    facts.history_matches.slice(0, depth).some(Boolean)
+  ) {
+    violations.history_depth = depth;
+  }
+  if (!("max_length" in violations) && length > MAX_PASSWORD_LENGTH) {
+    violations.max_length = MAX_PASSWORD_LENGTH;
+  }
+  if (Object.keys(violations).length === 0) {
+    return { allowed: true };
+  }
+  return { allowed: false, code: "user.password_policy_violation", violations };
 }
 
 /** A shallow copy with its keys in order, so two configs compare by value. */
@@ -2995,6 +3056,40 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    // A dry run: nothing is read or stored. The config is checked as a
+    // publish checks it, then evaluated as the server's password set would.
+    http.post("*/policies/evaluate", async ({ request }) => {
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      if (policyRuleViolated(body.data.config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
+        self_service: body.data.facts?.self_service ?? true,
+        history_matches: body.data.facts?.history_matches ?? [],
+      });
+      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.get("*/policies", ({ request }) => {

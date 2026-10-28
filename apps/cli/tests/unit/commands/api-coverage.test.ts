@@ -114,8 +114,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
-  // Policies are written from .zitadel/policies/ by `apply` (ADR 066).
-  publishPolicy: "configuration: `apply` publishes .zitadel/policies/ through the policy syncer",
+  // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
+  publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
@@ -131,6 +131,8 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   removeOrigin:
     "not yet exposed — `zitadel origin remove` lands with the origins CLI surface (#1578)",
   listProjectAdmins: "not yet exposed; a project sub-resource listing, no command reads it yet",
+  evaluatePolicy:
+    "not yet exposed — `zitadel policies test` lands with the policy-test CLI (#1445)",
 };
 
 const capitalize = (word: string): string => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`;
