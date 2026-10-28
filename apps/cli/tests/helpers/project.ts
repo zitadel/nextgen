@@ -311,6 +311,24 @@ export class ScaffoldedApp {
     }
   }
 
+  /** Commits everything outstanding, as the developer would before deploying. */
+  async commitEverything(): Promise<void> {
+    await execFileAsync("git", ["add", "--all"], { cwd: this.path });
+    await execFileAsync(
+      "git",
+      [
+        "-c",
+        "user.name=Dev",
+        "-c",
+        "user.email=dev@example.com",
+        "commit",
+        "--quiet",
+        "--message=feat: change the configuration",
+      ],
+      { cwd: this.path },
+    );
+  }
+
   /** The subjects of the project's commits, newest first, or [] without a repo. */
   async commitSubjects(): Promise<string[]> {
     try {
@@ -1452,7 +1470,18 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
  */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();
-  const result = await app.setup(["--no-git", "--no-deploy", ...extraArgs]);
+  const result = await app.setup(["--no-git", ...extraArgs]);
+  expect(result, "arranging setup should have succeeded").toSucceed();
+  return app;
+}
+
+/**
+ * An app through `setup` with its commit kept, so a release built from it
+ * records a git sha and a later deploy has a baseline to diff against.
+ */
+export async function aCommittedApp(): Promise<ScaffoldedApp> {
+  const app = await anApp();
+  const result = await app.setup();
   expect(result, "arranging setup should have succeeded").toSucceed();
   return app;
 }

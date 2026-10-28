@@ -60,7 +60,12 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
+import {
+  brandingGuidanceAction,
+  exploreAllCommands,
+  publishConfigurationAction,
+  publishConfigurationBoxAction,
+} from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -102,14 +107,13 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { DEPLOY_ARGS } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
   ensureInitialCommit,
   type InitialCommitOutcome,
 } from "./initial-commit";
-import { runInitialDeploy, type InitialDeployOutcome } from "./initial-deploy";
-import { DEPLOY_ARGS } from "../../lib/release";
 import { moveDevPort } from "./move-dev-port";
 import {
   askCustomSettings,
@@ -237,12 +241,6 @@ export default class Setup extends Promptable(BaseCommand) {
       default: true,
       description:
         "Initialise a git repository and make one commit when the project is not already in one, so the first release records a commit. Use --no-git to leave version control alone.",
-    }),
-    deploy: Flags.boolean({
-      allowNo: true,
-      default: true,
-      description:
-        "Deploy the .zitadel/ files setup writes, so the project serves them from the start. Use --no-deploy to write them and publish later with `zitadel deploy`.",
     }),
     preset: Flags.string({
       description:
@@ -834,14 +832,6 @@ export default class Setup extends Promptable(BaseCommand) {
     // and the next deploy has no baseline to diff against. That ordering is why
     // both happen here rather than being left to the developer (#1651).
     const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
-    const initialDeploy = await this.deployInitialRelease({
-      cwd,
-      dryRun,
-      server: answers.server,
-      project,
-      selector: recoverySelector(flags.cwd),
-      enabled: flags.deploy !== false,
-    });
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
@@ -918,6 +908,16 @@ export default class Setup extends Promptable(BaseCommand) {
       }
     }
 
+    // Nothing was deployed, so the project serves the server's defaults until
+    // the developer publishes. Setup does not do it for them, so this is the
+    // only thing that says the step exists.
+    const publishSelector = recoverySelector(flags.cwd);
+    const publishStep = {
+      actions: [publishConfigurationAction(this.meta.cliVersion, publishSelector)],
+      boxActions: [publishConfigurationBoxAction(this.meta.cliVersion, publishSelector)],
+      commands: [projectCommand(DEPLOY_ARGS, publishSelector, this.meta.cliVersion)],
+    };
+
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
       !ownedByLocalAdmin &&
@@ -978,6 +978,7 @@ export default class Setup extends Promptable(BaseCommand) {
             "",
             renderBoxActions([
               ...installOutcome.boxActions,
+              ...publishStep.boxActions,
               ...consoleStep.boxActions,
               ...claimNudge.boxActions,
             ]),
@@ -1032,18 +1033,6 @@ export default class Setup extends Promptable(BaseCommand) {
           initialized: commit.kind === "created",
           commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
         },
-        // The first deployment, so the project serves the developer's own
-        // `.zitadel/` rather than the resources the server seeds beside a new
-        // project. `null` when setup did not get that far.
-        deployment:
-          initialDeploy?.kind === "deployed"
-            ? {
-                release_id: initialDeploy.releaseId,
-                content_hash: initialDeploy.contentHash,
-                deployment_id: initialDeploy.deploymentId,
-                origins: [...initialDeploy.origins],
-              }
-            : null,
         // The provider enabled during scaffolding, or null. `secret` reports
         // where the value went, never the value itself — `published` is the
         // one that decides whether the provider button works.
@@ -1073,6 +1062,7 @@ export default class Setup extends Promptable(BaseCommand) {
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
           ...installOutcome.nextActions,
+          ...publishStep.actions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
           ...claimNudge.actions,
@@ -1102,6 +1092,7 @@ export default class Setup extends Promptable(BaseCommand) {
             recoverySelector(flags.cwd),
           ),
           ...installOutcome.nextCommands,
+          ...publishStep.commands,
           ...consoleStep.commands,
           ...claimNudge.commands,
         ]),
@@ -1143,58 +1134,6 @@ export default class Setup extends Promptable(BaseCommand) {
     if (outcome.kind === "unavailable") {
       reportWarning(
         `Could not commit the scaffolded project (${outcome.reason}); the first release records no commit, so the next deploy cannot show a diff.`,
-      );
-    }
-    return outcome;
-  }
-
-  /**
-   * Deploy what setup wrote, so the project is live off `.zitadel/` from the
-   * start. A failure here is reported rather than thrown: the project, its
-   * files and its credentials all exist and are worth keeping, and the deploy
-   * is one command away.
-   */
-  private async deployInitialRelease(opts: {
-    cwd: string;
-    dryRun: boolean;
-    server: string;
-    project: CreateProject201;
-    selector: EnvironmentSelector;
-    enabled: boolean;
-  }): Promise<InitialDeployOutcome | undefined> {
-    if (!opts.enabled) {
-      return undefined;
-    }
-    // A dry run writes nothing, and `--server mock` answers from fixtures and
-    // has no project to deploy to.
-    if (opts.dryRun) {
-      consola.info("Would deploy .zitadel/ to the project (dry run)");
-      return undefined;
-    }
-    if (opts.server === "mock") {
-      return undefined;
-    }
-    consola.start("Deploying .zitadel/ to the project");
-    const json = this.jsonEnabled();
-    const outcome = await runInitialDeploy({
-      cwd: opts.cwd,
-      client: createZitadelClient({
-        baseUrl: opts.server,
-        token: opts.project.project_secret,
-      }),
-      projectId: opts.project.id,
-      env: this.meta.env,
-      json,
-      color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
-      suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
-    });
-    if (outcome.kind === "deployed") {
-      consola.success(
-        `Deployed ${outcome.contentHash} to ${outcome.origins.length} origin${outcome.origins.length === 1 ? "" : "s"}`,
-      );
-    } else {
-      reportWarning(
-        `The project was created and its files written, but the first deploy failed: ${outcome.message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish them.`,
       );
     }
     return outcome;

@@ -684,7 +684,6 @@ describe("setup command pre-flight", () => {
       "--json",
       "--skip-install",
       "--no-git",
-      "--no-deploy",
       // Setup warns when the app's port is taken, and whatever holds 3000 on
       // the machine running the tests must not decide what it reports.
       "--dev-port",
