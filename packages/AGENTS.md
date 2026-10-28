@@ -32,8 +32,16 @@ change needs a changeset, and the whole train versions together.
   `libraryBuild()` fails the build on any other.
 - **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
   into shared chunks and strip the directive. Re-test the App Router split.
+- **Ship SDKs minified with source maps**: `libraryBuild()` does both; a build
+  outside it reuses `minify` from `@zitadel/vite`.
 - **Build `sdk-nuxt` with `nuxtModule()`** (`@mridang/vite-plugin-nuxt-module`):
   list each entry in `nuxtModule({ entry })` as well as in `exports`.
+- **Ship `sdk-nuxt` without source maps**: the plugin's `sourcemap` maps the
+  declarations too, to `src/` files the package does not ship.
+- **Keep `sdk-angular` unminified**: an app's Angular linker rejects minified
+  `ɵɵngDeclare*` metadata; its edge spec links the built package and fails.
+- **Keep `sdk-qwik` unminified**: Qwik's plugin builds libraries unminified,
+  and the app's optimizer splits the QRLs in `.qwik.mjs`.
 - **Check `sdk-angular` templates in `typecheck`**: Analog's plugin skips them,
   so `ngc --noEmit` enforces `strictTemplates`.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
