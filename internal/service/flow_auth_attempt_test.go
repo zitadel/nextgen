@@ -42,6 +42,13 @@ type fakeAuthAttempts struct {
 	// setResultErrs answers SetSSOCallbackResult calls in order; a call past
 	// the end succeeds.
 	setResultErrs []error
+	// ssoFailures are the failures RecordSSOFailure was told of.
+	ssoFailures []domain.FlowSSOFailureInput
+}
+
+func (f *fakeAuthAttempts) RecordSSOFailure(_ context.Context, in domain.FlowSSOFailureInput) error {
+	f.ssoFailures = append(f.ssoFailures, in)
+	return nil
 }
 
 func (f *fakeAuthAttempts) Create(_ context.Context, in service.CreateAuthAttemptInput) (*domain.AuthAttempt, error) {

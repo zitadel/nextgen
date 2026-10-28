@@ -290,6 +290,8 @@ webhooks:
     $ref: endpoints/events/webhooks/auth-sso-authorization-failed.yaml
   auth.sso.exchange.failed:
     $ref: endpoints/events/webhooks/auth-sso-exchange-failed.yaml
+  auth.sso.resolution.failed:
+    $ref: endpoints/events/webhooks/auth-sso-resolution-failed.yaml
   auth.sso.exchange.succeeded:
     $ref: endpoints/events/webhooks/auth-sso-exchange-succeeded.yaml
   auth.token.issued:

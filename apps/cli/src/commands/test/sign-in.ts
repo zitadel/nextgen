@@ -1,3 +1,4 @@
+import { Flags } from "@oclif/core";
 import {
   idpProvider,
   IDP_PROVIDERS,
@@ -9,6 +10,7 @@ import {
 import { consola } from "consola";
 
 import { escapeControlCharacters, type ZitadelClient } from "../../lib/api-client";
+import { openInBrowser } from "../../lib/browser";
 import {
   type CheckResult,
   IDP_CHECKS,
@@ -17,6 +19,7 @@ import {
   runChecks,
   type Send,
 } from "../../lib/checks/idp";
+import { isAttached } from "../../lib/claim-state";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { type ConnectionFile, callbackUriFor, readConnectionFiles } from "../../lib/idp";
 import { isObject } from "../../lib/json";
@@ -28,9 +31,32 @@ import {
   nonBlankString,
 } from "../../lib/oclif";
 import { nextCommandsData } from "../../lib/oclif/envelope";
+import { readZitadelSecret } from "../../lib/project";
+import { diffConfigAgainst } from "../../lib/release/git";
+import { listLiveDeployments, servesPrimary } from "../../lib/release";
+import { SIGN_IN_EVENT_TYPES, watchSignInAudit } from "../../lib/sign-in-audit";
 import { reportWarning } from "../../lib/warnings";
 
 const REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_TIMEOUT_SECONDS = 300;
+const POLL_MS = 1_000;
+/** How many of the newest audit events one poll reads; a sign-in writes a handful. */
+const AUDIT_PAGE = 100;
+
+/** Resolves after `ms`, or as soon as `signal` aborts. */
+const wait = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
+
 const MAX_BODY_BYTES = 1_000_000;
 /** One GET, following redirects, bounded in time and in the body it keeps. */
 const send: Send = async (url) => {
@@ -93,19 +119,49 @@ async function readBounded(response: Response, limit: number): Promise<string> {
 export default class TestSignIn extends EnvironmentCommand {
   static override description = "Check that a sign-in provider is set up correctly.";
   static override group = CommandGroups.configuration;
-  static override examples = ["<%= config.bin %> test sign-in --provider google"];
+  static override examples = [
+    "<%= config.bin %> test sign-in --provider google",
+    "<%= config.bin %> test sign-in --provider google --live",
+  ];
   static override flags = {
     provider: nonBlankString({
       description: "Connection to check. Defaults to every connection the Project has.",
+    }),
+    live: Flags.boolean({
+      description:
+        "After the checks, sign in through a browser and follow it through the project's audit events. Off by default.",
+    }),
+    timeout: Flags.integer({
+      description: "Seconds to wait for the browser sign-in.",
+      default: DEFAULT_TIMEOUT_SECONDS,
+      min: 1,
     }),
   };
 
   async run(): Promise<JsonEnvelope> {
     const { flags } = await this.parse(TestSignIn);
+    const live = flags.live;
     await this.toMeta(flags);
     const { cwd } = this.meta;
     const { client, projectId } = await this.connect();
     const connections = await this.connections(cwd, flags.provider);
+    if (connections.length > 1 && live) {
+      throw new ZitadelError("E_VALIDATION", "A live sign-in belongs to one provider", {
+        hint: `Name one with --provider: ${connections.map(slugOf).join(", ")}`,
+      });
+    }
+    if (live && this.meta.dryRun) {
+      // A live sign-in is started by a person in a browser and can create a user and a
+      // session, so a dry run stops before opening anything, as `claim` does.
+      return this.emit({
+        status: "skipped",
+        reason: "dry-run",
+        data: {
+          title: "The live sign-in was not started.",
+          would: `Open the login page and wait for a sign-in with ${connections.map(slugOf).join(", ")}, then report which phase failed and on which side.`,
+        },
+      });
+    }
     // The callback URI is built from the origin the app serves from.
     const projectIssuer = this.environment.values.ZITADEL_ISSUER?.value;
     if (projectIssuer === undefined) {
@@ -116,7 +172,13 @@ export default class TestSignIn extends EnvironmentCommand {
     const providers = await connections.reduce<Promise<readonly ProviderReport[]>>(
       async (done, connection) => [
         ...(await done),
-        await this.checkProvider(connection, projectIssuer, { client, projectId }),
+        await this.checkProvider({
+          connection,
+          projectIssuer,
+          project: { client, projectId },
+          live,
+          timeoutSeconds: flags.timeout,
+        }),
       ],
       Promise.resolve([]),
     );
@@ -134,7 +196,7 @@ export default class TestSignIn extends EnvironmentCommand {
     const summary = `${data.passed} passed, ${data.warned} warned, ${data.failed} failed, ${data.skipped} skipped`;
     consola.box({
       title: "Sign-in checks",
-      message: wrapForBox(summaryOf(providers)),
+      message: wrapForBox(summaryOf(providers, live)),
       style: {
         padding: 1,
         borderStyle: "rounded",
@@ -163,7 +225,11 @@ export default class TestSignIn extends EnvironmentCommand {
       status: "ok",
       data: {
         ...data,
-        next_actions: ["Sign in once to be sure: these checks cannot prove the whole journey."],
+        next_actions: [
+          live
+            ? "The live sign-in completed; a user it created is still in the project."
+            : "Sign in once to be sure: these checks cannot prove the whole journey.",
+        ],
         ...nextCommandsData(
           only === undefined ? [] : [this.suggest(`test sign-in --provider ${only.provider}`)],
         ),
@@ -172,14 +238,22 @@ export default class TestSignIn extends EnvironmentCommand {
   }
 
   /** Runs the battery for one connection, printing each check as it finishes. */
-  private async checkProvider(
-    connection: ConnectionFile,
-    projectIssuer: string,
-    project: { readonly client: ZitadelClient; readonly projectId: string },
-  ): Promise<ProviderReport> {
+  private async checkProvider(options: {
+    readonly connection: ConnectionFile;
+    readonly projectIssuer: string;
+    readonly project: { readonly client: ZitadelClient; readonly projectId: string };
+    readonly live: boolean;
+    readonly timeoutSeconds: number;
+  }): Promise<ProviderReport> {
+    const { connection, projectIssuer, project, live } = options;
     const slug = slugOf(connection);
     const oidc = isObject(connection.body.oidc) ? connection.body.oidc : {};
     const callbackUri = callbackUriFor(projectIssuer, slug);
+    if (live) {
+      await this.requireClaimed();
+      await this.requireSecretVariable(project, oidc.client_secret);
+      await this.requireApplied(project);
+    }
 
     consola.start(`Checking ${slug}`);
     if (process.stdout.isTTY) {
@@ -236,6 +310,39 @@ export default class TestSignIn extends EnvironmentCommand {
         consoleUrl: catalogId === undefined ? undefined : idpProvider(catalogId).consoleUrl,
         probes: PROVIDER_PROBES.get(kind),
         request: send,
+        ...(live
+          ? {
+              live: {
+                loginUrl: `${projectIssuer.replace(/\/$/, "")}/login`,
+                timeoutMs: options.timeoutSeconds * 1000,
+                open: async (url: string) => {
+                  await openInBrowser(url);
+                },
+                // Under --json consola is silent, so the login URL a person has to open would reach
+                // nobody; stderr keeps stdout clean for the envelope and still shows it.
+                say: (message: string) =>
+                  this.jsonEnabled()
+                    ? process.stderr.write(`${escaped(message)}\n`)
+                    : consola.info(escaped(message)),
+                watch: async (signal: AbortSignal) =>
+                  watchSignInAudit(
+                    (pageToken) =>
+                      project.client.listEvents({
+                        project_id: project.projectId,
+                        order: "desc",
+                        limit: AUDIT_PAGE,
+                        event_type: [...SIGN_IN_EVENT_TYPES],
+                        ...(pageToken === undefined ? {} : { page_token: pageToken }),
+                      }),
+                    slug,
+                    wait,
+                    POLL_MS,
+                    signal,
+                  ),
+                sleep: wait,
+              },
+            }
+          : {}),
       }),
       report,
     );
@@ -250,6 +357,94 @@ export default class TestSignIn extends EnvironmentCommand {
       skipped: count("skipped"),
       checks: results,
     };
+  }
+
+  /**
+   * The audit events are readable only once the project is claimed, so on an
+   * unclaimed one a sign-in would complete while the command waited for events
+   * it can never see. The claim is recorded in `.zitadel/secret`; a project that
+   * keeps no such file cannot be told, so it is not refused here.
+   */
+  private async requireClaimed(): Promise<void> {
+    const secret = await readZitadelSecret(this.meta.cwd).catch(() => undefined);
+    if (secret !== undefined && !isAttached(secret)) {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "The project is not claimed, so its events are hidden",
+        {
+          hint: "A live sign-in is followed through the project's audit events, which are readable once the project is claimed. Claim it, then try again.",
+          nextCommands: [this.suggest("claim")],
+        },
+      );
+    }
+  }
+
+  /** The client secret is write-only, so the most that can be known is that the project holds one. */
+  private async requireSecretVariable(
+    project: { readonly client: ZitadelClient; readonly projectId: string },
+    written: unknown,
+  ): Promise<void> {
+    const name = typeof written === "string" ? referencedVariable(written) : undefined;
+    if (name === undefined) {
+      return;
+    }
+    const held = await project.client
+      .getVariable(name, { project_id: project.projectId, kind: "primary" })
+      .then(
+        ({ primary }) => primary,
+        (error: unknown) => {
+          const failure = toZitadelError(error);
+          if (failure.code === "E_NOT_FOUND") {
+            return undefined;
+          }
+          throw failure;
+        },
+      );
+    if (held === undefined || held === null || typeof held !== "object") {
+      throw new ZitadelError(
+        "E_CREDENTIAL_MISSING",
+        `The client secret variable ${name} is ${held === undefined ? "not set" : "not a secret"}`,
+        {
+          hint: `Publish it with: zitadel variable set ${name} --secret`,
+          nextCommands: [this.suggest(`variable set ${name} --secret`)],
+        },
+      );
+    }
+  }
+
+  /**
+   * What the project serves is what gets signed in with, so a sign-in is refused
+   * while the files differ from the live release. Where the live release records
+   * no commit to compare with, nothing can be said and the check goes on.
+   */
+  private async requireApplied(project: {
+    readonly client: ZitadelClient;
+    readonly projectId: string;
+  }): Promise<void> {
+    const deployments = await listLiveDeployments(project.client, project.projectId, {
+      withRelease: true,
+    });
+    const live = deployments.find(servesPrimary)?.release?.metadata;
+    if (live === undefined) {
+      throw new ZitadelError("E_VALIDATION", "Nothing is deployed to the project yet", {
+        hint: "The sign-in runs against what the project serves, so deploy the files first.",
+        nextCommands: [this.suggest("deploy -m '<what changed>'")],
+      });
+    }
+    const diff =
+      live.git_sha && !live.git_dirty
+        ? await diffConfigAgainst(this.meta.cwd, live.git_sha, false, [])
+        : null;
+    if (diff !== null && diff.trim() !== "") {
+      throw new ZitadelError(
+        "E_VALIDATION",
+        "The files have changes the project does not serve yet",
+        {
+          hint: "The sign-in would run against the deployed files, not the ones on disk.",
+          nextCommands: [this.suggest("deploy -m '<what changed>'")],
+        },
+      );
+    }
   }
 
   /** The connection named with --provider, or every connection the project has. */
@@ -380,7 +575,7 @@ function report({ status, title, message, recovery }: CheckResult): void {
 }
 
 /** What each provider's checks came to, and what to do next, for the closing box. */
-function summaryOf(providers: readonly ProviderReport[]): string {
+function summaryOf(providers: readonly ProviderReport[], live: boolean): string {
   const width = Math.max(...providers.map((report) => report.provider.length));
   const rows = providers.map((report) => {
     const counts = (
@@ -395,9 +590,13 @@ function summaryOf(providers: readonly ProviderReport[]): string {
       .map(([count, word]) => `${count} ${word}`);
     return `${report.provider.padEnd(width)}  ${counts.join(", ")}`;
   });
-  return [...rows, "", "These checks cannot prove a sign-in works: sign in once to be sure."].join(
-    "\n",
-  );
+  return [
+    ...rows,
+    "",
+    live
+      ? "A sign-in that created a user left it in the project."
+      : "Only a real sign-in proves the whole journey: add --live to try one.",
+  ].join("\n");
 }
 
 const escaped = (text: string) => escapeControlCharacters(text, { keepLayout: false });

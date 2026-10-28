@@ -555,8 +555,23 @@ callback URI. It never needs the client secret, which the platform stores
 write-only. Each entry of `data.providers[].checks` has a `status` of `pass`,
 `warn`, `fail` or `skipped`, and a `skipped` check is never a pass: it says the
 check could not tell. A failure exits `E_VALIDATION` naming the providers that
-failed, with the one thing to do in `hint`. The checks cannot prove a sign-in
-works end to end: only a person signing in does.
+failed, with the one thing to do in `hint`. Add `--live` (with `--provider` when
+there are several) only when a person is at the machine: it opens the login page
+and waits for them to sign in, then reports from the project's audit events
+(`zitadel events list`) which phase failed and on which side, provider or
+journey; a wrong secret shows up there as a provider-side failure at the
+exchange. The live check's `details` hold the attempt id, the phase it ended
+in, the reason and side, and every phase seen with its time, so read those
+rather than the message. It works against any server the project is on, but the project must be
+claimed (`zitadel claim`), because a project that is not claimed hides its events,
+and the files must be deployed (`zitadel deploy`). A `--dry-run` starts nothing, since a sign-in can
+create a user and `--live` leaves any user it created in the project. It follows
+the first attempt that exchanges with the named connection and ignores the
+others, so a password login in the meantime does not count. A sign-in that fails
+before the person leaves the login page, such as a connection the server cannot
+build the redirect from, records no event, so the check ends with "no sign-in
+attempt seen"; the checks that run without `--live` catch the usual causes of
+that.
 
 Repo config is authoritative: edit `zitadel.json` or files under `.zitadel/`,
 then re-run `deploy`. See the reference below for driving the login UI

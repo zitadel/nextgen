@@ -81,6 +81,58 @@ export interface ProviderProbes {
   authorize(response: HttpResponse): Verdict;
 }
 
+export type SignInPhase =
+  | "ceremony_started"
+  | "callback_received"
+  | "exchange_finished"
+  | "resolved"
+  | "user_created"
+  | "handed_off";
+
+/**
+ * One phase of one sign-in attempt, as the runtime reports it. It carries ids
+ * and names only: the runtime never logs a code, a token, a secret or a claim
+ * value, so there is none to read.
+ */
+export type SignInEvent = {
+  readonly slug: string;
+  /** Identifies the attempt. */
+  readonly flowId: string;
+  /**
+   * Whether the event is about an SSO exchange with a named connection, which an
+   * attempt's start and handoff, shared by every kind of sign-in, are not.
+   */
+  readonly sso?: true;
+  readonly phase: SignInPhase;
+  readonly status: "ok" | "failed";
+  readonly reason?: string;
+  readonly side?: "provider" | "journey";
+  /** When the runtime recorded it. */
+  readonly at?: string;
+};
+
+/**
+ * Everything the live sign-in check touches outside itself: the page to send
+ * the developer to, the runtime's events, a way to open a browser and the
+ * clock. A test hands it fakes for all of them.
+ */
+export type LiveSignIn = {
+  readonly loginUrl: string;
+  readonly timeoutMs: number;
+  /** Best effort: the URL is printed first, so a failure to open a browser is not an error. */
+  readonly open: (url: string) => Promise<void>;
+  /** Progress shown while waiting. */
+  readonly say: (message: string) => void;
+  /**
+   * Events from the moment the promise resolves on, until `signal` aborts. It
+   * resolves only once what the log already holds has been read, so an attempt
+   * made after that is never mistaken for an old one.
+   */
+  readonly watch: (signal: AbortSignal) => Promise<AsyncIterable<SignInEvent>>;
+  /** Resolves after `ms`, or as soon as `signal` aborts. */
+  readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
+};
+
 export type IdpContext = {
   /** Every endpoint the connection names itself, by field, so each can be checked as the server does. */
   readonly configuredEndpoints?: Readonly<Record<string, string>>;
@@ -105,6 +157,8 @@ export type IdpContext = {
   readonly probes: ProviderProbes | undefined;
   readonly discovery: Promise<DiscoveryResult>;
   readonly request: Send;
+  /** Absent when the live sign-in is skipped. */
+  readonly live?: LiveSignIn;
 };
 
 /** The one way a check reaches the network: a GET that follows redirects. */

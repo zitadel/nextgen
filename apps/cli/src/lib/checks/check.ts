@@ -18,6 +18,8 @@ export type Outcome = {
   readonly message: string;
   /** The one thing to do about a `warn` or `fail`. */
   readonly recovery?: string;
+  /** What the check observed, for a reader that wants data and not prose (`--json`). */
+  readonly details?: Readonly<Record<string, unknown>>;
 };
 
 export type CheckResult = Outcome & {
@@ -32,7 +34,11 @@ export abstract class Check<Context> {
   /** Names of checks that must not have failed or been skipped for this one to run. */
   readonly dependsOn: readonly string[] = [];
 
-  abstract run(context: Context): Promise<Outcome>;
+  /**
+   * `earlier` holds the results of the checks that already ran, for a check
+   * whose verdict depends on how the battery went and not on one named check.
+   */
+  abstract run(context: Context, earlier: readonly CheckResult[]): Promise<Outcome>;
 }
 
 /** One check's result, given the results of the checks that ran before it. */
@@ -47,7 +53,7 @@ async function resultOf<Context>(
   });
   const outcome: Outcome =
     blocker === undefined
-      ? await (async () => check.run(context))().catch(
+      ? await (async () => check.run(context, earlier))().catch(
           (error: unknown): Outcome => ({
             status: "fail",
             message: error instanceof Error ? error.message : String(error),

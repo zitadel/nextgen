@@ -3359,6 +3359,18 @@
           "type": "option"
         },
         {
+          "name": "live",
+          "description": "After the checks, sign in through a browser and follow it through the project's audit events. Off by default.",
+          "type": "boolean"
+        },
+        {
+          "name": "timeout",
+          "description": "Seconds to wait for the browser sign-in.",
+          "type": "option",
+          "default": 300,
+          "min": 1
+        },
+        {
           "name": "env",
           "char": "e",
           "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
@@ -3373,6 +3385,9 @@
       "examples": [
         {
           "command": "test sign-in --provider google"
+        },
+        {
+          "command": "test sign-in --provider google --live"
         }
       ]
     },

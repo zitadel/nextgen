@@ -3190,7 +3190,7 @@ Check that a sign-in provider is set up correctly.
 ```
 USAGE
   $ zitadel test sign-in [--json] [-c <value>] [-s <value>] [-n] [--dry-run] [-v] [--debug] [--color]
-    [--telemetry] [-e <value>] [--env-file <value>] [--provider <value>]
+    [--telemetry] [-e <value>] [--env-file <value>] [--provider <value>] [--live] [--timeout <value>]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -3204,8 +3204,11 @@ FLAGS
       --dry-run           Preview without mutating files or the platform.
       --env-file=<value>  Read ZITADEL_* values from this file ahead of the process environment. A relative path is read
                           from the current directory, not from --cwd. Cannot be combined with --env.
+      --live              After the checks, sign in through a browser and follow it through the project's audit events.
+                          Off by default.
       --provider=<value>  Connection to check. Defaults to every connection the Project has.
       --[no-]telemetry    Send anonymous usage analytics. Disable with --no-telemetry.
+      --timeout=<value>   [default: 300] Seconds to wait for the browser sign-in.
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -3215,6 +3218,8 @@ DESCRIPTION
 
 EXAMPLES
   $ zitadel test sign-in --provider google
+
+  $ zitadel test sign-in --provider google --live
 ```
 
 ## `zitadel uninstall`

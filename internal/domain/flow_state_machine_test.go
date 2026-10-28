@@ -18,6 +18,7 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	domainmock "github.com/zitadel/nextgen/internal/domain/mock"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 )
 
 func containsFieldName(fields []domain.FlowField, name string) bool {
@@ -75,6 +76,8 @@ type flowTestWorld struct {
 	ssoRedirects       *domainmock.MockFlowSSORedirectIssuer
 	passwords          *fakePasswordPolicy
 	sm                 *domain.FlowStateMachineRuntime
+	// ssoFailures are the failures of an SSO sign-in the machine recorded.
+	ssoFailures []domain.FlowSSOFailureInput
 }
 
 // fakePasswordPolicy answers the password length bounds; the zero value is a
@@ -132,7 +135,7 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		now,
 	)
 
-	return &flowTestWorld{
+	w := &flowTestWorld{
 		mock:               mock,
 		hasher:             hasher,
 		schemaResolver:     schemaResolver,
@@ -144,6 +147,14 @@ func newFlowTestWorld(t *testing.T) *flowTestWorld {
 		passwords:          passwords,
 		sm:                 sm,
 	}
+	authAttemptService.EXPECT().
+		RecordSSOFailure(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, in domain.FlowSSOFailureInput) error {
+			w.ssoFailures = append(w.ssoFailures, in)
+			return nil
+		}).
+		AnyTimes()
+	return w
 }
 
 // loginDefinition builds a single-step login flow: a `credentials`
@@ -4215,12 +4226,15 @@ func TestFlowStateMachine_Process_NavPurposeSwitchDropsResolvedUser(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, "password", afterIdentify.State.CurrentStep)
 	require.Equal(t, "user_alice", afterIdentify.State.CollectedData.UserID)
+	afterIdentify.State.SSOProviderSlug = "google"
 
 	back, err := w.sm.Process(t.Context(), def, afterIdentify.State, domain.FlowSubmitInput{
 		Action: "back",
 	})
 	require.NoError(t, err)
 	require.Equal(t, "identifier", back.State.CurrentStep)
+	assert.Empty(t, back.State.SSOProviderSlug,
+		"a rotated attempt has signed in with no connection, so a later failure is not the old one's")
 
 	// "Sign up" must start register mode fresh: no resolved user and no
 	// collected credential material.
@@ -5620,7 +5634,9 @@ func TestFlowStateMachine_Render_SSOTeamUniqueClaimBindsOwnerWithoutTeam(t *test
 func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T) {
 	t.Parallel()
 	w, def, state := ssoRenderWorld(t)
-	w.expectParked(unlinkedParked(map[string]any{"email": "alice@example.com"}, nil), nil)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+	parked.ProviderSlug = "google"
+	w.expectParked(parked, nil)
 	w.expectOwner("email", "alice@example.com", "")
 
 	result, err := w.sm.Render(t.Context(), def, state)
@@ -5629,6 +5645,10 @@ func TestFlowStateMachine_Render_SSOOutcomeUnwiredRendersStepError(t *testing.T)
 	require.NotNil(t, result.Step.Error)
 	assert.Equal(t, domain.FlowStepErrorSSOUserNotFound, *result.Step.Error)
 	assert.Equal(t, "ch-1", result.State.SSOResolvedCheckID)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonUnroutable,
+	}}, w.ssoFailures, "an outcome nothing routes ends the sign-in, so the audit trail says so")
 }
 
 // The validator does not require user_already_exists on a step that offers
@@ -5843,6 +5863,8 @@ func TestFlowStateMachine_Render_SSOStaleParkedRowProvisioningRendersStep(t *tes
 			assert.Nil(t, result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
 			assert.False(t, result.Reseal)
+			// Another request claimed the parked row: a race the render settles, not a failure.
+			assert.Empty(t, w.ssoFailures)
 		})
 	}
 }
@@ -7229,8 +7251,108 @@ func TestFlowStateMachine_Process_SSOCollectionStepErrors(t *testing.T) {
 			require.NotNil(t, result.Step.Error)
 			assert.Equal(t, tc.wantErr, *result.Step.Error)
 			assert.Empty(t, result.State.CollectedData.UserID)
+			if tc.wantErr == domain.FlowStepErrorSSOUserInvalid {
+				assert.Empty(t, w.ssoFailures, "a value the person can correct is not the end of the sign-in")
+			}
 		})
 	}
+}
+
+// A property the schema requires that nothing maps or collects can never be
+// supplied, so the sign-in is told of as failing instead of looking stalled.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAnUncreatableUser(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com"}, map[string]bool{"email": true})
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).MinTimes(1).MaxTimes(2)
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+
+	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonUserInvalid,
+	}}, w.ssoFailures)
+}
+
+// Going back from the collection step abandons the identity the connection sent, so the attempt
+// that exchanged with it must not be the one the person finishes another way.
+func TestFlowStateMachine_Process_BackFromCollectionRotatesTheAttempt(t *testing.T) {
+	t.Parallel()
+	for name, offersIdentifier := range map[string]bool{
+		"to a step that collects an identifier": true,
+		"to a picker with no field":             false,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			rotatesOnBack(t, offersIdentifier)
+		})
+	}
+}
+
+func rotatesOnBack(t *testing.T, offersIdentifier bool) {
+	t.Helper()
+	w := newFlowTestWorld(t)
+	def := purposeNavDefinition()
+	w.schemaResolver.EXPECT().
+		Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+		Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+		AnyTimes()
+	gomock.InOrder(
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-1", nil),
+		w.authAttemptService.EXPECT().SubmitIdentifier(gomock.Any(), gomock.Any()).Return("user_alice", nil),
+		w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("attempt-2", nil),
+	)
+	start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+		Definition:    def,
+		Purpose:       domain.FlowDefinitionPurposeLogin,
+		Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+		UserSchemaURL: defaultSchemaURL,
+	})
+	require.NoError(t, err)
+	next, err := w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+		Action: domain.FlowActionSubmit,
+		Fields: map[string]any{"email": "alice@example.com"},
+	})
+	require.NoError(t, err)
+	if !offersIdentifier {
+		def.Steps[0].Fields = nil
+	}
+	// The connection exchanged, but no user was resolved from it.
+	next.State.CollectedData.UserID = ""
+	next.State.SSOProviderSlug = "google"
+
+	back, err := w.sm.Process(t.Context(), def, next.State, domain.FlowSubmitInput{Action: "back"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "attempt-2", back.State.AuthAttemptID)
+	assert.Empty(t, back.State.SSOProviderSlug)
+}
+
+// A collision the collection step cannot route ends the sign-in, so it is recorded.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAnUnroutableCollision(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	step := &def.Steps[len(def.Steps)-1]
+	delete(step.Transitions, domain.FlowImplicitOutcomeUserAlreadyExists)
+	parked := unlinkedParked(map[string]any{"email": "alice@example.com", "badge": "b-7"}, map[string]bool{"email": true})
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).MinTimes(1).MaxTimes(2)
+	w.expectOwner("badge", "b-7", "")
+	w.expectOwner("email", "alice@example.com", "user-9")
+
+	result, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Step.Error)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonUnroutable,
+	}}, w.ssoFailures)
 }
 
 // A submit whose row is gone or was claimed by another request: a user bound
@@ -7335,6 +7457,263 @@ func TestFlowStateMachine_Process_SSOCollectionRefusedSubmit(t *testing.T) {
 
 			_, err := w.sm.Process(t.Context(), def, state, in)
 			require.ErrorIs(t, err, tc.wantErr)
+		})
+	}
+}
+
+// Each way an identity fails to settle records its failure, naming the
+// connection, the attempt, the phase and the reason; a settled one records
+// nothing, since its own events say so.
+func TestFlowStateMachine_Render_SSORecordsFailures(t *testing.T) {
+	t.Parallel()
+	claims, verified := completeClaims()
+	tests := []struct {
+		name    string
+		parked  *domain.FlowSSOParkedIdentity
+		loadErr error
+		expect  func(w *flowTestWorld)
+		wantErr bool
+		want    []domain.FlowSSOFailureInput
+	}{
+		{
+			name: "a linked user of another schema is the journey's, though nothing is parked",
+			loadErr: &domain.SSOLoadFailure{
+				ProviderSlug: "google",
+				Reason:       ssoevent.ReasonOtherSchema,
+				Err:          domain.ErrFlowRestartRequired(),
+			},
+			wantErr: true,
+			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonOtherSchema}},
+		},
+		{
+			name: "a creation that fails is recorded once, in the phase it failed in",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", errors.New("store unavailable"))
+			},
+			wantErr: true,
+			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseUserCreated, Reason: ssoevent.ReasonInternal}},
+		},
+		{
+			name: "a bind that finds the attempt settled elsewhere is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(domain.ErrFlowRestartRequired())
+			},
+			wantErr: true,
+		},
+		{
+			name: "a creation that finds the attempt settled elsewhere is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("", domain.ErrFlowRestartRequired())
+			},
+			wantErr: true,
+		},
+		{
+			name: "a flow that starts over because the attempt already has a user is not a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				p.AttemptUserID = "user-signed-in"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
+			},
+			wantErr: true,
+		},
+		{
+			name:   "a handoff retried after a lost cookie is the connection the load recovered",
+			parked: &domain.FlowSSOParkedIdentity{BoundUserID: "user-1", ProviderSlug: "google"},
+			expect: func(w *flowTestWorld) {
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+			},
+			wantErr: true,
+			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed}},
+		},
+		{
+			name: "a linked identity is bound and handed off without a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+			},
+		},
+		{
+			name: "a handoff that fails after the bind is the journey's",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := linkedParked()
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().BindLinked(gomock.Any(), gomock.Any()).Return(nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+			},
+			wantErr: true,
+			want:    []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed}},
+		},
+		{
+			name:   "a connection that disallows creation is the journey's",
+			parked: &domain.FlowSSOParkedIdentity{CheckID: "ch-1", ConnectionID: "idp-1", ProviderSlug: "google", Subject: "sub-1", CreationDisabled: true},
+			want:   []domain.FlowSSOFailureInput{{ConnectionSlug: "google", Phase: ssoevent.PhaseResolved, Reason: ssoevent.ReasonCreationDisabled}},
+		},
+		{
+			name: "complete claims create a user and hand off without a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(claims, verified)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) {
+				w.ssoIdentities.EXPECT().FindUniqueOwner(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", nil).Times(3)
+				w.ssoIdentities.EXPECT().CreateLinked(gomock.Any(), gomock.Any()).Return("user-new", nil)
+				w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+					Return(domain.FlowHandoffOutput{Token: "handoff-1", ExpiresAt: time.Unix(1700000060, 0).UTC()}, nil)
+			},
+		},
+		{
+			name: "incomplete claims go to the collection step without a failure",
+			parked: func() *domain.FlowSSOParkedIdentity {
+				p := unlinkedParked(map[string]any{"email": "alice@example.com"}, nil)
+				p.ProviderSlug = "google"
+				return p
+			}(),
+			expect: func(w *flowTestWorld) { w.expectOwner("email", "alice@example.com", "") },
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			w, def, state := ssoRenderWorld(t)
+			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOAuthenticated] = domain.FlowStepTransition{Target: "done"}
+			def.Steps[0].Transitions[domain.FlowImplicitOutcomeSSOUserNotFound] = domain.FlowStepTransition{Target: "done"}
+			w.expectParked(tt.parked, tt.loadErr)
+			if tt.expect != nil {
+				tt.expect(w)
+			}
+
+			_, err := w.sm.Render(t.Context(), def, state)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			want := make([]domain.FlowSSOFailureInput, len(tt.want))
+			for i, failure := range tt.want {
+				failure.ProjectID, failure.AttemptID = testProjectID, "att-1"
+				want[i] = failure
+			}
+			assert.ElementsMatch(t, want, append([]domain.FlowSSOFailureInput{}, w.ssoFailures...))
+		})
+	}
+}
+
+// A user created on the collection step is handed off, and a handoff that
+// fails there is recorded like one after a bind.
+func TestFlowStateMachine_Process_SSOCollectionRecordsAFailedHandoff(t *testing.T) {
+	t.Parallel()
+	w, def, state := submittableCollectionStepWorld(t)
+	parked := unlinkedParked(
+		map[string]any{"email": "alice@example.com", "badge": "b-7"},
+		map[string]bool{"email": true, "badge": true},
+	)
+	parked.ProviderSlug = "google"
+	w.expectCollected(parked, nil).Times(2)
+	w.expectOwner("badge", "b-7", "")
+	w.expectOwner("email", "alice@example.com", "")
+	w.expectOwner("username", "alice", "")
+	w.expectCreateLinked(map[string]any{
+		"email": "alice@example.com", "username": "alice", "given_name": "Alice", "family_name": "Liddell", "badge": "b-7",
+	}, "", "user-1", nil)
+	w.authAttemptService.EXPECT().Handoff(gomock.Any(), gomock.Any()).
+		Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+
+	_, err := w.sm.Process(t.Context(), def, state, collectionSubmit(func(map[string]any) {}))
+
+	require.Error(t, err)
+	assert.Equal(t, []domain.FlowSSOFailureInput{{
+		ProjectID: testProjectID, AttemptID: "att-1", ConnectionSlug: "google",
+		Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed,
+	}}, w.ssoFailures)
+}
+
+// A handoff that fails on a later request than the one that resolved the
+// identity is still told of, because the state remembers the connection; a
+// sign-in with no connection, such as a password registration, says nothing.
+func TestFlowStateMachine_Process_RecordsAFailedHandoffByTheConnectionTheStateKeeps(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		slug string
+		want []domain.FlowSSOFailureInput
+	}{
+		"an sso sign-in": {
+			slug: "google",
+			want: []domain.FlowSSOFailureInput{{
+				ProjectID: testProjectID, AttemptID: "att_1", ConnectionSlug: "google",
+				Phase: ssoevent.PhaseHandedOff, Reason: ssoevent.ReasonHandoffFailed,
+			}},
+		},
+		"a password registration": {slug: ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			w := newFlowTestWorld(t)
+			def := signupDefinition()
+			w.schemaResolver.EXPECT().
+				Resolve(gomock.Any(), gomock.Any(), gomock.Any(), defaultSchemaURL, gomock.Any()).
+				Return(mustUnmarshal[jsonschema.Schema](t, defaultSchemaContent), nil).
+				AnyTimes()
+			w.authAttemptService.EXPECT().Start(gomock.Any(), gomock.Any()).Return("att_1", nil)
+			w.createUser.EXPECT().Handle(gomock.Any(), gomock.Any()).Return(domain.FlowOnSuccessResult{UserID: "user_01TEST"}, nil)
+			w.authAttemptService.EXPECT().
+				SubmitIdentifier(gomock.Any(), gomock.Any()).
+				Return("", domain.ErrAuthAttemptProofRejected(nil))
+			w.authAttemptService.EXPECT().
+				Handoff(gomock.Any(), gomock.Any()).
+				Return(domain.FlowHandoffOutput{}, errors.New("store unavailable"))
+			start, err := w.sm.Start(t.Context(), domain.FlowStartInput{
+				Definition:    def,
+				Purpose:       domain.FlowDefinitionPurposeRegister,
+				Session:       domain.FlowSessionRef{ID: "sess-1", Version: 1},
+				UserSchemaURL: defaultSchemaURL,
+			})
+			require.NoError(t, err)
+			start.State.SSOProviderSlug = tc.slug
+
+			_, err = w.sm.Process(t.Context(), def, start.State, domain.FlowSubmitInput{
+				Action: domain.FlowActionSubmit,
+				Fields: map[string]any{
+					"email":                   "alice@example.com",
+					"x-auth-methods#password": "correct-horse-battery-staple",
+				},
+			})
+
+			require.Error(t, err)
+			assert.Equal(t, tc.want, w.ssoFailures)
 		})
 	}
 }

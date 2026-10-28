@@ -59,6 +59,10 @@ func (s *runtimeAuthAttemptStub) FinishPasskeyEnrollment(context.Context, servic
 	return nil, domain.ErrAuthAttemptNotFound()
 }
 
+func (s *runtimeAuthAttemptStub) RecordSSOFailure(context.Context, domain.FlowSSOFailureInput) error {
+	return nil
+}
+
 var _ service.AuthAttemptService = (*runtimeAuthAttemptStub)(nil)
 
 func TestCreateAuthAttempt_ProjectMismatch(t *testing.T) {

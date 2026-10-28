@@ -12,6 +12,7 @@ import (
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/ssoevent"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -75,6 +76,13 @@ type AuthAttemptService interface {
 	//
 	// errors: domain.ErrSSOStateInvalid, domain.ErrInternal
 	SetSSOCallbackResult(ctx context.Context, projectID string, check *domain.SSOCallbackCheck, result *domain.SSOCallbackResult, eventType domain.EventType) error
+
+	// RecordSSOFailure emits auth.sso.resolution.failed for an SSO sign-in
+	// that failed after its exchange. The event carries the attempt, the
+	// connection, the phase and the reason, and never a claim or a code.
+	//
+	// errors: domain.ErrInternal
+	RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) error
 
 	// VerifyProof verifies the submitted proof against the challenge identified by ChallengeID.
 	//
@@ -515,9 +523,49 @@ func (s *authAttemptService) SetSSOCallbackResult(ctx context.Context, projectID
 			EntityID:   check.ID,
 			SessionID:  attempt.SessionID,
 			Payload: domain.AuthCheckPayload{
-				CheckID:       check.ID,
-				CheckType:     check.Type().String(),
-				AuthAttemptID: check.AuthAttemptID,
+				CheckID:        check.ID,
+				CheckType:      check.Type().String(),
+				AuthAttemptID:  check.AuthAttemptID,
+				ConnectionSlug: check.Pending.ProviderSlug,
+				Reason:         string(result.FailureReason),
+				Side:           sideOf(result.FailureReason),
+			},
+		})
+	})
+}
+
+// sideOf is who a failure reason blames, empty for no failure.
+func sideOf(reason ssoevent.Reason) string {
+	if reason == "" {
+		return ""
+	}
+	return string(reason.Side())
+}
+
+// RecordSSOFailure implements [AuthAttemptService].
+func (s *authAttemptService) RecordSSOFailure(ctx context.Context, in domain.FlowSSOFailureInput) (err error) {
+	ctx, end := startSpan(ctx, "AuthAttemptService.RecordSSOFailure")
+	defer end(&err)
+
+	return s.stmts.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
+		// The session the event carries lives on the attempt.
+		attempt, err := tx.Statements().GetAuthAttemptByID(ctx, in.ProjectID, in.AttemptID)
+		if err != nil {
+			return err
+		}
+		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
+			Type:       domain.EventTypeAuthSSOResolutionFailed,
+			Category:   domain.EventCategoryAuth,
+			ProjectID:  in.ProjectID,
+			EntityType: "auth_attempt",
+			EntityID:   in.AttemptID,
+			SessionID:  attempt.SessionID,
+			Payload: domain.AuthSSOFailurePayload{
+				AuthAttemptID:  in.AttemptID,
+				ConnectionSlug: in.ConnectionSlug,
+				Phase:          string(in.Phase),
+				Reason:         string(in.Reason),
+				Side:           sideOf(in.Reason),
 			},
 		})
 	})

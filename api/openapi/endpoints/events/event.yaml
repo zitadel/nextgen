@@ -12,6 +12,7 @@ oneOf:
   - $ref: types/auth-sso-authorization-failed-event.yaml
   - $ref: types/auth-sso-exchange-failed-event.yaml
   - $ref: types/auth-sso-exchange-succeeded-event.yaml
+  - $ref: types/auth-sso-resolution-failed-event.yaml
   - $ref: types/auth-token-issued-event.yaml
   - $ref: types/auth-token-revoked-event.yaml
   - $ref: types/authz-granted-event.yaml
@@ -59,6 +60,7 @@ discriminator:
     auth.sso.authorization.failed: types/auth-sso-authorization-failed-event.yaml
     auth.sso.exchange.failed: types/auth-sso-exchange-failed-event.yaml
     auth.sso.exchange.succeeded: types/auth-sso-exchange-succeeded-event.yaml
+    auth.sso.resolution.failed: types/auth-sso-resolution-failed-event.yaml
     auth.token.issued: types/auth-token-issued-event.yaml
     auth.token.revoked: types/auth-token-revoked-event.yaml
     authz.granted: types/authz-granted-event.yaml
