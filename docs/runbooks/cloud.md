@@ -522,9 +522,9 @@ project and imports the root admin.
   A server that fails to start shows up the same way: the request that
   started the instance answers 500, and its lines end with the launcher's
   error and `the user server exited during startup`. An error outside a
-  request, such as a failed event retention run, has no status to find it
-  by: search the messages for the word, which also matches the 4xx
-  `api error` lines, and keep the `ERROR` ones:
+  request, such as a failed flush of the request audit events, has no
+  status to find it by: search the messages for the word, which also
+  matches the 4xx `api error` lines, and keep the `ERROR` ones:
 
   ```sh
   npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
