@@ -1,7 +1,7 @@
 # Agent Instructions — `packages/`
 
-Rules for the packages without an `AGENTS.md` of their own: the SDKs
-(`packages/sdk-*`), `packages/api` and `packages/config`.
+Rules for `packages/api`, `packages/config` and the rules every SDK
+(`packages/sdk-*`) shares. Each SDK's own packaging is in its `AGENTS.md`.
 
 ## The SDKs (`packages/sdk-*`)
 
@@ -30,20 +30,9 @@ change needs a changeset, and the whole train versions together.
   `libraryBuild()` derives the entries from `exports`.
 - **Fix a Rolldown warning, or allow its code with a comment saying why**:
   `libraryBuild()` fails the build on any other.
-- **Keep `sdk-next` on `preserveModules`**: bundlers merge `"use client"` modules
-  into shared chunks and strip the directive. Re-test the App Router split.
 - **Ship SDKs minified with source maps**: `libraryBuild()` does both; a build
-  outside it reuses `minify` from `@zitadel/vite`.
-- **Build `sdk-nuxt` with `nuxtModule()`** (`@mridang/vite-plugin-nuxt-module`):
-  list each entry in `nuxtModule({ entry })` as well as in `exports`.
-- **Ship `sdk-nuxt` without source maps**: the plugin's `sourcemap` maps the
-  declarations too, to `src/` files the package does not ship.
-- **Keep `sdk-angular` unminified**: an app's Angular linker rejects minified
-  `ɵɵngDeclare*` metadata; its edge spec links the built package and fails.
-- **Keep `sdk-qwik` unminified**: Qwik's plugin builds libraries unminified,
-  and the app's optimizer splits the QRLs in `.qwik.mjs`.
-- **Check `sdk-angular` templates in `typecheck`**: Analog's plugin skips them,
-  so `ngc --noEmit` enforces `strictTemplates`.
+  outside it reuses `minify` from `@zitadel/vite`. Exceptions are in the SDK's
+  `AGENTS.md`.
 - **The same-origin proxy is the shared concept**: every SDK fronts the API
   through `/__nextgen/*` on the app's own origin
   ([ADR 036](../docs/adrs/036-api-credential-planes.md), ADR 005). Server SDKs
