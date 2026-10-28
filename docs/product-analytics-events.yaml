@@ -415,9 +415,19 @@ components:
       - $insert_id
     # The copy of an event sent to Vercel Web Analytics, from runs on the
     # production channel. It keeps the event's name and the first 8 of these
-    # properties that hold a value, in this order.
+    # properties that hold a value, in this order. `<dimension>` stands for the
+    # command's entry under `dimensions` below, the one dimension of its own the
+    # copy keeps; a command without one keeps none. On cli_command_failed,
+    # where `reason` holds the eighth value, it takes non_interactive's place.
     vercel:
-      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, non_interactive]
+      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, <dimension>, non_interactive]
+      # Each answers one question while Mixpanel is paused.
+      dimensions:
+        setup: framework # Which frameworks do people set up, and which fail?
+        claim: claim_outcome # Do claims complete in the browser, or expire or time out?
+        doctor: failed_checks # Which checks fail? Doctor fails whenever one does.
+        api: operation # Which operations do people call without a command of their own?
+        start: runtime # Do people run the local server as the binary or in Docker?
     events:
       cli_command_started:
         status: emitted
