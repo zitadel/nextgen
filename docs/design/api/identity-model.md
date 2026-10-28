@@ -2,13 +2,16 @@
 
 > **Status:** Draft for discussion. The names are proposals too; see
 > [Names](#names).
+>
 > **Date:** 2026-10-28
+>
 > **Builds on:** [#1425](https://github.com/zitadel/nextgen/issues/1425)
 > (Application and Client),
 > [#2430](https://github.com/zitadel/nextgen/pull/2430) (apps, machine
 > identities and client credentials),
 > [ADR 082](../../adrs/082-oauth-and-oidc-server.md),
 > [IdP connections](../idp/1-resource-model.md)
+>
 > **Reopens:** the 26 Oct agreement that user schemas describe every identity
 > type, machines included
 
