@@ -2710,7 +2710,14 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const query = parse(ListSchemasQueryParams, listQueryRecord(request), "invalid_query");
+      // `expand` repeats (`expand=in_use&expand=…`) and is an array in the
+      // spec; queryRecord keeps only its last value.
+      const expand = new URL(request.url).searchParams.getAll("expand");
+      const raw = {
+        ...listQueryRecord(request),
+        ...(expand.length === 0 ? {} : { expand }),
+      };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2733,11 +2740,13 @@ export function setupPlatformHandlers() {
         return paged.response;
       }
       const { page, next } = paged;
+      // The mock keeps no users, so no revision is ever in use.
+      const inUse = query.data.expand?.includes("in_use") ? { in_use: false } : {};
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
-          metadata: { created_at: r.createdAt },
+          metadata: { created_at: r.createdAt, ...inUse },
         })),
         next_page_token: next,
       };
