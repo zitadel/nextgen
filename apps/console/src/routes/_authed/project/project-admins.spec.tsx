@@ -369,7 +369,10 @@ describe("project admins", () => {
     await openAdmins();
     expect(row("user_1").getByText("Admin grant")).toBeInTheDocument();
     const dialog = await openRemove("user_1");
-    expect(dialog.getByText(/immediately lose access/)).toBeInTheDocument();
+    // A deleted user and one outside the viewer's read look the same, so the
+    // copy claims neither that the account exists nor that it is gone.
+    expect(dialog.getByText(/Nothing about this user can be read/)).toBeInTheDocument();
+    expect(dialog.queryByText(/user account isn't deleted/)).not.toBeInTheDocument();
     await userEvent.click(dialog.getByRole("button", { name: "Remove admin" }));
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });

@@ -14,6 +14,12 @@ export interface Removable {
   level: string;
   /** How the person keeps admin access once the grant is gone; empty when they do not. */
   keeps: string[];
+  /**
+   * A user ref with nothing but its id: the user was deleted, or is outside
+   * what the viewer may read. The two look the same on the wire, so the copy
+   * claims nothing about the account.
+   */
+  unresolved?: boolean;
 }
 
 /**
@@ -75,6 +81,9 @@ function describeRemoval(removable: Removable): string {
   if (removable.principal === "team") {
     return "Everyone in this team loses the access this grant gave them. Members who have access to this project another way keep it.";
   }
+  if (removable.unresolved) {
+    return "Nothing about this user can be read: they may have been deleted, or be outside what you can see. Removing the grant leaves the user record as it is and takes this project from them if they still exist.";
+  }
   if (removable.keeps.length > 0) {
     return `This removes only the grant made to them directly. They keep admin access through ${joinAnd(removable.keeps)}, so they can still manage this project.`;
   }
@@ -87,6 +96,12 @@ function describeRemoved(name: string, removable: Removable): [string, { descrip
     return [
       `Grant to ${name} removed`,
       { description: "Its members no longer have access through it." },
+    ];
+  }
+  if (removable.unresolved) {
+    return [
+      `Grant to ${name} removed`,
+      { description: "It no longer gives access to this project." },
     ];
   }
   if (removable.keeps.length > 0) {

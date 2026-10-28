@@ -278,6 +278,7 @@ function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: str
       principal,
       level,
       keeps: admin ? admin.sources.map(describeKept) : [],
+      unresolved: principal === "user" && !grant.user?.display && !grant.user?.identifier,
     },
   };
 }
