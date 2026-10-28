@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { ZitadelError } from "../../lib/errors";
+import { shellCommand } from "../../lib/suggestion";
 import { headSha } from "../../lib/release";
 
 const run = promisify(execFile);
@@ -14,7 +15,7 @@ const run = promisify(execFile);
  * other commit this repository's tooling writes, and with no trailer of any
  * kind: the commit belongs to the developer, not to the tool that made it.
  */
-export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with zitadel setup";
+export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with Zitadel setup";
 
 /**
  * Paths that must never be committed, whatever `.gitignore` happens to say.
@@ -292,9 +293,10 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
     hint:
       "Setup commits the project directory so the first release records a commit, and it will not " +
       "do that while there is work it did not write, which would be committed under setup's name. " +
-      "Run `git status` to see them, commit or stash them, then run setup again. If you have just scaffolded " +
+      "Look at them, commit or stash them, then run setup again. If you have just scaffolded " +
       "the app yourself, committing it first is the expected step. To set up without touching " +
       "version control at all, pass --no-git.",
+    nextCommands: [shellCommand("git status")],
     details: { modified, untracked },
   });
 }

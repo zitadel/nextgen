@@ -1127,12 +1127,19 @@ export default class Setup extends Promptable(BaseCommand) {
       return { kind: "skipped" };
     }
     if (dryRun) {
-      consola.info("Would initialise a git repository and commit the scaffolded project (dry run)");
+      this.ui
+        .begin("Committing the scaffolded project")
+        .done("Would initialise a git repository and commit the project (dry run)");
       return { kind: "skipped" };
     }
+    const committing = this.ui.begin("Committing the scaffolded project");
     const outcome = await ensureInitialCommit(cwd);
+    if (outcome.kind !== "created" && outcome.kind !== "committed") {
+      // Why there is no commit is said once, in the warning under the step.
+      committing.done("Left the project uncommitted");
+    }
     if (outcome.kind === "created" || outcome.kind === "committed") {
-      consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
+      committing.done(`Committed the project as ${outcome.sha.slice(0, 7)}`);
       // git guesses an author from the machine when none is configured and
       // commits anyway, so the commit exists but carries a name the developer
       // did not choose. Said out loud, with the one command that fixes it.
@@ -1140,12 +1147,12 @@ export default class Setup extends Promptable(BaseCommand) {
         reportWarning(
           "git could build no author identity on this machine, so the commit was made as " +
             "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
-            "`git commit --amend --reset-author` to put your own name on it.",
+            "git commit --amend --reset-author to put your own name on it.",
         );
       } else if (outcome.guessedIdentity) {
         reportWarning(
           "This machine has no git user.name/user.email, so git guessed the author from your " +
-            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "username and hostname. Set your identity and run git commit --amend --reset-author " +
             "to put your own name on the commit.",
         );
       }
