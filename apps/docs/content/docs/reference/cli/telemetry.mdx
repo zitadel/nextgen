@@ -25,6 +25,16 @@ Each event keeps at most eight properties:
 | `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
 | `non_interactive` | Whether it ran without prompts. |
 
+A few commands add one property of their own. When a failed command's event already holds eight, it takes the place of `non_interactive`.
+
+| Command | Property | What it holds |
+| --- | --- | --- |
+| `setup` | `framework` | The framework it set up. |
+| `claim` | `claim_outcome` | How the claim ended, such as `completed`, `link_issued` or `expired`. |
+| `doctor` | `failed_checks` | The names of the checks that failed, never their messages. |
+| `api` | `operation` | The operation it called, such as `listReleases`, never a path, an id or a field. |
+| `start` | `runtime` | The runtime: `binary` or `docker`. |
+
 Vercel records a location (country, region and city) worked out from the IP address an event comes from. Runs in CI send nothing.
 
 Run a command with `--debug` to see each event on stderr before it is sent.
@@ -59,6 +69,7 @@ Some commands add what they did, as counts and fixed values:
 | `claim` | How the claim ended, how often it polled, and whether it opened a browser. |
 | `variables` | Whether a variable is secret, and how many `list` found, never a name or a value. |
 | `branding eject` | The design it ejected. |
+| `api` | The operation it called, and whether it followed pagination. |
 
 Mixpanel is told not to locate you by your IP address (`ip: 0`); the country comes from your timezone instead.
 
