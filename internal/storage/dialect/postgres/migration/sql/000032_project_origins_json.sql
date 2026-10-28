@@ -34,3 +34,7 @@ SET preview_origins = COALESCE(
 
 ALTER TABLE zitadel_nextgen.projects
     DROP COLUMN origins;
+
+-- The default only filled existing rows; 000001 declared the column without one.
+ALTER TABLE zitadel_nextgen.projects
+    ALTER COLUMN preview_origins DROP DEFAULT;
