@@ -1,5 +1,5 @@
 -- +goose Up
--- See the postgres peer (000038_user_unique_attribute_indexes.sql) for the
+-- See the postgres peer (000039_user_unique_attribute_indexes.sql) for the
 -- measurements.
 
 -- +goose StatementBegin

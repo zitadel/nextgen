@@ -1,6 +1,6 @@
 -- +goose NO TRANSACTION
 -- +goose Up
--- See the postgres peer (000038_user_unique_attribute_indexes.sql) for the
+-- See the postgres peer (000039_user_unique_attribute_indexes.sql) for the
 -- measurements. Spanner needs only the lookup index: the foreign keys from
 -- user_unique_attributes and tokens to users already have managed backing
 -- indexes on (project_id, user_id), which serve the cascade.
