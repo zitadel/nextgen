@@ -1,15 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Braces } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { api } from "@/api/zitadel";
-import { MetaCard, MetaRule, MetaValue } from "@/components/detail-meta";
-import { DetailPanel, PanelTitle } from "@/components/detail-page";
+import { DETAIL_BODY, DetailSection } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
-import { SECTION_HEADING, SUBSECTION_HEADING } from "@/components/typography";
+import { PAGE_TITLE } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
+import { CopyButton } from "@/components/ui/copy-button";
 import { InlineCode } from "@/components/ui/inline-code";
 import {
   Select,
@@ -29,6 +28,7 @@ import {
   schemaAuthMethods,
   schemaDisplayName,
 } from "@/lib/schema";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project", resource: "user schema" },
@@ -56,90 +56,84 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  * log D10), and the newest is marked `latest`; none is called active, because
  * which revision serves new registrations is the release's choice, not the
  * schema's. Users stay on the revision they were created on until they are
- * migrated through the API, which an older revision says under the tab row.
+ * migrated through the API, which an older revision says under the card title.
+ *
+ * The header is the title over one line of identity (id and created date), not
+ * the resource screens' icon tile and meta card: the design draws this screen
+ * that way. Each tab is a `DetailSection`, with the revision picker as the
+ * card's action, since the revision applies to the whole schema.
  */
-
 function SchemaDetail() {
   const { schema, createdAt, revisions } = Route.useLoaderData();
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
   const older = revisions.length > 0 && revisions[0]?.id !== schemaId;
+  const picker = revisions.length > 0 && (
+    <RevisionSelect revisions={revisions} current={schemaId} />
+  );
+  const note = older && (
+    <p className="text-muted-foreground text-sm">
+      Not the newest revision. Users stay on the revision they were created on until they are
+      migrated through the API.
+    </p>
+  );
 
   return (
-    <Page inset="panel">
-      <DetailPanel>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <PanelTitle icon={Braces} title={name} />
-          {/* The same header card as Login flows. The design draws a third
-              value, `EXPIRES AT`; nothing on the schema resource backs it. */}
-          <MetaCard bordered={false}>
-            <MetaValue label="Schema ID" value={schemaId} copyable />
-            <MetaRule />
-            <MetaValue label="Created" value={formatDate(createdAt)} />
-          </MetaCard>
+    <Page>
+      <header className="flex flex-col gap-2 px-2">
+        <h1 className={cn(PAGE_TITLE, "wrap-anywhere")}>{name}</h1>
+        {/* The design draws `Expires at` here; nothing on the schema resource
+            backs it, so the created date stands in. */}
+        {/* Stacked under `sm`, where the id alone fills the line; the rule
+            between the two values only exists in the row layout. */}
+        <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
+          <span className="flex flex-wrap items-center gap-x-1">
+            <span className="whitespace-nowrap">Schema ID</span>
+            <span className="flex items-center gap-1">
+              <span className="text-foreground">{schemaId}</span>
+              <CopyButton value={schemaId} label="Copy Schema ID" size="inline" />
+            </span>
+          </span>
+          <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
+          <span className="flex items-center gap-1">
+            <span>Created</span>
+            <span>{formatDate(createdAt)}</span>
+          </span>
         </div>
+      </header>
 
-        <Separator />
+      <Tabs defaultValue="fields" className={`${DETAIL_BODY} gap-6`}>
+        <TabsList aria-label="Schema detail sections">
+          <TabsTrigger value="fields">Fields</TabsTrigger>
+          <TabsTrigger value="authentication">Authentication</TabsTrigger>
+        </TabsList>
 
-        <Tabs defaultValue="fields" className="gap-4.5">
-          {/* `py-[3px]` only — this strip has no horizontal padding, which is
-              what puts the first trigger's box flush with the card's content
-              edge and its label in line with `SCHEMA` below. (The viewer's own
-              JSON/YAML strip does use `p-[3px]`.) */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <TabsList className="h-10 px-0 py-[3px]">
-              <TabsTrigger value="fields" variant="muted">
-                Fields
-              </TabsTrigger>
-              <TabsTrigger value="authentication" variant="muted">
-                Authentication
-              </TabsTrigger>
-            </TabsList>
-            {/* On the tab row, as the design draws it: the revision applies to
-                both tabs. */}
-            {revisions.length > 0 && <RevisionSelect revisions={revisions} current={schemaId} />}
-          </div>
-
-          {older && (
-            <p className="text-muted-foreground px-2 text-sm">
-              Not the newest revision. Users stay on the revision they were created on until they
-              are migrated through the API.
-            </p>
-          )}
-
-          <TabsContent value="fields">
-            {/* The field table is a fixed 468px and the viewer takes the rest,
-                matching height. Stacked below `lg`, where the design puts the
-                viewer under the table.
-
-                `pl-2` because the design insets this row by 8px on the left
-                while the tab strip above starts at the content edge: a tab
-                trigger is `px-2`, so the effect is that the heading and `SCHEMA` line
-                up with the tab *label* and the tab's box sits just outside it. */}
-            <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch lg:pl-2">
-              <div className="flex flex-col gap-4 lg:w-[468px] lg:shrink-0">
-                <h2 className={SECTION_HEADING}>Field definitions</h2>
+        <TabsContent value="fields">
+          <DetailSection title="Field definitions" action={picker} note={note}>
+            {/* The field table and the viewer split the card, matching height;
+                stacked below `lg`, where the design puts the viewer under the
+                table. */}
+            <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch">
+              <div className="min-w-0 lg:flex-1">
                 <SchemaFieldsPanel schema={schema} />
               </div>
               <DocumentViewer document={schema} noun="schema" />
             </div>
-          </TabsContent>
+          </DetailSection>
+        </TabsContent>
 
-          <TabsContent value="authentication">
-            {/* `px-2`, the same 8px inset the Fields tab uses, so the section
-                heading lines up with the tab label above it rather than with
-                the tab's box. */}
-            <section className="flex flex-col gap-2.5 px-2">
-              <h2 className={SUBSECTION_HEADING}>Sign-in methods</h2>
-              {methods.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  This schema declares no sign-in methods.
-                </p>
-              ) : (
-                methods.map((method) => (
+        <TabsContent value="authentication">
+          <DetailSection title="Sign-in methods" action={picker} note={note}>
+            {methods.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This schema declares no sign-in methods.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2.5">
+                {methods.map((method, index) => (
                   <Fragment key={method.key}>
-                    <Separator className={RULE} />
+                    {index > 0 && <Separator className={RULE} />}
                     <div className="flex items-center justify-between gap-4 py-1">
                       <span className="text-sm leading-5 font-medium text-foreground">
                         {method.label}
@@ -158,12 +152,12 @@ function SchemaDetail() {
                       </div>
                     </div>
                   </Fragment>
-                ))
-              )}
-            </section>
-          </TabsContent>
-        </Tabs>
-      </DetailPanel>
+                ))}
+              </div>
+            )}
+          </DetailSection>
+        </TabsContent>
+      </Tabs>
     </Page>
   );
 }
@@ -173,7 +167,13 @@ function SchemaDetail() {
  * and marked `latest`. Picking one opens that revision's own page, since each
  * is a schema of its own; the project scope rides along in the search.
  */
-function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; current: string }) {
+function RevisionSelect({
+  revisions,
+  current,
+}: {
+  revisions: SchemaRevision[];
+  current: string;
+}): ReactNode {
   const navigate = useNavigate({ from: Route.fullPath });
   const latest = revisions[0]?.id;
   return (
@@ -183,8 +183,7 @@ function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; c
         void navigate({ to: "/schemas/$schemaId", params: { schemaId } })
       }
     >
-      {/* The design's 36px trigger with the id in the 12px medium sans, not
-          the meta card's mono. */}
+      {/* The design's 36px trigger with the id in the 12px medium sans. */}
       <SelectTrigger aria-label="Schema revision" className="max-w-full">
         {/* Custom content: the id alone, without the item's timestamp, keeps
             the trigger to the design's one id and badge. */}

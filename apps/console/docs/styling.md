@@ -159,9 +159,9 @@ Projects, the home, has no sidebar (D24), so its content sits in `HomeColumn`
 inside `Page`: capped and centred, so the table does not stretch across the
 window.
 
-`inset="panel"` is for the configuration-panel screens (User schemas, Login
-flows, Identity providers), whose single card the design insets by 24px on the
-sides. It changes the sides only, never the top.
+`inset="panel"` is for the configuration-panel screens (Login flows, Identity
+providers), whose single card the design insets by 24px on the sides. It
+changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
 
@@ -223,10 +223,12 @@ Detail screens come in three compositions, and each has one shell:
   card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
   `h1`.
-- **Configuration panel** (User schemas, Login flows): the whole screen is one
-  `DetailPanel` headed by a `PanelTitle` (both in
+- **Configuration panel** (Login flows, Identity providers): the whole screen is
+  one `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `<Page inset="panel">`
-  (`src/components/layout.tsx`).
+  (`src/components/layout.tsx`). User schemas left this composition for the
+  resource detail one, with a title over an identity line instead of the icon
+  tile and meta card, and each tab a `DetailSection`.
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
   centred column `--zl-container-settings` wide. Compose `Page` +
   `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with

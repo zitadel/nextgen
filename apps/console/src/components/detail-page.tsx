@@ -15,9 +15,9 @@ import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
  * One shell draws all three; its measurements live in "Resource detail layout"
  * in `docs/styling.md`, which a change to a value here updates too.
  *
- * The schema and login-flow screens are a different composition — the whole
- * screen is one panel ({@link DetailPanel}) — and keep it. Both share the icon
- * tile ({@link ICON_PLATE}) and the header card (`MetaCard`).
+ * The login-flow and identity-provider screens are a different composition —
+ * the whole screen is one panel ({@link DetailPanel}) — and keep it. They share
+ * the icon tile ({@link ICON_PLATE}) and the header card (`MetaCard`).
  */
 
 /** The 24px gap between the header row and the first body element. */
@@ -66,7 +66,9 @@ export function DetailSection({
     <Card className={cn(DETAIL_CARD, className)} {...props}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
         {action ? (
-          <div className="flex items-center justify-between gap-4">
+          // Wraps so a wide action (the schema page's revision picker) drops
+          // under the title on a phone instead of pushing past the card.
+          <div className="flex flex-wrap items-center justify-between gap-4">
             {heading}
             {action}
           </div>
