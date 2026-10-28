@@ -81,7 +81,10 @@ function ctx(live: Live[], json = false, env: Record<string, string> = {}): Step
 async function liveCommit(): Promise<string> {
   const git = (args: string[]) => run("git", args, { cwd });
   await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
-  await writeFile(join(cwd, ".zitadel", "schemas", "user.json"), '{ "type": "object" }\n');
+  await writeFile(
+    join(cwd, ".zitadel", "schemas", "user.json"),
+    '{ "type": "object", "title": "User" }\n',
+  );
   await git(["init", "-q"]);
   await git(["config", "user.email", "test@example.com"]);
   await git(["config", "user.name", "Test"]);

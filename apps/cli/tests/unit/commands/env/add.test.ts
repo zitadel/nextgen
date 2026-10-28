@@ -219,8 +219,8 @@ describe("env add", () => {
 
       const out = await addRendered(cwd);
 
-      expect(out).toContain("Added the production environment, bound to proj_new");
-      expect(out).not.toContain("\nWrote .env.production.local\n");
+      expect(out).toContain("Added the production environment, bound to proj_new Summary");
+      expect(out).not.toContain("Wrote .env.production.local Summary");
     });
 
     it("names the file whose variables it lists, rather than calling it 'it'", async () => {

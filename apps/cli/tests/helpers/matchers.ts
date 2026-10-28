@@ -12,8 +12,17 @@ import { asOneLine } from "./terminal";
  * under the sentence that introduces it. A spec asserts the words a command
  * said; where they were broken is the layout's, and its unit tests'.
  */
+/**
+ * Whether the output said this, as a person reads it: the box, the gutter and
+ * the line it was folded over do not count, so an expectation is written as
+ * one sentence however the terminal happened to break it.
+ *
+ * Text that names a tab is matched exactly instead. A tab is not spacing in
+ * what a normal command prints — it is the separator `cut` and `awk` read the
+ * rows by — and flattening it would let a row that lost its tabs pass.
+ */
 const said = (output: string, text: string): boolean =>
-  output.includes(text) || asOneLine(output).includes(asOneLine(text));
+  output.includes(text) || (!text.includes("\t") && asOneLine(output).includes(asOneLine(text)));
 
 /** Matchers that assert the CLI's behaviour in its own terms. */
 

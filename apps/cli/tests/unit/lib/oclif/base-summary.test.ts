@@ -201,7 +201,7 @@ describe("the ending of a run nothing is drawn into", () => {
   it("does not fall back to the bare label a terminal never shows", async () => {
     const shown = await written(STATUS);
 
-    expect(shown).not.toContain("\nNext:\n");
+    expect(shown).not.toContain("Next:");
   });
 
   it("closes a wizard on the line it would have closed the chain on", async () => {

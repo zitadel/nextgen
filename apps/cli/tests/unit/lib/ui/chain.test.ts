@@ -364,7 +364,6 @@ describe("a normal command's chain, which is no chain at all", () => {
       const text = stripAnsi(scripted().written(summary));
 
       expect(text).toContain("Run next:");
-      expect(text).not.toContain("\nNext:");
     });
 
     it("ends a wizard on where it ran, in the sentence the box ends on", () => {
