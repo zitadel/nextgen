@@ -72,6 +72,24 @@ properties:
     type: string
     values: [sign_in_methods, identity_providers, overview, authentication, active, deactivated]
     description: The selected tab, on pages with tracked tabs.
+  placement:
+    type: string
+    values: [hero, showcase, footer]
+    description: Where on its page a copy button or a call to action sits.
+  target:
+    type: string
+    values: [quickstart, github]
+    description: Where a link leads, as a stable name, never a URL.
+
+  # Calls to action
+  snippet:
+    type: string
+    values: [all, start, setup, dev, plan, apply, skills]
+    description: >-
+      What a copy button copied, never its text: the CLI command it runs
+      (`start`, `setup`, `plan`, `apply`), `dev` for the app's dev server,
+      `skills` for the coding agents' skills, or `all` for the website's whole
+      block of commands.
 
   # Journeys and actions
   flow:
@@ -513,6 +531,13 @@ components:
     automatic:
       - Vercel Web Analytics page views and Speed Insights, in the cloud build only (`CONSOLE_VERCEL_INSIGHTS=1`).
     events:
+      copied_command:
+        status: emitted
+        trigger: >-
+          The setup command on the Projects page is on the clipboard; only the
+          cloud build sends it, like the page views.
+        destinations: [vercel]
+        properties: [page, snippet]
       viewed_page:
         status: planned
         plan: "#2233"
@@ -584,7 +609,17 @@ components:
     source: apps/website
     automatic:
       - Vercel Web Analytics page views and Speed Insights.
-    events: {}
+    events:
+      copied_command:
+        status: emitted
+        trigger: A copy button put its command on the clipboard.
+        destinations: [vercel]
+        properties: [page, snippet, placement]
+      clicked_link:
+        status: emitted
+        trigger: A call to action, to the quickstart or to GitHub, is clicked.
+        destinations: [vercel]
+        properties: [page, target, placement]
 
   docs:
     source: apps/docs

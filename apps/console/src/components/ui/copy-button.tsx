@@ -29,6 +29,7 @@ export function CopyButton({
   label,
   size = "icon-xs",
   className,
+  onCopied,
 }: {
   value: string;
   /** The button's full accessible name, e.g. `Copy User ID`. */
@@ -36,6 +37,8 @@ export function CopyButton({
   size?: keyof typeof ICON_SIZE;
   /** Escape hatch for call sites where the button must not drive row height. */
   className?: string;
+  /** Runs once the value is on the clipboard, such as to report the copy. */
+  onCopied?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -61,7 +64,10 @@ export function CopyButton({
           const { clipboard } = navigator;
           if (!clipboard) return;
           void clipboard.writeText(value).then(
-            () => setCopied(true),
+            () => {
+              setCopied(true);
+              onCopied?.();
+            },
             () => setCopied(false),
           );
         }}
