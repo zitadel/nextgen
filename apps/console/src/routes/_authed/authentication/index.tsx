@@ -7,7 +7,6 @@ import { EntityLink } from "@/components/entity-link";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_WRAP,
