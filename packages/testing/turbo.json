@@ -21,7 +21,7 @@
     // the app-embedded login, not /ui/*.
     "test:integration": {
       "cache": false,
-      "dependsOn": ["build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["install-browsers", "build", "@zitadel/cli#build", "@zitadel/server#build"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "PLAYWRIGHT_*", "DEBUG", "RUNNER_TEMP", "GITHUB_*"]
     }
   }

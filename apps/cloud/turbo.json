@@ -84,13 +84,22 @@
       "outputs": ["dist/cloud-schemas/**"]
     },
     // The cloud on localhost: `vercel dev` over vercel.json's services
-    // (scripts/run-cloud.mjs), which builds what the services' dev servers
-    // read itself. `pnpm run cloud` runs the same script without a runner.
+    // (scripts/run-cloud.mjs). The dependencies are what the services' dev
+    // servers read from disk; the script builds the same targets itself for
+    // `pnpm run cloud` and moon, which under turbo are cache hits.
     // It sees the whole environment, as `pnpm run cloud` does: `vercel dev`
     // hands it to every service (the server reads NEXTGEN_* and the
     // OpenTelemetry SDK's OTEL_*, each dev server its own), and a list would
     // quietly drop whatever it missed.
     "dev": {
+      "dependsOn": [
+        "@zitadel/sdk-react#build",
+        "@zitadel/api#build",
+        "@zitadel/api-mock#build",
+        "@zitadel/components#build",
+        "@zitadel/docs#generate",
+        "@zitadel/design-tokens#generate"
+      ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/scripts/run-cloud.mjs",

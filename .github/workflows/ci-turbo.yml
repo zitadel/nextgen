@@ -93,9 +93,6 @@ jobs:
       # test output is left in the log.
       NO_COLOR: ""
       TURBO_TELEMETRY_DISABLED: "1"
-      # The contributor scripts (run-cli, local-registry, check) build through
-      # turbo instead of moon.
-      NEXTGEN_TASK_RUNNER: turbo
       # Depot runners point TURBO_API at Depot's own turbo cache. This job uses
       # Vercel's instead (one cache shared with the cloud deployments); delete
       # this line and the remote-cache step to use Depot's, which needs no
@@ -135,39 +132,17 @@ jobs:
           fi
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # Not setup-go's cache: its key (Go version and go.mod) is ci.yml's
-      # too, and the two jobs write GOCACHE in formats the other cannot read.
-      # On Depot runners ci.yml builds through GOCACHEPROG (`depot gocache`,
-      # which keeps depot-* files there); turbo's strict env drops
-      # GOCACHEPROG, so the builds here use Go's own files. Whichever job
-      # saved a shared entry first chose the format for both. The key names
-      # the installed Go, whose patch differs between Depot's runner images
-      # (a build result serves only the compiler that made it), and every
-      # module's go.sum (tools/bench and tools/oidc-mock are modules of their
-      # own).
+      # As in ci.yml, whose cache entry this job shares: on Depot runners both
+      # build through Depot's Go cache (GOCACHEPROG and DEPOT_CACHE_TOKEN,
+      # which turbo passes through), and the module cache is the same.
       - uses: actions/setup-go@v6
-        id: setup-go
         with:
           go-version-file: go.mod
-          cache: false
-
-      # Every run restores the newest entry; the nightly run on main saves one
-      # (the step before the uploads), since it compiles every package, for
-      # every target the release snapshot builds, without turbo's cache. An
-      # entry never changes once saved, so the key ends in the run: keyed on
-      # go.sum alone, the first run of a go.sum kept its entry for good, and
-      # every later snapshot cross-compiled the server from scratch.
-      - name: Restore Go modules and builds
-        id: go-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}-
-            go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            tools/bench/go.sum
+            tools/oidc-mock/go.sum
 
       - uses: pnpm/action-setup@v5
         with:
@@ -230,8 +205,10 @@ jobs:
           TURBO_FORCE: ${{ env.FORCE }}
         run: turbo run check-generate-pruned --filter=@zitadel/server $AFFECTED
 
-      # The setup only some lanes need runs when one of them is affected, by
-      # the same base and inputs as their `--affected` below.
+      # The journey's setup runs when its lane is affected, by the same base
+      # and inputs as its `--affected` below. Chromium needs no step: every
+      # lane and browser test that opens it depends on its package's
+      # `install-browsers`, so turbo installs it when one of them runs.
       # `turbo query affected --exit-code` exits 1 when a named task is
       # affected, 0 when none is, and 2 on an error, which counts as affected.
       # The journey runs its framework matrix in full only when a surface that
@@ -254,30 +231,15 @@ jobs:
           for dir in packages/sdk-*/; do
             sdks+=("@zitadel/$(basename "$dir")")
           done
-          browsers="$(affected --tasks console-smoke console-real console-embedded console-platform demo-next-mock demo-next-real demo-nuxt-mock test:integration journey-local)"
           journey="$(affected --tasks journey-local)"
           matrix=single
           if [ "$(affected --tasks journey build --packages @zitadel/e2e "${sdks[@]}")" = true ]; then
             matrix=full
           fi
           {
-            echo "browsers=$browsers"
             echo "journey=$journey"
             echo "journey_matrix=$matrix"
           } | tee -a "$GITHUB_OUTPUT"
-
-      # Chromium for the e2e lanes, as in ci.yml. The gate's browser test
-      # lanes install their own through an `install-browsers` dependency.
-      - name: Cache Playwright browsers
-        if: ${{ steps.setup.outputs.browsers == 'true' }}
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright Chromium
-        if: ${{ steps.setup.outputs.browsers == 'true' }}
-        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ env.VERSION_PR == 'false' }}
@@ -291,14 +253,12 @@ jobs:
       # which the cache mostly restores. A console change reaches the
       # server's tests, which embed it, through their task edge.
       # `--continue=dependencies-successful` is moon's behaviour: a failure
-      # skips its dependents and nothing else. The summary feeds the report
-      # step.
+      # skips its dependents and nothing else.
       - name: Run turbo build and test graph
-        id: turbo-gate
         if: ${{ env.VERSION_PR == 'false' }}
         env:
           TURBO_FORCE: ${{ env.FORCE }}
-        run: turbo run lint typecheck build test check-adrs check-moon-graph $AFFECTED --continue=dependencies-successful --summarize
+        run: turbo run lint typecheck build test check-adrs check-moon-graph $AFFECTED --continue=dependencies-successful
 
       # `server:test` is part of the gate above; the database lanes stay
       # outside it, as in ci.yml.
@@ -347,7 +307,6 @@ jobs:
       # (see the top). A failed lane stops no other. Streamed, as in ci.yml:
       # grouped, a lane's output reaches the log only when the lane ends.
       - name: Run e2e lanes
-        id: turbo-e2e
         if: ${{ env.LANES == 'true' }}
         env:
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
@@ -355,13 +314,7 @@ jobs:
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing $AFFECTED --continue=dependencies-successful --log-order=stream --summarize
-
-      # Reads the newest run summary, so it names the failures of whichever
-      # turbo step failed: the gate or the e2e lanes.
-      - name: Report turbo failures
-        if: ${{ failure() && (steps.turbo-gate.conclusion == 'failure' || steps.turbo-e2e.conclusion == 'failure') }}
-        run: node scripts/report-turbo-failures.mjs
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing $AFFECTED --continue=dependencies-successful --log-order=stream
 
       # After the e2e lanes and only once they passed, as in ci.yml.
       - name: Look for journey registry changes
@@ -397,18 +350,6 @@ jobs:
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
-
-      # See "Restore Go modules and builds". Main only: a cache entry from a
-      # branch would reach every branch on Depot's runners, whose cache has no
-      # branch scopes.
-      - name: Save Go modules and builds
-        if: ${{ !cancelled() && env.FORCE == 'true' && github.ref == 'refs/heads/main' }}
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
