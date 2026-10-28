@@ -37,6 +37,21 @@ func TestMatchRedirectURI(t *testing.T) {
 		{"a fragment", "https://app.example.com/callback#x", false},
 		{"a custom scheme", "com.example.app:/callback", false},
 		{"nothing", "", false},
+		// Zitadel v4 decoded redirect_uri twice to check it and redirected to
+		// the once-decoded value. These are what reaches the matcher, already
+		// decoded once by the request; none is decoded again.
+		{"v4's double-encoded loopback path and fragment, as userinfo", "http://127.0.0.1%2Fcallback%23@attacker.example/", false},
+		{"the same value decoded twice", "http://127.0.0.1/callback#@attacker.example/", false},
+		{"an encoded at sign in the host", "http://127.0.0.1%40attacker.example:53142/callback", false},
+		{"an encoded path and fragment after the loopback host", "http://127.0.0.1:53142/callback%23@attacker.example/", false},
+		{"an encoded letter in the path", "http://127.0.0.1:53142/%63allback", false},
+		{"a double-encoded letter in the path", "http://127.0.0.1:53142/%2563allback", false},
+		{"empty userinfo", "http://@127.0.0.1:53142/callback", false},
+		{"an empty fragment", "http://127.0.0.1:53142/callback#", false},
+		{"another spelling of the loopback address", "http://2130706433:53142/callback", false},
+		{"localhost with a trailing dot", "http://localhost.:53142/callback", false},
+		{"localhost in capitals, not the registered spelling", "http://LOCALHOST:53142/callback", false},
+		{"an uppercase scheme, which is not its own canonical form", "HTTP://127.0.0.1:53142/callback", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

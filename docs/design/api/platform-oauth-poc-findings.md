@@ -131,6 +131,32 @@ Postgres and Spanner were not run.
   platform API's identifier and the RFC 9728 path. The CIMD cache is per
   replica, and CIMD needs egress to the client's host, `claude.ai` here.
 
+## Loopback redirects and v4's double-decode report
+
+A Zitadel v4 report showed codes stolen through native-client loopback
+redirects. The validator decoded `redirect_uri` twice and redirected to the
+once-decoded value, so `http://127.0.0.1%2Fcallback%23@attacker.example/`
+passed as `http://127.0.0.1/callback#@attacker.example/` while the browser
+went to `attacker.example`.
+
+- **One decode, one parse.** The request's query or form parser decodes the
+  parameter once, and `httputil.ParseRedirectTarget` parses that value once.
+  Nothing decodes it again.
+- **The checked URL is the redirected URL.** The value must be its own
+  canonical form, so the browser is sent byte for byte to the URL that was
+  checked, with only `code`, `state` and `iss` added.
+- **What is refused.** Userinfo, any `#` (an empty one too), and every host
+  but the registered loopback literal. Only the port may differ (RFC 8252
+  §7.3).
+- **What changed.** The v4 payload was already refused, as userinfo. The
+  canonical-form rule closed three harmless spellings the matcher used to
+  accept and re-serialize: an empty `#`, `LOCALHOST` and an uppercase scheme.
+- **Tests.** The matcher's table, and `authorize` with the payload encoded
+  once and twice (400, no `Location`). The `Location` of an accepted request
+  is checked against the URI that was validated. The payload is also in the
+  shared corpus, `internal/httputil/testdata/redirect_targets.json`, which
+  the API mock's port reads too.
+
 ## What the identity model got right
 
 - **App = clients + APIs + registration** matched what the code needed, with
