@@ -72,6 +72,16 @@ SET revoked_at = ?, updated_at = ?
 WHERE project_id = ? AND id = ? AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
 
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE authz_assignments
+SET revoked_at = ?, updated_at = ?
+WHERE principal_type = ? AND principal_id = ? AND revoked_at IS NULL
+RETURNING id, project_id, catalog_id,
+          principal_type, principal_id, object_type, relation,
+          scope_kind, scope_team_id, scope_resource_id,
+          grantor_type, grantor_id, delegation_id,
+          expires_at, revoked_at, created_at, updated_at`
+
 	getActiveOwningTeamGrantStmt = `
 SELECT id, project_id, catalog_id,
        principal_type, principal_id, object_type, relation,
@@ -220,6 +230,21 @@ func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, pr
 		return wrapError(err)
 	}
 	return nil
+}
+
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	now := nowUnixNano()
+	rows, err := s.client.Query(ctx, revokeAuthzAssignmentsByPrincipalStmt, now, now, principalType.String(), principalID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	defer rows.Close()
+	assignments, err := collectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
 }
 
 // GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].

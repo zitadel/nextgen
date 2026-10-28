@@ -50,7 +50,7 @@ import { HomeColumn, Page } from "@/components/layout";
  * of the choice being asked for.
  *
  * A row opens the project — selects it and goes to its first screen — rather
- * than a detail page: the project's own page is `Project settings` in the
+ * than a detail page: the project's own page is `Settings` in the
  * sidebar once it is selected, and the row menu links there directly.
  *
  * The list can hold every project of a deployment — a platform operator acts
@@ -285,7 +285,7 @@ function ProjectSearch({ query, onSearch }: { query: string; onSearch: (q: strin
 /**
  * The row menu.
  *
- * `Project settings` goes straight to the project's own page, which the row
+ * `View project` goes straight to the project's own page, which the row
  * itself does not: the row opens the project's contents. There is no project
  * delete endpoint, so there is no destructive action here.
  */
@@ -294,7 +294,7 @@ function RowActions({ projectId, name }: { projectId: string; name: string }) {
     <RowMenu name={name}>
       <DropdownMenuItem asChild>
         <Link to="/project" search={{ project: projectId }}>
-          Project settings
+          View project
         </Link>
       </DropdownMenuItem>
     </RowMenu>

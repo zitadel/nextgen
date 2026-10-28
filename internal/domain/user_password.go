@@ -83,12 +83,21 @@ type UserPassword struct {
 	CreatedAt   time.Time
 }
 
-func (u *UserPassword) Verify(password string, verifier crypto.HashVerifier) error {
+// Verify checks password against the stored hash. On a match, updated is a new
+// hash when the stored one is outdated for verifier, and empty otherwise. An
+// error wrapping [crypto.ErrRehashFailed] means the password matched but no
+// new hash could be written; the caller lets the sign-in through.
+func (u *UserPassword) Verify(password string, verifier crypto.RehashingVerifier) (updated string, err error) {
 	normalized := NormalizePassword(password)
-	if verifier.VerifyHash(u.EncodedHash, normalized) != nil {
-		return ErrUserPasswordInvalid()
+	updated, err = verifier.VerifyAndRehash(u.EncodedHash, normalized)
+	if errors.Is(err, crypto.ErrRehashFailed) {
+		return "", err
 	}
-	return nil
+	if err != nil {
+		// Keep the cause: it tells a wrong password from a hash that could not be read.
+		return "", ErrUserPasswordInvalid().WithParent(err)
+	}
+	return updated, nil
 }
 
 type SetUserPassword struct {

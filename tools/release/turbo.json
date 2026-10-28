@@ -14,10 +14,12 @@
   // embedded dist they compiled — see the migration plan.
   "tasks": {
     "changesets": {
-      "cache": false
+      "cache": false,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"]
     },
     "check-graph": {
-      "cache": false
+      "cache": false,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"]
     },
     "build-public-packages": {
       "cache": false,
@@ -45,6 +47,7 @@
     },
     "version": {
       "cache": false,
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/.changeset/**"],
       "passThroughEnv": ["GITHUB_*", "NPM_*", "BASE_SHA"]
     },
     "pack": {

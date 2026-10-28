@@ -428,7 +428,7 @@ func routeMatches(source, path string) bool {
 // checkout, so the function is compiled without it; a plain build would
 // carry the console whenever that service built first.
 func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	raw, err := os.ReadFile(filepath.Join("..", "build-launcher.sh"))
 	require.NoError(t, err)
 	var builds []string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -436,7 +436,7 @@ func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
 			builds = append(builds, line)
 		}
 	}
-	require.Len(t, builds, 1, "build.sh compiles the function once")
+	require.Len(t, builds, 1, "build-launcher.sh compiles the function once")
 	assert.Contains(t, builds[0], "-tags noconsole")
 }
 

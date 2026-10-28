@@ -64,7 +64,9 @@ export function customizeAndPublishActions(
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
     `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
-      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish. Nothing is ` +
+      "released yet, so publishing is what pins this configuration rather than leaving the project " +
+      "on whatever its newest revisions happen to be.",
   ];
 }
 

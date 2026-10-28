@@ -1,0 +1,86 @@
+post:
+  operationId: evaluatePolicy
+  summary: Evaluate a policy
+  description: |
+    Evaluates a policy config against one request, without side effects, and
+    answers the decision the operation would reach. Nothing is read from or
+    written to the project: the config is the one in the body, checked
+    exactly as a publish checks it, so an invalid config answers `pol.invalid`
+    with the same violations.
+
+    `input` is what the operation's request carries, in the operation's own
+    terms (a password, not its length): the server derives what the policy
+    checks with the code the live operation runs, guards included. `facts`
+    states what the operation would look up at runtime, such as whether the
+    candidate matches one of the user's kept passwords.
+
+    The decision and the names of the failed rules hold wherever the
+    operation runs. `code` and `violations` are what an API call answers; a
+    login flow shows the same rules as field errors on the password field
+    (`error.x-auth-methods#password_<rule>` in `step.error`).
+
+    Which policy a project or release applies is not decided here: read it
+    and pass its config.
+
+    The caller needs read access to the project in `project_id`.
+  tags:
+    - Policies
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+  security:
+    - oauth2:
+        - policy.read
+    - nextgenSession: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: evaluate-policy-request.yaml
+        examples:
+          tooShort:
+            summary: A password below the minimum
+            value:
+              operation: auth.factor.password.set
+              config:
+                min_length: 12
+              input:
+                password: short1
+          reused:
+            summary: A user reusing their previous password
+            value:
+              operation: auth.factor.password.set
+              config:
+                min_length: 12
+                history_depth: 3
+              input:
+                password: a-long-enough-one
+              facts:
+                self_service: true
+                history_matches: [false, true]
+  responses:
+    '200':
+      description: The policy was evaluated.
+      content:
+        application/json:
+          schema:
+            $ref: evaluate-policy-response.yaml
+          examples:
+            allowed:
+              summary: The password would be set
+              value:
+                allowed: true
+            violation:
+              summary: The password breaks the policy
+              value:
+                allowed: false
+                code: user.password_policy_violation
+                violations:
+                  min_length: 12
+            empty:
+              summary: The password is empty
+              value:
+                allowed: false
+                code: user.password_empty
+    default:
+      $ref: evaluatePolicy-error-response.yaml

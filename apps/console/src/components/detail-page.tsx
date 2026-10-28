@@ -30,6 +30,9 @@ export const DETAIL_TITLE = PAGE_TITLE;
 export const ICON_PLATE =
   "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
 
+/** A card's or tab row's small action: 12px text, a 14px glyph. */
+export const CARD_ACTION_BUTTON = "gap-1 px-2.5 text-xs [&_svg]:size-3.5!";
+
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
@@ -75,6 +78,42 @@ export function DetailSection({
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * A card row with a label rail: the label, and a badge beside it, on a 192px
+ * column, then the value 24px after it, stacked under `sm`. The rail is 216px
+ * less the gap, so the value starts on the column an inline field's input
+ * does. `divider` closes the row with the rule the next one sits under.
+ */
+export function DetailRow({
+  label,
+  align = "start",
+  divider = false,
+  as: Tag = "div",
+  children,
+}: {
+  label: ReactNode;
+  /** `center` for a one-line value, as a row with a trailing menu. */
+  align?: "start" | "center";
+  divider?: boolean;
+  as?: "div" | "li";
+  children: ReactNode;
+}) {
+  return (
+    <Tag
+      className={cn(
+        "flex flex-col gap-1 sm:flex-row sm:gap-6",
+        align === "center" ? "sm:items-center" : "sm:items-start",
+        divider && "border-b border-border py-3",
+      )}
+    >
+      <div className="flex shrink-0 items-center gap-2 text-sm leading-5 text-muted-foreground sm:w-48">
+        {label}
+      </div>
+      {children}
+    </Tag>
   );
 }
 

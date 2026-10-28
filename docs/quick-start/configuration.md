@@ -232,6 +232,89 @@ instrumentation:
       batch_duration: 5s
 ```
 
+## Metrics
+
+| YAML key                                            | Environment                                                 | Default | Description                                     |
+| --------------------------------------------------- | ----------------------------------------------------------- | ------- | ----------------------------------------------- |
+| `instrumentation.metric.exporter.type`              | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_TYPE`              | unset   | Where metrics are sent                          |
+| `instrumentation.metric.exporter.endpoint`          | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_ENDPOINT`          | unset   | Collector address for `grpc` and `http`         |
+| `instrumentation.metric.exporter.insecure`          | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_INSECURE`          | `false` | Plain-text connection for `grpc` and `http`     |
+| `instrumentation.metric.exporter.batch_duration`    | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_BATCH_DURATION`    | `60s`   | Interval between exports for push exporters     |
+| `instrumentation.metric.exporter.google_project_id` | `NEXTGEN_INSTRUMENTATION_METRIC_EXPORTER_GOOGLE_PROJECT_ID` | unset   | Google Cloud project for the `google` exporter  |
+
+- `exporter.type`: `none`, `stdout`, `stderr`, `grpc`, `http`, `google` (set
+  `exporter.google_project_id`), `prometheus`, `auto`.
+- Metrics are exported only when an exporter type is set and is not `none`.
+  Without one, nothing is recorded: every instrument reports itself disabled,
+  and the code that would measure a statement skips the work. With one, every
+  statement pays the stack walk that names it, a clock read and a histogram
+  record, on every request, whether tracing samples it or not.
+- `auto` reads the standard OpenTelemetry environment variables
+  (`OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and the others).
+  When none of them is set, no metrics are exported.
+- `prometheus` registers the exporter with the process's default Prometheus
+  registry and serves no endpoint by itself. For a scrape endpoint out of the
+  box, use `auto` with `OTEL_METRICS_EXPORTER=prometheus`: that serves
+  `/metrics` on `localhost:9464`, or on the host and port
+  `OTEL_EXPORTER_PROMETHEUS_HOST` and `OTEL_EXPORTER_PROMETHEUS_PORT` name.
+- `exporter.batch_duration` is how often a push exporter (`stdout`, `stderr`,
+  `grpc`, `http`, `google`) sends what it collected. Left unset, the
+  OpenTelemetry default applies: `OTEL_METRIC_EXPORT_INTERVAL`, or 60 seconds.
+  `prometheus` is scraped and ignores it. `auto` ignores it too: an OTLP
+  exporter it picks sends at `OTEL_METRIC_EXPORT_INTERVAL`, and its Prometheus
+  exporter is scraped.
+
+```yaml
+instrumentation:
+  metric:
+    exporter:
+      type: grpc
+      endpoint: otel-collector:4317
+      insecure: true
+      batch_duration: 30s
+```
+
+### What is measured
+
+Every instrument carries only what is listed here. No attribute identifies a
+user, project, session, token or request, and the attributes marked "fixed in
+code" take names from the code (a statement method, an event type, a cache),
+never from data. The API's request instruments (`ogen.server.request_count`,
+`ogen.server.errors_count` and `ogen.server.duration`, which records in
+milliseconds with the SDK's default buckets) carry
+the operation (`oas.operation`), the method (`http.request.method`), the
+route template (`http.route`, as in `/users/{user_id}`) and the status
+(`http.response.status_code`), never the request path. Should an attribute
+ever follow the data anyway, each instrument holds at most 2000 series: past
+that, new attribute combinations land on one series marked
+`otel.metric.overflow=true` instead of becoming series of their own. The
+limit is the OpenTelemetry SDK's default; `OTEL_GO_X_CARDINALITY_LIMIT`
+changes it.
+
+The instruments below record durations in seconds, with buckets from 100µs
+to 60s. In
+Prometheus, a dot becomes an underscore, a duration gets a `_seconds` suffix
+and a counter a `_total` suffix: `db.client.operation.duration` is
+`db_client_operation_duration_seconds`, and `zitadel.auth.attempt.outcomes`
+is `zitadel_auth_attempt_outcomes_total`.
+
+| Instrument | Type | Unit | Attributes | What it measures |
+| --- | --- | --- | --- | --- |
+| `db.client.operation.duration` | histogram | `s` | `db.system.name`: `postgresql`, `sqlite`, `gcp.spanner`; `db.query.summary`: fixed in code | Duration of one storage statement call, including any wait for a pooled connection. PostgreSQL and SQLite time a query until it returns, before its rows are read, and PostgreSQL a single-row read until it is scanned; Spanner times a statement including the callback that reads its rows. With a metric exporter configured, every statement pays for this: the stack walk that names it, a clock read and a histogram record, on every request, whether tracing samples it or not. |
+| `db.client.connection.count` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite`; `db.client.connection.state`: `idle`, `used` | Connections of a database pool, by state. |
+| `db.client.connection.max` | updowncounter | `{connection}` | `db.client.connection.pool.name`: `postgres`, `sqlite` | The most connections a database pool will open. |
+| `zitadel.auth.credential.validation.duration` | histogram | `s` | `result`: `valid`, `revoked`, `invalid`, `error` | Duration of validating a bearer credential: decrypting it, checking its claims and, for a revocable one, reading its token record. |
+| `zitadel.auth.token.revocation_checks` | counter | `{check}` | `result`: `active`, `revoked`, `error` | Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked, or that carry no token id, are not checked and not counted. |
+| `zitadel.auth.password.verification.duration` | histogram | `s` | `purpose`: `login`, `history`; `result`: `match`, `updated`, `mismatch`, `error` | Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only. |
+| `zitadel.auth.attempt.outcomes` | counter | `{proof}` | `check`: `user`, `password`, `passkey`, `passkey_registration`; `result`: `success`, `rejected`, `error` | Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted. |
+| `zitadel.crypto.key_chain.resolution.duration` | histogram | `s` | `key.kind`: `master`, `project` | Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Only a resolution that produced a crypter is recorded; a failed unwrap is not. Reading the key row is a storage statement and is part of db.client.operation.duration. |
+| `zitadel.flow.step.transitions` | counter | `{transition}` | `operation`: `start`, `submit`, `render`; `result`: `step`, `complete`, `error` | Flow engine operations, by entry point and where they left the flow. Step names are defined per project and are deliberately not an attribute. |
+| `zitadel.audit.insert.duration` | histogram | `s` | `source`: `request`, `event` | Duration of one audit insert: a single event in its transaction, or one attempt to write a batch of buffered request events (a retried batch is timed per attempt). |
+| `zitadel.audit.events.written` | counter | `{event}` | `type`: fixed in code | Audit events handed to storage successfully, by event type. An event written inside a transaction that later rolls back is still counted. |
+| `zitadel.cache.lookups` | counter | - | `cache`: fixed in code; `result`: `hit`, `miss` | Cache lookups, split into hits and misses. |
+| `zitadel.cache.evictions` | counter | - | `cache`: fixed in code | Entries dropped from a cache because it was full. |
+| `zitadel.cache.entries` | gauge | - | `cache`: fixed in code | Entries currently held in a cache. |
+
 ## Config file search paths
 
 When `-c` is not passed, the server looks for `nextgen.yaml` in:

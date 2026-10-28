@@ -76,7 +76,7 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page.locator("zitadel-login").getByRole("textbox", { name: "Email" })).toBeVisible();
 
   // The granted customer project: listed on the overview, where a row opens
-  // the project (selects it, lands on Users); its own page is Project settings.
+  // the project (selects it, lands on Users); its own page is Settings.
   await page.goto("/ui/console/projects");
   const projectLink = page.getByRole("table").getByRole("link").first();
   await expect(projectLink).toBeVisible();
@@ -84,7 +84,7 @@ test("a platform operator reaches every management screen without an error", asy
   await expect(page).toHaveURL(new RegExp(`/users\\?.*project=${zitadel.handle.projectId}`));
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Project settings" })
+    .getByRole("link", { name: "Settings" })
     .click();
   await expect(page).toHaveURL(new RegExp(`/project\\?project=${zitadel.handle.projectId}$`));
   await expectNoErrorBoundary(page);

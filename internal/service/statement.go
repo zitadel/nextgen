@@ -155,6 +155,7 @@ type JSONSchemaQueryOptions struct {
 	// object_type. Rows without an object_type are revisions of nothing and
 	// pass through untouched.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 }
 
 type JSONSchemaStatements interface {
@@ -569,6 +570,11 @@ type UserPasswordStatements interface {
 	// the one that lands last is current. An unknown user returns
 	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
+	// UpdateUserPasswordHash replaces pw's hash with updated in place, so the
+	// password keeps its row, its created_at and its place in the history. It
+	// changes nothing when pw.EncodedHash is no longer stored: a concurrent
+	// rehash got there first.
+	UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
 	GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error)
@@ -752,6 +758,11 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// RevokeAuthzAssignmentsByPrincipal revokes every unrevoked assignment the
+	// principal holds and returns the revoked rows, in no particular order.
+	// Keyed on the principal alone: a platform user's grants sit on the
+	// projects they were granted on, not on the user's own (ADR 053).
+	RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error)
 	// ListProjectAdmins returns a page of the people, by user id, who
 	// administer the project: as active members of the owning team, as active
 	// members of a team with an unexpired admin grant, or as existing users

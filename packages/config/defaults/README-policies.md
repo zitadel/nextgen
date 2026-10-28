@@ -1,7 +1,8 @@
 # `.zitadel/policies/`
 
 This folder holds your project's operation policies: the rules Zitadel checks
-before an operation runs. One file per operation, named after it.
+before an operation runs. One file per operation, named after it, and
+optionally a test file beside it (see [Testing a policy](#testing-a-policy)).
 
 `auth.factor.password.set.json` is the password policy, checked whenever a
 password is set: at sign-up, through the API, and by a user changing their own.
@@ -49,3 +50,49 @@ A policy keeps its revisions. Deploying without the file switches the policy
 off for sign-ins and sign-ups, but not for a password set through the API,
 which uses the newest revision: to switch it off everywhere, keep the file
 with `"config": {}` and deploy it.
+
+## Testing a policy
+
+`auth.factor.password.set.test.json` beside the policy holds cases you write:
+an input, and the decision you expect. `zitadel policies test` sends each case
+to Zitadel, which evaluates it exactly as a real password set would, and
+reports the ones that do not hold. Your editor validates the file against
+`.zitadel/meta/policy-test.json`, and `zitadel deploy` never carries it.
+
+``` json
+{
+  "$schema": "../meta/policy-test.json",
+  "operation": "auth.factor.password.set",
+  "cases": [
+    {
+      "name": "too short",
+      "input": { "password": "short1" },
+      "expect": { "allowed": false, "violations": ["min_length"] }
+    },
+    {
+      "name": "15 characters, counted as written",
+      "input": { "password": "Passwört-sicher" },
+      "expect": { "allowed": true }
+    }
+  ]
+}
+```
+
+- `input` is what the operation receives: the password itself, so the
+  test also covers how it is counted (`Passwört-sicher` is 15 characters,
+  though 16 bytes).
+- `facts` is what a real password set would look up: `self_service`
+  (default `true`, a user setting their own password) and `history_matches`
+  (default `[]`, whether the password matches each of the user's kept ones,
+  current first). With `history_depth` set, a case with
+  `"facts": { "history_matches": [false, true] }` checks that reusing the
+  previous password is refused.
+- `expect` takes `allowed`, and optionally the `code` the operation answers
+  with (such as `user.password_empty`) and exactly the `violations` it reports.
+  The decision and the rules hold wherever a password is set; the `code` is
+  what an API call answers, while your app's sign-up shows the same rules as
+  errors on the password field.
+
+`zitadel policies test --release <id>` runs the same cases against the policy a
+built release pins, before you deploy it. Without a policy, the cases run
+against none, which shows what would get through.

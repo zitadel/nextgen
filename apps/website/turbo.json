@@ -14,9 +14,24 @@
     },
     // The showcase's login previews (app/showcase/login-preview.tsx) import
     // the atoms of @zitadel/components, which Next resolves to the package's
-    // dist/.
+    // dist/. The changelog finds the release that ships each entry in the
+    // published packages' release notes, which Changesets writes on every
+    // release (app/changelog/entries.ts).
+    //
+    // The hosted cloud's website service builds through this task, keyed by
+    // the deployment's ID as the docs' build is (apps/docs/turbo.json): on
+    // Vercel it never hits. The Speed Insights sample rate and the commit the
+    // analytics events report are read at build time (next.config.ts,
+    // app/layout.tsx), and strict mode would hide them.
     "build": {
+      "env": ["VERCEL_DEPLOYMENT_ID", "VERCEL_GIT_COMMIT_SHA", "WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE"],
       "dependsOn": ["@zitadel/components#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.changeset/config.json",
+        "$TURBO_ROOT$/apps/*/CHANGELOG.md",
+        "$TURBO_ROOT$/packages/*/CHANGELOG.md"
+      ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "start": {
