@@ -3,7 +3,7 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { api } from "@/api/zitadel";
 
 import { displayValue, field, isPresent } from "./record";
-import { type SchemaField, type UserSchema, schemaFields } from "./schema";
+import { type SchemaField, type SchemaLineage, type UserSchema, schemaFields } from "./schema";
 import {
   type UserTeam,
   userAttributes,
@@ -44,8 +44,13 @@ export async function fetchUsers(
   projectId: string,
   pageToken?: string,
   expand = true,
+  filter: UserFilter = [],
 ): Promise<UsersPage & { teamsExpanded: boolean }> {
-  const body = { limit: PAGE_SIZE, page_token: pageToken };
+  const body = {
+    limit: PAGE_SIZE,
+    page_token: pageToken,
+    ...(filter.length > 0 ? { filter } : {}),
+  };
   const params = { project_id: projectId };
   if (!expand) {
     return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
@@ -59,6 +64,39 @@ export async function fetchUsers(
     if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
     return { ...(await api.queryUsers(body, params)), teamsExpanded: false };
   }
+}
+
+/** What the Users list is narrowed to, as the URL carries it. */
+export interface UsersSearch {
+  /** A schema's object type; absent for every schema. */
+  schema?: string;
+  /** `latest`, `older`, or one revision's id; absent for every revision. */
+  revision?: string;
+}
+
+export type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
+
+/**
+ * The server-side criteria for a search (#1669). Every revision of a schema
+ * shares its `object_type`; `latest` and `older` compare the user's `schema`
+ * with the newest revision's id, which the lineages supply. Without them the
+ * two cannot be expressed and are left off, while the object type still
+ * narrows the list.
+ */
+export function userFilter(search: UsersSearch, lineages: SchemaLineage[]): UserFilter {
+  if (!search.schema) return [];
+  const criteria: UserFilter = [
+    { field: "schema_object_type", operation: "equals", value: search.schema },
+  ];
+  const latest = lineages.find((lineage) => lineage.objectType === search.schema)?.revisions[0]?.id;
+  if (search.revision === "latest") {
+    if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
+  } else if (search.revision === "older") {
+    if (latest) criteria.push({ field: "schema", operation: "not_equals", value: latest });
+  } else if (search.revision) {
+    criteria.push({ field: "schema", operation: "equals", value: search.revision });
+  }
+  return criteria;
 }
 
 /**

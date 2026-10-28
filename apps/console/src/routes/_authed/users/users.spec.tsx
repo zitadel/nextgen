@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { formatDateTime } from "@/lib/date";
 import { scopedPath } from "@/test/project-scope.fixture";
 import { server } from "@/test/msw";
 
@@ -215,6 +216,7 @@ describe("users screen", () => {
     // order, without the email that would only repeat the line under the name.
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Attributes",
       "Status",
       "Member of",
@@ -263,6 +265,7 @@ describe("users screen", () => {
     expect(within(link.parentElement as HTMLElement).getByText("email")).toBeInTheDocument();
     expect(table.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual([
       "User",
+      "Revision",
       "Status",
       "Member of",
       "ID",
@@ -863,7 +866,8 @@ describe("users screen", () => {
     expect(within(screen.getByRole("table")).getByText("Acme")).toBeInTheDocument();
     expect(within(minimal as HTMLElement).getByText("email: min@acme.com")).toBeInTheDocument();
     const cells = within(minimal as HTMLElement).getAllByRole("cell");
-    expect(cells[1]).toHaveTextContent("—");
+    // User, Revision, then the pinned column.
+    expect(cells[2]).toHaveTextContent("—");
   });
 
   it("renders the server-resolved identity chain, never deriving from attributes", async () => {
@@ -1193,7 +1197,9 @@ describe("users screen", () => {
     // leaving the row a column short.
     const soloRow = screen.getByRole("link", { name: "solo@acme.com" }).closest("tr");
     expect(soloRow).not.toBeNull();
-    expect(within(soloRow as HTMLElement).getByText("—")).toBeInTheDocument();
+    // The Member of cell: third from the end, before the ID and the row menu.
+    const soloCells = within(soloRow as HTMLElement).getAllByRole("cell");
+    expect(soloCells.at(-3)).toHaveTextContent("—");
   });
 
   it("says when a user is on more teams than the row carries", async () => {
@@ -1271,5 +1277,132 @@ describe("users screen", () => {
     expect(bodies).toHaveLength(3);
     expect(bodies.at(-1)).toMatchObject({ page_token: "page-2" });
     expect(bodies.at(-1)).not.toHaveProperty("expand");
+  });
+
+  /** Two revisions of one schema, the newer one still in use, for the filter. */
+  function serveLineage() {
+    server.use(
+      http.get(SCHEMAS_URL, ({ request }) => {
+        if (new URL(request.url).searchParams.get("revisions") !== "all") {
+          return HttpResponse.json({ schemas: [] });
+        }
+        const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+        return HttpResponse.json({
+          schemas: [
+            {
+              id: "sch_business_2",
+              schema: business,
+              metadata: { created_at: "2026-08-01T09:30:00Z", in_use: true },
+            },
+            {
+              id: "sch_business",
+              schema: business,
+              metadata: { created_at: "2026-07-01T00:00:00Z", in_use: false },
+            },
+          ],
+        });
+      }),
+    );
+  }
+
+  it("shows the revision each user is on, opening that schema", async () => {
+    // A revision is a schema of its own, so the column carries the user's
+    // `schema` id and opens it (#1669).
+    server.use(
+      http.post(USERS_QUERY_URL, () =>
+        HttpResponse.json({
+          users: [
+            {
+              id: "user_1",
+              schema: "sch_business",
+              identifier: "maya@acme.com",
+              identifier_property: "email",
+              attributes: { email: "maya@acme.com" },
+            },
+          ],
+        }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () => HttpResponse.json(BUSINESS_SCHEMA)),
+    );
+    await renderUsers();
+
+    const table = within(await screen.findByRole("table"));
+    expect(table.getByRole("columnheader", { name: "Revision" })).toBeInTheDocument();
+    expect(table.getByRole("link", { name: "sch_business" })).toHaveAttribute(
+      "href",
+      scopedPath("/schemas/sch_business"),
+    );
+  });
+
+  it("narrows the list to a schema, then to its older revisions, on the server", async () => {
+    // Every revision of a schema shares its object type, so the schema filter
+    // sends that; `Older revisions` adds `schema not_equals` the newest id.
+    // The revision belongs to the schema, so changing the schema drops it.
+    serveLineage();
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers();
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).not.toHaveProperty("filter");
+    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
+    await userEvent.click(await screen.findByRole("option", { name: "Business" }));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toMatchObject({ schema: "business" }),
+    );
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+      }),
+    );
+    expect(await screen.findByText("No users match this filter.")).toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole("combobox", { name: "Filter by revision" }));
+    const options = within(await screen.findByRole("listbox")).getAllByRole("option");
+    expect(options.map((option) => option.textContent)).toEqual([
+      "All revisions",
+      "Latest only",
+      "Older revisions",
+      `sch_business_2${formatDateTime("2026-08-01T09:30:00Z")}latestin use`,
+      `sch_business${formatDateTime("2026-07-01T00:00:00Z")}`,
+    ]);
+    await userEvent.click(screen.getByRole("option", { name: "Older revisions" }));
+    await waitFor(() =>
+      expect(bodies.at(-1)).toMatchObject({
+        filter: [
+          { field: "schema_object_type", operation: "equals", value: "business" },
+          { field: "schema", operation: "not_equals", value: "sch_business_2" },
+        ],
+      }),
+    );
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+      "Older revisions",
+    );
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Filter by schema" }));
+    await userEvent.click(await screen.findByRole("option", { name: "All schemas" }));
+    await waitFor(() => expect(bodies.at(-1)).not.toHaveProperty("filter"));
+    expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
+  });
+
+  it("filters by one revision from the URL, with the list left when the lineages cannot be read", async () => {
+    // The lineages are chrome: unreadable, the filter leaves the title row and
+    // the list still narrows by what the URL carries.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=business&revision=sch_business`);
+
+    await screen.findByRole("table");
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [
+        { field: "schema_object_type", operation: "equals", value: "business" },
+        { field: "schema", operation: "equals", value: "sch_business" },
+      ],
+    });
+    expect(screen.queryByRole("combobox", { name: "Filter by schema" })).not.toBeInTheDocument();
   });
 });

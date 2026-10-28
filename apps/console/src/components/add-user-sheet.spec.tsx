@@ -175,7 +175,13 @@ describe("add user sheet", () => {
     server.use(
       http.post(USERS_QUERY_URL, () => HttpResponse.json({ users: [] })),
       http.get(SCHEMAS_URL, ({ request }) => {
-        const token = new URL(request.url).searchParams.get("page_token");
+        const url = new URL(request.url);
+        // The Users list behind the sheet reads every revision for its filter;
+        // only the picker's own read of the latest ones is under test.
+        if (url.searchParams.get("revisions") !== "latest") {
+          return HttpResponse.json({ schemas: [] });
+        }
+        const token = url.searchParams.get("page_token");
         askedTokens.push(token);
         const page = token
           ? { id: "sch_minimal", body: MINIMAL }

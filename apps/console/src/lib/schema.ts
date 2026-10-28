@@ -1,3 +1,5 @@
+import { ApiError } from "@zitadel/api/runtime/fetch";
+
 import { api } from "@/api/zitadel";
 import { readAllPages } from "./paging";
 import { field } from "./record";
@@ -420,4 +422,71 @@ function propertyPlaceholder(property: Record<string, unknown>): string | undefi
     if (typeof first === "string") return first;
   }
   return field(property, "example");
+}
+
+/** One revision of a user schema, as the Users filter lists it. */
+export interface SchemaRevisionRef {
+  id: string;
+  createdAt: string;
+  /** Whether any user of the project is on it; absent when the read could not say. */
+  inUse?: boolean;
+}
+
+/** Every revision of one schema, under the object type they share. */
+export interface SchemaLineage {
+  objectType: string;
+  /** The newest revision's title, else its id. */
+  title: string;
+  /** Newest first, as the server lists them. */
+  revisions: SchemaRevisionRef[];
+}
+
+/**
+ * The project's user schemas grouped by object type, each with its revisions
+ * newest first and whether any user is on each one (`expand=in_use`). A
+ * schema stored without an object type has no lineage to filter by and is
+ * left out. The expansion needs read on the whole project; refused, the
+ * lineages come back without it rather than not at all.
+ */
+export async function fetchSchemaLineages(projectId: string): Promise<SchemaLineage[]> {
+  const list = (expand: boolean) =>
+    readAllPages(async (pageToken) => {
+      const page = await api.listSchemas({
+        project_id: projectId,
+        kind: "user-schema",
+        revisions: "all",
+        ...(expand ? { expand: ["in_use" as const] } : {}),
+        limit: 100,
+        page_token: pageToken,
+      });
+      return { items: page.schemas, next: page.next_page_token };
+    });
+  let entries: Awaited<ReturnType<typeof list>>;
+  try {
+    entries = await list(true);
+  } catch (cause) {
+    if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
+    entries = await list(false);
+  }
+  const lineages = new Map<string, SchemaLineage>();
+  for (const entry of entries) {
+    const schema = entry.schema as UserSchema;
+    const objectType = field(schema, "objectType");
+    if (!objectType) continue;
+    const revision: SchemaRevisionRef = {
+      id: entry.id,
+      createdAt: entry.metadata.created_at,
+      inUse: entry.metadata.in_use,
+    };
+    const lineage = lineages.get(objectType);
+    if (lineage) lineage.revisions.push(revision);
+    else {
+      lineages.set(objectType, {
+        objectType,
+        title: schemaDisplayName(schema, entry.id),
+        revisions: [revision],
+      });
+    }
+  }
+  return [...lineages.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
