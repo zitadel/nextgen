@@ -287,8 +287,14 @@ covers a server that answered 5xx and one that never answered — refused,
 unresolvable, or silent past the 30-second request deadline. Ctrl-C exits
 130: a command waiting on the server, or on an answer at a prompt, stops at
 once with `E_CANCELLED`, and any other command exits within a second, possibly
-without an envelope. In human mode a cancel prints no error block. An
-unknown command is handled by the CLI's help layer, not the envelope.
+without an envelope. In human mode a cancel prints no error block. A name the
+CLI cannot resolve to a command is handled by its help layer, not the envelope:
+an unknown command, an unknown subcommand, and a stray extra word (read as a
+subcommand) each write nothing to stdout, explain themselves on stderr, and
+exit 127. Treat an empty stdout as that case rather than as a parse failure.
+Everything the CLI does resolve answers with an envelope, errors included — an
+unknown flag, a missing argument and a resource that is not found are all
+`status: "error"` objects on stdout.
 
 ## Clarify before you configure
 
