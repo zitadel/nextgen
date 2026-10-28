@@ -26,14 +26,15 @@ Individual decisions are marked inline in each doc:
 
 1. [`hierarchy.md`](hierarchy.md) — three-layer model (Project / Team / User). Platform is a reserved project.
 2. [`credentials.md`](credentials.md) — bearer tokens (`sk_proj_` / `sk_team_`), origin-bound browser challenges, handoff tokens, api_keys as resources.
-3. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL, slash verbs.
-4. [`conventions.md`](conventions.md) — IDs, errors, pagination, idempotency A/B split, capabilities split, header-based versioning.
-5. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
-6. [`authz.md`](authz.md) — credential × scope × permission.
-7. [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL for catalogs, assignments, membership edges, and `resource_scope_index` (feeds issue #422).
-8. [`authz-testing.md`](authz-testing.md) — L1–L4 fuzzy/property strategy for compiler, persist, and (later) resolver oracles.
-9. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
-10. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
+3. [`apps-and-machine-identities.md`](apps-and-machine-identities.md) — OPEN draft: identities as principals with schema capabilities, apps as client registrations, client credentials, PATs, import, introspection.
+4. [`url-architecture.md`](url-architecture.md) — flat-by-ID, resource-scope index, scope-bound DAL, slash verbs.
+5. [`conventions.md`](conventions.md) — IDs, errors, pagination, idempotency A/B split, capabilities split, header-based versioning.
+6. [`authn-and-auth-flows.md`](authn-and-auth-flows.md) — auth_attempts state machine, OIDC adapter, SSR handoff.
+7. [`authz.md`](authz.md) — credential × scope × permission.
+8. [`permission-storage.md`](permission-storage.md) — Wave 0 relational DDL for catalogs, assignments, membership edges, and `resource_scope_index` (feeds issue #422).
+9. [`authz-testing.md`](authz-testing.md) — L1–L4 fuzzy/property strategy for compiler, persist, and (later) resolver oracles.
+10. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
+11. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
 
 ## Sibling doc sets
 
