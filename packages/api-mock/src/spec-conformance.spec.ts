@@ -2001,7 +2001,11 @@ describe("api-mock releases and deployments", () => {
       { config: {}, input: { password: "x", passwd: "x" } },
       { config: { history_depth: 2 }, input: { password: "x" }, facts: { history_match: [true] } },
       { config: {}, input: { password: "a".repeat(4097) } },
-      { config: {}, input: { password: "x" }, facts: { history_matches: [false, false, false, false, true] } },
+      {
+        config: {},
+        input: { password: "x" },
+        facts: { history_matches: [false, false, false, false, true] },
+      },
     ]) {
       const res = await evaluate(malformed);
       expect(res.status, JSON.stringify(malformed)).toBe(400);
