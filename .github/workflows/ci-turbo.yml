@@ -253,14 +253,12 @@ jobs:
       # which the cache mostly restores. A console change reaches the
       # server's tests, which embed it, through their task edge.
       # `--continue=dependencies-successful` is moon's behaviour: a failure
-      # skips its dependents and nothing else. The summary feeds the report
-      # step.
+      # skips its dependents and nothing else.
       - name: Run turbo build and test graph
-        id: turbo-gate
         if: ${{ env.VERSION_PR == 'false' }}
         env:
           TURBO_FORCE: ${{ env.FORCE }}
-        run: turbo run lint typecheck build test check-adrs check-moon-graph $AFFECTED --continue=dependencies-successful --summarize
+        run: turbo run lint typecheck build test check-adrs check-moon-graph $AFFECTED --continue=dependencies-successful
 
       # `server:test` is part of the gate above; the database lanes stay
       # outside it, as in ci.yml.
@@ -309,7 +307,6 @@ jobs:
       # (see the top). A failed lane stops no other. Streamed, as in ci.yml:
       # grouped, a lane's output reaches the log only when the lane ends.
       - name: Run e2e lanes
-        id: turbo-e2e
         if: ${{ env.LANES == 'true' }}
         env:
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
@@ -317,13 +314,7 @@ jobs:
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing $AFFECTED --continue=dependencies-successful --log-order=stream --summarize
-
-      # Reads the newest run summary, so it names the failures of whichever
-      # turbo step failed: the gate or the e2e lanes.
-      - name: Report turbo failures
-        if: ${{ failure() && (steps.turbo-gate.conclusion == 'failure' || steps.turbo-e2e.conclusion == 'failure') }}
-        run: node scripts/report-turbo-failures.mjs
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing $AFFECTED --continue=dependencies-successful --log-order=stream
 
       # After the e2e lanes and only once they passed, as in ci.yml.
       - name: Look for journey registry changes
