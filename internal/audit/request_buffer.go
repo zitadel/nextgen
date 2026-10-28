@@ -240,7 +240,9 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		cancel()
 		if lastErr == nil {
 			b.flushed.Add(uint64(len(events)))
-			recordEventsWritten(ctx, events)
+			for _, ev := range events {
+				metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
+			}
 			return
 		}
 		if attempt < maxAttempts {
@@ -257,18 +259,6 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 		slog.Uint64("dropped_total", b.dropped.Load()),
 		slog.String("error", lastErr.Error()),
 	)
-}
-
-// recordEventsWritten counts a batch that storage accepted, once per event
-// type it held.
-func recordEventsWritten(ctx context.Context, events []*domain.Event) {
-	counts := make(map[domain.EventType]int, 1)
-	for _, ev := range events {
-		counts[ev.EventType]++
-	}
-	for eventType, n := range counts {
-		metrics.RecordAuditEvents(ctx, string(eventType), n)
-	}
 }
 
 // Close drains the buffer and stops the flusher.

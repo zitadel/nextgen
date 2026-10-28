@@ -147,9 +147,7 @@ func tokenUserID(tok *domain.Token) *string {
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *domain.Token, err error) {
 	ctx, end := startSpan(ctx, "TokenService.IntrospectToken")
 	defer end(&err)
-	// On the path of every authenticated request: how long validating takes,
-	// and how often it refuses, are the first things a load result is read
-	// against. err is the named result, so this sees every return below.
+	// err is the named result, so this sees every return below.
 	start := time.Now()
 	defer func() {
 		metrics.RecordCredentialValidation(ctx, credentialResult(err), time.Since(start))

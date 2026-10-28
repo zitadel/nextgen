@@ -11,10 +11,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// credentialResult classifies the outcome of validating a bearer credential.
-// Anything that is not the bearer's own doing, a read that failed or a key
-// that could not be unwrapped, is an error, so a database outage does not read
-// as a wave of bad credentials.
+// credentialResult maps a validation error to its CredentialResult. A missing
+// project KEK row surfaces as ErrEncryptionKeyNotFound, indistinguishable here
+// from a key id the bearer presented, so it counts as invalid.
 func credentialResult(err error) metrics.CredentialResult {
 	switch {
 	case err == nil:
@@ -24,17 +23,16 @@ func credentialResult(err error) metrics.CredentialResult {
 	case domain.IsServerFault(err):
 		return metrics.CredentialError
 	default:
-		// A refusal the credential earned: malformed, forged, expired, or
-		// minted under a key this deployment does not hold.
 		return metrics.CredentialInvalid
 	}
 }
 
-// passwordResult classifies the outcome of verifying a password against its
-// hash: the hash was read and the password did not match, or the hash could
-// not be verified at all.
-func passwordResult(err error) metrics.PasswordResult {
+// passwordResult maps a verification's outcome to its PasswordResult: updated
+// is the new hash a match on an outdated hash computed, or empty.
+func passwordResult(updated string, err error) metrics.PasswordResult {
 	switch {
+	case updated != "" || errors.Is(err, crypto.ErrRehashFailed):
+		return metrics.PasswordUpdated
 	case err == nil:
 		return metrics.PasswordMatch
 	case errors.Is(err, crypto.ErrHashMismatch):
@@ -44,33 +42,17 @@ func passwordResult(err error) metrics.PasswordResult {
 	}
 }
 
-// authCheck names the kind of proof for the authentication outcome metric.
-// A proof of no known kind is not counted: the set of values is closed.
-func authCheck(proof Proof) (metrics.AuthCheck, bool) {
-	if proof == nil {
-		return "", false
-	}
-	switch proof.proofCheckType() {
-	case domain.AuthCheckTypeUser:
-		return metrics.CheckUser, true
-	case domain.AuthCheckTypePassword:
-		return metrics.CheckPassword, true
-	case domain.AuthCheckTypePasskey:
-		return metrics.CheckPasskey, true
-	case domain.AuthCheckTypePasskeyRegistration:
-		return metrics.CheckPasskeyRegistration, true
-	default:
-		return "", false
-	}
+// authChecks names the kind of proof for the authentication outcome metric. A
+// proof kind not in the map is not counted: the set of values is closed.
+var authChecks = map[domain.AuthCheckType]metrics.AuthCheck{
+	domain.AuthCheckTypeUser:                metrics.CheckUser,
+	domain.AuthCheckTypePassword:            metrics.CheckPassword,
+	domain.AuthCheckTypePasskey:             metrics.CheckPasskey,
+	domain.AuthCheckTypePasskeyRegistration: metrics.CheckPasskeyRegistration,
 }
 
 // authResult classifies the outcome of verifying a proof: it worked, it was
 // checked and refused, or it could not be completed.
-//
-// A rejected proof keeps its cause as the parent of auth_attempt.proof_rejected,
-// and that cause decides: a storage failure that verify wrapped as a rejection
-// is still a failure of the server, not of the proof. Reading the cause here
-// is what keeps an outage from counting as a wave of wrong passwords.
 func authResult(err error) metrics.AuthResult {
 	if err == nil {
 		return metrics.AuthSuccess
@@ -85,10 +67,8 @@ func authResult(err error) metrics.AuthResult {
 	return metrics.AuthRejected
 }
 
-// proofRejectedResult classifies a rejection by what verify wrapped: nothing,
-// a login name that names no one user, a password that does not match, an
-// assertion or attestation WebAuthn refused, or a refusal classified by the
-// domain is the proof's own doing; anything else is a failure to verify it.
+// proofRejectedResult classifies the cause verify wrapped: the proof's own
+// doing, or a failure to verify it.
 func proofRejectedResult(cause error) metrics.AuthResult {
 	if cause == nil || errors.Is(cause, errIdentifierUnresolved) {
 		return metrics.AuthRejected
@@ -100,17 +80,19 @@ func proofRejectedResult(cause error) metrics.AuthResult {
 		return metrics.AuthRejected
 	}
 	if pe, ok := errors.AsType[*protocol.Error](cause); ok {
-		// WebAuthn also wraps what our own lookups returned, such as a storage
-		// failure while resolving a discoverable credential: that decides.
+		// WebAuthn nests its own errors: the innermost one says whether it
+		// wraps anything but a refusal.
+		for inner, ok := errors.AsType[*protocol.Error](pe.Err); ok; inner, ok = errors.AsType[*protocol.Error](pe.Err) {
+			pe = inner
+		}
 		if pe.Err == nil {
 			return metrics.AuthRejected
 		}
-		return proofRejectedResult(pe.Err)
 	}
-	if _, ok := errors.AsType[domain.Error](cause); ok && !domain.IsServerFault(cause) {
-		return metrics.AuthRejected
+	if domain.IsServerFault(cause) {
+		return metrics.AuthError
 	}
-	return metrics.AuthError
+	return metrics.AuthRejected
 }
 
 // flowResult classifies where a flow engine operation left the flow: at a

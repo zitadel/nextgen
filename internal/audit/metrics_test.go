@@ -12,39 +12,42 @@ import (
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 )
-
-// The reader is cumulative and shared by the whole binary, so every test here
-// asserts the change it caused and none of them runs in parallel.
 
 type failingEventInserter struct{ err error }
 
 func (f failingEventInserter) InsertEvent(context.Context, *domain.Event) error { return f.err }
 
-func source(v metrics.AuditSource) attribute.KeyValue { return metrics.SourceKey.String(string(v)) }
-
 func eventType(v domain.EventType) attribute.KeyValue { return metrics.EventTypeKey.String(string(v)) }
+
+// insertDurations is the GrewOnly check on the audit insert histogram, over
+// both sources.
+func insertDurations(t *testing.T) func(want metrics.AuditSource) {
+	t.Helper()
+	return metricstest.GrewOnly(t, metricsReader, metrics.AuditInsertDuration, nil, metrics.SourceKey, metrics.AuditEvent, metrics.AuditRequest)
+}
 
 func TestInsert_metrics(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
 		insertErr   error
-		wantWritten int64
+		wantWritten domain.EventType // empty: nothing was written
 	}{
-		{"written", nil, 1},
-		{"insert failed", errors.New("down"), 0},
+		{"written", nil, domain.EventTypeUserCreated},
+		{"insert failed", errors.New("down"), ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ev := FromContext(t.Context(), domain.EventTypeUserCreated, domain.EventCategoryEntity)
 			ev.ProjectID = "proj_1"
-			durationBefore := metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditEvent))
-			writtenBefore := metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeUserCreated))
+			durations := insertDurations(t)
+			written := metricstest.GrewOnly(t, metricsReader, metrics.AuditEventsWritten, nil, metrics.EventTypeKey, domain.EventTypeUserCreated)
 
 			err := Insert(t.Context(), failingEventInserter{err: tc.insertErr}, ev)
 			require.ErrorIs(t, err, tc.insertErr)
 
-			assert.Equal(t, uint64(1), metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditEvent))-durationBefore, "insert duration")
-			assert.Equal(t, tc.wantWritten, metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeUserCreated))-writtenBefore, "events written")
+			durations(metrics.AuditEvent)
+			written(tc.wantWritten)
 		})
 	}
 }
@@ -52,15 +55,15 @@ func TestInsert_metrics(t *testing.T) {
 // An insert skipped for want of a project is not a write and takes no time
 // worth recording.
 func TestInsert_metrics_skipped(t *testing.T) {
-	durationBefore := metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditEvent))
+	durations := insertDurations(t)
 	ev := FromContext(t.Context(), domain.EventTypeUserCreated, domain.EventCategoryEntity)
 	require.NoError(t, Insert(t.Context(), failingEventInserter{err: errors.New("never called")}, ev))
-	assert.Equal(t, uint64(0), metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditEvent))-durationBefore)
+	durations("")
 }
 
 // One flush is one insert, and the events it carried are counted per type.
 func TestRequestBuffer_flush_metrics(t *testing.T) {
-	durationBefore := metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditRequest))
+	durations := insertDurations(t)
 	apiBefore := metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeRequestAPI))
 	otherBefore := metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeUserCreated))
 
@@ -75,15 +78,15 @@ func TestRequestBuffer_flush_metrics(t *testing.T) {
 	require.Eventually(t, func() bool { return buf.Flushed() >= 3 }, time.Second, 10*time.Millisecond)
 	require.Equal(t, 1, ins.batchCalls())
 
-	assert.Equal(t, uint64(1), metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditRequest))-durationBefore, "flush duration")
+	durations(metrics.AuditRequest)
 	assert.Equal(t, int64(2), metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeRequestAPI))-apiBefore, "api requests written")
 	assert.Equal(t, int64(1), metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeUserCreated))-otherBefore, "the other type written")
 }
 
 // A flush that storage refuses is timed but counts no event as written.
 func TestRequestBuffer_flush_metrics_dropped(t *testing.T) {
-	durationBefore := metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditRequest))
-	apiBefore := metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeRequestAPI))
+	durationBefore := metricsReader.HistogramCount(t, metrics.AuditInsertDuration, metrics.SourceKey.String(string(metrics.AuditRequest)))
+	written := metricstest.GrewOnly(t, metricsReader, metrics.AuditEventsWritten, nil, metrics.EventTypeKey, domain.EventTypeRequestAPI)
 
 	ins := &failingInserter{}
 	buf := NewRequestBuffer(ins, RequestBufferConfig{BatchSize: 1, Capacity: 100, MaxAge: time.Hour})
@@ -91,6 +94,6 @@ func TestRequestBuffer_flush_metrics_dropped(t *testing.T) {
 	buf.Enqueue(&domain.Event{ProjectID: "proj_1", EventType: domain.EventTypeRequestAPI, Category: domain.EventCategoryRequest})
 	require.Eventually(t, func() bool { return buf.Dropped() >= 1 }, 5*time.Second, 10*time.Millisecond)
 
-	assert.GreaterOrEqual(t, metricsReader.HistogramCount(t, metrics.AuditInsertDuration, source(metrics.AuditRequest))-durationBefore, uint64(1), "every attempt is timed")
-	assert.Equal(t, int64(0), metricsReader.CounterSum(t, metrics.AuditEventsWritten, eventType(domain.EventTypeRequestAPI))-apiBefore, "nothing written")
+	assert.GreaterOrEqual(t, metricsReader.HistogramCount(t, metrics.AuditInsertDuration, metrics.SourceKey.String(string(metrics.AuditRequest)))-durationBefore, uint64(1), "every attempt is timed")
+	written("")
 }

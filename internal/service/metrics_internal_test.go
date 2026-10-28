@@ -15,10 +15,8 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-// MetricsReader installs the collecting meter provider once, when the test
-// binary starts, the way SpanExporter installs the tracer provider: a package
-// variable rather than a TestMain, because the postgres_integration build
-// already has one. It is exported for the site tests in package service_test.
+// MetricsReader installs the collecting meter provider once, when the binary
+// starts: a package variable rather than a TestMain, for the reason SpanExporter gives.
 var MetricsReader = metricstest.Install()
 
 func TestCredentialResult(t *testing.T) {
@@ -46,46 +44,22 @@ func TestCredentialResult(t *testing.T) {
 func TestPasswordResult(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
-		name string
-		err  error
-		want metrics.PasswordResult
+		name    string
+		updated string
+		err     error
+		want    metrics.PasswordResult
 	}{
-		{"nil", nil, metrics.PasswordMatch},
-		{"mismatch", domain.ErrUserPasswordInvalid().WithParent(fmt.Errorf("%w: x", crypto.ErrHashMismatch)), metrics.PasswordMismatch},
-		{"unreadable hash", domain.ErrUserPasswordInvalid().WithParent(crypto.ErrInvalidHash), metrics.PasswordError},
-		{"no cause", domain.ErrUserPasswordInvalid(), metrics.PasswordError},
+		{"match", "", nil, metrics.PasswordMatch},
+		{"match on an outdated hash", "new-hash", nil, metrics.PasswordUpdated},
+		{"match, rehash failed", "", fmt.Errorf("%w: x", crypto.ErrRehashFailed), metrics.PasswordUpdated},
+		{"mismatch", "", domain.ErrUserPasswordInvalid().WithParent(fmt.Errorf("%w: x", crypto.ErrHashMismatch)), metrics.PasswordMismatch},
+		{"mismatch from the verifier", "", crypto.ErrHashMismatch, metrics.PasswordMismatch},
+		{"unreadable hash", "", domain.ErrUserPasswordInvalid().WithParent(crypto.ErrInvalidHash), metrics.PasswordError},
+		{"no cause", "", domain.ErrUserPasswordInvalid(), metrics.PasswordError},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, passwordResult(tt.err))
-		})
-	}
-}
-
-type unknownProof struct{}
-
-func (unknownProof) proofCheckType() domain.AuthCheckType { return domain.AuthCheckTypeSSOCallback }
-
-func TestAuthCheck(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name  string
-		proof Proof
-		want  metrics.AuthCheck
-		ok    bool
-	}{
-		{"user", UserProof{}, metrics.CheckUser, true},
-		{"password", PasswordProof{}, metrics.CheckPassword, true},
-		{"passkey", PasskeyProof{}, metrics.CheckPasskey, true},
-		{"passkey registration", PasskeyRegistrationProof{}, metrics.CheckPasskeyRegistration, true},
-		{"nil", nil, "", false},
-		{"not a proof kind", unknownProof{}, "", false},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := authCheck(tt.proof)
-			assert.Equal(t, tt.ok, ok)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, passwordResult(tt.updated, tt.err))
 		})
 	}
 }
@@ -108,6 +82,7 @@ func TestAuthResult(t *testing.T) {
 		{"rejected, identifier unresolved", rejected(errIdentifierUnresolved), metrics.AuthRejected},
 		{"rejected, wrong password", rejected(domain.ErrUserPasswordInvalid().WithParent(crypto.ErrHashMismatch)), metrics.AuthRejected},
 		{"rejected, webauthn refused", rejected(protocol.ErrVerification.WithDetails("signature")), metrics.AuthRejected},
+		{"rejected, webauthn nested refusal", rejected(protocol.ErrParsingData.WithError(protocol.ErrBadRequest.WithDetails("short"))), metrics.AuthRejected},
 		{"rejected, webauthn lookup found nothing", rejected(protocol.ErrBadRequest.WithDetails("lookup").WithError(database.NewNoRowFoundError(nil))), metrics.AuthRejected},
 		{"rejected, webauthn lookup failed in storage", rejected(protocol.ErrBadRequest.WithDetails("lookup").WithError(database.NewUnavailableError(errors.New("down")))), metrics.AuthError},
 		{"rejected, domain refusal", rejected(domain.ErrUserNotFound()), metrics.AuthRejected},

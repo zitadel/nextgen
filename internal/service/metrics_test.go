@@ -18,20 +18,11 @@ import (
 	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
-
-// The reader is cumulative and shared by the whole binary, so every test here
-// asserts the change it caused and none of them runs in parallel.
-
-// counterDelta returns a func reporting how much the counter grew since now.
-func counterDelta(t *testing.T, name string, attrs ...attribute.KeyValue) func() int64 {
-	t.Helper()
-	before := service.MetricsReader.CounterSum(t, name, attrs...)
-	return func() int64 { return service.MetricsReader.CounterSum(t, name, attrs...) - before }
-}
 
 // histogramDelta returns a func reporting how many measurements the histogram
 // gained since now.
@@ -42,6 +33,15 @@ func histogramDelta(t *testing.T, name string, attrs ...attribute.KeyValue) func
 }
 
 func result(v string) attribute.KeyValue { return metrics.ResultKey.String(v) }
+
+// passwordVerifications is the GrewOnly check on the password verification
+// histogram at one purpose, over every result.
+func passwordVerifications(t *testing.T, purpose metrics.PasswordPurpose) func(want metrics.PasswordResult) {
+	t.Helper()
+	return metricstest.GrewOnly(t, service.MetricsReader, metrics.PasswordVerificationDuration,
+		[]attribute.KeyValue{metrics.PurposeKey.String(string(purpose))}, metrics.ResultKey,
+		metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError)
+}
 
 func TestTokenService_IntrospectToken_metrics(t *testing.T) {
 	var raw [32]byte
@@ -73,10 +73,8 @@ func TestTokenService_IntrospectToken_metrics(t *testing.T) {
 				statements.EXPECT().GetTokenByID(gomock.Any(), "proj_1", "tkn_1").Return(tc.record, tc.storeErr)
 			}
 			credential := histogramDelta(t, metrics.CredentialValidationDuration, result(string(tc.wantCredential)))
-			revocations := map[metrics.RevocationResult]func() int64{}
-			for _, r := range []metrics.RevocationResult{metrics.RevocationActive, metrics.RevocationRevoked, metrics.RevocationError} {
-				revocations[r] = counterDelta(t, metrics.TokenRevocationChecks, result(string(r)))
-			}
+			revocations := metricstest.GrewOnly(t, service.MetricsReader, metrics.TokenRevocationChecks, nil,
+				metrics.ResultKey, metrics.RevocationActive, metrics.RevocationRevoked, metrics.RevocationError)
 
 			_, err := svc.IntrospectToken(t.Context(), tc.token)
 			if tc.wantCredential == metrics.CredentialValid {
@@ -86,13 +84,7 @@ func TestTokenService_IntrospectToken_metrics(t *testing.T) {
 			}
 
 			assert.Equal(t, uint64(1), credential(), "credential validation %s", tc.wantCredential)
-			for r, delta := range revocations {
-				var want int64
-				if r == tc.wantRevocation {
-					want = 1
-				}
-				assert.Equal(t, want, delta(), "revocation checks %s", r)
-			}
+			revocations(tc.wantRevocation)
 		})
 	}
 }
@@ -112,12 +104,11 @@ func TestKeyService_GetCrypter_metrics(t *testing.T) {
 	)
 
 	for _, call := range []struct {
-		name          string
-		wantPerKind   uint64
-		unwrapsNeeded string
+		name        string
+		wantPerKind uint64
 	}{
-		{"cold", 1, "the KEK under the master key, the token key under the KEK"},
-		{"warm", 0, "nothing: the crypter is cached"},
+		{"cold", 1},
+		{"warm", 0},
 	} {
 		master := histogramDelta(t, metrics.KeyChainResolutionDuration, metrics.KeyKindKey.String(string(metrics.KeyKindMaster)))
 		project := histogramDelta(t, metrics.KeyChainResolutionDuration, metrics.KeyKindKey.String(string(metrics.KeyKindProject)))
@@ -125,8 +116,8 @@ func TestKeyService_GetCrypter_metrics(t *testing.T) {
 		_, err := svc.GetCrypter(t.Context(), tokenKey.ID, jose.A256GCM)
 		require.NoError(t, err)
 
-		assert.Equal(t, call.wantPerKind, master(), "%s: master unwraps; %s", call.name, call.unwrapsNeeded)
-		assert.Equal(t, call.wantPerKind, project(), "%s: project unwraps; %s", call.name, call.unwrapsNeeded)
+		assert.Equal(t, call.wantPerKind, master(), "%s: master unwraps", call.name)
+		assert.Equal(t, call.wantPerKind, project(), "%s: project unwraps", call.name)
 	}
 }
 
@@ -141,22 +132,25 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 			},
 		}
 	}
-	check := metrics.CheckKey.String(string(metrics.CheckPassword))
+	check := []attribute.KeyValue{metrics.CheckKey.String(string(metrics.CheckPassword))}
 
 	for _, tc := range []struct {
 		name         string
-		passwordErr  error // from GetUserPassword
-		verifyErr    error // from the hash verifier
+		passwordErr  error  // from GetUserPassword
+		updated      string // the new hash the verifier computed
+		verifyErr    error  // from the hash verifier
 		wantOutcome  metrics.AuthResult
 		wantPassword metrics.PasswordResult // empty: no hash was verified
 	}{
-		{"match", nil, nil, metrics.AuthSuccess, metrics.PasswordMatch},
-		{"mismatch", nil, fmt.Errorf("%w: x", crypto.ErrHashMismatch), metrics.AuthRejected, metrics.PasswordMismatch},
-		{"hash unreadable", nil, crypto.ErrInvalidHash, metrics.AuthRejected, metrics.PasswordError},
-		{"no password set", database.NewNoRowFoundError(nil), nil, metrics.AuthRejected, ""},
+		{"match", nil, "", nil, metrics.AuthSuccess, metrics.PasswordMatch},
+		{"outdated hash", nil, "new-hash", nil, metrics.AuthSuccess, metrics.PasswordUpdated},
+		{"rehash failed", nil, "", fmt.Errorf("%w: x", crypto.ErrRehashFailed), metrics.AuthSuccess, metrics.PasswordUpdated},
+		{"mismatch", nil, "", fmt.Errorf("%w: x", crypto.ErrHashMismatch), metrics.AuthRejected, metrics.PasswordMismatch},
+		{"hash unreadable", nil, "", crypto.ErrInvalidHash, metrics.AuthRejected, metrics.PasswordError},
+		{"no password set", database.NewNoRowFoundError(nil), "", nil, metrics.AuthRejected, ""},
 		// The storage failure is wrapped as a rejected proof; the metric
 		// reads the cause and still counts it as an error.
-		{"password store unavailable", database.NewUnavailableError(errors.New("down")), nil, metrics.AuthError, ""},
+		{"password store unavailable", database.NewUnavailableError(errors.New("down")), "", nil, metrics.AuthError, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -164,26 +158,25 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 			hashers := mocks.NewMockProjectHasherResolver(ctrl)
 			stmts := mocks.NewMockAllStatements(ctrl)
 			stmts.EXPECT().GetAuthAttemptByID(gomock.Any(), gomock.Any(), gomock.Any()).Return(newAttempt(), nil)
+			password := &domain.UserPassword{EncodedHash: "encoded"}
 			if tc.passwordErr != nil {
 				stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(nil, tc.passwordErr)
 			} else {
-				stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(&domain.UserPassword{EncodedHash: "encoded"}, nil)
+				stmts.EXPECT().GetUserPassword(gomock.Any(), gomock.Any()).Return(password, nil)
 				hashers.EXPECT().HasherForProject(gomock.Any(), gomock.Any()).Return(projectHasher, nil)
-				projectHasher.EXPECT().VerifyAndRehash("encoded", "pw").Return("", tc.verifyErr)
+				projectHasher.EXPECT().VerifyAndRehash("encoded", "pw").Return(tc.updated, tc.verifyErr)
+			}
+			if tc.updated != "" {
+				stmts.EXPECT().UpdateUserPasswordHash(gomock.Any(), password, tc.updated).Return(nil)
 			}
 			if tc.wantOutcome == metrics.AuthSuccess {
 				stmts.EXPECT().AuthAttemptChallengeSucceeded(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			} else {
 				stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 			}
-			outcomes := map[metrics.AuthResult]func() int64{}
-			for _, r := range []metrics.AuthResult{metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError} {
-				outcomes[r] = counterDelta(t, metrics.AuthAttemptOutcomes, check, result(string(r)))
-			}
-			passwords := map[metrics.PasswordResult]func() uint64{}
-			for _, r := range []metrics.PasswordResult{metrics.PasswordMatch, metrics.PasswordMismatch, metrics.PasswordError} {
-				passwords[r] = histogramDelta(t, metrics.PasswordVerificationDuration, result(string(r)))
-			}
+			outcomes := metricstest.GrewOnly(t, service.MetricsReader, metrics.AuthAttemptOutcomes, check,
+				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError)
+			passwords := passwordVerifications(t, metrics.PasswordLogin)
 
 			svc := newAuthAttemptSvcWithHashers(ctrl, stmts, nil, nil, hashers, nil)
 			_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -196,26 +189,46 @@ func TestAuthAttemptService_VerifyProof_password_metrics(t *testing.T) {
 				require.Error(t, err)
 			}
 
-			for r, delta := range outcomes {
-				var want int64
-				if r == tc.wantOutcome {
-					want = 1
-				}
-				assert.Equal(t, want, delta(), "outcome %s", r)
+			outcomes(tc.wantOutcome)
+			passwords(tc.wantPassword)
+		})
+	}
+}
+
+// A password change compares the candidate with each remembered password:
+// one verification per comparison, under the history purpose.
+func TestPasswordPolicy_History_metrics(t *testing.T) {
+	selfService := service.SetPasswordInput{ProjectID: "p", UserID: "u", Password: "candidate", SelfService: true}
+	for _, tc := range []struct {
+		name string
+		kept string
+		want metrics.PasswordResult
+	}{
+		{"matches the current password", "match", metrics.PasswordMatch},
+		{"differs from the current password", "other", metrics.PasswordMismatch},
+		{"current password unreadable", "unreadable", metrics.PasswordError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newHistoryFixture(t, 1)
+			f.kept(0, 1, tc.kept)
+			logins := passwordVerifications(t, metrics.PasswordLogin)
+			history := passwordVerifications(t, metrics.PasswordHistory)
+
+			_, err := f.gate.CheckPassword(t.Context(), selfService)
+			if tc.want == metrics.PasswordMismatch {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
 			}
-			for r, delta := range passwords {
-				var want uint64
-				if r == tc.wantPassword {
-					want = 1
-				}
-				assert.Equal(t, want, delta(), "password verification %s", r)
-			}
+
+			history(tc.want)
+			logins("")
 		})
 	}
 }
 
 func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
-	check := metrics.CheckKey.String(string(metrics.CheckUser))
+	check := []attribute.KeyValue{metrics.CheckKey.String(string(metrics.CheckUser))}
 	for _, tc := range []struct {
 		name      string
 		lookupErr error
@@ -239,8 +252,8 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 			}, nil)
 			users.EXPECT().GetByAttributes(gomock.Any(), "proj", gomock.Any(), gomock.Any()).Return(nil, tc.lookupErr)
 			stmts.EXPECT().AuthAttemptChallengeFailed(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			rejected := counterDelta(t, metrics.AuthAttemptOutcomes, check, result(string(metrics.AuthRejected)))
-			failed := counterDelta(t, metrics.AuthAttemptOutcomes, check, result(string(metrics.AuthError)))
+			outcomes := metricstest.GrewOnly(t, service.MetricsReader, metrics.AuthAttemptOutcomes, check,
+				metrics.ResultKey, metrics.AuthSuccess, metrics.AuthRejected, metrics.AuthError)
 
 			svc := newAuthAttemptSvc(ctrl, stmts, nil, users)
 			_, err := svc.VerifyProof(t.Context(), service.VerifyProofInput{
@@ -249,14 +262,7 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 			})
 			require.Error(t, err)
 
-			var wantRejected, wantFailed int64
-			if tc.want == metrics.AuthRejected {
-				wantRejected = 1
-			} else {
-				wantFailed = 1
-			}
-			assert.Equal(t, wantRejected, rejected(), "rejected")
-			assert.Equal(t, wantFailed, failed(), "error")
+			outcomes(tc.want)
 		})
 	}
 }
@@ -264,7 +270,6 @@ func TestAuthAttemptService_VerifyProof_user_metrics(t *testing.T) {
 func TestFlowService_metrics(t *testing.T) {
 	def := newDef("login", "1.0.0", domain.FlowDefinitionAudience{}, domain.FlowDefinitionPurposeLogin)
 	state := &domain.FlowState{ProjectID: def.ProjectID, AuthAttemptID: "att-1", FlowProgress: domain.FlowProgress{DefinitionID: def.ID}}
-	op := func(v metrics.FlowOperation) attribute.KeyValue { return metrics.OperationKey.String(string(v)) }
 	completeStep := &domain.FlowStep{Name: "done", Complete: new(domain.FlowStepCompleteRedirect)}
 
 	for _, tc := range []struct {
@@ -304,10 +309,9 @@ func TestFlowService_metrics(t *testing.T) {
 		}, metrics.FlowRender, metrics.FlowStep},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			deltas := map[metrics.FlowResult]func() int64{}
-			for _, r := range []metrics.FlowResult{metrics.FlowStep, metrics.FlowComplete, metrics.FlowFailed} {
-				deltas[r] = counterDelta(t, metrics.FlowStepTransitions, op(tc.wantOp), result(string(r)))
-			}
+			transitions := metricstest.GrewOnly(t, service.MetricsReader, metrics.FlowStepTransitions,
+				[]attribute.KeyValue{metrics.OperationKey.String(string(tc.wantOp))}, metrics.ResultKey,
+				metrics.FlowStep, metrics.FlowComplete, metrics.FlowFailed)
 
 			err := tc.call(t)
 			if tc.wantRes == metrics.FlowFailed {
@@ -316,13 +320,7 @@ func TestFlowService_metrics(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			for r, delta := range deltas {
-				var want int64
-				if r == tc.wantRes {
-					want = 1
-				}
-				assert.Equal(t, want, delta(), "%s %s", tc.wantOp, r)
-			}
+			transitions(tc.wantRes)
 		})
 	}
 }

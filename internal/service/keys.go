@@ -212,9 +212,8 @@ func (s *keyService) getCrypterOfKey(ctx context.Context, key *domain.Encryption
 	if err != nil {
 		return nil, err
 	}
-	// The whole resolution is timed, the uncached KEK read and recursion
-	// included: that is what the cache saves. Only a resolution that produced
-	// a crypter is recorded; a failed one says nothing about that.
+	// Timed from the top: the uncached KEK read and recursion are what the
+	// cache saves. A failed resolution is not recorded.
 	metrics.RecordKeyChainResolution(ctx, kind, time.Since(start))
 
 	s.crypterCache.Add(CrypterCacheKey{KeyID: key.ID, Algorithm: key.Algorithm}, crypter)

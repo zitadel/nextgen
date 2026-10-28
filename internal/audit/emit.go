@@ -62,9 +62,8 @@ func Insert(ctx context.Context, stmts EventInserter, ev *domain.Event) error {
 	start := time.Now()
 	err := stmts.InsertEvent(ctx, ev)
 	metrics.RecordAuditInsert(ctx, metrics.AuditEvent, time.Since(start))
-	if err != nil {
-		return err
+	if err == nil {
+		metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
 	}
-	metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
-	return nil
+	return err
 }
