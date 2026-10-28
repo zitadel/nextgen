@@ -23,8 +23,9 @@ function clientReferences(): Plugin {
     enforce: "post",
     transform(code) {
       if (!/^\s*["']use client["']/.test(code)) return null;
-      // The build lists its exports in one trailing `export { a, b as c }`.
-      const names = [...code.matchAll(/^export \{([^}]*)\}/gm)].flatMap((match) =>
+      // The build lists its exports in one trailing `export{a,b as c}`, on the last
+      // line of minified output.
+      const names = [...code.matchAll(/\bexport\s*\{([^}]*)\}/g)].flatMap((match) =>
         (match[1] ?? "")
           .split(",")
           .map((name) =>

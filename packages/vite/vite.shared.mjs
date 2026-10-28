@@ -97,7 +97,7 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
       build: {
         outDir: "dist",
         sourcemap: true,
-        minify: false,
+        minify: true,
         lib: {
           entry,
           formats: ["es"],
@@ -105,6 +105,9 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
         },
         rolldownOptions: {
           external: [new RegExp(`^(${external.join("|")})($|/)`), /^node:/],
+          // Vite keeps the whitespace of an ES library so its `__PURE__` annotations survive,
+          // but Rolldown keeps those comments while it strips the whitespace too.
+          output: { minify: { compress: true, mangle: true, codegen: { removeWhitespace: true } } },
           onwarn: (warning) => {
             // Whether a slow plugin (type generation) is reported depends on the machine's load.
             if (warning.code === "PLUGIN_TIMINGS" || keptDirective(warning)) return;

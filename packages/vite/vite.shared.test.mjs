@@ -163,6 +163,26 @@ describe("libraryBuild entries", () => {
   });
 });
 
+describe("libraryBuild output", () => {
+  const root = () => packageOf({ exports: { ".": { import: "./dist/index.js" } } }, ["src/index.ts"]);
+
+  it("minifies the JavaScript", () => {
+    expect(buildOf(root()).minify).toBe(true);
+  });
+
+  it("strips the whitespace Vite keeps in an ES library", () => {
+    expect(buildOf(root()).rolldownOptions.output.minify).toEqual({
+      compress: true,
+      mangle: true,
+      codegen: { removeWhitespace: true },
+    });
+  });
+
+  it("keeps a source map beside each file", () => {
+    expect(buildOf(root()).sourcemap).toBe(true);
+  });
+});
+
 describe("libraryBuild externals and warnings", () => {
   const root = () =>
     packageOf(
