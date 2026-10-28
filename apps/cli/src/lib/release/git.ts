@@ -54,6 +54,14 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
 }
 
 /**
+ * The `git diff` options the terminal's diff and the `--json` one share, so
+ * the two never disagree: git's own unified diff, never an external diff
+ * program's, with paths relative to the project, as the CLI reports them
+ * everywhere else.
+ */
+const DIFF_OPTIONS = ["--no-ext-diff", "--relative"];
+
+/**
  * The coloured diff of `.zitadel/` against `sha`, or null when no diff can be
  * shown: git is missing, this is not a repo, or the commit is not in local
  * history (a shallow clone, say). A dead commit is told apart from a clean tree
@@ -70,12 +78,96 @@ export async function diffConfigAgainst(
    */
   referenced: readonly string[] = [],
 ): Promise<string | null> {
+  return diffConfig(cwd, sha, [color ? "--color=always" : "--no-color"], referenced);
+}
+
+/** One changed file of a deploy's diff, as `deploy --json` reports it. */
+export interface ConfigDiffFile {
+  /** Project-relative; for a rename or a copy, where the file is now. */
+  readonly path: string;
+  readonly status: "added" | "modified" | "deleted" | "renamed" | "copied";
+  /** Where a renamed or copied file came from. */
+  readonly previous_path?: string;
+  /** The file's part of the diff, uncoloured, exactly as the terminal shows it. */
+  readonly patch: string;
+}
+
+/**
+ * {@link diffConfigAgainst}, uncoloured and split by file: joined back
+ * together, the patches are the diff the terminal shows. Null when no diff can
+ * be shown, for the same reasons.
+ */
+export async function diffConfigFilesAgainst(
+  cwd: string,
+  sha: string,
+  referenced: readonly string[] = [],
+): Promise<ConfigDiffFile[] | null> {
+  // `--raw -z` lists every file's status and paths, unquoted, ahead of the patch.
+  const output = await diffConfig(cwd, sha, ["--no-color", "--raw", "-z", "--patch"], referenced);
+  return output === null ? null : splitByFile(output);
+}
+
+/**
+ * Pair the `--raw -z` records with the patch's per-file sections. git writes
+ * both from one list of files, in one order, so they line up one to one, except
+ * for a file whose type changed (a file replaced by a symlink): git shows it as
+ * a deletion and a creation, two sections under one header, joined here.
+ */
+function splitByFile(output: string): ConfigDiffFile[] {
+  let at = 0;
+  const field = (): string => {
+    const end = output.indexOf("\0", at);
+    const value = output.slice(at, end === -1 ? output.length : end);
+    at = end === -1 ? output.length : end + 1;
+    return value;
+  };
+  const records: Omit<ConfigDiffFile, "patch">[] = [];
+  // A record is `:<modes> <ids> <status letter>[<score>]`, then its path, or
+  // for a rename or a copy the path it came from and the path it went to.
+  while (output.startsWith(":", at)) {
+    const meta = field();
+    const letter = meta.charAt(meta.lastIndexOf(" ") + 1);
+    const path = field();
+    if (letter === "R" || letter === "C") {
+      const status = letter === "R" ? "renamed" : "copied";
+      records.push({ path: field(), status, previous_path: path });
+    } else {
+      const status = letter === "A" ? "added" : letter === "D" ? "deleted" : "modified";
+      records.push({ path, status });
+    }
+  }
+
+  // One more NUL ends the records; the patch follows.
+  const sections = output.slice(at + 1).split(/^(?=diff --git )/m);
+  let next = 0;
+  return records.map((record) => {
+    let patch = sections[next++] ?? "";
+    while (next < sections.length && headerOf(sections[next]) === headerOf(patch)) {
+      patch += sections[next++];
+    }
+    return { ...record, patch };
+  });
+}
+
+/** A patch section's first line, its `diff --git` header. */
+function headerOf(section = ""): string {
+  const end = section.indexOf("\n");
+  return end === -1 ? section : section.slice(0, end);
+}
+
+/** `git diff` of the release's paths against `sha`, in `format`. */
+async function diffConfig(
+  cwd: string,
+  sha: string,
+  format: readonly string[],
+  referenced: readonly string[],
+): Promise<string | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
   const resolved = await git(cwd, ["cat-file", "-e", `${sha}^{commit}`]);
   if (resolved === null) {
     return null;
   }
-  const diffArgs = ["diff", color ? "--color=always" : "--no-color", sha, "--", ...paths];
+  const diffArgs = ["diff", ...DIFF_OPTIONS, ...format, sha, "--", ...paths];
 
   // `git diff` omits untracked files, but a release bundle includes every new
   // file under `.zitadel/`, so a brand-new (untracked) resource must show in

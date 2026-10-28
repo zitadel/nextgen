@@ -4,7 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp, PASSWORD_POLICY, type ScaffoldedApp, SETUP_ORIGIN } from "../helpers/project";
+import {
+  aCommittedApp,
+  aSetUpApp,
+  PASSWORD_POLICY,
+  type ScaffoldedApp,
+  SETUP_ORIGIN,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -214,6 +220,15 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("points a project whose issuer setup 0.1.0 registered as a preview origin at doctor --fix", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest("doctor --fix");
+      });
+
       it("checks for a primary origin before syncing IdP connections", async () => {
         const app = await aSetUpApp();
         await app.removeOrigin(SETUP_ORIGIN.pattern);
@@ -383,6 +398,44 @@ describe("deploy", () => {
         const listed = await app.run(["deployment", "list", "--json"]);
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
       });
+
+      it("shows what a dry run would change since the live release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.commit();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const data = await app.deployDryRunData();
+
+        expect(data.diff?.files).toEqual([
+          expect.objectContaining({
+            status: "modified",
+            patch: expect.stringContaining('"nickname"'),
+          }),
+        ]);
+      });
+
+      it("reports what a deploy changed since the release it replaced", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.commit();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const data = await app.deployData();
+
+        expect(data.diff?.files).toEqual([
+          expect.objectContaining({
+            status: "modified",
+            patch: expect.stringContaining('"nickname"'),
+          }),
+        ]);
+      });
     });
 
     describe("SSO configuration across files", () => {
@@ -486,6 +539,36 @@ describe("deploy", () => {
         const result = await app.deployRendered();
 
         expect(result).toPrint("Deployed sha256:");
+      });
+
+      it("has no baseline to diff against on the first deploy", async () => {
+        const app = await aCommittedApp();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("No diff available");
+      });
+
+      it("diffs against the commit the live release was built from", async () => {
+        const app = await aCommittedApp();
+        await app.deployRendered();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+        await app.commitEverything();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("nickname");
+      });
+
+      it("reports a clean tree as no change rather than no diff", async () => {
+        const app = await aCommittedApp();
+        await app.deployRendered();
+
+        const result = await app.deployRendered();
+
+        expect(result).toPrint("No changes to .zitadel/ since");
       });
     });
   });

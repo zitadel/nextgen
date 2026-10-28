@@ -5,6 +5,7 @@ import { BaseCommand } from "../../../../src/lib/oclif/base";
 import {
   environmentFlags,
   environmentSelectorSuffix,
+  projectEnvFile,
 } from "../../../../src/lib/oclif/environment-flags";
 
 /** `[name, char]` for every flag in a bag. */
@@ -79,9 +80,9 @@ describe("environmentSelectorSuffix", () => {
     expect(environmentSelectorSuffix({})).toBe("");
   });
 
-  it("keeps --cwd, which --env-file resolves against", () => {
-    expect(environmentSelectorSuffix({ cwd: "apps/web", envFile: ".env.prod" })).toBe(
-      " --env-file .env.prod --cwd apps/web",
+  it("keeps --cwd and --env-file as typed", () => {
+    expect(environmentSelectorSuffix({ cwd: "apps/web", envFile: "apps/web/.env.prod" })).toBe(
+      " --env-file apps/web/.env.prod --cwd apps/web",
     );
   });
 
@@ -96,5 +97,21 @@ describe("environmentSelectorSuffix", () => {
     ["a directory", { cwd: "--force" }, " --cwd=--force"],
   ])("joins a dash-prefixed %s to its flag, so the retry parses", (_name, input, expected) => {
     expect(environmentSelectorSuffix(input)).toBe(expected);
+  });
+});
+
+describe("projectEnvFile", () => {
+  it("names a project file as it is for a run in the project", () => {
+    expect(projectEnvFile(undefined, ".env.development.local")).toBe(".env.development.local");
+  });
+
+  it("puts --cwd in front, since Node reads --env-file from the shell's directory", () => {
+    expect(projectEnvFile("shop", ".env.development.local")).toBe("shop/.env.development.local");
+  });
+
+  it("keeps an absolute --cwd absolute", () => {
+    expect(projectEnvFile("/work/shop/", ".env.production.local")).toBe(
+      "/work/shop/.env.production.local",
+    );
   });
 });

@@ -14,6 +14,7 @@ post:
   security:
     - oauth2:
         - origin.write
+    - nextgenSession: []
   requestBody:
     required: true
     content:

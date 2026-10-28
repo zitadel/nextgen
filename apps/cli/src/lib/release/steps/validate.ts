@@ -29,7 +29,7 @@ import { validateLoginTemplate } from "@zitadel/config/template";
 export const validateStep: Step = {
   name: "validate",
   runsFor: ["deploy", "preview"],
-  async run(ctx: StepContext): Promise<void> {
+  async run(ctx: StepContext): Promise<undefined> {
     assertEnvRefsResolve(ctx);
     // Structural parsing first: `validateFlowDefinition` is the semantic
     // validator and assumes its input already parsed against `flowConfigSchema`,

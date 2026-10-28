@@ -19,7 +19,7 @@ import { LocalServer } from "../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../lib/oclif";
 import { resolveCwd } from "../lib/paths";
 import { nextCommandsData } from "../lib/oclif/envelope";
-import { unscopedCommand } from "../lib/suggestion";
+import type { SuggestedCommand } from "../lib/suggestion";
 
 export default class Start extends BaseCommand {
   static override description = "Start a local Zitadel server.";
@@ -81,7 +81,7 @@ export default class Start extends BaseCommand {
             api: serverUrl,
             console: `${serverUrl}/ui/console/`,
           },
-          ...nextCommandsData([unscopedCommand("start", this.meta.cliVersion)]),
+          ...nextCommandsData([this.suggestUnscoped("start")]),
         },
       });
     }
@@ -117,7 +117,15 @@ export default class Start extends BaseCommand {
     this.meta = { ...this.meta, source: runtime.server_url };
     return this.emit({
       status: "ok",
-      data: readyData(runtime, alreadyRunning, this.meta.cliVersion),
+      // Setup reads the server from the directory start ran in, so a run from
+      // elsewhere carries it: `setup --server local` from the shell's directory
+      // finds no server and scaffolds into the wrong place.
+      data: readyData(
+        runtime,
+        alreadyRunning,
+        this.meta.cliVersion,
+        this.suggestUnscoped("setup --server local"),
+      ),
     });
   }
 }
@@ -138,7 +146,12 @@ function platformBootstrapEnabled(env: NodeJS.ProcessEnv): boolean {
   return !pinned || pinned === PLATFORM_PROJECT_ID;
 }
 
-function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean, cliVersion: string) {
+function readyData(
+  metadata: RuntimeMetadata,
+  alreadyRunning: boolean,
+  cliVersion: string,
+  setupCommand: SuggestedCommand,
+) {
   return {
     title: alreadyRunning
       ? "Local Zitadel server is already running."
@@ -170,7 +183,7 @@ function readyData(metadata: RuntimeMetadata, alreadyRunning: boolean, cliVersio
       "Setup asks for a framework and sign-in method, creates or updates your app, and installs its dependencies.",
       serverLogAction(cliVersion),
     ],
-    ...nextCommandsData([unscopedCommand("setup --server local", cliVersion)]),
+    ...nextCommandsData([setupCommand]),
   };
 }
 
