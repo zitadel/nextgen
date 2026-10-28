@@ -188,6 +188,7 @@ var (
 		"POST": "Authorization,Content-Type",
 	}
 	rn62AllowedHeaders = map[string]string{
+		"GET":   "Authorization",
 		"PATCH": "Content-Type",
 	}
 	rn103AllowedHeaders = map[string]string{

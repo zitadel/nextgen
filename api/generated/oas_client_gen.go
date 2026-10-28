@@ -615,6 +615,9 @@ type Invoker interface {
 	// ever reads their own user.
 	// With `project_id`, the user is returned only when the session belongs to
 	// that project.
+	// A platform-project user may also call it with the access token the
+	// platform project's authorization server issued them for this API (the
+	// `zitadel login` credential), which names the same user.
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)
@@ -7351,6 +7354,9 @@ func (c *Client) sendGetMySessionCsrfToken(ctx context.Context, params GetMySess
 // ever reads their own user.
 // With `project_id`, the user is returned only when the session belongs to
 // that project.
+// A platform-project user may also call it with the access token the
+// platform project's authorization server issued them for this API (the
+// `zitadel login` credential), which names the same user.
 //
 // GET /users/me
 func (c *Client) GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error) {
@@ -7443,11 +7449,23 @@ func (c *Client) sendGetMyUser(ctx context.Context, params GetMyUserParams) (res
 				return res, errors.Wrap(err, "security \"NextgenSession\"")
 			}
 		}
+		{
+			stage = "Security:OAuth2"
+			switch err := c.securityOAuth2(ctx, GetMyUserOperation, r); {
+			case err == nil: // if NO error
+				satisfied[0] |= 1 << 1
+			case errors.Is(err, ogenerrors.ErrSkipClientSecurity):
+				// Skip this security.
+			default:
+				return res, errors.Wrap(err, "security \"OAuth2\"")
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {

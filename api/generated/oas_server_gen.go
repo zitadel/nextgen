@@ -595,6 +595,9 @@ type Handler interface {
 	// ever reads their own user.
 	// With `project_id`, the user is returned only when the session belongs to
 	// that project.
+	// A platform-project user may also call it with the access token the
+	// platform project's authorization server issued them for this API (the
+	// `zitadel login` credential), which names the same user.
 	//
 	// GET /users/me
 	GetMyUser(ctx context.Context, params GetMyUserParams) (GetMyUserRes, error)

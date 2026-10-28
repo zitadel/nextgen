@@ -226,6 +226,7 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	GetIdpRevisionByIdOperation: []string{
 		"idp.read",
 	},
+	GetMyUserOperation: []string{},
 	GetPolicyOperation: []string{
 		"policy.read",
 	},

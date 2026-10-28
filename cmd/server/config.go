@@ -13,6 +13,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/httputil"
 	"github.com/zitadel/nextgen/internal/instrumentation"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
 	"github.com/zitadel/nextgen/internal/storage/database"
@@ -81,6 +82,11 @@ type PlatformConfig struct {
 	// user that exists and revokes what an earlier list granted. Needs a
 	// platform project, from BootstrapProject or ProjectID.
 	Operators []string `mapstructure:"operators"`
+
+	// OAuth serves the platform project's authorization server (a proof of
+	// concept of ADR 082 for the CLI and MCP clients). Needs BootstrapProject:
+	// its app is the platform project's.
+	OAuth oauth.Config `mapstructure:"oauth"`
 }
 
 func (c PlatformConfig) Validate() error {
@@ -100,6 +106,9 @@ func (c PlatformConfig) Validate() error {
 	}
 	if len(c.Operators) > 0 && c.ResolvedProjectID() == "" {
 		return errors.New("platform.operators needs a platform project: set platform.bootstrap_project or platform.project_id")
+	}
+	if c.OAuth.Enabled && !c.BootstrapProject {
+		return errors.New("platform.oauth.enabled needs the platform project: set platform.bootstrap_project")
 	}
 	return nil
 }

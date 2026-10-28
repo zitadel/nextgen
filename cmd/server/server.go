@@ -46,6 +46,7 @@ import (
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
+	"github.com/zitadel/nextgen/internal/oauth"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/serviceping"
@@ -446,6 +447,31 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	defer pinger.Close()
 
 	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
+
+	// The platform project's authorization server (a proof of concept of
+	// ADR 082): the CLI and MCP clients sign a developer in, and the API
+	// takes the token as a user bearer (ADR 053 §5).
+	var authServer *oauth.Server
+	securityHandler := api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID())
+	if cfg.Platform.OAuth.Enabled {
+		authServer, err = oauth.New(oauth.Deps{
+			Config:      cfg.Platform.OAuth,
+			PublicBase:  cfg.Server.PublicBase,
+			ConsolePath: cfg.Server.ConsolePath,
+			ProjectID:   cfg.Platform.ResolvedProjectID(),
+			Keys:        keyService,
+			Sessions:    tokenService,
+			Users:       userService,
+			Grants:      service.NewOAuthGrantService(serviceDBPool),
+			Fetch:       egressClient,
+		})
+		if err != nil {
+			return err
+		}
+		securityHandler = securityHandler.WithUserBearers(userBearers{authServer})
+		slog.Info("platform oauth: serving the authorization server", slog.String("issuer", authServer.Issuer()))
+	}
+
 	oasServer, err := oasapi.NewServer(
 		api.NewHandler(
 			flowService,
@@ -473,7 +499,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		).WithPersonalTeamEnsurer(personalTeams).WithBuiltinSchemaBases(builtinBases).WithRuntimeResolver(runtimeResolver).WithPolicyService(policyService).WithReadinessCheck(pool),
 		// The same platform project the handler resolves: sessions homed there
 		// can reach the platform operator path (ADR 075).
-		api.NewSecurityHandler(tokenService).WithPlatformProject(cfg.Platform.ResolvedProjectID()),
+		securityHandler,
 		apiServerOptions(telemetry.TracerProvider(), telemetry.MeterProvider(), consoleLink(cfg.Server.ConsolePath))...)
 	if err != nil {
 		return fmt.Errorf("failed to build api server: %w", err)
@@ -486,6 +512,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		retentionJob.Trigger())
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
+	}
+	if authServer != nil {
+		mountOAuth(mux, cfg.Server, idgen.NewULID(), authServer, requestEventBuf)
 	}
 
 	httpServer := &http.Server{
@@ -698,6 +727,13 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("platform.bootstrap_project", false)
 	// Empty: nobody is a platform operator (ADR 075).
 	v.SetDefault("platform.operators", []string{})
+	// Off: no authorization server, and the API takes no user bearer. Zero
+	// lifetimes take oauth's defaults (ADR 037: minutes, two weeks).
+	v.SetDefault("platform.oauth.enabled", false)
+	v.SetDefault("platform.oauth.access_token_ttl", 0)
+	v.SetDefault("platform.oauth.refresh_token_ttl", 0)
+	v.SetDefault("platform.oauth.client_id_metadata_documents", false)
+	v.SetDefault("platform.oauth.dynamic_registration", false)
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
@@ -925,6 +961,41 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	}
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
+}
+
+// mountOAuth mounts the authorization server's routes behind the API's
+// request middleware. Each pattern is more specific than the console's mount
+// and the API's catch-all, so it wins over both.
+func mountOAuth(mux *http.ServeMux, cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, server *oauth.Server, requestEvents *audit.RequestBuffer) {
+	for _, route := range server.Routes() {
+		mux.Handle(route.Pattern, middleware.Chain(route.Handler,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+			api.WithRequestHostMiddleware,
+			middleware.WithUserAgentMiddleware,
+			func(next http.Handler) http.Handler { return audit.WithRequestEventMiddleware(requestEvents, next) },
+		))
+	}
+}
+
+// userBearers adapts the authorization server to the API's user bearer
+// verifier.
+type userBearers struct{ server *oauth.Server }
+
+func (u userBearers) VerifyUserBearer(ctx context.Context, token string) (api.UserBearer, error) {
+	verified, err := u.server.VerifyPlatformAccessToken(ctx, token)
+	if err != nil {
+		return api.UserBearer{}, err
+	}
+	return api.UserBearer{
+		ProjectID: verified.ProjectID,
+		UserID:    verified.Subject,
+		ClientID:  verified.ClientID,
+		ExpiresAt: verified.ExpiresAt,
+	}, nil
 }
 
 // withIncomingTraceContext decides what an incoming trace context means for
