@@ -86,6 +86,10 @@
     // The cloud on localhost: `vercel dev` over vercel.json's services
     // (scripts/run-cloud.mjs), which builds what the services' dev servers
     // read itself. `pnpm run cloud` runs the same script without a runner.
+    // It sees the whole environment, as `pnpm run cloud` does: `vercel dev`
+    // hands it to every service (the server reads NEXTGEN_* and the
+    // OpenTelemetry SDK's OTEL_*, each dev server its own), and a list would
+    // quietly drop whatever it missed.
     "dev": {
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -93,7 +97,7 @@
         "$TURBO_ROOT$/scripts/dev-process.mjs",
         "$TURBO_ROOT$/scripts/task-runner.mjs"
       ],
-      "passThroughEnv": ["CLOUD_DEV_PORT", "CLOUD_DEV_DEBUG", "NEXTGEN_*", "GOFLAGS"]
+      "passThroughEnv": ["*"]
     }
   }
 }
