@@ -18,6 +18,11 @@
 //     the server re-wraps every project key to the current one at startup.
 //   - The optional bootstrap admin document, BOOTSTRAP_ADMIN_USER_JSON_B64,
 //     becomes a --user-file.
+//   - The audit event purge. A function runs only while it serves a request,
+//     so the server's own hourly purge cannot run here: a Vercel Cron Job
+//     (repo-root vercel.json) calls the server's retention trigger instead,
+//     with CRON_SECRET as its bearer token, which becomes
+//     events.retention.trigger_secret in <data_dir>/nextgen.yaml.
 //   - The deployment's shape. The listen address follows PORT, the data dir
 //     is the function's writable /tmp, and the console is a service of its own
 //     (repo-root vercel.json). The platform project is bootstrapped, logs are
@@ -49,6 +54,7 @@ import (
 	"time"
 
 	"github.com/zitadel/nextgen/cmd/server"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/bootstrap/users"
 )
 
@@ -247,6 +253,10 @@ type serving struct {
 	// adminID is the user id admin names, the deployment's platform operator
 	// unless NEXTGEN_PLATFORM_OPERATORS says otherwise (ADR 075).
 	adminID string
+	// cronSecret is what the cron job that runs the audit event purge sends
+	// as its bearer token. Empty in a local run, which keeps the server's own
+	// purge loop.
+	cronSecret string
 }
 
 func parseServing(env string) (*serving, error) {
@@ -322,6 +332,18 @@ func parseServing(env string) (*serving, error) {
 		s.admin = doc
 		s.adminID = admin.Header.ID
 	}
+
+	// Without it a deployment would never purge: the cron job is the only
+	// caller of the purge, and the server refuses a call without the secret.
+	s.cronSecret = os.Getenv("CRON_SECRET")
+	if s.cronSecret == "" && deployed(env) {
+		return nil, fmt.Errorf("CRON_SECRET must be set for a %s deployment: the cron job that purges expired audit events authenticates with it", env)
+	}
+	if s.cronSecret != "" {
+		if err := audit.CheckTriggerSecret(s.cronSecret); err != nil {
+			return nil, fmt.Errorf("CRON_SECRET %w", err)
+		}
+	}
 	return s, nil
 }
 
@@ -360,6 +382,7 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 	_ = os.Unsetenv("MASTER_KEY_PEM_B64")
 	_ = os.Unsetenv("MASTER_KEY_PREVIOUS_PEM_B64")
+	_ = os.Unsetenv("CRON_SECRET")
 	if s.previousID != "" {
 		fmt.Fprintf(os.Stderr, "launcher: master key %s, re-wrapping what %s wrapped; delete MASTER_KEY_PREVIOUS_PEM_B64 and MASTER_KEY_PREVIOUS_ID once this deployment has started\n", s.keyID, s.previousID)
 	}
@@ -504,10 +527,11 @@ func decodePEM(name, b64 string) ([]string, error) {
 	return lines, nil
 }
 
-// renderConfig writes the one setting that cannot come from the environment:
-// the master keys as YAML block scalars under their ids. The current key
-// encrypts; a previous key, during a rotation, only decrypts until the
-// server has re-wrapped everything it wrapped.
+// renderConfig writes what cannot come from the environment or should not
+// stay in it: the master keys as YAML block scalars under their ids, and the
+// cron job's secret. The current key encrypts; a previous key, during a
+// rotation, only decrypts until the server has re-wrapped everything it
+// wrapped. With the secret, the server leaves the purge to the cron job.
 func renderConfig(s *serving) []byte {
 	var b strings.Builder
 	b.WriteString("server:\n")
@@ -524,6 +548,13 @@ func renderConfig(s *serving) []byte {
 	writeKey(s.keyID, s.pem, true)
 	if s.previousID != "" {
 		writeKey(s.previousID, s.previousPEM, false)
+	}
+	if s.cronSecret != "" {
+		// Single quotes: parseServing let through printable ASCII only, and a
+		// quote is the one character to escape.
+		b.WriteString("events:\n")
+		b.WriteString("  retention:\n")
+		b.WriteString("    trigger_secret: '" + strings.ReplaceAll(s.cronSecret, "'", "''") + "'\n")
 	}
 	return []byte(b.String())
 }
