@@ -1,5 +1,13 @@
 # @zitadel/api
 
+## 0.3.0
+
+### Minor Changes
+
+- [#2129](https://github.com/zitadel/nextgen/pull/2129) [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3) - `POST /users/query` can find the users still on an older revision of a schema. The new `schema_object_type` filter field matches the object type every revision of a schema shares, with `equals`, `not_equals` and `contains`, and `schema` now accepts `not_equals`, so `schema_object_type` `equals` a type together with `schema` `not_equals` its newest revision lists the users left to migrate. `zitadel users list --filter` accepts `schema_object_type`.
+
+- [#2129](https://github.com/zitadel/nextgen/pull/2129) [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3) - `GET /schemas` accepts `expand=in_use`, which adds `metadata.in_use` to each listed revision: whether any user of the project is on it. The flag is absent unless asked for, and needs read on the whole project, plus `user.read` for a token. Users are now indexed by schema, so the check and the `schema` filter on `POST /users/query` no longer read every user of the project.
+
 ## 0.2.0
 
 ### Minor Changes
