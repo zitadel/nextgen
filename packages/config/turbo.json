@@ -8,8 +8,31 @@
     // inputs, and every task that reads the copy depends on it. The script
     // holds the `generated-sources` lock: the server's generation rewrites
     // what it copies.
+    // Its inputs leave out what the shared build shape leaves out: every
+    // task that reads the copy depends on this one, so a docs or test edit
+    // here would otherwise re-run them all.
     "sync-schemas": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!**/LICENSE",
+        "!**/LICENSE.md",
+        "!docs/**",
+        "!skills/**/*.md",
+        "!**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+        "!**/__tests__/**",
+        "!**/__snapshots__/**",
+        "!tests/**",
+        "!test/**",
+        "!**/vitest.config.*",
+        "!**/vitest.*.config.*"
+      ],
       "outputs": ["meta-schemas/*.json"]
     },
     "typecheck": {
@@ -21,8 +44,23 @@
     "build-release": {
       "dependsOn": ["@zitadel/api#build-release"]
     },
+    // Files the tests read outside the package: the IdP design docs' Markdown
+    // and example schemas, and every file their relative links name, which
+    // the test checks exist (src/idp/design-docs.test.ts); the orchestrator's
+    // default template (src/template.test.ts) and the Go flow model the
+    // validator mirrors (src/validation/flow.test.ts).
     "test": {
-      "dependsOn": ["build"]
+      "dependsOn": ["build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/docs/design/idp/**",
+        "$TURBO_ROOT$/docs/**/*.md",
+        "$TURBO_ROOT$/apps/cli/src/lib/local-server/internal/*-launcher.ts",
+        "$TURBO_ROOT$/packages/components/src/orchestrator/templates/default.liquid",
+        "$TURBO_ROOT$/internal/domain/flow_definition.go",
+        "$TURBO_ROOT$/internal/domain/flow_definition_validator.go",
+        "$TURBO_ROOT$/internal/domain/flow_on_success.go"
+      ]
     }
   }
 }

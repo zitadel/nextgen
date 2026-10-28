@@ -123,7 +123,8 @@ func extractDomainErrors(domainPath string) []errorInfo {
 									if !ok {
 										continue
 									}
-									description := capitalizeFirst(strings.Trim(msgLit.Value, `"`))
+									description := strings.Trim(msgLit.Value, `"`)
+									description = capitalizeFirst(description)
 
 									errors = append(errors, errorInfo{
 										code:        code,

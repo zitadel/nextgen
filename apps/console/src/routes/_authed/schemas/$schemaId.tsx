@@ -8,6 +8,7 @@ import { DetailPanel, PanelTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
+import { SECTION_HEADING, SUBSECTION_HEADING } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { InlineCode } from "@/components/ui/inline-code";
 import { Separator } from "@/components/ui/separator";
@@ -72,10 +73,11 @@ function SchemaDetail() {
 
                 `pl-2` because the design insets this row by 8px on the left
                 while the tab strip above starts at the content edge: a tab
-                trigger is `px-2`, so the effect is that `SCHEMA` lines up with
-                the tab *label* and the tab's box sits just outside it. */}
+                trigger is `px-2`, so the effect is that the heading and `SCHEMA` line
+                up with the tab *label* and the tab's box sits just outside it. */}
             <div className="flex flex-col gap-4.5 lg:flex-row lg:items-stretch lg:pl-2">
-              <div className="lg:w-[468px] lg:shrink-0">
+              <div className="flex flex-col gap-4 lg:w-[468px] lg:shrink-0">
+                <h2 className={SECTION_HEADING}>Field definitions</h2>
                 <SchemaFieldsPanel schema={schema} />
               </div>
               <DocumentViewer document={schema} noun="schema" />
@@ -87,9 +89,7 @@ function SchemaDetail() {
                 heading lines up with the tab label above it rather than with
                 the tab's box. */}
             <section className="flex flex-col gap-2.5 px-2">
-              <h2 className="font-serif text-[15px] leading-[22px] text-foreground">
-                Sign-in methods
-              </h2>
+              <h2 className={SUBSECTION_HEADING}>Sign-in methods</h2>
               {methods.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   This schema declares no sign-in methods.

@@ -14,6 +14,9 @@ non-required `ci-turbo` job.
 
 Where the two differ on purpose:
 
+- The hosted cloud is a turbo package (`@zitadel/cloud`: the launcher and
+  its migration, the schemas, `dev`) and no moon project. Moon's `workspace:cloud` runs the same
+  script as its `dev`, and `server:test` runs the launcher's tests.
 - Moon's `test` runs each package's `test:all` script, turbo runs `test`. In
   the browser-test packages, `test` wraps `scripts/task-guard.mjs` for
   turbo's retries and `test:all` calls Vitest directly, because moon has its
@@ -28,6 +31,14 @@ Where the two differ on purpose:
 - Turbo's console `build` lists the git-ignored `.env*` files as inputs. Moon
   hashes only the files git sees, listed or not, so `moon.yml` does not list
   them: under moon a changed `.env.local` still restores the old build.
+- Turbo's inputs follow file classes: no task hashes its package's docs, and
+  no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
+  Moon keeps the whole folder (below). A file read outside the folder goes
+  into both.
+- Turbo's `journey-local` also depends on `server#build`: ci-turbo.yml
+  selects each lane with `--affected`, and the server the journey runs comes
+  packed in the release snapshot, outside the graph. Moon runs the journey
+  with every other lane through `e2e:all`.
 
 ## Shared tasks live in `.moon/tasks`
 

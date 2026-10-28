@@ -41,10 +41,15 @@ const NON_SHIPPING_TOP_LEVEL_DIRS = [
 ];
 
 // Workspaces that build or exercise the product without ever reaching a user:
-// mocks, demos, and the docs site. (`packages/testing` left this list when it
-// joined the release train in #692 — the manifest-derived PUBLISHED_ROOTS
-// covers it now.)
-const NON_SHIPPING_WORKSPACES = ["apps/docs/", "apps/storybook/", "packages/api-mock/"];
+// mocks, demos, the docs site and the shared test config. (`packages/testing`
+// left this list when it joined the release train in #692 — the
+// manifest-derived PUBLISHED_ROOTS covers it now.)
+const NON_SHIPPING_WORKSPACES = [
+  "apps/docs/",
+  "apps/storybook/",
+  "packages/api-mock/",
+  "packages/vitest-config/",
+];
 
 // Repo-meta markdown, wherever it sits. Every other `.md` is treated as shipping
 // on purpose: `packages/config/defaults/README-*.md` and the CLI's framework
@@ -76,8 +81,6 @@ const NON_SHIPPING_ROOT_FILES = new Set([
   "tsconfig.base.json",
   "tsconfig.json",
   "vitest.config.ts",
-  "vitest.shared.mjs",
-  "vitest.shared.d.mts",
 ]);
 
 export function parseSemanticConfig(source) {

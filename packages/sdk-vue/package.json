@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-vue",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Vue 3 components for the Zitadel auth UI (client-side SPA).",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-vue#readme",
   "bugs": {
@@ -47,6 +47,7 @@
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
     "@zitadel/api-mock": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "msw": "catalog:",
     "typescript": "catalog:",

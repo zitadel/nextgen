@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/config",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Versioned Zitadel local config schemas and defaults",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/config#readme",
   "bugs": {
@@ -113,6 +113,7 @@
   "devDependencies": {
     "@types/culori": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "ajv": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

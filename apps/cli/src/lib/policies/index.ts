@@ -40,6 +40,17 @@ export function toPolicyWireBody(file: PolicyFile): PublishPolicyBody {
   return { operation: file.operation, config: file.config };
 }
 
+/**
+ * The suffix of a policy test file (`<operation>.test.json`), which sits
+ * beside the policies but is never deployed: `zitadel policies test` runs it.
+ */
+export const POLICY_TEST_SUFFIX = ".test.json";
+
+/** Whether a file in `.zitadel/policies/` is a test file rather than a policy. */
+export function isPolicyTestFile(name: string): boolean {
+  return name.endsWith(POLICY_TEST_SUFFIX);
+}
+
 /** The name a policy file must have: its operation, so one file holds one operation's policy. */
 export function policyFileName(operation: string): string {
   return `${operation}.json`;

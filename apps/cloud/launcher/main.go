@@ -24,7 +24,7 @@
 //     JSON and the public base is the deployment's URL unless a NEXTGEN_*
 //     variable says otherwise.
 //
-// A deployment migrates at deploy time, never at startup: build.sh calls
+// A deployment migrates at deploy time, never at startup: a turbo task runs
 // `launcher migrate` after compiling, which creates a preview's database when
 // it is missing and runs the server's migrate command against the direct
 // URL. The serving invocation refuses --migrate, so a function cannot change

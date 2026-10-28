@@ -860,7 +860,7 @@ const edgeConfigProblems = (source: string): string[] => {
   const found: string[] = [];
   if (
     !lines.some((line) =>
-      /^import \{[^}]*\bedgeProject\b[^}]*\} from "\.\.\/\.\.\/vitest\.shared\.mjs";$/.test(line),
+      /^import \{[^}]*\bedgeProject\b[^}]*\} from "@zitadel\/vitest-config";$/.test(line),
     )
   ) {
     found.push("does not import edgeProject from the shared module");
@@ -936,7 +936,7 @@ describe("client SDK edge specs", () => {
   });
 
   describe("the config guard", () => {
-    const good = `import { baseTest, edgeProject } from "../../vitest.shared.mjs";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
+    const good = `import { baseTest, edgeProject } from "@zitadel/vitest-config";\n${EDGE_COMMENT}\n      edgeProject({}),\n`;
 
     it("accepts the shared import and comment", () => {
       expect(edgeConfigProblems(good)).toEqual([]);
