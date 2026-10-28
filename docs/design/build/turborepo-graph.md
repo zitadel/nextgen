@@ -1,4 +1,4 @@
-# A precise, checked task graph for Turborepo
+# A precise task graph for Turborepo, selected by turbo
 
 > **Status:** proposed and implemented, 2026-10-27. Turborepo 2.11.7, moon
 > 2.6.1. Builds on [turborepo.md](turborepo.md) (the configuration) and
@@ -22,25 +22,28 @@ reasons:
    site) spent 312 s of its 490 s job on lanes only the entries ahead needed,
    #2410 (changelog Markdown) 230 s of 281 s.
 3. **Turbo's `--affected` followed `package.json` edges**, so the port could
-   not use it and ran the whole gate on every change.
+   not use it: it ran the whole gate on every change, and a script of ours
+   (`scripts/ci-mode.mjs`) walked turbo's graph to decide the lanes.
 
-The design: inputs by file class; one selector (turbo's own task-level
-`--affected`) for the cache key, the gate and the CI lanes; the merge queue's
-own base; and checks that keep the inputs complete, statically on every pull
-request and without a cache every night. Measured on 23 change classes, a
-docs-only change runs nothing, a package README edit nothing but release
-packaging, a test edit that package's own checks; source changes select what
-they did before. Building the checks also found tasks in both runners that
-read files their inputs did not name; they are [listed](#what-the-checks-found)
-and fixed.
+The design: inputs by file class; turbo's own task-level `--affected` as the
+one selector, for the gate, for every lane and, through `turbo query
+affected`, for the setup the lanes need; the merge queue's own base; and
+every night a run of every task without the cache. No script of ours models
+turbo's graph a second time. Building it also found tasks in both runners
+that read files their inputs did not name; they are
+[listed](#reads-the-inputs-missed) and fixed.
 
 | change, gate run locally on a warm cache | moon | turbo before | turbo after |
 |---|---|---|---|
-| `docs/runbooks/cloud.md` | 0.3 s, none | 7.5 s, 4 tasks | 0.2 s, none |
+| `docs/runbooks/cloud.md` | 0.3 s, none | 7.5 s, 4 tasks | 1.1 s, 1 task |
 | `packages/components/README.md` | 89 s, 57 tasks | 108 s, 58 tasks | 0.2 s, none |
-| a components spec file | 95 s, 57 tasks | 92 s, 59 tasks | 21 s, 5 tasks |
-| an sdk-react spec file | 51 s, 23 tasks | 47 s, 28 tasks | 2.9 s, 5 tasks |
-| a components source file | 87 s, 57 tasks | 72 s, 59 tasks | 65 s, 58 tasks |
+| a components spec file | 95 s, 57 tasks | 92 s, 59 tasks | 22 s, 5 tasks |
+| an sdk-react spec file | 51 s, 23 tasks | 47 s, 28 tasks | 3.0 s, 5 tasks |
+| a components source file | 87 s, 57 tasks | 72 s, 59 tasks | 68 s, 58 tasks |
+
+Over the last 150 merged pull requests, ci-turbo.yml would have run 796 e2e
+lane steps where ci.yml ran 1,089: ci.yml runs every lane once one is
+affected, turbo the lanes a change reaches.
 
 ## Why docs-only changes ran tests
 
@@ -72,21 +75,24 @@ touched `apps/website/moon.yml` or `scripts/` was forced into a full run
 `turbo run --affected` selects packages along `package.json` edges and would
 skip the server's tests on a console change. The port ran the whole gate
 instead and relied on the cache, which still hashes 130 tasks and replays
-every hit, and re-ran whatever the folder-wide inputs invalidated.
+every hit, and re-ran whatever the folder-wide inputs invalidated. Its lanes
+ran when ci-mode's walk over `turbo run --dry=json` counted them affected.
 
 ## Principles
 
-1. **Sound before fast.** A task re-runs when a file it reads changes. Every
-   exclusion is checked mechanically; what the checks cannot see runs.
-2. **Hash what a task reads.** Inputs follow file classes, not folders.
-3. **One selector.** Turbo matches changed files against the same `inputs`
-   for the cache key, `turbo run --affected` and `turbo query affected`, so
-   the gate, the lane gates and the cache cannot disagree.
-4. **Check the graph, not the reviewer.** Static rules run in the gate; a
-   nightly run without the cache and without unclaimed files is the ground
-   truth.
-5. **Fail open.** A changed file no task claims, an empty diff or a failed
-   query runs everything, as ci-mode always did.
+1. **Sound before fast.** A task re-runs when a file it reads changes. A
+   change no task's inputs name runs nothing, so every file a task reads is
+   one of its inputs, and a nightly run without the cache checks what that
+   rule cannot.
+2. **Hash what a task reads.** Inputs follow file classes, not folders, and
+   leave out what other tasks write.
+3. **One selector, turbo's.** Turbo matches changed files against the same
+   `inputs` for the cache key, `turbo run --affected` and `turbo query
+   affected`, so the gate, the lanes, their setup and the cache cannot
+   disagree.
+4. **Turbo's features, not ours.** `--affected`, `turbo query affected
+   --exit-code`, `TURBO_FORCE` and `turbo boundaries` instead of scripts
+   that model the graph again, each with its own exceptions to maintain.
 
 ## Design
 
@@ -100,11 +106,11 @@ leave out what they cannot read:
 | docs | `**/README.md`, `**/AGENTS.md`, `**/CLAUDE.md`, `**/CHANGELOG.md`, `**/LICENSE`, `**/LICENSE.md`, `docs/**`, `skills/**/*.md` | `typecheck`, `build`, `generate`, `test` (`lint` leaves out all Markdown: Biome processes none) |
 | tests | `**/*.{test,spec}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}`, `**/__tests__/**`, `**/__snapshots__/**`, `tests/**`, `test/**`, `**/vitest.config.*`, `**/vitest.*.config.*` | `build`, `generate` |
 
-A negation wins over any inclusion wherever it stands in the list, and it
-matches package-relative paths only (`$TURBO_ROOT$/…` paths never). So a
-task that reads a file of an excluded class replaces `inputs` instead of
-extending them: `cli#test` keeps `README.md` and `skills/`, which its docs
-test reads. Files that only look like docs are outside the class by name:
+A negation wins over any inclusion wherever it stands in the list, and a
+package-relative one never matches a `$TURBO_ROOT$/…` path. So a task that
+reads a file of an excluded class replaces `inputs` instead of extending
+them: `cli#test` keeps `README.md` and `skills/`, which its docs test reads.
+Files that only look like docs are outside the class by name:
 `packages/config/defaults/README-*.md` ship and are read at run time,
 `apps/docs/content/**/*.mdx` and `apps/website/changelog/*.md` are content.
 Release tasks keep every file, since the tarballs ship the docs.
@@ -122,78 +128,95 @@ Explicit globs match ignored files too (the console's `.env*` relies on it).
 `.claude/worktrees/`, so any worktree's edit missed the main checkout's
 server cache. Repository-wide globs now name the ignored trees they skip.
 
+Turbo hashes a run's inputs before the run starts. A task whose inputs match
+files another task of the run writes therefore hashes them without that
+run's output, and with it on the next run, which misses the cache. Three did:
+the server's build listed the console's dist it embeds (the `console#build`
+edge already hashes it), `//#lint` matched Next's `next-env.d.ts` and
+Vitest's `.vitest/` caches (both ignored, and Biome reads neither), and
+`sdk-core#test` matched the demo apps' `.next/` and `.nuxt/` output (its
+contract test skips them). A second run of the whole gate on an unchanged
+tree now runs only the four never-cached `install-browsers` tasks.
+
 ### 2. Reads outside a package are inputs
 
-A task that reads a file outside its package lists it, as before; the checks
-below now find the ones that do not. The CLI's tests of root scripts
-(`apps/cli/tests/unit/scripts/`) are the largest case: they import 19 scripts
-and read what the release manifest is made from. They belong in the root
-`//#test`; until they move, `cli#test` lists what they read.
+A task that reads a file outside its package lists it, as before. Building
+this change found tasks in both runners that did not, listed
+[below](#reads-the-inputs-missed). The CLI's tests of root scripts
+(`apps/cli/tests/unit/scripts/`) are the largest case: they import 19
+scripts and read what the release manifest is made from. They belong in the
+root `//#test`; until they move, `cli#test` lists what they read.
 
 ### 3. One selector
 
 - `futureFlags.affectedUsingTaskInputs` makes `turbo run --affected` and
-  `turbo query affected` match changed files against each task's `inputs` and
-  follow task edges, including the artifact edges that are no `package.json`
-  dependency (the server embeds the console).
-- ci-mode asks `turbo query affected` instead of walking a
-  `turbo run --dry=json`. Turbo's glob matching sees deleted and renamed
-  files, which the walk over the current tree's file list missed. Tasks it
-  lists "required by an affected task" are prerequisites, not affected.
-- ci-mode reports `gate=affected` when no fail-open reason applies. The gate
-  then runs with `--affected` from the same base; otherwise, and on every push
-  to main, the whole gate runs, which fills the remote cache with main's
-  results and is the first check of anything the selection missed.
+  `turbo query affected` match changed files against each task's `inputs`,
+  deleted and renamed files included, and follow task edges, including the
+  artifact edges that are no `package.json` dependency (the server embeds
+  the console).
+- Every `turbo run` in `ci-turbo.yml` takes `--affected` from
+  `TURBO_SCM_BASE`: a merge group's `base_sha`, a pull request's base, or the
+  commit a push to main replaced. Each lane runs in a step of its own
+  (`turbo run console-real --filter=@zitadel/e2e --affected`); lanes that
+  share a port stay apart.
+- The setup only some lanes need is a step gated by `turbo query affected
+  --tasks … --exit-code`, which exits 1 when one of the named tasks is
+  affected, 0 when none is and 2 on an error, which counts as affected:
+  Playwright's browsers for the browser lanes, the release snapshot and the
+  journey's registry cache for `journey-local`. The snapshot runs without
+  `--affected`: the journey needs it whenever it runs, and a change to the
+  journey's own specs reaches no release task.
+- The journey runs its framework matrix in full when `@zitadel/e2e#journey`
+  (the by-hand lane, which reads the journey's files and depends on the CLI,
+  the test kit and the mock OIDC provider) or an SDK's `build` is affected,
+  and one framework otherwise, ci-mode's rule from turbo's answer.
+  `--packages` takes exact names, so the step lists `packages/sdk-*`.
+- Turbo's `journey-local` also depends on `server#build`. The journey runs
+  the server from the snapshot's tarballs, built in a step before it and
+  outside its graph, so without the edge a Go change selected every server
+  lane but the journey. Moon runs the journey with every other lane through
+  `e2e:all`, and keeps its graph as it was.
+- A version PR is its `changeset-release/*` branch: it runs the release's
+  checks instead of the gate, as ci.yml's version-only mode does. Its
+  merge-queue entry has the queue's branch name and runs like any other.
+- A push to main runs the gate alone, from the commit it replaced: its merge
+  group ran the same tasks, so they come from the cache, and the remote cache
+  holds main's results for the branches cut from it.
 - Merge groups compare with `merge_group.base_sha`, the commit the group is
   built on. The entries ahead are tested in their own groups, and an entry
   lands only after them, so a task the entry cannot reach keeps the result
   the group ahead verified. Pull requests keep `pull_request.base.sha`; both
-  runners get the same base (`MOON_BASE`, `TURBO_SCM_BASE`).
+  runners get the same base (`MOON_BASE` and ci-mode's argument in ci.yml,
+  `TURBO_SCM_BASE` in ci-turbo.yml).
 
-### 4. Checks
+### 4. What checks the inputs
 
-**On every pull request:** `//#check-turbo-graph`
-(`scripts/check-turbo-graph.mjs`, about 1 s, in both runners' gates). From
-the resolved graph (`turbo run … --dry=json`) it fails on
+Nothing before a merge: a file a task reads but does not list neither
+selects the task nor misses its cache. Every night, and by hand with
+`force`, ci-turbo.yml runs the gate and the generated-files check with
+`TURBO_FORCE`, so every cacheable task runs once without reading the cache
+and writes its result, and then every lane without `--affected`, whose
+prerequisites come from what the gate just built. A failure there, on a main
+whose merge groups passed, is a read the inputs miss or a change no task
+reads (a workflow) that broke something: it shows a day late, not never.
 
-1. a repository file a task's code reads that is not part of its result:
-   named by an import, an fs or path call (`join("..", "x.json")` included),
-   a `//go:embed` pattern or the task's command, and hashed neither by the
-   task, a task it depends on nor the global dependencies, nor written by a
-   dependency. What a task runs depends on its kind: Biome and gofmt read
-   nothing a file names, a typecheck resolves imports, a build also runs its
-   configs and scripts but not its tests, a test runs its tests, configs and
-   what they import. Go files count for the tasks of their module;
-2. a declared workspace package a task does not build first (a package's
-   `build` for `dependencies`, its `typecheck` and `test` also for
-   `devDependencies`), the rule moon's `check-moon-graph` enforced for moon;
-3. an ignored file a task hashes.
-
-Every exception names its reason in the script (17 edges, 8 references).
-Re-removing four of the fixes below makes it fail with the read that broke.
-
-**Nightly:** `turbo-canary.yml` runs `scripts/check-turbo-hermetic.mjs` on
-main. In a scratch worktree it deletes every tracked file no task claims,
-builds everything without the test and docs files the builds leave out, then
-runs the whole gate without the cache. A task that passes there cannot depend
-on a file outside its inputs; one that fails names the read the static check
-missed. Its first local run found two: `config#test` checks that the IdP
-docs' relative links exist (paths that come from Markdown, not code), and
-this design's first test glob, `**/*.spec.*`, also matched
-`tsconfig.spec.json`, which `api#generate` resolves through tsx. With both
-fixed, every build (39 tasks) passes without the 634 test and docs files the
-builds leave out, and the whole gate (130 tasks) without the 47 files no task
-claims: 54 s and 103 s here.
+Two checks of our own found the reads below and were dropped again: a
+static one that scanned each task's code for the files it opens (imports,
+fs and path calls, `//go:embed` patterns) and compared them with the
+hashed inputs, and a nightly run in a scratch tree without the files no
+task claims. Each modelled turbo's graph a second time, with its own
+exceptions to keep in step with the graph. `turbo boundaries` keeps each
+package's imports inside the package graph (zitadel/nextgen#2423).
 
 ### 5. What stays in moon
 
 Moon keeps folder-wide inputs: its rule is never to list a package's own
-files, and it goes at the cutover. It gets the input fixes, the merge-queue
-base and `workspace:check-turbo-graph`, which make today's required check
-correct, faster in the queue, and the guard of the turbo graph during the
-dual run.
+files, and it goes at the cutover. It gets the input fixes and the
+merge-queue base, which make today's required check correct and faster in
+the queue. ci-mode still selects ci.yml's lanes; ci-turbo.yml does not use
+it.
 
-## What the checks found
+## Reads the inputs missed
 
 Inputs neither runner declared, fixed in both (`turbo.json`, `moon.yml`):
 
@@ -201,10 +224,10 @@ Inputs neither runner declared, fixed in both (`turbo.json`, `moon.yml`):
 |---|---|
 | `cli#test` | the 19 root and journey scripts its script tests import; `.changeset/config.json`, `.moon/workspace.yml`, every package's `package.json` and `moon.yml`; `.github/semantic.yml`; `Dockerfile`; `docs/design/idp/schemas/**` |
 | `cli#typecheck` | the root scripts its tests import |
-| `config#test` | `docs/design/idp/**` (ci-mode treated `docs/` as inert, so a change there alone skipped everything) and every file those docs link to, which it checks exist (the hermetic run found these); the orchestrator's `default.liquid`; three `internal/domain/flow_*.go` files |
+| `config#test` | `docs/design/idp/**` (ci-mode treated `docs/` as inert, so a change there alone skipped everything) and every Markdown file under `docs/` those docs may link to, which it checks exist; the orchestrator's `default.liquid`; three `internal/domain/flow_*.go` files |
 | `api-mock#test` | `internal/httputil/testdata/redirect_targets.json` |
 | `e2e#test`, `e2e#typecheck`, the journey lanes | the root release scripts, the CLI's skill, the mock OIDC users, the built-in schemas |
-| `//#test` | `scripts/task-runner.mjs`, `scripts/server-build.mjs`, `packages/config/defaults/**` |
+| `//#test` | `scripts/server-build.mjs` (through the release scripts it tests), `packages/config/defaults/**` |
 | every lint | `biome-plugins/*.grit`, the rules `biome.json` loads |
 
 Turbo-only drift from moon or from the port:
@@ -221,49 +244,85 @@ Turbo-only drift from moon or from the port:
 ## Benchmarks
 
 Apple M5 Max (18 cores), warm Go and pnpm caches, local turbo cache only.
+"Turbo before" is main's configuration with ci-mode's walk over a dry run.
+Its numbers, and moon's wall clock, were measured on the first revision of
+this change; moon's selection and everything under "turbo after" on this
+one.
 
-### Selection, 23 change classes
+### Selection, 21 change classes
 
-Tasks each selector marks affected (ci-mode's view; gate and non-gate tasks
-together):
+Tasks each selector marks affected (moon's query as ci-mode asks it, turbo's
+without the prerequisites it adds; gate and non-gate tasks together), and
+the lanes CI runs for the change out of twelve: the generated-files check,
+the two database lanes and nine e2e lanes, the journey and the kit's
+real-instance suite among them.
 
-| change | moon | turbo before | turbo after | what turbo after still selects |
-|---|---|---|---|---|
-| `docs/adrs/*.md` | 1 | 1 | 1 | `check-adrs` |
-| `docs/runbooks/*.md`, root `AGENTS.md` | 0 | 0 | 0 | |
-| `packages/components/README.md` | 105 | 96 | 16 | release packaging only |
-| `apps/console/AGENTS.md` | 28 | 23 | 4 | release packaging only |
-| `packages/sdk-react/README.md` | 56 | 62 | 10 | `sdk-core#test` (reads the SDK READMEs), release packaging |
-| an SDK's `SKILL.md` | 11 | 11 | 7 | `sdk-core#test`, release packaging |
-| `apps/cli/skills/zitadel-cli/SKILL.md` | 22 | 36 | 29 | `cli#test` (reads it), release packaging |
-| `e2e/console/README.md` | 9 | 8 | 0 | |
-| a components spec file | 105 | 97 | 20 | its lint, typecheck, test; release packaging |
-| an sdk-react spec file | 56 | 63 | 14 | its checks, `sdk-core#test`, release packaging |
-| a console spec file | 28 | 24 | 8 | its checks, release packaging |
-| a components source file | 105 | 97 | 96 | unchanged: everything downstream |
-| a console source file | 28 | 24 | 24 | unchanged |
-| a Go source file | 24 | 23 | 23 | unchanged |
-| `scripts/check-pr-title.mjs` | 0 | 1 | 34 | `cli#test` and what depends on it: the script's tests, which nothing ran |
-| `tsconfig.base.json` | 183 | 188 | 188 | everything (a global dependency) |
+| change | moon | turbo before | turbo after | ci.yml lanes | ci-turbo lanes | what turbo after still selects |
+|---|---|---|---|---|---|---|
+| `docs/adrs/*.md` | 2 | 1 | 2 | 0 | 0 | `check-adrs`, `config#test` (it checks that the docs' links resolve) |
+| `docs/runbooks/*.md` | 1 | 0 | 1 | 0 | 0 | `config#test` |
+| root `AGENTS.md` | 0 | 0 | 0 | 0 | 0 | |
+| `packages/components/README.md` | 105 | 96 | 16 | 12 | 0 | release packaging only |
+| `apps/console/AGENTS.md` | 28 | 23 | 4 | 12 | 0 | release packaging only |
+| `packages/sdk-react/README.md` | 56 | 62 | 10 | 12 | 0 | `sdk-core#test` (reads the SDK READMEs), release packaging |
+| an SDK's `SKILL.md` | 12 | 11 | 7 | 9 | 0 | `sdk-core#test`, release packaging |
+| `apps/cli/skills/zitadel-cli/SKILL.md` | 23 | 36 | 30 | 9 | 1 | `cli#test` and `e2e#test` (read it), the journey, release packaging |
+| `e2e/console/README.md` | 9 | 8 | 0 | 9 | 0 | |
+| a components spec file | 105 | 97 | 20 | 12 | 0 | its lint, typecheck, test; `//#lint`; release packaging |
+| an sdk-react spec file | 56 | 63 | 14 | 12 | 0 | its checks, `sdk-core#test`, `//#lint`, release packaging |
+| a console spec file | 28 | 24 | 8 | 12 | 0 | its checks, `//#lint`, release packaging |
+| a components source file | 105 | 97 | 97 | 12 | 11 | everything downstream |
+| a console source file | 28 | 24 | 25 | 12 | 9 | everything downstream, the journey through `server#build` |
+| a Go source file | 24 | 23 | 24 | 12 | 9 | the server's tasks, the lanes that run the server |
+| an sdk-vue source file | 11 | | 12 | 9 | 1 | its checks, the journey |
+| a journey spec | 6 | | 7 | 9 | 1 | the journey's checks and lanes |
+| an api-mock source file | 39 | | 52 | 9 | 2 | its checks and dependents, the two mock demo lanes, release packaging |
+| `scripts/check-pr-title.mjs` | 9 | 1 | 34 | 12 (forced) | 1 | `cli#test` and what depends on it, the journey (both read root scripts) |
+| `tsconfig.base.json` | 183 | 188 | 193 | 12 (forced) | 12 | everything (a global dependency) |
+| `.github/workflows/ci.yml` | 0 | | 0 | 12 (forced) | 0 | nothing: no task reads it |
+
+"Forced" is ci-mode's fail-open rule for files no moon task claims. Release
+packaging is the release builds and `snapshot`, which only the release
+flows and the journey's snapshot step run.
 
 ### Replay of 150 merged pull requests
 
-Each PR's file list, applied to today's tree. Gate tasks (`lint`,
-`typecheck`, `build`, `test`, `check-*`) per full-mode PR (145):
+Each of the last 150 merged pull requests (#2157 to #2419), its files
+touched in today's tree and committed on top, then asked of moon and ci-mode
+as ci.yml asks them and of turbo as ci-turbo.yml does. 144 ran in full mode;
+four were version PRs, two touched no file left in today's tree, and two
+file lists stop at GitHub's 100.
 
-| selector | median | mean | PRs with none |
+Gate tasks (`lint`, `typecheck`, `build`, `test`, `check-*`) per full-mode
+pull request:
+
+| selector | median | mean | pull requests with none |
 |---|---|---|---|
-| moon | 7 | 32.4 | 2 |
-| turbo before (whole gate) | 22 | 39.2 | 2 |
-| turbo after | 8 | 28.0 | 5 |
+| moon | 8 | 32.0 | 1 |
+| turbo after | 8 | 28.5 | 2 |
 
-Most PRs touch code and select what they did; turbo after's usual one or two
-more than moon are `//#lint` (moon's root lint has no inputs and is never
-selected) and the new graph check. Turbo after skips lanes moon ran in five
-PRs, each by the file classes: SDK spec files and a `vitest.config.ts` feed
-no build the lanes run, the CLI patchers' developer READMEs ship nowhere, a
-console e2e spec reaches the console lanes but not the journey's snapshot.
-It adds the Go lanes in one, an edit of `apps/server/turbo.json`.
+Turbo after selects one more in 68, always `//#lint` (moon's root lint has no
+inputs and is never selected), five more in #2312, which edits the server's
+`turbo.json`, and fewer in 14: docs, test and lockfile edits that moon's
+folder-wide and implicit inputs spread.
+
+Lanes:
+
+| | ci.yml | ci-turbo.yml |
+|---|---|---|
+| lane runs | 1,386 | 1,021 |
+| of them e2e lanes | 1,089 | 796 |
+| pull requests with the database lanes | 99 | 85 |
+| pull requests with the journey (full matrix) | 121 (87) | 112 (78) |
+| pull requests with no lane | 23 | 30 |
+
+ci-turbo.yml runs a lane ci.yml does not in one pull request, #2312. It
+skips a lane ci.yml runs in 91. In 21 of them ci-mode forced a full run for
+a workflow, root script, manifest or `moon.yml` edit, which turbo follows
+only as far as a task reads the file (in four, to no lane at all). In the
+rest ci.yml runs every e2e lane once one is affected, or moon's folder-wide
+inputs carry a test edit into the builds: #2189 and #2191 edit only SDK
+specs and a Vitest config, and run every lane under moon.
 
 ### Wall clock
 
@@ -274,48 +333,54 @@ selects), turbo before's whole gate, turbo after's `--affected` gate.
 
 | change | moon | turbo before | turbo after |
 |---|---|---|---|
-| cold, whole gate | 113.7 s (131 tasks) | 90.1 s (130) | 86.4 s (130) |
+| cold, whole gate | 113.7 s (131 tasks) | 90.1 s (130) | 97.3 s (133) |
 | no change | 0.3 s (0) | 6.4 s (6) | 0.2 s (0) |
-| `docs/runbooks/cloud.md` | 0.3 s (0) | 7.5 s (4) | 0.2 s (0) |
+| `docs/runbooks/cloud.md` | 0.3 s (0) | 7.5 s (4) | 1.1 s (1) |
 | `packages/components/README.md` | 89.2 s (57) | 108.2 s (58) | 0.2 s (0) |
-| a components spec file | 94.6 s (57) | 91.8 s (59) | 21.1 s (5) |
-| an sdk-react spec file | 51.4 s (23) | 46.5 s (28) | 2.9 s (5) |
-| a console source file | 15.2 s (8) | 17.0 s (14) | 12.9 s (9) |
-| a Go source file | 19.5 s (10) | 22.8 s (16) | 18.8 s (10) |
-| a components source file | 86.8 s (57) | 72.2 s (59) | 65.0 s (58) |
+| a components spec file | 94.6 s (57) | 91.8 s (59) | 21.8 s (5) |
+| an sdk-react spec file | 51.4 s (23) | 46.5 s (28) | 3.0 s (5) |
+| a console source file | 15.2 s (8) | 17.0 s (14) | 13.2 s (9) |
+| a Go source file | 19.5 s (10) | 22.8 s (16) | 18.9 s (10) |
+| a components source file | 86.8 s (57) | 72.2 s (59) | 67.5 s (58) |
 
 Tasks in parentheses are the ones that ran; the rest of each gate came from
-the cache. Turbo before re-runs the never-cached `install-browsers` tasks
-on every change. Under load, `cli:test`'s proxy tests against a remote HTTPS
-server and `e2e:test`'s port tests failed in some runs of both runners; the
-times include those runs.
+the cache. The cold run of this revision ran on a busier machine (the first
+revision's took 86.4 s). Turbo before re-runs the never-cached
+`install-browsers` tasks on every change. In the first revision's runs,
+`cli:test`'s proxy tests against a remote HTTPS server and `e2e:test`'s port
+tests failed under load in some runs of both runners; the times include
+those runs.
 
-Overheads every turbo run pays, three runs each: a dry run of the gate took
-3.6–5.5 s before, nearly all of it `//#lint` hashing ignored files, and
-0.18–0.20 s after. ci-mode's affected question took 3.3–3.4 s as the walk
-over a dry run and takes 0.24 s as `turbo query affected`.
+Overheads: a dry run of the gate took 3.6–5.5 s before, nearly all of it
+`//#lint` hashing ignored files, and 0.18–0.20 s after. The setup step's
+three `turbo query affected --exit-code` calls take 0.4 s together.
 
 ## Limits
 
-- The static check sees paths written as literals. One built from data
-  (`join(dir, name)` over a list) is invisible to it; the nightly run is the
-  backstop.
-- The nightly run proves that every task passes without the files no task
-  claims and every build without its excluded files; it does not compare
-  outputs. A build that reads such a file only to vary its output would pass.
+- A change no task's inputs name runs nothing in ci-turbo.yml: a workflow
+  edit, a new runner image. ci-mode forces a full ci.yml run for the files it
+  knows no task claims; turbo has no such list, and the nightly run is the
+  check, a day late.
 - `--affected` trusts main: every commit there passed its merge group, and
-  pushes to main run the whole gate. Changes that are no file change (a
-  workflow's environment) force a full run through ci-mode's `.github/` rule.
+  the nightly run checks main without the cache.
+- `turbo run --affected` fails, rather than counting every file changed,
+  when its base does not resolve. The bases CI passes are always in the
+  full-depth checkout. Without a base, as on a run by hand, turbo compares
+  with a local `main`; a branch's checkout has none, so turbo counts every
+  file as changed and runs everything through the cache.
+- The nightly run proves that every task passes on main; it does not compare
+  outputs. A build that reads an unlisted file only to vary its output would
+  pass.
 - Turbo still has no early cutoff. A source edit that leaves a build's output
   unchanged still re-runs its dependents; the file classes only keep edits
   that cannot change the output from starting the cascade.
 
 ## Rollout
 
-- With this change: moon's gate runs `check-turbo-graph` and gets the input
-  fixes and the merge-queue base; turbo's configuration and ci-mode's turbo
-  path are complete; `turbo-canary.yml` starts nightly.
-- `ci-turbo.yml` uses `--affected` once `pull_request` and `merge_group` are
-  back in its `on:` for the parity weeks (migration decision 9).
+- With this change: ci-turbo.yml runs on pull requests, the merge queue,
+  pushes to main and nightly, still not required; moon's gate gets the input
+  fixes and the merge-queue base.
+- The two weeks of the dual run's comparison count from here (migration
+  plan, decision 9).
 - Follow-up: move `apps/cli/tests/unit/scripts/` to the root `//#test`, which
   shrinks `cli#test`'s inputs to its own package.

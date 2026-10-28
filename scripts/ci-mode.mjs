@@ -4,7 +4,6 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { isDirectRun } from "./dev-process.mjs";
-import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 
 // Decides what the ci workflow runs, in three layers:
 //
@@ -21,11 +20,6 @@ import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 //    moved: the scaffolded flow widget is framework-independent, so a
 //    server-only change proves as much on one framework as on the full
 //    matrix (e2e/journey/scripts/frameworks.mjs owns the list).
-// 4. Gate scope — `gate=affected` when the affected set is the answer (no
-//    fail-open reason below): ci-turbo.yml then runs its gate with
-//    `--affected` against the same base, which turbo resolves from the same
-//    task inputs. Any fail-open reason makes it `full`: the whole gate, which
-//    the cache skips through.
 //
 // The gates fail open: known repo-wide files no task claims (workflow
 // definitions, scripts/, moon config, root manifests and compiler/release
@@ -122,18 +116,16 @@ const GO_TEST_TARGETS = [
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
-// runs the console gate, which ci-turbo.yml's console steps read; ci.yml runs
-// both through e2e:all.
+// turns the console gate on; ci.yml runs both through e2e:all.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 // The lanes that need no backend: the console's preview smoke and the demos
-// against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
-// of e2e:all.
+// against api-mock. Moon runs them as part of e2e:all.
 const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
 // The aggregate ci.yml runs in its own e2e step (`moon exec e2e:all`) when the
 // `e2e` gate is on: moon counts it affected whenever any lane is, and running it
 // runs every lane as its dependency, the journey included, whether or not a
 // journey trigger above moved (an api-mock change reaches it through the mock
-// lanes). ci-turbo.yml gates its lane steps one by one and ignores this gate.
+// lanes).
 const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
@@ -177,7 +169,6 @@ export function resolveGates({ mode, files, targets }) {
     return {
       gates: Object.fromEntries(ALL_GATES.map((g) => [g, false])),
       matrix: "full",
-      gate: "full",
       reason: "version-only",
     };
   }
@@ -191,7 +182,6 @@ export function resolveGates({ mode, files, targets }) {
     return {
       gates: Object.fromEntries(ALL_GATES.map((g) => [g, true])),
       matrix: "full",
-      gate: "full",
       reason: forced,
     };
   }
@@ -236,21 +226,14 @@ export function resolveGates({ mode, files, targets }) {
   };
   const matrix =
     journeyProject || anySdkBuild || MATRIX_TRIGGERS.some((t) => set.has(t)) ? "full" : "single";
-  return { gates, matrix, gate: "affected", reason: null };
+  return { gates, matrix, reason: null };
 }
 
 /**
- * The affected task set as moon `project:task` targets, from whichever task
- * runner is selected (scripts/task-runner.mjs): moon's own affected query, or
- * turbo's. Returns null when the query failed — which fails open.
+ * The affected task set as moon `project:task` targets. Returns null when the
+ * query failed — which fails open.
  */
-export function queryAffectedTargets(base, spawn = spawnSync, { runner = taskRunner() } = {}) {
-  return runner === "turbo"
-    ? queryTurboAffectedTargets(base, spawn)
-    : queryMoonAffectedTargets(base, spawn);
-}
-
-function queryMoonAffectedTargets(base, spawn) {
+export function queryAffectedTargets(base, spawn = spawnSync) {
   // Asked as a local run would be. In CI, moon drops a task that does not run
   // there (`runInCI: false` or "skip") from the affected set when its own
   // inputs changed, yet the gates exist for exactly such tasks: the e2e lanes
@@ -284,114 +267,6 @@ function queryMoonAffectedTargets(base, spawn) {
     );
   } catch {
     console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
-    return null;
-  }
-}
-
-// Every non-persistent task name in turbo.json: the affected query asks about
-// all of them, and scripts/check-turbo-graph.mjs checks them all.
-export const TURBO_GRAPH_TASKS = [
-  "lint",
-  "typecheck",
-  "build",
-  "test",
-  "build-release",
-  "install-browsers",
-  "generate",
-  "sync-schemas",
-  "sync",
-  "sync:export",
-  "readme",
-  "format",
-  "vet",
-  "openapi",
-  "check-generate",
-  "check-generate-pruned",
-  "clean-generated",
-  "test-postgres",
-  "test-sqlite",
-  "test-spanner",
-  "test:integration",
-  "e2e",
-  "e2e-local",
-  "console-smoke",
-  "console-real",
-  "console-embedded",
-  "console-platform",
-  "console-deployment",
-  "demo-next-mock",
-  "demo-next-real",
-  "demo-nuxt-mock",
-  "journey",
-  "journey-local",
-  "changesets",
-  "check-graph",
-  "build-public-packages",
-  "version",
-  "pack",
-  "snapshot",
-  "publish",
-  "sweep",
-  "summarize",
-  "check-adrs",
-  "check-moon-graph",
-  "check-turbo-graph",
-  "check-typecheck",
-  "check-openapi-rules",
-  "doctor",
-  "build-local-image",
-  "smoke-container",
-  "check",
-];
-
-// The reason `turbo query affected` gives a task it lists only because an
-// affected task needs it to run first.
-const TURBO_PREREQUISITE = "required by an affected task";
-
-/**
- * moon's `--affected --downstream deep`, from turbo's answer. With
- * futureFlags.affectedUsingTaskInputs (turbo.json), turbo matches the diff
- * against each task's `inputs`, deleted and renamed files included, and
- * follows task edges to every dependent, the artifact edges that are no
- * package.json dependency included (the server embeds the console). It also
- * lists the prerequisites of those tasks, which moon does not; the gates key on
- * upstream builds (`api:build`), so counting them would run every lane on
- * every change. A changed global input affects every task, as moon's
- * implicitInputs do. Returns null for an answer without the affected list.
- */
-export function affectedTurboTargets(answer) {
-  const items = answer?.data?.affectedTasks?.items;
-  if (!Array.isArray(items)) {
-    return null;
-  }
-  return items
-    .filter((item) => item?.reason?.description !== TURBO_PREREQUISITE)
-    .map((item) => moonTargetOf(item.package?.name ?? "", item.name));
-}
-
-function queryTurboAffectedTargets(base, spawn) {
-  const query = `query { affectedTasks(base: ${JSON.stringify(base)}, head: "HEAD", tasks: ${JSON.stringify(TURBO_GRAPH_TASKS)}) { items { name package { name } reason { __typename ... on TaskAllChanged { description } } } } }`;
-  const result = spawn("turbo", ["query", query], {
-    encoding: "utf8",
-    env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (result.status !== 0) {
-    process.stderr.write(result.stderr ?? "");
-    console.error(`# turbo query failed (exit ${result.status})`);
-    return null;
-  }
-  try {
-    const answer = JSON.parse(result.stdout);
-    if (answer?.errors?.length) {
-      console.error(
-        `# turbo query answered with errors: ${JSON.stringify(answer.errors).slice(0, 400)}`,
-      );
-      return null;
-    }
-    return affectedTurboTargets(answer);
-  } catch {
-    console.error(`# turbo returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
@@ -476,13 +351,12 @@ function main() {
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
   const targets = needsQuery ? queryAffectedTargets(base, spawnSync) : [];
-  const { gates, matrix, gate, reason } = resolveGates({ mode, files, targets });
+  const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
   const lines = [
     `mode=${mode}`,
     ...ALL_GATES.map((g) => `${g}=${gates[g]}`),
     `journey_matrix=${matrix}`,
-    `gate=${gate}`,
   ];
   for (const line of lines) {
     console.log(line);

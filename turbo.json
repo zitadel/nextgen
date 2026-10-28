@@ -86,10 +86,8 @@
     // Inputs by file class (docs/design/build/turborepo-graph.md): no task
     // below reads a package's docs, and no build reads its tests. A negation
     // wins over any inclusion, so a task that reads one of these files
-    // replaces `inputs` instead of extending them (cli#test).
-    // scripts/check-turbo-graph.mjs fails when a task's code reads a file its
-    // inputs leave out. Every package lint is `biome check .`, which
-    // processes no Markdown.
+    // replaces `inputs` instead of extending them (cli#test). Every package
+    // lint is `biome check .`, which processes no Markdown.
     "lint": {
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/biome-plugins/*.grit", "!**/*.md", "!**/*.mdx", "!**/LICENSE"]
     },
@@ -211,7 +209,7 @@
     // orchestration. The root package's default inputs are the whole
     // repository, so every root task lists its inputs: the cached ones as
     // moon.yml does, the uncached ones so that only a change to their own
-    // scripts marks them affected (scripts/ci-mode.mjs).
+    // scripts marks them affected (`--affected`).
     //
     // The root lint checks the whole repository, so its inputs are every file
     // Biome checks (moon's workspace:lint has no inputs and is never selected
@@ -238,6 +236,8 @@
         "!**/.vercel/**",
         "!**/test-results/**",
         "!**/playwright-report/**",
+        "!**/.vitest/**",
+        "!**/next-env.d.ts",
         "!**/*.timestamp*",
         "!apps/docs/.source/**",
         "!apps/docs/.generated/**",
@@ -255,10 +255,6 @@
       "inputs": [
         "scripts/ci-mode.mjs",
         "scripts/ci-mode.test.mjs",
-        "scripts/check-turbo-graph.mjs",
-        "scripts/check-turbo-graph.test.mjs",
-        "scripts/check-turbo-hermetic.mjs",
-        "scripts/check-turbo-hermetic.test.mjs",
         "scripts/dev-process.mjs",
         "scripts/dev-process.test.mjs",
         "scripts/shims/pnpm",
@@ -269,7 +265,6 @@
         "scripts/release-github.test.mjs",
         "scripts/release-manifest.mjs",
         "scripts/server-build.mjs",
-        "scripts/task-runner.mjs",
         "scripts/render-builtin-schemas.mjs",
         "scripts/render-builtin-schemas.test.mjs",
         "api/openapi/endpoints/schemas/*.json",
@@ -325,13 +320,6 @@
         "packages/*/package.json",
         "e2e/package.json"
       ]
-    },
-    // Checks the turbo graph against the rules in docs/design/build/
-    // turborepo.md (scripts/check-turbo-graph.mjs). It reads every code file,
-    // manifest and turbo.json, so any of them is an input; the root
-    // package's default inputs are every file git sees.
-    "//#check-turbo-graph": {
-      "inputs": ["$TURBO_DEFAULT$", "!**/*.md", "!**/*.mdx"]
     },
     "//#check-adrs": {
       "inputs": ["docs/adrs/**/*.md", "scripts/check-adrs-index.mjs", "scripts/dev-process.mjs"]

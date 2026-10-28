@@ -11,14 +11,14 @@
     //
     // `test` is the journey harness's unit tests in both runners. Where this
     // differs from moon.yml on purpose: moon runs the lanes through its `e2e:all`
-    // aggregate in ci.yml's own e2e step; the lanes are uncached, so
-    // ci-turbo.yml runs them as explicit steps gated by ci-mode, and there is
-    // no `all` here. Each lane's inputs are its own folder plus the shared
-    // files (and, for the demo lanes, the demo app they serve), less the docs
-    // and the ignored trees, so ci-mode's affected query does not mark the
-    // journey for a console spec edit but does see a demo app edit. The
-    // two demo-next lanes share a task-guard mutex in package.json (both serve
-    // the demo on :3002), standing in for moon's mutex of the same name.
+    // aggregate in ci.yml's own e2e step; ci-turbo.yml runs each lane in a
+    // step of its own with `--affected`, and there is no `all` here. Each
+    // lane's inputs are its own folder plus the shared files (and, for the
+    // demo lanes, the demo app they serve), less the docs and the ignored
+    // trees, so a console spec edit does not select the journey and a demo
+    // app edit selects the demo's lanes. The two demo-next lanes share a
+    // task-guard mutex in package.json (both serve the demo on :3002),
+    // standing in for moon's mutex of the same name.
     // The packed-CLI helpers and the journey's registry scripts import the
     // root release scripts; the harness's unit tests (`test`) also read the
     // CLI's skill, the mock OIDC provider's users and the built-in schemas.
@@ -203,11 +203,14 @@
     // provider binary, imports the kit's virtual-passkey helper, and its claim
     // suite the console copy in
     // console/support/copy.ts. The scripts default ZITADEL_TELEMETRY to 0.
-    // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
-    // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
-    // `--ci` set and, like moon's lane of the same name, also depends on every
-    // framework SDK build so an SDK-only change selects it (sdk-next arrives via
-    // cli#build).
+    // `e2e-local` is the runner with caller-supplied flags; `journey` is the
+    // by-hand alias; `journey-local`, CI's lane, bakes in the `--ci` set and,
+    // like moon's lane of the same name, also depends on every framework SDK
+    // build so an SDK-only change selects it (sdk-next arrives via cli#build).
+    // Unlike moon's, it also depends on the server's build: the server it runs
+    // comes packed in the release snapshot, which CI builds in a step before
+    // it, and without the edge a Go change would not select the journey. Moon
+    // runs it with every other lane through `e2e:all`.
     "e2e-local": {
       "inputs": [
         "journey/**",
@@ -253,6 +256,7 @@
         "@zitadel/cli#build",
         "@zitadel/testing#build",
         "@zitadel/oidc-mock#build",
+        "@zitadel/server#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",
         "@zitadel/sdk-vue#build",

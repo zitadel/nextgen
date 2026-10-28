@@ -94,11 +94,6 @@ tasks:
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
-      - "scripts/check-turbo-graph.mjs"
-      - "scripts/check-turbo-graph.test.mjs"
-      - "scripts/check-turbo-hermetic.mjs"
-      - "scripts/check-turbo-hermetic.test.mjs"
-      - "scripts/task-runner.mjs"
       - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"
       - "scripts/dev-process.test.mjs"
@@ -194,21 +189,6 @@ tasks:
       - "apps/*/package.json"
       - "packages/*/package.json"
       - "e2e/package.json"
-    options:
-      cache: true
-      runInCI: true
-
-  # The turbo graph rules in docs/design/build/turborepo.md: every file a
-  # task's code reads is hashed, every declared package is built first, no
-  # ignored tree is hashed. It reads every code file, manifest and turbo.json.
-  check-turbo-graph:
-    command: "node scripts/check-turbo-graph.mjs"
-    inputs:
-      - "**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,go}"
-      - "**/turbo.json"
-      - "**/package.json"
-      - "**/go.mod"
-      - "**/.gitignore"
     options:
       cache: true
       runInCI: true

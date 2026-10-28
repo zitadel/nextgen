@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { test } from "vitest";
 
 import {
-  affectedTurboTargets,
   computeMode,
   forceFullReason,
   queryAffectedTargets,
@@ -565,13 +564,10 @@ function fakeSpawn(result) {
   return () => ({ status: 0, stdout: "", stderr: "", ...result });
 }
 
-const moon = { runner: "moon" };
-
 test("queryAffectedTargets parses the grouped task map", () => {
   const targets = queryAffectedTargets(
     "HEAD",
     fakeSpawn({ stdout: '{"tasks":{"server":{"test":{},"build":{}},"release":{"snapshot":{}}}}' }),
-    moon,
   );
   assert.deepEqual(targets?.sort(), ["release:snapshot", "server:build", "server:test"]);
 });
@@ -590,7 +586,7 @@ test("queryAffectedTargets asks moon as a local run would, against the given bas
   process.env.CI = "true";
   process.env.GITHUB_ACTIONS = "true";
   try {
-    queryAffectedTargets("abc123", spawn, moon);
+    queryAffectedTargets("abc123", spawn);
   } finally {
     for (const [name, value] of Object.entries(previous)) {
       if (value === undefined) delete process.env[name];
@@ -606,101 +602,15 @@ test("queryAffectedTargets asks moon as a local run would, against the given bas
 });
 
 test("queryAffectedTargets returns an empty set for an empty tasks map", () => {
-  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' }), moon), []);
+  assert.deepEqual(queryAffectedTargets("HEAD", fakeSpawn({ stdout: '{"tasks":{}}' })), []);
 });
 
 test("queryAffectedTargets fails open on schema drift, garbage output, and nonzero exits", () => {
-  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result), moon);
+  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result));
   assert.equal(query({ stdout: '{"unexpected":true}' }), null);
   assert.equal(query({ stdout: '{"tasks":[1,2]}' }), null);
   assert.equal(query({ stdout: "not json" }), null);
   assert.equal(query({ status: 1, stderr: "boom" }), null);
-});
-
-// A trimmed `turbo query affected` answer (turbo 2.11.7 with
-// futureFlags.affectedUsingTaskInputs): each task the change reaches with the
-// reason turbo gives, plus the prerequisites an affected task needs first.
-function turboAnswer(...items) {
-  return {
-    data: {
-      affectedTasks: {
-        items: items.map(([fullName, reason]) => {
-          const [packageName, name] = fullName.split("#");
-          return { name, package: { name: packageName }, reason };
-        }),
-      },
-    },
-  };
-}
-const fileChanged = { __typename: "TaskFileChanged" };
-const dependencyChanged = { __typename: "TaskDependencyTaskChanged" };
-const prerequisite = { __typename: "TaskAllChanged", description: "required by an affected task" };
-
-test("affectedTurboTargets keeps the changed tasks and their dependents, not prerequisites", () => {
-  // A console edit: its build, and the server test that embeds it through a
-  // task edge, are affected; api's build only runs first.
-  const answer = turboAnswer(
-    ["@zitadel/api#build", prerequisite],
-    ["@zitadel/console#build", fileChanged],
-    ["@zitadel/server#test", dependencyChanged],
-  );
-  assert.deepEqual(affectedTurboTargets(answer), ["console:build", "server:test"]);
-});
-
-test("affectedTurboTargets maps root tasks, colon scripts and the e2e lanes", () => {
-  const answer = turboAnswer(
-    ["//#check-adrs", fileChanged],
-    ["@zitadel/testing#test:integration", dependencyChanged],
-    ["@zitadel/e2e#console-real", fileChanged],
-  );
-  assert.deepEqual(affectedTurboTargets(answer), [
-    "workspace:check-adrs",
-    "testing:test-integration",
-    "e2e:console-real",
-  ]);
-});
-
-test("affectedTurboTargets counts a global change and any other reason as affected", () => {
-  const answer = turboAnswer(
-    ["@zitadel/api#build", { __typename: "TaskGlobalDepsChanged" }],
-    ["//#lint", { __typename: "TaskAllChanged", description: "package is affected" }],
-  );
-  assert.deepEqual(affectedTurboTargets(answer), ["api:build", "workspace:lint"]);
-  assert.deepEqual(affectedTurboTargets(turboAnswer()), []);
-});
-
-test("queryAffectedTargets under turbo asks turbo's affected query from the base", () => {
-  const seen = [];
-  const spawn = (command, args) => {
-    seen.push({ command, args });
-    return {
-      status: 0,
-      stdout: JSON.stringify(turboAnswer(["@zitadel/console#build", fileChanged])),
-    };
-  };
-  assert.deepEqual(queryAffectedTargets("abc123", spawn, { runner: "turbo" }), ["console:build"]);
-  assert.equal(seen[0].command, "turbo");
-  assert.equal(seen[0].args[0], "query");
-  assert.match(seen[0].args[1], /affectedTasks\(base: "abc123", head: "HEAD", tasks: \["lint",/);
-});
-
-test("queryAffectedTargets under turbo fails open on errors, garbage output and nonzero exits", () => {
-  const query = (result) => queryAffectedTargets("HEAD", fakeSpawn(result), { runner: "turbo" });
-  assert.equal(query({ stdout: "not json" }), null);
-  assert.equal(query({ stdout: '{"nope":1}' }), null);
-  assert.equal(query({ stdout: '{"data":null,"errors":[{"message":"Unknown field"}]}' }), null);
-  assert.equal(query({ status: 1, stderr: "boom" }), null);
-});
-
-test("the gate is scoped to the affected tasks only when the affected set is the answer", () => {
-  const scope = (files, targets, mode = "full") => resolveGates({ mode, files, targets }).gate;
-  assert.equal(scope(["apps/console/src/main.tsx"], ["console:build"]), "affected");
-  assert.equal(scope(["docs/runbooks/cloud.md"], []), "affected");
-  assert.equal(scope([".github/workflows/ci.yml"], []), "full");
-  assert.equal(scope(["apps/console/src/main.tsx"], null), "full");
-  assert.equal(scope(["packages/config/src/unclaimed.ts"], []), "full");
-  assert.equal(scope([], []), "full");
-  assert.equal(scope(["packages/sdk-react/package.json"], [], "version-only"), "full");
 });
 
 // A trimmed `moon ci` report (.moon/cache/ciReport.json, moon 2.6.1): sync

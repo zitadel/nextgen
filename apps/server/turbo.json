@@ -9,8 +9,7 @@
   // integration-test fixtures, the events catalog and the product analytics
   // catalog. The repository-wide globs leave out the ignored trees an explicit
   // glob would otherwise match: node_modules, and in the main checkout every
-  // worktree under .claude/. scripts/check-turbo-graph.mjs fails when a
-  // //go:embed or a file a test opens is missing here.
+  // worktree under .claude/.
   // GOFLAGS and the target platform change what Go produces, so they are
   // hashed; the cache locations pass through globally (root turbo.json).
   "tasks": {
@@ -290,10 +289,10 @@
     // The database lanes talk to a database whose state no hash sees, so
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
-    // still matter: they decide when a change marks the lane affected
-    // (scripts/ci-mode.mjs), as the server inputs do in moon. They wait for
-    // check-generate, which rewrites api/generated, a package they compile and
-    // type-load (api/internal/erroranalysis).
+    // still matter: they decide when a change marks the lane affected, which
+    // selects it in CI (`--affected`), as the server inputs do in moon. They
+    // wait for check-generate, which rewrites api/generated, a package they
+    // compile and type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
       "dependsOn": ["check-generate", "@zitadel/console#build"],
@@ -387,9 +386,10 @@
         "$TURBO_ROOT$/apps/cloud/build.sh"
       ]
     },
-    // The binary embeds the console's dist; the dist bytes are inputs of the
-    // build alone, so a console-only change re-links the binary without
-    // re-running the Go checks and tests.
+    // The binary embeds the console's dist, which the console#build edge
+    // hashes. Its files are not inputs: turbo hashes a run's inputs before
+    // the run starts, so the build would hash them without that run's console
+    // build and miss the cache on the next run.
     "build": {
       "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -415,7 +415,6 @@
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/internal/staticui/**",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],

@@ -6,9 +6,9 @@ phase of [turborepo-migration.md](turborepo-migration.md)), every task exists
 twice — in `moon.yml` ([.moon/AGENTS.md](../../../.moon/AGENTS.md)) and in a
 `turbo.json` — and a change goes into both (where the two differ on purpose
 is listed in `.moon/AGENTS.md`). Moon is the runner of record; the
-turbo version runs in CI as the non-required `ci-turbo` job (on pushes to
-main and by hand, not on pull requests), on Vercel for the hosted cloud's
-builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
+turbo version runs in CI as the non-required `ci-turbo` job (on pull
+requests, in the merge queue, on pushes to main and nightly), on Vercel for
+the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
 
 ## Layout
 
@@ -31,7 +31,8 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`,
   `journey`, `journey-local` and `e2e-local` (the journey runner with its
   options from `JOURNEY_*`), plus the docs' `e2e` and `e2e-deployment`. Unlike
-  moon there is no `all` aggregate: ci-turbo.yml runs the lanes as gated steps.
+  moon there is no `all` aggregate: ci-turbo.yml runs each lane in a step of
+  its own, with `--affected`.
 
 ## Dependencies
 
@@ -73,12 +74,15 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
 - An explicit glob matches ignored files too. A repository-wide one
   (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
   otherwise walk: `node_modules`, build output, `.claude/`.
-- `//#check-turbo-graph` (`scripts/check-turbo-graph.mjs`) fails when a task's
-  code reads a file neither it nor a task it depends on hashes, when a
-  declared workspace package is not built first, or when a task hashes an
-  ignored tree. Fix the inputs or the edge; an exception takes its reason.
-  `turbo-canary.yml` runs `scripts/check-turbo-hermetic.mjs` nightly: the
-  gate without a cache, in a tree without the files no task claims.
+- A task does not list what its dependencies write (the server's build and
+  the console's dist): the dependency's hash covers it, and turbo hashes a
+  run's inputs before the run starts, so those files would change the task's
+  hash on the next run, which then misses the cache.
+- A file a task reads is one of its inputs or a dependency's: `--affected`
+  and the cache key see nothing else, so an edit to an unlisted file neither
+  selects the task nor misses its cache. Nothing checks that before a merge;
+  the nightly `ci-turbo` run executes every task without the cache and fails
+  on what such an edit broke.
 - An ignored file a task reads is not a default input either, so the task
   lists it. The console's build reads its `.env*` files (Vite's `loadEnv`)
   and lists `["$TURBO_EXTENDS$", ".env*"]`; without them, a changed
@@ -155,7 +159,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
 | what would run | `turbo run build --dry` |
 | affected tasks, task-level | `turbo query affected --base origin/main --tasks test` (its prerequisites carry the reason "required by an affected task") |
-| check the graph | `pnpm run check-turbo-graph`; nightly `pnpm run check-turbo-hermetic` |
+| every task without the cache (CI's nightly run) | `turbo run lint typecheck build test --force` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |
 
@@ -170,11 +174,13 @@ runner (`e2e/journey/README.md`).
 
 `--affected` and `turbo query affected` match the diff against each task's
 `inputs` and follow task edges, so a console change still reaches the
-server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`). CI
-runs the gate with `--affected` from the pull request's or merge group's
-base when ci-mode trusts the affected set (`gate=affected`), and the whole
-gate otherwise and on main. `--filter=…[ref]` still selects packages: do not
-use it for the gate.
+server's tests, which embed it (`futureFlags.affectedUsingTaskInputs`).
+ci-turbo.yml passes `--affected` to every `turbo run`, from the pull
+request's base, the merge group's or the commit a push to main replaced, and
+runs the setup a lane needs when `turbo query affected --exit-code` finds the
+lane affected; a change no task reads, such as a workflow edit, runs nothing
+there. Nightly it runs every task and lane with `TURBO_FORCE` instead.
+`--filter=…[ref]` still selects packages: do not use it for the gate.
 
 Turbo needs a `pnpm` binary on `PATH` (`corepack enable`). A checkout has no
 `turbo` on `PATH`: install it globally (`npm install --global turbo`), which
