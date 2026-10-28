@@ -43,7 +43,7 @@ workflow, not the task graph.
 | Inline scripts | `scripts/go-format-check.mjs`, `scripts/go-lint.mjs` | Turbo's versions of the `format` and `lint` inline scripts of the two Go projects; moon keeps its inline scripts until the cutover. |
 | Runner selection | `scripts/task-runner.mjs` (+ `.d.mts`) | `NEXTGEN_TASK_RUNNER=moon\|turbo` picks the runner the contributor scripts build through, turbo when a turbo task runs them (`TURBO_HASH`); maps `project:task` to turbo tasks. |
 | Ported scripts | `check.mjs`, `run-server.mjs`, `run-server-debug.mjs`, `run-cli.mjs`, `apps/console/scripts/dev-real.mts`, `e2e/journey/scripts/local-registry.mjs` | Work under either runner; tests added for the turbo paths. |
-| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, a non-required job on pull requests, the merge queue, pushes to main and nightly; turbo's `--affected` selects what each step runs (decision 9). |
+| CI | `.github/workflows/ci-turbo.yml` | The turbo version of ci.yml's moon steps, three parallel jobs (the gate, the journey, the other e2e lanes) behind one non-required check, `full-pr-turbo`, on pull requests, the merge queue, pushes to main and nightly; turbo's `--affected` selects what each job runs (decision 9). |
 | Unchanged | all `moon.yml`, `.moon/`, ci.yml, the required check | Moon runs exactly as before. |
 
 Verified in the prototype, 2026-10-12:
@@ -184,7 +184,7 @@ as they were.
 | demo-next | `build` (outputs .next) | `#build` | outputs `.next/**`, `!.next/cache/**` |
 | demo-next, demo-nuxt | `dev`, `start` | same | existing |
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
-| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env; the demo-next pair's mutex `demo-next-app`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*`, `ZITADEL_TELEMETRY` and `JOURNEY_TARBALLS_REQUIRED` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the affected lanes in one `turbo run --affected`, side by side, and `journey-local` also depends on `server#build` so that a Go change selects it; every lane that opens Chromium depends on the **new** `install-browsers` |
+| e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env; the demo-next pair's mutex `demo-next-app`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*`, `ZITADEL_TELEMETRY` and `JOURNEY_TARBALLS_REQUIRED` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs `journey-local` in a job of its own and the other affected lanes in one `turbo run --affected`, side by side, and `journey-local` also depends on `server#build` so that a Go change selects it; every lane that opens Chromium depends on the **new** `install-browsers` |
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
 | docs | `build` (`next build`, mergeArgs replace) | `#build` | the script is `next build`, as moon's command; the Vercel docs service runs the task, keyed by the deployment's ID (`VERCEL_DEPLOYMENT_ID`) |
 | docs | `dev`, `start` | same | existing |
@@ -210,7 +210,7 @@ as they were.
 |---|---|---|
 | `generated-sources` (server `generate`, `clean-generated`, `check-generate`, `check-generate-pruned`; api `generate`; config `sync-schemas`) | generation rewriting files other tasks read mid-graph | `task-guard --mutex generated-sources` in the six scripts. Ordering edges were rejected: they would put the Go generation on the critical path of every TypeScript build. |
 | `public-dist` (api, config, sdk-next `build-release`; cli `test`) | release builds cleaning a dist the CLI tests import | an edge: the release builds start after `@zitadel/cli#test`. Moon could not express that edge (cli depends on those packages, a project-graph cycle); turbo has no project graph. |
-| `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`, which keeps them apart in ci-turbo.yml's one run of every lane. |
+| `demo-next-app` (e2e `demo-next-mock`, `demo-next-real`) | the two lanes that serve apps/demo-next with `next dev` on :3002 from one `.next` folder; the other lanes of ci.yml's e2e step (`moon exec e2e:all`) run beside them | their two scripts hold `task-guard --mutex demo-next-app`, which keeps them apart in ci-turbo.yml's one run of every lane but the journey's. |
 | `sdk-nuxt-dist` (sdk-nuxt `build`, `build-release`; demo-nuxt `build`) | demo-nuxt bundling from sdk-nuxt/dist | the existing `demo-nuxt#build → sdk-nuxt#build` edge orders the dev builds; the release build never shares a turbo invocation with demo-nuxt. If that ever changes, the guard covers it. |
 
 The lock lives in the OS temp dir under a hash of the repository root, so two
@@ -239,8 +239,8 @@ check-adrs check-moon-graph`; every `runInCI: false` task has another name
 (`build-release`, `dev`, …) and is never reached. Moon's e2e lanes are
 `runInCI: "skip"`, which keeps them out of the `moon ci` graph, and ci.yml runs
 them in a step of its own with `moon exec e2e:all --ignore-ci-checks`; turbo
-has no `all`, and ci-turbo.yml names every lane in one `turbo run
---affected`. One
+has no `all`, and ci-turbo.yml names every lane but the journey's, which has
+a job of its own, in one `turbo run --affected`. One
 known difference: the console real-instance configs retry once when `CI` is
 set (`retries: process.env.CI ? 1 : 0`); moon's lane commands unset `CI`
 (`env -u`: a task `env` entry would not override the runner's value), turbo
@@ -345,22 +345,26 @@ still runs the whole gate: it has no base to compare with.
 
 ### `ci.yml` → the draft `ci-turbo.yml`
 
+Three jobs run side by side on runners of their own and share the remote
+cache: the gate, the journey and the other e2e lanes. `full-pr-turbo` needs
+all three and is the one check name.
+
 | ci.yml step | turbo draft |
 |---|---|
 | `MOON_SUMMARY=detailed` | none: turbo groups each task's log and annotates every failed task itself |
-| `node scripts/ci-mode.mjs <base>`: the mode, the lane gates, the journey matrix | none: every `turbo run` below takes `--affected` (`TURBO_SCM_BASE`: the merge group's base, the pull request's, or the commit a push to main replaced); the journey's setup (the snapshot, its registry cache) and the journey matrix ask `turbo query affected --exit-code`, and each lane that opens Chromium installs it through `install-browsers`; a version PR is its `changeset-release/*` branch |
+| `node scripts/ci-mode.mjs <base>`: the mode, the lane gates, the journey matrix | none: every `turbo run` below takes `--affected` (`TURBO_SCM_BASE`: the merge group's base, the pull request's, or the commit a push to main replaced); each job first asks `turbo query affected --exit-code` about its own tasks, before it installs anything, and skips its other steps when none is affected; the journey's job asks it for the journey matrix too, and each lane that opens Chromium installs it through `install-browsers`; a version PR is its `changeset-release/*` branch |
 | `moon run server:check-generate-pruned` | `turbo run check-generate-pruned --filter=@zitadel/server --affected`, on pushes to main too |
-| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph --affected --continue=dependencies-successful` |
+| `moon ci :lint :typecheck :build :test :check-adrs :check-moon-graph --downstream deep --include-relations` | `turbo run lint typecheck build test check-adrs check-moon-graph test-postgres test-sqlite --affected --continue=dependencies-successful` in the gate's job, the database lanes not on pushes to main |
 | `moon run server:test` | dropped: part of the gate (moon re-ran it because `moon ci` selects by affectedness) |
-| `moon run server:test-postgres` / `test-sqlite` | `turbo run test-postgres --filter=@zitadel/server --affected` / `test-sqlite` |
-| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` when the journey is affected, without `--affected`: the journey needs it whenever it runs (no `env -u`; no arguments after `--`, see turborepo.md) |
-| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): `e2e:journey-local` (`JOURNEY_*` env on the step), `testing:test-integration`, the console and demo lanes, side by side in one step after the graph | `JOURNEY_MATRIX=… turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing --affected --continue=dependencies-successful`: the affected lanes, side by side, in one step after the snapshot |
+| `moon run server:test-postgres` / `test-sqlite` | dropped: part of the gate's run, beside its other tasks |
+| `env -u CI -u GITHUB_ACTIONS moon run release:snapshot -- --skip-container` | `RELEASE_SKIP_CONTAINER=1 turbo run snapshot --filter=@zitadel/release` first in the journey's job, without `--affected`: the journey needs it whenever it runs (no `env -u`; no arguments after `--`, see turborepo.md) |
+| `moon exec e2e:all --ignore-ci-checks` (gate `e2e`): `e2e:journey-local` (`JOURNEY_*` env on the step), `testing:test-integration`, the console and demo lanes, side by side in one step after the graph | `JOURNEY_MATRIX=… turbo run journey-local --filter=@zitadel/e2e` after the snapshot in the journey's job; `turbo run test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing --affected --continue=dependencies-successful` in the other lanes' job: the affected lanes, side by side |
 | `… moon run release:version` / `release:pack` | `turbo run version --filter=@zitadel/release --affected` / `pack` |
 | Depot's remote cache (implicit) | the remote-cache step, see below |
 
-Every night, and by hand with `force`, ci-turbo.yml runs the gate with
-`TURBO_FORCE` and every lane without `--affected`: each task once, without
-the results of earlier runs. Fork pull requests keep running on
+Every night, and by hand with `force`, ci-turbo.yml runs every job with
+`TURBO_FORCE` and without `--affected`: each task and lane, without the
+results of earlier runs. Fork pull requests keep running on
 GitHub-hosted runners without a cache token.
 
 ### The other workflows
@@ -518,9 +522,10 @@ and the merge queue run `ci-turbo` again, each step selected by turbo's own
 
 ### Phase 2: cutover (1 week)
 
-- `ci.yml` takes the turbo steps under the same job name `full-pr` (the
-  required check does not change its name), `ci-turbo.yml` is deleted;
-  release-publish, spanner and sync-design-tokens follow.
+- `ci.yml` takes the turbo jobs, the aggregate one under the job name
+  `full-pr` (the required check does not change its name), and
+  `ci-turbo.yml` is deleted; release-publish, spanner and sync-design-tokens
+  follow.
 - `NEXTGEN_TASK_RUNNER` defaults to turbo; `doctor` requires turbo.
 - The documentation rewrite lands in the same PR train as the workflow change
   (the front doors must not point at a runner CI no longer exercises).
@@ -563,9 +568,11 @@ the release graph.
    release builds' package edges; turbo's edges reproduce that order for
    `snapshot`, `pack` and `publish`, but the
    server-tests-versus-console-release-build overlap in `snapshot` is not
-   fully ordered. Mitigation: run `snapshot` on the dual-run job every time
-   (it is gated like today) and watch for embed mismatches; fix properly by
-   separating release output directories (decision 5).
+   fully ordered. Mitigation: run `snapshot` in the dual run whenever the
+   journey runs and watch for embed mismatches; fix properly by separating
+   release output directories (decision 5). Its job runs beside the gate's,
+   so the server's tests run in it whenever the gate has not cached them
+   yet, and the overlap is no longer only in principle.
 2. **Selection.** `--affected` follows task inputs and task edges only with
    `futureFlags.affectedUsingTaskInputs` (root `turbo.json`);
    `--filter=…[ref]` still selects packages and drops the artifact edges. It
