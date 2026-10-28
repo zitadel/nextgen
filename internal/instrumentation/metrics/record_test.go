@@ -2,7 +2,6 @@ package metrics_test
 
 import (
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -11,67 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 )
-
-// recorded is one instrument as the reader returned it.
-type recorded struct {
-	description string
-	unit        string
-	kind        metrics.Kind
-	keys        []attribute.Key
-}
-
-// collectRecorded reads every instrument in the metrics scope back through
-// the SDK, which is what proves the instruments were registered with the
-// names, units and descriptions the catalogue promises.
-func collectRecorded(t *testing.T, reader *metricstest.Reader) map[string]recorded {
-	t.Helper()
-	out := map[string]recorded{}
-	for _, scope := range reader.Collect(t).ScopeMetrics {
-		if scope.Scope.Name != metrics.ScopeName {
-			continue
-		}
-		for _, m := range scope.Metrics {
-			r := recorded{description: m.Description, unit: m.Unit}
-			var sets []attribute.Set
-			switch data := m.Data.(type) {
-			case metricdata.Histogram[float64]:
-				r.kind = metrics.KindHistogram
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			case metricdata.Sum[int64]:
-				r.kind = metrics.KindCounter
-				if !data.IsMonotonic {
-					r.kind = metrics.KindUpDownCounter
-				}
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			case metricdata.Gauge[int64]:
-				r.kind = metrics.KindGauge
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			default:
-				t.Fatalf("instrument %s: unexpected data %T", m.Name, m.Data)
-			}
-			for _, set := range sets {
-				for _, kv := range set.ToSlice() {
-					if !slices.Contains(r.keys, kv.Key) {
-						r.keys = append(r.keys, kv.Key)
-					}
-				}
-			}
-			out[m.Name] = r
-		}
-	}
-	return out
-}
 
 // Every instrument the package records is in the catalogue, and the catalogue
 // describes it as recorded: same name, unit, kind and attribute keys. The
@@ -85,16 +27,15 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	metrics.RecordStatement(ctx, metrics.DBSystemSQLite, "tokenStatements.GetTokenByID", time.Millisecond)
 	metrics.RecordCredentialValidation(ctx, metrics.CredentialValid, time.Millisecond)
 	metrics.RecordRevocationCheck(ctx, metrics.RevocationActive)
-	metrics.RecordPasswordVerification(ctx, metrics.PasswordMatch, time.Millisecond)
+	metrics.RecordPasswordVerification(ctx, metrics.PasswordLogin, metrics.PasswordMatch, time.Millisecond)
 	metrics.RecordAuthOutcome(ctx, metrics.CheckPassword, metrics.AuthSuccess)
 	metrics.RecordKeyChainResolution(ctx, metrics.KeyKindMaster, time.Millisecond)
 	metrics.RecordFlowTransition(ctx, metrics.FlowSubmit, metrics.FlowStep)
 	metrics.RecordAuditInsert(ctx, metrics.AuditEvent, time.Millisecond)
 	metrics.RecordAuditEvents(ctx, "auth.token.revoked", 1)
-	unregister, err := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
+	unregister := metrics.RegisterPool(metrics.PoolSQLite, func() metrics.PoolStats {
 		return metrics.PoolStats{Used: 1, Idle: 2, Max: 3}
 	})
-	require.NoError(t, err)
 	defer func() { require.NoError(t, unregister()) }()
 
 	// The cache instruments are injected rather than global; report them on
@@ -105,7 +46,7 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 	cache.RecordLookup(true)
 	cache.RecordAdd(true)
 
-	got := collectRecorded(t, reader)
+	got := metricstest.Instruments(reader.Collect(t))
 	catalogued := map[string]bool{}
 	for _, in := range metrics.Catalogue() {
 		catalogued[in.Name] = true
@@ -113,13 +54,16 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 		if !assert.True(t, ok, "%s is catalogued but was not recorded", in.Name) {
 			continue
 		}
-		assert.Equal(t, in.Description, r.description, "%s: description", in.Name)
-		assert.Equal(t, in.Unit, r.unit, "%s: unit", in.Name)
-		assert.Equal(t, in.Kind, r.kind, "%s: kind", in.Name)
-		assert.ElementsMatch(t, in.AttributeKeys(), r.keys, "%s: attribute keys", in.Name)
+		assert.Equal(t, metrics.ScopeName, r.Scope, "%s: scope", in.Name)
+		assert.Equal(t, in.Description, r.Description, "%s: description", in.Name)
+		assert.Equal(t, in.Unit, r.Unit, "%s: unit", in.Name)
+		assert.Equal(t, in.Kind, r.Kind, "%s: kind", in.Name)
+		assert.ElementsMatch(t, in.AttributeKeys(), r.Keys, "%s: attribute keys", in.Name)
 	}
-	for name := range got {
-		assert.True(t, catalogued[name], "%s was recorded but is not in the catalogue", name)
+	for name, r := range got {
+		if r.Scope == metrics.ScopeName {
+			assert.True(t, catalogued[name], "%s was recorded but is not in the catalogue", name)
+		}
 	}
 }
 
@@ -128,8 +72,7 @@ func TestCatalogue_MatchesWhatIsRecorded(t *testing.T) {
 func TestRegisterPool_ReportsUntilUnregistered(t *testing.T) {
 	reader := metricstest.Install()
 	stats := metrics.PoolStats{Used: 4, Idle: 6, Max: 10}
-	unregister, err := metrics.RegisterPool(metrics.PoolPostgres, func() metrics.PoolStats { return stats })
-	require.NoError(t, err)
+	unregister := metrics.RegisterPool(metrics.PoolPostgres, func() metrics.PoolStats { return stats })
 
 	pool := metrics.DBConnectionPoolKey.String(string(metrics.PoolPostgres))
 	used := metrics.DBConnectionStateKey.String(string(metrics.PoolUsed))
@@ -152,11 +95,32 @@ func TestRegisterPool_ReportsUntilUnregistered(t *testing.T) {
 func TestRecordAuditEvents_IgnoresNothing(t *testing.T) {
 	reader := metricstest.Install()
 	eventType := metrics.EventTypeKey.String("probe.nothing")
+	before := reader.CounterSum(t, metrics.AuditEventsWritten, eventType)
 	metrics.RecordAuditEvents(t.Context(), "probe.nothing", 0)
 	metrics.RecordAuditEvents(t.Context(), "probe.nothing", -1)
-	assert.Equal(t, int64(0), reader.CounterSum(t, metrics.AuditEventsWritten, eventType))
+	assert.Equal(t, before, reader.CounterSum(t, metrics.AuditEventsWritten, eventType))
 	metrics.RecordAuditEvents(t.Context(), "probe.nothing", 3)
-	assert.Equal(t, int64(3), reader.CounterSum(t, metrics.AuditEventsWritten, eventType))
+	assert.Equal(t, before+3, reader.CounterSum(t, metrics.AuditEventsWritten, eventType))
+}
+
+// A closed-set record lands on exactly the value it was given, on a counter
+// and on a histogram alike; this is also what proves the GrewOnly check the
+// layers above test with.
+func TestRecord_GrowsOnlyTheGivenValue(t *testing.T) {
+	reader := metricstest.Install()
+
+	revocations := metricstest.GrewOnly(t, reader, metrics.TokenRevocationChecks, nil,
+		metrics.ResultKey, metrics.RevocationActive, metrics.RevocationRevoked, metrics.RevocationError)
+	metrics.RecordRevocationCheck(t.Context(), metrics.RevocationRevoked)
+	revocations(metrics.RevocationRevoked)
+
+	login := metrics.PurposeKey.String(string(metrics.PasswordLogin))
+	passwords := metricstest.GrewOnly(t, reader, metrics.PasswordVerificationDuration, []attribute.KeyValue{login},
+		metrics.ResultKey, metrics.PasswordMatch, metrics.PasswordUpdated, metrics.PasswordMismatch, metrics.PasswordError)
+	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordHistory, metrics.PasswordMismatch, time.Millisecond)
+	passwords("")
+	metrics.RecordPasswordVerification(t.Context(), metrics.PasswordLogin, metrics.PasswordUpdated, time.Millisecond)
+	passwords(metrics.PasswordUpdated)
 }
 
 // identifierLike matches an attribute key that would carry a user, project,
@@ -173,58 +137,6 @@ func TestCatalogue_AttributesNeverIdentify(t *testing.T) {
 			assert.NotEmpty(t, a.Description, "%s: attribute %s has no description", in.Name, a.Key)
 			assert.False(t, identifierLike.MatchString(strings.ToLower(string(a.Key))),
 				"%s: attribute %s looks like an identifier", in.Name, a.Key)
-		}
-	}
-}
-
-// The closed sets a dashboard is written against are the typed constants the
-// recording API takes, so a value the code can record is one the catalogue
-// (and so the documentation) lists.
-func TestCatalogue_ClosedValuesAreTheConstants(t *testing.T) {
-	t.Parallel()
-	want := map[string]map[attribute.Key][]string{
-		metrics.DBOperationDuration: {
-			metrics.DBSystemNameKey: {string(metrics.DBSystemPostgreSQL), string(metrics.DBSystemSQLite), string(metrics.DBSystemSpanner)},
-		},
-		metrics.DBConnectionCount: {
-			metrics.DBConnectionPoolKey:  {string(metrics.PoolPostgres), string(metrics.PoolSQLite)},
-			metrics.DBConnectionStateKey: {string(metrics.PoolIdle), string(metrics.PoolUsed)},
-		},
-		metrics.DBConnectionMax: {
-			metrics.DBConnectionPoolKey: {string(metrics.PoolPostgres), string(metrics.PoolSQLite)},
-		},
-		metrics.CredentialValidationDuration: {
-			metrics.ResultKey: {string(metrics.CredentialValid), string(metrics.CredentialRevoked), string(metrics.CredentialInvalid), string(metrics.CredentialError)},
-		},
-		metrics.TokenRevocationChecks: {
-			metrics.ResultKey: {string(metrics.RevocationActive), string(metrics.RevocationRevoked), string(metrics.RevocationError)},
-		},
-		metrics.PasswordVerificationDuration: {
-			metrics.ResultKey: {string(metrics.PasswordMatch), string(metrics.PasswordUpdated), string(metrics.PasswordMismatch), string(metrics.PasswordError)},
-		},
-		metrics.AuthAttemptOutcomes: {
-			metrics.CheckKey:  {string(metrics.CheckUser), string(metrics.CheckPassword), string(metrics.CheckPasskey), string(metrics.CheckPasskeyRegistration)},
-			metrics.ResultKey: {string(metrics.AuthSuccess), string(metrics.AuthRejected), string(metrics.AuthError)},
-		},
-		metrics.KeyChainResolutionDuration: {
-			metrics.KeyKindKey: {string(metrics.KeyKindMaster), string(metrics.KeyKindProject)},
-		},
-		metrics.FlowStepTransitions: {
-			metrics.OperationKey: {string(metrics.FlowStart), string(metrics.FlowSubmit), string(metrics.FlowRender)},
-			metrics.ResultKey:    {string(metrics.FlowStep), string(metrics.FlowComplete), string(metrics.FlowFailed)},
-		},
-		metrics.AuditInsertDuration: {
-			metrics.SourceKey: {string(metrics.AuditRequest), string(metrics.AuditEvent)},
-		},
-		metrics.CacheLookups: {
-			metrics.ResultKey: {"hit", "miss"},
-		},
-	}
-	for _, in := range metrics.Catalogue() {
-		for _, a := range in.Attributes {
-			values := want[in.Name][a.Key]
-			assert.Equal(t, values, a.Values, "%s: values of %s", in.Name, a.Key)
-			assert.Equal(t, len(values) > 0, a.Closed(), "%s: %s closed", in.Name, a.Key)
 		}
 	}
 }

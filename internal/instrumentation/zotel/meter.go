@@ -72,28 +72,24 @@ func allowAttributes(scope instrumentation.Scope, name string, keys []attribute.
 	)
 }
 
-// meterProviderOptions are the options every meter provider of the server is
-// built with, before its reader: the resource and the views.
+// NewMeterProvider builds the server's meter provider: the resource, the
+// views and the exporter the config selects.
 //
 // The series bound is the SDK's cardinality limit, left at its default (2000
 // series per instrument, OTEL_GO_X_CARDINALITY_LIMIT to change it): past it,
 // a new attribute combination is aggregated into one overflow series
 // (`otel.metric.overflow=true`), so an attribute that unexpectedly follows
 // the data costs one series, not one per value.
-func meterProviderOptions(resource *resource.Resource) []sdkmetric.Option {
-	return []sdkmetric.Option{
-		sdkmetric.WithResource(resource),
-		sdkmetric.WithView(MeterViews()...),
-	}
-}
-
 func NewMeterProvider(ctx context.Context, cfg ExporterConfig, resource *resource.Resource) (_ *sdkmetric.MeterProvider, err error) {
 	readerOption, err := cfg.metrics(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	opts := meterProviderOptions(resource)
+	opts := []sdkmetric.Option{
+		sdkmetric.WithResource(resource),
+		sdkmetric.WithView(MeterViews()...),
+	}
 	if readerOption != nil {
 		opts = append(opts, readerOption)
 	}

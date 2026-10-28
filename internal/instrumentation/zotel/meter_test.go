@@ -14,41 +14,19 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics/metricstest"
 	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
 // attributeKeys collects, per instrument, every attribute key that survived
 // the views.
-func attributeKeys(t *testing.T, reader sdkmetric.Reader) map[string][]string {
+func attributeKeys(t *testing.T, reader sdkmetric.Reader) map[string][]attribute.Key {
 	t.Helper()
 	var rm metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &rm))
-	out := map[string][]string{}
-	for _, scope := range rm.ScopeMetrics {
-		for _, m := range scope.Metrics {
-			var sets []attribute.Set
-			switch data := m.Data.(type) {
-			case metricdata.Sum[int64]:
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			case metricdata.Histogram[float64]:
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			case metricdata.Gauge[int64]:
-				for _, p := range data.DataPoints {
-					sets = append(sets, p.Attributes)
-				}
-			}
-			for _, set := range sets {
-				for _, kv := range set.ToSlice() {
-					if !slices.Contains(out[m.Name], string(kv.Key)) {
-						out[m.Name] = append(out[m.Name], string(kv.Key))
-					}
-				}
-			}
-		}
+	out := map[string][]attribute.Key{}
+	for name, in := range metricstest.Instruments(rm) {
+		out[name] = in.Keys
 	}
 	return out
 }
@@ -86,8 +64,8 @@ func TestMeterViews_HTTPAttributesAreBounded(t *testing.T) {
 	}, rogue)...))
 
 	got := attributeKeys(t, reader)
-	assert.ElementsMatch(t, []string{"oas.operation", "http.request.method", "http.route", "http.response.status_code"}, got["ogen.server.request_count"])
-	assert.ElementsMatch(t, []string{"http.method", "http.status_code", "http.route"}, got["http.server.request.count"])
+	assert.ElementsMatch(t, []attribute.Key{"oas.operation", "http.request.method", "http.route", "http.response.status_code"}, got["ogen.server.request_count"])
+	assert.ElementsMatch(t, []attribute.Key{"http.method", "http.status_code", "http.route"}, got["http.server.request.count"])
 }
 
 // A view is built from the catalogue, so an application instrument cannot
@@ -106,5 +84,5 @@ func TestMeterViews_ApplicationAttributesFollowTheCatalogue(t *testing.T) {
 		attribute.String("project_id", "prj_1"),
 	))
 
-	assert.Equal(t, []string{"result"}, attributeKeys(t, reader)[metrics.TokenRevocationChecks])
+	assert.Equal(t, []attribute.Key{"result"}, attributeKeys(t, reader)[metrics.TokenRevocationChecks])
 }

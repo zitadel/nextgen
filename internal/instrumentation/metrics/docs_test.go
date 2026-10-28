@@ -12,9 +12,9 @@ import (
 )
 
 // The Metrics section of the configuration guide is the catalogue written
-// out. A documented attribute that the code does not carry, or an instrument
-// the documentation has never heard of, is how a dashboard ends up graphing
-// nothing.
+// out, row for row. A documented attribute or value the code does not carry,
+// or an instrument the documentation has never heard of, is how a dashboard
+// ends up graphing nothing, so each row has to equal what the catalogue says.
 func TestCatalogue_IsDocumented(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile("../../../docs/quick-start/configuration.md")
@@ -23,45 +23,46 @@ func TestCatalogue_IsDocumented(t *testing.T) {
 	require.True(t, ok, "the configuration guide has no Metrics section")
 	section, _, _ = strings.Cut(section, "\n## ")
 
-	var rows []string
+	rows := map[string][]string{}
 	for line := range strings.SplitSeq(section, "\n") {
-		if strings.HasPrefix(line, "| `") {
-			rows = append(rows, line)
+		if !strings.HasPrefix(line, "| `") {
+			continue
 		}
+		cells := strings.Split(strings.TrimSuffix(strings.TrimPrefix(line, "| "), " |"), " | ")
+		rows[strings.Trim(cells[0], "`")] = cells
 	}
 
 	documented := map[string]bool{}
 	for _, in := range metrics.Catalogue() {
-		row := ""
-		for _, r := range rows {
-			if strings.HasPrefix(r, "| `"+in.Name+"` |") {
-				row = r
-			}
-		}
-		if !assert.NotEmpty(t, row, "instrument %s is not documented", in.Name) {
+		cells, ok := rows[in.Name]
+		if !assert.True(t, ok, "instrument %s is not documented", in.Name) {
 			continue
 		}
 		documented[in.Name] = true
-		assert.Contains(t, row, "| "+string(in.Kind)+" |", "%s: type", in.Name)
-		assert.Contains(t, row, "| "+orDash(in.Unit)+" |", "%s: unit", in.Name)
-		assert.Contains(t, row, in.Description, "%s: description", in.Name)
-		for _, a := range in.Attributes {
-			assert.Contains(t, row, "`"+string(a.Key)+"`: ", "%s: attribute %s", in.Name, a.Key)
-			for _, v := range a.Values {
-				assert.Contains(t, row, "`"+v+"`", "%s: value %s of %s", in.Name, v, a.Key)
-			}
-			if !a.Closed() {
-				assert.Contains(t, row, "`"+string(a.Key)+"`: fixed in code", "%s: %s is open", in.Name, a.Key)
-			}
-		}
+		assert.Equal(t, []string{"`" + in.Name + "`", string(in.Kind), orDash(in.Unit), attributesCell(in), in.Description}, cells, "%s: row", in.Name)
 	}
-	for _, r := range rows {
-		name, _, _ := strings.Cut(strings.TrimPrefix(r, "| `"), "`")
+	for name := range rows {
 		if strings.HasPrefix(name, "instrumentation.") {
 			continue // the configuration table
 		}
 		assert.True(t, documented[name], "%s is documented but is not in the catalogue", name)
 	}
+}
+
+// attributesCell is the Attributes cell of a documented row as the catalogue
+// entry says it should read: each attribute as `key`: its values in
+// backticks, or "fixed in code" for an open one; attributes separated by
+// semicolons.
+func attributesCell(in metrics.Instrument) string {
+	var attrs []string
+	for _, a := range in.Attributes {
+		cell := "`" + string(a.Key) + "`: fixed in code"
+		if a.Closed() {
+			cell = "`" + string(a.Key) + "`: `" + strings.Join(a.Values, "`, `") + "`"
+		}
+		attrs = append(attrs, cell)
+	}
+	return strings.Join(attrs, "; ")
 }
 
 func orDash(unit string) string {

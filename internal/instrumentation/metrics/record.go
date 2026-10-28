@@ -139,7 +139,6 @@ func (o closedOptions[T]) of(v T) metric.MeasurementOption {
 var (
 	credentialResults = closed(ResultKey, CredentialValid, CredentialRevoked, CredentialInvalid, CredentialError)
 	revocationResults = closed(ResultKey, RevocationActive, RevocationRevoked, RevocationError)
-	passwordResults   = closed(ResultKey, PasswordMatch, PasswordMismatch, PasswordError)
 	keyKinds          = closed(KeyKindKey, KeyKindMaster, KeyKindProject)
 	auditSources      = closed(SourceKey, AuditRequest, AuditEvent)
 )
@@ -174,7 +173,7 @@ type PoolStats struct {
 // instruments, reading stats when the collector asks rather than on every
 // acquire. The returned func stops the reporting; call it when the pool
 // closes, so a pool that is gone does not keep reporting its last reading.
-func RegisterPool(name PoolName, stats func() PoolStats) (unregister func() error, err error) {
+func RegisterPool(name PoolName, stats func() PoolStats) (unregister func() error) {
 	pool := DBConnectionPoolKey.String(string(name))
 	idle := metric.WithAttributes(pool, DBConnectionStateKey.String(string(PoolIdle)))
 	used := metric.WithAttributes(pool, DBConnectionStateKey.String(string(PoolUsed)))
@@ -191,9 +190,12 @@ func RegisterPool(name PoolName, stats func() PoolStats) (unregister func() erro
 		global.connectionCount, global.connectionMax,
 	)
 	if err != nil {
-		return nil, err
+		// The callback observes instruments created on the same meter, which
+		// is the only thing registration checks, so like mustInstruments this
+		// is a programming error a test catches, not a condition to handle.
+		panic(fmt.Sprintf("metrics: register pool %s: %v", name, err))
 	}
-	return registration.Unregister, nil
+	return registration.Unregister
 }
 
 // RecordCredentialValidation records the duration of validating one bearer
@@ -208,9 +210,12 @@ func RecordRevocationCheck(ctx context.Context, result RevocationResult) {
 }
 
 // RecordPasswordVerification records the duration of verifying one password
-// against its hash, with its outcome.
-func RecordPasswordVerification(ctx context.Context, result PasswordResult, d time.Duration) {
-	global.passwordDuration.Record(ctx, d.Seconds(), passwordResults.of(result))
+// against its hash, with why it was verified and its outcome.
+func RecordPasswordVerification(ctx context.Context, purpose PasswordPurpose, result PasswordResult, d time.Duration) {
+	global.passwordDuration.Record(ctx, d.Seconds(), metric.WithAttributes(
+		PurposeKey.String(string(purpose)),
+		ResultKey.String(string(result)),
+	))
 }
 
 // RecordAuthOutcome counts one verified authentication proof, by the kind of

@@ -1,4 +1,4 @@
-package zotel
+package zotel_test
 
 import (
 	"fmt"
@@ -11,9 +11,9 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	"go.opentelemetry.io/otel/sdk/resource"
 
 	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
+	"github.com/zitadel/nextgen/internal/instrumentation/zotel"
 )
 
 // The statement summary is an open attribute, fixed in code. Were it ever fed
@@ -23,12 +23,13 @@ import (
 //
 // The limit is the SDK's default, which the SDK does not export. This test pins
 // it: if an SDK upgrade changes the default, it fails and the docs need the new
-// number.
+// number. The limit counts the overflow series, so 1999 distinct sets fit and
+// the 2000th is the overflow (sdk/metric/internal/aggregate/limit.go).
 func TestNewMeterProvider_BoundsSeriesPerInstrument(t *testing.T) {
 	const sdkDefaultCardinalityLimit = 2000
 	t.Setenv("OTEL_GO_X_CARDINALITY_LIMIT", "")
 	reader := sdkmetric.NewManualReader()
-	provider := sdkmetric.NewMeterProvider(append(meterProviderOptions(resource.Empty()), sdkmetric.WithReader(reader))...)
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader), sdkmetric.WithView(zotel.MeterViews()...))
 
 	histogram, err := provider.Meter(metrics.ScopeName).Float64Histogram(metrics.DBOperationDuration, metric.WithUnit("s"))
 	require.NoError(t, err)
@@ -60,6 +61,6 @@ func TestNewMeterProvider_BoundsSeriesPerInstrument(t *testing.T) {
 			}
 		}
 	}
-	assert.LessOrEqual(t, series, sdkDefaultCardinalityLimit, "%d distinct values must not become %d series", distinct, series)
+	assert.Equal(t, sdkDefaultCardinalityLimit, series, "%d distinct values must become exactly the limit's worth of series", distinct)
 	assert.True(t, overflowed, "values past the limit land on the overflow series")
 }

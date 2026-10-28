@@ -22,9 +22,10 @@ import (
 //   - an open set, whose values come from names fixed in code (a statement
 //     method, an event type), never from data.
 //
-// The SDK's per-instrument cardinality limit (set in zotel) is the hard bound
-// behind both: past it, new attribute combinations land on one overflow
-// series instead of becoming series of their own.
+// The SDK's per-instrument cardinality limit (its default, which the zotel
+// tests pin) is the hard bound behind both: past it, new attribute
+// combinations land on one overflow series instead of becoming series of
+// their own.
 //
 // Changing a name or an attribute key is a breaking change for whatever is
 // graphing it.
@@ -60,6 +61,7 @@ const (
 	DBConnectionStateKey = semconv.DBClientConnectionStateKey
 
 	CheckKey     = attribute.Key("check")
+	PurposeKey   = attribute.Key("purpose")
 	KeyKindKey   = attribute.Key("key.kind")
 	OperationKey = attribute.Key("operation")
 	SourceKey    = attribute.Key("source")
@@ -163,17 +165,26 @@ const (
 	RevocationError   RevocationResult = "error"
 )
 
+// PasswordPurpose is why a password was verified against a hash.
+type PasswordPurpose string
+
+const (
+	// PasswordLogin verifies a sign-in proof.
+	PasswordLogin PasswordPurpose = "login"
+	// PasswordHistory compares a new password against a remembered one on a
+	// password change; a mismatch there is the normal outcome.
+	PasswordHistory PasswordPurpose = "history"
+)
+
 // PasswordResult is the outcome of verifying a password against its hash.
 type PasswordResult string
 
 const (
 	PasswordMatch    PasswordResult = "match"
 	PasswordMismatch PasswordResult = "mismatch"
-	// PasswordUpdated is a match on a hash written with another algorithm or
-	// other cost parameters than the current hasher's, so the verify also
-	// computed a new hash: two hashes for one sign-in. Not recorded until the
-	// password verifier reports the rehash; it is declared now so dashboards
-	// can be built against the final value set.
+	// PasswordUpdated is a match on a hash that is outdated for the project's
+	// method, so the verify also computed a new hash, or attempted to and
+	// failed: two hashes for one sign-in. Login purpose only.
 	PasswordUpdated PasswordResult = "updated"
 	// PasswordError is a hash that could not be verified at all, such as one
 	// in an algorithm the server no longer carries.
@@ -274,7 +285,7 @@ func Catalogue() []Instrument {
 	return []Instrument{
 		{
 			Name: DBOperationDuration, Kind: KindHistogram, Unit: "s",
-			Description: "Duration of one storage statement call, including any wait for a pooled connection. PostgreSQL and SQLite time a query until it returns, before its rows are read, and PostgreSQL a single-row read until it is scanned; Spanner times a statement including the callback that reads its rows.",
+			Description: "Duration of one storage statement call, including any wait for a pooled connection. PostgreSQL and SQLite time a query until it returns, before its rows are read, and PostgreSQL a single-row read until it is scanned; Spanner times a statement including the callback that reads its rows. With a metric exporter configured, every statement pays for this: the stack walk that names it, a clock read and a histogram record, on every request, whether tracing samples it or not.",
 			Attributes: []Attribute{
 				{Key: DBSystemNameKey, Description: "Database product.", Values: values(DBSystemPostgreSQL, DBSystemSQLite, DBSystemSpanner)},
 				{Key: DBQuerySummaryKey, Description: "The statement method that issued the call, as `type.Method` (for example `tokenStatements.GetTokenByID`). Fixed in code."},
@@ -302,21 +313,22 @@ func Catalogue() []Instrument {
 		},
 		{
 			Name: TokenRevocationChecks, Kind: KindCounter, Unit: "{check}",
-			Description: "Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked are not checked and not counted.",
+			Description: "Token record lookups made to see whether a credential was revoked. Credentials that cannot be revoked, or that carry no token id, are not checked and not counted.",
 			Attributes: []Attribute{
 				{Key: ResultKey, Description: "Outcome.", Values: values(RevocationActive, RevocationRevoked, RevocationError)},
 			},
 		},
 		{
 			Name: PasswordVerificationDuration, Kind: KindHistogram, Unit: "s",
-			Description: "Duration of verifying a password against its stored hash. `updated` is a match that also computed a new hash (another algorithm or other cost parameters than the current hasher's); it is not reported yet.",
+			Description: "Duration of verifying a password against its stored hash. `updated` is a match on a hash outdated for the project's method, so the verify also computed (or attempted) a new hash: two hashes for one sign-in; it occurs for the `login` purpose only.",
 			Attributes: []Attribute{
+				{Key: PurposeKey, Description: "Why the password was verified: `login` verifies a sign-in proof; `history` compares a new password against a remembered one on a password change, where `mismatch` is the normal outcome.", Values: values(PasswordLogin, PasswordHistory)},
 				{Key: ResultKey, Description: "Outcome.", Values: values(PasswordMatch, PasswordUpdated, PasswordMismatch, PasswordError)},
 			},
 		},
 		{
 			Name: AuthAttemptOutcomes, Kind: KindCounter, Unit: "{proof}",
-			Description: "Authentication proofs verified, by kind of proof and outcome.",
+			Description: "Authentication proofs verified through auth attempts, by kind of proof and outcome. SSO sign-ins are not counted.",
 			Attributes: []Attribute{
 				{Key: CheckKey, Description: "Kind of proof.", Values: values(CheckUser, CheckPassword, CheckPasskey, CheckPasskeyRegistration)},
 				{Key: ResultKey, Description: "Outcome: `rejected` is refused by the client's doing, `error` is a failure of the server.", Values: values(AuthSuccess, AuthRejected, AuthError)},
@@ -324,9 +336,9 @@ func Catalogue() []Instrument {
 		},
 		{
 			Name: KeyChainResolutionDuration, Kind: KindHistogram, Unit: "s",
-			Description: "Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Reading the key row is a storage statement and is part of db.client.operation.duration.",
+			Description: "Duration of unwrapping an encryption key that was not in the crypter cache, including resolving any wrapping key that is not cached either. Only a resolution that produced a crypter is recorded; a failed unwrap is not. Reading the key row is a storage statement and is part of db.client.operation.duration.",
 			Attributes: []Attribute{
-				{Key: KeyKindKey, Description: "What wraps the key. A project-wrapped resolution includes the time spent resolving its project KEK, which is recorded again as its own master-wrapped resolution.", Values: values(KeyKindMaster, KeyKindProject)},
+				{Key: KeyKindKey, Description: "What wraps the key. A project-wrapped resolution includes resolving its project KEK when that is not cached, which is also recorded as a master-wrapped resolution of its own, so do not sum the two kinds.", Values: values(KeyKindMaster, KeyKindProject)},
 			},
 		},
 		{
