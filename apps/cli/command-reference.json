@@ -162,6 +162,13 @@
           "type": "boolean"
         },
         {
+          "name": "git",
+          "description": "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
+          "type": "boolean",
+          "allowNo": true,
+          "default": true
+        },
+        {
           "name": "preset",
           "description": "Sign-in preset for the scaffolded schema and login flow (default: password-first).",
           "type": "option",
