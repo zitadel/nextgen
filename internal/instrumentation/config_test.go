@@ -26,7 +26,6 @@ func TestLogFormat_ErrorHandler_UnspecifiedTraceID(t *testing.T) {
 	logger := slog.New(LogFormatUnspecified.ErrorHandler(nil))
 
 	provider := tracesdk.NewTracerProvider(tracesdk.WithSampler(tracesdk.AlwaysSample()))
-	t.Cleanup(func() { _ = provider.Shutdown(t.Context()) })
 
 	t.Run("inside a sampled span", func(t *testing.T) {
 		out.Reset()

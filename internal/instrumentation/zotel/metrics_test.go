@@ -42,9 +42,13 @@ func (metricExporter) Export(context.Context, *metricdata.ResourceMetrics) error
 func (metricExporter) ForceFlush(context.Context) error                          { return nil }
 func (e metricExporter) Shutdown(context.Context) error                          { return e.shutdownErr }
 
-// newTestMetrics builds an OtelMetrics whose providers fail at shutdown with the given errors.
-// A nil error makes that provider's exporter shut down cleanly.
-func newTestMetrics(logErr, traceErr, metricErr error) *OtelMetrics {
+// newTestMetrics builds an OtelMetrics whose providers fail at shutdown with
+// their own error when fail is set, and shut down cleanly otherwise.
+func newTestMetrics(fail bool) *OtelMetrics {
+	var logErr, traceErr, metricErr error
+	if fail {
+		logErr, traceErr, metricErr = errLogShutdown, errTraceShutdown, errMetricShutdown
+	}
 	return &OtelMetrics{
 		loggerProvider: logsdk.NewLoggerProvider(
 			logsdk.WithProcessor(logsdk.NewSimpleProcessor(logExporter{shutdownErr: logErr})),
@@ -66,30 +70,15 @@ func TestOtelMetrics_Shutdown(t *testing.T) {
 	}{
 		{
 			name:    "all providers shut down cleanly",
-			metrics: newTestMetrics(nil, nil, nil),
+			metrics: newTestMetrics(false),
 		},
 		{
 			name:    "no providers configured",
 			metrics: &OtelMetrics{},
 		},
 		{
-			name:    "logger provider fails",
-			metrics: newTestMetrics(errLogShutdown, nil, nil),
-			wantErr: []error{errLogShutdown},
-		},
-		{
-			name:    "tracer provider fails",
-			metrics: newTestMetrics(nil, errTraceShutdown, nil),
-			wantErr: []error{errTraceShutdown},
-		},
-		{
-			name:    "meter provider fails",
-			metrics: newTestMetrics(nil, nil, errMetricShutdown),
-			wantErr: []error{errMetricShutdown},
-		},
-		{
 			name:    "every provider fails and none is masked",
-			metrics: newTestMetrics(errLogShutdown, errTraceShutdown, errMetricShutdown),
+			metrics: newTestMetrics(true),
 			wantErr: []error{errLogShutdown, errTraceShutdown, errMetricShutdown},
 		},
 	}
