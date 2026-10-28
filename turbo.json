@@ -14,9 +14,12 @@
   // `--affected` and `turbo query affected` match changed files against each
   // task's `inputs` and follow task edges, the artifact edges included (the
   // server embeds the console): the same answer as the cache key gives
-  // (docs/design/build/turborepo-graph.md).
+  // (docs/design/build/turborepo-graph.md). `turbo watch` reruns by the same
+  // inputs; matched by package instead, it ignored every Go edit, because the
+  // Go code lives in the root package.
   "futureFlags": {
-    "affectedUsingTaskInputs": true
+    "affectedUsingTaskInputs": true,
+    "watchUsingTaskInputs": true
   },
   // Tasks see only the variables listed on them, turbo's built-in list (PATH,
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
@@ -336,10 +339,13 @@
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    // Under `turbo watch server` a Go or console edit restarts the server
+    // (`interruptible`): its edges reach both.
     "//#server": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build"],
+      "interruptible": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/server#go-sources"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
