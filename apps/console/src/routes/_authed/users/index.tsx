@@ -17,18 +17,19 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_HEADER,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
   RESOURCE_STICKY_START,
   RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
+  RESOURCE_TITLE,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
   ResourceRow,
-  ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
@@ -197,36 +198,36 @@ function UsersScreen() {
   return (
     <Page>
       {/* No search beside the title: it is out of the page headers until there
-          is a console-wide solution (D19). */}
-      <ResourceTitle
-        action={
-          // The filter sits beside Add, 8px apart as the design draws it, and
-          // wraps under it on a phone so Add keeps the title row (D19).
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-            {loaded.lineages.length > 0 && (
-              <UsersFilter
-                lineages={loaded.lineages}
-                search={search}
-                onChange={(next) =>
-                  void navigate({
-                    search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
-                  })
-                }
-              />
-            )}
-            <AddUserSheet onCreated={() => router.invalidate()}>
-              {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
-                  `px-2.5`, which renders the 68px control at 72px. */}
-              <Button className="shrink-0 gap-1.5 px-2.5!">
-                <Plus aria-hidden />
-                Add
-              </Button>
-            </AddUserSheet>
+          is a console-wide solution (D19). The title row is composed here
+          rather than through `ResourceTitle`: the filter sits beside Add, 8px
+          apart as the design draws it, and on a phone drops to its own row
+          under the title while Add keeps the title row (D19). */}
+      <div className={`${RESOURCE_HEADER} flex min-h-9 flex-wrap items-center gap-x-2 gap-y-4`}>
+        <h1 className={RESOURCE_TITLE}>Users</h1>
+        {loaded.lineages.length > 0 && (
+          <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+            <UsersFilter
+              lineages={loaded.lineages}
+              search={search}
+              onChange={(next) =>
+                void navigate({
+                  search: (prev) => ({ ...prev, schema: next.schema, revision: next.revision }),
+                })
+              }
+            />
           </div>
-        }
-      >
-        Users
-      </ResourceTitle>
+        )}
+        <div className="order-2 ml-auto sm:order-3 sm:ml-0">
+          <AddUserSheet onCreated={() => router.invalidate()}>
+            {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
+                `px-2.5`, which renders the 68px control at 72px. */}
+            <Button className="shrink-0 gap-1.5 px-2.5!">
+              <Plus aria-hidden />
+              Add
+            </Button>
+          </AddUserSheet>
+        </div>
+      </div>
 
       {/* The pinned columns give the table no fixed width. The ID gives way
           first; more pinned columns than fit scroll the table horizontally
