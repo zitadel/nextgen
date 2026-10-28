@@ -199,7 +199,7 @@ tasks:
       # the deployment's configuration together. Scoped to test: nothing the
       # server compiles reads them.
       - "/vercel.json"
-      - "/apps/cloud/build.sh"
+      - "/apps/cloud/build-launcher.sh"
     options:
       runFromWorkspaceRoot: true
 

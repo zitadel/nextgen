@@ -24,7 +24,9 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   add an empty script to fill a gap. Moon's `server`, `bench` and `release`
   projects are the packages `@zitadel/server`, `@zitadel/bench`
   (`tools/bench`) and `@zitadel/release` (`tools/release`); their scripts
-  `cd` to the directory the command needs.
+  `cd` to the directory the command needs. `@zitadel/cloud` (`apps/cloud`,
+  the hosted cloud's launcher and schemas) has no moon project: its `dev` is
+  moon's `workspace:cloud`.
 - Task names are script names: `dev:real`, `test:integration` and
   `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
@@ -68,6 +70,10 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   and lists `["$TURBO_DEFAULT$", ".env*"]`; without them, a changed
   `.env.local` would restore a build made without it. Moon hashes only what
   git sees, listed or not ([.moon/AGENTS.md](../../../.moon/AGENTS.md)).
+- A listed glob matches ignored files too: `$TURBO_ROOT$/**/*.go` hashes
+  `node_modules`, agents' worktrees (`.claude/`, …) and, on Vercel, the Go
+  toolchain and module cache in `.vercel/cache/golang`. Exclude them
+  (`@zitadel/cloud#build`).
 - Outputs may lie outside the package (`$TURBO_ROOT$/internal/staticui/
   console/dist/**`). Framework caches are excluded (`!.next/cache/**`).
 - `cache: false` for anything that is not a pure function of its inputs: the
@@ -104,7 +110,9 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   leaves them out only in the Vite service's build, and the same packages
   would get other keys in the storybook's and the server's builds.
   `VERCEL_*` still reaches every task unhashed (turbo's built-in list): a
-  build whose output depends on one lists it in its `env`.
+  build whose output depends on one lists it in its `env` (the cloud's
+  launcher `VERCEL_GIT_COMMIT_REF`, the Next.js builds
+  `VERCEL_DEPLOYMENT_ID`).
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
@@ -167,15 +175,20 @@ git worktree turbo's cache defaults to the main checkout's `.turbo/cache`; set
 `TURBO_CACHE_DIR` to keep worktrees apart. Telemetry is off in CI and on
 Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
-On Vercel, the hosted cloud's services build with the plain `turbo run build`
-Vercel itself uses (repo-root `vercel.json`; the server's login UI in
-`apps/cloud/build.sh`). Two project variables, `TURBO_TELEMETRY_DISABLED`
+On Vercel, every service of the hosted cloud builds through turbo (repo-root
+`vercel.json`): the console, the docs and the website with
+`turbo run build`, the server with `@zitadel/cloud`'s `build`
+(`apps/cloud/build.sh`, which then migrates outside turbo) and the schemas
+with its `schemas`. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The cache works as Vercel sets it up:
 every build reads and writes the team's remote cache, production and
 previews in separate entries, and keeps no local cache. Writing takes the
-team's token, which a fork's pull request never gets unapproved. The docs
-and the website do not build through turbo: with Skew Protection on, a
-Next.js build's cache key includes the deployment's ID, so no build could
-reuse another's.
+team's token, which a fork's pull request never gets unapproved. The docs'
+and the website's builds never hit there: a Next.js build bakes in its
+deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
+metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers
+`NEXT_DEPLOYMENT_ID` into every task of a Next.js package, so the docs'
+`generate` and `typecheck`, which do not depend on it, drop it
+(`!NEXT_DEPLOYMENT_ID`) and still hit.

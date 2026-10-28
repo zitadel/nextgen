@@ -10,7 +10,7 @@
  *
  * - server: `entrypoint` names apps/cloud/launcher. Vercel's Go builder builds
  *   it in dev and starts it on $PORT; a deployment runs build.sh instead,
- *   which compiles the same package. The launcher, without
+ *   which builds the same package through turbo. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
  * - console: its `devCommand` builds it and serves the build, as the
  *   deployment serves it, behind the same service rewrites. Its dev server
@@ -20,8 +20,8 @@
  * What only a local run needs comes from here: the builds the dev servers
  * read from disk, a throwaway master key and root admin minted on the first
  * run under .zitadel/local/cloud/, where the SQLite database lives too, and
- * the function compiled without the console (-tags noconsole) as build.sh
- * compiles it. No Vercel account, link or secret is involved (-L), and Go
+ * the function compiled without the console (-tags noconsole) as
+ * build-launcher.sh compiles it. No Vercel account, link or secret is involved (-L), and Go
  * need not be installed: Vercel's Go builder downloads the version go.mod
  * names.
  */

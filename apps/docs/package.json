@@ -10,7 +10,7 @@
   "scripts": {
     "generate": "node scripts/bundle-openapi.mjs && node scripts/bundle-cli.mjs",
     "dev": "node scripts/bundle-openapi.mjs && node scripts/bundle-cli.mjs && next dev --port 3003",
-    "build": "node scripts/bundle-openapi.mjs && node scripts/bundle-cli.mjs && next build",
+    "build": "next build",
     "start": "next start --port 3003",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.spec.json && node scripts/sdk-samples.ts && tsc -p tsconfig.samples.json",
     "lint": "biome check .",

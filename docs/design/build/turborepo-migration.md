@@ -184,7 +184,7 @@ as they were.
 | demo-nuxt | `build` (outputs .output, mutex sdk-nuxt-dist) | `#build` | outputs `.output/**` |
 | e2e | `test` (journey harness unit tests); lanes `console-smoke`, `console-real`, `console-embedded`, `console-platform`, `console-deployment`, `demo-next-mock`, `demo-next-real`, `demo-nuxt-mock`, `journey`, `journey-local` (env; the demo-next pair's mutex `demo-next-app`); `all` (noop over every lane; ci.yml's e2e step runs it) | `@zitadel/e2e#…`, same lane names, plus `e2e-local`; no `all` | scripts carry the `NEXTGEN_*`, `ZITADEL_TELEMETRY` and `JOURNEY_TARBALLS_REQUIRED` defaults; the demo-next pair holds the guard's `demo-next-app` lock; ci-turbo.yml runs the lanes as gated steps |
 | docs | `generate` (inputs openapi + redocly) | `#generate` | same inputs and outputs |
-| docs | `build` (`next build`, mergeArgs replace) | `#build` | existing script (`pnpm run generate && next build`): bundles once more than moon; the Vercel docs service runs the script without a runner |
+| docs | `build` (`next build`, mergeArgs replace) | `#build` | the script is `next build`, as moon's command; the Vercel docs service runs the task, keyed by the deployment's ID (`VERCEL_DEPLOYMENT_ID`) |
 | docs | `dev`, `start` | same | existing |
 | docs | `e2e` (dep build), `e2e-deployment` (its own Playwright config, which requires `CLOUD_URL`) | same | **new** scripts; the root's `check:cloud` runs `e2e-deployment` with the e2e package's `console-deployment` |
 | console | `build` env inputs `$CONSOLE_VERCEL_INSIGHTS`, `$CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | `#build` `env` | both listed: strict mode would otherwise hide them from vite.config.ts. Neither is `VITE_`-prefixed: Vite inference would hash a prefixed one into every Vite package of the cloud's console build (as `VITE_CONSOLE_VERCEL_INSIGHTS`, it had `components` built twice per deployment) |
@@ -196,6 +196,7 @@ as they were.
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
 | workspace | `doctor`, `server`, `server-debug`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`); `journey` moved to `@zitadel/e2e#journey`, and moon keeps `workspace:journey` as a deprecated alias |
+| workspace | `cloud` (persistent) | `@zitadel/cloud#dev` | **new** `apps/cloud/package.json`, no moon project; its `build` (the cloud's launcher) and `schemas` are what the cloud's `server` and `schemas` services build |
 | workspace | `cli` (interactive) | — | not a turbo task: interactive tasks need turbo's terminal UI. `pnpm run cli -- …` (the root script that exists today) |
 | cli-skill-e2e (no moon project) | — | — | its `test` script is renamed `eval` (`eval:fresh` for `FRESH=1`), otherwise `turbo run test` would run a Claude-driven eval |
 
@@ -379,8 +380,10 @@ token.
   console-deployment --filter=@zitadel/e2e`), the tasks the root's
   `pnpm check:cloud` runs by hand, and the step summary's "Reproduce" line
   names that command.
-- **Vercel:** the repo-root `vercel.json` and `apps/cloud/build.sh` already
-  build with turbo (pilot). `apps/console/vercel.json` belongs to the paused
+- **Vercel:** every service of the repo-root `vercel.json` builds through
+  turbo: the console, the docs and the website with `turbo run build`, the
+  server (`apps/cloud/build.sh`) and the schemas through `@zitadel/cloud`'s
+  `build` and `schemas`. `apps/console/vercel.json` belongs to the paused
   legacy `nextgen` project and still says `moon run console:build`; it is
   deleted or updated with that project.
 - **Dockerfile:** the comment "Consumed by Moon release tasks" is text only.
@@ -420,7 +423,7 @@ Two workable setups; the prototype's draft uses the first.
 | | Vercel Remote Cache (OIDC) | Depot's turbo cache |
 |---|---|---|
 | Setup | a repository variable `TURBO_TEAM=zitadel`, `id-token: write` on the job, `vercel/setup-turborepo-remote-cache-action@v1.1.0` before the first `turbo` (with `policy:` set to the policy's ID only if more than one of the team's Turborepo policies matches the token: Vercel then refuses the exchange), `TURBO_API=https://vercel.com` on Depot runners (they inject Depot's `TURBO_API`), and a **Turborepo CLI OIDC policy** in the Vercel team settings (Build and Deployment → OIDC Policies for CLI Access → Turborepo CLI Policies, not a VCR policy; select GitHub, repository `zitadel/nextgen`; optionally restrict to a workflow or branch) | nothing on Depot runners: `TURBO_API`, `TURBO_TOKEN`, `TURBO_TEAM` are injected |
-| Shared with | the cloud deployments (same team cache): a build CI did is a hit on Vercel and the reverse | CI only |
+| Shared with | the cloud deployments (same team cache, apart by key: turbo hashes `VERCEL_TARGET_ENV` into every task on Vercel, so a build CI did is no hit there) | CI only |
 | Cost | free, within a fair-use limit of 1 TB/month of uploads on Pro; artifacts expire after 7 days | part of the Depot plan (as moon's cache today) |
 | Forks | no token, local cache only | same |
 | Write policy | `TURBO_CACHE=local:rw,remote:rw` on every run: pushes to main (which run the gate alone), runs by hand, and pull requests and the merge queue while they run it (decision 9), as moon's runs write Depot's cache; on Vercel, every build reads and writes, Vercel's default, production and previews in separate entries (see "Who may write to the cache") | same flags |
