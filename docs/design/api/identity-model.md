@@ -36,7 +36,7 @@ credential, and only the machine user could hold permissions.
 | --- | --- | --- |
 | **User** | A person who signs in | Properties and sign-in methods, defined by a user schema per kind of person |
 | **App** | Anything that uses Zitadel: a web or mobile app, a backend, a service account, a SaaS product, or an agent calling APIs and MCP servers, Zitadel's own included | Any number of configs: OAuth and OIDC clients, SAML IdP configs, SCIM provisioning configs, and the APIs it serves, MCP servers among them, each with its mappings. A confidential client can be a principal: it acts as itself, or for a user by delegation or impersonation |
-| **Connection** | Anything Zitadel trusts upstream: Google, a customer's Entra, GitHub Actions, a SCIM directory | Any number of configs: OIDC and OAuth RP, OIDC WIF, SAML SP and SCIM provider configs, with the mappings |
+| **Connection** | Anything Zitadel trusts upstream: Google, a customer's Entra and the agents it runs, GitHub Actions, a SCIM directory | Any number of configs: OIDC and OAuth RP, OIDC WIF, SAML SP and SCIM provider configs, with the mappings |
 
 The two sides mirror each other:
 
@@ -44,6 +44,7 @@ The two sides mirror each other:
 | --- | --- | --- |
 | OIDC and OAuth | Clients: Zitadel is the provider | RP configs: Zitadel signs users in upstream |
 | Workloads | A client is the principal a workload acts as | OIDC WIF: Zitadel accepts a workload's token |
+| Agents | The customer's own agents, and third parties that registered | External agents, which a trusted party runs and vouches for; the mapping says which client each becomes |
 | SAML | IdP configs: Zitadel signs users into the app | SP configs: Zitadel trusts the upstream IdP |
 | SCIM | Provisioning configs: Zitadel is the SCIM client and pushes users into the app | Provider configs: Zitadel is the SCIM server, and the upstream pushes users in |
 | Mappings | User properties to claims, attributes and SCIM | Claims, attributes and SCIM to user properties, or a workload to a client |
@@ -76,10 +77,10 @@ An app is one piece of software, and it holds as many configs as it needs:
 - **APIs** the app serves, MCP servers among them: an identifier, which is
   the `aud` of tokens for it, and scopes. A token is for one API
   ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)).
-- **Dynamic registration**, when the app opens it: agents that register with
-  a [client ID metadata document](https://datatracker.ietf.org/doc/draft-ietf-oauth-client-id-metadata-document/),
-  or older ones through [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591),
-  become third-party clients of the app.
+- **Dynamic registration**, when the app opens it: agents that register
+  themselves, the ways
+  [ADR 082 §9](../../adrs/082-oauth-and-oidc-server.md#9-registration)
+  allows, become third-party clients of the app.
 
 **A client can be a principal.** A client that authenticates as itself, with
 a key, a secret or a WIF mapping, gets tokens whose `sub` is the client, and
@@ -91,13 +92,14 @@ it holds rights the way a user does:
   the user and its `act` names the client, so every API sees both. A
   third-party client delegates only for users who consented.
 - **Impersonate**: the same, without `act`, so APIs see only the user. It is
-  the narrower right, for support tooling, and the server audits every
-  exchange.
+  the narrower right, and the server audits every exchange.
 
 Rights are granted like any other permission, so they can be scoped (all
-users, users of one schema, one team) and are audited the same way. A public
-client, such as a SPA or a mobile app, is never a principal: it only acts for
-the user who signed in.
+users, users of one schema, one team) and are audited the same way. A user
+can hold delegate and impersonate as well, so a customer decides who acts
+for its users: an agent, a support tool or its own staff. A public client,
+such as a SPA or a mobile app, is never a principal: it only acts for the
+user who signed in.
 
 That covers machines without machine users:
 
@@ -106,7 +108,7 @@ That covers machines without machine users:
   and a client, not v4's two apps and a machine user.
 
 **An agent is an app too**, whoever built it. How it gets tokens depends on
-whom it works for and whose API it calls:
+whom it works for, whose API it calls, and who vouches for it:
 
 - **For itself**, such as a job that reprices the catalog every night: its
   client is a principal with its own permissions, and authenticates with a
@@ -122,11 +124,15 @@ whom it works for and whose API it calls:
   project, the platform project, is a project like any other, so its API is
   one more API and the same rules apply. The agent acts for the developer
   who connected it, or holds permissions of its own.
+- **External**, when a party Zitadel trusts vouches for it, such as an agent
+  that runs in a customer's Entra: it comes in through that party's
+  connection, and the mapping says which client it becomes, as for a CI
+  workload.
 
-Agents delegate; they do not impersonate. A delegated token names the agent
-in `act`, so an API can set limits for agents, and Zitadel can refuse what
-only a person may do, such as claiming a project. Impersonation stays with
-support tooling.
+Agents delegate: a delegated token names the agent in `act`, so an API can
+set limits for agents, and Zitadel can refuse what only a person may do,
+such as claiming a project. Who may impersonate is the customer's call, for
+its staff or its tools.
 
 ### Connections
 
@@ -135,8 +141,9 @@ needs, with the mappings between them:
 
 - **OIDC and OAuth RP configs**, any number: Zitadel signs users in at the
   upstream provider.
-- **OIDC WIF configs**: Zitadel accepts the tokens that CI systems, clusters
-  and clouds issue to their workloads, so a workload needs no secret.
+- **OIDC WIF configs**: Zitadel accepts the tokens that CI systems, clusters,
+  clouds and agent platforms issue to their workloads and agents, so neither
+  needs a secret.
 - **SAML SP configs**: Zitadel signs users in at an upstream SAML IdP.
 - **SCIM provider configs**: the upstream provisions users and groups into
   Zitadel.
@@ -147,8 +154,8 @@ The mappings say:
   and when a user is created on first sign-in;
 - where each config finds the shared subject, so a user that SCIM created
   signs in through OIDC without a linking step;
-- which client a workload token becomes, by its claims (for GitHub Actions,
-  the repository and the branch).
+- which client a workload or an external agent becomes, by the claims in its
+  token (for GitHub Actions, the repository and the branch).
 
 ## How it looks
 
@@ -218,7 +225,7 @@ GitHub Actions, deploying as the shop's `deploy` client without a secret:
 | **Connection** | Anything Zitadel trusts upstream, with its configs and mappings | "IdP", "provider", v4's identity providers | Auth0's and WorkOS's word. "Provider" already names Zitadel itself, the OIDC provider, and the server side of SCIM |
 | **WIF config** | A connection's trust in the tokens workloads get from CI systems, clusters and clouds | keys and secrets stored in CI | The clouds' name: workload identity federation |
 | **Mapping** | How claims, attributes and SCIM translate to and from user properties, and which client a workload becomes | the IdP connection's `claim_mapping`, v4's actions for mapping | Says what it does |
-| **Delegate**, **impersonate** | Rights a principal client holds to act for a user, with `act` or without | v4's impersonation setting | RFC 8693's words |
+| **Delegate**, **impersonate** | Rights to act for a user, with `act` or without, which a client or a user can hold | v4's impersonation setting | RFC 8693's words |
 
 ## What changes
 
@@ -257,9 +264,10 @@ consents stay per user, client and scope.
    connections (`x-auth-methods.sso.providers`); with several configs per
    connection, the list may name configs, or the app may choose.
 8. **Agents that must be users.** An app may want an agent among its
-   members, or accept only user tokens. Entra pairs such an agent with an
-   optional user account, one to one; whether a principal client gets one
-   here, or the app learns to take clients.
+   members, or accept only user tokens, and an external agent can arrive as
+   a user: Entra pairs an agent with a user account, one to one. Whether a
+   connection maps such an agent to a user marked as an agent, or the app
+   learns to take clients.
 
 ## Prior art
 
@@ -276,11 +284,9 @@ consents stay per user, client and scope.
   from a blueprint, which holds the credentials. It gets tokens as itself, or
   user tokens that name it as the actor, and an optional user account, paired
   one to one, serves systems that accept only users.
-- **MCP authorization**: an MCP server is an OAuth protected resource, and a
-  client with no prior relationship registers with a client ID metadata
-  document; the
-  [2026-07-28 revision](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/client-registration)
-  deprecates DCR. That is an app's API plus its dynamic registration.
+- **MCP authorization**: an MCP server is an OAuth protected resource, and
+  its clients register themselves, which is an app's API plus its dynamic
+  registration.
 - **Zitadel v4**: token exchange with impersonation, which a security setting
   has to allow.
 - **Keycloak**, as a warning: a client with service accounts enabled gets a
