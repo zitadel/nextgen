@@ -43,12 +43,12 @@ func TestListUsers_UniqueAttributeLookupPlan(t *testing.T) {
 	}{
 		{
 			name:     "every scope",
-			registry: "SEARCH ua USING COVERING INDEX idx_user_unique_attributes_lookup (project_id=? AND key=? AND value_hash=?)",
+			registry: "SEARCH user_unique_attributes USING COVERING INDEX idx_user_unique_attributes_lookup (project_id=? AND key=? AND value_hash=?)",
 		},
 		{
 			name:         "project scope",
 			uniqueTeamID: new(""),
-			registry:     "SEARCH ua USING INDEX sqlite_autoindex_user_unique_attributes_1 (project_id=? AND team_id=? AND key=? AND value_hash=?)",
+			registry:     "SEARCH user_unique_attributes USING INDEX sqlite_autoindex_user_unique_attributes_1 (project_id=? AND team_id=? AND key=? AND value_hash=?)",
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

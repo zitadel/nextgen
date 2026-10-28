@@ -408,45 +408,52 @@ func (us userStatements) ListUsers(ctx context.Context, filter *database.ListOpt
 	users, nextCursor, err := pagination.Page(filter.Pagination, userSchema, func(limit uint32) ([]*domain.User, error) {
 		var compiler statementCompiler
 		compiler.WriteString(userQuery)
+		if opts.UniqueAttributesOnly {
+			for i, a := range opts.Attributes {
+				hash, err := domain.UniqueValueHash(a.Value)
+				if err != nil {
+					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+				}
+				// A join, not IN: Postgres 16 and older run a correlated IN once
+				// per users row. The registry is reached by the outer project_id
+				// equality, which the planner pushes into the subquery. DISTINCT
+				// keeps one row per user holding the value in several team scopes,
+				// so LIMIT counts users.
+				alias := fmt.Sprintf("ua%d", i)
+				compiler.WriteString(" JOIN (SELECT DISTINCT project_id AS ua_project_id, user_id AS ua_user_id FROM ")
+				compiler.WriteString(userUniqueAttributesTable)
+				compiler.WriteString(" WHERE key = ")
+				compiler.WriteArg(a.Key)
+				compiler.WriteString(" AND value_hash = ")
+				compiler.WriteArg(hash[:])
+				if opts.UniqueTeamID != nil {
+					compiler.WriteString(" AND team_id = ")
+					compiler.WriteArg(*opts.UniqueTeamID)
+				}
+				compiler.WriteString(") " + alias + " ON " + alias + ".ua_project_id = zitadel_nextgen.users.project_id AND " + alias + ".ua_user_id = zitadel_nextgen.users.id")
+			}
+		}
 
 		hasWhere := false
 		if readFilter != nil {
 			writeConjunct(&compiler, &hasWhere)
 			compileFilter(&compiler, readFilter, userSchema)
 		}
-		for _, a := range opts.Attributes {
-			writeConjunct(&compiler, &hasWhere)
-			if opts.UniqueAttributesOnly {
-				hash, err := domain.UniqueValueHash(a.Value)
+		if !opts.UniqueAttributesOnly {
+			for _, a := range opts.Attributes {
+				writeConjunct(&compiler, &hasWhere)
+				raw, err := json.Marshal(a.Value)
 				if err != nil {
-					return nil, fmt.Errorf("hash attribute %q: %w", a.Key, err)
+					return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
 				}
-				// IN for parity with the sqlite dialect, which needs it. Postgres plans
-				// IN and EXISTS as the same semi join.
-				compiler.WriteString("zitadel_nextgen.users.id IN (SELECT ua.user_id FROM ")
-				compiler.WriteString(userUniqueAttributesTable)
-				compiler.WriteString(" ua WHERE ua.project_id = zitadel_nextgen.users.project_id AND ua.key = ")
+				compiler.WriteString("EXISTS (SELECT 1 FROM ")
+				compiler.WriteString(userAttributesTable)
+				compiler.WriteString(" a WHERE a.project_id = zitadel_nextgen.users.project_id AND a.user_id = zitadel_nextgen.users.id AND a.key = ")
 				compiler.WriteArg(a.Key)
-				compiler.WriteString(" AND ua.value_hash = ")
-				compiler.WriteArg(hash[:])
-				if opts.UniqueTeamID != nil {
-					compiler.WriteString(" AND ua.team_id = ")
-					compiler.WriteArg(*opts.UniqueTeamID)
-				}
-				compiler.WriteString(")")
-				continue
+				compiler.WriteString(" AND a.value = ")
+				compiler.WriteArg(string(raw))
+				compiler.WriteString("::jsonb AND jsonb_typeof(a.value) IN ('string', 'number', 'boolean'))")
 			}
-			raw, err := json.Marshal(a.Value)
-			if err != nil {
-				return nil, fmt.Errorf("marshal attribute %q: %w", a.Key, err)
-			}
-			compiler.WriteString("EXISTS (SELECT 1 FROM ")
-			compiler.WriteString(userAttributesTable)
-			compiler.WriteString(" a WHERE a.project_id = zitadel_nextgen.users.project_id AND a.user_id = zitadel_nextgen.users.id AND a.key = ")
-			compiler.WriteArg(a.Key)
-			compiler.WriteString(" AND a.value = ")
-			compiler.WriteArg(string(raw))
-			compiler.WriteString("::jsonb AND jsonb_typeof(a.value) IN ('string', 'number', 'boolean'))")
 		}
 		if opts.MembershipTeamID != nil {
 			writeConjunct(&compiler, &hasWhere)
