@@ -1905,7 +1905,7 @@ describe("the release resource", () => {
     );
   });
 
-  it("shows a release's pointers as a table under its fields", () => {
+  it("shows the resources a release pins as a table under its fields", () => {
     const release = {
       pointers: [
         { kind: "schema", handle: "human-user", revision_id: "sch_1" },
@@ -1916,7 +1916,7 @@ describe("the release resource", () => {
     expect(RESOURCES.release.get.sections?.(release)).toEqual([releasePointers(release)]);
     expect(releasePointers(release)).toBe(
       [
-        "pointers",
+        "resources",
         "  kind             handle         revision_id",
         "  ---------------  -------------  -----------",
         "  schema           human-user     sch_1",

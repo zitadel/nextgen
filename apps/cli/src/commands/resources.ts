@@ -102,7 +102,7 @@ export const releasePointers = (release: unknown): string => {
   const table = renderTable(["kind", "handle", "revision_id"], pointers)
     .split("\n")
     .map((line) => `  ${line}`);
-  return ["pointers", ...table].join("\n");
+  return ["resources", ...table].join("\n");
 };
 
 /** The operations a policy can guard, as the generated publish body names them. */
