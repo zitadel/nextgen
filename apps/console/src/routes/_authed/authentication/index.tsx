@@ -282,7 +282,6 @@ function IdpRow({ idp, users }: { idp: IdpConnection; users: IdpReference[] }) {
           params={{ idpId: idp.id }}
           className={RESOURCE_ROW_LINK}
         >
-          <Shield aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>
