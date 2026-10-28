@@ -239,6 +239,13 @@ func TestSchemaService_ListSchemas(t *testing.T) {
 			result: &database.ListResult[*domain.JSONSchema]{},
 		},
 		{
+			name:          "in_use reaches the statement",
+			input:         service.ListSchemasInput{ProjectID: "proj_a", IncludeInUse: true},
+			wantOpts:      listSchemasOpts(20, ""),
+			wantQueryOpts: service.JSONSchemaQueryOptions{IncludeInUse: true},
+			result:        &database.ListResult[*domain.JSONSchema]{},
+		},
+		{
 			name:     "limit clamped to max",
 			input:    service.ListSchemasInput{ProjectID: "proj_a", Limit: 500},
 			wantOpts: listSchemasOpts(100, ""),

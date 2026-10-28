@@ -7,6 +7,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 	"github.com/zitadel/nextgen/internal/storage/flowdefinition"
 )
@@ -291,9 +292,12 @@ func (s *flowService) resolveFlowSession(ctx context.Context, req StartFlowReque
 	return session.ID, nil
 }
 
-func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain.FlowStepResult, err error) {
+func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (res domain.FlowStepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Start")
 	defer end(&err)
+	// Where the flow was left, never which step: step names are defined per
+	// project. res and err are the named results, so this sees every return.
+	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowStart, flowResult(res, err)) }()
 
 	if req.Definition == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: start without definition")
@@ -354,9 +358,10 @@ func (s *flowService) Start(ctx context.Context, req StartFlowRequest) (_ domain
 	return domain.FlowStepResult{State: result.State, Step: result.Step}, nil
 }
 
-func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ domain.FlowStepResult, err error) {
+func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (res domain.FlowStepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.Submit")
 	defer end(&err)
+	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowSubmit, flowResult(res, err)) }()
 
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: submit without state")
@@ -400,9 +405,10 @@ func (s *flowService) Submit(ctx context.Context, req SubmitFlowRequest) (_ doma
 	}, nil
 }
 
-func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (_ domain.FlowStepResult, err error) {
+func (s *flowService) GetStep(ctx context.Context, req GetFlowStepRequest) (res domain.FlowStepResult, err error) {
 	ctx, end := startSpan(ctx, "FlowService.GetStep")
 	defer end(&err)
+	defer func() { metrics.RecordFlowTransition(ctx, metrics.FlowRender, flowResult(res, err)) }()
 
 	if req.State == nil {
 		return domain.FlowStepResult{}, fmt.Errorf("flow service: get step without state")

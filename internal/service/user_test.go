@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -129,6 +130,38 @@ func TestUserService_ListUsers_ValidationErrors(t *testing.T) {
 			wantErr: domain.ErrRequestInvalid(),
 		},
 		{
+			name: "schema_object_type cannot be sorted by",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Sorting:   &service.Sorting{Field: "schema_object_type", Direction: "asc"},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "ordering operation on schema_object_type is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema_object_type", Operation: "less_than", Value: "consumer"}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "non-string schema_object_type value is invalid",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema_object_type", Operation: "equals", Value: 42}},
+			},
+			wantErr: domain.ErrRequestInvalid(),
+		},
+		{
+			name: "not_contains on schema not implemented",
+			input: service.ListUsersInput{
+				ProjectID: "proj_1",
+				Filters:   []service.Filter{{Field: "schema", Operation: "not_contains", Value: "v1"}},
+			},
+			wantErr: domain.ErrNotImplemented(),
+		},
+		{
 			name: "contains on team_id is invalid",
 			input: service.ListUsersInput{
 				ProjectID: "proj_1",
@@ -239,6 +272,7 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 				{Field: "created_at", Operation: "greater_than", Value: time.Now().UTC().Format(time.RFC3339)},
 				{Field: "id", Operation: "equals", Value: "usr_1"},
 				{Field: "schema", Operation: "contains", Value: "sch_"},
+				{Field: "schema_object_type", Operation: "equals", Value: "consumer"},
 				{Field: "status", Operation: "equals", Value: "active"},
 				{Field: "team_id", Operation: "equals", Value: "team_1"},
 				{Field: "lifecycle_owner_team_id", Operation: "equals", Value: "team_2"},
@@ -273,6 +307,37 @@ func TestUserService_ListUsers_TranslatesQuery(t *testing.T) {
 		assert.Equal(t, "team_1", *gotOpts.MembershipTeamID)
 		// Only the implicit project predicate is left on the row filter.
 		assert.NotNil(t, gotList.Filter)
+	})
+
+	t.Run("schema and object type filters compile to row filters", func(t *testing.T) {
+		t.Parallel()
+
+		svc, stmts := newMockedUserService(t)
+		var got *database.ListOptions[domain.UserField]
+		stmts.EXPECT().
+			ListUsers(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], _ service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
+				got = opts
+				return &database.ListResult[*domain.User]{}, nil
+			})
+
+		_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
+			ProjectID: "proj_1",
+			Filters: []service.Filter{
+				{Field: "schema_object_type", Operation: "contains", Value: "consum"},
+				{Field: "schema_object_type", Operation: "not_equals", Value: "business"},
+				{Field: "schema", Operation: "not_equals", Value: "https://example.test/consumer-v2.json"},
+			},
+		})
+		require.NoError(t, err)
+
+		objectType := database.Col(domain.UserFieldSchemaObjectType)
+		assert.Equal(t, database.And(
+			database.Equal(database.Col(domain.UserFieldProjectID), "proj_1"),
+			database.StringContainsFold(objectType, "consum"),
+			database.Not[domain.UserField](database.StringEqual(objectType, "business")),
+			database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaURL), "https://example.test/consumer-v2.json")),
+		), got.Filter)
 	})
 
 	t.Run("no membership filter leaves the query option unset", func(t *testing.T) {
@@ -533,7 +598,7 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 }
 
 // A `schema` equality on a built-in schema's `$id` must match the users
-// stored under any of its bases: a user created by naming one base is stored
+// stored under any of its bases, and an inequality must exclude all of them: a user created by naming one base is stored
 // under the base the project holds the row at.
 func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) {
 	t.Parallel()
@@ -554,7 +619,7 @@ func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) 
 		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], _ service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 			gotList = opts
 			return &database.ListResult[*domain.User]{}, nil
-		}).Times(2)
+		}).Times(3)
 
 	_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
 		ProjectID: "proj_1",
@@ -579,6 +644,16 @@ func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) 
 		"https://schemas.test/builtin/v0/default-human-user.json",
 		"https://schemas.test/builtin/v1/default-human-user.json",
 	}, spellings)
+
+	// not_equals excludes the same spellings equals includes.
+	_, err = svc.ListUsers(t.Context(), service.ListUsersInput{
+		ProjectID: "proj_1",
+		Filters:   []service.Filter{{Field: "schema", Operation: "not_equals", Value: "https://schemas.test/builtin/v0/default-human-user.json"}},
+	})
+	require.NoError(t, err)
+	and, ok = gotList.Filter.(database.AndFilter[domain.UserField])
+	require.True(t, ok, "%T", gotList.Filter)
+	assert.Equal(t, database.Not[domain.UserField](or), and.Filters[1])
 
 	// A schema outside the namespace, or a non-equality, is filtered as written.
 	_, err = svc.ListUsers(t.Context(), service.ListUsersInput{
@@ -733,5 +808,62 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 			Attributes: map[string]any{"email": "taken@example.com"},
 		})
 		requireTakenFields(t, err)
+	})
+}
+
+func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a deleted user loses every grant, each with its own event", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		var events []*domain.Event
+		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				events = append(events, ev)
+				return nil
+			},
+		).AnyTimes()
+		gomock.InOrder(
+			stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_platform", "user_1"),
+			stmts.EXPECT().RevokeAuthzAssignmentsByPrincipal(gomock.Any(), domain.AuthzPrincipalTypeUser, "user_1").
+				Return([]*domain.AuthzAssignment{
+					{ID: "asgn_a", ProjectID: "proj_a", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_1", Relation: "admin"},
+					{ID: "asgn_b", ProjectID: "proj_b", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_1", Relation: "viewer"},
+				}, nil),
+		)
+
+		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_platform", UserID: "user_1"}).
+			Apply(t.Context(), stmts)
+		require.NoError(t, err)
+
+		require.Len(t, events, 3)
+		for i, want := range []struct{ project, entity, relation string }{
+			{"proj_a", "asgn_a", "admin"},
+			{"proj_b", "asgn_b", "viewer"},
+		} {
+			assert.Equal(t, domain.EventTypeAuthzRevoked, events[i].EventType)
+			assert.Equal(t, want.project, events[i].ProjectID)
+			require.NotNil(t, events[i].EntityID)
+			assert.Equal(t, want.entity, *events[i].EntityID)
+			var payload domain.AuthzRevokedPayload
+			require.NoError(t, json.Unmarshal(events[i].Payload, &payload))
+			assert.Equal(t, domain.AuthzRevokedPayload{PrincipalType: "user", PrincipalID: "user_1", Relation: want.relation}, payload)
+		}
+		assert.Equal(t, domain.EventTypeUserDeleted, events[2].EventType)
+	})
+
+	// The revoke is keyed on the user alone, so a delete that matched no user
+	// in the caller's project must not reach a same-id user's grants elsewhere.
+	t.Run("a user outside the project keeps their grants", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_other", "user_1").Return(database.NewNoRowFoundError(nil))
+
+		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_other", UserID: "user_1"}).
+			Apply(t.Context(), stmts)
+		require.NoError(t, err)
 	})
 }

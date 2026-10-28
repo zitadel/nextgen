@@ -952,6 +952,68 @@ func TestConsoleSessionPartialAccessDoesNotExpand(t *testing.T) {
 	})
 }
 
+// TestConsoleSessionSchemaInUseNeedsProjectRead pins the gate on
+// GET /schemas?expand=in_use: the flag says whether users exist on a revision,
+// so it is read under the users' permission (ADR 059 rule 8). A session minting
+// no scopes gets it from read on the whole project; a viewer grant scoped to
+// one team still lists schemas but is refused the flag.
+func TestConsoleSessionSchemaInUseNeedsProjectRead(t *testing.T) {
+	t.Parallel()
+
+	customer, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	_, teamID := harness.CreateUserOwnedByTeam(t, customer.ID)
+	params := api.ListSchemasParams{
+		ProjectID: api.ProjectID(customer.ID),
+		Expand:    []api.SchemaExpand{api.SchemaExpandInUse},
+	}
+
+	t.Run("read on the whole project", func(t *testing.T) {
+		t.Parallel()
+		console := harness.EnsurePlatformProject(t)
+		operatorID, _ := harness.CreateUserOwnedByTeam(t, console.ID)
+		harness.SeedProjectAdmin(t, customer.ID, operatorID)
+
+		resp, err := sessionClientForUser(t, operatorID).ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		listed, ok := resp.(*api.ListSchemasResponse)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		require.NotEmpty(t, listed.Schemas)
+		for _, schema := range listed.Schemas {
+			assert.True(t, schema.Metadata.InUse.Set, "in_use must be set on %s", schema.ID)
+		}
+	})
+
+	t.Run("a grant scoped to one team", func(t *testing.T) {
+		t.Parallel()
+		_, operatorID, cookie := ownSessionUser(t)
+		asgn := &domain.AuthzAssignment{
+			ProjectID:     customer.ID,
+			CatalogID:     domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser,
+			PrincipalID:   operatorID,
+			ObjectType:    "project",
+			Relation:      "viewer",
+		}
+		asgn.ApplyScope(domain.NewTeamAssignmentScope(teamID))
+		require.NoError(t, harness.EnsureServiceDB(t).Statements().CreateAuthzAssignment(t.Context(), asgn))
+		session, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+		require.NoError(t, err)
+		session.SetSessionToken(cookie.Value)
+
+		listed, err := session.ListSchemas(t.Context(), api.ListSchemasParams{ProjectID: params.ProjectID})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListSchemasResponse{}, listed, "the foothold still lists: %s", helpers.MustMarshal(t, listed))
+
+		resp, err := session.ListSchemas(t.Context(), params)
+		require.NoError(t, err)
+		status, code, _, ok := errorResponseParts(t, resp)
+		require.True(t, ok, helpers.MustMarshal(t, resp))
+		assert.Equal(t, http.StatusForbidden, status)
+		assert.Equal(t, domain.ErrJSONSchemaPermissionDenied().Code, code)
+	})
+}
+
 // TestConsoleSessionByIDTeamFilterNeedsProjectRead closes the side door next
 // to TestConsoleSessionPartialAccessDoesNotExpand: GET /users/{id}?team_id=
 // answers "is this user an active member of that team", the membership read

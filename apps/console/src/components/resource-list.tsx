@@ -239,6 +239,7 @@ export function ResourceEmptyRow({ colSpan, children }: { colSpan: number; child
 export function RowMenu({
   name,
   icon: Icon = Ellipsis,
+  size = "icon",
   className,
   contentClassName = "w-40",
   children,
@@ -246,6 +247,8 @@ export function RowMenu({
   /** The row's name, for the trigger's accessible name. */
   name: string;
   icon?: LucideIcon;
+  /** `icon-xs`: the 24px trigger a detail card's rows draw. */
+  size?: "icon" | "icon-xs";
   className?: string;
   contentClassName?: string;
   children: ReactNode;
@@ -255,7 +258,7 @@ export function RowMenu({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size={size}
           aria-label={`Actions for ${name}`}
           className={className}
         >

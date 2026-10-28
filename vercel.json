@@ -181,6 +181,12 @@
       }
     }
   ],
+  "crons": [
+    {
+      "path": "/cron/events-retention",
+      "schedule": "17 * * * *"
+    }
+  ],
   "regions": ["iad1", "sfo1", "fra1", "sin1", "hnd1"],
   "git": {
     "deploymentEnabled": {

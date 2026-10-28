@@ -17,7 +17,7 @@
     "generate": {
       "env": ["!NEXT_*"],
       "inputs": [
-        "$TURBO_DEFAULT$",
+        "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/api/openapi/**/*.yaml",
         "$TURBO_ROOT$/redocly.yaml",
         "$TURBO_ROOT$/apps/cli/command-reference.json",
@@ -46,7 +46,7 @@
         "@zitadel/api-mock#build",
         "@zitadel/components#build"
       ],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/api/src/**"]
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/packages/api/src/**", "!$TURBO_ROOT$/packages/api/src/generated/**"]
     },
     // app/global.css imports the design tokens' CSS variables, which the
     // repository commits, so that build needs no generation of them.

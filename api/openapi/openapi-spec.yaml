@@ -238,6 +238,8 @@ paths:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
+  /policies/evaluate:
+    $ref: endpoints/policies/evaluate/methods.yaml
   /policies/{policy_id}:
     $ref: endpoints/policies/by_id/methods.yaml
   /policies/{policy_id}/revisions:

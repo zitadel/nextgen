@@ -75,6 +75,16 @@ SET revoked_at = now(), updated_at = now()
 WHERE project_id = $1 AND id = $2 AND revoked_at IS NULL
 RETURNING revoked_at, updated_at`
 
+	revokeAuthzAssignmentsByPrincipalStmt = `
+UPDATE zitadel_nextgen.authz_assignments
+SET revoked_at = now(), updated_at = now()
+WHERE principal_type = $1 AND principal_id = $2 AND revoked_at IS NULL
+RETURNING id, project_id, catalog_id,
+          principal_type, principal_id, object_type, relation,
+          scope_kind, scope_team_id, scope_resource_id,
+          grantor_type, grantor_id, delegation_id,
+          expires_at, revoked_at, created_at, updated_at`
+
 	// Literal 'project'/'team' so the planner can serve this from the partial
 	// index authz_assignments_one_owning_team; the relation names match
 	// domain.NewClaimTeamAssignment and the seeded system catalog.
@@ -206,6 +216,19 @@ func (s authzAssignmentStatements) ListManagedGrants(ctx context.Context, projec
 func (s authzAssignmentStatements) RevokeAuthzAssignment(ctx context.Context, projectID, id string) error {
 	var revokedAt, updatedAt time.Time
 	return wrapError(s.client.QueryRow(ctx, revokeAuthzAssignmentStmt, projectID, id).Scan(&revokedAt, &updatedAt))
+}
+
+// RevokeAuthzAssignmentsByPrincipal implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	rows, err := s.client.Query(ctx, revokeAuthzAssignmentsByPrincipalStmt, principalType.String(), principalID)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	assignments, err := pgx.CollectRows(rows, scanAuthzAssignment)
+	if err != nil {
+		return nil, wrapError(err)
+	}
+	return assignments, nil
 }
 
 // GetActiveOwningTeamGrant implements [service.AuthzAssignmentStatements].
