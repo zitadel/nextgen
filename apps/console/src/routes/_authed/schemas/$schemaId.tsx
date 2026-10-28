@@ -60,8 +60,8 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  *
  * The header is the title over one line of identity (id and created date), not
  * the resource screens' icon tile and meta card: the design draws this screen
- * that way. Each tab is a `DetailSection`, with the revision picker as the
- * card's action, since the revision applies to the whole schema.
+ * that way. Each tab is a `DetailSection`; the Fields card carries the
+ * revision picker as its action.
  */
 function SchemaDetail() {
   const { schema, createdAt, revisions } = Route.useLoaderData();
@@ -124,7 +124,8 @@ function SchemaDetail() {
         </TabsContent>
 
         <TabsContent value="authentication">
-          <DetailSection title="Sign-in methods" action={picker} note={note}>
+          {/* No picker here: the design draws it on the Fields card only. */}
+          <DetailSection title="Sign-in methods">
             {methods.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 This schema declares no sign-in methods.
