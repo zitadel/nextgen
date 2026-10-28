@@ -195,7 +195,7 @@ test("gives a colleague admin access to the project, and takes it away", async (
     // whether or not anything was created, which is the point of it.
     const row = page.getByRole("row").filter({ hasText: colleague.email });
     await expect(row).toBeVisible();
-    await expect(row.getByText("Admin", { exact: true })).toBeVisible();
+    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
 
     // With the grant the colleague's session can write to the project, not only
     // read it: the team comes back from the list read after `POST /teams`.
@@ -253,7 +253,9 @@ test("answers the same way for an address that belongs to nobody", async ({
   // before the submit, where there was no such row either — an assertion that
   // cannot fail.
   const refreshed = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/grants/query" && response.ok(),
+    (response) =>
+      new URL(response.url()).pathname === `/api/projects/${zitadel.handle.projectId}/admins` &&
+      response.ok(),
   );
   await dialog.getByRole("button", { name: "Add admin", exact: true }).click();
 

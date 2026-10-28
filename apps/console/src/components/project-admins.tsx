@@ -1,12 +1,13 @@
-import { Plus } from "lucide-react";
+import { Plus, User, Users } from "lucide-react";
 import { useState } from "react";
 
 import { AddAdminDialog } from "@/components/add-admin-dialog";
 import { CARD_ACTION_BUTTON } from "@/components/detail-page";
-import { RemoveAdminDialog } from "@/components/remove-admin-dialog";
+import { type Removable, RemoveAdminDialog } from "@/components/remove-admin-dialog";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_ROW_ICON,
   RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
@@ -18,31 +19,46 @@ import {
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table";
+import { joinAnd, titleCase } from "@/lib/text";
 
 import type { api } from "@/api/zitadel";
 
+type Admin = Awaited<ReturnType<typeof api.listProjectAdmins>>["admins"][number];
+type Source = Admin["sources"][number];
 type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
- * A project's admins: who administers it, and how that access is given and
- * taken away (#1025, journey in #769). The Admins tab of the project's own
- * page, because a grant is project-level data (#1238): the project id comes
- * from the route, and every request made from here carries it. The Add button
- * is `AddAdminButton`, which the page draws on the tab row.
+ * A project's admins: who administers it, how each of them holds that access,
+ * and how it is given and taken away (#1025, journey in #769). The Admins tab
+ * of the project's own page, because a grant is project-level data (#1238):
+ * the project id comes from the route, and every request made from here
+ * carries it. The Add button is `AddAdminButton`, which the page draws on the
+ * tab row.
  *
- * **The owner is not a row.** Their access comes through the owning team, not
- * an admin grant, so a freshly claimed project lists nobody — and removing the
- * last granted admin just returns it to that state. The owning team keeps the
- * project manageable; deactivating *that* is the lockout path, and #1231 guards
- * it.
+ * **People come from `GET /projects/{id}/admins`** (#1462). It lists each person
+ * once with every way they hold admin access: membership in the owning team,
+ * an admin grant to a team they are in, or an admin grant to them directly.
+ * So the owner is a row like anyone else, and a person who is both an owning
+ * team member and a granted admin is one row with two lines in `Access`.
  *
- * **The viewer's own access is a line above the table** when no grant listed
- * is theirs. Reaching this page takes access to the project, but nothing here
- * says where it comes from: membership in the owning team (#1462 is the
- * follow-up that shows that access here), a team grant listed below, or the
- * deployment's platform operators (root ADR 075) all reach a project with no
- * grant naming the person. So the line says only that their access is not a
- * grant of their own, and names no source.
+ * **Every other grant is a row of its own, from the grants read.** The admins
+ * list is people with live admin access, so it leaves out a grant to a team the
+ * viewer is not in, a `viewer` or `editor` grant, an expired grant and a
+ * deleted user's grant. Each is still the project's, and still the thing to
+ * revoke, so each is a row: a team's, named by the team, or the person's,
+ * degraded to the id where nothing else is left. Only a grant the admins list
+ * already shows on a person's row is left out, so nobody appears twice for it.
+ *
+ * **Only a direct grant is removable from a person's row.** Owning-team access
+ * is not a grant, and a team grant belongs to the team's row; so a person who
+ * holds access only through a team has no actions, and removing a grant from
+ * someone who keeps admin access another way says so, rather than claiming
+ * they lose the project.
+ *
+ * **A viewer with no row is told why.** Whoever opens this page can see the
+ * project, but a platform operator (ADR 075) holds it through neither a grant
+ * nor the owning team, so no row is theirs and the line says their access is
+ * not a grant of their own.
  *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
@@ -58,23 +74,24 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  */
 export function ProjectAdmins({
   projectId,
+  admins,
   grants,
   viewerUserId,
   onChanged,
 }: {
   projectId: string;
+  admins: Admin[];
   grants: Grant[];
-  /** The signed-in user, to tell their own grant from access that comes some other way. */
+  /** The signed-in user, to mark their own row. */
   viewerUserId?: string;
   /** Called after a grant was removed, to reload the page's data. */
   onChanged: () => void;
 }) {
-  const rows = grants.map(toAdminRow);
-  const notListed = !grants.some((grant) => grant.user?.user_id === viewerUserId);
+  const rows = toRows(admins, grants, viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
     <section aria-label="Admins" className="flex flex-col gap-4">
-      {notListed && (
+      {!rows.some((row) => row.self) && (
         <p className="text-muted-foreground text-sm">
           Your access to this Project isn’t a grant of your own, so you aren’t listed here.
         </p>
@@ -83,26 +100,42 @@ export function ProjectAdmins({
         <Table className="text-xs">
           <TableHeader>
             <ResourceHeaderRow>
-              <ResourceHeadCell>Email</ResourceHeadCell>
+              <ResourceHeadCell>Name</ResourceHeadCell>
               {/* The design's `Status` column is not here: a grant has no status
-                  field, so every row would read `Active` and the column would
-                  say nothing about any of them. */}
-              <ResourceHeadCell>Level</ResourceHeadCell>
+                field, so every row would read `Active` and the column would
+                say nothing about any of them. `Access` says what the design's
+                `Level` did and where it comes from. */}
+              <ResourceHeadCell>Access</ResourceHeadCell>
               <ResourceMenuHead className="w-15" />
             </ResourceHeaderRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <ResourceEmptyRow colSpan={3}>No additional admins have been added.</ResourceEmptyRow>
+              <ResourceEmptyRow colSpan={3}>No admins to show.</ResourceEmptyRow>
             ) : (
               rows.map((row) => (
-                <ResourceRow key={row.id}>
-                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
-                    {row.name}
+                <ResourceRow key={row.key}>
+                  <TableCell className={`${RESOURCE_CELL} text-foreground text-sm`}>
+                    <span className="flex items-center gap-2.5">
+                      {row.kind === "team" ? (
+                        <Users aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+                      ) : (
+                        <User aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
+                      )}
+                      <span className="truncate">{row.name}</span>
+                      {row.self && <span className="text-muted-foreground shrink-0">(you)</span>}
+                    </span>
                   </TableCell>
-                  <TableCell className={RESOURCE_CELL_MUTED}>{row.level}</TableCell>
+                  <TableCell className={RESOURCE_CELL_MUTED}>{row.access}</TableCell>
                   <TableCell className={RESOURCE_CELL}>
-                    <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
+                    {row.removable && (
+                      <RowActions
+                        projectId={projectId}
+                        name={row.name}
+                        removable={row.removable}
+                        onRemoved={onChanged}
+                      />
+                    )}
                   </TableCell>
                 </ResourceRow>
               ))
@@ -130,47 +163,131 @@ export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAd
 }
 
 interface AdminRow {
-  /** Grant id — what `DELETE /grants/{id}` revokes. */
-  id: string;
+  key: string;
+  kind: "user" | "team";
   /** The person or team, as the table labels them. */
   name: string;
-  /** The catalog relation this grant carries, title-cased for display. */
-  level: string;
+  /** The signed-in user's own row. */
+  self: boolean;
+  /** Every way the row holds access, as one line. */
+  access: string;
+  /** The grant the row's action revokes; absent where there is none. */
+  removable?: Removable;
 }
 
 /**
- * How a grant is labelled.
- *
- * `expand: ["principal"]` copies envelope fields onto the same `user` / `team`
- * ref so the table needs no read per row. A deleted user leaves its grant
- * behind as a degraded ref (`user_id` / `team_id` only). A user's identity
- * fields are themselves optional, since ADR 058 lets a schema designate
- * neither a display nor an identifier. The chain ends at that id, which
- * always exists — and which is what the operator needs to know which grant
- * they are revoking.
- *
- * Discriminate on which of `user` or `team` is present. Label from the
- * team's name or the user's `display` / `identifier`; the id is always
- * the last fallback.
+ * The rows, sorted by label. The admins list orders by user id, which says
+ * nothing to a reader, and the team rows come from another read.
  */
-function toAdminRow(grant: Grant): AdminRow {
+function toRows(admins: Admin[], grants: Grant[], viewerUserId?: string): AdminRow[] {
+  const shown = new Set(admins.flatMap((admin) => admin.sources.flatMap(directGrantId)));
+  const byUser = new Map(admins.map((admin) => [admin.user.user_id, admin]));
+  const rows = [
+    ...admins.map((admin) => toPersonRow(admin, viewerUserId)),
+    ...grants
+      .filter((grant) => !shown.has(grant.id))
+      .map((grant) => toGrantRow(grant, byUser, viewerUserId)),
+  ];
+  return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+/** The id of a person's own grant; a team's grant is the team's row, not theirs. */
+function directGrantId(source: Source): string[] {
+  return source.type === "grant" && !source.team ? [source.grant_id] : [];
+}
+
+/**
+ * A user-ref renders `display`, falling back to `identifier`, then `user_id`
+ * (ADR 058 §3): a deleted user degrades to the id, which is what the operator
+ * needs to know whose grant they are revoking.
+ */
+function toPersonRow(admin: Admin, viewerUserId?: string): AdminRow {
+  const { user, sources } = admin;
+  const direct = sources.find((source) => source.type === "grant" && !source.team);
   return {
-    id: grant.id,
-    name: principalName(grant) ?? grant.user?.user_id ?? grant.team?.team_id ?? grant.id,
-    level: grant.relation.charAt(0).toUpperCase() + grant.relation.slice(1),
+    key: `user:${user.user_id}`,
+    kind: "user",
+    name: user.display ?? user.identifier ?? user.user_id,
+    self: user.user_id === viewerUserId,
+    access: describeAccess(sources),
+    removable:
+      direct?.type === "grant"
+        ? {
+            grantId: direct.grant_id,
+            principal: "user",
+            level: "admin",
+            keeps: sources.filter((source) => source !== direct).map(describeKept),
+          }
+        : undefined,
   };
 }
 
-function principalName(grant: Grant): string | undefined {
-  return grant.team?.name ?? grant.user?.display ?? grant.user?.identifier;
+/**
+ * The `Access` cell: every source on one line, in the API's order (owning
+ * team, team grants, the direct grant), so the row keeps the list's height
+ * however many there are.
+ */
+function describeAccess(sources: Source[]): string {
+  const [first, ...rest] = sources.map(describeSource);
+  return joinAnd([
+    first ?? "",
+    ...rest.map((line) => line.charAt(0).toLowerCase() + line.slice(1)),
+  ]);
+}
+
+function describeSource(source: Source): string {
+  if (source.type === "owning_team") {
+    return "Owning team";
+  }
+  return source.team ? `Via team ${teamLabel(source.team)}` : "Admin grant";
+}
+
+/** The same source as the remove dialog names what stays. */
+function describeKept(source: Source): string {
+  if (source.type === "owning_team") {
+    return "the owning team";
+  }
+  return source.team ? `team ${teamLabel(source.team)}` : "an admin grant of their own";
+}
+
+/** A team's name is on the ref only where the viewer may see it; the id always is. */
+function teamLabel(team: { team_id: string; name?: string }): string {
+  return team.name ?? team.team_id;
+}
+
+/**
+ * A grant's `user` / `team` ref carries the name without a read per row.
+ * Discriminate on which of the two is present; the id is always the last
+ * fallback. A person's lower grant keeps whatever the admins list says they
+ * hold, so removing it does not claim they lose the project.
+ */
+function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: string): AdminRow {
+  const level = grant.relation;
+  const principal = grant.team ? "team" : "user";
+  const admin = grant.user && byUser.get(grant.user.user_id);
+  return {
+    key: `grant:${grant.id}`,
+    kind: principal,
+    name: grant.team
+      ? teamLabel(grant.team)
+      : (grant.user?.display ?? grant.user?.identifier ?? grant.user?.user_id ?? grant.id),
+    self: grant.user?.user_id === viewerUserId,
+    access: `${titleCase(level)} grant`,
+    removable: {
+      grantId: grant.id,
+      principal,
+      level,
+      keeps: admin ? admin.sources.map(describeKept) : [],
+    },
+  };
 }
 
 /**
  * The row menu carries only the revoke.
  *
- * It names the relation the row actually holds. This section only ever creates
- * `admin`, but the list shows whatever a grant carries, and a row saying
- * "Remove admin" over a `viewer` grant would misdescribe what the click
+ * It names the relation the grant actually holds. This section only ever
+ * creates `admin`, but the list shows whatever a grant carries, and a row
+ * saying "Remove admin" over a `viewer` grant would misdescribe what the click
  * revokes.
  *
  * The design's `Revoke invite` and `Resend invite` belong to an invite flow that
@@ -180,29 +297,29 @@ function principalName(grant: Grant): string | undefined {
  */
 function RowActions({
   projectId,
-  row,
+  name,
+  removable,
   onRemoved,
 }: {
   projectId: string;
-  row: AdminRow;
+  name: string;
+  removable: Removable;
   onRemoved: () => void;
 }) {
   const [removeOpen, setRemoveOpen] = useState(false);
-  const action = `Remove ${row.level.toLowerCase()}`;
 
   return (
     <>
-      <RowMenu name={row.name} contentClassName="w-auto">
+      <RowMenu name={name} contentClassName="w-auto">
         <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
-          {action}
+          Remove {removable.level}
         </DropdownMenuItem>
       </RowMenu>
 
       <RemoveAdminDialog
         projectId={projectId}
-        grantId={row.id}
-        name={row.name}
-        level={row.level}
+        name={name}
+        removable={removable}
         open={removeOpen}
         onOpenChange={setRemoveOpen}
         onRemoved={onRemoved}
