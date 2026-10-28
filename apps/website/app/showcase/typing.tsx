@@ -69,7 +69,7 @@ export function useTyping(ref: RefObject<Element | null>, command: string, lines
 export function TypedCommand({ command, typing }: { command: string; typing: Typing }) {
   const { typed, caret } = typing;
   return (
-    <CommandLine command={command}>
+    <CommandLine command={command} placement="showcase">
       <span className="break-words">
         {command.slice(0, typed)}
         {caret && <span aria-hidden="true" className="caret" />}

@@ -6,9 +6,12 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     // Builds into the server's embed directory, outside the package. The
-    // hosted cloud's build bakes its base path, Vercel's insights and their
-    // sample rate in (vite.config.ts, src/vite-env.d.ts), so the variables are
-    // part of the cache key and visible to the build. None has the VITE_
+    // hosted cloud's build bakes its base path, Vercel's insights, their
+    // sample rate and the commit its events report in (vite.config.ts,
+    // src/vite-env.d.ts), so the variables are part of the cache key and
+    // visible to the build. The commit makes that build miss on every
+    // deployment, which costs its own two-second `vite build`, never its
+    // dependencies'. None has the VITE_
     // prefix: Vite's framework inference would hash a prefixed one into every
     // Vite package of the run, the console's dependencies too
     // (vite.config.ts), and strict mode hides an unprefixed one unless it is
@@ -22,7 +25,12 @@
     // .env.local would restore a build made without it; they are listed.
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"],
-      "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
+      "env": [
+        "CONSOLE_BASE_PATH",
+        "CONSOLE_VERCEL_INSIGHTS",
+        "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE",
+        "VERCEL_GIT_COMMIT_SHA"
+      ],
       "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },

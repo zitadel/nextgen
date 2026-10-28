@@ -66,6 +66,11 @@ between files are the sign the component is missing.
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
 
+## Analytics
+
+- Send a custom event only through `src/lib/analytics.ts`, and list it in
+  [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
 ## Local loop
 
 ```sh
