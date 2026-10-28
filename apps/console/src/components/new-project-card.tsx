@@ -3,6 +3,7 @@ import { SquareTerminal } from "lucide-react";
 import { cliSetup } from "@/components/cli-hint";
 import { CopyButton } from "@/components/ui/copy-button";
 import { avatarVars } from "@/components/user-avatar";
+import { trackEvent } from "@/lib/analytics";
 import { serverOrigin } from "@/lib/server-origin";
 
 /**
@@ -53,7 +54,14 @@ export function NewProjectCard({ first = false }: { first?: boolean }) {
           <code className="min-w-0 flex-1 py-1.5 font-mono text-xs leading-5 text-foreground wrap-anywhere">
             {command}
           </code>
-          <CopyButton value={command} label="Copy the setup command" size="sm" />
+          {/* The console's one call to action: the copy is what reaches the
+              terminal, so it is reported (lib/analytics.ts). */}
+          <CopyButton
+            value={command}
+            label="Copy the setup command"
+            size="sm"
+            onCopied={() => trackEvent("copied_command", { page: "projects", snippet: "setup" })}
+          />
         </div>
         <p className="text-xs text-muted-foreground">
           It creates the project and connects your app. Follow the steps it prints to finish.
