@@ -104,6 +104,9 @@ function stubProject(grants: Record<string, unknown>[], record = project()) {
     // The page's variables card reads alongside; none keeps these tests about
     // the admins.
     http.get("http://localhost/api/variables", () => HttpResponse.json({})),
+    http.get("http://localhost/api/policies", () =>
+      HttpResponse.json({ policies: [], next_page_token: null }),
+    ),
     http.post(GRANTS_QUERY_URL, async ({ request }) => {
       const projectId = new URL(request.url).searchParams.get("project_id");
       queries.push({ projectId, body: (await request.json()) as Record<string, unknown> });
