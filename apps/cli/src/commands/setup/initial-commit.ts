@@ -193,8 +193,11 @@ const FALLBACK_IDENTITY: NodeJS.ProcessEnv = {
  */
 async function changes(cwd: string): Promise<Change[]> {
   // `--untracked-files=all` lists the files inside an untracked directory
-  // rather than collapsing them to `apps/web/`, which strips to "" and makes
-  // every brand-new package in an existing repository look dirty.
+  // rather than collapsing them to one `apps/web/` entry, which strips to ""
+  // and would report "1 untracked file" naming nothing. A brand-new package is
+  // still refused, deliberately: setup commits the whole project directory and
+  // will not sweep up an app it did not write. The flag only makes the refusal
+  // name the files the developer has to deal with.
   const stdout = await git(cwd, [
     "status",
     "--porcelain",
@@ -287,10 +290,11 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
   ].filter((part) => part !== undefined);
   throw new ZitadelError("E_CONFLICT", `The git working tree has ${parts.join(" and ")}`, {
     hint:
-      "Setup commits the files it writes so the first release records a commit, which it can only do " +
-      "safely from a clean tree — otherwise your own work would be committed under setup's name. " +
-      "Commit or stash what is listed, then run setup again. To set up without touching version " +
-      "control at all, pass --no-git.",
+      "Setup commits the project directory so the first release records a commit, and it will not " +
+      "do that while there is work it did not write, which would be committed under setup's name. " +
+      "Run `git status` to see them, commit or stash them, then run setup again. If you have just scaffolded " +
+      "the app yourself, committing it first is the expected step. To set up without touching " +
+      "version control at all, pass --no-git.",
     details: { modified, untracked },
   });
 }

@@ -467,7 +467,7 @@ describe("assertCleanWorktree", () => {
     await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
   });
 
-  it("allows a project directory the repository has never seen", async () => {
+  it("allows a never-seen project directory holding only what start left", async () => {
     const { root } = await aSubdirectoryProject();
     const fresh = join(root, "apps/brand-new");
     await mkdir(join(fresh, ".zitadel/local"), { recursive: true });
@@ -475,6 +475,39 @@ describe("assertCleanWorktree", () => {
     await writeFile(join(fresh, ".zitadel/local/server.log"), "written by start\n");
 
     await expect(assertCleanWorktree(fresh)).resolves.toBeUndefined();
+  });
+
+  it("refuses an app the developer scaffolded into a never-seen directory", async () => {
+    const { root } = await aSubdirectoryProject();
+    const fresh = join(root, "apps/brand-new");
+    await mkdir(fresh, { recursive: true });
+    await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
+    await writeFile(join(fresh, "index.js"), "export default () => null;\n");
+
+    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+
+  it("names those files rather than reporting an empty path", async () => {
+    const { root } = await aSubdirectoryProject();
+    const fresh = join(root, "apps/brand-new");
+    await mkdir(fresh, { recursive: true });
+    await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
+    await writeFile(join(fresh, "index.js"), "export default () => null;\n");
+
+    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
+      details: { untracked: ["index.js", "package.json"] },
+    });
+  });
+
+  it("says that committing a scaffolded app first is the expected step", async () => {
+    const { root } = await aSubdirectoryProject();
+    const fresh = join(root, "apps/brand-new");
+    await mkdir(fresh, { recursive: true });
+    await writeFile(join(fresh, "package.json"), '{"name":"brand-new"}');
+
+    await expect(assertCleanWorktree(fresh)).rejects.toMatchObject({
+      hint: expect.stringContaining("committing it first is the expected step"),
+    });
   });
 
   it("still refuses a subdirectory project with the developer's own work in it", async () => {
