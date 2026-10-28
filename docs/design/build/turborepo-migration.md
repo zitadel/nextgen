@@ -196,7 +196,7 @@ as they were.
 | release | `changesets`, `check-graph`, `build-public-packages`, `version`, `pack`, `snapshot`, `publish` | `@zitadel/release#…` | **new** `tools/release/package.json` (`cd ../.. && node scripts/release.mjs …`) |
 | workspace | `test`, `check-typecheck`, `check-openapi-rules`, `check-moon-graph`, `check-adrs` | `//#…` | root scripts (**new** for the four checks), explicit inputs as in moon.yml |
 | workspace | `doctor`, `server`, `server-debug`, `build-local-image`, `smoke-container`, `check` | `//#…` | root scripts (**new** `server-debug`, `build-local-image`, `smoke-container`); `journey` moved to `@zitadel/e2e#journey`, and moon keeps `workspace:journey` as a deprecated alias |
-| workspace | `cloud` (persistent) | `@zitadel/cloud#dev` | **new** `apps/cloud/package.json`, no moon project; its `build` (the cloud's launcher) and `schemas` are what the cloud's `server` and `schemas` services build |
+| workspace | `cloud` (persistent) | `@zitadel/cloud#dev` | **new** `apps/cloud/package.json`, no moon project; its `deploy` (the cloud's launcher, then the migration) and `schemas` are what the cloud's `server` and `schemas` services run |
 | workspace | `cli` (interactive) | — | not a turbo task: interactive tasks need turbo's terminal UI. `pnpm run cli -- …` (the root script that exists today) |
 | cli-skill-e2e (no moon project) | — | — | its `test` script is renamed `eval` (`eval:fresh` for `FRESH=1`), otherwise `turbo run test` would run a Claude-driven eval |
 
@@ -382,8 +382,8 @@ token.
   names that command.
 - **Vercel:** every service of the repo-root `vercel.json` builds through
   turbo: the console, the docs and the website with `turbo run build`, the
-  server (`apps/cloud/build.sh`) and the schemas through `@zitadel/cloud`'s
-  `build` and `schemas`. `apps/console/vercel.json` belongs to the paused
+  server and the schemas through `@zitadel/cloud`'s `deploy` (its `build`,
+  then the migration) and `schemas`. `apps/console/vercel.json` belongs to the paused
   legacy `nextgen` project and still says `moon run console:build`; it is
   deleted or updated with that project.
 - **Dockerfile:** the comment "Consumed by Moon release tasks" is text only.

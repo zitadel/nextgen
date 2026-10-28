@@ -26,7 +26,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; `apps/cloud/build.sh` builds `apps/cloud/launcher` without the console (`-tags noconsole`) through turbo, `@zitadel/cloud`'s `build` task, then migrates | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
+| `server` | Go preset; the build command installs (the preset runs no `installCommand`) and runs `turbo run deploy --filter=@zitadel/cloud`: `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), and the uncached `deploy` hands it to the preset and migrates | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
@@ -417,8 +417,8 @@ not use:
 
 - The `server` service's `entrypoint` names `apps/cloud/launcher`. In dev,
   Vercel's Go builder builds that package and starts it on `$PORT`; a
-  deployment runs `build.sh`, which compiles the same package, and the
-  builder takes the build command's binary instead. Without
+  deployment's build command compiles the same package through turbo, and
+  the builder takes that binary instead. Without
   `CLOUD_DATABASE_URL` and outside a deployment, the launcher serves from
   SQLite and migrates it at startup.
 - The `console` service's `devCommand` builds it and serves the build behind

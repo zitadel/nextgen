@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "sh build-launcher.sh",
+    "deploy": "sh deploy.sh",
     "schemas": "node ../../scripts/render-builtin-schemas.mjs",
     "dev": "node ../../scripts/run-cloud.mjs"
   }

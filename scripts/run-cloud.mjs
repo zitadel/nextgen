@@ -9,8 +9,9 @@
  * not use:
  *
  * - server: `entrypoint` names apps/cloud/launcher. Vercel's Go builder builds
- *   it in dev and starts it on $PORT; a deployment runs build.sh instead,
- *   which builds the same package through turbo. The launcher, without
+ *   it in dev and starts it on $PORT; a deployment's build runs
+ *   @zitadel/cloud's `deploy` instead, which compiles the same package
+ *   through turbo. The launcher, without
  *   CLOUD_DATABASE_URL, serves from SQLite and migrates it at startup.
  * - console: its `devCommand` builds it and serves the build, as the
  *   deployment serves it, behind the same service rewrites. Its dev server

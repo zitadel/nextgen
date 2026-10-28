@@ -14,8 +14,8 @@ non-required `ci-turbo` job.
 
 Where the two differ on purpose:
 
-- The hosted cloud is a turbo package (`@zitadel/cloud`: the launcher, the
-  schemas, `dev`) and no moon project. Moon's `workspace:cloud` runs the same
+- The hosted cloud is a turbo package (`@zitadel/cloud`: the launcher and
+  its migration, the schemas, `dev`) and no moon project. Moon's `workspace:cloud` runs the same
   script as its `dev`, and `server:test` runs the launcher's tests.
 - Moon's `test` runs each package's `test:all` script, turbo runs `test`. In
   the browser-test packages, `test` wraps `scripts/task-guard.mjs` for

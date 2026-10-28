@@ -7,8 +7,8 @@
   // in @zitadel/server#test (`go test ./...`).
   "tasks": {
     // The `server` service's function binary (build-launcher.sh), which
-    // build.sh builds through turbo and then migrates with; the migration is
-    // never cached. Its inputs are the Go files and what they embed
+    // `deploy` hands to Vercel and migrates with. Its inputs are the Go files
+    // and what they embed
     // (//go:embed), as in apps/server/moon.yml's serverInputs, and the
     // server's version, which it stamps in. The OpenAPI YAML reaches the
     // binary only through the generated Go code. Turbo hashes the ignored
@@ -43,6 +43,19 @@
         "!$TURBO_ROOT$/.vercel/**"
       ],
       "outputs": ["dist/nextgen-launcher"]
+    },
+    // The `server` service's build command (repo-root vercel.json) installs,
+    // as the Go preset runs no installCommand, and runs this: deploy.sh
+    // copies the binary to $VERCEL_OUTPUT_FILE, where the preset takes the
+    // function from, then migrates the deployment's database. Never cached:
+    // it has to migrate on every deployment. It sees the whole environment:
+    // the deployment's configuration is the environment, and the launcher
+    // checks every variable the function needs to start (a missing one fails
+    // the build), which strict mode would hide unless listed here.
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["build"],
+      "passThroughEnv": ["*"]
     },
     // The `schemas` service's static files: the built-in schemas the server
     // embeds, rendered as the documents their identifiers name

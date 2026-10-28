@@ -173,9 +173,11 @@ Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
 On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
-`turbo run build`, the server with `@zitadel/cloud`'s `build`
-(`apps/cloud/build.sh`, which then migrates outside turbo) and the schemas
-with its `schemas`. Two project variables, `TURBO_TELEMETRY_DISABLED`
+`turbo run build`, the server with `@zitadel/cloud`'s `deploy`, which
+migrates after its `build` and is never cached, and the schemas with its
+`schemas`. `deploy` passes the whole environment through
+(`passThroughEnv: ["*"]`): the launcher checks every variable the function
+needs, and strict mode would hide one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
 about each project variable `turbo.json` does not pass
 ([runbook](../../runbooks/cloud.md)). The cache works as Vercel sets it up:

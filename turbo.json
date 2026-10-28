@@ -5,7 +5,7 @@
   // here, the rest in each package's turbo.json ("extends": ["//"]), which
   // mirrors that package's moon.yml edge for edge. Both runners run the same
   // package.json scripts. Moon stays the runner of record (CI, local docs)
-  // until the cutover; the hosted cloud (vercel.json, apps/cloud/build.sh)
+  // until the cutover; the hosted cloud (vercel.json, apps/cloud)
   // builds with turbo since the pilot.
   //
   // Without this, turbo writes its own block into the root AGENTS.md whenever

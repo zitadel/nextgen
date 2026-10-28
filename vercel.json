@@ -5,7 +5,7 @@
       "root": ".",
       "framework": "go",
       "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh",
+      "buildCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
       "functions": {
         "apps/cloud/launcher/main.go": {
           "regions": ["fra1"]

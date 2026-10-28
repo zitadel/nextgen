@@ -1,8 +1,8 @@
 #!/bin/sh
 # The `build` task of @zitadel/cloud (apps/cloud/turbo.json): compile the
 # launcher into the `server` service's function binary,
-# apps/cloud/dist/nextgen-launcher. build.sh, that service's build, runs it
-# through turbo.
+# apps/cloud/dist/nextgen-launcher. The service's build command runs it
+# through turbo as a dependency of `deploy` (deploy.sh), which migrates.
 #
 # The console is not embedded: it is a service of its own, and the launcher
 # turns the server's console off. The services build one after another in
@@ -36,7 +36,7 @@ echo "built $out (version ${version}+cloud, commit ${commit})"
 # carries the cache from build to build, so every rebuild's packages would
 # pile up towards the build cache's limit. On Vercel, drop what no build
 # used in the last two hours (Go refreshes an entry's time at most hourly).
-# Here rather than in build.sh: when turbo restores the binary, Go has
+# Here rather than in deploy.sh: when turbo restores the binary, Go has
 # refreshed nothing, and the prune would empty the cache.
 if [ -n "${VERCEL:-}" ]; then
   find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
