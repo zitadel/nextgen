@@ -254,10 +254,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
+	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
+		projectHashers,
 		passwordHasher,
 	)
 	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
@@ -319,9 +321,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
-	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -622,7 +623,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("password_hasher.hasher.memory", 64*1024)
 	v.SetDefault("password_hasher.hasher.threads", 4)
 	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
-	// validate and transparently rehash to argon2id on the next successful login.
+	// validate. A successful sign-in stores a new hash written by the project's
+	// hasher, argon2id unless the project chose another method.
 	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
 		crypto.HashNameArgon2,
 		crypto.HashNameBcrypt,

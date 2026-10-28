@@ -2,13 +2,16 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/crypto"
+	cryptomock "github.com/zitadel/nextgen/internal/crypto/mock"
 )
 
 // limitedHasher refuses what it cannot take in full, the way bcrypt does past
@@ -30,11 +33,11 @@ func (plainHasher) Hash(password string) (string, error) {
 	return "plain$" + password, nil
 }
 
-func (plainHasher) VerifyHash(encoded, password string) error {
+func (plainHasher) VerifyAndRehash(encoded, password string) (string, error) {
 	if encoded != "plain$"+password {
-		return errors.New("mismatch")
+		return "", errors.New("mismatch")
 	}
-	return nil
+	return "", nil
 }
 
 const (
@@ -106,15 +109,40 @@ func TestUserPassword_Verify(t *testing.T) {
 		hash, err := HashPassword(composed, plainHasher{})
 		require.NoError(t, err)
 		pw := &UserPassword{EncodedHash: hash}
-		assert.NoError(t, pw.Verify(composed, plainHasher{}))
-		assert.NoError(t, pw.Verify(decomposed, plainHasher{}))
-		assert.ErrorIs(t, pw.Verify("cafe-au-lait", plainHasher{}), ErrUserPasswordInvalid())
+		_, err = pw.Verify(composed, plainHasher{})
+		assert.NoError(t, err)
+		_, err = pw.Verify(decomposed, plainHasher{})
+		assert.NoError(t, err)
+		_, err = pw.Verify("cafe-au-lait", plainHasher{})
+		assert.ErrorIs(t, err, ErrUserPasswordInvalid())
 	})
 
 	t.Run("applies no length limit", func(t *testing.T) {
 		t.Parallel()
 		long := strings.Repeat("a", MaxPasswordLength+1)
 		pw := &UserPassword{EncodedHash: "plain$" + long}
-		assert.NoError(t, pw.Verify(long, plainHasher{}))
+		_, err := pw.Verify(long, plainHasher{})
+		assert.NoError(t, err)
 	})
+
+	// The password matched in both: the caller stores the new hash or, when
+	// none could be written, still lets the sign-in through.
+	tests := map[string]struct {
+		updated string
+		err     error
+	}{
+		"returns the rehash of an outdated hash":  {updated: "new"},
+		"a failed rehash is not a wrong password": {err: fmt.Errorf("%w: too long", crypto.ErrRehashFailed)},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			verifier := cryptomock.NewMockRehashingVerifier(gomock.NewController(t))
+			verifier.EXPECT().VerifyAndRehash("old", "secret").Return(tt.updated, tt.err)
+			updated, err := (&UserPassword{EncodedHash: "old"}).Verify("secret", verifier)
+			assert.Equal(t, tt.updated, updated)
+			assert.ErrorIs(t, err, tt.err)
+			assert.NotErrorIs(t, err, ErrUserPasswordInvalid())
+		})
+	}
 }

@@ -1,5 +1,6 @@
 get:
   operationId: listPreviews
+  x-zitadel-cli: preview list
   summary: List previews
   description: |
     Lists the project's live previews, newest first by `created_at`. An

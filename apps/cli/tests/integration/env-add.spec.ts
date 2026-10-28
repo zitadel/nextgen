@@ -159,7 +159,9 @@ describe("env add", () => {
 
         const added = await app.run([...ADD, "--app-url", "https://app.example.com"]);
 
-        expect(added).toSuggest("deploy -m '<what changed>' --env-file .env.production.local");
+        expect(added).toSuggest(
+          `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local`,
+        );
       });
 
       it("offers no deploy to an environment with no origin for one to land on", async () => {
@@ -167,7 +169,9 @@ describe("env add", () => {
 
         const added = await app.run(ADD);
 
-        expect(added).not.toSuggest("deploy -m '<what changed>' --env-file .env.production.local");
+        expect(added).not.toSuggest(
+          `deploy -m '<what changed>' --env-file ${app.path}/.env.production.local`,
+        );
       });
 
       it("writes nothing on a dry run", async () => {

@@ -171,8 +171,9 @@ tasks:
       - "console:build"
     inputs:
       - "@group(serverInputs)"
-      # The Biome config the launcher check runs against.
+      # The Biome config the launcher check runs against, and its plugins.
       - "/biome.json"
+      - "/biome-plugins/*.grit"
     options:
       runFromWorkspaceRoot: true
 
@@ -199,7 +200,7 @@ tasks:
       # the deployment's configuration together. Scoped to test: nothing the
       # server compiles reads them.
       - "/vercel.json"
-      - "/apps/cloud/build.sh"
+      - "/apps/cloud/build-launcher.sh"
     options:
       runFromWorkspaceRoot: true
 

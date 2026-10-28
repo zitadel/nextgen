@@ -61,8 +61,7 @@ func (NoPolicyResolver) ResolvePolicy(context.Context, string, string) (*policy.
 type PasswordPolicy struct {
 	engine   *policy.Engine
 	resolver PolicyResolver
-	verifier crypto.HashVerifier
-	pool     StatementPool
+	history  passwordHistory
 }
 
 // NewPasswordPolicy builds the gate. verifier is the deployment-wide hash
@@ -74,7 +73,7 @@ func NewPasswordPolicy(engine *policy.Engine, resolver PolicyResolver, verifier 
 	if _, err := engine.Template(OperationPasswordSet); err != nil {
 		return nil, fmt.Errorf("password policy: %w", err)
 	}
-	return &PasswordPolicy{engine: engine, resolver: resolver, verifier: verifier, pool: pool}, nil
+	return &PasswordPolicy{engine: engine, resolver: resolver, history: storedPasswordHistory{verifier: verifier, pool: pool}}, nil
 }
 
 var _ PasswordGate = (*PasswordPolicy)(nil)
@@ -194,10 +193,9 @@ func (p *PasswordPolicy) CheckPassword(ctx context.Context, in SetPasswordInput)
 	return check, nil
 }
 
-// historyMatches compares the candidate with the user's kept passwords,
-// current first, newest first, and only as many as the policy's depth: each
-// comparison is a deliberately slow hash verification. With history off it
-// verifies nothing.
+// historyMatches compares the candidate with the user's kept passwords
+// through p.history, current first, newest first, and only as many as the
+// policy's depth. With history off it compares nothing.
 func (p *PasswordPolicy) historyMatches(ctx context.Context, bound *policy.Bound, in SetPasswordInput) ([]bool, PasswordCheck, error) {
 	active, err := bound.Active("history_depth")
 	if err != nil {
@@ -218,24 +216,47 @@ func (p *PasswordPolicy) historyMatches(ctx context.Context, bound *policy.Bound
 		// Reading no depth would verify nothing and let any password through.
 		return nil, PasswordCheck{}, domain.ErrInternal(fmt.Errorf("history_depth is %v", constraints.Rules["history_depth"])).WithMessage("failed to read the password policy")
 	}
-	check := PasswordCheck{HistoryChecked: true}
+	matches, currentID, err := p.history.matches(ctx, in, depth)
+	if err != nil {
+		return nil, PasswordCheck{}, err
+	}
+	return matches, PasswordCheck{HistoryChecked: true, CurrentPasswordID: currentID}, nil
+}
 
-	stmts := p.pool.Statements()
-	var kept []*domain.UserPassword
+// passwordHistory says, for each of the user's kept passwords up to depth,
+// current first and newest first, whether the candidate matches it, and
+// which password was current then ("" for none).
+type passwordHistory interface {
+	matches(ctx context.Context, in SetPasswordInput, depth int64) (matches []bool, currentID string, err error)
+}
+
+// storedPasswordHistory compares the candidate with the user's stored
+// passwords: each comparison is a deliberately slow hash verification.
+type storedPasswordHistory struct {
+	verifier crypto.HashVerifier
+	pool     StatementPool
+}
+
+func (h storedPasswordHistory) matches(ctx context.Context, in SetPasswordInput, depth int64) ([]bool, string, error) {
+	stmts := h.pool.Statements()
+	var (
+		kept      []*domain.UserPassword
+		currentID string
+	)
 	current, err := stmts.GetUserPassword(ctx, database.And(
 		database.Equal(database.Col(domain.UserPasswordFieldProjectID), in.ProjectID),
 		database.Equal(database.Col(domain.UserPasswordFieldUserID), in.UserID),
 	))
 	if _, none := errors.AsType[*database.NoRowFoundError](err); err != nil && !none {
-		return nil, PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to read the current password")
+		return nil, "", domain.ErrInternal(err).WithMessage("failed to read the current password")
 	}
 	if err == nil {
-		check.CurrentPasswordID = current.ID
+		currentID = current.ID
 		kept = append(kept, current)
 		if depth > 1 {
 			previous, err := stmts.GetUserPasswordHistory(ctx, in.ProjectID, in.UserID)
 			if err != nil {
-				return nil, PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to read the password history")
+				return nil, "", domain.ErrInternal(err).WithMessage("failed to read the password history")
 			}
 			kept = append(kept, previous...)
 		}
@@ -247,15 +268,15 @@ func (p *PasswordPolicy) historyMatches(ctx context.Context, bound *policy.Bound
 	candidate := domain.NormalizePassword(in.Password)
 	matches := make([]bool, 0, min(int64(len(kept)), depth))
 	for _, pw := range kept[:min(int64(len(kept)), depth)] {
-		err := p.verifier.VerifyHash(pw.EncodedHash, candidate)
+		err := h.verifier.VerifyHash(pw.EncodedHash, candidate)
 		switch {
 		case err == nil:
 			matches = append(matches, true)
 		case errors.Is(err, crypto.ErrHashMismatch):
 			matches = append(matches, false)
 		default:
-			return nil, PasswordCheck{}, domain.ErrInternal(err).WithMessage("failed to compare with a kept password")
+			return nil, "", domain.ErrInternal(err).WithMessage("failed to compare with a kept password")
 		}
 	}
-	return matches, check, nil
+	return matches, currentID, nil
 }
