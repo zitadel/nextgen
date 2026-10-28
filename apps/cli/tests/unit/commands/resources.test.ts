@@ -6,7 +6,7 @@ import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { type Platform, RESOURCES } from "../../../src/commands/resources";
+import { type Platform, RESOURCES, releasePointers } from "../../../src/commands/resources";
 import { COMMANDS } from "../../../src/index";
 import {
   definitionOf,
@@ -1899,9 +1899,29 @@ describe("the release resource", () => {
     );
   });
 
-  it("shows a release's content hash, revocation and pointers", () => {
+  it("shows a release's content hash and revocation", () => {
     expect(RESOURCES.release.detail).toEqual(
-      expect.arrayContaining(["content_hash", "revoked_at", "pointers"]),
+      expect.arrayContaining(["content_hash", "revoked_at"]),
+    );
+  });
+
+  it("shows a release's pointers as a table under its fields", () => {
+    const release = {
+      pointers: [
+        { kind: "schema", handle: "human-user", revision_id: "sch_1" },
+        { kind: "flow_definition", handle: "default-login", revision_id: "fd_1" },
+      ],
+    };
+
+    expect(RESOURCES.release.get.sections?.(release)).toEqual([releasePointers(release)]);
+    expect(releasePointers(release)).toBe(
+      [
+        "pointers",
+        "  kind             handle         revision_id",
+        "  ---------------  -------------  -----------",
+        "  schema           human-user     sch_1",
+        "  flow_definition  default-login  fd_1",
+      ].join("\n"),
     );
   });
 });
