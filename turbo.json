@@ -31,10 +31,14 @@
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
-    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
-    // so the Go tasks list those as hashed `env` instead.
+    // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
+    // runners set (`depot gocache`), which authenticates with the job's
+    // DEPOT_CACHE_TOKEN. GOFLAGS and the target platform change outputs, so
+    // the Go tasks list those as hashed `env` instead.
     "GOPATH",
     "GOCACHE",
+    "GOCACHEPROG",
+    "DEPOT_CACHE_TOKEN",
     "GOMODCACHE",
     "GOTMPDIR",
     "GOTOOLCHAIN",
