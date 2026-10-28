@@ -109,7 +109,7 @@ export function ProjectOrigins({
           onOpenChange={setAddOpen}
           onChanged={onChanged}
           trigger={
-            <Button variant="outline" size="sm" className={CARD_ACTION_BUTTON}>
+            <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
               <Plus aria-hidden />
               Add origin
             </Button>

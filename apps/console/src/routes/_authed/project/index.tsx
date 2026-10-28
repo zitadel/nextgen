@@ -33,14 +33,20 @@ import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
  * domain layer. The cell is left out rather than shown empty, and returns as one
  * more `MetaValue` when the field lands.
  *
- * Two tabs, as the team's page. Overview holds the project's name, its
- * origins, its variables and secrets and its policies; Admins holds the grants (#1238), with
- * the Add button on the tab row. All of it is project-level data, so it lives
- * here rather than under account settings, and the id every request carries
- * is this route's. The origins ride on the project; the grants and the
- * variables are loaded with it, since all three reads are the same viewer
- * check on the same project and succeed or fail as one. The password policy
- * is read beside them but fails on its own: its card only shows it.
+ * Two tabs, as the team's page, and the team page's rhythm: 24px under the
+ * tab row on both tabs, `Details` as the name card's title, and secondary
+ * for the small actions. The Overview frame draws 16px, `Project Detail` and
+ * an outline Add origin; the shipped pages win over one frame, and #2319
+ * carries the three divergences for the frames.
+ *
+ * Overview holds the project's name, its origins, its variables and secrets
+ * and its policies; Admins holds the grants (#1238), with the Add button on
+ * the tab row. All of it is project-level data, so it lives here rather than
+ * under account settings, and the id every request carries is this route's.
+ * The origins ride on the project; the grants and the variables are loaded
+ * with it, since all three reads are the same viewer check on the same
+ * project and succeed or fail as one. The password policy is read beside
+ * them but fails on its own: its card only shows it.
  */
 export const Route = createFileRoute("/_authed/project/")({
   // Last: the list above it is the project's contents, this is the project.
@@ -102,7 +108,7 @@ function ProjectDetail() {
       <Tabs
         value={tab}
         onValueChange={(value) => setTab(value as Tab)}
-        className={`${DETAIL_BODY} gap-4`}
+        className={`${DETAIL_BODY} gap-6`}
       >
         {/* The active tab's action sits on the tab row, as the design draws it. */}
         <div className="flex items-center justify-between gap-6">
@@ -117,7 +123,6 @@ function ProjectDetail() {
         <TabsContent value="overview" className="flex flex-col gap-4">
           <RenameCard
             id="project-name"
-            title="Project Detail"
             layout="inline"
             label="Project name"
             value={project.name}
@@ -132,7 +137,7 @@ function ProjectDetail() {
           <ProjectPolicies password={passwordPolicy} />
         </TabsContent>
 
-        <TabsContent value="admins" className="mt-2">
+        <TabsContent value="admins">
           <ProjectAdmins
             projectId={project.id}
             grants={grants}
