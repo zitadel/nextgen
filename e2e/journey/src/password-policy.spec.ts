@@ -203,8 +203,10 @@ async function deploy(message: string): Promise<void> {
 async function expectRefused(page: Page, email: string, password: string, minimum: number) {
   await gotoLogin(page);
   await registerWithPassword(page, { email, password, profile: registrationProfile });
+  // The refusal, "Password must be at least N characters.", not the field's
+  // hint "At least N characters.", which shows before anything is submitted.
   await expect(
-    page.getByText(new RegExp(`at least ${minimum} characters`, "i")).first(),
+    page.getByText(new RegExp(`must be at least ${minimum} characters`, "i")).first(),
   ).toBeVisible();
   // Still on the password step: the refusal kept the user from signing up.
   await expect(flowField(page, "password", { label: /password/i })).toBeVisible();
