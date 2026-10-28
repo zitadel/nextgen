@@ -1081,7 +1081,7 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
       dir,
     );
 
-    expect(advice.nextCommands).toEqual([]);
+    expect(advice.nextCommands).toEqual([publicCliCommand("start", "1.0.0")]);
     expect(advice.suggestedArgs).toEqual([
       ["start", "--cwd", dir],
       ["start"],
@@ -1123,6 +1123,33 @@ describe("failureAdvice for a runtime found in a parent directory", () => {
     expect(advice.hint).toContain("the parent folder, /home/dev/app");
     expect(advice.hint).toContain("Resetting deletes the local data in /home/dev/app");
     expect(advice.hint).toContain("run start here");
+  });
+
+  it("starts a server in doctor's own --cwd, not the shell's directory", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+      "/home/dev/app/child",
+    );
+
+    expect(advice.suggestedArgs?.[1]).toEqual(["start", "--cwd", "/home/dev/app/child"]);
+  });
+
+  it("keeps the hint to one line", () => {
+    const advice = failureAdvice(
+      failed,
+      "image",
+      8080,
+      "1.0.0",
+      environmentSelectorSuffix({}),
+      "/home/dev/app",
+    );
+
+    expect(advice.hint).not.toContain("\n");
   });
 
   it("keeps the plain advice for a runtime in the working directory", () => {
