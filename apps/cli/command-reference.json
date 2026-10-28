@@ -3316,7 +3316,7 @@
         },
         {
           "name": "env-file",
-          "description": "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
           "type": "option"
         }
       ],
