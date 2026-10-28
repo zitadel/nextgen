@@ -211,6 +211,8 @@ Environment variables (add secrets with
 | `ENABLE_EXPERIMENTAL_COREPACK` | Production, Preview | `1`: the builds run package scripts that call `pnpm`, which must be the workspace's pinned version |
 | `TURBO_TELEMETRY_DISABLED` | Production, Preview | `1`: turbo sends no telemetry from the builds, as in CI |
 | `TURBO_PLATFORM_ENV_DISABLED` | Production, Preview | `1`: stops turbo listing, under every task, each project variable `turbo.json` does not pass; the JS builds are not meant to see them (strict environment mode) |
+| `TURBO_REMOTE_CACHE_SIGNATURE_KEY` | Production; sensitive | production's key for turbo's cache signatures, `openssl rand -hex 32`; the GitHub environment `turbo-cache-main` holds the same value ([who holds which key](../design/build/turborepo.md#remote-cache)) |
+| `TURBO_REMOTE_CACHE_SIGNATURE_KEY` | Preview; sensitive | the previews' key, another `openssl rand -hex 32`; the GitHub environment `turbo-cache-branches` holds the same value |
 | `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
 
 Database URLs take the form PlanetScale's Connect dialog gives,
@@ -571,6 +573,15 @@ project and imports the root admin.
   entry) is fixed by a team owner clearing the cache (team Settings → Build
   and Deployment → Remote Caching); a redeploy without the build cache
   skips the remote cache too.
+- **Cache signatures:** a build restores only entries signed with its
+  environment's `TURBO_REMOTE_CACHE_SIGNATURE_KEY`, so production never
+  restores what a preview wrote, even under production's hash
+  ([turborepo.md](../design/build/turborepo.md#remote-cache)). A rejected
+  entry logs as a plain `cache miss`. A build without its key logs
+  `WARNING artifact signature error` and uses no cache; one whose key is
+  shorter than 32 bytes fails. To rotate a key, replace the variable and the
+  GitHub environment's secret that holds the same value; the next builds miss
+  once.
 - **Build cache:** Vercel keeps one per branch (a branch's first build
   starts from production's) and restores it before the installs: every
   `node_modules`, the docs' and the website's `.next/cache`, and

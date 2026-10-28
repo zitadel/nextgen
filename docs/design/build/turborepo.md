@@ -135,6 +135,48 @@ Moon keeps its own `mutex` and `retryCount` until the cutover. Its `test`
 task runs each package's `test:all` script, which in the four browser-test
 packages calls Vitest without the guard, so no suite retries under both.
 
+## Remote cache
+
+Any build with a token for the team's remote cache can write any entry,
+under a hash anyone can compute from the commit. So turbo signs what it
+uploads with `TURBO_REMOTE_CACHE_SIGNATURE_KEY` (`remoteCache.signature`) and
+takes an entry it cannot verify with its own key for a miss: a run restores
+only what runs holding its key wrote.
+
+| Runs | Key, held in | Kept apart in the hash by |
+|---|---|---|
+| Vercel production builds | production's: project variable (Production) | `VERCEL_TARGET_ENV=production` |
+| ci-turbo on `main` | production's: GitHub environment `turbo-cache-main` | `CACHE_SIGNER=main` |
+| Vercel previews | the previews': project variable (Preview) | `VERCEL_TARGET_ENV=preview` |
+| ci-turbo on any other ref | the previews': GitHub environment `turbo-cache-branches` | `CACHE_SIGNER=branches` |
+
+- Both GitHub environments hold the key as the secret
+  `TURBO_REMOTE_CACHE_SIGNATURE_KEY`. Give `turbo-cache-main` a branch rule
+  admitting `main` alone before its secret: GitHub creates an environment a
+  workflow names, without rules. The Vercel side:
+  [runbook](../../runbooks/cloud.md#3-vercel-project).
+- Turbo hashes `VERCEL_TARGET_ENV` wherever it is set, so a preview can
+  compute production's hashes and upload under them; only the key keeps
+  production from restoring that.
+- Every task sees the key (strict mode passes `TURBO_*`), so whatever runs in
+  a production build or a ci-turbo run on `main` can sign as production:
+  `main`'s code and its dependencies, and a preview promoted to production or
+  a `vercel deploy --prod`, which build with production's variables.
+- The merge queue signs as a branch: GitHub does not document that only the
+  queue can create `gh-readonly-queue/` branches, and a branch rule admitting
+  them would hand production's key to anyone who could (by running ci-turbo
+  by hand on one). Once only the queue can, add `gh-readonly-queue/main/*` to
+  `turbo-cache-main`'s rule and `merge_group` to ci-turbo.yml's choice of
+  environment and `CACHE_SIGNER`.
+- A rejected entry is a plain `cache miss` in the log, even at `-vvv`.
+  Without a key, turbo uploads nothing (`WARNING artifact signature error`)
+  and misses on every remote entry; a key under 32 bytes, an empty one
+  included, fails a run that uses the remote cache before its first task
+  (`futureFlags.longerSignatureKey`).
+- Contributors need no key: without a remote cache turbo never reads it, and
+  with one linked but no key, turbo warns on each upload and runs from the
+  local cache alone.
+
 ## Commands
 
 | | |

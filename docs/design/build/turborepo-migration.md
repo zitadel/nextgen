@@ -451,7 +451,8 @@ sets them up:
   under production's keys, previews only previews'. That separation is by
   key, not by permission: a branch's preview build runs the branch's code
   with a token that can write any entry, production's keys included, so
-  anyone who can push a branch could plant one. Forks cannot: their pull
+  anyone who can push a branch can plant one, which production rejects
+  unless production's signing key made it (below). Forks cannot: their pull
   requests get no build, and so no token, until a team member approves one
   (the project's Git fork protection). A planted entry is removed by
   clearing the team's cache (owners only).
@@ -466,17 +467,20 @@ sets them up:
   merge queue writes the results of the commit that lands on main. A
   read-only flag (`remote:r`) is the pull request's own choice, so it only
   ever kept honest branches out. Without `VERCEL_TARGET_ENV`, CI's entries
-  are apart from the Vercel builds'. A poisoned artifact could still make a
-  pull-request or merge-queue run pass for code that fails; the signatures
-  below close that.
-- **Later, to let only main's results reach production:** turbo's
-  artifact signatures (`remoteCache.signature: true` with
-  `TURBO_REMOTE_CACHE_SIGNATURE_KEY`). Production and trusted CI get the
-  real key (a Vercel Production-only env var; a GitHub environment with a
-  branch rule for main and the merge queue), previews and pull requests a
-  different one, and restores reject artifacts signed with the wrong key.
-  That separates the two populations server-side without a second cache, at
-  the price of two more secrets.
+  are apart from the Vercel builds'. A poisoned artifact can still make a
+  pull-request or merge-queue run pass for code that fails: those runs sign
+  with the previews' key (below), which every branch can use.
+- **Signatures** (decision 11): turbo signs every entry it uploads
+  (`remoteCache.signature: true` with `TURBO_REMOTE_CACHE_SIGNATURE_KEY`), and
+  a restore that fails to verify with the run's own key is a miss.
+  Production builds and ci-turbo's runs on main hold production's key (a
+  Vercel Production variable; a GitHub environment whose branch rule admits
+  main alone), previews and every other ci-turbo run the previews' key. That
+  separates the two populations without a second cache, at the price of two
+  secrets; ci-turbo's populations also hash apart (`CACHE_SIGNER`), as
+  Vercel's do, so neither keeps rejecting the other's entries. The merge
+  queue stays with the branches until only it can create its branches. Who
+  holds which key and why: [turborepo.md](turborepo.md#remote-cache).
 
 This was raised by the security review of the first pull request and is
 tracked there (zitadel/nextgen#1696).
@@ -635,3 +639,11 @@ the release graph.
     `--continue` reports every suite. The suites build and cache nothing,
     so the runner changes nothing else there: moon took about 1.5 s of a
     one-minute job.
+11. **Cache entries are signed** (2026-10-27). Any branch could write an
+    entry under production's hash, and production would restore it, the
+    console's bundle among them. Now every entry carries turbo's signature,
+    and a run restores only entries signed with its own key: production's
+    for production builds and ci-turbo on main, the previews' for previews
+    and ci-turbo anywhere else ("Who may write to the cache"). Branch runs
+    restore the branches' results (their own earlier pushes, other
+    branches', the merge queue's while it runs ci-turbo), no longer main's.

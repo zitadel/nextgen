@@ -21,7 +21,8 @@ name: ci-turbo
 #
 # Every run writes the remote cache (TURBO_CACHE below). A push to main runs
 # the generated-files check and the gate alone, so that the cache holds
-# main's results for the runs on branches cut from it.
+# main's results for main's next run: a run anywhere else signs with another
+# key and restores none of them (the job's environment).
 #
 # Arguments never go after `--` in a turbo run here: turbo puts them into
 # the cache key of every task in the run, not just the task they are for
@@ -44,6 +45,16 @@ jobs:
   full-pr-turbo:
     runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
     timeout-minutes: 120
+    # The environment holds the key that signs this run's remote cache
+    # entries (the signing-key step). Runs on main take production's key from
+    # turbo-cache-main, whose branch rule admits main alone; every other run
+    # takes the previews' key from turbo-cache-branches. The merge queue's
+    # gh-readonly-queue/ branches stay out of turbo-cache-main until only the
+    # queue can create them (docs/design/build/turborepo.md, "Remote cache").
+    # The runs deploy nothing, so they record no deployment.
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'turbo-cache-main' || 'turbo-cache-branches' }}
+      deployment: false
     permissions:
       contents: read
       # The remote-cache step below exchanges this job's OIDC token for a
@@ -68,13 +79,19 @@ jobs:
       # Every run reads and writes the remote cache, pull requests and the
       # merge queue too, as moon's runs do with Depot's: a pull request's
       # later pushes restore what its earlier ones built, and the merge
-      # queue writes the results of the commit that lands on main. A
-      # read-only flag would protect nothing, since the code under test sets
-      # it: the OIDC policy gives every run of this repository a token that
-      # can write, as Vercel gives every preview build one, and CI's entries
-      # stay apart from the Vercel builds' (the plan: "Who may write to the
+      # queue writes the results of the commit that lands on main for the
+      # branches cut from it. A read-only flag would protect nothing, since
+      # the code under test sets it: the OIDC policy gives every run of this
+      # repository a token that can write any entry, as Vercel gives every
+      # preview build one. What a run restores is decided by the signatures
+      # instead: only entries signed with its own key, so no branch's entry
+      # reaches main's runs or production (the plan: "Who may write to the
       # cache"). Forks get no token.
       TURBO_CACHE: local:rw,remote:rw
+      # The key this run signs with (the environment above), which every
+      # turbo hash includes (globalEnv in turbo.json): main's runs and the
+      # others never share an entry.
+      CACHE_SIGNER: ${{ github.ref == 'refs/heads/main' && 'main' || 'branches' }}
       # As in ci.yml: no Ryuk reaper, the postgres lane's only Docker Hub
       # image. test-postgres passes TESTCONTAINERS_* through turbo's strict env.
       TESTCONTAINERS_RYUK_DISABLED: "true"
@@ -163,12 +180,31 @@ jobs:
         with:
           team: ${{ vars.TURBO_TEAM }}
 
+      # The key turbo signs this run's uploads with and checks its restores
+      # against (remoteCache.signature in turbo.json): the secret of the job's
+      # environment. It enters the environment of the steps after this one,
+      # so the setup actions and the install above never see it. Without a
+      # key the job keeps to the local cache: turbo would upload nothing and
+      # miss on every remote entry.
+      - name: Set up the remote cache's signing key
+        id: signing-key
+        if: ${{ steps.remote-cache.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          SIGNING_KEY: ${{ secrets.TURBO_REMOTE_CACHE_SIGNATURE_KEY }}
+        run: |
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::warning::The job's environment has no TURBO_REMOTE_CACHE_SIGNATURE_KEY secret, so it runs with the local cache only (docs/design/build/turborepo.md, Remote cache)"
+            exit 1
+          fi
+          echo "TURBO_REMOTE_CACHE_SIGNATURE_KEY=$SIGNING_KEY" >> "$GITHUB_ENV"
+
       # Depot runners inject a token for Depot's own turbo cache; with TURBO_API
       # pointing at Vercel it only produces a failed request per task, and
       # turbo would still report "Remote caching enabled". Without a Vercel
-      # token the job runs with the local cache alone.
-      - name: Use the local cache only when the token exchange failed
-        if: ${{ steps.remote-cache.outcome != 'success' }}
+      # token or a signing key the job runs with the local cache alone.
+      - name: Use the local cache only without a token or a signing key
+        if: ${{ steps.signing-key.outcome != 'success' }}
         run: echo "TURBO_CACHE=local:rw" >> "$GITHUB_ENV"
 
       - name: Check pending changesets

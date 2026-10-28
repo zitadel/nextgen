@@ -11,6 +11,20 @@
   // Without this, turbo writes its own block into the root AGENTS.md whenever
   // it detects an AI agent running it.
   "agentGuidance": false,
+  // Every build that holds a token for the team's remote cache can write any
+  // entry, previews and branch runs included. Turbo signs each entry it
+  // uploads with TURBO_REMOTE_CACHE_SIGNATURE_KEY and takes an entry it
+  // cannot verify with that key for a miss, so a run restores only what a run
+  // with its own key wrote. Which runs hold which key:
+  // docs/design/build/turborepo.md, "Remote cache".
+  "remoteCache": {
+    "signature": true
+  },
+  // A key shorter than 32 bytes, an empty one included, fails the run instead
+  // of signing with a guessable key.
+  "futureFlags": {
+    "longerSignatureKey": true
+  },
   // Tasks see only the variables listed on them, turbo's built-in list (PATH,
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
   // adds (VITE_* for Vite packages, NEXT_* for Next.js, ...).
@@ -21,7 +35,13 @@
   // the same packages got other keys there than in the console's build and
   // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
-  "globalEnv": ["!VITE_VERCEL_*"],
+  //
+  // CACHE_SIGNER names the key a ci-turbo run signs with, and every hash
+  // includes it, as every hash on Vercel includes VERCEL_TARGET_ENV: runs
+  // with different keys then never share an entry. Sharing one, each would
+  // reject the entries the other signed and upload its own under the same
+  // hash.
+  "globalEnv": ["!VITE_VERCEL_*", "CACHE_SIGNER"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOFLAGS and the target platform change outputs,
