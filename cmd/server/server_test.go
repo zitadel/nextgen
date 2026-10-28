@@ -175,7 +175,7 @@ func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	// Pre-existing bcrypt hash still verifies and is rehashed to argon2id.
 	legacy, err := bcrypt.New(10, nil).Hash(password)
 	require.NoError(t, err)
-	rehashed, err := hasher.Verify(legacy, password)
+	rehashed, err := hasher.VerifyAndRehash(legacy, password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(rehashed, argon2.Prefix), "bcrypt hash should rehash to argon2id, got %q", rehashed)
 }

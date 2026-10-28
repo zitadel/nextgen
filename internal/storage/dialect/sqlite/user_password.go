@@ -27,6 +27,9 @@ FROM user_passwords
 WHERE project_id = ? AND user_id = ?
 RETURNING id`
 
+	updateUserPasswordHashStmt = `UPDATE user_passwords SET encoded_hash = ?` +
+		` WHERE project_id = ? AND id = ? AND encoded_hash = ?`
+
 	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
@@ -64,6 +67,12 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		pw.ProjectID,
 		pw.UserID,
 	).Scan(&pw.ID)
+	return wrapError(err)
+}
+
+// UpdateUserPasswordHash implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error {
+	_, err := ps.client.Exec(ctx, updateUserPasswordHashStmt, updated, pw.ProjectID, pw.ID, pw.EncodedHash)
 	return wrapError(err)
 }
 

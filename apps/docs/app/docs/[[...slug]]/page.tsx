@@ -11,6 +11,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OpenAPIPage } from "@/components/api-page";
+import { Feedback } from "@/components/feedback";
 import { MarkdownPage } from "@/components/markdown-page";
 import { getMDXComponents, MdxLink } from "@/components/mdx";
 import { Operations } from "@/components/operations";
@@ -54,6 +55,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         <DocsBody>
           <OpenAPIPage {...openapiPageProps(page)} />
         </DocsBody>
+        <Feedback />
       </DocsPage>
     );
   }
@@ -65,6 +67,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         <DocsBody>
           <MarkdownPage markdown={page.data.markdown} />
         </DocsBody>
+        <Feedback />
       </DocsPage>
     );
   }
@@ -84,6 +87,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
           })}
         />
       </DocsBody>
+      <Feedback />
     </DocsPage>
   );
 }

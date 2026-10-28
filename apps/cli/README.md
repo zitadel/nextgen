@@ -173,6 +173,9 @@ which ships in this package.
 * [`zitadel origin rm PATTERN`](#zitadel-origin-rm-pattern)
 * [`zitadel policies get POLICY`](#zitadel-policies-get-policy)
 * [`zitadel policies list`](#zitadel-policies-list)
+* [`zitadel preview`](#zitadel-preview)
+* [`zitadel preview list`](#zitadel-preview-list)
+* [`zitadel preview rm URL`](#zitadel-preview-rm-url)
 * [`zitadel projects get ID`](#zitadel-projects-get-id)
 * [`zitadel projects list`](#zitadel-projects-list)
 * [`zitadel projects update ID`](#zitadel-projects-update-id)
@@ -324,8 +327,8 @@ Disable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method passkey disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -343,9 +346,6 @@ FLAGS
                          more than one.
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Disable passkey sign-in for a user schema.
@@ -362,8 +362,8 @@ Enable passkey sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method passkey enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+  $ zitadel auth-method passkey enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -380,9 +380,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Enable passkey sign-in for a user schema.
 
@@ -398,8 +395,8 @@ Disable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>] [-f]
+  $ zitadel auth-method password disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [-f]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -418,9 +415,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Disable password sign-in for a user schema.
 
@@ -436,8 +430,8 @@ Enable password sign-in for a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method password enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
+  $ zitadel auth-method password enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>]
 
 FLAGS
   -c, --cwd=<value>      Project directory to operate on.
@@ -454,9 +448,6 @@ FLAGS
       --[no-]telemetry   Send anonymous usage analytics. Disable with
                          --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Enable password sign-in for a user schema.
 
@@ -472,9 +463,9 @@ Remove an identity provider from a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso disable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [--schema <value>]
-    [--provider <value>] [-f]
+  $ zitadel auth-method sso disable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [--schema <value>] [--provider <value>]
+    [-f]
 
 FLAGS
   -c, --cwd=<value>       Project directory to operate on.
@@ -494,9 +485,6 @@ FLAGS
       --[no-]telemetry    Send anonymous usage analytics. Disable with
                           --no-telemetry.
 
-GLOBAL FLAGS
-  --json  Format output as json.
-
 DESCRIPTION
   Remove an identity provider from a user schema.
 
@@ -512,9 +500,9 @@ Add an identity provider to a user schema.
 
 ```
 USAGE
-  $ zitadel auth-method sso enable [--json] [-c <value>] [-s <value>] [-n]
-    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--schema <value>] [--provider google|custom] [--slug <value>]
+  $ zitadel auth-method sso enable [-c <value>] [-s <value>] [-n] [--dry-run] [-v]
+    [--debug] [--color] [--telemetry] [-e <value>] [--env-file <value>]
+    [--schema <value>] [--provider google|custom] [--slug <value>]
     [--display-name <value>] [--issuer <value>] [--scopes <value>] [--client-id
     <value>]
 
@@ -553,9 +541,6 @@ FLAGS
                               refer to it by this.
       --[no-]telemetry        Send anonymous usage analytics. Disable with
                               --no-telemetry.
-
-GLOBAL FLAGS
-  --json  Format output as json.
 
 DESCRIPTION
   Add an identity provider to a user schema.
@@ -732,28 +717,36 @@ Claim this project to make it permanent. Opens a browser to create an account or
 USAGE
   $ zitadel claim [--json] [-c <value>] [-s <value>] [-n]
     [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
-    <value>] [--no-open] [--timeout <value>]
+    <value>] [--no-open] [--no-wait | --challenge-id <value> | --timeout
+    <value>]
 
 FLAGS
-  -c, --cwd=<value>       Project directory to operate on.
-  -e, --env=<value>       Environment to run against, e.g. production. Defaults
-                          to ZITADEL_ENV, then the hosting platform's build
-                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
-  -n, --non-interactive   Disable prompts. Required when scripting or running as
-                          an agent.
-  -s, --server=<value>    Override the resolved server URL.
-  -v, --verbose           Verbose logging.
-      --[no-]color        Colorize human output. Disable with --no-color;
-                          NO_COLOR and FORCE_COLOR are honored too.
-      --debug             Debug logging.
-      --dry-run           Preview without mutating files or the platform.
-      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
-                          process environment. Cannot be combined with --env.
-      --no-open           Print the link instead of opening a browser.
-      --[no-]telemetry    Send anonymous usage analytics. Disable with
-                          --no-telemetry.
-      --timeout=<value>   Seconds to wait for the browser step. Defaults to the
-                          link's own expiry (10 minutes).
+  -c, --cwd=<value>           Project directory to operate on.
+  -e, --env=<value>           Environment to run against, e.g. production.
+                              Defaults to ZITADEL_ENV, then the hosting
+                              platform's build (VERCEL_ENV, or Netlify's
+                              CONTEXT), then development.
+  -n, --non-interactive       Disable prompts. Required when scripting or
+                              running as an agent.
+  -s, --server=<value>        Override the resolved server URL.
+  -v, --verbose               Verbose logging.
+      --challenge-id=<value>  Wait for the link a --no-wait run printed, instead
+                              of creating a new one.
+      --[no-]color            Colorize human output. Disable with --no-color;
+                              NO_COLOR and FORCE_COLOR are honored too.
+      --debug                 Debug logging.
+      --dry-run               Preview without mutating files or the platform.
+      --env-file=<value>      Read ZITADEL_* values from this file ahead of the
+                              process environment. Cannot be combined with
+                              --env.
+      --no-open               Print the link instead of opening a browser.
+      --no-wait               Print the link and exit, without opening a browser
+                              or waiting for the browser step. The result names
+                              the command that waits for it.
+      --[no-]telemetry        Send anonymous usage analytics. Disable with
+                              --no-telemetry.
+      --timeout=<value>       Seconds to wait for the browser step. Defaults to
+                              the link's own expiry (10 minutes).
 
 GLOBAL FLAGS
   --json  Format output as json.
@@ -768,6 +761,10 @@ EXAMPLES
   $ zitadel claim --no-open
 
   $ zitadel claim --timeout 120
+
+  $ zitadel claim --no-wait
+
+  $ zitadel claim --challenge-id ch_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C
 ```
 
 ## `zitadel commands`
@@ -802,7 +799,7 @@ _See code: [@oclif/plugin-commands](https://github.com/oclif/plugin-commands/blo
 
 ## `zitadel console`
 
-Open the local console, signed in as the local admin created by `zitadel start`.
+Open the local console, signed in as the local admin.
 
 ```
 USAGE
@@ -827,11 +824,11 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Open the local console, signed in as the local admin created by `zitadel
-  start`.
+  Open the local console, signed in as the local admin.
 
-  Run it in the directory `zitadel start` ran in, or one inside it: the local
-  admin is read from the nearest `.zitadel/local/` on the way up.
+  The local admin is the one `zitadel start` created. Run this in the directory
+  `zitadel start` ran in, or one inside it: the local admin is read from the
+  nearest `.zitadel/local/` on the way up.
 
 EXAMPLES
   $ zitadel console
@@ -841,7 +838,7 @@ EXAMPLES
 
 ## `zitadel deploy`
 
-Build a release from .zitadel/ and deploy it to the project.
+Apply your local configuration to Zitadel.
 
 ```
 USAGE
@@ -872,7 +869,10 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Build a release from .zitadel/ and deploy it to the project.
+  Apply your local configuration to Zitadel.
+
+  Builds a release from .zitadel/ and deploys it to the project. Use --dry-run
+  to preview what would change.
 
 EXAMPLES
   $ zitadel deploy -m 'add phone_number to human-user'
@@ -2307,6 +2307,148 @@ EXAMPLES
   $ zitadel policies list --filter operation=equals:<value>
 ```
 
+## `zitadel preview`
+
+Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+```
+USAGE
+  $ zitadel preview [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--origin <value>...] [--ttl <value>] [--strict]
+
+FLAGS
+  -c, --cwd=<value>        Project directory to operate on.
+  -e, --env=<value>        Environment to run against, e.g. production. Defaults
+                           to ZITADEL_ENV, then the hosting platform's build
+                           (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -n, --non-interactive    Disable prompts. Required when scripting or running
+                           as an agent.
+  -s, --server=<value>     Override the resolved server URL.
+  -v, --verbose            Verbose logging.
+      --[no-]color         Colorize human output. Disable with --no-color;
+                           NO_COLOR and FORCE_COLOR are honored too.
+      --debug              Debug logging.
+      --dry-run            Preview without mutating files or the platform.
+      --env-file=<value>   Read ZITADEL_* values from this file ahead of the
+                           process environment. Cannot be combined with --env.
+      --origin=<value>...  A preview URL to deploy to, instead of detecting them
+                           from the platform build. Repeatable.
+      --strict             Fail instead of warning when no preview credential
+                           (ZITADEL_PROJECT_SECRET) is set.
+      --[no-]telemetry     Send anonymous usage analytics. Disable with
+                           --no-telemetry.
+      --ttl=<value>        How long each preview stays live, e.g. 7d, 12h or
+                           90m. Between 60s and 365d. Omitted, the project's
+                           default applies.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Deploy a release from .zitadel/ to a pull-request build's preview URLs.
+
+EXAMPLES
+  $ zitadel preview
+
+  $ zitadel preview --origin https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview --ttl 24h
+```
+
+## `zitadel preview list`
+
+List the project's live previews, newest first.
+
+```
+USAGE
+  $ zitadel preview list [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [--limit <value>] [-a | --page-token <value>] [--plain]
+
+FLAGS
+  -a, --all                 Fetch every page instead of one.
+  -c, --cwd=<value>         Project directory to operate on.
+  -e, --env=<value>         Environment to run against, e.g. production.
+                            Defaults to ZITADEL_ENV, then the hosting platform's
+                            build (VERCEL_ENV, or Netlify's CONTEXT), then
+                            development.
+  -n, --non-interactive     Disable prompts. Required when scripting or running
+                            as an agent.
+  -s, --server=<value>      Override the resolved server URL.
+  -v, --verbose             Verbose logging.
+      --[no-]color          Colorize human output. Disable with --no-color;
+                            NO_COLOR and FORCE_COLOR are honored too.
+      --debug               Debug logging.
+      --dry-run             Preview without mutating files or the platform.
+      --env-file=<value>    Read ZITADEL_* values from this file ahead of the
+                            process environment. Cannot be combined with --env.
+      --limit=<value>       Page size (server default 20, max 100).
+      --page-token=<value>  Continue from a previous page's next_page_token.
+      --plain               Tab-separated rows with no header, for piping.
+                            Implied when stdout is not a terminal.
+      --[no-]telemetry      Send anonymous usage analytics. Disable with
+                            --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  List the project's live previews, newest first.
+
+EXAMPLES
+  $ zitadel preview list
+
+  $ zitadel preview list --all
+
+  $ zitadel preview list --plain
+```
+
+## `zitadel preview rm URL`
+
+Remove a live preview from the project.
+
+```
+USAGE
+  $ zitadel preview rm URL [--json] [-c <value>] [-s <value>] [-n]
+    [--dry-run] [-v] [--debug] [--color] [--telemetry] [-e <value>] [--env-file
+    <value>] [-f]
+
+ARGUMENTS
+  URL  The preview URL to remove.
+
+FLAGS
+  -c, --cwd=<value>       Project directory to operate on.
+  -e, --env=<value>       Environment to run against, e.g. production. Defaults
+                          to ZITADEL_ENV, then the hosting platform's build
+                          (VERCEL_ENV, or Netlify's CONTEXT), then development.
+  -f, --force             Remove the preview without the confirmation prompt.
+                          Required when non-interactive.
+  -n, --non-interactive   Disable prompts. Required when scripting or running as
+                          an agent.
+  -s, --server=<value>    Override the resolved server URL.
+  -v, --verbose           Verbose logging.
+      --[no-]color        Colorize human output. Disable with --no-color;
+                          NO_COLOR and FORCE_COLOR are honored too.
+      --debug             Debug logging.
+      --dry-run           Preview without mutating files or the platform.
+      --env-file=<value>  Read ZITADEL_* values from this file ahead of the
+                          process environment. Cannot be combined with --env.
+      --[no-]telemetry    Send anonymous usage analytics. Disable with
+                          --no-telemetry.
+
+GLOBAL FLAGS
+  --json  Format output as json.
+
+DESCRIPTION
+  Remove a live preview from the project.
+
+EXAMPLES
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app
+
+  $ zitadel preview rm https://acme-git-sso-acmeinc.vercel.app --force
+```
+
 ## `zitadel projects get ID`
 
 Get one project by id.
@@ -2489,7 +2631,7 @@ EXAMPLES
 
 ## `zitadel pull [TARGET]`
 
-Rebuild .zitadel/ from the revisions a released snapshot pins.
+Rebuild your .zitadel/ files from a release.
 
 ```
 USAGE
@@ -2523,7 +2665,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Rebuild .zitadel/ from the revisions a released snapshot pins.
+  Rebuild your .zitadel/ files from a release.
+
+  Writes .zitadel/ from the revisions a released snapshot pins.
 
 EXAMPLES
   $ zitadel pull
@@ -2747,7 +2891,7 @@ DESCRIPTION
 
 ## `zitadel resources`
 
-List the resources this CLI manages and what can be done to each.
+List the resources this CLI manages.
 
 ```
 USAGE
@@ -2773,7 +2917,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  List the resources this CLI manages and what can be done to each.
+  List the resources this CLI manages.
+
+  Shows what can be done to each.
 
 EXAMPLES
   $ zitadel resources
@@ -3080,7 +3226,7 @@ EXAMPLES
 
 ## `zitadel setup`
 
-Create a Zitadel project and scaffold local auth.
+Create a Zitadel project and scaffold local auth. An interactive setup ends with a note about the Zitadel agent skills, shown once per machine; set NO_SKILLS_PROMPT=1 to hide it.
 
 ```
 USAGE
@@ -3132,9 +3278,9 @@ FLAGS
       lte|qwik-router|qwik|angular>
 
   --password-min-length=<value>
-      Minimum password length for the project's password policy, for example 15; 0
-      sets none. Without it, setup writes the policy with no rules; change it in
-      .zitadel/policies/ later.
+      Minimum password length for the project's password policy, for example 12; 0
+      sets none. Without it, setup sets 15, the NIST minimum for password-only
+      sign-in; change it in .zitadel/policies/ later.
 
   --preset=<option>
       Sign-in preset for the scaffolded schema and login flow (default:
@@ -3185,7 +3331,9 @@ GLOBAL FLAGS
   --json  Format output as json.
 
 DESCRIPTION
-  Create a Zitadel project and scaffold local auth.
+  Create a Zitadel project and scaffold local auth. An interactive setup ends
+  with a note about the Zitadel agent skills, shown once per machine; set
+  NO_SKILLS_PROMPT=1 to hide it.
 
 EXAMPLES
   $ zitadel setup --framework next

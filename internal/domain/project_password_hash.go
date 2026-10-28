@@ -20,8 +20,9 @@ func ErrProjectPasswordHashInvalid() Error {
 // project's stored passwords predate whatever it picks today: every hash the
 // server could read before a policy is set stays readable after, and a project
 // that changes its mind does not invalidate the passwords already written under
-// the old method. Nothing rehashes on the strength of a policy change either --
-// a password is only ever rewritten when its owner sets a new one.
+// the old method. A policy change rewrites no stored password by itself: a
+// password moves to the new method on its owner's next successful sign-in, or
+// when its owner sets a new one.
 //
 // A project without a policy hashes with the deployment default, which is
 // argon2id unless the operator configured otherwise. That is the state of every
