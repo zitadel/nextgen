@@ -22,6 +22,8 @@ import Eject from "./commands/eject";
 import Env from "./commands/env/index";
 import EnvAdd from "./commands/env/add";
 import EnvList from "./commands/env/list";
+import Login from "./commands/login";
+import Logout from "./commands/logout";
 import Logs from "./commands/logs";
 import OriginAdd from "./commands/origin/add";
 import OriginList from "./commands/origin/list";
@@ -44,6 +46,7 @@ import VariableList from "./commands/variable/list";
 import VariableResolve from "./commands/variable/resolve";
 import VariableRm from "./commands/variable/rm";
 import VariableSet from "./commands/variable/set";
+import Whoami from "./commands/whoami";
 
 /**
  * The explicit oclif command table (`oclif.commands.strategy: "explicit"` in
@@ -62,6 +65,8 @@ export const COMMANDS: Record<string, typeof Command> = {
   doctor: Doctor,
   eject: Eject,
   env: Env,
+  login: Login,
+  logout: Logout,
   logs: Logs,
   preview: Preview,
   pull: Pull,
@@ -71,6 +76,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   start: Start,
   status: Status,
   stop: Stop,
+  whoami: Whoami,
   "auth-method:password:enable": AuthMethodPasswordEnable,
   "auth-method:password:disable": AuthMethodPasswordDisable,
   "auth-method:passkey:enable": AuthMethodPasskeyEnable,

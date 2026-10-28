@@ -1,6 +1,7 @@
 import { consola } from "consola";
 
 import { createZitadelClient, type ZitadelClient } from "../api-client";
+import { developerAccessToken } from "../login/flow";
 import { type Environment, requireValueInteractive, resolveEnvironment } from "../environment";
 import { resolveCwd } from "../paths";
 import { BaseCommand } from "./base";
@@ -32,6 +33,13 @@ export abstract class EnvironmentCommand extends BaseCommand {
   static override baseFlags = { ...BaseCommand.baseFlags, ...environmentFlags };
 
   static credential: CredentialKind = "project";
+
+  /**
+   * Whether the developer's own sign-in (`zitadel login`) may stand in when
+   * no project secret resolves: the command then acts as the developer, with
+   * their grants on the project (ADR 053), rather than as the project.
+   */
+  static acceptsDeveloperLogin = false;
 
   /** What the invocation resolved to; set by {@link toMeta}. */
   protected environment!: Environment;
@@ -163,10 +171,21 @@ export abstract class EnvironmentCommand extends BaseCommand {
     };
     const server = await requireValueInteractive(environment, "ZITADEL_URL", ask);
     const projectId = await requireValueInteractive(environment, "ZITADEL_PROJECT_ID", ask);
-    const token = await requireValueInteractive(environment, CREDENTIALS[credential], ask);
+    // A secret that resolves always wins, so CI keeps acting as the project.
+    const developer =
+      (this.constructor as typeof EnvironmentCommand).acceptsDeveloperLogin &&
+      environment.values[CREDENTIALS[credential]] === undefined
+        ? await developerAccessToken(server, process.env)
+        : undefined;
+    const token =
+      developer?.token ??
+      (await requireValueInteractive(environment, CREDENTIALS[credential], ask));
     if (process.stdout.isTTY && !options.quiet) {
       consola.info(`Project   ${projectId}`);
       consola.info(`Server    ${server}`);
+      if (developer) {
+        consola.info(`As        ${developer.login.user.identifier ?? developer.login.user.id}`);
+      }
     }
     return {
       client: createZitadelClient({ baseUrl: server, token }, { verbatim: options.verbatim }),
