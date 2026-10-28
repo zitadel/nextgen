@@ -492,7 +492,7 @@ export function advisoryForWarnings(
 
   if (warnings.some((check) => check.name === "issuer-origin")) {
     nextActions.push(
-      "Make the app's issuer a primary origin; `zitadel deploy` lands only on primary origins, and `zitadel setup` 0.1.0 registered it as a preview one.",
+      "Make the app's issuer a primary origin: a deploy lands only on primary origins, and setup 0.1.0 registered it as a preview one.",
     );
     nextCommands.push(projectCommand("doctor --fix", selector, cliVersion));
   }

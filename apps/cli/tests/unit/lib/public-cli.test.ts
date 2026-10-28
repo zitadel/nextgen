@@ -236,10 +236,18 @@ describe("the CLI names itself once in human output", () => {
     "commands/stop.ts",
   ];
 
-  /** The source with every comment blanked, keeping each line where it was. */
+  /**
+   * The source with every comment blanked, keeping each line where it was.
+   *
+   * String literals are matched first and kept. A slash-star inside a string
+   * such as `@zitadel/*` would otherwise open a comment that runs to the next
+   * real comment close and blanks every line a person reads in between. That
+   * hid twenty lines of `doctor/index.ts` from this scan, one an offender.
+   */
   const blankComments = (source: string): string =>
-    source.replaceAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) =>
-      comment.replaceAll(/[^\n]/g, " "),
+    source.replaceAll(
+      /"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+      (match) => (match.startsWith("/") ? match.replaceAll(/[^\n]/g, " ") : match),
     );
 
   /** The double-quoted string literals on a line, quotes included. */
