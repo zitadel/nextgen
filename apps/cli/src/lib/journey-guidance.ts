@@ -64,41 +64,10 @@ export function customizeAndPublishActions(
       "the information you collect, and .zitadel/flows/ to change the sign-up/sign-in " +
       "experience. Each folder has a README with examples.",
     `See your changes before they go live: ${projectCommand("deploy --dry-run", selector, cliVersion)} to ` +
-      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish.`,
+      `preview, then ${projectCommand(DEPLOY_ARGS, selector, cliVersion)} to publish. Nothing is ` +
+      "released yet, so publishing is what pins this configuration rather than leaving the project " +
+      "on whatever its newest revisions happen to be.",
   ];
-}
-
-/**
- * Said once a project exists with nothing deployed to it.
- *
- * The server answers a project that has no release from its own seeded schema
- * and login flow, so the `.zitadel/` files just written are on disk but not
- * live, and nothing else in the output says so. Publishing is left to the
- * developer rather than done for them, so this is the only thing that tells
- * them the step exists.
- *
- * Shared, because every command that leaves a project in that state owes the
- * same sentence.
- */
-export function publishConfigurationAction(
-  cliVersion: string,
-  selector: EnvironmentSelector,
-): string {
-  return (
-    "Publish your configuration: nothing is deployed yet, so sign-in uses the server's " +
-    `defaults rather than your .zitadel/ files. Run ${projectCommand(DEPLOY_ARGS, selector, cliVersion)}.`
-  );
-}
-
-/** {@link publishConfigurationAction} as the box renders it. */
-export function publishConfigurationBoxAction(
-  cliVersion: string,
-  selector: EnvironmentSelector,
-): { text: string; command: SuggestedCommand } {
-  return {
-    text: "Publish your configuration (nothing is deployed yet, so sign-in uses the server's defaults):",
-    command: projectCommand(DEPLOY_ARGS, selector, cliVersion),
-  };
 }
 
 /**

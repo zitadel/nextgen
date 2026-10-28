@@ -60,12 +60,7 @@ import {
   type SecretOutcome,
   type SecretPublisher,
 } from "../../lib/idp";
-import {
-  brandingGuidanceAction,
-  exploreAllCommands,
-  publishConfigurationAction,
-  publishConfigurationBoxAction,
-} from "../../lib/journey-guidance";
+import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
 import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
@@ -108,7 +103,6 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
-import { DEPLOY_ARGS } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
@@ -249,7 +243,7 @@ export default class Setup extends Promptable(BaseCommand) {
       allowNo: true,
       default: true,
       description:
-        "Initialise a git repository and make one commit when the project is not already in one, so the first release records a commit. Use --no-git to leave version control alone.",
+        "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
     }),
     preset: Flags.string({
       description:
@@ -345,7 +339,9 @@ export default class Setup extends Promptable(BaseCommand) {
     // Before anything is written: setup commits what it writes, and it can
     // only tell its own files from the developer's when the tree starts clean.
     // A dirty repository is refused here, where nothing has happened yet.
-    if (flags.git !== false && !dryRun) {
+    // A dry run too: the check only reads, and previewing success on a
+    // repository the real run would refuse is a worse lie than refusing early.
+    if (flags.git !== false) {
       await assertCleanWorktree(cwd);
     }
     // Before anything is detected, created or written: a server another CLI
@@ -840,10 +836,9 @@ export default class Setup extends Promptable(BaseCommand) {
       package_manager: installOutcome.install.package_manager,
     });
 
-    // Version control first, then publish: a release records the commit it was
-    // built from, so one built before the commit exists carries no `git_sha`
-    // and the next deploy has no baseline to diff against. That ordering is why
-    // both happen here rather than being left to the developer (#1651).
+    // The commit exists so that the release a later `deploy` builds records
+    // the commit it came from; without it that deploy has no baseline and the
+    // one after it can show no diff (#1651).
     const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
 
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
@@ -921,16 +916,6 @@ export default class Setup extends Promptable(BaseCommand) {
       }
     }
 
-    // Nothing was deployed, so the project serves the server's defaults until
-    // the developer publishes. Setup does not do it for them, so this is the
-    // only thing that says the step exists.
-    const publishSelector = recoverySelector(flags.cwd);
-    const publishStep = {
-      actions: [publishConfigurationAction(this.meta.cliVersion, publishSelector)],
-      boxActions: [publishConfigurationBoxAction(this.meta.cliVersion, publishSelector)],
-      commands: [projectCommand(DEPLOY_ARGS, publishSelector, this.meta.cliVersion)],
-    };
-
     const deadline = dryRun ? undefined : claimWindowDeadline(project.created_at);
     const nudgeClaim =
       !ownedByLocalAdmin &&
@@ -993,7 +978,6 @@ export default class Setup extends Promptable(BaseCommand) {
             "",
             renderBoxActions([
               ...installOutcome.boxActions,
-              ...publishStep.boxActions,
               ...consoleStep.boxActions,
               ...claimNudge.boxActions,
             ]),
@@ -1040,10 +1024,10 @@ export default class Setup extends Promptable(BaseCommand) {
         })),
         files_skipped: result.filesSkipped.map((file) => relativeDisplay(cwd, file)),
         install: installOutcome.install,
-        // Whether setup put the project under version control, and the commit
-        // the first release was built from. `null` when the project was
-        // already in a repository, when `--no-git` was passed, or when git
-        // could not be used.
+        // Whether setup created the repository, and the commit it made.
+        // `initialized` is false when the project was already in one, which it
+        // is still committed into; the commit is `null` only under `--no-git`
+        // or when git could not be used.
         git: {
           initialized: commit.kind === "created",
           commit: commit.kind === "created" || commit.kind === "committed" ? commit.sha : null,
@@ -1077,7 +1061,6 @@ export default class Setup extends Promptable(BaseCommand) {
         // claim to keep it (the same order the manifesto's journey walks).
         next_actions: [
           ...installOutcome.nextActions,
-          ...publishStep.actions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
           ...claimNudge.actions,
@@ -1107,7 +1090,6 @@ export default class Setup extends Promptable(BaseCommand) {
             recoverySelector(flags.cwd),
           ),
           ...installOutcome.nextCommands,
-          ...publishStep.commands,
           ...consoleStep.commands,
           ...claimNudge.commands,
         ]),
@@ -1135,14 +1117,14 @@ export default class Setup extends Promptable(BaseCommand) {
     const outcome = await ensureInitialCommit(cwd);
     if (outcome.kind === "created" || outcome.kind === "committed") {
       consola.success(`Committed the project as ${outcome.sha.slice(0, 7)}`);
-      // git cannot commit without an author, so one was invented to get the
-      // commit the release needs. Said out loud rather than left in the
-      // developer's history unmentioned, with the one command that fixes it.
-      if (outcome.fallbackIdentity) {
+      // git guesses an author from the machine when none is configured and
+      // commits anyway, so the commit exists but carries a name the developer
+      // did not choose. Said out loud, with the one command that fixes it.
+      if (outcome.guessedIdentity) {
         reportWarning(
-          "This machine has no git user.name/user.email, so the commit was authored as " +
-            "Zitadel Setup <setup@zitadel.local>. Set your identity and run " +
-            "`git commit --amend --reset-author` to put your own name on it.",
+          "This machine has no git user.name/user.email, so git guessed the author from your " +
+            "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
+            "to put your own name on the commit.",
         );
       }
     }

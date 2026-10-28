@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import { ZitadelError } from "../../lib/errors";
+import { headSha } from "../../lib/release";
 
 const run = promisify(execFile);
 
@@ -13,17 +14,18 @@ const run = promisify(execFile);
 export const INITIAL_COMMIT_SUBJECT = "chore: scaffold the project with zitadel setup";
 
 /**
- * Identity used only when the machine has none configured, because git refuses
- * to commit without one and no commit means no `git_sha` — the whole reason
- * this exists. It is reported back so setup can say the commit needs its author
- * corrected, rather than leaving an invented name in the history unmentioned.
+ * Paths that must never be committed, whatever `.gitignore` happens to say.
+ *
+ * `.zitadel/local/` holds the local admin credential and the server's data
+ * directory. Only the `.gitignore` line `start` appends keeps it out, so a
+ * project missing that line would otherwise commit the credential.
  */
-const FALLBACK_IDENTITY = { name: "Zitadel Setup", email: "setup@zitadel.local" };
-
-/** Paths that must never be committed, whatever `.gitignore` happens to say. */
 function isSecretPath(path: string): boolean {
   const name = path.split("/").pop() ?? path;
   if (path === ".zitadel/secret" || path.endsWith("/.zitadel/secret")) {
+    return true;
+  }
+  if (path === ".zitadel/local" || path.startsWith(".zitadel/local/")) {
     return true;
   }
   return name.startsWith(".env") && name !== ".env.example";
@@ -32,9 +34,9 @@ function isSecretPath(path: string): boolean {
 /** What {@link ensureInitialCommit} did, for setup to report. */
 export type InitialCommitOutcome =
   /** There was no repository, so one was created and the project committed. */
-  | { readonly kind: "created"; readonly sha: string; readonly fallbackIdentity: boolean }
+  | { readonly kind: "created"; readonly sha: string; readonly guessedIdentity: boolean }
   /** The project was already in a repository, and was committed into it. */
-  | { readonly kind: "committed"; readonly sha: string; readonly fallbackIdentity: boolean }
+  | { readonly kind: "committed"; readonly sha: string; readonly guessedIdentity: boolean }
   /** `--no-git`, or a dry run. */
   | { readonly kind: "skipped" }
   /** git is missing, or init/add/commit failed, or a secret would have been committed. */
@@ -49,13 +51,15 @@ type Change = { readonly path: string; readonly untracked: boolean };
  * to the project directory, never the repository root: in a monorepo the two
  * differ, and comparing the wrong one refuses every subdirectory project.
  *
- * `start` appends `.zitadel/local/` to `.gitignore` and writes the runtime
- * files under it, and it runs immediately before `setup` on the documented
- * golden path. Counting those would make setup refuse every project that has
- * ever been started, which is every project.
+ * Just the two `start` leaves behind: the `.zitadel/local/` it writes and the
+ * `.gitignore` line that ignores it. It runs immediately before `setup` on the
+ * documented golden path, so counting those would refuse every project that
+ * has ever been started. Nothing else under `.zitadel/` is exempt: a
+ * connection in `.zitadel/idps/` or a policy file is the developer's, and an
+ * uncommitted edit there must not be committed under setup's subject.
  */
 function isCliOwned(path: string): boolean {
-  return path === ".gitignore" || path === ".zitadel" || path.startsWith(".zitadel/");
+  return path === ".gitignore" || path === ".zitadel/local" || path.startsWith(".zitadel/local/");
 }
 
 /**
@@ -90,22 +94,25 @@ async function insideRepository(cwd: string): Promise<boolean> {
  * directory it runs in, so this is what turns one into a project-relative path.
  */
 async function projectPrefix(cwd: string): Promise<string> {
-  try {
-    return (await git(cwd, ["rev-parse", "--show-prefix"])).trim();
-  } catch {
-    return "";
-  }
+  // Not caught: an empty prefix guessed after a failure would make every
+  // subdirectory project look dirty. The caller refuses instead.
+  return (await git(cwd, ["rev-parse", "--show-prefix"])).trim();
 }
 
-/** Whether git has an author identity of the developer's own to commit with. */
-async function hasIdentity(cwd: string): Promise<boolean> {
+/**
+ * Whether the developer has an identity of their own for git to commit with,
+ * from config or from `GIT_AUTHOR_*`/`GIT_COMMITTER_*`/`EMAIL`.
+ *
+ * Without one git does not fail: it guesses from the username and hostname and
+ * commits anyway. `user.useConfigOnly` is what turns that guess back into an
+ * error, so asking under it is the way to tell a real identity from a guessed
+ * one. Nothing is passed to the commit either way — an identity this invented
+ * would be a worse author than the one git derives from the machine.
+ */
+async function hasOwnIdentity(cwd: string): Promise<boolean> {
   try {
-    // `--get` takes its key as a separate argument. Written as `--get=user.email`
-    // git exits 129 and this reports "no identity" on every machine, so every
-    // commit would be attributed to FALLBACK_IDENTITY.
-    const email = (await git(cwd, ["config", "--get", "user.email"])).trim();
-    const name = (await git(cwd, ["config", "--get", "user.name"])).trim();
-    return email !== "" && name !== "";
+    await git(cwd, ["-c", "user.useConfigOnly=true", "var", "GIT_AUTHOR_IDENT"]);
+    return true;
   } catch {
     return false;
   }
@@ -120,7 +127,17 @@ async function hasIdentity(cwd: string): Promise<boolean> {
  * which `git add` here would never touch — does not refuse the setup.
  */
 async function changes(cwd: string): Promise<Change[]> {
-  const stdout = await git(cwd, ["status", "--porcelain", "-z", "--", "."]);
+  // `--untracked-files=all` lists the files inside an untracked directory
+  // rather than collapsing them to `apps/web/`, which strips to "" and makes
+  // every brand-new package in an existing repository look dirty.
+  const stdout = await git(cwd, [
+    "status",
+    "--porcelain",
+    "-z",
+    "--untracked-files=all",
+    "--",
+    ".",
+  ]);
   const fields = stdout.split("\0");
   const found: Change[] = [];
   for (let index = 0; index < fields.length; index += 1) {
@@ -182,10 +199,20 @@ export async function assertCleanWorktree(cwd: string): Promise<void> {
         path: change.path.startsWith(prefix) ? change.path.slice(prefix.length) : change.path,
       }))
       .filter((change) => !isCliOwned(change.path));
-  } catch {
-    // git answered the repository probe but not this; leave it to the commit,
-    // which reports its own failure without stopping setup.
-    return;
+  } catch (error) {
+    // Refuse rather than carry on. The commit does not check again, so going
+    // ahead here would stage and commit the very work this guard exists to
+    // protect, on the strength of a question git declined to answer.
+    throw new ZitadelError(
+      "E_CONFLICT",
+      `Could not tell whether the git working tree is clean: ${messageOf(error)}`,
+      {
+        hint:
+          "Setup commits the files it writes, and will not do that without knowing the tree " +
+          "started clean. Fix what git is reporting, then run setup again, or pass --no-git to " +
+          "set up without touching version control.",
+      },
+    );
   }
   if (dirty.length === 0) {
     return;
@@ -228,16 +255,18 @@ function plural(list: readonly unknown[]): string {
  */
 export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOutcome> {
   const existing = await insideRepository(cwd);
+  let staged = false;
   try {
     if (!existing) {
       await git(cwd, ["init", "--quiet"]);
     }
     await git(cwd, ["add", "--all", "--", "."]);
+    staged = true;
     // `.gitignore` is the first line of defence and the scaffold writes one,
     // but a secret committed once cannot be scrubbed later, so the staged set
     // is checked rather than trusted.
-    const staged = await stagedPaths(cwd);
-    const secrets = staged.filter(isSecretPath);
+    const paths = await stagedPaths(cwd);
+    const secrets = paths.filter(isSecretPath);
     if (secrets.length > 0) {
       await git(cwd, ["reset", "--quiet", "--", ...secrets]);
     }
@@ -246,36 +275,64 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     // under that spelling would leave the secret staged and silently commit it.
     const stillStaged = (await stagedPaths(cwd)).filter(isSecretPath);
     if (stillStaged.length > 0) {
+      await unstageProject(cwd, existing);
       return {
         kind: "unavailable",
         reason: `${stillStaged[0]} could not be kept out of the commit, so nothing was committed`,
       };
     }
-    if (staged.length === secrets.length) {
+    if (paths.length === secrets.length) {
+      await unstageProject(cwd, existing);
       return { kind: "unavailable", reason: "there was nothing to commit" };
     }
-    const fallbackIdentity = !(await hasIdentity(cwd));
-    const identity = fallbackIdentity
-      ? ["-c", `user.name=${FALLBACK_IDENTITY.name}`, "-c", `user.email=${FALLBACK_IDENTITY.email}`]
-      : [];
+    const guessedIdentity = !(await hasOwnIdentity(cwd));
     // Signing is disabled for this commit alone: a configured GPG key would
     // otherwise block setup on a passphrase prompt it never asked for.
+    //
+    // `-- .` is what keeps the commit to this project. Without a pathspec the
+    // commit takes the whole index, and the clean-tree check is scoped to the
+    // project, so a sibling package's already-staged work would pass the check
+    // and then land in a commit under setup's subject.
     await git(cwd, [
-      ...identity,
       "-c",
       "commit.gpgsign=false",
       "commit",
       "--quiet",
       "--no-verify",
       `--message=${INITIAL_COMMIT_SUBJECT}`,
+      "--",
+      ".",
     ]);
     return {
       kind: existing ? "committed" : "created",
-      sha: (await git(cwd, ["rev-parse", "HEAD"])).trim(),
-      fallbackIdentity,
+      sha: (await headSha(cwd)) ?? "",
+      guessedIdentity,
     };
   } catch (error) {
+    if (staged) {
+      await unstageProject(cwd, existing);
+    }
     return { kind: "unavailable", reason: messageOf(error) };
+  }
+}
+
+/**
+ * Put the index back when the commit does not happen.
+ *
+ * Everything this staged stays staged otherwise, the secret it just refused to
+ * commit included, and the developer's next `git commit` would pick it up.
+ * Scoped to the project, so a sibling package's own staged work is left alone.
+ */
+async function unstageProject(cwd: string, existing: boolean): Promise<void> {
+  try {
+    // An unborn branch has no HEAD for `reset` to read, so the index is
+    // emptied of these paths directly.
+    await git(
+      cwd,
+      existing ? ["reset", "--quiet", "--", "."] : ["rm", "-r", "--cached", "-q", "."],
+    );
+  } catch {
+    // Nothing better to do: the caller already reports that no commit was made.
   }
 }
 

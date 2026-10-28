@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   assertCleanWorktree,
@@ -41,9 +41,20 @@ async function aRepository(): Promise<string> {
   await run("git", ["config", "user.name", "Dev"], { cwd: dir });
   await run("git", ["config", "user.email", "dev@example.com"], { cwd: dir });
   await run("git", ["add", "--all"], { cwd: dir });
-  await run("git", ["commit", "--quiet", "--message=feat: the developer's own work"], {
-    cwd: dir,
-  });
+  await run(
+    "git",
+    [
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "--quiet",
+      "--no-verify",
+      "--message=feat: the developer's own work",
+    ],
+    {
+      cwd: dir,
+    },
+  );
   return dir;
 }
 
@@ -70,8 +81,11 @@ async function aSubdirectoryProject(): Promise<{ project: string; root: string }
       "user.name=Dev",
       "-c",
       "user.email=dev@example.com",
+      "-c",
+      "commit.gpgsign=false",
       "commit",
       "--quiet",
+      "--no-verify",
       "--message=feat: the monorepo",
     ],
     { cwd: root },
@@ -111,7 +125,7 @@ describe("ensureInitialCommit", () => {
       expect(outcome).toEqual({
         kind: "created",
         sha: expect.stringMatching(/^[0-9a-f]{40}$/),
-        fallbackIdentity: expect.any(Boolean),
+        guessedIdentity: expect.any(Boolean),
       });
     });
 
@@ -164,17 +178,23 @@ describe("ensureInitialCommit", () => {
 
     it("commits even when the machine has no git identity configured", async () => {
       const cwd = await aProject();
-      const global = process.env.GIT_CONFIG_GLOBAL;
-      const system = process.env.GIT_CONFIG_SYSTEM;
-      process.env.GIT_CONFIG_GLOBAL = "/dev/null";
-      process.env.GIT_CONFIG_SYSTEM = "/dev/null";
+      vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
+      vi.stubEnv("GIT_CONFIG_SYSTEM", "/dev/null");
+      for (const name of [
+        "GIT_AUTHOR_NAME",
+        "GIT_AUTHOR_EMAIL",
+        "GIT_COMMITTER_NAME",
+        "GIT_COMMITTER_EMAIL",
+        "EMAIL",
+      ]) {
+        vi.stubEnv(name, undefined as unknown as string);
+      }
       try {
         const outcome = await ensureInitialCommit(cwd);
 
-        expect(outcome).toMatchObject({ kind: "created", fallbackIdentity: true });
+        expect(outcome).toMatchObject({ kind: "created", guessedIdentity: true });
       } finally {
-        process.env.GIT_CONFIG_GLOBAL = global;
-        process.env.GIT_CONFIG_SYSTEM = system;
+        vi.unstubAllEnvs();
       }
     });
 
@@ -199,7 +219,7 @@ describe("ensureInitialCommit", () => {
       expect(outcome).toEqual({
         kind: "committed",
         sha: expect.stringMatching(/^[0-9a-f]{40}$/),
-        fallbackIdentity: false,
+        guessedIdentity: false,
       });
     });
 
@@ -213,6 +233,32 @@ describe("ensureInitialCommit", () => {
         INITIAL_COMMIT_SUBJECT,
         "feat: the developer's own work",
       ]);
+    });
+
+    it("leaves a sibling package's staged work out of its commit", async () => {
+      const { project, root } = await aSubdirectoryProject();
+      await writeFile(join(root, "apps/api/index.js"), "mine, half finished\n");
+      await run("git", ["add", "--", "apps/api/index.js"], { cwd: root });
+      await writeFile(join(project, "index.js"), "export default () => null;\n");
+
+      await ensureInitialCommit(project);
+
+      const { stdout } = await run("git", ["show", "--name-only", "--pretty=format:", "HEAD"], {
+        cwd: root,
+      });
+      expect(stdout).not.toContain("apps/api/index.js");
+    });
+
+    it("leaves that sibling's work staged, exactly as it was", async () => {
+      const { project, root } = await aSubdirectoryProject();
+      await writeFile(join(root, "apps/api/index.js"), "mine, half finished\n");
+      await run("git", ["add", "--", "apps/api/index.js"], { cwd: root });
+      await writeFile(join(project, "index.js"), "export default () => null;\n");
+
+      await ensureInitialCommit(project);
+
+      const { stdout } = await run("git", ["diff", "--cached", "--name-only"], { cwd: root });
+      expect(stdout).toContain("apps/api/index.js");
     });
 
     it("keeps a secret out of the commit from a subdirectory of the repository", async () => {
@@ -244,7 +290,7 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(cwd);
 
-      expect(outcome).toMatchObject({ fallbackIdentity: false });
+      expect(outcome).toMatchObject({ guessedIdentity: false });
     });
 
     it("records the developer's configured email on the commit it makes", async () => {
@@ -367,6 +413,16 @@ describe("assertCleanWorktree", () => {
     await expect(assertCleanWorktree(project)).resolves.toBeUndefined();
   });
 
+  it("allows a project directory the repository has never seen", async () => {
+    const { root } = await aSubdirectoryProject();
+    const fresh = join(root, "apps/brand-new");
+    await mkdir(join(fresh, ".zitadel/local"), { recursive: true });
+    await writeFile(join(fresh, ".gitignore"), "node_modules\n.zitadel/local/\n");
+    await writeFile(join(fresh, ".zitadel/local/server.log"), "written by start\n");
+
+    await expect(assertCleanWorktree(fresh)).resolves.toBeUndefined();
+  });
+
   it("still refuses a subdirectory project with the developer's own work in it", async () => {
     const { project } = await aSubdirectoryProject();
     await writeFile(join(project, "notes.md"), "mine\n");
@@ -408,15 +464,28 @@ describe("ensureInitialCommit when git cannot run", () => {
     it("reports why instead of failing", async () => {
       const cwd = await aProject();
       const binDir = await aBrokenGit();
-      const path = process.env.PATH;
-      process.env.PATH = binDir;
+      vi.stubEnv("PATH", binDir);
       try {
         const outcome = await ensureInitialCommit(cwd);
 
         expect(outcome).toEqual({ kind: "unavailable", reason: "git: not available" });
       } finally {
-        process.env.PATH = path;
+        vi.unstubAllEnvs();
       }
     });
+  });
+});
+
+describe("ensureInitialCommit when it refuses to commit", () => {
+  it("stages nothing, so a later commit cannot pick up what it left", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "zitadel-initial-commit-"));
+    dirs.push(dir);
+    await writeFile(join(dir, ".env"), "SUPER_SECRET=1\n");
+
+    const outcome = await ensureInitialCommit(dir);
+
+    expect(outcome.kind).toBe("unavailable");
+    const { stdout } = await run("git", ["diff", "--cached", "--name-only"], { cwd: dir });
+    expect(stdout.trim()).toBe("");
   });
 });

@@ -163,7 +163,7 @@
         },
         {
           "name": "git",
-          "description": "Initialise a git repository and make one commit when the project is not already in one, so the first release records a commit. Use --no-git to leave version control alone.",
+          "description": "Commit the project setup writes, initialising a repository first when there is none, so a release records the commit it was built from. Refuses a repository that already has uncommitted work. Use --no-git to leave version control alone.",
           "type": "boolean",
           "allowNo": true,
           "default": true

@@ -377,17 +377,20 @@ commit and the next deploy reports no diff.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
-from `details.modified`. It commits the whole project directory, so it can
+from `details.modified`. The commit covers the project directory, so it can
 only tell its own files from yours when the tree starts clean. Commit or stash
-first, then rerun. Changes the CLI made itself (`.gitignore`, anything under
-`.zitadel/`) never count, so the `start` → `setup` path is unaffected.
+first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
+the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
+yours and is not exempt.
 
-Setup deploys nothing. The project serves the server's defaults until
-`.zitadel/` is published, so setup says so and names the `deploy` to run, in
-`next_actions` and `next_commands`. `data.git` reports what it did
-(`initialized`, and the `commit`, or null). `--no-git` skips both the
-refusal and the commit, and nothing prompts, so this is the same interactively
-and in CI.
+Setup deploys nothing, and it does not need to: a project with no release
+resolves the newest revisions, which are the ones setup just uploaded, so
+sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
+is what the server will require once that fallback goes (#1616). The publish
+step says so and names the command. `data.git` reports what setup did
+(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
+and the commit, and nothing prompts, so this is the same interactively and in
+CI.
 
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
