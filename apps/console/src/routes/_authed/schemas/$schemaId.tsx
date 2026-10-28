@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment, type ReactNode } from "react";
+import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
 import { DETAIL_BODY, DetailSection } from "@/components/detail-page";
@@ -168,13 +168,7 @@ function SchemaDetail() {
  * and marked `latest`. Picking one opens that revision's own page, since each
  * is a schema of its own; the project scope rides along in the search.
  */
-function RevisionSelect({
-  revisions,
-  current,
-}: {
-  revisions: SchemaRevision[];
-  current: string;
-}): ReactNode {
+function RevisionSelect({ revisions, current }: { revisions: SchemaRevision[]; current: string }) {
   const navigate = useNavigate({ from: Route.fullPath });
   const latest = revisions[0]?.id;
   return (

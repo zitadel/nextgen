@@ -360,14 +360,14 @@ describe("user schema detail", () => {
     expect(table().getByRole("cell", { name: "street" })).toBeInTheDocument();
   });
 
-  it("carries the schema id and created date in the header card", async () => {
+  it("carries the schema id and created date under the title", async () => {
     // The same card as Login flows: the id, copyable, beside the created date.
     serveBusiness();
     await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
 
     expect(screen.getByText("Schema ID")).toBeInTheDocument();
-    // Once in the card, once in the revision picker.
+    // Once under the title, once in the revision picker.
     expect(screen.getAllByText("sch_business")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Copy Schema ID" })).toBeInTheDocument();
     expect(screen.getByText("Created")).toBeInTheDocument();
