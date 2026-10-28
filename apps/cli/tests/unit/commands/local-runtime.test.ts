@@ -531,7 +531,9 @@ describe("local runtime commands", () => {
     // before setup attaches a project, so `console` is where its link comes from.
     expect(envelope.data.console).toBeUndefined();
     expect(envelope.data.urls).toMatchObject({ console: `${serverUrl}/ui/console/` });
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    ]);
     expect(envelope.data.next_actions).toContainEqual(
       expect.stringContaining(expectedPublicCliCommand("logs --follow")),
     );
@@ -573,7 +575,9 @@ describe("local runtime commands", () => {
     expect(result.stdout).toContain(
       "  Create an app with authentication by running setup in this directory",
     );
-    expect(result.stdout).toContain(`  $ ${expectedPublicCliCommand("setup --server local")}`);
+    expect(result.stdout).toContain(
+      `  $ ${expectedPublicCliCommand(`setup --server local --cwd ${cwd}`)}`,
+    );
     expect(result.stdout).not.toContain("handoff");
     expect(result.stdout).not.toContain(expectedPublicCliCommand("console"));
     expect(result.stderr).not.toContain("console sign-in link");
@@ -641,7 +645,7 @@ describe("local runtime commands", () => {
       // No admin, and no console in the report either way.
       expect(envelope.data.console).toBeUndefined();
       expect(envelope.data.next_commands).toEqual([
-        expectedPublicCliCommand("setup --server local"),
+        expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
       ]);
       await expect(readFile(join(cwd, ".zitadel/local/admin.json"), "utf8")).rejects.toThrow();
       await expect(readFile(join(cwd, ".zitadel/local/admin-user.json"), "utf8")).rejects.toThrow();
@@ -693,7 +697,9 @@ describe("local runtime commands", () => {
     );
     expect(envelope.data.next_actions.join("\n")).toContain("Setup asks for a framework");
     // As in the binary case: setup is the only next step, and no `console` one.
-    expect(envelope.data.next_commands).toEqual([expectedPublicCliCommand("setup --server local")]);
+    expect(envelope.data.next_commands).toEqual([
+      expectedPublicCliCommand(`setup --server local --cwd ${cwd}`),
+    ]);
     expect(envelope.data.next_commands).not.toContain("npm install");
     expect(envelope.data.next_commands).not.toContain("npm run dev");
 

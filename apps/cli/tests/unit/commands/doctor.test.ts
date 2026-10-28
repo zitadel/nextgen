@@ -359,7 +359,7 @@ describe("doctor command", () => {
       (parseJson(res.stdout) as { data: { next_commands?: string[] } }).data.next_commands,
     ).toContain(
       expectedPublicCliCommand(
-        `claim --env-file .env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
+        `claim --env-file ${cwd}/.env.development.local --server https://api.zitadel.cloud --cwd ${cwd}`,
       ),
     );
   });

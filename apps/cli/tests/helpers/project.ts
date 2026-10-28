@@ -1410,6 +1410,15 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   return new ScaffoldedApp(path);
 }
 
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
+}
+
 /** An app already through `setup`, for specs about the commands after it. */
 export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp> {
   const app = await anApp();

@@ -685,9 +685,10 @@ describe("LiquidJS engine", () => {
     const result = engine.renderFileSync(TEMPLATE_NAMES.default, context);
     expect(result).toContain('autocomplete="username"');
     expect(result).toContain('autocomplete="new-password"');
-    // Password complexity copy and the YYYY-MM-DD date hint were removed: only
-    // minLength is enforced server-side, and native <input type="date"> handles
-    // its own localized format (#251 tracks dynamic, rule-driven hints).
+    // No static password complexity copy or YYYY-MM-DD date hint: a password
+    // hint comes only from the field's own `validation.min_length`, which this
+    // field lacks, and native <input type="date"> handles its own localized
+    // format.
     expect(result).not.toContain("At least 8 characters");
     expect(result).not.toContain('placeholder="YYYY-MM-DD"');
     expect(result).not.toContain("Use YYYY-MM-DD.");
@@ -699,6 +700,75 @@ describe("LiquidJS engine", () => {
     expect(result).not.toContain('class="zl-card-nav"');
     expect(result).toContain('label="Sign up"');
     expect(result).not.toContain("compact");
+  });
+
+  it("fieldRuleHint names the minimum length of a password the user chooses", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const result = engine.parseAndRenderSync('{{ "" | fieldRuleHint: f }}', {
+      f: { type: "password", validation: { min_length: 15, max_length: 64 } },
+    });
+    expect(result).toBe("At least 15 characters.");
+  });
+
+  it("fieldRuleHint keeps the help text it is given", () => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    const result = engine.parseAndRenderSync('{{ "Use a passphrase." | fieldRuleHint: f }}', {
+      f: { type: "password", validation: { min_length: 15 } },
+    });
+    expect(result).toBe("Use a passphrase.");
+  });
+
+  it.each([
+    ["a password with no minimum", { type: "password", validation: { max_length: 64 } }],
+    ["a password with a zero minimum", { type: "password", validation: { min_length: 0 } }],
+    ["a field that is not a password", { type: "text", validation: { min_length: 3 } }],
+    ["a field with no validation", { type: "password" }],
+  ])("fieldRuleHint says nothing for %s", (_name, f) => {
+    const engine = createLiquidEngine({ locale: fullLocale });
+    expect(engine.parseAndRenderSync('{{ "" | fieldRuleHint: f }}', { f })).toBe("");
+  });
+
+  describe("a password the user chooses, on the default template", () => {
+    const renderRegisterPassword = (locale: Record<string, string>) => {
+      const engine = createLiquidEngine({ locale });
+      const f = toArray({
+        "x-auth-methods#password": {
+          type: "password",
+          text_key: "register-password.field.password",
+          autocomplete: "new-password",
+          required: true,
+          validation: { min_length: 15, max_length: 64 },
+        },
+      });
+      const a = toArray({ submit: { text_key: "register-password.action.submit", primary: true } });
+      return engine.renderFileSync(TEMPLATE_NAMES.default, {
+        step: { name: "register-password", texts: { title_key: "register-password.title" } },
+        fields: f,
+        actions: a,
+        branding: {},
+        loading: false,
+        errors: [],
+        gates: {},
+        sso_providers: [],
+        messages: [],
+        identity: null,
+      });
+    };
+
+    it("shows its minimum length under the field before anything is typed", () => {
+      expect(renderRegisterPassword(fullLocale)).toContain(
+        '<span slot="help">At least 15 characters.</span>',
+      );
+    });
+
+    it("shows the field's own help text instead, when the locale has one", () => {
+      const result = renderRegisterPassword({
+        ...fullLocale,
+        "register-password.field.password.help": "Use a long passphrase.",
+      });
+      expect(result).toContain('<span slot="help">Use a long passphrase.</span>');
+      expect(result).not.toContain("At least 15 characters.");
+    });
   });
 
   it("renders the default template when the API returns a terminal step (complete: show)", () => {

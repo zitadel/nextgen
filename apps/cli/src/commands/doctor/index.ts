@@ -27,7 +27,11 @@ import {
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import {
+  environmentFlags,
+  environmentSelectorSuffix,
+  projectEnvFile,
+} from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
 import {
@@ -206,7 +210,7 @@ export default class Doctor extends BaseCommand {
     ))
       ? environmentSelectorSuffix({
           cwd: cwdFlag,
-          envFile: ".env.development.local",
+          envFile: projectEnvFile(cwdFlag, ".env.development.local"),
           server: projectServer,
         })
       : bareResolves

@@ -196,6 +196,29 @@ describe("setup dependency installation", () => {
     expect(result.nextCommands).toEqual(["npm install", "npm run dev", planCommand]);
   });
 
+  it("runs the suggested install and dev commands in the --cwd directory", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    const result = await installDependenciesForSetup(
+      input({ cwd, cwdFlag: "shop", run, skipInstall: true }),
+    );
+
+    expect(result.nextCommands.slice(0, 2)).toEqual([
+      "npm --prefix shop install",
+      "npm --prefix shop run dev",
+    ]);
+  });
+
+  it("runs the install itself in the project directory, as typed nowhere", async () => {
+    const cwd = await tempProject();
+    const run = vi.fn<typeof runPackageCommand>(async () => undefined);
+
+    await installDependenciesForSetup(input({ cwd, cwdFlag: "shop", run }));
+
+    expect(run.mock.calls[0]?.[0].display).toBe("npm install");
+  });
+
   it("does not install when no dependency changed", async () => {
     const cwd = await tempProject();
     const run = vi.fn<typeof runPackageCommand>(async () => undefined);
