@@ -158,9 +158,11 @@ root `//#test`; until they move, `cli#test` lists what they read.
   the console).
 - Every `turbo run` in `ci-turbo.yml` takes `--affected` from
   `TURBO_SCM_BASE`: a merge group's `base_sha`, a pull request's base, or the
-  commit a push to main replaced. Each lane runs in a step of its own
-  (`turbo run console-real --filter=@zitadel/e2e --affected`); lanes that
-  share a port stay apart.
+  commit a push to main replaced. The e2e lanes run in one `turbo run
+  --affected`, side by side as moon's `e2e:all` runs them; the two demo-next
+  lanes, which both serve the demo on :3002, take turns through their
+  `demo-next-app` mutex. The database lanes keep steps of their own before
+  them, as in ci.yml.
 - The setup only some lanes need is a step gated by `turbo query affected
   --tasks … --exit-code`, which exits 1 when one of the named tasks is
   affected, 0 when none is and 2 on an error, which counts as affected:

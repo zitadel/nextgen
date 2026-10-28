@@ -11,8 +11,9 @@
     //
     // `test` is the journey harness's unit tests in both runners. Where this
     // differs from moon.yml on purpose: moon runs the lanes through its `e2e:all`
-    // aggregate in ci.yml's own e2e step; ci-turbo.yml runs each lane in a
-    // step of its own with `--affected`, and there is no `all` here. Each
+    // aggregate in ci.yml's own e2e step; ci-turbo.yml names every lane in
+    // one `turbo run --affected`, which runs the affected ones side by side,
+    // and there is no `all` here. Each
     // lane's inputs are its own folder plus the shared files (and, for the
     // demo lanes, the demo app they serve), less the docs and the ignored
     // trees, so a console spec edit does not select the journey and a demo

@@ -151,14 +151,22 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Cache Go modules and builds
-        uses: actions/cache@v5
+      # Every run restores the newest entry; the nightly run on main saves one
+      # (the step before the uploads), since it compiles every package, for
+      # every target the release snapshot builds, without turbo's cache. An
+      # entry never changes once saved, so the key ends in the run: keyed on
+      # go.sum alone, the first run of a go.sum kept its entry for good, and
+      # every later snapshot cross-compiled the server from scratch.
+      - name: Restore Go modules and builds
+        id: go-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}
+          key: go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles('go.sum', 'tools/bench/go.sum', 'tools/oidc-mock/go.sum') }}-
             go-turbo-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
       - uses: pnpm/action-setup@v5
@@ -292,10 +300,6 @@ jobs:
           TURBO_FORCE: ${{ env.FORCE }}
         run: turbo run lint typecheck build test check-adrs check-moon-graph $AFFECTED --continue=dependencies-successful --summarize
 
-      - name: Report turbo failures
-        if: ${{ failure() && steps.turbo-gate.conclusion == 'failure' }}
-        run: node scripts/report-turbo-failures.mjs
-
       # `server:test` is part of the gate above; the database lanes stay
       # outside it, as in ci.yml.
       - name: Run Go integration tests (postgres)
@@ -334,10 +338,16 @@ jobs:
           node e2e/journey/scripts/registry-cache.mjs list
           "$RUNNER_TEMP/journey-verdaccio-storage" "$RUNNER_TEMP/journey-verdaccio-restored.txt"
 
-      # ci.yml's lane, `journey-local`, which fixes `--ci --runtime binary`;
-      # the rest of the runner's options come as JOURNEY_* variables (see the
-      # top).
-      - name: Run journey e2e lanes
+      # Every e2e lane the change reaches, in one run and side by side, as
+      # ci.yml's `e2e:all` runs them: each binds ports of its own, and the two
+      # demo-next lanes, which both serve the demo on :3002, take turns through
+      # their `demo-next-app` mutex (scripts/task-guard.mjs). The journey's
+      # lane is ci.yml's, `journey-local`, which fixes `--ci --runtime
+      # binary`; the rest of the runner's options come as JOURNEY_* variables
+      # (see the top). A failed lane stops no other. Streamed, as in ci.yml:
+      # grouped, a lane's output reaches the log only when the lane ends.
+      - name: Run e2e lanes
+        id: turbo-e2e
         if: ${{ env.LANES == 'true' }}
         env:
           JOURNEY_REGISTRY_STORAGE: ${{ runner.temp }}/journey-verdaccio-storage
@@ -345,10 +355,15 @@ jobs:
           JOURNEY_WORK_DIR: ${{ runner.temp }}/ci-journey
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
-          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local --filter=@zitadel/e2e $AFFECTED
+          JOURNEY_TARBALLS_DIR="dist/release/${version}/npm" turbo run journey-local test:integration demo-next-real demo-next-mock demo-nuxt-mock console-smoke console-real console-embedded console-platform --filter=@zitadel/e2e --filter=@zitadel/testing $AFFECTED --continue=dependencies-successful --log-order=stream --summarize
 
-      # Right after the journey; ci.yml's journey is part of its e2e step, so
-      # the save there waits for every lane.
+      # Reads the newest run summary, so it names the failures of whichever
+      # turbo step failed: the gate or the e2e lanes.
+      - name: Report turbo failures
+        if: ${{ failure() && (steps.turbo-gate.conclusion == 'failure' || steps.turbo-e2e.conclusion == 'failure') }}
+        run: node scripts/report-turbo-failures.mjs
+
+      # After the e2e lanes and only once they passed, as in ci.yml.
       - name: Look for journey registry changes
         id: journey-registry-changes
         if: ${{ steps.setup.outputs.journey == 'true' }}
@@ -362,29 +377,6 @@ jobs:
         with:
           path: ${{ runner.temp }}/journey-verdaccio-storage
           key: ${{ steps.journey-registry.outputs.cache-primary-key }}
-
-      - name: Run @zitadel/testing real-instance suites
-        if: ${{ env.LANES == 'true' }}
-        run: turbo run test:integration demo-next-real --filter=@zitadel/testing --filter=@zitadel/e2e $AFFECTED
-
-      # The lanes that need no backend: the console's preview smoke and the demos
-      # against api-mock (moon runs them inside e2e:all). After the step above:
-      # both demo-next lanes serve the demo on :3002.
-      - name: Run mock-backed e2e lanes
-        if: ${{ env.LANES == 'true' }}
-        run: turbo run console-smoke demo-next-mock demo-nuxt-mock --filter=@zitadel/e2e $AFFECTED
-
-      - name: Run console real-instance suite
-        if: ${{ env.LANES == 'true' }}
-        run: turbo run console-real --filter=@zitadel/e2e $AFFECTED
-
-      - name: Run console embedded-surface suite
-        if: ${{ env.LANES == 'true' }}
-        run: turbo run console-embedded --filter=@zitadel/e2e $AFFECTED
-
-      - name: Run console platform-project suite
-        if: ${{ env.LANES == 'true' }}
-        run: turbo run console-platform --filter=@zitadel/e2e $AFFECTED
 
       - name: Validate version PR
         if: ${{ env.VERSION_PR == 'true' }}
@@ -405,6 +397,18 @@ jobs:
         run: |
           version="$(node -p "require('./apps/server/package.json').version")"
           node e2e/journey/scripts/verify-tarballs.mjs "dist/release/${version}/npm"
+
+      # See "Restore Go modules and builds". Main only: a cache entry from a
+      # branch would reach every branch on Depot's runners, whose cache has no
+      # branch scopes.
+      - name: Save Go modules and builds
+        if: ${{ !cancelled() && env.FORCE == 'true' && github.ref == 'refs/heads/main' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
 
       - name: Upload journey diagnostics
         if: ${{ failure() }}
