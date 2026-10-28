@@ -63,7 +63,9 @@ properties:
   # Interface and location
   page:
     type: string
-    description: A stable page category, never a URL.
+    description: >-
+      A stable page category, never a URL; on the docs, the page's path, such
+      as `/docs/reference/cli`.
   view:
     type: string
     values: [list, details]
@@ -189,6 +191,17 @@ properties:
   duration_ms:
     type: number
     description: How long the command, flow or operation took.
+
+  # Feedback
+  opinion:
+    type: string
+    values: [awful, bad, good, great]
+    description: How helpful a reader found a docs page, from the feedback card's four faces.
+  message:
+    type: string
+    description: >-
+      What the reader wrote on the feedback card, at most 255 characters; empty
+      when they wrote nothing. The one free-text property (product-analytics.md).
 
   # Platform
   os:
@@ -611,7 +624,14 @@ components:
     source: apps/docs
     automatic:
       - Vercel Web Analytics page views and Speed Insights.
-    events: {}
+    events:
+      docs_feedback:
+        status: emitted
+        trigger: >-
+          A reader sends a rating from the feedback card at the end of a page;
+          the docs' feedback route sends it on from the server.
+        destinations: [vercel]
+        properties: [page, opinion, message]
 
   server:
     source: internal
