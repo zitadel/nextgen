@@ -256,9 +256,14 @@ describe("setup command", () => {
       reason: "dry-run",
       command: "npm install",
     });
-    expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-    expect(json.data.next_commands[2]).toMatch(
-      /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+    expect(json.data.next_commands.slice(0, 2)).toEqual([
+      `npm --prefix ${cwd} install`,
+      `npm --prefix ${cwd} run dev`,
+    ]);
+    expect(json.data.next_commands[2]).toBe(
+      expectedPublicCliCommand(
+        `deploy --dry-run --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
+      ),
     );
   });
 
@@ -527,7 +532,7 @@ describe("setup command", () => {
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
     );
   });
 
@@ -555,7 +560,7 @@ describe("setup command", () => {
     };
     expect(json.data.next_actions.join("\n")).toContain("temporary and its data may be lost");
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
     );
   });
 
@@ -630,9 +635,14 @@ describe("setup command", () => {
       expect(json.data.framework).toBe(framework);
       expect(json.data.install).toMatchObject({ status: "skipped", reason: "dry-run" });
       expect(json.data.files_written).toContain(expectedFile);
-      expect(json.data.next_commands.slice(0, 2)).toEqual(["npm install", "npm run dev"]);
-      expect(json.data.next_commands[2]).toMatch(
-        /^npx @zitadel\/cli@\S+ deploy --dry-run --env-file \.env\.development\.local/,
+      expect(json.data.next_commands.slice(0, 2)).toEqual([
+        `npm --prefix ${cwd} install`,
+        `npm --prefix ${cwd} run dev`,
+      ]);
+      expect(json.data.next_commands[2]).toBe(
+        expectedPublicCliCommand(
+          `deploy --dry-run --env-file ${cwd}/.env.development.local --cwd ${cwd}`,
+        ),
       );
     },
   );
@@ -751,7 +761,7 @@ describe("setup command", () => {
     };
     expect(secret.team_id).toBeUndefined();
     expect(json.data.next_commands.at(-1)).toMatch(
-      /^npx @zitadel\/cli@\S+ claim --env-file \.env\.development\.local --cwd \S+$/,
+      /^npx @zitadel\/cli@\S+ claim --env-file \S+\/\.env\.development\.local --cwd \S+$/,
     );
   });
 
@@ -933,7 +943,7 @@ describe("setup command", () => {
     const json = parseJson(res.stdout) as {
       data: { next_actions: string[]; next_commands: string[] };
     };
-    expect(json.data.next_commands.at(-1)).toMatch(/^npx @zitadel\/cli@\S+ console$/);
+    expect(json.data.next_commands.at(-1)).toBe(expectedPublicCliCommand(`console --cwd ${cwd}`));
     expect(json.data.next_actions.join("\n")).toContain(
       "Manage the project in the local console as admin@zitadel.localhost",
     );

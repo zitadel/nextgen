@@ -1,3 +1,5 @@
+import { posix } from "node:path";
+
 import { shellOption } from "../shell";
 import { nonBlankString } from "./flags";
 import { asEnvironmentSelector, type EnvironmentSelector } from "../suggestion";
@@ -16,7 +18,7 @@ export const environmentFlags = {
   }),
   "env-file": nonBlankString({
     description:
-      "Read ZITADEL_* values from this file ahead of the process environment. Cannot be combined with --env.",
+      "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
   }),
 };
 
@@ -55,8 +57,9 @@ export const previewFlags = {
  * value needs no flag because the next run in the same environment inherits it.
  */
 export function environmentSelectorSuffix(input: {
-  /** `--cwd` as typed: the project the run was about, and what `--env-file` resolves against. */
+  /** `--cwd` as typed: the project the run was about. */
   cwd?: string;
+  /** `--env-file` as typed, relative to the shell's directory; see {@link projectEnvFile}. */
   envFile?: string;
   envName?: string;
   server?: string;
@@ -75,4 +78,15 @@ export function environmentSelectorSuffix(input: {
     parts.push(shellOption("--cwd", input.cwd));
   }
   return asEnvironmentSelector(parts.length === 0 ? "" : ` ${parts.join(" ")}`);
+}
+
+/**
+ * A file in the project directory, as `--env-file` names it: relative to the
+ * shell's directory, so a run with `--cwd` puts that directory in front. Node
+ * reads `--env-file` from anywhere on the command line before the CLI starts,
+ * from the shell's directory, and exits when the file is not there; a path
+ * relative to `--cwd` would stop the suggested command before it runs.
+ */
+export function projectEnvFile(cwd: string | undefined, file: string): string {
+  return cwd === undefined ? file : posix.join(cwd, file);
 }
