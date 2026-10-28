@@ -145,15 +145,6 @@ function byName(a: IdpReference, b: IdpReference): number {
 }
 
 /**
- * "Business, Consumer ... +4": the first `shown` names and a count for the
- * rest, as the design truncates a list of user schemas in a table cell.
- */
-export function nameSummary(names: string[], shown = 2): string {
-  const rest = names.length - shown;
-  return rest > 0 ? `${names.slice(0, shown).join(", ")} ... +${rest}` : names.join(", ");
-}
-
-/**
  * One row of the Sign-in methods tab: a method some schema enables, and the
  * schemas that enable it.
  */

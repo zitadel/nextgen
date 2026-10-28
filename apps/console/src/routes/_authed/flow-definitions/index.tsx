@@ -18,6 +18,7 @@ import {
   ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
+import { EntityLink } from "@/components/entity-link";
 import { StatusBadge } from "@/components/status-badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { InlineCode } from "@/components/ui/inline-code";
@@ -155,18 +156,15 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
           ))}
         </div>
       </TableCell>
-      <TableCell className={`${RESOURCE_CELL} truncate text-sm`}>
+      {/* A reference to another configuration, not the row's own name. */}
+      <TableCell className={RESOURCE_CELL_MUTED}>
         {schemaName &&
           (schemaId ? (
-            <Link
-              to="/schemas/$schemaId"
-              params={{ schemaId }}
-              className="text-foreground font-medium underline-offset-2 hover:underline"
-            >
+            <EntityLink to="/schemas/$schemaId" params={{ schemaId }}>
               {schemaName}
-            </Link>
+            </EntityLink>
           ) : (
-            <span className="text-foreground font-medium">{schemaName}</span>
+            schemaName
           ))}
       </TableCell>
       <TableCell className={RESOURCE_CELL_MUTED}>{formatDate(updatedAt)}</TableCell>

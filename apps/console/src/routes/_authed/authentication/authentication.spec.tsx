@@ -202,7 +202,14 @@ describe("authentication screen", () => {
     });
     await renderAt("/authentication");
     await screen.findByRole("table");
-    expect(row("Passkey").getByText("Alpha, Beta ... +2")).toBeInTheDocument();
+    // Each named schema opens itself; the count names the rest in its tooltip.
+    expect(row("Passkey").getByRole("link", { name: "Alpha" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("/schemas/sch_a"),
+    );
+    expect(row("Passkey").getByRole("link", { name: "Beta" })).toBeInTheDocument();
+    expect(row("Passkey").queryByRole("link", { name: "Customer users" })).toBeNull();
+    expect(row("Passkey").getByText("... +2")).toHaveAttribute("title", "Customer users, Gamma");
   });
 
   it("puts the selected tab in the URL", async () => {
