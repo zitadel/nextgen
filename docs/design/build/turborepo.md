@@ -44,6 +44,13 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   remove.
 - A task cannot depend on a persistent task (`dev`, `start`, `preview`,
   `//#server`).
+- A package imports only its own files and the workspace packages its
+  `package.json` declares; `turbo boundaries` checks it in CI. Shared config
+  is a package of its own (`@zitadel/vitest-config`). An import that cannot
+  go through a package, such as a root `scripts/` module (no package can
+  depend on the workspace root) or a module the runtime provides (k6's),
+  carries `// @boundaries-ignore <reason>` on the line above, and its task
+  lists the file in its inputs.
 - Each release build cleans and rewrites the `dist/` that dev builds and
   tests of the same graph read, so the release builds start after
   `cli#test` (`api#build-release` depends on it, and every other release
@@ -136,6 +143,7 @@ packages calls Vitest without the guard, so no suite retries under both.
 | one task | `turbo run test --filter=@zitadel/cli` |
 | pass arguments (by hand only, below) | `turbo run test --filter=@zitadel/cli -- --reporter=verbose` |
 | what would run | `turbo run build --dry` |
+| package boundaries | `turbo boundaries` |
 | affected tasks, task-level | `turbo query '{ affectedTasks(base: "origin/main", tasks: ["test"]) { items { name package { name } } } }'` |
 | a run summary for the failure report | `--summarize` → `.turbo/runs/<id>.json`, `node scripts/report-turbo-failures.mjs` |
 | check a deployment of the cloud | `CLOUD_URL=<url> pnpm check:cloud`: every deployment suite, `--continue` ([runbook](../../runbooks/cloud.md#checking-a-deployment-by-hand)) |

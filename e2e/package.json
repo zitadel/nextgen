@@ -30,6 +30,7 @@
     "@zitadel/config": "workspace:*",
     "@zitadel/sdk-nuxt": "workspace:*",
     "@zitadel/testing": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

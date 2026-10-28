@@ -34,6 +34,7 @@
     "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "publint": "catalog:",
     "sharp": "catalog:",
     "tsx": "catalog:",

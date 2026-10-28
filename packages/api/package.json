@@ -87,6 +87,7 @@
     "@faker-js/faker": "catalog:",
     "@redocly/openapi-core": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "orval": "catalog:",
     "tsdown": "catalog:",

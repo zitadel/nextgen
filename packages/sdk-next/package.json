@@ -88,6 +88,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "next": "^16.3.8",
     "react": "catalog:",

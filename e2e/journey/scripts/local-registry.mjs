@@ -3,9 +3,13 @@ import { spawn } from "node:child_process";
 import { cp, mkdir, open, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { runCapture } from "../../../scripts/dev-process.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { runnerCommand } from "../../../scripts/task-runner.mjs";
 import { packageName, parsePort } from "./lib.mjs";
 

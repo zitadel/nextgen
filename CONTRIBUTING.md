@@ -235,7 +235,9 @@ SQLite lane, a few repository checks and every other e2e lane
 Branch protection requires the GitHub Actions context `full-pr`, shown in the
 pull request UI as `ci / full-pr` and defined in
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The job installs
-dependencies, then picks one of two modes via `scripts/ci-mode.mjs`:
+dependencies, checks with `turbo boundaries` that each package imports only
+its own files and the packages it declares, then picks one of two modes via
+`scripts/ci-mode.mjs`:
 
 **Full mode** (normal PRs) runs, in order:
 
