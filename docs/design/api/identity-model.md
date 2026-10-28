@@ -161,7 +161,9 @@ The mappings say:
 
 ## How it looks
 
-Sketches of the shape, not schemas.
+Sketches of the shape, not schemas. The app and GitHub Actions are the
+developer's, as code; Acme's Entra is data that Acme's admin writes
+([Code or API](#code-or-api)).
 
 An app with four clients, an API and an MCP server, a SAML config, SCIM
 provisioning and open registration:
@@ -169,6 +171,7 @@ provisioning and open registration:
 ```json
 {
   "name": "Shop",
+  "slug": "shop",
   "clients": [
     { "slug": "web", "protocol": "oidc", "type": "confidential", "redirect_uris": ["https://shop.example.com/callback"] },
     { "slug": "ios", "protocol": "oidc", "type": "public", "redirect_uris": ["com.example.shop:/callback"] },
@@ -190,19 +193,25 @@ provisioning and open registration:
 }
 ```
 
-A customer's Entra, signing users in and provisioning them under one subject:
+A customer's Entra, which Acme's admin sets up in the product, signing users
+in and provisioning them under one subject:
 
 ```json
 {
-  "name": "Acme",
-  "oidc": [{ "slug": "entra", "issuer": "https://login.microsoftonline.com/<tenant>/v2.0", "client_id": "<id>", "client_secret": "${{ ACME_ENTRA_SECRET }}" }],
-  "scim": [{ "slug": "entra-sync" }],
+  "team": "acme",
+  "slug": "entra",
+  "domains": ["acme.com"],
+  "oidc": [{ "slug": "sign-in", "issuer": "https://login.microsoftonline.com/<tenant>/v2.0", "client_id": "<id>", "client_secret": "<write-only>" }],
+  "scim": [{ "slug": "sync" }],
   "mappings": {
-    "subject": { "entra": "oid", "entra-sync": "externalId" },
+    "subject": { "sign-in": "oid", "sync": "externalId" },
     "user": { "email": "email", "givenName": "given_name", "familyName": "family_name" }
   }
 }
 ```
+
+The developer's rules decided what it may hold, and the Entra preset filled
+its mappings.
 
 GitHub Actions, deploying as the shop's `deploy` client without a secret:
 
@@ -268,6 +277,78 @@ zitadel app create repricer --preset service-account --role catalog.write
   `--json` envelope carries the client ids, the issuer and the
   `next_commands`.
 
+## Code or API
+
+The release suits what the developer owns, and not what its customers own. A
+B2B customer's Entra is set up by that customer's admin, in the product, long
+after the release that shipped the product, so no repository can hold it.
+Each resource takes one path, chosen by its owner, and the document and its
+one call are the same on both
+([ADR 082 §1](../../adrs/082-oauth-and-oidc-server.md#1-who-owns-what)).
+[ADR 064 §1](../../adrs/064-cli-resource-commands.md#1-configuration-stays-declarative-runtime-resources-become-imperative)
+left customer-owned connections to be decided on their merits; this is that
+decision.
+
+| | As code, in the release | Through the API |
+| --- | --- | --- |
+| Apps | The developer's own: web and mobile apps, backends, service accounts, agents | Apps the product creates for its customers, and third parties that registered |
+| Connections | The developer's own: social providers, the company's IdP, its CI | Each B2B customer's SSO and SCIM, which the customer's admin sets up |
+| Self-service rules | What a customer may set up, and what it must map | — |
+
+**Self-service splits in two.** The developer declares the rules once, as
+code, and each customer's admin writes a connection within them:
+
+- **The rules**: the protocols a customer may add, the user schema its users
+  get and the properties they must have, the roles they start with, and
+  whether a domain must be verified first. One deploy changes them for every
+  customer.
+- **The customer's connection**: its issuer or metadata, its credentials, its
+  domains, and how its claims fill the properties the rules ask for. A preset
+  per provider, such as Entra, Okta or Google Workspace, fills the mapping, as
+  a preset fills an app.
+
+**What keeps it safe**, since a customer writes it:
+
+- A team's connection serves its team only. The users it creates are
+  team-owned, as [hierarchy](hierarchy.md) has it for tenant-managed sources,
+  and it signs in or links only that team's users, so no customer can claim
+  another's email addresses and take over those accounts.
+- It answers only for domains the customer verified, which is also how
+  sign-in finds it: a schema is code, and cannot list a connection made after
+  the release.
+- Its slug is the team's, `acme/entra`, as a client's is its app's, so a
+  declared connection can never revise a customer's by sharing its slug.
+- A secret the customer's admin enters is write-only and stored encrypted
+  ([ADR 029](../../adrs/029-cryptography-secrets-and-key-lifecycle.md)); for
+  a SCIM config, Zitadel mints the token and shows it once.
+- `team_admin` gets the right to manage its team's connections, which only
+  `project_admin` holds today
+  ([permission catalog](system-permission-catalog.md)), and the setup screen
+  calls the API with that admin's own session.
+
+**The developer builds no setup screen.** A product with a screen of its own
+calls the API; any other embeds an element in its admin page, as it embeds
+the login and ADR 082's connected-apps element. The element shows the
+customer's admin the redirect URI or ACS URL to register upstream, takes the
+metadata, verifies the domain, checks the mapping and runs a test sign-in.
+
+**What code cannot do, and how the model copes:**
+
+- **A deploy touches only what it declares.** It never revises or removes a
+  customer's connection or a registered app. A connection the developer
+  manages for a customer, through the API or a Terraform provider, is
+  read-only in that customer's setup screen, so every connection has one
+  writer.
+- **A customer's connection may name code, never the reverse.** It names the
+  user schema whose properties it fills, and a release that removes or
+  renames a property still in use fails its build, naming the connections.
+- **Code is the same in every project it ships to; data is not.** Staging
+  gets the apps and the rules from the release, but not the customers'
+  connections, so it tests the rules with connections of its own.
+- **A rule change reaches every customer with the next deploy**, which is why
+  the rules are code. A connection the change leaves short, such as one that
+  maps no property the rules now require, says so to its admin.
+
 ## Names
 
 | Name | Means | Instead of | Why |
@@ -288,9 +369,9 @@ Measured against what the repo has today:
 | Area | Today | With this model |
 | --- | --- | --- |
 | Glossary | `app` is one OIDC client or SAML SP; `app_group` (LOCKED) holds roles; `idp` is an upstream provider | `app` is the software and holds its configs; one OIDC client is a client; `idp` becomes connection |
-| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused | A `client` principal type, which `agent` becomes; delegate and impersonate as rights |
+| Authz | Principal types `user`, `team`, `agent`, `sk_proj`, `sk_team`; `agent` is unused; only `project_admin` writes connections | A `client` principal type, which `agent` becomes; delegate and impersonate as rights; `team_admin` manages its team's connections |
 | #2430 | Machines are users of a `service` or `agent` kind; a client is owned by an app, an identity or both; client methods sit in `x-auth-methods` | Machines are apps; every client belongs to an app and can be a principal itself; client methods move to the client, and `x-auth-methods` keeps sign-in methods. Its secret format, hashing and PAT design carry over; its client table loses the identity column |
-| IdP connections | Project-level, OIDC only, one `protocol` block per connection | A connection holds several configs (OIDC, OAuth, WIF, SAML, SCIM) and the mappings between them |
+| IdP connections | Project-level, OIDC only, one `protocol` block per connection | A connection holds several configs (OIDC, OAuth, WIF, SAML, SCIM) and the mappings between them; the developer's are declared, and a B2B customer's belongs to its team and is written through the API within the developer's rules |
 | ADR 082 | `Service` app kind; APIs are separate files; registered clients belong to the project; token exchange later | Any confidential client can be a principal; APIs are an app's config, still one audience per token; registered clients join an app; token exchange moves up for delegation, impersonation and WIF |
 | CLI | ADR 082 §12: `oauth enable`, `apps create` and `apis create`, each writing a file | `app create` writes an app with its clients and APIs from a preset, and turns the issuer on if it is off |
 | v4 import | — | v4 projects become apps; v4 apps become clients, SAML configs or APIs; v4 machine users become apps with a principal client |
@@ -311,13 +392,19 @@ consents stay per user, client and scope.
 4. **Registration.** A dynamic registration request names no API, so how it
    finds its app: a registration endpoint per app, or the app of the API in
    the first authorization request.
-5. **Connection scope.** Project-level, or owned by a team, so a B2B customer
-   brings its own Entra.
+5. **Self-service rules.** Where they live: on the user schema, which already
+   says how a kind of person signs in; as an operation policy on a team's
+   connection writes, a template Zitadel defines and the release fills in
+   ([ADR 066](../../adrs/066-operation-policies.md)); or in a file of their
+   own. And whether a team may use a declared connection too, such as one
+   Okta for several teams.
 6. **Identity links.** Whether a link keys on the connection or on one of its
    configs, when a connection holds two OIDC configs for different issuers.
 7. **Where sign-in offers connections.** Today a user schema lists its
    connections (`x-auth-methods.sso.providers`); with several configs per
-   connection, the list may name configs, or the app may choose.
+   connection, the list may name configs, or the app may choose. A team's
+   connection is data no schema can list, so sign-in finds it by verified
+   domain.
 8. **Agents that must be users.** An app may want an agent among its
    members, or accept only user tokens, and an external agent can arrive as
    a user: Entra pairs an agent with a user account, one to one. Whether a
@@ -333,6 +420,13 @@ consents stay per user, client and scope.
   `<client_id>@clients`); an application can carry a SAML add-on beside its
   OAuth settings; connections.
 - **Okta**: app integrations that carry sign-on and provisioning together.
+- **Auth0 self-service SSO**: the developer's self-service profile sets the
+  providers a customer may use and the user attributes it must provide, and a
+  ticket lets the customer's admin create the connection, with SCIM and a
+  DNS-verified domain: the developer's rules and the customer's connection.
+- **WorkOS Admin Portal**: a hosted page where a customer's IT admin sets up
+  SSO and directory sync, and maps directory attributes onto ones the
+  developer defined.
 - **Google Cloud**: workload identity pools hold several providers with
   attribute mappings and conditions, which is the shape of a connection with
   WIF configs.
@@ -349,3 +443,7 @@ consents stay per user, client and scope.
   has to allow.
 - **Keycloak**, as a warning: a client with service accounts enabled gets a
   hidden user that holds its roles. Here the client is the principal.
+- **Auth0's Deploy CLI**, as a warning: code and dashboard edits share a
+  tenant, so a deploy deletes what its files lack only when
+  `AUTH0_ALLOW_DELETE` is set. Here every resource has one writer, so a
+  deploy holds nothing of a customer's to delete.
