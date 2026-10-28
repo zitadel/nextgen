@@ -499,7 +499,7 @@ catalogs:
       version: 5.31.1
     yaml:
       specifier: ^2.9.0
-      version: 2.9.1
+      version: 2.9.0
     zod:
       specifier: ^4.3.6
       version: 4.4.3
@@ -1713,6 +1713,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.1.11(@vitest/browser@4.1.11)(vitest@4.1.11)
+      '@zitadel/vite':
+        specifier: workspace:*
+        version: link:../vite
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

@@ -5,6 +5,14 @@ import { join, resolve } from "node:path";
 /** Source extensions an entry may have, in the order they are tried. */
 const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts"];
 
+/**
+ * Rolldown's minify for an ES library. Vite keeps an ES library's whitespace so
+ * its `__PURE__` annotations survive, but Rolldown keeps those comments while it
+ * strips the whitespace too. A build that does not go through `libraryBuild()`
+ * sets it as `build.rolldownOptions.output.minify`.
+ */
+export const minify = { compress: true, mangle: true, codegen: { removeWhitespace: true } };
+
 /** Every string in an `exports` value, however deeply its conditions nest. */
 const leaves = (value) =>
   typeof value === "string" ? [value] : Object.values(value ?? {}).flatMap(leaves);
@@ -105,9 +113,7 @@ export function libraryBuild(root, { src = "src", allow = [] } = {}) {
         },
         rolldownOptions: {
           external: [new RegExp(`^(${external.join("|")})($|/)`), /^node:/],
-          // Vite keeps the whitespace of an ES library so its `__PURE__` annotations survive,
-          // but Rolldown keeps those comments while it strips the whitespace too.
-          output: { minify: { compress: true, mangle: true, codegen: { removeWhitespace: true } } },
+          output: { minify },
           onwarn: (warning) => {
             // Whether a slow plugin (type generation) is reported depends on the machine's load.
             if (warning.code === "PLUGIN_TIMINGS" || keptDirective(warning)) return;

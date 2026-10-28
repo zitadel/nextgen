@@ -10,6 +10,13 @@ export interface LibraryBuildOptions {
   allow?: string[];
 }
 
+/** Rolldown's minify for an ES library, whitespace included; see the implementation. */
+export declare const minify: {
+  readonly compress: true;
+  readonly mangle: true;
+  readonly codegen: { readonly removeWhitespace: true };
+};
+
 /** The shared library build, derived from the package's `exports`; see the implementation. */
 export declare function libraryBuild(
   root: string,

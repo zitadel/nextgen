@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { failOnDiagnostics, libraryBuild } from "./vite.shared.mjs";
+import { failOnDiagnostics, libraryBuild, minify } from "./vite.shared.mjs";
 
 const roots = [];
 
@@ -177,6 +177,10 @@ describe("libraryBuild output", () => {
       mangle: true,
       codegen: { removeWhitespace: true },
     });
+  });
+
+  it("is the minify a build outside it can reuse", () => {
+    expect(buildOf(root()).rolldownOptions.output.minify).toBe(minify);
   });
 
   it("keeps a source map beside each file", () => {
