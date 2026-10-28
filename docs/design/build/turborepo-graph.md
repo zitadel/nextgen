@@ -126,7 +126,9 @@ Explicit globs match ignored files too (the console's `.env*` relies on it).
 50,000 build outputs on every turbo run, and the Go tasks'
 `$TURBO_ROOT$/**/*.go` would, in the main checkout, hash every checkout under
 `.claude/worktrees/`, so any worktree's edit missed the main checkout's
-server cache. Repository-wide globs now name the ignored trees they skip.
+server cache. On Vercel it would hash the Go toolchain and module cache,
+which its builds keep under `.vercel/`. Repository-wide globs now name the
+ignored trees they skip.
 
 Turbo hashes a run's inputs before the run starts. A task whose inputs match
 files another task of the run writes therefore hashes them without that

@@ -8,8 +8,8 @@
   // (incl. presets), the error page and the design tokens it inlines, the
   // integration-test fixtures, the events catalog and the product analytics
   // catalog. The repository-wide globs leave out the ignored trees an explicit
-  // glob would otherwise match: node_modules, and in the main checkout every
-  // worktree under .claude/.
+  // glob would otherwise match: node_modules, in the main checkout every
+  // worktree under .claude/, and on Vercel the Go caches under .vercel/.
   // GOFLAGS and the target platform change what Go produces, so they are
   // hashed; the cache locations pass through globally (root turbo.json).
   "tasks": {
@@ -24,6 +24,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -53,6 +54,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -85,6 +87,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -137,6 +140,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -172,6 +176,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -206,6 +211,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -235,6 +241,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -268,6 +275,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -307,6 +315,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -339,6 +348,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -368,6 +378,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
@@ -402,6 +413,7 @@
         "!$TURBO_ROOT$/.codex/**",
         "!$TURBO_ROOT$/.cursor/**",
         "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",

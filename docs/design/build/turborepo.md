@@ -80,7 +80,8 @@ the hosted cloud's builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   turbo has no file groups, so the list is repeated per task.
 - An explicit glob matches ignored files too. A repository-wide one
   (`$TURBO_ROOT$/**/*.go`, `//#lint`'s) names the ignored trees it would
-  otherwise walk: `node_modules`, build output, `.claude/`.
+  otherwise walk: `node_modules`, build output, `.claude/`, and `.vercel/`,
+  where Vercel's builds keep the Go toolchain and module cache.
 - A task does not list what its dependencies write (the server's build and
   the console's dist): the dependency's hash covers it, and turbo hashes a
   run's inputs before the run starts, so those files would change the task's
