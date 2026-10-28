@@ -7,11 +7,9 @@ import { cn } from "@/lib/utils";
  * A referenced configuration in a table cell: muted text that turns
  * `foreground` on hover and on keyboard focus. No icon, no underline, no
  * background, so it never competes with the row's own name.
- *
- * Exported for the rare reference that is not a router link.
  */
-export const ENTITY_LINK =
-  "text-muted-foreground hover:text-foreground focus-visible:text-foreground focus-visible:ring-ring/50 cursor-pointer rounded-sm no-underline transition-colors outline-none hover:no-underline focus-visible:ring-[3px]";
+const ENTITY_LINK =
+  "text-muted-foreground hover:text-foreground focus-visible:text-foreground focus-visible:ring-ring/50 cursor-pointer rounded-sm no-underline transition-colors outline-none focus-visible:ring-[3px]";
 
 function EntityAnchor({
   className,

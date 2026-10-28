@@ -118,6 +118,7 @@ Canonical examples:
 | Mutation error inside a form or card | `FormError` (`src/components/form-error.tsx`) |
 | Button that is submitting | `Button` with `loading` |
 | Row actions menu | `RowMenu` (`src/components/resource-list.tsx`) |
+| Another configuration referenced in a table cell (a row's user schema) | `EntityLink` (`src/components/entity-link.tsx`): muted text, no icon or underline |
 | Screen outside the app shell (sign-in, claim, server unavailable) | `StandaloneScreen` + `StandaloneMessage` (`src/components/standalone-screen.tsx`) |
 
 Shared text styles (`PAGE_TITLE`, `SECTION_HEADING`, `SUBSECTION_HEADING`,
