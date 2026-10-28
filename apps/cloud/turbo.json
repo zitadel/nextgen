@@ -7,22 +7,24 @@
   // in @zitadel/server#test (`go test ./...`).
   "tasks": {
     // The `server` service's function binary (build-launcher.sh), which
-    // `migrate` runs and `deploy` hands to Vercel. Its inputs are the Go
-    // files and what they embed
-    // (//go:embed), as in apps/server/moon.yml's serverInputs, and the
-    // server's version, which it stamps in. The OpenAPI YAML reaches the
+    // `migrate` runs and `deploy` hands to Vercel. Never cached: it runs with
+    // the deployment's secrets and becomes its function, and branch builds
+    // (previews, CI) can write the team's remote cache, so an entry planted
+    // under production's key would run in production. Go's own build cache,
+    // in Vercel's build cache of the branch, keeps the compile short.
+    //
+    // Its inputs still decide when it is affected: the Go files and what
+    // they embed (//go:embed), as in apps/server/moon.yml's serverInputs, and
+    // the server's version, which it stamps in. The OpenAPI YAML reaches the
     // binary only through the generated Go code. Turbo hashes the ignored
     // files a glob matches, so the trees that hold other Go code are
     // excluded: node_modules, agents' worktrees and, on Vercel, the Go
     // toolchain and module cache inside the checkout (.vercel/cache/golang).
-    //
-    // It also stamps in the branch, which picks a preview's database
-    // (launcher/database.go), so VERCEL_GIT_COMMIT_REF is hashed: a binary is
-    // never restored into another branch's deployment. The commit and date it
-    // stamps in are those of the build that made it (turbo passes VERCEL_*
-    // through unhashed). CGO_ENABLED is pinned in the script.
+    // Vercel's Go builder sets GOOS and GOARCH for the function's
+    // architecture; CGO_ENABLED is pinned in the script.
     "build": {
-      "env": ["GOFLAGS", "GOOS", "GOARCH", "VERCEL_GIT_COMMIT_REF"],
+      "cache": false,
+      "passThroughEnv": ["GOFLAGS", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",

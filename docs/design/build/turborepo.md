@@ -106,9 +106,8 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   leaves them out only in the Vite service's build, and the same packages
   would get other keys in the storybook's and the server's builds.
   `VERCEL_*` still reaches every task unhashed (turbo's built-in list): a
-  build whose output depends on one lists it in its `env` (the cloud's
-  launcher `VERCEL_GIT_COMMIT_REF`, the Next.js builds
-  `VERCEL_DEPLOYMENT_ID`).
+  build whose output depends on one lists it in its `env` (the Next.js
+  builds `VERCEL_DEPLOYMENT_ID`).
 - A task cannot set a variable's value. Values a lane needs (moon's task
   `env:` blocks) are set in the `package.json` script as defaults that a
   caller's own value overrides, as it overrides moon's task `env`:
@@ -174,8 +173,9 @@ Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
 `turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`
-and `deploy`, in that order (`dependsOn`), the last two never cached, and
-the schemas with its `schemas`. The server's build command installs before
+and `deploy`, in that order (`dependsOn`) and none of them cached, and the
+schemas with its `schemas`. The launcher is not cached because it runs with
+the deployment's secrets, and any branch's build can write the cache. The server's build command installs before
 it runs turbo: Vercel's Go builder runs no `installCommand`, and turbo comes
 with the install. `migrate` passes the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function

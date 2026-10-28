@@ -26,7 +26,7 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs (the preset runs no `installCommand`) and runs `turbo run deploy --filter=@zitadel/cloud`: `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then the uncached `migrate` migrates and `deploy` hands the binary to the preset | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
+| `server` | Go preset; the build command installs (the preset runs no `installCommand`) and runs `turbo run deploy --filter=@zitadel/cloud`: `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
 | `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
@@ -564,10 +564,10 @@ project and imports the root admin.
   registers through the console's sign-in page.
 - **Turbo's remote cache:** every service builds through turbo and reads and
   writes the team's remote cache, production and previews in separate
-  entries: the console, the launcher (a preview's also keyed by its branch,
-  which picks its database), the schemas and the packages the docs and the
+  entries: the console, the schemas and the packages the docs and the
   website render. The docs' and the website's own builds never come from it:
-  their keys hold the deployment's ID. Each build's log shows `cache hit` or
+  their keys hold the deployment's ID. The launcher is never cached: it runs
+  with the deployment's secrets, and any branch's build can write the cache. Each build's log shows `cache hit` or
   `cache miss` per task, and the deployment's Run Summary shows why a task
   missed. A build with a
   result that is wrong although its inputs are right (a broken or planted
@@ -598,8 +598,7 @@ project and imports the root admin.
   pnpm compares the lockfile with the one that `node_modules` was installed
   from and installs when they differ. Go would keep each rebuild's compiled
   packages for five days, so `build-launcher.sh` drops those no build used
-  in the last two hours, after it compiled: a binary turbo restores
-  refreshes none. A new Go version starts the Go caches over: when the
+  in the last two hours. A new Go version starts the Go caches over: when the
   toolchain Vercel picks from `go.mod`'s `toolchain` line differs from the
   restored one, its Go builder downloads it and deletes
   `.vercel/cache/golang`, module cache included. The next build of each

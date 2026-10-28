@@ -457,7 +457,9 @@ sets them up:
   anyone who can push a branch could plant one. Forks cannot: their pull
   requests get no build, and so no token, until a team member approves one
   (the project's Git fork protection). A planted entry is removed by
-  clearing the team's cache (owners only).
+  clearing the team's cache (owners only). The cloud's launcher, which runs
+  with production's secrets, is never cached for that reason
+  (`@zitadel/cloud#build`).
 - **GitHub Actions on pull requests** run the pull request's code, and the
   OIDC policy gives every run of this repository a token that can write
   (Vercel's docs describe no read-only policy; forks get no token).

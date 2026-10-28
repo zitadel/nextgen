@@ -16,8 +16,7 @@ cd "$(dirname "$0")/../.."
 version="$(node -p 'require("./apps/server/package.json").version')"
 commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
 # The branch picks a preview's database; stamped in so the serving function
-# knows it even where Vercel exposes no Git metadata at runtime. turbo.json
-# hashes it, so a cached binary never serves another branch.
+# knows it even where Vercel exposes no Git metadata at runtime.
 ref="${VERCEL_GIT_COMMIT_REF:-}"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 out=apps/cloud/dist/nextgen-launcher
@@ -36,9 +35,6 @@ echo "built $out (version ${version}+cloud, commit ${commit})"
 # carries the cache from build to build, so every rebuild's packages would
 # pile up towards the build cache's limit. On Vercel, drop what no build
 # used in the last two hours (Go refreshes an entry's time at most hourly).
-# Here rather than in a task that runs on every deployment: when turbo
-# restores the binary, Go has refreshed nothing, and the prune would empty
-# the cache.
 if [ -n "${VERCEL:-}" ]; then
   find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
 fi
