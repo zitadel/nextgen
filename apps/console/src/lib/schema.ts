@@ -425,7 +425,7 @@ function propertyPlaceholder(property: Record<string, unknown>): string | undefi
 }
 
 /** One revision of a user schema, as the Users filter lists it. */
-export interface SchemaRevisionRef {
+interface SchemaRevisionRef {
   id: string;
   createdAt: string;
   /** Whether any user of the project is on it; absent when the read could not say. */

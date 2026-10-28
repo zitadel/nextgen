@@ -74,7 +74,7 @@ export interface UsersSearch {
   revision?: string;
 }
 
-export type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
+type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
 /**
  * The server-side criteria for a search (#1669). Every revision of a schema
