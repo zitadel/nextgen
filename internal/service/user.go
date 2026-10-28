@@ -18,6 +18,7 @@ const (
 	userFieldCreatedAt            = "created_at"
 	userFieldID                   = "id"
 	userFieldSchema               = "schema"
+	userFieldSchemaObjectType     = "schema_object_type"
 	userFieldStatus               = "status"
 	userFieldTeamID               = "team_id"
 	userFieldLifecycleOwnerTeamID = "lifecycle_owner_team_id"
@@ -384,9 +385,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out. A `schema` equality names
-// a built-in schema's `$id` under any of its bases: users are stored under
-// the base their project holds the row at, whichever one the caller used.
+// [splitUserFilters] has already taken team_id out. A `schema` equality or
+// inequality names a built-in schema's `$id` under any of its bases: users are
+// stored under the base their project holds the row at, whichever one the
+// caller used.
 func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
@@ -402,14 +404,30 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 		if err != nil {
 			return nil, err
 		}
-		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+		if f.Operation != filterOpEquals && f.Operation != filterOpNotEquals {
+			return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+		}
+		var sameSchema database.Filter[domain.UserField] = database.StringEqual(database.Col(domain.UserFieldSchemaURL), value)
+		if equivalents := builtinBases.Equivalents(value); len(equivalents) > 1 {
 			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
 			for _, url := range equivalents {
 				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
 			}
-			return database.Or(spellings...), nil
+			sameSchema = database.Or(spellings...)
 		}
-		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+		if f.Operation == filterOpNotEquals {
+			return database.Not(sameSchema), nil
+		}
+		return sameSchema, nil
+	case userFieldSchemaObjectType:
+		value, err := stringFilterValue(f)
+		if err != nil {
+			return nil, err
+		}
+		if f.Operation == filterOpNotEquals {
+			return database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaObjectType), value)), nil
+		}
+		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaObjectType), value)
 	case userFieldStatus:
 		value, err := stringFilterValue(f)
 		if err != nil {
@@ -465,11 +483,11 @@ func userField(field string) (domain.UserField, error) {
 		return domain.UserFieldStatus, nil
 	case userFieldLifecycleOwnerTeamID:
 		return domain.UserFieldLifecycleOwnerTeamID, nil
-	case userFieldTeamID:
+	case userFieldTeamID, userFieldSchemaObjectType:
 		// Not a column on the user: the keyset cursor is built from the last
-		// row's sort values, and there is no membership value on that row.
+		// row's sort values, and there is no such value on that row.
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().
-			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", userFieldTeamID))
+			WithDetails(fmt.Sprintf("%s can be filtered but not sorted", field))
 	default:
 		return domain.UserFieldUnspecified, domain.ErrRequestInvalid().WithDetails(fmt.Sprintf("unknown field %q", field))
 	}

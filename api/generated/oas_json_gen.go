@@ -120668,10 +120668,17 @@ func (s *SchemaMetadata) encodeFields(e *jx.Encoder) {
 		e.FieldStart("created_at")
 		json.EncodeDateTime(e, s.CreatedAt)
 	}
+	{
+		if s.InUse.Set {
+			e.FieldStart("in_use")
+			s.InUse.Encode(e)
+		}
+	}
 }
 
-var jsonFieldsNameOfSchemaMetadata = [1]string{
+var jsonFieldsNameOfSchemaMetadata = [2]string{
 	0: "created_at",
+	1: "in_use",
 }
 
 // Decode decodes SchemaMetadata from json.
@@ -120694,6 +120701,16 @@ func (s *SchemaMetadata) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"created_at\"")
+			}
+		case "in_use":
+			if err := func() error {
+				s.InUse.Reset()
+				if err := s.InUse.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"in_use\"")
 			}
 		default:
 			return d.Skip()
@@ -134219,6 +134236,8 @@ func (s *UserFilterField) Decode(d *jx.Decoder) error {
 		*s = UserFilterFieldID
 	case UserFilterFieldSchema:
 		*s = UserFilterFieldSchema
+	case UserFilterFieldSchemaObjectType:
+		*s = UserFilterFieldSchemaObjectType
 	case UserFilterFieldStatus:
 		*s = UserFilterFieldStatus
 	case UserFilterFieldTeamID:

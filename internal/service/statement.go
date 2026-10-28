@@ -155,6 +155,7 @@ type JSONSchemaQueryOptions struct {
 	// object_type. Rows without an object_type are revisions of nothing and
 	// pass through untouched.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 }
 
 type JSONSchemaStatements interface {

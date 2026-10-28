@@ -4,7 +4,15 @@ description: |
   - `created_at`: RFC3339 timestamp
   - `id`: user id
   - `schema`: the schema the user's attributes satisfy, matched against the
-    value the user carries as `schema`
+    value the user carries as `schema`. Each revision of a schema has its own
+    URL, so `equals` selects the users on one revision and `not_equals` the
+    users on any other.
+  - `schema_object_type`: the `object_type` of the user's schema, which every
+    revision of that schema shares. It may be repeated, like any field: give
+    `not_equals` once per object type to exclude several. A schema without an
+    object type reads as `""`, so `not_equals` matches its users and `equals`
+    `""` selects them. Combine `equals` here with `schema` `not_equals` the
+    newest revision to find the users still on an older one.
   - `status`: one of `active`, `suspended`, `deactivated`, `pending_purge`
   - `team_id`: restricts the result to users holding an **active** membership
     in that team. A user who has been invited but has not accepted does not
@@ -21,8 +29,8 @@ description: |
   their own lifecycle, so the two disagree often and neither implies the other
   (ADR 024).
 
-  `team_id` is filterable but not sortable — it is not a column on the user, so
-  it is absent from the sort-field enum.
+  `team_id` and `schema_object_type` are filterable but not sortable: neither
+  is a column on the user, so both are absent from the sort-field enum.
 
   Filtering on `team_id` requires `team_membership.read` in addition to
   `user.read`: it reads the same memberships that `expand: ["teams"]` embeds.
@@ -33,6 +41,7 @@ enum:
   - created_at
   - id
   - schema
+  - schema_object_type
   - status
   - team_id
   - lifecycle_owner_team_id
