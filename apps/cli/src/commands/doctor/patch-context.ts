@@ -62,17 +62,24 @@ export async function loadPatchContext(
   };
 }
 
-async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
-  // The issuer setup recorded for the development project, from its files
-  // alone: the repair writes it into `.env.local` and `.env.development.local`,
-  // so a production issuer exported in the shell, or a `ZITADEL_ENV` naming
-  // another environment, must never stand in for it. A file the resolver
-  // cannot read leaves the issuer to the fallbacks below rather than failing
-  // the repair.
-  const issuer = await resolveEnvironment({ cwd, env: {} }).then(
+/**
+ * The issuer setup recorded for the development project (`ZITADEL_ISSUER`),
+ * from its files alone: the repair writes it into `.env.local` and
+ * `.env.development.local`, so a production issuer exported in the shell, or a
+ * `ZITADEL_ENV` naming another environment, must never stand in for it.
+ * `undefined` when no file sets it, or one the resolver cannot read.
+ */
+export async function configuredIssuer(cwd: string): Promise<string | undefined> {
+  return resolveEnvironment({ cwd, env: {} }).then(
     ({ values }) => values.ZITADEL_ISSUER?.value,
     () => undefined,
   );
+}
+
+async function resolveIssuer(cwd: string, facts: FrameworkFacts): Promise<string> {
+  // A file the resolver cannot read leaves the issuer to the fallbacks below
+  // rather than failing the repair.
+  const issuer = await configuredIssuer(cwd);
   if (issuer !== undefined) {
     return issuer;
   }

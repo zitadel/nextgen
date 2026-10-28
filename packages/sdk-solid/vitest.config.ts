@@ -1,7 +1,7 @@
 import solid from "vite-plugin-solid";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 
 /**
  * Three projects in one config, one per way Solid compiles the wrappers:

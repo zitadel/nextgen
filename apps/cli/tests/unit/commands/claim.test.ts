@@ -456,6 +456,169 @@ describe("claim", () => {
     expect(json.data.project_id).toBe(envProject.id);
   });
 
+  describe("--no-wait", () => {
+    type LinkEnvelope = {
+      status: string;
+      data: {
+        title: string;
+        project_id: string;
+        claim_url: string;
+        challenge_id: string;
+        expires_at: string;
+        next_actions: string[];
+        next_commands: string[];
+      };
+    };
+
+    it("returns the link and the command that waits for it, without waiting", async () => {
+      const { cwd, project } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait"]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as LinkEnvelope;
+      expect(json.status).toBe("ok");
+      expect(json.data.title).toBe("Open the link in a browser to make your Project permanent.");
+      expect(json.data.project_id).toBe(project.id);
+      expect(json.data.challenge_id).toMatch(/^ch_/);
+      expect(json.data.claim_url).toContain(`/claim/${json.data.challenge_id}`);
+      expect(Number.isNaN(Date.parse(json.data.expires_at))).toBe(false);
+      expect(json.data.next_actions).toEqual(["Wait for the browser step to finish with:"]);
+      // The resume keeps this run's server and directory, or it would wait on
+      // the default project instead.
+      expect(json.data.next_commands).toEqual([
+        expect.stringMatching(
+          new RegExp(`claim --challenge-id ${json.data.challenge_id} --server ${SERVER} --cwd `),
+        ),
+      ]);
+    });
+
+    it("claims nothing and leaves the secret untouched", async () => {
+      const { cwd } = await makeProject();
+
+      await claim(cwd, ["--no-wait"]);
+
+      expect(snapshotPlatformStore().claims).toBe(0);
+      const secret = await readSecret(cwd);
+      expect(secret.team_id).toBeUndefined();
+      expect(secret.claimed_at).toBeUndefined();
+    });
+
+    it("prints the link and the resume command for a person", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await runCliForTest(["claim", "--cwd", cwd, "--server", SERVER, "--no-wait"]);
+
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout).toContain("/claim/ch_");
+      expect(res.stdout).toContain("Wait for the browser step to finish with:");
+      expect(res.stdout).toContain("claim --challenge-id ch_");
+    });
+
+    it("refuses --timeout, which a run that does not wait cannot honour", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait", "--timeout", "5"]);
+
+      expect(res.exitCode).not.toBe(0);
+      expect(snapshotPlatformStore().claimChallengeIds).toEqual([]);
+    });
+
+    it("previews a link under --dry-run and suggests the same mode for real", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--no-wait", "--dry-run"]);
+
+      const json = parseJson(res.stdout) as {
+        status: string;
+        data: { would: string };
+        next_commands: string[];
+      };
+      expect(json.status).toBe("skipped");
+      expect(json.data.would).toBe("Create a link to claim this project.");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+  });
+
+  describe("--challenge-id", () => {
+    async function handOutLink(cwd: string): Promise<string> {
+      const res = await claim(cwd, ["--no-wait"]);
+      return (parseJson(res.stdout) as { data: { challenge_id: string } }).data.challenge_id;
+    }
+
+    it("waits on a handed-out link and records the claim", async () => {
+      const { cwd, project } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      completeClaimChallenge(challengeId, project.id);
+
+      const res = await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(res.exitCode).toBe(0);
+      const json = parseJson(res.stdout) as {
+        status: string;
+        data: { title: string; team_id: string; claimed_at: string };
+      };
+      expect(json.status).toBe("ok");
+      expect(json.data.title).toBe("Your Project is now permanent.");
+      const secret = await readSecret(cwd);
+      expect(secret.team_id).toBe(json.data.team_id);
+      expect(secret.claimed_at).toBe(json.data.claimed_at);
+    });
+
+    it("mints no second link", async () => {
+      const { cwd, project } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      completeClaimChallenge(challengeId, project.id);
+
+      await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(snapshotPlatformStore().claimChallengeIds).toEqual([challengeId]);
+    });
+
+    it("suggests a new link that does not wait when the handed-out one expires", async () => {
+      const { cwd } = await makeProject();
+      const challengeId = await handOutLink(cwd);
+      expireClaimChallenge(challengeId);
+
+      const res = await claim(cwd, ["--challenge-id", challengeId]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; next_commands: string[] };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+
+    it("reports a link the platform never minted for this project as not found", async () => {
+      const { cwd } = await makeProject();
+
+      const res = await claim(cwd, ["--challenge-id", "ch_neverminted"]);
+
+      expect(res.exitCode).toBe(4);
+      const json = parseJson(res.stdout) as {
+        code: string;
+        message: string;
+        next_commands: string[];
+      };
+      expect(json.code).toBe("E_NOT_FOUND");
+      expect(json.message).toBe("This project has no claim link with that challenge id.");
+      expect(json.next_commands).toEqual([expect.stringContaining("claim --no-wait")]);
+    });
+
+    it("refuses an id that is not a challenge id before connecting", async () => {
+      const cwd = await mkdtemp(join(tmpdir(), "zitadel-claim-"));
+      tempDirs.push(cwd);
+
+      // No project is set up here, so reaching the server would fail on the
+      // missing project id instead: the refusal has to come first.
+      const res = await claim(cwd, ["--challenge-id", "ch_x;whoami"]);
+
+      expect(res.exitCode).toBe(3);
+      const json = parseJson(res.stdout) as { code: string; message: string };
+      expect(json.code).toBe("E_VALIDATION");
+      expect(json.message).toContain("--challenge-id");
+    });
+  });
+
   describe("--server local", () => {
     // These talk to a real socket on an ephemeral port. msw's platform
     // handlers match any origin, so they would otherwise swallow the stub's

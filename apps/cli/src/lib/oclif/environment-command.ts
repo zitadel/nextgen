@@ -183,3 +183,35 @@ export abstract class EnvironmentCommand extends BaseCommand {
     };
   }
 }
+
+/**
+ * A command that runs in a pull-request build and talks to the project with one
+ * credential, never falling back to the other: a missing one fails and names
+ * the variable. The `preview` command adds the `--origin`/`--ttl` flag bag
+ * itself; `preview list` and `preview rm` extend this for the credential alone.
+ *
+ * The reach the credential carries — the release/deployment/preview operations
+ * these commands make — is granted and enforced by the server, not by the CLI:
+ * the CLI only chooses which token to present.
+ *
+ * Which one that is, is {@link PREVIEW_CREDENTIAL}: the project secret for now,
+ * because the server does not accept the narrower preview token yet (#1575).
+ * Every message naming the variable derives it from there, so moving back to
+ * `preview` is this one constant.
+ */
+export const PREVIEW_CREDENTIAL: CredentialKind = "project";
+
+export abstract class PreviewCommand extends EnvironmentCommand {
+  static override credential: CredentialKind = PREVIEW_CREDENTIAL;
+
+  /**
+   * Never prompts: a pull-request build has no one to ask, and a missing
+   * value, the preview token above all, fails naming the variable rather
+   * than being typed in and saved to `.env.<name>.local`.
+   */
+  protected override connect(
+    options: { verbatim?: boolean; quiet?: boolean; prompt?: boolean } = {},
+  ): Promise<Connection> {
+    return super.connect({ ...options, prompt: false });
+  }
+}

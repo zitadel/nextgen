@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, test } from "vitest";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { APP_RELEASE_PACKAGES, PUBLIC_PACKAGE_DIRS } from "../../../scripts/release-manifest.mjs";
 import { packageName } from "./lib.mjs";
 

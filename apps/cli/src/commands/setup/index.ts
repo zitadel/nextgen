@@ -61,7 +61,7 @@ import {
 } from "../../lib/idp";
 import { brandingGuidanceAction, exploreAllCommands } from "../../lib/journey-guidance";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { serverKind } from "../../lib/oclif/server-kind";
 import { findLocalAdminFor } from "../../lib/local-server/admin-credential";
 import { claimProjectAsAdmin } from "../../lib/local-server/claim-as-admin";
@@ -74,6 +74,7 @@ import {
   writeZitadelSecret,
 } from "../../lib/project";
 import {
+  assertDirectoryOrMissing,
   createOrca,
   inspectScaffoldTarget,
   issuerFromPort,
@@ -171,9 +172,13 @@ const RENDERER_FLAG_DESCRIPTION =
  * the process environment (unlike `--env`); same reasoning as the SSO recovery.
  */
 function recoverySelector(cwd: string | undefined): EnvironmentSelector {
-  // `--cwd` too, as typed: `--env-file` resolves against it, so a recovery
-  // run from where setup was launched reads the file setup wrote.
-  return environmentSelectorSuffix({ envFile: ".env.development.local", cwd });
+  // `--cwd` too, as typed, and the file under it: `--env-file` is read from
+  // the shell's directory, so a recovery run from where setup was launched
+  // reads the file setup wrote.
+  return environmentSelectorSuffix({
+    envFile: projectEnvFile(cwd, ".env.development.local"),
+    cwd,
+  });
 }
 
 /**
@@ -181,7 +186,11 @@ function recoverySelector(cwd: string | undefined): EnvironmentSelector {
  * local-server failure (see `ssoRecovery`).
  */
 function localRecoverySelector(cwd: string | undefined): EnvironmentSelector {
-  return environmentSelectorSuffix({ envFile: ".env.development.local", server: "local", cwd });
+  return environmentSelectorSuffix({
+    envFile: projectEnvFile(cwd, ".env.development.local"),
+    server: "local",
+    cwd,
+  });
 }
 
 /** `zitadel setup` — create a project and scaffold local auth.
@@ -298,6 +307,9 @@ export default class Setup extends Promptable(BaseCommand) {
       throw localSetupHint(error, retryOptionsFromFlags(flags), this.config.version);
     }
     const { cwd, nonInteractive, dryRun, force } = this.meta;
+    // A `--cwd` that does not exist yet is the new app's directory, created
+    // with the app; one that is a file is a mistake to name before any read.
+    await assertDirectoryOrMissing(cwd);
 
     if (await hasZitadelConfig(cwd)) {
       // An app already set up has nothing left to scaffold, but an explicit
@@ -800,6 +812,7 @@ export default class Setup extends Promptable(BaseCommand) {
     const installOutcome = await installDependenciesForSetup({
       cliVersion: this.meta.cliVersion,
       cwd,
+      ...(flags.cwd === undefined ? {} : { cwdFlag: flags.cwd }),
       depsAdded: result.depsAdded,
       dryRun,
       env: this.meta.env,
@@ -904,7 +917,9 @@ export default class Setup extends Promptable(BaseCommand) {
       : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
     // Only when the project is the local admin's: the console lists nothing
     // else for them, so the command would open an empty console otherwise.
-    const consoleCommand = unscopedCommand("console", this.meta.cliVersion);
+    // `console` finds the server from its directory up, so a run with `--cwd`
+    // passes it on.
+    const consoleCommand = this.suggestUnscoped("console");
     const consoleStep = ownedByLocalAdmin
       ? {
           actions: [

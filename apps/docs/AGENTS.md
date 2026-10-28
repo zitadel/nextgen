@@ -72,7 +72,8 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
   (`lib/source.ts`), never `getOpenAPIPageProps()` directly, which hands the
   client component the whole OpenAPI document.
 - `llms-full.txt` leaves out operations and webhooks, and its test fails on a
-  Markdown link to one: link prose to the section's page.
+  Markdown link to one: link prose to the section's page. Of the CLI's release
+  notes it carries the newest version only.
 - An operation's samples are its `@zitadel/api` call (`lib/sdk-sample.ts`),
   its `zitadel` command (`x-zitadel-cli`, `lib/cli-sample.ts`) and cURL
   (`components/api-page.tsx`); its Markdown repeats all three for the default
@@ -97,6 +98,13 @@ Fumadocs stories (`components/examples/`).
 - A page's Markdown leaves its examples out (`lib/source.ts`): write the prose
   around one so it reads without it.
 - Type an atom an example renders in `elements.d.ts`, from the example's props.
+
+## Page feedback
+
+- `app/docs/api/feedback` posts ratings to the deployment's own URL, which
+  deployment protection covers: keep the `cloud` project's automation bypass.
+- Never send that route a valid rating from `tests/`: the suite runs against
+  deployments, where it becomes a real event.
 
 ## Checks and tests
 

@@ -224,6 +224,15 @@ describe("guidance content", () => {
     expect(agents).toContain("`step.purpose` is `login` while it signs in");
   });
 
+  it("says sign-in returns to the page's next parameter ahead of post-sign-in-url", () => {
+    const agents = agentsGuidanceSection(ctx);
+
+    expect(agents).toContain(
+      "the path in its page's `?next=` parameter, ahead of `post-sign-in-url`",
+    );
+    expect(agents).toContain("`force-post-sign-in-url` (SDK wrappers: `forcePostSignInUrl`)");
+  });
+
   it("names the presentation knobs and, on Next, the shipped JSX types", () => {
     const agents = agentsGuidanceSection(ctx);
     expect(agents).toContain('variant="widget"');

@@ -10,6 +10,8 @@ type Handler struct {
 	minLevel slog.Level
 	streams  []Stream
 	handler  slog.Handler
+	// stream is the one [WithStream] set; StreamUnspecified means no filter.
+	stream Stream
 }
 
 func NewHandler(
@@ -29,43 +31,27 @@ func (h Handler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h Handler) Handle(ctx context.Context, record slog.Record) error {
-	stream := streamFromRecord(record)
-	if stream != StreamUnspecified && !slices.Contains(h.streams, stream) {
+	if h.stream != StreamUnspecified && !slices.Contains(h.streams, h.stream) {
 		return nil
 	}
 	return h.handler.Handle(ctx, record)
 }
 
 func (h Handler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return NewHandler(
-		h.minLevel,
-		h.streams,
-		h.handler.WithAttrs(attrs),
-	)
+	for _, attr := range attrs {
+		if attr.Key == StreamAttributeKey {
+			if stream, err := StreamString(attr.Value.String()); err == nil {
+				h.stream = stream
+			}
+		}
+	}
+	h.handler = h.handler.WithAttrs(attrs)
+	return &h
 }
 
 func (h Handler) WithGroup(name string) slog.Handler {
-	return NewHandler(
-		h.minLevel,
-		h.streams,
-		h.handler.WithGroup(name),
-	)
-}
-
-func streamFromRecord(record slog.Record) Stream {
-	stream := StreamUnspecified
-	record.Attrs(func(attr slog.Attr) bool {
-		if attr.Key != StreamAttributeKey {
-			return true
-		}
-
-		v, ok := attr.Value.Any().(Stream)
-		if ok {
-			stream = v
-		}
-		return false
-	})
-	return stream
+	h.handler = h.handler.WithGroup(name)
+	return &h
 }
 
 var _ slog.Handler = (*Handler)(nil)

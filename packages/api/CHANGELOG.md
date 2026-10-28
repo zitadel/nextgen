@@ -1,5 +1,37 @@
 # @zitadel/api
 
+## 0.2.0
+
+### Minor Changes
+
+- [#1650](https://github.com/zitadel/nextgen/pull/1650) [`2d78353`](https://github.com/zitadel/nextgen/commit/2d78353e4191d576d8d163d312ae78be0e6c4341) - `zitadel origin add <pattern> --kind primary|preview`, `origin list` and `origin rm` manage the origins a project serves, with the project secret ([docs](https://preview.zitadel.com/docs/reference/cli/origin/add)). A primary origin is an exact URL, and a preview wildcard on a shared host needs a literal label of your own.
+
+- [#2248](https://github.com/zitadel/nextgen/pull/2248) [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87) - The console's ⌘K search, Projects list and project switcher now find a project by name on the server, however many you can act on: `GET /users/me/projects` takes `name_contains`, and `listMyProjects()` in `@zitadel/api` accepts it. A project's Admins section no longer says your access comes from the owning team when it cannot tell.
+
+- [#1852](https://github.com/zitadel/nextgen/pull/1852) [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d) - `POST /deployments/{deployment_id}/rollback` re-deploys an earlier primary deployment's release to every current primary origin, as a new deployment with `reason: rollback` ([docs](https://preview.zitadel.com/docs/reference/api/deployments/rollbackDeployment)). When nothing would change it answers `200` with the newest primary deployment, and `expected_deployment_id` guards against a racing deploy with `409` `dep.conflict`.
+
+- [#2373](https://github.com/zitadel/nextgen/pull/2373) [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19) - `<zitadel-login>` now says why it switched between sign-in and sign-up by itself: an email without an account becomes a sign-up, with a note to fix a typo in the email field, and one with an account a sign-in; an identity provider sign-in without an account gets the same note. Flow API steps carry `purpose` and, after a switch, `notice`.
+  
+  **Upgrading a page or design from an earlier release:** a page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names, and a design ejected earlier shows the notice once its template renders `messages`, as the designs `zitadel branding eject` copies now do.
+
+- [#2329](https://github.com/zitadel/nextgen/pull/2329) [`2ecde76`](https://github.com/zitadel/nextgen/commit/2ecde76e573c125fd86b7cf7b918619426b624bd) - `POST /releases/build` now takes operation policies under `policies`, each the body `POST /policies` takes, adds a revision only for a changed one and pins each; building them needs `policy.write` ([docs](https://preview.zitadel.com/docs/reference/api/releases/buildRelease)). A sign-in or sign-up applies the policy its release pins, none when it pins none, and the newest revision when no release resolves.
+
+- [#1855](https://github.com/zitadel/nextgen/pull/1855) [`89a3471`](https://github.com/zitadel/nextgen/commit/89a34712236d2edc2deb6f482b56a636726956e3) - `POST /deployments` now deploys a release to the preview URLs named in `targets`, each matching one of the project's preview patterns, and keeps each live for the request's `ttl`, an ISO-8601 duration of up to 365 days, or for 7 days ([docs](https://preview.zitadel.com/docs/reference/api/deployments/createDeployment)). A session exchange `ttl` too large to represent now answers `400` instead of wrapping around.
+
+- [#1849](https://github.com/zitadel/nextgen/pull/1849) [`33918fa`](https://github.com/zitadel/nextgen/commit/33918faa4ac9300e53d43bf99b55191ba2daa07f) - `GET /projects/{project_id}/previews` lists the project's live previews, newest first, with their expiry, and `POST /projects/{project_id}/previews/remove` ends one at once. Removing a URL with no live preview answers `204` too. A removal that ends a preview is recorded in the audit stream as `preview.removed`.
+
+- [#1508](https://github.com/zitadel/nextgen/pull/1508) [`5ea7fe4`](https://github.com/zitadel/nextgen/commit/5ea7fe4f9bcaa323c67d2cd347e53e9ba9048d02) - `GET /projects/{project_id}/admins` lists who can administer a project and how: through the team that owns it, an admin grant to them, or one to a team they belong to, as far as the caller may see ([docs](https://preview.zitadel.com/docs/reference/api/projects/listProjectAdmins)). `GET` and `PATCH /projects/{project_id}` now return `owning_team_id`, and the person who claimed a project during local setup is listed through its owning team.
+
+- [#1651](https://github.com/zitadel/nextgen/pull/1651) [`c21caeb`](https://github.com/zitadel/nextgen/commit/c21caeb5e6c797d092a970129eb2238884d9c9f3) - `zitadel deploy` replaces `plan` and `apply`: it builds `.zitadel/`, identity provider connections included, into one immutable release, shows its git diff against the live one, and makes it live on the project's primary origins ([guide](https://preview.zitadel.com/docs/guides/deploy)). New `release` and `deployment` commands, and their `@zitadel/api` operations, create, list, deploy, roll back and revoke releases directly; a rollback lists the revisions it restores.
+  
+  **Breaking:** `plan` and `apply` are removed. Use `deploy --dry-run` where you ran `plan`, and `deploy` where you ran `apply`. The generated `releases list` and `releases get` are now `release list` and `release get`, beside `release create` and `release revoke`. Add the origins your project serves with `origin add` before the first deploy — `deploy` needs at least one primary origin. A server refusal because of the state it holds (an HTTP 409) now fails every command with `E_CONFLICT` (exit 5) rather than `E_VALIDATION` (exit 3), and a target the project does not hold as an origin fails with `E_VALIDATION` rather than `E_AUTH`.
+  
+  **Upgrading a project set up with 0.1.0:** its app URL is registered as a preview origin only, so its first `deploy` fails with "The project has no primary origin to deploy to". Run `zitadel doctor --fix` once to make that URL primary, as `zitadel setup` now does; `zitadel doctor` warns about such a project, and `deploy` suggests the fix. To do it by hand, find the URL with `zitadel origin list`, remove it with `zitadel origin rm <url>`, add it back with `zitadel origin add <url> --kind primary`, then deploy. Adding it again without removing it fails, because the URL is already stored as a preview origin.
+
+### Patch Changes
+
+- [#2301](https://github.com/zitadel/nextgen/pull/2301) [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8) - The console's error screens now show the failed request's ID instead of the error code, so a support request can quote it, and `ApiError` from `@zitadel/api` carries it as `requestId`. A not-found screen names what is missing, such as "User not found", and leads back to its list; the others lead to Projects without the selected project.
+
 ## 0.1.0
 
 ### Minor Changes

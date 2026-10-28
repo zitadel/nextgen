@@ -151,7 +151,7 @@ describe("env add", () => {
 
       expect(suggested(envelope).length).toBeGreaterThan(0);
       for (const command of suggested(envelope)) {
-        expect(command).toContain(" --env-file .env.production.local");
+        expect(command).toContain(` --env-file ${cwd}/.env.production.local`);
       }
     });
 
@@ -185,7 +185,7 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd));
 
       expect(out).toContain(
-        "Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file .env.production.local",
+        `Give it an origin first: zitadel origin add '<your-app-url>' --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
 
@@ -221,7 +221,7 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd, "--app-url", "https://app.acme.com"));
 
       expect(out).toContain(
-        "Deploy to it: zitadel deploy -m '<what changed>' --env-file .env.production.local",
+        `Deploy to it: zitadel deploy -m '<what changed>' --env-file ${cwd}/.env.production.local`,
       );
     });
 
@@ -259,7 +259,7 @@ describe("env add", () => {
       );
 
       expect(out).toContain(
-        "origin add 'http://[::1]:3000' --kind primary --env-file .env.production.local",
+        `origin add 'http://[::1]:3000' --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
 
@@ -283,7 +283,7 @@ describe("env add", () => {
       );
 
       expect(out).toContain(
-        "origin add https://app.acme.com --kind primary --env-file .env.production.local",
+        `origin add https://app.acme.com --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
 
@@ -301,7 +301,7 @@ describe("env add", () => {
       const { envelope } = await addBound(cwd, "--app-url", "https://app.acme.com");
 
       expect(suggested(envelope)[0]).toContain(
-        "origin add https://app.acme.com --kind primary --env-file .env.production.local",
+        `origin add https://app.acme.com --kind primary --env-file ${cwd}/.env.production.local`,
       );
     });
   });

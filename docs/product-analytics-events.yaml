@@ -370,7 +370,7 @@ properties:
     description: Whether `zitadel api` followed pagination.
   claim_outcome:
     type: string
-    values: [completed, already_claimed, expired, window_expired, timeout, dry_run]
+    values: [completed, link_issued, already_claimed, expired, not_found, window_expired, timeout, dry_run]
     description: How `claim` ended; never an id or a URL.
   poll_count:
     type: number

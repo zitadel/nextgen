@@ -14,7 +14,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
-| `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work

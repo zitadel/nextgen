@@ -7,7 +7,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 
 const defaultConsoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";

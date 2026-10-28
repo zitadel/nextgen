@@ -132,6 +132,15 @@ describe("deploy", () => {
         expect(result).toFailWith("E_VALIDATION");
       });
 
+      it("points a project whose issuer setup 0.1.0 registered as a preview origin at doctor --fix", async () => {
+        const app = await aSetUpApp();
+        await app.hasItsIssuerAsAPreviewOrigin();
+
+        const result = await app.deploy();
+
+        expect(result).toSuggest("doctor --fix");
+      });
+
       it("checks for a primary origin before syncing IdP connections", async () => {
         const app = await aSetUpApp();
         await app.removeOrigin(SETUP_ORIGIN.pattern);
@@ -300,6 +309,44 @@ describe("deploy", () => {
         expect(dry).toSucceed();
         const listed = await app.run(["deployment", "list", "--json"]);
         expect(app.envelopeOf<{ count: number }>(listed).data.count).toBe(0);
+      });
+
+      it("shows what a dry run would change since the live release", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.commit();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const data = await app.deployDryRunData();
+
+        expect(data.diff?.files).toEqual([
+          expect.objectContaining({
+            status: "modified",
+            patch: expect.stringContaining('"nickname"'),
+          }),
+        ]);
+      });
+
+      it("reports what a deploy changed since the release it replaced", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.commit();
+        await app.deployData();
+        await app.editUserSchema((schema) => {
+          schema.properties.nickname = { type: "string" };
+        });
+
+        const data = await app.deployData();
+
+        expect(data.diff?.files).toEqual([
+          expect.objectContaining({
+            status: "modified",
+            patch: expect.stringContaining('"nickname"'),
+          }),
+        ]);
       });
     });
 
