@@ -116,5 +116,6 @@ moon run website:typecheck website:lint website:test website:build
 moon run website:start   # the build on port 3004
 ```
 
-Vercel runs `turbo run build --filter=@zitadel/components`, then
-`pnpm run build`; the Next build itself never goes through a task runner.
+Vercel runs `turbo run build --filter=@zitadel/website`; the build's key
+holds the deployment's ID, so Vercel never restores it
+([turborepo.md](../../docs/design/build/turborepo.md)).

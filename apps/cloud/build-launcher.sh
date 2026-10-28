@@ -1,8 +1,8 @@
 #!/bin/sh
-# Build step of the `server` service (repo-root vercel.json, Go preset):
-# compile the launcher into the function binary, then migrate the
-# deployment's database (a preview's is created first; see
-# apps/cloud/launcher/database.go).
+# The `build` task of @zitadel/cloud (apps/cloud/turbo.json): compile the
+# launcher into the `server` service's function binary,
+# apps/cloud/dist/nextgen-launcher. The service's build command runs it
+# through turbo, before `migrate` and `deploy`.
 #
 # The console is not embedded: it is a service of its own, and the launcher
 # turns the server's console off. The services build one after another in
@@ -10,13 +10,6 @@
 # directory (internal/staticui/console/dist), so the launcher is compiled
 # with -tags noconsole; without it, the function would carry the console
 # whenever that service built first.
-#
-# Migrations run here, before the deployment goes live, never when a
-# function starts. A failed migration fails the build and the previous
-# deployment keeps serving, so every migration must leave the schema
-# readable by the deployment still serving (expand/contract).
-#
-# Output: $VERCEL_OUTPUT_FILE on Vercel, dist/nextgen-launcher locally.
 set -eu
 cd "$(dirname "$0")/../.."
 
@@ -26,7 +19,7 @@ commit="${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknow
 # knows it even where Vercel exposes no Git metadata at runtime.
 ref="${VERCEL_GIT_COMMIT_REF:-}"
 date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-out="${VERCEL_OUTPUT_FILE:-dist/nextgen-launcher}"
+out=apps/cloud/dist/nextgen-launcher
 mkdir -p "$(dirname "$out")"
 
 CGO_ENABLED=0 go build -trimpath -tags noconsole \
@@ -42,8 +35,6 @@ echo "built $out (version ${version}+cloud, commit ${commit})"
 # carries the cache from build to build, so every rebuild's packages would
 # pile up towards the build cache's limit. On Vercel, drop what no build
 # used in the last two hours (Go refreshes an entry's time at most hourly).
-if [ -n "${VERCEL_OUTPUT_FILE:-}" ]; then
+if [ -n "${VERCEL:-}" ]; then
   find -H "$(go env GOCACHE)" -mindepth 2 -type f -mmin +120 -delete
 fi
-
-"$out" migrate
