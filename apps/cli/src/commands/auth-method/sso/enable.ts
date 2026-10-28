@@ -440,15 +440,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         publish,
       });
       consola.success(`Wrote ${plan.path}`);
-      if (selection.kind === "custom") {
-        for (const note of mappingNotes({
-          file: plan.path,
-          provider: entry.displayName,
-          connection,
-        })) {
-          consola.info(note);
-        }
-      }
     }
 
     const written = await this.enableInConfiguration(cwd, schema, edits);
@@ -920,40 +911,5 @@ function editedFiles(schema: SchemaFile, edits: PlannedEdits): string[] {
   return [
     ...(edits.schema.changed ? [schema.path] : []),
     ...edits.flows.filter(({ result }) => result.changed).map(({ flow }) => flow.path),
-  ];
-}
-
-/**
- * What a person needs to know about the claim mappings a custom connection was
- * written with, in two parts: the mappings (where they are, which side of each
- * line is their user schema's and which is the claim the provider must return),
- * then what verifies a value, which a mapping alone does not. Nothing here
- * edits a mapping; the connection file is where that happens.
- */
-function mappingNotes(options: { file: string; provider: string; connection: object }): string[] {
-  const { file, provider, connection } = options;
-  const document = connection as {
-    claim_mapping?: Readonly<Record<string, string>>;
-    verified_claims?: Readonly<Record<string, string | true>>;
-  };
-  const mappings = Object.entries(document.claim_mapping ?? {});
-  if (mappings.length === 0) {
-    return [];
-  }
-  const verified = Object.entries(document.verified_claims ?? {});
-  return [
-    `Claim mappings in ${file}. Each line is an attribute of your user schema, then the claim ${provider} must return for it:`,
-    ...mappings.map(([attribute, claim]) => `  ${attribute} ← ${claim}`),
-    ...(verified.length === 0
-      ? ["Nothing is treated as verified."]
-      : [
-          "Verification, which a mapping alone does not give:",
-          ...verified.map(([attribute, how]) =>
-            how === true
-              ? `  ${attribute} is treated as verified.`
-              : `  ${attribute} is treated as verified only when ${provider} says so in the ${how} claim.`,
-          ),
-        ]),
-    "Edit the mappings in that file if your provider returns other claims.",
   ];
 }
