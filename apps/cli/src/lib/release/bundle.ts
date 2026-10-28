@@ -5,7 +5,7 @@ import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
 import { IDPS_DIR } from "../idp";
 import { readJsonDir, readJsonDirEntries } from "../json-dir";
-import { POLICIES_DIR } from "../policies";
+import { isPolicyTestFile, POLICIES_DIR } from "../policies";
 import { SCHEMAS_DIR } from "../user-schema";
 
 /**
@@ -72,7 +72,11 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   // the file it came from, and the bundle carries only the bodies.
   const idpEntries = await readJsonDirEntries(join(cwd, IDPS_DIR));
   const idps = idpEntries.map((entry) => stripSchema(entry.body));
-  const policyEntries = await readJsonDirEntries(join(cwd, POLICIES_DIR));
+  // Test files sit beside the policies; `policies test` runs them, and a
+  // release never carries them.
+  const policyEntries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
+    skip: isPolicyTestFile,
+  });
   const policies = policyEntries.map((entry) => stripSchema(entry.body));
   const brandingSources = (await readJsonDir(join(cwd, BRANDING_DIR))).map((descriptor) => ({
     ...descriptor,

@@ -3,7 +3,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { apiMockPublicDir } from "@zitadel/api-mock/public-dir";
 import { defineConfig } from "vitest/config";
 
-import { baseTest, edgeProject, edgeSpecs } from "../../vitest.shared.mjs";
+import { baseTest, edgeProject, edgeSpecs } from "@zitadel/vitest-config";
 import { renderServerLogin } from "./src/__tests__/server-markup.ts";
 
 /**

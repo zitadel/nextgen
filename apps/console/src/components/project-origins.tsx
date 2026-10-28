@@ -5,25 +5,12 @@ import { toast } from "sonner";
 import { api } from "@/api/zitadel";
 import { CARD_ACTION_BUTTON, DetailSection } from "@/components/detail-page";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FORM_DIALOG_BODY, FormDialog, FormDialogFooter } from "@/components/form-dialog";
 import { SHEET_CHOICE_CARD } from "@/components/form-sheet";
-import {
-  DIALOG_CONTENT,
-  DIALOG_FOOTER,
-  DIALOG_HEADER,
-  DIALOG_TITLE,
-} from "@/components/notice-dialog";
 import { OriginLink } from "@/components/origin-link";
 import { RowMenu } from "@/components/resource-list";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/ui/copy-button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
   Field,
@@ -37,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSubmit } from "@/hooks/use-submit";
 import { describeError } from "@/lib/api-error";
+import { KIND_LABEL } from "@/lib/deployment";
 
 type Origin = Awaited<ReturnType<typeof api.getProject>>["origins"][number];
 type OriginKind = Origin["kind"];
@@ -44,11 +32,9 @@ type OriginKind = Origin["kind"];
 /** The kinds in the order the form offers them and the rows take. */
 const KINDS: OriginKind[] = ["primary", "preview"];
 
-const KIND_LABEL: Record<OriginKind, string> = { primary: "Primary", preview: "Preview" };
-
 /** What each kind is for, on its choice card. */
 const KIND_SUMMARY: Record<OriginKind, string> = {
-  primary: "Your app's live URLs",
+  primary: "Your app's live URL",
   preview: "A pattern for preview deployments",
 };
 
@@ -62,9 +48,6 @@ const KIND_HINT: Record<OriginKind, string> = {
   primary: "The exact URL your app is served from, with no path.",
   preview: "Use * for the part that changes, like branch names.",
 };
-
-/** The form's body: the dialog's 24px inset, 16px between the fields. */
-const FORM_BODY = "flex flex-col gap-4 px-6 pb-6";
 
 /**
  * The project's origins: one row per pattern, its kind beside it, with an add,
@@ -93,12 +76,12 @@ export function ProjectOrigins({
   /** Called after an origin was added, changed or removed, to reload the page's data. */
   onChanged: () => void;
 }) {
+  const [addOpen, setAddOpen] = useState(false);
   const rows = sortOrigins(origins);
   return (
     <DetailSection
       title="Origins"
       titleId="project-origins"
-      className="mt-4"
       role="region"
       aria-labelledby="project-origins"
     >
@@ -120,12 +103,18 @@ export function ProjectOrigins({
         </ul>
       )}
       <div className="flex justify-end">
-        <AddOriginDialog projectId={projectId} onChanged={onChanged}>
-          <Button variant="outline" size="sm" className={CARD_ACTION_BUTTON}>
-            <Plus aria-hidden />
-            Add origin
-          </Button>
-        </AddOriginDialog>
+        <OriginDialog
+          projectId={projectId}
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onChanged={onChanged}
+          trigger={
+            <Button variant="outline" size="sm" className={CARD_ACTION_BUTTON}>
+              <Plus aria-hidden />
+              Add origin
+            </Button>
+          }
+        />
       </div>
     </DetailSection>
   );
@@ -133,9 +122,8 @@ export function ProjectOrigins({
 
 /** Primary patterns first, then by pattern, so a project's live origins lead. */
 function sortOrigins(origins: Origin[]): Origin[] {
-  const order: Record<OriginKind, number> = { primary: 0, preview: 1 };
   return [...origins].sort(
-    (a, b) => order[a.kind] - order[b.kind] || a.pattern.localeCompare(b.pattern),
+    (a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || a.pattern.localeCompare(b.pattern),
   );
 }
 
@@ -171,7 +159,12 @@ function OriginRow({
       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {isPattern ? (
-            <span className="truncate text-sm leading-5 text-foreground">{origin.pattern}</span>
+            // The link's icon and gap as a spacer, so the text keeps the
+            // linked rows' column.
+            <span className="flex min-w-0 items-center gap-1 text-sm leading-5 text-foreground">
+              <span aria-hidden className="size-3 shrink-0" />
+              <span className="truncate">{origin.pattern}</span>
+            </span>
           ) : (
             <OriginLink
               origin={origin.pattern}
@@ -179,34 +172,23 @@ function OriginRow({
               iconClassName="text-muted-foreground"
             />
           )}
-          <CopyButton
-            value={origin.pattern}
-            label={`Copy ${origin.pattern}`}
-            size="icon-xs"
-            className="size-4 shrink-0"
-          />
+          <CopyButton value={origin.pattern} label={`Copy ${origin.pattern}`} size="inline" />
         </div>
         <RowMenu name={origin.pattern} size="icon-xs" contentClassName="w-50">
           <DropdownMenuItem onSelect={() => setEditOpen(true)}>Edit</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => setRemoveOpen(true)}>Remove</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={() => setRemoveOpen(true)}>
+            Remove
+          </DropdownMenuItem>
         </RowMenu>
       </div>
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className={DIALOG_CONTENT} aria-describedby={undefined}>
-          <DialogHeader className={DIALOG_HEADER}>
-            <DialogTitle className={DIALOG_TITLE}>Edit origin</DialogTitle>
-          </DialogHeader>
-          {editOpen && (
-            <OriginForm
-              projectId={projectId}
-              current={origin}
-              onChanged={onChanged}
-              onClose={() => setEditOpen(false)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <OriginDialog
+        projectId={projectId}
+        current={origin}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onChanged={onChanged}
+      />
       <RemoveOriginDialog
         projectId={projectId}
         origin={origin}
@@ -219,34 +201,40 @@ function OriginRow({
   );
 }
 
-/** Add one pattern to the project. */
-function AddOriginDialog({
-  children,
+/**
+ * Add a pattern to the project, or with `current` change that one. No
+ * description under the title: the two choice cards say what each kind is
+ * for.
+ */
+function OriginDialog({
   projectId,
+  current,
+  trigger,
+  open,
+  onOpenChange,
   onChanged,
 }: {
-  children: ReactNode;
   projectId: string;
+  current?: Origin;
+  trigger?: ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onChanged: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      {/* 448px with the design's 24px rhythm, as the notice dialog. No
-          description: the two choice cards say what each kind is for. */}
-      <DialogContent className={DIALOG_CONTENT} aria-describedby={undefined}>
-        <DialogHeader className={DIALOG_HEADER}>
-          <DialogTitle className={DIALOG_TITLE}>Add origin</DialogTitle>
-        </DialogHeader>
-        {/* Remounted per opening so a cancelled attempt does not leave its
-            pattern or its error behind. */}
-        {open && (
-          <OriginForm projectId={projectId} onChanged={onChanged} onClose={() => setOpen(false)} />
-        )}
-      </DialogContent>
-    </Dialog>
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      trigger={trigger}
+      title={current ? "Edit origin" : "Add origin"}
+    >
+      <OriginForm
+        projectId={projectId}
+        current={current}
+        onChanged={onChanged}
+        onClose={() => onOpenChange(false)}
+      />
+    </FormDialog>
   );
 }
 
@@ -272,10 +260,11 @@ function OriginForm({
   const hintId = `${inputId}-hint`;
   const [kind, setKind] = useState<OriginKind>(current?.kind ?? "primary");
   const [pattern, setPattern] = useState(current?.pattern ?? "");
+  const next: Origin = { pattern: pattern.trim(), kind };
+  const dirty = !current || next.pattern !== current.pattern || next.kind !== current.kind;
   // ADR 030: the refusal's own message is the human-facing string.
   const save = useSubmit(
     async () => {
-      const next: Origin = { pattern: pattern.trim(), kind };
       if (current) {
         await replaceOrigin(projectId, current, next, onChanged);
       } else {
@@ -298,7 +287,7 @@ function OriginForm({
     // `contents`: the form is here for Enter-to-submit, the body and the
     // footer lay themselves out in the dialog's grid.
     <form className="contents" onSubmit={submit}>
-      <div className={FORM_BODY}>
+      <div className={FORM_DIALOG_BODY}>
         <RadioGroup
           aria-label="Type"
           className="gap-2"
@@ -355,20 +344,20 @@ function OriginForm({
         </Field>
       </div>
 
-      <DialogFooter className={DIALOG_FOOTER}>
+      <FormDialogFooter>
         <Button type="button" variant="outline" onClick={onClose} disabled={save.pending}>
           Cancel
         </Button>
-        {/* Held while the server's refusal stands: the same request would be
-            refused again. */}
+        {/* Held while nothing would change, and while the server's refusal
+            stands: the same request would be refused again. */}
         <Button
           type="submit"
-          disabled={pattern.trim() === "" || error !== undefined}
+          disabled={!dirty || next.pattern === "" || error !== undefined}
           loading={save.pending}
         >
           {current ? "Save" : "Add origin"}
         </Button>
-      </DialogFooter>
+      </FormDialogFooter>
     </form>
   );
 }
@@ -390,7 +379,6 @@ async function replaceOrigin(
   next: Origin,
   onChanged: () => void,
 ): Promise<void> {
-  if (next.pattern === current.pattern && next.kind === current.kind) return;
   await api.removeOrigin(projectId, { pattern: current.pattern });
   try {
     await api.addOrigin(projectId, next);

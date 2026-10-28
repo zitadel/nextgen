@@ -2,7 +2,7 @@ import { availableParallelism } from "node:os";
 
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "../../vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 import { PORT_WORKERS } from "./tests/helpers/ports";
 
 export default defineConfig({
@@ -14,7 +14,21 @@ export default defineConfig({
     // The integration specs drive the built CLI; keep their telemetry off with
     // the cross-tool standard (https://consoledonottrack.com) so a unit run
     // never ships events, independent of the moon/CI env.
-    env: { DO_NOT_TRACK: "1" },
+    // CI markers are blanked for the code under test (the retry below reads the
+    // real one at config time), so a suite behaves the same on a CI runner as
+    // on a laptop: `preview` and the skills hint branch on running in CI.
+    env: {
+      DO_NOT_TRACK: "1",
+      CI: "",
+      GITHUB_ACTIONS: "",
+      GITLAB_CI: "",
+      CIRCLECI: "",
+      BUILDKITE: "",
+      JENKINS_URL: "",
+      CF_PAGES: "",
+      TF_BUILD: "",
+      CODEBUILD_BUILD_ID: "",
+    },
     // Both suffixes, for the same reason the shared base matches both: a
     // renamed suite must not vanish silently. Specs are `*.spec.ts`, unit
     // tests `*.test.ts` (tests/AGENTS.md).

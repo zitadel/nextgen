@@ -13,8 +13,9 @@ import { useSubmit } from "@/hooks/use-submit";
  *
  * The field follows `value`: a save re-runs the loader, and the draft resets
  * when the saved name changes. `layout="inline"` puts the label on a 202px
- * rail beside the input, as the project's card draws it; the default stacks
- * them.
+ * rail beside the input, as the project's card draws it, and stacks them
+ * below `sm` where the rail would leave the input no room; the default
+ * stacks them always.
  */
 export function RenameCard({
   id,
@@ -51,8 +52,13 @@ export function RenameCard({
   return (
     <DetailSection title={title} className={className}>
       <div className="flex flex-col gap-4.5">
-        <Field orientation={layout === "inline" ? "horizontal" : "vertical"}>
-          <FieldLabel htmlFor={id} className={cn(layout === "inline" && "w-[202px] flex-none!")}>
+        <Field
+          orientation={layout === "inline" ? "horizontal" : "vertical"}
+          className={cn(
+            layout === "inline" && "flex-col items-stretch sm:flex-row sm:items-center",
+          )}
+        >
+          <FieldLabel htmlFor={id} className={cn(layout === "inline" && "flex-none! sm:w-[202px]")}>
             {label}
           </FieldLabel>
           <Input

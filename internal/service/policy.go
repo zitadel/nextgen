@@ -402,11 +402,17 @@ func (s *PolicyService) ResolvePolicy(ctx context.Context, projectID, operation 
 			return nil, err
 		}
 	}
-	dec := json.NewDecoder(bytes.NewReader(entity.Config))
+	return policyInstance(entity.Operation, entity.Config)
+}
+
+// policyInstance decodes a stored or canonical config into the instance the
+// engine binds, numbers kept exact.
+func policyInstance(operation string, raw json.RawMessage) (*policy.Instance, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
 	dec.UseNumber()
 	var config map[string]any
 	if err := dec.Decode(&config); err != nil {
 		return nil, err
 	}
-	return &policy.Instance{Kind: policy.KindPolicy, Operation: entity.Operation, Config: config}, nil
+	return &policy.Instance{Kind: policy.KindPolicy, Operation: operation, Config: config}, nil
 }

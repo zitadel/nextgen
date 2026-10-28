@@ -23,7 +23,7 @@
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"],
       "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after

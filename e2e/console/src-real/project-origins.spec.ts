@@ -8,16 +8,17 @@ import { signIn } from "../support/sign-in";
  * The project page's origins and variables, against a real instance.
  *
  * The unit specs drive both over stubbed responses. These prove the round
- * trips: an origin added through the dialog reaches the project and comes
- * back on reload, a removal takes it away again, and variables set through the
- * API show up with a secret held rather than shown.
+ * trips: the server's refusal reaches the field, an origin added through the
+ * dialog reaches the project and comes back on reload, a removal takes it
+ * away again, and variables set through the API show up with a secret held
+ * rather than shown.
  *
  * Every pattern and name is unique to the run, and each test removes what it
  * added: a standalone deployment has one project, which every other spec
  * reads.
  */
 
-test("adds an origin through the dialog, edits it and removes it again", async ({
+test("refuses a wildcard as primary, then adds, edits and removes an origin", async ({
   page,
   zitadel,
   seed,
@@ -32,6 +33,13 @@ test("adds an origin through the dialog, edits it and removes it again", async (
     await section.getByRole("button", { name: "Add origin" }).click();
 
     const dialog = page.getByRole("dialog");
+    // A wildcard is not a primary origin. The server's refusal lands on the
+    // field and the dialog stays: nothing was written.
+    await dialog.getByRole("textbox", { name: "URL" }).fill("https://*.example.com");
+    await dialog.getByRole("button", { name: "Add origin" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText(/exact URL/);
+    await expect(dialog).toBeVisible();
+
     await dialog.getByRole("textbox", { name: "URL" }).fill(pattern);
     await dialog.getByRole("button", { name: "Add origin" }).click();
     await expect(dialog).toBeHidden();
@@ -64,29 +72,6 @@ test("adds an origin through the dialog, edits it and removes it again", async (
       await withErrorBody(zitadel.api.removeOrigin(zitadel.handle.projectId, { pattern: origin }));
     }
   }
-});
-
-test("refuses a wildcard as a primary origin with the server's message", async ({
-  page,
-  zitadel,
-  seed,
-}) => {
-  await signIn(page, zitadel, await seed.user());
-
-  await page.goto(`/projects/${zitadel.handle.projectId}`);
-  await page
-    .getByRole("region", { name: "Origins" })
-    .getByRole("button", { name: "Add origin" })
-    .click();
-
-  const dialog = page.getByRole("dialog");
-  await dialog.getByRole("textbox", { name: "URL" }).fill("https://*.example.com");
-  await dialog.getByRole("button", { name: "Add origin" }).click();
-
-  // The console shows the refusal on the field and keeps the dialog: nothing
-  // was written.
-  await expect(dialog.getByRole("alert")).toHaveText(/exact URL/);
-  await expect(dialog).toBeVisible();
 });
 
 test("lists variables set through the API, with a secret held rather than shown", async ({

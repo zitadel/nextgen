@@ -47,7 +47,6 @@ export function ProjectVariables({ variables }: { variables: Variables }) {
     <DetailSection
       title="Variables and Secrets"
       titleId="project-variables"
-      className="mt-4"
       role="region"
       aria-labelledby="project-variables"
     >
@@ -72,15 +71,7 @@ export function ProjectVariables({ variables }: { variables: Variables }) {
             {rows.map((row) => (
               <TableRow key={row.name} className="border-border hover:bg-transparent">
                 <TableCell className={cn(CELL, "text-foreground")}>
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate">{row.name}</span>
-                    <CopyButton
-                      value={row.name}
-                      label={`Copy ${row.name}`}
-                      size="icon-xs"
-                      className="size-4 shrink-0"
-                    />
-                  </span>
+                  <Copyable text={row.name} label={`Copy ${row.name}`} />
                 </TableCell>
                 <TableCell className={cn(CELL, "text-muted-foreground")}>{row.type}</TableCell>
                 <TableCell className={CELL}>
@@ -141,15 +132,15 @@ function ValueCell({ name, kind, value }: { name: string; kind: string; value?: 
     return <span className="text-foreground">Configured</span>;
   }
   const text = String(value);
+  return <Copyable text={text} label={`Copy ${name} ${kind} value`} />;
+}
+
+/** A cell's text with its copy beside it; the text truncates, the copy does not. */
+function Copyable({ text, label }: { text: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5 text-foreground">
       <span className="truncate">{text}</span>
-      <CopyButton
-        value={text}
-        label={`Copy ${name} ${kind} value`}
-        size="icon-xs"
-        className="size-4 shrink-0"
-      />
+      <CopyButton value={text} label={label} size="inline" />
     </span>
   );
 }
