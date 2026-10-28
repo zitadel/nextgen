@@ -30,6 +30,9 @@ export const DETAIL_TITLE = PAGE_TITLE;
 export const ICON_PLATE =
   "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
 
+/** A card's or tab row's small action: 12px text, a 14px glyph. */
+export const CARD_ACTION_BUTTON = "gap-1 px-2.5 text-xs [&_svg]:size-3.5!";
+
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
