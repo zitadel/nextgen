@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-next",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Next.js middleware, helpers and components for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-next#readme",
   "bugs": {
@@ -89,6 +89,8 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vite": "workspace:*",
+    "@zitadel/vitest-config": "workspace:*",
     "jsdom": "catalog:",
     "next": "^16.3.8",
     "react": "catalog:",

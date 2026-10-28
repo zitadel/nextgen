@@ -51,9 +51,9 @@ export const en: Record<string, string> = {
   "collect-credentials.field.email": "Email",
   "collect-credentials.field.email.placeholder": "you@example.com",
   "collect-credentials.field.password": "Password",
-  // No static password rule hint: the only enforced rule is the schema's
-  // minLength, and "symbol + number" was never enforced. The client will build
-  // this hint dynamically from the API's per-field validation rules (#251).
+  // No static password rule hint: the template builds it from the field's own
+  // `validation.min_length` (`fieldRuleHint`, "hint.field_min_length"), which
+  // the server sets from the project's password policy.
   "collect-credentials.action.submit": "Sign up",
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -249,6 +249,11 @@ export const en: Record<string, string> = {
   "error.field_min_length_value": "{0} must be at least {1} characters.",
   "error.field_max_length_value": "{0} must be at most {1} characters.",
   "error.field_invalid": "Please check {0}.",
+
+  // --- Field hints from validation rules ({0} = the rule's bound) ---
+  // Shown under a field before anything is typed, by `fieldRuleHint`
+  // (liquid.ts), when the field has no `.help` text of its own.
+  "hint.field_min_length": "At least {0} characters.",
 
   // --- Sign-in form-level alert ---
   "error.sign_in_server.title": "We couldn't complete your sign in.",

@@ -1,12 +1,12 @@
 import { defineConfig } from "vitest/config";
 
-import { baseTest } from "./vitest.shared.mjs";
+import { baseTest } from "@zitadel/vitest-config";
 
 /**
  * Root workspace-tooling tests (all Vitest, run in Node). This is not a project
  * aggregator — it never descends into `apps/*` or `packages/*` (each of those
  * has its own config and moon `test` task); `include` names only the root
- * `scripts/` tests and the one for `vite.shared.mjs`. The `workspace:test` task
+ * `scripts/` tests and the one for `packages/vite/vite.shared.mjs`. The `workspace:test` task
  * runs the general ones; the `check-typecheck` / `check-openapi-rules` tasks
  * filter this same config down to their one file (then run their audit script),
  * so they share one config.
@@ -17,9 +17,16 @@ export default defineConfig({
     ...baseTest,
     name: "@zitadel/workspace",
     environment: "node",
-    include: ["scripts/**/*.test.mjs", "scripts/**/*.test.ts", "vite.shared.test.mjs"],
+    include: [
+      "scripts/**/*.test.mjs",
+      "scripts/**/*.test.ts",
+      "packages/vite/vite.shared.test.mjs",
+    ],
     // Root tests exercise scripts/, not src/ (there is none at the repo root).
-    coverage: { ...baseTest.coverage, include: ["scripts/**/*.{mjs,ts}", "vite.shared.mjs"] },
+    coverage: {
+      ...baseTest.coverage,
+      include: ["scripts/**/*.{mjs,ts}", "packages/vite/vite.shared.mjs"],
+    },
     // Several of these run slow work (the redocly lint, tsc program audits)
     // that run well past Vitest's 5s default; node:test had no timeout.
     testTimeout: 120_000,

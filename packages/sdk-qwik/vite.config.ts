@@ -2,7 +2,7 @@ import { qwikVite } from "@qwik.dev/core/optimizer";
 import dts from "unplugin-dts/vite";
 import { defineConfig } from "vite";
 
-import { failOnDiagnostics, libraryBuild } from "../../vite.shared.mjs";
+import { failOnDiagnostics, libraryBuild } from "@zitadel/vite";
 
 // qwikVite writes an app's client manifest (`q-manifest.json`, a bundle graph) in a post hook, and
 // prints a warning for every import the library keeps external. A library has no use for either.

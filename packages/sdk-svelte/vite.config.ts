@@ -1,7 +1,7 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
-import { libraryBuild } from "../../vite.shared.mjs";
+import { libraryBuild } from "@zitadel/vite";
 import { svelteTypes } from "./vite-plugin-svelte-types.ts";
 
 export default defineConfig({

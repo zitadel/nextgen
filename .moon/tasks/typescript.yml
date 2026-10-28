@@ -25,11 +25,11 @@ implicitInputs:
   # Spread into every project's vitest config's `test` block. Without these a
   # change to the shared base would leave every project's test task cache-hit
   # (and unselected by `moon ci`), running stale config.
-  - "/vitest.shared.mjs"
-  - "/vitest.shared.d.mts"
+  - "/packages/vitest-config/vitest.shared.mjs"
+  - "/packages/vitest-config/vitest.shared.d.mts"
   # The Vite build of the SDKs (`libraryBuild()`), which their build tasks read.
-  - "/vite.shared.mjs"
-  - "/vite.shared.d.mts"
+  - "/packages/vite/vite.shared.mjs"
+  - "/packages/vite/vite.shared.d.mts"
 
 tasks:
   # Single standardized linter + formatter for every TypeScript project: Biome

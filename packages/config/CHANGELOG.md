@@ -1,5 +1,33 @@
 # @zitadel/config
 
+## 0.2.0
+
+### Minor Changes
+
+- [#2270](https://github.com/zitadel/nextgen/pull/2270) [`08a369b`](https://github.com/zitadel/nextgen/commit/08a369b1b6e2218f284df5950bf65e5249091ea0) - `zitadel deploy` now carries operation policies from `.zitadel/policies/`, one file per operation, checked against the new `.zitadel/meta/policy.json` schema before anything is sent; `zitadel policies list` and `policies get` read them back ([docs](https://preview.zitadel.com/docs/reference/cli/policies/list)). Sign-ins and sign-ups use the policy the deployed release carries, so deploying without a file switches that policy off.
+
+- [#1803](https://github.com/zitadel/nextgen/pull/1803) [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171) - Rework the console navigation: logo and collapse toggle in the sidebar, project and team switchers and a ⌘K search in the top bar, an account menu with theme and sign-out, and one title line per screen. Settings is your profile, with your passkeys and linked accounts, and teams gain Overview and Members tabs. `@zitadel/config/server` exports `DEFAULT_SERVER`, the CLI's default server.
+
+- [#2231](https://github.com/zitadel/nextgen/pull/2231) [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5) - The password step of `<zitadel-login>` shows the account as a full-width chip that goes back to use another account, with an avatar generated from the typed identifier, so it never confirms an account exists; the console shows the same avatar. Custom templates get the chip as `<zl-account>`, and `<zl-avatar>` and `@zitadel/components/avatar` export the avatar for your own pages.
+
+- [#2279](https://github.com/zitadel/nextgen/pull/2279) [`65e1b78`](https://github.com/zitadel/nextgen/commit/65e1b7834326cfdd82e366df33df026769bf07af) - `zitadel setup` now writes and publishes a password policy for every new project, `.zitadel/policies/auth.factor.password.set.json`, with a minimum of 15 characters, NIST's minimum without a second factor, and a README on its settings. The wizard offers 15, 8 or none; `--password-min-length <n>` sets another, `0` none. Change it in the file and publish it with `zitadel deploy`.
+  
+  **Breaking:** a scripted `zitadel setup` now publishes a 15-character minimum. If your scripts or tests register users with passwords shorter than 15 characters, use longer ones, or pass `--password-min-length` with the length you need.
+
+### Patch Changes
+
+- [#2368](https://github.com/zitadel/nextgen/pull/2368) [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9) - `zitadel setup --use-case consumer` and `--use-case business` now make a user's given and family name their display name (`x-display`), so a signed-in session reads "Ada Lovelace" instead of only the email, in `getSession()` and `<zitadel-session>`.
+  
+  **Upgrading a project set up earlier:** add `"x-display": ["givenName", "familyName"]` to its user schema and run `zitadel deploy`; users who sign up after that show their name.
+
+- [#2373](https://github.com/zitadel/nextgen/pull/2373) [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19) - `<zitadel-login>` now says why it switched between sign-in and sign-up by itself: an email without an account becomes a sign-up, with a note to fix a typo in the email field, and one with an account a sign-in; an identity provider sign-in without an account gets the same note. Flow API steps carry `purpose` and, after a switch, `notice`.
+  
+  **Upgrading a page or design from an earlier release:** a page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names, and a design ejected earlier shows the notice once its template renders `messages`, as the designs `zitadel branding eject` copies now do.
+
+- [#2328](https://github.com/zitadel/nextgen/pull/2328) [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1) - The packages no longer ship `.d.ts.map` files. They pointed at `src` files the packages do not publish, so an editor's go-to-definition already landed on the `.d.ts`; it still does.
+- Updated dependencies [[`2d78353`](https://github.com/zitadel/nextgen/commit/2d78353e4191d576d8d163d312ae78be0e6c4341), [`53386a7`](https://github.com/zitadel/nextgen/commit/53386a7de897e2e0605495246231d42558b27e87), [`fedce7e`](https://github.com/zitadel/nextgen/commit/fedce7e399b15ebe9e1068e072f864f89ffb7bc8), [`db036a5`](https://github.com/zitadel/nextgen/commit/db036a50ad5ae80f7d7d5159ceaeecca4fb5992d), [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19), [`2ecde76`](https://github.com/zitadel/nextgen/commit/2ecde76e573c125fd86b7cf7b918619426b624bd), [`89a3471`](https://github.com/zitadel/nextgen/commit/89a34712236d2edc2deb6f482b56a636726956e3), [`33918fa`](https://github.com/zitadel/nextgen/commit/33918faa4ac9300e53d43bf99b55191ba2daa07f), [`5ea7fe4`](https://github.com/zitadel/nextgen/commit/5ea7fe4f9bcaa323c67d2cd347e53e9ba9048d02), [`c21caeb`](https://github.com/zitadel/nextgen/commit/c21caeb5e6c797d092a970129eb2238884d9c9f3)]:
+  - @zitadel/api@0.2.0
+
 ## 0.1.0
 
 ### Patch Changes

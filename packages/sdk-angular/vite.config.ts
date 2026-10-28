@@ -2,7 +2,7 @@ import angular from "@analogjs/vite-plugin-angular";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
-import { libraryBuild } from "../../vite.shared.mjs";
+import { libraryBuild } from "@zitadel/vite";
 
 // Analog's plugin drives Angular's own compiler, so it writes the partial-Ivy
 // JavaScript and the matching `.d.ts` (with Angular's `ɵɵComponentDeclaration`

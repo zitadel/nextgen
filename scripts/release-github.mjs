@@ -3,7 +3,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { artifactImageRows, artifactPackageRows } from "./release-artifacts.mjs";
+import { forwardedArgs, isDirectRun } from "./dev-process.mjs";
+import {
+  artifactImageRows,
+  artifactPackageRows,
+  readReleasePackages,
+  readServerRelease,
+} from "./release-artifacts.mjs";
 
 const defaultRepoRoot = fileURLToPath(new URL("..", import.meta.url));
 const GITHUB_API_VERSION = "2022-11-28";
@@ -14,12 +20,13 @@ const RELEASE_TITLE_PREFIX = "Zitadel NextGen";
 // `.length` against this limit stays on the safe side.
 export const GITHUB_RELEASE_BODY_MAX_CHARS = 125000;
 
-// The website's changelog parses the body back
-// (apps/website/app/changelog/releases.ts): change its format there too.
+// GitHub rejects pull request bodies longer than this.
+export const GITHUB_PULL_REQUEST_BODY_MAX_CHARS = 65536;
+
 export const GENERATED_BLOCK_START = "<!-- nextgen-release-facts:start -->";
 export const GENERATED_BLOCK_END = "<!-- nextgen-release-facts:end -->";
 export const PRODUCT_NOTES_PLACEHOLDER =
-  "<!-- Maintainers: add human-written product release notes above the generated facts before publishing this draft. -->";
+  "<!-- Notes above the generated facts are optional and show on GitHub only: notable changes get entries on the website's changelog, apps/website/changelog/. -->";
 
 // A change's bump, the highest first, as the CHANGELOG.md headings name them.
 const BUMPS = ["major", "minor", "patch"];
@@ -38,7 +45,7 @@ export async function upsertProductGithubRelease(options = {}) {
     const { body, omitted } = fitInitialReleaseBody({ metadata, changes, tag });
     options.log?.(`dry run: would create or update draft GitHub Release ${tag}`);
     options.log?.(body);
-    logOmittedChanges(options.log, tag, omitted);
+    logOmittedChanges(options.log, `GitHub Release ${tag}`, omitted);
     return { action: "dry-run", tag, body, omittedChanges: omitted };
   }
 
@@ -57,7 +64,7 @@ export async function upsertProductGithubRelease(options = {}) {
       body,
     });
     options.log?.(`created draft GitHub Release ${tag}`);
-    logOmittedChanges(options.log, tag, omitted);
+    logOmittedChanges(options.log, `GitHub Release ${tag}`, omitted);
     return { action: "create", tag, release: created, body, omittedChanges: omitted };
   }
 
@@ -79,7 +86,7 @@ export async function upsertProductGithubRelease(options = {}) {
     body: updatedBody,
   });
   options.log?.(`updated GitHub Release ${tag} generated facts block`);
-  logOmittedChanges(options.log, tag, fitted.omitted);
+  logOmittedChanges(options.log, `GitHub Release ${tag}`, fitted.omitted);
   return {
     action: "update",
     tag,
@@ -103,7 +110,7 @@ function fitInitialReleaseBody({ metadata, changes, tag }) {
   return { body: createInitialReleaseBody(fitted.block), omitted: fitted.omitted };
 }
 
-function logOmittedChanges(log, tag, omitted) {
+function logOmittedChanges(log, from, omitted, limit = GITHUB_RELEASE_BODY_MAX_CHARS) {
   if (omitted.length === 0) {
     return;
   }
@@ -111,7 +118,7 @@ function logOmittedChanges(log, tag, omitted) {
     .filter(([, changes]) => changes.length > 0)
     .map(([bump, changes]) => `${changes.length} ${bump}`);
   log?.(
-    `omitted ${omitted.length} change(s) from GitHub Release ${tag} to stay under ${GITHUB_RELEASE_BODY_MAX_CHARS} characters: ${counts.join(", ")}`,
+    `omitted ${omitted.length} change(s) from ${from} to stay under ${limit} characters: ${counts.join(", ")}`,
   );
 }
 
@@ -157,6 +164,55 @@ ${artifactPackageRows(metadata)}
 
 ${packageChanges}
 ${GENERATED_BLOCK_END}`;
+}
+
+/**
+ * The version pull request's description, from a checkout `changeset version`
+ * has just versioned: the release's changes, each once with the packages it
+ * ships in, as the GitHub Release will list them. changesets/action's own
+ * description repeats a change under every package it ships in and drops every
+ * changelog once that passes 60,000 characters. Changes are omitted as for the
+ * release body to stay under GitHub's limit for a pull request.
+ */
+export async function renderVersionPullRequestBody(options = {}) {
+  const repoRoot = options.repoRoot ?? defaultRepoRoot;
+  const metadata = options.metadata ?? (await readVersionMetadata(repoRoot));
+  const changes = await collectReleaseChanges({ repoRoot, metadata });
+  const intro = versionPullRequestIntro(releaseTag(metadata));
+  const fitted = fitChanges({
+    changes,
+    render: (omitted) =>
+      `${intro}\n\n${renderPackageChanges({
+        metadata,
+        changes,
+        omitted,
+        notice: omittedFromVersionPullRequestNotice,
+      })}\n`,
+    fits: (body) => body.length <= GITHUB_PULL_REQUEST_BODY_MAX_CHARS,
+  });
+  if (!fitted.fits) {
+    throw new Error(
+      `the version pull request's description exceeds ${GITHUB_PULL_REQUEST_BODY_MAX_CHARS} characters even with every change but the breaking ones omitted`,
+    );
+  }
+  return { body: fitted.text, omitted: fitted.omitted };
+}
+
+// The release `changeset version` left in the checkout: the server's version
+// names it, and every public package ships in it (the fixed group).
+async function readVersionMetadata(repoRoot) {
+  const release = await readServerRelease(repoRoot);
+  return {
+    version: release.version,
+    tag: release.tag,
+    packages: await readReleasePackages(repoRoot),
+  };
+}
+
+function versionPullRequestIntro(tag) {
+  return `Merging this pull request releases \`${tag}\`: \`release-publish\` publishes the npm packages and the server container image, and drafts the GitHub Release. Until then, each changeset merged to \`main\` updates it.
+
+Each change is listed once, with the packages it ships in, as the GitHub Release will list it. Every package's \`CHANGELOG.md\` is in the diff.`;
 }
 
 /**
@@ -255,9 +311,15 @@ export function parseChangelogEntries(section) {
  * The block's "Package Changes": a `#### Minor Changes` heading per bump, the
  * highest first, and under it a list item per change that names the packages
  * it changes before the changeset's entry, "- `@zitadel/cli`, `@zitadel/server`:
- * [#123](…) … - Summary". The changes `omitted` leave one line per bump.
+ * [#123](…) … - Summary". The changes `omitted` leave one line per bump, the
+ * `notice` (the release body's unless given).
  */
-export function renderPackageChanges({ metadata, changes, omitted = new Set() }) {
+export function renderPackageChanges({
+  metadata,
+  changes,
+  omitted = new Set(),
+  notice = omittedChangesNotice,
+}) {
   const groups = BUMPS.flatMap((bump) => {
     const ofBump = changes.filter((change) => change.bump === bump);
     if (ofBump.length === 0) {
@@ -268,7 +330,7 @@ export function renderPackageChanges({ metadata, changes, omitted = new Set() })
       [
         `#### ${BUMP_HEADINGS[bump]}`,
         ...ofBump.filter((change) => !omitted.has(change)).map(renderChange),
-        ...(left.length > 0 ? [omittedChangesNotice({ metadata, bump, changes: left })] : []),
+        ...(left.length > 0 ? [notice({ metadata, bump, changes: left })] : []),
       ].join("\n\n"),
     ];
   });
@@ -284,32 +346,55 @@ function renderChange(change) {
 }
 
 function omittedChangesNotice({ metadata, bump, changes }) {
+  return `_${countOf(bump, changes)} omitted to keep this release body under GitHub's ${GITHUB_RELEASE_BODY_MAX_CHARS}-character limit; see ${changelogsOf(metadata, changes)} at tag \`${releaseTag(metadata)}\`._`;
+}
+
+function omittedFromVersionPullRequestNotice({ metadata, bump, changes }) {
+  return `_${countOf(bump, changes)} omitted to keep this description under GitHub's ${GITHUB_PULL_REQUEST_BODY_MAX_CHARS}-character limit; see ${changelogsOf(metadata, changes)} in this pull request._`;
+}
+
+function countOf(bump, changes) {
+  return changes.length === 1 ? `1 ${bump} change` : `${changes.length} ${bump} changes`;
+}
+
+// The CHANGELOG.md files that hold `changes`, as prose.
+function changelogsOf(metadata, changes) {
   const names = new Set(changes.flatMap((change) => change.packages));
-  const changelogs = (metadata.packages ?? [])
-    .filter((pkg) => names.has(pkg.name))
-    .map((pkg) => `\`${pkg.path}/CHANGELOG.md\``);
-  const count = changes.length === 1 ? `1 ${bump} change` : `${changes.length} ${bump} changes`;
-  return `_${count} omitted to keep this release body under GitHub's ${GITHUB_RELEASE_BODY_MAX_CHARS}-character limit; see ${listOf(changelogs)} at tag \`${releaseTag(metadata)}\`._`;
+  return listOf(
+    (metadata.packages ?? [])
+      .filter((pkg) => names.has(pkg.name))
+      .map((pkg) => `\`${pkg.path}/CHANGELOG.md\``),
+  );
 }
 
 function listOf(items) {
   return items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items.at(-1)}` : items.join("");
 }
 
-// Omits changes until `fits(block)` accepts the assembled facts block: patch
-// changes before minor ones, and of each bump the longest first, so the most
-// changes stay listed for the fewest characters shed. A bump's omitted changes
-// leave one line naming the CHANGELOG.md files that hold them. A breaking
-// change is never omitted: readers must learn from the release what breaks and
-// what to do. `fits: false` in the result means even the block that lists only
-// the breaking changes is rejected — the space is consumed outside the block.
+// The facts block with as many changes as `fits(block)` accepts (`fitChanges`).
+// `fits: false` in the result means even the block that lists only the
+// breaking changes is rejected — the space is consumed outside the block.
 export function fitGeneratedReleaseFacts({ metadata, changes, fits }) {
+  const { text, ...fitted } = fitChanges({
+    changes,
+    fits,
+    render: (omitted) =>
+      assembleGeneratedReleaseFacts(metadata, renderPackageChanges({ metadata, changes, omitted })),
+  });
+  return { block: text, ...fitted };
+}
+
+// Omits changes until `fits(text)` accepts `render(omitted)`: patch changes
+// before minor ones, and of each bump the longest first, so the most changes
+// stay listed for the fewest characters shed. A bump's omitted changes leave
+// one line naming the CHANGELOG.md files that hold them. A breaking change is
+// never omitted: readers must learn from the release what breaks and what to
+// do, so `fits: false` means even the text with only those was rejected.
+function fitChanges({ changes, render, fits }) {
   const omitted = new Set();
-  const assemble = () =>
-    assembleGeneratedReleaseFacts(metadata, renderPackageChanges({ metadata, changes, omitted }));
-  let block = assemble();
-  if (fits(block)) {
-    return { block, omitted: [], fits: true };
+  let text = render(omitted);
+  if (fits(text)) {
+    return { text, omitted: [], fits: true };
   }
 
   const candidates = changes
@@ -323,13 +408,13 @@ export function fitGeneratedReleaseFacts({ metadata, changes, fits }) {
     );
   for (const { change } of candidates) {
     omitted.add(change);
-    block = assemble();
-    if (fits(block)) {
-      return { block, omitted: [...omitted], fits: true };
+    text = render(omitted);
+    if (fits(text)) {
+      return { text, omitted: [...omitted], fits: true };
     }
   }
 
-  return { block, omitted: [...omitted], fits: false };
+  return { text, omitted: [...omitted], fits: false };
 }
 
 // A major, or a change whose entry says **Breaking:**, the way a breaking
@@ -516,4 +601,35 @@ function githubHeaders(token) {
 async function responseText(response) {
   const text = await response.text();
   return `${response.status} ${response.statusText ?? ""}${text ? ` ${text}` : ""}`.trim();
+}
+
+export async function main(args = forwardedArgs(), options = {}) {
+  if (args[0] !== "version-pr-body" || args.length > 1) {
+    console.error(`Usage: node scripts/release-github.mjs version-pr-body
+
+Prints the version pull request's description for a checkout \`changeset version\` has just versioned.`);
+    return 1;
+  }
+
+  const { body, omitted } = await renderVersionPullRequestBody(options);
+  logOmittedChanges(
+    console.error,
+    "the version pull request's description",
+    omitted,
+    GITHUB_PULL_REQUEST_BODY_MAX_CHARS,
+  );
+  process.stdout.write(body);
+  return 0;
+}
+
+if (isDirectRun(import.meta.url)) {
+  main().then(
+    (code) => {
+      process.exitCode = code;
+    },
+    (error) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    },
+  );
 }

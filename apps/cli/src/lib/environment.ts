@@ -211,7 +211,10 @@ export async function resolveEnvironment(input: ResolveEnvironmentInput): Promis
     },
   ];
   if (input.envFile) {
-    const values = await readEnvFile(resolve(input.cwd, input.envFile));
+    // From the shell's directory, not `--cwd`: Node reads `--env-file` from
+    // the command line itself before the CLI starts, there, and exits when the
+    // file is missing, so a path relative to `--cwd` never reaches this read.
+    const values = await readEnvFile(resolve(input.envFile));
     if (values === undefined) {
       throw new ZitadelError("E_VALIDATION", `--env-file ${input.envFile} was not found`);
     }

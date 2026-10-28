@@ -33,7 +33,7 @@ import { PUBLIC_PROJECT_ID_VARIABLE } from "../../lib/orca/patchers/rule/public-
 import { readZitadelConfig } from "../../lib/project";
 import { DEFAULT_SERVER, parseServer, resolveServer } from "../../lib/server";
 import { shellArg, shellOption } from "../../lib/shell";
-import { environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import { environmentSelectorSuffix, projectEnvFile } from "../../lib/oclif/environment-flags";
 import { nextCommandsData } from "../../lib/oclif/envelope";
 import { type EnvironmentSelector, projectCommand } from "../../lib/suggestion";
 import { Promptable } from "../../lib/oclif/promptable";
@@ -247,9 +247,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // a follow-up run in a shell exporting another project's ZITADEL_* values
     // still acts on the project this run bound. This run's own selection is
     // not it either way.
+    const cwdFlag = typeof flags.cwd === "string" ? flags.cwd : undefined;
     const newEnvironment = environmentSelectorSuffix({
-      envFile: file,
-      ...(typeof flags.cwd === "string" ? { cwd: flags.cwd } : {}),
+      envFile: projectEnvFile(cwdFlag, file),
+      ...(cwdFlag === undefined ? {} : { cwd: cwdFlag }),
     });
     // A created project already holds its app URL as a primary origin, which
     // closes it; only a bound one (`--project`) still needs the pattern added.

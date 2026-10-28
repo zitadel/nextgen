@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/testing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Test-kit for seeded ephemeral local Zitadel instances",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/testing#readme",
   "bugs": {
@@ -62,6 +62,7 @@
   "devDependencies": {
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "msw": "catalog:",
     "tsdown": "catalog:",
     "tslib": "catalog:",

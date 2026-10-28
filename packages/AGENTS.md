@@ -23,7 +23,7 @@ change needs a changeset, and the whole train versions together.
 - **TypeScript floor**: consumers need TypeScript ≥ 5.0, because the entry
   points use `export type *`. This is the one statement of it; READMEs link
   here.
-- **Build an SDK with plain Vite**: `libraryBuild()` (`vite.shared.mjs`), the
+- **Build an SDK with plain Vite**: `libraryBuild()` from `@zitadel/vite`, the
   framework plugin and `unplugin-dts` (`svelteTypes()` for Svelte; Analog
   writes Angular's).
 - **Add an entry point to `exports` and give it a source, never to a config**:
@@ -42,7 +42,7 @@ change needs a changeset, and the whole train versions together.
   implement it; SPA SDKs document a dev/deploy proxy (production guidance:
   [#560](https://github.com/zitadel/nextgen/issues/560)).
 - **Edge entries are tested in the edge runtime**: an SDK entry that claims
-  edge support has an `edge` project (`edgeProject()` in `vitest.shared.mjs`,
+  edge support has an `edge` project (`edgeProject()` in `@zitadel/vitest-config`,
   Vercel's `edge-runtime` VM) that runs only its edge specs. It fails at
   config load if none exists. Every edge project resolves with `workerd`, the
   condition Wrangler adds for Cloudflare Workers. A package adds a condition

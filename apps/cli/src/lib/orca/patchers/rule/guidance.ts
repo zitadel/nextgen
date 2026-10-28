@@ -90,6 +90,10 @@ export function agentsGuidanceSection(ctx: PatchContext): string {
       : ctx.framework.id === "nuxt"
         ? "Your app's own chrome (header navigation, account menus) reads session state with the auto-imported `useAuth()` composable — seeded from the server on every render by the scaffolded auth plugin. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so the state is fresh on every page load."
         : 'Your app\'s own chrome (header navigation, account menus) can read session state from the same-origin `/__nextgen/sessions/me?project_id=<project id>`, naming the project id the app passes to `configureZitadel()` — the same server-answered read the session card performs. Fetch with `credentials: "include"`, `cache: "no-store"`, and `Accept: application/json`; treat 200 as signed-in only with a non-empty `user_id` and that `project_id`, and signed-out only for the canonical error envelope `401/auth.unauthorized`, `403/sess.project_mismatch` (a session of another project on the same host, such as the console\'s on localhost) or `404/sess.not_found`. Any other response is unknown/error, never signed-out. Sign-in and sign-out navigate (`post-sign-in-url` / `post-sign-out-url`), so chrome re-reads on the next page load.';
+  // Where sign-in lands is otherwise only in the SDK's type comments, so an
+  // app that protects a checkout cannot tell whether the visitor returns to it.
+  const returnPathParagraph =
+    "After sign-in the login goes to the path in its page's `?next=` parameter, ahead of `post-sign-in-url`, so a visitor a protected route sent to sign in lands back on that route; a page of your own can read `next` to tell them why they must sign in. Set `force-post-sign-in-url` (SDK wrappers: `forcePostSignInUrl`) on a login whose page uses `next` for something else.";
   return `## Authentication (Zitadel)
 
 This app's login is managed by Zitadel. Local config is the source of truth for what the login collects and how sign-in works (step 3 below). The app files setup generated are yours to change, from the pages to the request boundary that protects routes in a server-rendered app: \`doctor\` reports a file you changed as \`edited\`, or as \`adopted\` once you delete its \`zitadel-cli: managed-file\` comment, and \`doctor --fix\` restores only a missing file, never one you changed.
@@ -112,6 +116,8 @@ ${presentationParagraph}${jsxTypesNote}
 ${themingParagraph}
 
 ${sessionStateParagraph}
+
+${returnPathParagraph}
 
 Machine-readable dialect (read these before authoring flow or schema edits):
 

@@ -27,6 +27,7 @@ type CheckPrTitleModule = {
 };
 
 const load = async (): Promise<CheckPrTitleModule> =>
+  // @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
   // @ts-expect-error -- the script is a plain .mjs with no declaration file
   (await import("../../../../../scripts/check-pr-title.mjs")) as unknown as CheckPrTitleModule;
 
@@ -99,7 +100,7 @@ describe("isNonShippingFile", () => {
     // On the release train since #692 — customers install it from npm.
     "packages/testing/src/passkey.ts",
     // The shared library build decides what every SDK publishes.
-    "vite.shared.mjs",
+    "packages/vite/vite.shared.mjs",
   ])("treats %s as shipping", async (file) => {
     const { isNonShippingFile } = await load();
     expect(isNonShippingFile(file)).toBe(false);
@@ -123,7 +124,7 @@ describe("isNonShippingFile", () => {
     "packages/components/moon.yml",
     "internal/domain/user_test.go",
     "packages/sdk-react/src/index.test.ts",
-    "vite.shared.test.mjs",
+    "packages/vite/vite.shared.test.mjs",
     // Build tooling inside a package produces what ships without shipping.
     "packages/design-tokens/scripts/build.ts",
     // design-tokens is a build input, never published — its README reaches nobody.

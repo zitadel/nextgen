@@ -4,7 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { useLocalServers } from "../helpers/local-server";
 import { usePlatformMock } from "../helpers/platform";
-import { aNewAppDirectory, anApp, type ScaffoldedApp, PASSWORD_POLICY } from "../helpers/project";
+import {
+  aMissingAppDirectory,
+  aNewAppDirectory,
+  anApp,
+  type ScaffoldedApp,
+  PASSWORD_POLICY,
+} from "../helpers/project";
 
 const platform = usePlatformMock();
 useLocalServers();
@@ -153,6 +159,14 @@ describe("setup", () => {
       it("creates a new app in the directory start ran in", async () => {
         const app = await aNewAppDirectory();
         await app.startLocalServer();
+
+        const result = await app.setupNewApp();
+
+        expect(result).toSucceed();
+      });
+
+      it("creates a new app in a directory that does not exist yet", async () => {
+        const app = await aMissingAppDirectory();
 
         const result = await app.setupNewApp();
 

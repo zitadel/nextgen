@@ -73,6 +73,8 @@ cd myapp
 npx @zitadel/cli@latest doctor
 ```
 
+`doctor`, `setup` and `console` use the local server started in the current folder or in the nearest parent folder that has one, and `doctor` says which folder that is. A new, empty folder inside a folder where `start` ran therefore uses that server. To give the new folder a server of its own, run `npx @zitadel/cli@latest start` in it. `reset --force` deletes the local data of the folder it names, so check the folder `doctor` printed first.
+
 Pick a server before running `setup`. It cannot be changed on this app
 afterwards. Use `--server local` for local development, or point at a hosted
 Zitadel Cloud instance if you want the project to belong to your team there.
