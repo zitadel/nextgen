@@ -244,7 +244,10 @@ describe("developerAccessToken", () => {
     await developerAccessToken(as.origin, env);
     await writeLogin(
       as.origin,
-      { ...(stored as NonNullable<typeof stored>), access_token_expires_at: new Date(0).toISOString() },
+      {
+        ...(stored as NonNullable<typeof stored>),
+        access_token_expires_at: new Date(0).toISOString(),
+      },
       env,
     );
 
