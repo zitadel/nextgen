@@ -44,7 +44,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/console#build"],
+      "dependsOn": ["install-browsers", "@zitadel/console#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -60,7 +60,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -72,7 +72,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -84,7 +84,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -102,6 +102,7 @@
         "!**/AGENTS.md"
       ],
       "cache": false,
+      "dependsOn": ["install-browsers"],
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
     // The built-in schemas the `schemas` service publishes under /schemas/v1/
@@ -120,6 +121,7 @@
         "!**/AGENTS.md"
       ],
       "cache": false,
+      "dependsOn": ["install-browsers"],
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
     // The packed CLI against the deployment CLOUD_URL names, beside the
@@ -137,7 +139,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build"],
       "cache": false,
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*", "NODE_EXTRA_CA_CERTS"]
     },
@@ -157,7 +159,7 @@
         "!$TURBO_ROOT$/apps/demo-next/README.md",
         "!$TURBO_ROOT$/apps/demo-next/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -178,7 +180,7 @@
         "!$TURBO_ROOT$/apps/demo-next/README.md",
         "!$TURBO_ROOT$/apps/demo-next/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -196,7 +198,7 @@
         "!$TURBO_ROOT$/apps/demo-nuxt/README.md",
         "!$TURBO_ROOT$/apps/demo-nuxt/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -223,7 +225,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -238,7 +240,7 @@
         "!**/README.md",
         "!**/AGENTS.md"
       ],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -254,6 +256,7 @@
         "!**/AGENTS.md"
       ],
       "dependsOn": [
+        "install-browsers",
         "@zitadel/cli#build",
         "@zitadel/testing#build",
         "@zitadel/oidc-mock#build",

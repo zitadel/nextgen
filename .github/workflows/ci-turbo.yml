@@ -208,8 +208,10 @@ jobs:
           TURBO_FORCE: ${{ env.FORCE }}
         run: turbo run check-generate-pruned --filter=@zitadel/server $AFFECTED
 
-      # The setup only some lanes need runs when one of them is affected, by
-      # the same base and inputs as their `--affected` below.
+      # The journey's setup runs when its lane is affected, by the same base
+      # and inputs as its `--affected` below. Chromium needs no step: every
+      # lane and browser test that opens it depends on its package's
+      # `install-browsers`, so turbo installs it when one of them runs.
       # `turbo query affected --exit-code` exits 1 when a named task is
       # affected, 0 when none is, and 2 on an error, which counts as affected.
       # The journey runs its framework matrix in full only when a surface that
@@ -232,30 +234,15 @@ jobs:
           for dir in packages/sdk-*/; do
             sdks+=("@zitadel/$(basename "$dir")")
           done
-          browsers="$(affected --tasks console-smoke console-real console-embedded console-platform demo-next-mock demo-next-real demo-nuxt-mock test:integration journey-local)"
           journey="$(affected --tasks journey-local)"
           matrix=single
           if [ "$(affected --tasks journey build --packages @zitadel/e2e "${sdks[@]}")" = true ]; then
             matrix=full
           fi
           {
-            echo "browsers=$browsers"
             echo "journey=$journey"
             echo "journey_matrix=$matrix"
           } | tee -a "$GITHUB_OUTPUT"
-
-      # Chromium for the e2e lanes, as in ci.yml. The gate's browser test
-      # lanes install their own through an `install-browsers` dependency.
-      - name: Cache Playwright browsers
-        if: ${{ steps.setup.outputs.browsers == 'true' }}
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-
-      - name: Install Playwright Chromium
-        if: ${{ steps.setup.outputs.browsers == 'true' }}
-        run: corepack pnpm --filter @zitadel/components exec playwright install chromium
 
       - name: Keep Docker's interface churn away from Chromium
         if: ${{ env.VERSION_PR == 'false' }}
