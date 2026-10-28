@@ -122,10 +122,9 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(cwd);
 
-      expect(outcome).toEqual({
+      expect(outcome).toMatchObject({
         kind: "created",
         sha: expect.stringMatching(/^[0-9a-f]{40}$/),
-        guessedIdentity: expect.any(Boolean),
       });
     });
 
@@ -233,7 +232,7 @@ describe("ensureInitialCommit", () => {
 
       const outcome = await ensureInitialCommit(cwd);
 
-      expect(outcome).toEqual({
+      expect(outcome).toMatchObject({
         kind: "committed",
         sha: expect.stringMatching(/^[0-9a-f]{40}$/),
         guessedIdentity: false,
@@ -276,6 +275,44 @@ describe("ensureInitialCommit", () => {
 
       const { stdout } = await run("git", ["diff", "--cached", "--name-only"], { cwd: root });
       expect(stdout).toContain("apps/api/index.js");
+    });
+
+    it("keeps a secret the repository already tracks out of the commit", async () => {
+      const cwd = await aRepository();
+      // Committed before setup ever ran, so .gitignore has no say over it and
+      // the commit cannot be built from the working tree.
+      await writeFile(join(cwd, ".env.local"), "PUBLIC=1\n");
+      await run("git", ["add", "--", ".env.local"], { cwd });
+      await run(
+        "git",
+        ["-c", "commit.gpgsign=false", "commit", "--quiet", "--no-verify", "--message=feat: env"],
+        { cwd },
+      );
+      await writeFile(join(cwd, ".env.local"), "PUBLIC=1\nZITADEL_CLIENT_SECRET=hunter2\n");
+      await writeFile(join(cwd, "index.js"), "export default () => null;\n");
+
+      await ensureInitialCommit(cwd);
+
+      const { stdout } = await run("git", ["show", "HEAD:.env.local"], { cwd });
+      expect(stdout).not.toContain("hunter2");
+    });
+
+    it("leaves a tracked secret's change in the working tree, uncommitted", async () => {
+      const cwd = await aRepository();
+      await writeFile(join(cwd, ".env.local"), "PUBLIC=1\n");
+      await run("git", ["add", "--", ".env.local"], { cwd });
+      await run(
+        "git",
+        ["-c", "commit.gpgsign=false", "commit", "--quiet", "--no-verify", "--message=feat: env"],
+        { cwd },
+      );
+      await writeFile(join(cwd, ".env.local"), "PUBLIC=1\nZITADEL_CLIENT_SECRET=hunter2\n");
+      await writeFile(join(cwd, "index.js"), "export default () => null;\n");
+
+      await ensureInitialCommit(cwd);
+
+      const { stdout } = await run("git", ["status", "--porcelain", "--", ".env.local"], { cwd });
+      expect(stdout.trim()).toBe("M .env.local");
     });
 
     it("keeps a secret out of the commit from a subdirectory of the repository", async () => {

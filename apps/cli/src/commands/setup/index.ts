@@ -1120,7 +1120,13 @@ export default class Setup extends Promptable(BaseCommand) {
       // git guesses an author from the machine when none is configured and
       // commits anyway, so the commit exists but carries a name the developer
       // did not choose. Said out loud, with the one command that fixes it.
-      if (outcome.guessedIdentity) {
+      if (outcome.invented) {
+        reportWarning(
+          "git could build no author identity on this machine, so the commit was made as " +
+            "Zitadel Setup <setup@zitadel.local>. Set user.name and user.email, then run " +
+            "`git commit --amend --reset-author` to put your own name on it.",
+        );
+      } else if (outcome.guessedIdentity) {
         reportWarning(
           "This machine has no git user.name/user.email, so git guessed the author from your " +
             "username and hostname. Set your identity and run `git commit --amend --reset-author` " +
