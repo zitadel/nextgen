@@ -18,8 +18,9 @@ func coerceUserStatus(v any) (any, error) {
 
 // NewSchema binds user list/filter/order fields for one dialect's table names.
 // SchemaObjectType is the object type of the user's schema, read from the
-// schema row; the users foreign key guarantees that row exists. A schema
-// without an object type reads as "", so not_equals still matches its users.
+// schema row. It reads as "" for a schema without an object type and, on
+// dialects without a users-to-schemas foreign key, for a missing schema row,
+// so not_equals still matches those users.
 func NewSchema(usersTable, jsonSchemasTable string) database.Schema[domain.UserField, domain.User] {
 	return database.NewSchema(map[domain.UserField]database.FieldBinding[domain.User]{
 		domain.UserFieldProjectID: {

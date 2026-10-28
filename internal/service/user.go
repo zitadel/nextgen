@@ -385,9 +385,10 @@ func splitUserFilters(filters []Filter) ([]Filter, UserQueryOptions, error) {
 // userFilter maps an API filter predicate to a storage filter. Operations the
 // v2 filter layer cannot express return [domain.ErrNotImplemented];
 // invalid field/operation/value combinations return [domain.ErrRequestInvalid].
-// [splitUserFilters] has already taken team_id out. A `schema` equality names
-// a built-in schema's `$id` under any of its bases: users are stored under
-// the base their project holds the row at, whichever one the caller used.
+// [splitUserFilters] has already taken team_id out. A `schema` equality or
+// inequality names a built-in schema's `$id` under any of its bases: users are
+// stored under the base their project holds the row at, whichever one the
+// caller used.
 func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filter[domain.UserField], error) {
 	switch f.Field {
 	case userFieldCreatedAt:
@@ -403,17 +404,21 @@ func userFilter(f Filter, builtinBases domain.BuiltinSchemaBases) (database.Filt
 		if err != nil {
 			return nil, err
 		}
-		if f.Operation == filterOpNotEquals {
-			return database.Not[domain.UserField](database.StringEqual(database.Col(domain.UserFieldSchemaURL), value)), nil
+		if f.Operation != filterOpEquals && f.Operation != filterOpNotEquals {
+			return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
 		}
-		if equivalents := builtinBases.Equivalents(value); f.Operation == filterOpEquals && len(equivalents) > 1 {
+		var sameSchema database.Filter[domain.UserField] = database.StringEqual(database.Col(domain.UserFieldSchemaURL), value)
+		if equivalents := builtinBases.Equivalents(value); len(equivalents) > 1 {
 			spellings := make([]database.Filter[domain.UserField], 0, len(equivalents))
 			for _, url := range equivalents {
 				spellings = append(spellings, database.StringEqual(database.Col(domain.UserFieldSchemaURL), url))
 			}
-			return database.Or(spellings...), nil
+			sameSchema = database.Or(spellings...)
 		}
-		return stringFilter(f.Operation, database.Col(domain.UserFieldSchemaURL), value)
+		if f.Operation == filterOpNotEquals {
+			return database.Not(sameSchema), nil
+		}
+		return sameSchema, nil
 	case userFieldSchemaObjectType:
 		value, err := stringFilterValue(f)
 		if err != nil {

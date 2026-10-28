@@ -11,15 +11,29 @@
 -- and attaching it makes the parent valid. NO TRANSACTION above is for the
 -- CONCURRENTLY build.
 --
--- A failed or cancelled build leaves an INVALID partition index behind, so the
--- build is preceded by a DROP, as in 000019: a rerun rebuilds it instead of
--- keeping the leftover, which attaching would not repair. The attach is the
--- last step, so a failure always leaves the partition index unattached.
+-- A rerun must converge wherever the last run stopped. A failed or cancelled
+-- build leaves an INVALID partition index behind, which attaching would not
+-- repair, so an unattached leftover is dropped, as in 000019, and rebuilt. An
+-- attached one is complete and Postgres refuses to drop it, so it is kept, and
+-- attaching it again is a no-op.
 CREATE INDEX IF NOT EXISTS idx_users_schema_url
     ON ONLY zitadel_nextgen.users (project_id, schema_url);
 
-DROP INDEX CONCURRENTLY IF EXISTS zitadel_nextgen.idx_users_part_0_schema_url;
-CREATE INDEX CONCURRENTLY idx_users_part_0_schema_url
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class
+        WHERE oid = to_regclass('zitadel_nextgen.idx_users_part_0_schema_url')
+          AND relispartition
+    ) THEN
+        DROP INDEX IF EXISTS zitadel_nextgen.idx_users_part_0_schema_url;
+    END IF;
+END
+$$;
+-- +goose StatementEnd
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_part_0_schema_url
     ON zitadel_nextgen.users_part_0 (project_id, schema_url);
 
 ALTER INDEX zitadel_nextgen.idx_users_schema_url

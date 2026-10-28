@@ -82178,9 +82178,10 @@ func NewUserSchemaSchemaDocument(v UserSchema) SchemaDocument {
 // are found with `POST /users/query` filtering on `schema`. The property is
 // omitted entirely when not requested, so "did not ask" is distinguishable
 // from `false`.
-// Requires `user.read` in addition to `schema.read`. A Console session
-// carries no scopes; it may ask for `in_use` when it may read the whole
-// project, and is refused with `403` otherwise.
+// The flag counts every user of the project, not only those the caller may
+// list, so it requires read on the whole project, and for a token also
+// `user.read` in addition to `schema.read`. A caller without them is refused
+// with `403`.
 // Ref: #
 type SchemaExpand string
 

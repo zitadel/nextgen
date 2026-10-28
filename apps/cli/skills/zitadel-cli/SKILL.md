@@ -190,6 +190,11 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find the users still on an older revision of a schema, filter on the
+schema's object type and exclude the newest revision's URL:
+`users list --filter schema_object_type=equals:<type> --filter
+schema=not_equals:<newest-url> --all --json`.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:

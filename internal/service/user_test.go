@@ -597,7 +597,7 @@ func newMockedUserService(t *testing.T) (service.UserService, *servicemocks.Mock
 }
 
 // A `schema` equality on a built-in schema's `$id` must match the users
-// stored under any of its bases: a user created by naming one base is stored
+// stored under any of its bases, and an inequality must exclude all of them: a user created by naming one base is stored
 // under the base the project holds the row at.
 func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) {
 	t.Parallel()
@@ -618,7 +618,7 @@ func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) 
 		DoAndReturn(func(_ context.Context, opts *database.ListOptions[domain.UserField], _ service.UserQueryOptions) (*database.ListResult[*domain.User], error) {
 			gotList = opts
 			return &database.ListResult[*domain.User]{}, nil
-		}).Times(2)
+		}).Times(3)
 
 	_, err := svc.ListUsers(t.Context(), service.ListUsersInput{
 		ProjectID: "proj_1",
@@ -643,6 +643,16 @@ func TestUserService_ListUsers_SchemaFilterCoversEveryBuiltinBase(t *testing.T) 
 		"https://schemas.test/builtin/v0/default-human-user.json",
 		"https://schemas.test/builtin/v1/default-human-user.json",
 	}, spellings)
+
+	// not_equals excludes the same spellings equals includes.
+	_, err = svc.ListUsers(t.Context(), service.ListUsersInput{
+		ProjectID: "proj_1",
+		Filters:   []service.Filter{{Field: "schema", Operation: "not_equals", Value: "https://schemas.test/builtin/v0/default-human-user.json"}},
+	})
+	require.NoError(t, err)
+	and, ok = gotList.Filter.(database.AndFilter[domain.UserField])
+	require.True(t, ok, "%T", gotList.Filter)
+	assert.Equal(t, database.Not[domain.UserField](or), and.Filters[1])
 
 	// A schema outside the namespace, or a non-equality, is filtered as written.
 	_, err = svc.ListUsers(t.Context(), service.ListUsersInput{
