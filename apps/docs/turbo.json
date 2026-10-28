@@ -9,11 +9,13 @@
     // CLI's release notes, which Changesets writes on every release.
     //
     // Turbo hashes every NEXT_* variable into the tasks of a Next.js package,
-    // so on Vercel each deployment's NEXT_DEPLOYMENT_ID (see build) would key
-    // these too; nothing here depends on it, so generate and typecheck drop
-    // it and still hit the cache there.
+    // and on Vercel each deployment brings its own: NEXT_DEPLOYMENT_ID (see
+    // build), and Vercel's own variables under NEXT_PUBLIC_VERCEL_ (the
+    // deployment's URL, its commit), which the docs service's builds hash
+    // too: a preview missed both tasks with their inputs unchanged. Neither
+    // reads one, so both drop them all and hit the cache there.
     "generate": {
-      "env": ["!NEXT_DEPLOYMENT_ID"],
+      "env": ["!NEXT_*"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/api/openapi/**/*.yaml",
@@ -36,7 +38,7 @@
     // The live examples (components/examples) import the components, the
     // mock and the client the mock calls, each from its dist/.
     "typecheck": {
-      "env": ["!NEXT_DEPLOYMENT_ID"],
+      "env": ["!NEXT_*"],
       "dependsOn": [
         "generate",
         "@zitadel/api#generate",

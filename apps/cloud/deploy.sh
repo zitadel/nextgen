@@ -1,26 +1,16 @@
 #!/bin/sh
-# The `deploy` task of @zitadel/cloud (apps/cloud/turbo.json), which the
-# `server` service's build command runs (repo-root vercel.json, Go preset)
-# once turbo has the launcher (`build`, build-launcher.sh): hand the binary
-# to Vercel's Go builder, then migrate the deployment's database (a
-# preview's is created first; see apps/cloud/launcher/database.go).
-#
-# Migrations run here, before the deployment goes live, never when a
-# function starts, and never from turbo's cache: the task is uncached. A
-# failed migration fails the build and the previous deployment keeps
-# serving, so every migration must leave the schema readable by the
-# deployment still serving (expand/contract).
-#
-# Output: $VERCEL_OUTPUT_FILE on Vercel; locally the binary stays in
-# apps/cloud/dist/nextgen-launcher.
+# The `deploy` task of @zitadel/cloud (apps/cloud/turbo.json), the last of
+# the `server` service's build (repo-root vercel.json, Go preset), after
+# `migrate`: hand the launcher to Vercel's Go builder, which takes the
+# function from $VERCEL_OUTPUT_FILE, a path outside the repository. Outside
+# a Vercel build there is nothing to hand over.
 set -eu
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")"
 
-launcher=apps/cloud/dist/nextgen-launcher
-out="${VERCEL_OUTPUT_FILE:-$launcher}"
-if [ "$out" != "$launcher" ]; then
-  mkdir -p "$(dirname "$out")"
-  cp "$launcher" "$out"
+if [ -z "${VERCEL_OUTPUT_FILE:-}" ]; then
+  echo "no VERCEL_OUTPUT_FILE: the launcher stays in apps/cloud/dist/nextgen-launcher"
+  exit 0
 fi
-
-"$out" migrate
+mkdir -p "$(dirname "$VERCEL_OUTPUT_FILE")"
+cp dist/nextgen-launcher "$VERCEL_OUTPUT_FILE"
+echo "handed dist/nextgen-launcher to the Go builder"

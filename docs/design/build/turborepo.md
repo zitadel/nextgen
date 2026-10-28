@@ -173,9 +173,11 @@ Vercel (`TURBO_TELEMETRY_DISABLED=1`); set it locally too.
 
 On Vercel, every service of the hosted cloud builds through turbo (repo-root
 `vercel.json`): the console, the docs and the website with
-`turbo run build`, the server with `@zitadel/cloud`'s `deploy`, which
-migrates after its `build` and is never cached, and the schemas with its
-`schemas`. `deploy` passes the whole environment through
+`turbo run build`, the server with `@zitadel/cloud`'s `build`, `migrate`
+and `deploy`, in that order (`dependsOn`), the last two never cached, and
+the schemas with its `schemas`. The server's build command installs before
+it runs turbo: Vercel's Go builder runs no `installCommand`, and turbo comes
+with the install. `migrate` passes the whole environment through
 (`passThroughEnv: ["*"]`): the launcher checks every variable the function
 needs, and strict mode would hide one nobody listed. Two project variables, `TURBO_TELEMETRY_DISABLED`
 and `TURBO_PLATFORM_ENV_DISABLED`, turn off telemetry and turbo's warning
@@ -186,7 +188,8 @@ previews in separate entries, and keeps no local cache. Writing takes the
 team's token, which a fork's pull request never gets unapproved. The docs'
 and the website's builds never hit there: a Next.js build bakes in its
 deployment (Skew Protection's ID in its asset URLs, Vercel's URLs in its
-metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers
-`NEXT_DEPLOYMENT_ID` into every task of a Next.js package, so the docs'
-`generate` and `typecheck`, which do not depend on it, drop it
-(`!NEXT_DEPLOYMENT_ID`) and still hit.
+metadata), so their keys hold `VERCEL_DEPLOYMENT_ID`. Turbo infers every
+`NEXT_*` variable into every task of a Next.js package, and each deployment
+brings its own (`NEXT_DEPLOYMENT_ID`, and Vercel's `NEXT_PUBLIC_VERCEL_*`,
+which these services' builds hash too), so the docs' `generate` and
+`typecheck`, which read none, drop them (`!NEXT_*`) and still hit.

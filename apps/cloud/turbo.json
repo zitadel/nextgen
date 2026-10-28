@@ -7,8 +7,8 @@
   // in @zitadel/server#test (`go test ./...`).
   "tasks": {
     // The `server` service's function binary (build-launcher.sh), which
-    // `deploy` hands to Vercel and migrates with. Its inputs are the Go files
-    // and what they embed
+    // `migrate` runs and `deploy` hands to Vercel. Its inputs are the Go
+    // files and what they embed
     // (//go:embed), as in apps/server/moon.yml's serverInputs, and the
     // server's version, which it stamps in. The OpenAPI YAML reaches the
     // binary only through the generated Go code. Turbo hashes the ignored
@@ -44,18 +44,29 @@
       ],
       "outputs": ["dist/nextgen-launcher"]
     },
-    // The `server` service's build command (repo-root vercel.json) installs,
-    // as the Go preset runs no installCommand, and runs this: deploy.sh
-    // copies the binary to $VERCEL_OUTPUT_FILE, where the preset takes the
-    // function from, then migrates the deployment's database. Never cached:
-    // it has to migrate on every deployment. It sees the whole environment:
-    // the deployment's configuration is the environment, and the launcher
-    // checks every variable the function needs to start (a missing one fails
-    // the build), which strict mode would hide unless listed here.
-    "deploy": {
+    // The deployment's database: `launcher migrate` creates a preview's when
+    // it is missing (launcher/database.go) and migrates it. Migrations run
+    // here, before the deployment goes live, never when a function starts,
+    // and never from the cache. A failed migration fails the build and the
+    // previous deployment keeps serving, so every migration must leave the
+    // schema readable by the deployment still serving (expand/contract).
+    //
+    // It sees the whole environment: the deployment's configuration is the
+    // environment, and the launcher also checks every variable the function
+    // needs to start (a missing one fails the build), which strict mode would
+    // hide unless listed here.
+    "migrate": {
       "cache": false,
       "dependsOn": ["build"],
       "passThroughEnv": ["*"]
+    },
+    // The last step of the `server` service's build, whose command installs
+    // first, as Vercel's Go builder runs no installCommand, and then runs
+    // this task: deploy.sh copies the migrated launcher to
+    // $VERCEL_OUTPUT_FILE, where the builder takes the function from.
+    "deploy": {
+      "cache": false,
+      "dependsOn": ["migrate"]
     },
     // The `schemas` service's static files: the built-in schemas the server
     // embeds, rendered as the documents their identifiers name
