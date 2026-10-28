@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -807,5 +808,62 @@ func TestUserService_UniquenessConflictNamesTheAttribute(t *testing.T) {
 			Attributes: map[string]any{"email": "taken@example.com"},
 		})
 		requireTakenFields(t, err)
+	})
+}
+
+func TestDeleteUserAction_RevokesTheUsersGrants(t *testing.T) {
+	t.Parallel()
+
+	t.Run("a deleted user loses every grant, each with its own event", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		var events []*domain.Event
+		stmts.EXPECT().InsertEvent(gomock.Any(), gomock.Any()).DoAndReturn(
+			func(_ context.Context, ev *domain.Event) error {
+				events = append(events, ev)
+				return nil
+			},
+		).AnyTimes()
+		gomock.InOrder(
+			stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_platform", "user_1"),
+			stmts.EXPECT().RevokeAuthzAssignmentsByPrincipal(gomock.Any(), domain.AuthzPrincipalTypeUser, "user_1").
+				Return([]*domain.AuthzAssignment{
+					{ID: "asgn_a", ProjectID: "proj_a", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_1", Relation: "admin"},
+					{ID: "asgn_b", ProjectID: "proj_b", PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: "user_1", Relation: "viewer"},
+				}, nil),
+		)
+
+		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_platform", UserID: "user_1"}).
+			Apply(t.Context(), stmts)
+		require.NoError(t, err)
+
+		require.Len(t, events, 3)
+		for i, want := range []struct{ project, entity, relation string }{
+			{"proj_a", "asgn_a", "admin"},
+			{"proj_b", "asgn_b", "viewer"},
+		} {
+			assert.Equal(t, domain.EventTypeAuthzRevoked, events[i].EventType)
+			assert.Equal(t, want.project, events[i].ProjectID)
+			require.NotNil(t, events[i].EntityID)
+			assert.Equal(t, want.entity, *events[i].EntityID)
+			var payload domain.AuthzRevokedPayload
+			require.NoError(t, json.Unmarshal(events[i].Payload, &payload))
+			assert.Equal(t, domain.AuthzRevokedPayload{PrincipalType: "user", PrincipalID: "user_1", Relation: want.relation}, payload)
+		}
+		assert.Equal(t, domain.EventTypeUserDeleted, events[2].EventType)
+	})
+
+	// The revoke is keyed on the user alone, so a delete that matched no user
+	// in the caller's project must not reach a same-id user's grants elsewhere.
+	t.Run("a user outside the project keeps their grants", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+		stmts := servicemocks.NewMockAllStatements(ctrl)
+		stmts.EXPECT().DeleteUserByID(gomock.Any(), "proj_other", "user_1").Return(database.NewNoRowFoundError(nil))
+
+		err := service.NewDeleteUserAction(service.DeleteUserInput{ProjectID: "proj_other", UserID: "user_1"}).
+			Apply(t.Context(), stmts)
+		require.NoError(t, err)
 	})
 }
