@@ -5,10 +5,10 @@
 -- registry had none serving a lookup without a team scope. Measured with 100k
 -- users in one project, Postgres 18 and SQLite 3.51:
 --
---   unique attribute lookup, correlated EXISTS, no index: 0.1 ms / > 100 s
---   correlated IN + idx_user_unique_attributes_lookup:     0.04 ms / 0.0 ms
---   delete one user, no user-led index:                    4.1 ms / 7 ms
---   delete one user + idx_user_unique_attributes_user:     0.2 ms / 1 ms
+--   unique attribute lookup, correlated EXISTS, no index:     0.1 ms / > 100 s
+--   registry-first join + idx_user_unique_attributes_lookup:  0.03 ms / < 0.1 ms
+--   delete one user, no user-led index:                       4.1 ms / 7 ms
+--   delete one user + idx_user_unique_attributes_user:        0.2 ms / 1 ms
 --
 -- CONCURRENTLY, as in 000019, so no build blocks user creation or token
 -- writes. Postgres refuses CONCURRENTLY on the partitioned registry, so each

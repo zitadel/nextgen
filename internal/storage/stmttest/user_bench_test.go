@@ -19,7 +19,11 @@ const benchUsers = 10_000
 
 // Times the identifier lookup and a user delete in a project of benchUsers
 // users, each holding a token (#2377). Evidence for the indexes, not a gate:
-// the SQLite plan test in the dialect package is the regression check.
+// the SQLite plan test in the dialect package is the regression check. On
+// Postgres the lookup runs before the seeded rows are analyzed, so it starts
+// from users and is slower than with statistics. A project that gains users
+// quickly in an analyzed table has the same window until its project_id
+// reaches the column statistics.
 func BenchmarkUserStatements_10kUsers(b *testing.B) {
 	for _, d := range dialects {
 		b.Run(d.name, func(b *testing.B) {
@@ -55,13 +59,17 @@ func BenchmarkUserStatements_10kUsers(b *testing.B) {
 			}
 
 			b.Run("lookup", func(b *testing.B) {
-				projectFilter := database.Equal(database.Col(domain.UserFieldProjectID), project.ID)
+				// The identifier step's filter, as GetByAttributes builds it.
+				loginFilter := database.And(
+					database.Equal(database.Col(domain.UserFieldProjectID), project.ID),
+					database.Or(database.Equal(database.Col(domain.UserFieldSchemaURL), schemaURL)),
+				)
 				opts := service.UserQueryOptions{
 					Attributes:           []domain.Attribute{{Key: "email", Value: "usr-bench-05000@example.com"}},
 					UniqueAttributesOnly: true,
 				}
 				for b.Loop() {
-					_, err := d.stmts.GetUser(ctx, projectFilter, opts)
+					_, err := d.stmts.GetUser(ctx, loginFilter, opts)
 					require.NoError(b, err)
 				}
 			})
