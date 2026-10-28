@@ -3,7 +3,9 @@ import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { packPublicPackages } from "../../../scripts/release-artifacts.mjs";
+// @boundaries-ignore root scripts/ belongs to the workspace root, which no package can depend on
 import { PUBLIC_RELEASE_PACKAGES } from "../../../scripts/release-manifest.mjs";
 
 const execFileAsync = promisify(execFile);
