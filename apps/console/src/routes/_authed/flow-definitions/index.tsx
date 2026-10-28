@@ -5,7 +5,6 @@ import { api } from "@/api/zitadel";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
@@ -139,7 +138,6 @@ function FlowRowItem({ id, definition, updatedAt, schemaName, schemaId }: FlowRo
             params={{ definitionId: id }}
             className={RESOURCE_ROW_LINK}
           >
-            <Workflow aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
             {name}
           </Link>
           {/* Drafts only: the engine never selects one, and the design draws
