@@ -27,6 +27,13 @@ builds, and locally with `NEXTGEN_TASK_RUNNER=turbo`.
   `cd` to the directory the command needs. `@zitadel/cloud` (`apps/cloud`,
   the hosted cloud's launcher and schemas) has no moon project: its `dev` is
   moon's `workspace:cloud`.
+- A script does its own task's work only. A step that is a task of its own,
+  such as the package's `generate` or another package's `build`, is a
+  `dependsOn` edge here and a `deps` entry in `moon.yml`, never `a && b` in
+  the script: chained, it reruns on every run, and neither runner can cache,
+  order or skip it. So the docs' `build` and `dev` are plain `next build` and
+  `next dev`. A release build that cleans and rebuilds its own `dist`
+  (`build-release`) is still one task's work.
 - Task names are script names: `dev:real`, `test:integration` and
   `sync:export` keep their colons. The e2e lanes are `@zitadel/e2e`'s
   `console-smoke`, `console-real`, `console-embedded`, `console-platform`,
