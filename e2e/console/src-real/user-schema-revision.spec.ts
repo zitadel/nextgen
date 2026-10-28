@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { createSchemaFromSeed, withErrorBody } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
@@ -21,19 +21,11 @@ test("opens a user's URI schema revision from the user detail screen", async ({
   zitadel,
   seed,
 }) => {
-  const { projectId, schemaId: seededSchemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(seededSchemaId);
+  const { projectId } = zitadel.handle;
   const suffix = randomUUID();
   const title = `Revision ${suffix}`;
   const uri = `https://e2e.test/schemas/${suffix}.json`;
-  // Its own `objectType`: sharing the seeded one would make this schema the
-  // newest revision of it, the one other specs' Add user drawers pick from.
-  const schema = await withErrorBody(
-    zitadel.api.createSchema(
-      { ...template, $id: uri, title, objectType: `e2e-revision-${suffix}` },
-      { project_id: projectId },
-    ),
-  );
+  const schema = await createSchemaFromSeed(zitadel, { $id: uri, title });
   expect(schema.id).toBe(uri);
   const email = seed.identity().email;
   await withErrorBody(

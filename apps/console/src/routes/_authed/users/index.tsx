@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { Box, MoreVertical, Plus, User } from "lucide-react";
 import {
   Fragment,
@@ -17,19 +17,18 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_HEADER,
   RESOURCE_STICKY_BODY,
   RESOURCE_STICKY_END,
   RESOURCE_STICKY_START,
   RESOURCE_TABLE_SCROLL,
   RESOURCE_TABLE_TOP,
   RESOURCE_TABLE_WRAP,
-  RESOURCE_TITLE,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
   ResourceMenuHead,
   ResourceRow,
+  ResourceTitle,
   RowMenu,
 } from "@/components/resource-list";
 import { StatusBadge } from "@/components/status-badge";
@@ -65,6 +64,8 @@ import {
   columnsBeyondIdentity,
   columnsForUsers,
   fetchUsers,
+  latestRevisionId,
+  lineageDocuments,
   pinnedColumns,
   readColumnPins,
   toUserRow,
@@ -93,15 +94,29 @@ export const Route = createFileRoute("/_authed/users/")({
     const projectId = requireProjectScope(deps.project);
     // The lineages are the filter's options and name the newest revision a
     // `latest` or `older` criterion compares with. They are chrome: unreadable,
-    // the list still renders, narrowed by object type alone.
-    const lineages = await fetchSchemaLineages(projectId).catch(() => []);
-    const filter = userFilter(deps, lineages);
-    const page = await fetchUsers(projectId, undefined, true, filter);
+    // the list still renders, narrowed by whatever the URL can still express.
+    // `in_use` is asked for only once a schema is chosen, where the revision
+    // menu shows it.
+    const reading = fetchSchemaLineages(projectId, { inUse: Boolean(deps.schema) }).catch(() => []);
+    const needsLatest = deps.revision === "latest" || deps.revision === "older";
+    // Only those two criteria wait for the lineages; the users read runs beside
+    // the lineage read otherwise.
+    const lineagesFirst = needsLatest ? await reading : [];
+    if (needsLatest && !latestRevisionId(lineagesFirst, deps.schema)) {
+      // The URL asks for a comparison nobody can make. Dropping it from the URL
+      // keeps the list from claiming a narrower filter than it sends.
+      throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
+    }
+    const filter = userFilter(deps, lineagesFirst);
+    const [page, lineages] = await Promise.all([
+      fetchUsers(projectId, undefined, true, filter),
+      reading,
+    ]);
     return {
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users),
+      columns: await columnsForUsers(projectId, page.users, lineageDocuments(lineages)),
       lineages,
       filter,
     };
@@ -140,7 +155,11 @@ function UsersScreen() {
         nextPageToken: page.next_page_token ?? undefined,
         // A later page can carry a schema the first page never referenced, whose
         // properties the Columns menu would otherwise not offer.
-        columns: await columnsForUsers(projectId, [...users, ...page.users]),
+        columns: await columnsForUsers(
+          projectId,
+          [...users, ...page.users],
+          lineageDocuments(loaded.lineages),
+        ),
         teamsExpanded: page.teamsExpanded,
       };
     },
@@ -198,14 +217,10 @@ function UsersScreen() {
   return (
     <Page>
       {/* No search beside the title: it is out of the page headers until there
-          is a console-wide solution (D19). The title row is composed here
-          rather than through `ResourceTitle`: the filter sits beside Add, 8px
-          apart as the design draws it, and on a phone drops to its own row
-          under the title while Add keeps the title row (D19). */}
-      <div className={`${RESOURCE_HEADER} flex min-h-9 flex-wrap items-center gap-x-2 gap-y-4`}>
-        <h1 className={RESOURCE_TITLE}>Users</h1>
-        {loaded.lineages.length > 0 && (
-          <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+          is a console-wide solution (D19). */}
+      <ResourceTitle
+        filter={
+          loaded.lineages.length > 0 && (
             <UsersFilter
               lineages={loaded.lineages}
               search={search}
@@ -215,9 +230,9 @@ function UsersScreen() {
                 })
               }
             />
-          </div>
-        )}
-        <div className="order-2 ml-auto sm:order-3 sm:ml-0">
+          )
+        }
+        action={
           <AddUserSheet onCreated={() => router.invalidate()}>
             {/* `px-2.5!` — `Button`'s `has-[>svg]:px-3` out-specifies a plain
                 `px-2.5`, which renders the 68px control at 72px. */}
@@ -226,8 +241,10 @@ function UsersScreen() {
               Add
             </Button>
           </AddUserSheet>
-        </div>
-      </div>
+        }
+      >
+        Users
+      </ResourceTitle>
 
       {/* The pinned columns give the table no fixed width. The ID gives way
           first; more pinned columns than fit scroll the table horizontally

@@ -21,18 +21,30 @@ export interface SchemaEntry {
   createdAt: string;
 }
 
-/** Every user schema in the project, at its latest revision. */
-export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
-  const entries = await readAllPages(async (pageToken) => {
+/**
+ * Every page of the project's user schemas, at every revision or the latest
+ * only, optionally with whether each is in use.
+ */
+function listUserSchemas(
+  projectId: string,
+  options: { revisions: "latest" | "all"; inUse?: boolean },
+) {
+  return readAllPages(async (pageToken) => {
     const page = await api.listSchemas({
       project_id: projectId,
       kind: "user-schema",
-      revisions: "latest",
+      revisions: options.revisions,
+      ...(options.inUse ? { expand: ["in_use" as const] } : {}),
       limit: 100,
       page_token: pageToken,
     });
     return { items: page.schemas, next: page.next_page_token };
   });
+}
+
+/** Every user schema in the project, at its latest revision. */
+export async function fetchAllSchemas(projectId: string): Promise<SchemaEntry[]> {
+  const entries = await listUserSchemas(projectId, { revisions: "latest" });
   return entries.map((entry) => ({
     id: entry.id,
     schema: entry.schema as UserSchema,
@@ -428,7 +440,8 @@ function propertyPlaceholder(property: Record<string, unknown>): string | undefi
 interface SchemaRevisionRef {
   id: string;
   createdAt: string;
-  /** Whether any user of the project is on it; absent when the read could not say. */
+  schema: UserSchema;
+  /** Whether any user of the project is on it; absent when not asked or refused. */
   inUse?: boolean;
 }
 
@@ -443,30 +456,24 @@ export interface SchemaLineage {
 
 /**
  * The project's user schemas grouped by object type, each with its revisions
- * newest first and whether any user is on each one (`expand=in_use`). A
+ * in the server's order, newest first (created at, then id, descending). The
+ * server calls a revision latest when none of its type was created after it,
+ * so the first row is one the server calls latest. `inUse` also asks whether any user is on each revision
+ * (`expand=in_use`), which needs read on the whole project and a count per
+ * revision; if that read is refused or fails, the plain list stands in. A
  * schema stored without an object type has no lineage to filter by and is
- * left out. The expansion needs read on the whole project; refused, the
- * lineages come back without it rather than not at all.
+ * left out.
  */
-export async function fetchSchemaLineages(projectId: string): Promise<SchemaLineage[]> {
-  const list = (expand: boolean) =>
-    readAllPages(async (pageToken) => {
-      const page = await api.listSchemas({
-        project_id: projectId,
-        kind: "user-schema",
-        revisions: "all",
-        ...(expand ? { expand: ["in_use" as const] } : {}),
-        limit: 100,
-        page_token: pageToken,
-      });
-      return { items: page.schemas, next: page.next_page_token };
-    });
-  let entries: Awaited<ReturnType<typeof list>>;
+export async function fetchSchemaLineages(
+  projectId: string,
+  { inUse = false }: { inUse?: boolean } = {},
+): Promise<SchemaLineage[]> {
+  let entries: Awaited<ReturnType<typeof listUserSchemas>>;
   try {
-    entries = await list(true);
+    entries = await listUserSchemas(projectId, { revisions: "all", inUse });
   } catch (cause) {
-    if (!(cause instanceof ApiError) || cause.status !== 403) throw cause;
-    entries = await list(false);
+    if (!inUse || !(cause instanceof ApiError)) throw cause;
+    entries = await listUserSchemas(projectId, { revisions: "all" });
   }
   const lineages = new Map<string, SchemaLineage>();
   for (const entry of entries) {
@@ -476,6 +483,7 @@ export async function fetchSchemaLineages(projectId: string): Promise<SchemaLine
     const revision: SchemaRevisionRef = {
       id: entry.id,
       createdAt: entry.metadata.created_at,
+      schema,
       inUse: entry.metadata.in_use,
     };
     const lineage = lineages.get(objectType);

@@ -1385,6 +1385,43 @@ describe("users screen", () => {
     expect(screen.queryByRole("combobox", { name: "Filter by revision" })).not.toBeInTheDocument();
   });
 
+  it("drops a latest or older filter the URL carries when the newest revision is unknown", async () => {
+    // `older` compares with the newest revision's id. With the lineages
+    // unreadable there is none to compare with, and a list that quietly widened
+    // under the same URL would claim a filter it does not send; the URL loses
+    // the revision instead, and keeps the schema it can still narrow by.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+    const bodies = recordQueries(() => HttpResponse.json({ users: [] }));
+    const router = await renderUsers(`${scopedPath("/users")}&schema=business&revision=older`);
+
+    await screen.findByRole("table");
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.search).toEqual({
+        project: "proj_test",
+        schema: "business",
+      }),
+    );
+    expect(bodies.at(-1)).toMatchObject({
+      filter: [{ field: "schema_object_type", operation: "equals", value: "business" }],
+    });
+  });
+
+  it("names an object type the URL carries that no schema has", async () => {
+    // A link kept after its schema was deleted still narrows the list; the
+    // trigger says so rather than going blank for want of a matching option.
+    serveLineage();
+    recordQueries(() => HttpResponse.json({ users: [] }));
+    await renderUsers(`${scopedPath("/users")}&schema=ghost`);
+
+    await screen.findByRole("table");
+    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent("ghost");
+    expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
+  });
+
   it("filters by one revision from the URL, with the list left when the lineages cannot be read", async () => {
     // The lineages are chrome: unreadable, the filter leaves the title row and
     // the list still narrows by what the URL carries.

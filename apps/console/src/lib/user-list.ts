@@ -76,19 +76,35 @@ export interface UsersSearch {
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
+/** The newest revision's id of the schema with this object type, if the lineages hold it. */
+export function latestRevisionId(
+  lineages: SchemaLineage[],
+  objectType: string | undefined,
+): string | undefined {
+  return lineages.find((lineage) => lineage.objectType === objectType)?.revisions[0]?.id;
+}
+
+/** The documents the lineages carry, keyed by revision id. */
+export function lineageDocuments(lineages: SchemaLineage[]): Map<string, UserSchema> {
+  return new Map(
+    lineages.flatMap((lineage) =>
+      lineage.revisions.map((revision) => [revision.id, revision.schema] as const),
+    ),
+  );
+}
+
 /**
  * The server-side criteria for a search (#1669). Every revision of a schema
  * shares its `object_type`; `latest` and `older` compare the user's `schema`
- * with the newest revision's id, which the lineages supply. Without them the
- * two cannot be expressed and are left off, while the object type still
- * narrows the list.
+ * with the newest revision's id, which the lineages supply. The route sends
+ * neither without it, so a URL never claims a narrower list than it shows.
  */
 export function userFilter(search: UsersSearch, lineages: SchemaLineage[]): UserFilter {
   if (!search.schema) return [];
   const criteria: UserFilter = [
     { field: "schema_object_type", operation: "equals", value: search.schema },
   ];
-  const latest = lineages.find((lineage) => lineage.objectType === search.schema)?.revisions[0]?.id;
+  const latest = latestRevisionId(lineages, search.schema);
   if (search.revision === "latest") {
     if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
   } else if (search.revision === "older") {
@@ -149,10 +165,14 @@ export interface ColumnGroup {
 export async function columnsForUsers(
   projectId: string,
   users: Record<string, unknown>[],
+  /** Documents already in hand (the filter's lineages), read again for nobody. */
+  known: ReadonlyMap<string, UserSchema> = new Map(),
 ): Promise<ColumnGroup[]> {
   const schemaIds = [...new Set(users.map((user) => field(user, "schema")).filter(isPresent))];
   const fetched = await Promise.all(
     schemaIds.map(async (id) => {
+      const held = known.get(id);
+      if (held) return held;
       try {
         return (await api.getSchemaById(id, { project_id: projectId })).schema as UserSchema;
       } catch {

@@ -62,11 +62,35 @@ export const RESOURCE_TITLE = PAGE_TITLE;
  * its primary action beside it at every width (D19). 36px tall with or without
  * the button (`PAGE_TITLE_ROW`).
  */
-export function ResourceTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+export function ResourceTitle({
+  children,
+  action,
+  filter,
+}: {
+  children: ReactNode;
+  action?: ReactNode;
+  /**
+   * Controls that narrow the list, beside the action and 8px from it. On a
+   * phone they drop to their own row under the title while the action keeps
+   * the title row (D19).
+   */
+  filter?: ReactNode;
+}) {
+  if (!filter) {
+    return (
+      <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
+        <h1 className={RESOURCE_TITLE}>{children}</h1>
+        {action}
+      </div>
+    );
+  }
   return (
-    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
+    <div className={cn(RESOURCE_HEADER, "flex min-h-9 flex-wrap items-center gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      {action}
+      <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+        {filter}
+      </div>
+      <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
     </div>
   );
 }

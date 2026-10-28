@@ -41,7 +41,10 @@ export function UsersFilter({
       >
         <SelectTrigger aria-label="Filter by schema" className="font-medium">
           <Braces aria-hidden strokeWidth={1.5} className="text-foreground" />
-          <SelectValue />
+          {/* Named here rather than by the matching item: a URL can carry an
+              object type no lineage has (a deleted schema), and the trigger
+              must still say what the list is narrowed to. */}
+          <SelectValue>{lineage?.title ?? search.schema ?? "All schemas"}</SelectValue>
         </SelectTrigger>
         <SelectContent position="popper" align="end">
           <SelectItem value={ALL}>All schemas</SelectItem>
