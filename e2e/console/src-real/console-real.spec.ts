@@ -1,5 +1,6 @@
 import { expect, test } from "@zitadel/testing/playwright";
 
+import { withErrorBody } from "../support/api";
 import { ERROR_BOUNDARY_TITLE, NEUTRAL_MESSAGE } from "../support/copy";
 import { expectNoErrorBoundary, openAddTeam, uniqueName } from "../support/screens";
 import { completeLogin, signIn } from "../support/sign-in";
@@ -184,6 +185,13 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await page.getByRole("tab", { name: "Admins" }).click();
     await expect(page.getByRole("region", { name: "Admins" })).toBeVisible();
 
+    // The operator's own grant (the one `signIn` wrote) comes back through
+    // `GET /projects/{id}/admins` (#1462) as their row, marked as theirs: the
+    // list read resolves people and how they hold access on the server.
+    const own = page.getByRole("row").filter({ hasText: operator.email });
+    await expect(own.getByText("(you)", { exact: true })).toBeVisible();
+    await expect(own.getByText("Admin grant", { exact: true })).toBeVisible();
+
     await page.getByRole("button", { name: "Add admin", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Add admin" });
     await dialog.getByRole("textbox", { name: "Email address" }).fill(colleague.email);
@@ -224,6 +232,53 @@ test("gives a colleague admin access to the project, and takes it away", async (
     await expect(colleaguePage.getByText(ERROR_BOUNDARY_TITLE)).toBeVisible();
   } finally {
     await colleagueContext.close();
+  }
+});
+
+test("lists a team's grant as the team's own row, and revokes it from there", async ({
+  page,
+  zitadel,
+  seed,
+}) => {
+  // The admins list is people only (#1462), so a grant to a team is a row of
+  // its own from the grants read. Asserted against a real instance because
+  // which read carries the team, and that `DELETE /grants/{id}` takes the
+  // team's grant without touching the operator's own, are server behaviour.
+  const operator = await seed.user();
+  const projectId = zitadel.handle.projectId;
+  const team = await withErrorBody(
+    zitadel.api.createTeam({ name: uniqueName("granted-team") }, { project_id: projectId }),
+  );
+  try {
+    await withErrorBody(
+      zitadel.api.createGrant(
+        { team: { team_id: team.id }, relation: "admin" },
+        { project_id: projectId },
+      ),
+    );
+
+    await signIn(page, zitadel, operator);
+    await page.goto(`/projects/${projectId}`);
+    await page.getByRole("tab", { name: "Admins" }).click();
+    const row = page.getByRole("row").filter({ hasText: team.name });
+    await expect(row.getByText("Admin grant", { exact: true })).toBeVisible();
+
+    await row.getByRole("button", { name: `Actions for ${team.name}` }).click();
+    await page.getByRole("menuitem", { name: "Remove admin" }).click();
+    const confirm = page.getByRole("alertdialog");
+    // A team's grant, so the copy is about its members.
+    await expect(confirm.getByText(/Everyone in this team loses the access/)).toBeVisible();
+    await confirm.getByRole("button", { name: "Remove admin", exact: true }).click();
+
+    await expect(page.getByRole("row").filter({ hasText: team.name })).toHaveCount(0);
+    // The operator's own grant is untouched.
+    await expect(
+      page.getByRole("row").filter({ hasText: operator.email }).getByText("(you)", { exact: true }),
+    ).toBeVisible();
+    await expectNoErrorBoundary(page);
+  } finally {
+    // Leaves the instance as found: the Teams screens read the same project.
+    await zitadel.api.deleteTeam(team.id).catch(() => undefined);
   }
 });
 
