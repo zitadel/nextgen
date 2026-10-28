@@ -31,7 +31,7 @@
   // the same packages got other keys there than in the console's build and
   // were built twice per deployment. No build here reads
   // them. A negation here also applies to framework inference.
-  "globalEnv": ["!VITE_VERCEL_*"],
+  "globalEnv": ["!VITE_VERCEL_*", "CI_TURBO_TIMING_PROBE"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
     // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
