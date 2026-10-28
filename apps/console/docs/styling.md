@@ -188,6 +188,11 @@ its card below 576px rather than squeezing the cells.
 | Head label | display face, 12/16, 0.72px tracking, `foreground` |
 | Row icon | 16px, stroke 1.5, `muted-foreground`, 10px to its label |
 
+Only resource directories (Projects, Teams, Applications, Deployments,
+Sessions) lead their name cell with a row icon. Configuration directories
+(User schemas, Login flows, Branding, Authentication) show the name as text
+only.
+
 Two things are deliberately **not** shared, because the designs genuinely differ:
 
 - **Column widths.** Teams sits on a fixed 248px grid. Users and Projects

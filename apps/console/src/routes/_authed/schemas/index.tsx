@@ -6,7 +6,6 @@ import {
   LoadMore,
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
-  RESOURCE_ROW_ICON,
   RESOURCE_ROW_LINK,
   RESOURCE_TABLE_FIXED,
   RESOURCE_TABLE_TOP,
@@ -161,7 +160,6 @@ function SchemaRow({
     >
       <TableCell className={`${RESOURCE_CELL} truncate`}>
         <Link to="/schemas/$schemaId" params={{ schemaId: id }} className={RESOURCE_ROW_LINK}>
-          <Braces aria-hidden strokeWidth={1.5} className={RESOURCE_ROW_ICON} />
           {name}
         </Link>
       </TableCell>
