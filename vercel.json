@@ -103,6 +103,11 @@
       "source": "/changelog/",
       "destination": "/changelog",
       "permanent": true
+    },
+    {
+      "source": "/choose-version/",
+      "destination": "/choose-version",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -150,6 +155,12 @@
     },
     {
       "source": "/changelog",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/choose-version",
       "destination": {
         "service": "website"
       }

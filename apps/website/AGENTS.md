@@ -1,6 +1,7 @@
 # Agent Instructions — `apps/website`
 
-The hosted cloud's front page at `/` and its changelog at `/changelog`.
+The hosted cloud's front page at `/`, its changelog at `/changelog` and the
+guide to choosing it or Zitadel v4 at `/choose-version`.
 Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 - The front page says the benefit, then proves it, and nothing else: the
@@ -95,9 +96,15 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - `WEBSITE_GITHUB_TOKEN`, a token without permissions, lifts GitHub's
   rate limit on Vercel's shared addresses ([runbook](../../docs/runbooks/cloud.md)).
 
+## Choose a version
+
+- `app/choose-version/features.ts` holds every row, the guide above them
+  (`CHOOSE`) and the date shown (`UPDATED`). Change all three when a feature
+  ships or changes.
+
 ## Routing
 
-The cloud routes only `/`, `/changelog`, `/llms.txt`, `/_next/*`,
+The cloud routes only `/`, `/changelog`, `/choose-version`, `/llms.txt`, `/_next/*`,
 `/favicon.ico` and `/favicons/*` here (repo-root
 [`vercel.json`](../../vercel.json)).
 
