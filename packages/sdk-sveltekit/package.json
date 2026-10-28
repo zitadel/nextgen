@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-sveltekit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SvelteKit handle hook and helpers for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme",
   "bugs": {
@@ -56,6 +56,7 @@
     "@sveltejs/kit": "^3.0.1",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "@zitadel/vitest-config": "workspace:*",
     "svelte": "^5.57.2",
     "tsup": "catalog:",
     "typescript": "catalog:",

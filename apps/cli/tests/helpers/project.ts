@@ -4,6 +4,7 @@ import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { parseEnv, promisify } from "node:util";
 
 import { expect } from "vitest";
 
@@ -61,6 +62,16 @@ export interface DeployResult {
   readonly resources?: number;
   readonly origins?: string[];
   readonly dry_run?: boolean;
+  readonly diff?: {
+    readonly against: string | null;
+    readonly files: ReadonlyArray<{
+      readonly path: string;
+      readonly status: string;
+      readonly previous_path?: string;
+      readonly patch: string;
+    }> | null;
+    readonly note?: string;
+  };
 }
 
 export interface FlowStep {
@@ -616,9 +627,43 @@ export class ScaffoldedApp {
     return this.envelopeOf<DeployResult>(result).data;
   }
 
+  /** Deploys a preview to `url` and returns its envelope data, failing the arrange if it does not. */
+  async previewData(url: string): Promise<Record<string, unknown>> {
+    const result = await this.run(["preview", "--origin", url, "--json"]);
+    expect(result, "preview should have succeeded").toSucceed();
+    return this.envelopeOf<Record<string, unknown>>(result).data;
+  }
+
   /** `deploy --dry-run`: validates and shows the diff without writing. */
   deployDryRun(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--dry-run", "--non-interactive", "--json", ...extraArgs]);
+  }
+
+  /** The envelope data of a dry run expected to succeed (its diff). */
+  async deployDryRunData(extraArgs: string[] = []): Promise<DeployResult> {
+    const result = await this.deployDryRun(extraArgs);
+    expect(result, "deploy --dry-run should have succeeded").toSucceed();
+    return this.envelopeOf<DeployResult>(result).data;
+  }
+
+  /**
+   * Commits the whole app to git, making it a repository the first time, as a
+   * developer does before they deploy: a deploy records the commit it was built
+   * from, and the next one diffs `.zitadel/` against it.
+   */
+  async commit(): Promise<void> {
+    const git = (args: string[]) => promisify(execFile)("git", args, { cwd: this.path });
+    await git(["init", "-q"]);
+    await git(["add", "-A"]);
+    await git([
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-qm",
+      "wip",
+    ]);
   }
 
   /** `deploy` without `--json`, for a spec asserting what the developer reads. */
@@ -1037,6 +1082,28 @@ export class ScaffoldedApp {
     );
   }
 
+  /**
+   * The values setup bound the development environment to — its file, then the
+   * project secret for anything the file leaves out — for binding another
+   * environment to the same project.
+   */
+  async developmentValues(): Promise<Record<string, string>> {
+    const file = parseEnv(await readFile(join(this.path, ".env.development.local"), "utf8"));
+    const secret = JSON.parse(await readFile(join(this.path, ".zitadel/secret"), "utf8")) as {
+      project_id: string;
+      project_secret: string;
+      preview_secret: string;
+    };
+    return {
+      ZITADEL_PROJECT_ID: secret.project_id,
+      ZITADEL_PROJECT_SECRET: secret.project_secret,
+      ZITADEL_PREVIEW_TOKEN: secret.preview_secret,
+      ...Object.fromEntries(
+        Object.entries(file).filter((entry): entry is [string, string] => entry[1] !== undefined),
+      ),
+    };
+  }
+
   /** Writes `.env.<name>.local`, the file that binds an environment to a project. */
   bindEnvironment(name: string, values: Record<string, string>): Promise<void> {
     return this.writeProjectFile(`.env.${name}.local`, dotenv(values));
@@ -1341,6 +1408,15 @@ export async function aNewAppDirectory(): Promise<ScaffoldedApp> {
   const path = join(parent, "my-app");
   await mkdir(path);
   return new ScaffoldedApp(path);
+}
+
+/**
+ * A directory for setup to create a new app in that does not exist yet, under
+ * one that does: how `--cwd` names the folder a new app should live in.
+ */
+export async function aMissingAppDirectory(): Promise<ScaffoldedApp> {
+  const parent = await mkdtemp(join(tmpdir(), "zitadel-new-"));
+  return new ScaffoldedApp(join(parent, "my-app"));
 }
 
 /** An app already through `setup`, for specs about the commands after it. */

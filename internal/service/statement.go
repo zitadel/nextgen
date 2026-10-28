@@ -569,6 +569,11 @@ type UserPasswordStatements interface {
 	// the one that lands last is current. An unknown user returns
 	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
+	// UpdateUserPasswordHash replaces pw's hash with updated in place, so the
+	// password keeps its row, its created_at and its place in the history. It
+	// changes nothing when pw.EncodedHash is no longer stored: a concurrent
+	// rehash got there first.
+	UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
 	GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error)

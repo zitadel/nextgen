@@ -27,7 +27,11 @@ import {
 } from "../../lib/local-server/runtime";
 import { LocalServer } from "../../lib/local-server/server";
 import { BaseCommand, CommandGroups, type JsonEnvelope, nonBlankString } from "../../lib/oclif";
-import { environmentFlags, environmentSelectorSuffix } from "../../lib/oclif/environment-flags";
+import {
+  environmentFlags,
+  environmentSelectorSuffix,
+  projectEnvFile,
+} from "../../lib/oclif/environment-flags";
 import { createOrca } from "../../lib/orca";
 import { resolveCwd } from "../../lib/paths";
 import {
@@ -109,6 +113,7 @@ export default class Doctor extends BaseCommand {
     const { cwd, dryRun } = this.meta;
     const nearest = await readNearestRuntimeMetadata(cwd);
     const existingRuntime = nearest?.runtime;
+    const parentRuntimeDir = nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined;
     const runtimeBackend = resolveRuntimeBackend({
       runtime: flags.runtime,
       image: flags.image,
@@ -128,6 +133,7 @@ export default class Doctor extends BaseCommand {
             image,
             port,
             this.localServers(),
+            parentRuntimeDir,
           )
         : [];
     const hasConfig = await hasZitadelConfig(cwd);
@@ -201,7 +207,7 @@ export default class Doctor extends BaseCommand {
     ))
       ? environmentSelectorSuffix({
           cwd: cwdFlag,
-          envFile: ".env.development.local",
+          envFile: projectEnvFile(cwdFlag, ".env.development.local"),
           server: projectServer,
         })
       : bareResolves
@@ -255,7 +261,8 @@ export default class Doctor extends BaseCommand {
         port,
         this.meta.cliVersion,
         selector,
-        nearest !== undefined && nearest.dir !== cwd ? nearest.dir : undefined,
+        parentRuntimeDir,
+        cwdFlag,
       );
       // A check that failed with a typed CLI error advertises its own
       // category (e.g. the framework floor's E_UNSUPPORTED_PROJECT_SHAPE) —
@@ -293,6 +300,8 @@ export function failureAdvice(
   // state-dir — are machine checks the selector would only clutter.
   selector: EnvironmentSelector,
   runtimeDir?: string,
+  // doctor's own --cwd, carried by the `start` that gives that directory a server.
+  cwdFlag?: string,
 ): { hint: string; nextCommands: SuggestedCommand[]; suggestedArgs?: string[][] } {
   const failedNames = new Set(failed.map((check) => check.name));
 
@@ -347,19 +356,28 @@ export function failureAdvice(
     // in a parent is named explicitly. The directory comes from the file
     // system and quoting differs between POSIX shells, PowerShell and cmd.exe,
     // so a path that needs quoting leaves the strings out and the argument
-    // lists in `details.suggested_args` carry the recovery.
-    const at = runtimeDir === undefined ? [] : ["--cwd", runtimeDir];
-    const suggestedArgs = [
-      ["start", ...at],
-      ["reset", "--force", ...at],
-    ];
-    const nextCommands = portableSuggestions(suggestedArgs, cliVersion);
+    // lists in `details.suggested_args` carry the recovery. A `start` without
+    // the parent's `--cwd` gives the working directory a server of its own:
+    // `start` does not look in parents.
+    const startHere = cwdFlag === undefined ? ["start"] : ["start", "--cwd", cwdFlag];
+    const suggestedArgs =
+      runtimeDir === undefined
+        ? [["start"], ["reset", "--force"]]
+        : [["start", "--cwd", runtimeDir], startHere, ["reset", "--force", "--cwd", runtimeDir]];
+    // One list at a time, so a parent that needs quoting costs only the
+    // commands that name it, not the `start` that does not.
+    const nextCommands = suggestedArgs.flatMap((args) => portableSuggestions([args], cliVersion));
+    const quotingNote =
+      nextCommands.length < suggestedArgs.length
+        ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so the commands that name it are left out; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
+        : "";
     return {
       hint:
-        "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
-        (nextCommands.length === 0
-          ? ` The runtime is in ${runtimeDir ?? "the working directory"}, a directory that needs shell quoting, so no command is printed; run \`zitadel doctor --json\` and use details.suggested_args for the exact arguments.`
-          : ""),
+        runtimeDir === undefined
+          ? "Existing local runtime metadata was found, but the local Zitadel server is not healthy. Start it again or reset stale local data." +
+            quotingNote
+          : `This folder has no Zitadel server of its own, so doctor checked the one in the parent folder, ${runtimeDir}, and found a problem with it. ` +
+            `To keep using it, fix it or start it again. To give this folder its own server, run start here instead. Resetting deletes the local data in ${runtimeDir}, not in this folder.${quotingNote}`,
       nextCommands,
       suggestedArgs,
     };
@@ -582,6 +600,7 @@ async function runLocalRuntimeChecks(
   image: string,
   port: number,
   servers: LocalServers,
+  inheritedFrom?: string,
 ): Promise<CheckOutcome[]> {
   const managedRuntimeCheck = await checkManagedRuntimeProcesses(runtime, servers);
   if (runtimeBackend === "binary") {
@@ -604,7 +623,7 @@ async function runLocalRuntimeChecks(
       await check("port", `Port ${String(port)} is available`, () =>
         checkPortAvailability(runtime, port),
       ),
-      await checkRuntime(runtime, runtimeBackend),
+      await checkRuntime(runtime, runtimeBackend, inheritedFrom),
       managedRuntimeCheck,
     ];
   }
@@ -667,7 +686,7 @@ async function runLocalRuntimeChecks(
     await check("port", `Port ${String(port)} is available`, () =>
       checkPortAvailability(runtime, port),
     ),
-    await checkRuntime(runtime, runtimeBackend),
+    await checkRuntime(runtime, runtimeBackend, inheritedFrom),
     managedRuntimeCheck,
   ];
 }
@@ -748,6 +767,7 @@ function additionalManagedRuntimeProcesses(
 async function checkRuntime(
   runtime: { backend: RuntimeBackend; server_url: string } | undefined,
   runtimeBackend: RuntimeBackend,
+  inheritedFrom?: string,
 ): Promise<CheckOutcome> {
   return check("runtime", "Existing local runtime is healthy", async () => {
     if (!runtime) {
@@ -761,7 +781,9 @@ async function checkRuntime(
     if (!(await checkLocalServerHealth(runtime.server_url))) {
       throw new Error(`${runtime.server_url} is not ready: /readyz did not answer ok`);
     }
-    return `${runtime.server_url} is healthy`;
+    return inheritedFrom === undefined
+      ? `${runtime.server_url} is healthy`
+      : `${runtime.server_url} is healthy (server started in the parent folder ${inheritedFrom})`;
   });
 }
 

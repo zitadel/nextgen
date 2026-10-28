@@ -29,6 +29,9 @@ FROM user_passwords
 WHERE project_id = @p2 AND user_id = @p3
 THEN RETURN id`
 
+	updateUserPasswordHashStmt = `UPDATE user_passwords SET encoded_hash = @p1` +
+		` WHERE project_id = @p2 AND id = @p3 AND encoded_hash = @p4`
+
 	userPasswordColumns = `id, project_id, user_id, encoded_hash, created_at`
 
 	userPasswordQuery = `SELECT ` + userPasswordColumns + `
@@ -81,6 +84,13 @@ func (ps userPasswordStatements) SetUserPassword(ctx context.Context, pw *domain
 		pw.ID = id
 		return nil
 	})
+}
+
+// UpdateUserPasswordHash implements [service.UserPasswordStatements].
+func (ps userPasswordStatements) UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error {
+	stmt := buildStatement(updateUserPasswordHashStmt, updated, pw.ProjectID, pw.ID, pw.EncodedHash).statement()
+	_, err := ps.db.Update(ctx, stmt)
+	return wrapError(err)
 }
 
 // GetUserPassword implements [service.UserPasswordStatements].

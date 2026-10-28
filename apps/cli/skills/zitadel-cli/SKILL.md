@@ -71,7 +71,10 @@ upgrade, so upgrade the app and rerun rather than retrying.
   `--help` output is bounded too — read it in full rather than `head`-ing it, or
   you will miss flags further down.
 - **Working directory.** Add `--cwd <path>` when operating outside the current
-  working directory.
+  working directory. A relative `--env-file` path is still read from the
+  current directory, not from `--cwd` (`--cwd app --env-file app/.env.ci`):
+  Node reads `--env-file` itself before the CLI starts and exits 9 with
+  `node: <path>: not found`, and no envelope, when the file is not there.
 - **Server and project.** A command that talks to a project reads
   `ZITADEL_URL`, `ZITADEL_PROJECT_ID` and `ZITADEL_PROJECT_SECRET`, each from the
   first source that has it: `--server` (the URL only), `--env-file <path>`, the
@@ -222,12 +225,26 @@ Each invocation prints one JSON object:
   (the origins it went live on) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
+- `preview` is `deploy` for a pull-request build: it deploys the release to the
+  build's preview URLs (from the platform, or `--origin`) for `--ttl` and emits
+  `data.previews` plus `data.release_env` (the `NEXT_PUBLIC_ZITADEL_RELEASE`
+  line to pin). It uses `ZITADEL_PROJECT_SECRET` until the server accepts the narrower preview token (#1575), never the other credential, and
+  outside a preview or development build it is a no-op — even with an explicit
+  `--origin`, which selects targets but never authorizes a preview deploy. A CI
+  build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
+  skipped too. `preview list` and `preview rm <url>` read and end live previews.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
   Users keep their schema revision and attributes: a rollback does not migrate
   them back. Without `data.pointers`, a warning says the release could not be
   read.
+- `deploy --dry-run` and `deploy` emit `data.diff`, the git diff the terminal
+  shows, against the live release's commit (`diff.against`): `diff.files` holds
+  one `{path, status, previous_path?, patch}` per changed file (`status` is
+  `added`, `modified`, `deleted`, `renamed` or `copied`; `patch` is its unified
+  diff). Review it before you deploy. `files` is `[]` when nothing changed and
+  `null` when there is nothing to diff against, with `diff.note` saying why.
 - A write verb's `--dry-run` reports what it would send without calling the
   platform, so you can preview a mutation before making it.
 - `api` emits the response body as `data`, exactly as the API reference
@@ -356,8 +373,11 @@ npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive
 where it detects a framework. What `start` leaves in a directory —
 `.zitadel/local/` and the `.gitignore` line that ignores it — still counts as
 empty, so the golden path runs `setup` right after `start` in the same
-directory. Any other non-empty directory stops setup with a hint to pass
-`--force`. Pass it only for a directory whose contents may be replaced: files
+directory. A `--cwd` that does not exist yet counts as empty too: setup creates
+it with the app, and removes it again when setup fails before the app is kept.
+A `--cwd` that is a file fails with `E_VALIDATION`. Any other non-empty
+directory stops setup with a hint to pass `--force`. Pass it only for a
+directory whose contents may be replaced: files
 the new app also has, such as `package.json`, are overwritten. Without a
 terminal `setup` cannot ask which framework to scaffold, so pass `--framework`;
 the error lists the choices in `details.frameworks`. `setup --dry-run` creates
@@ -393,7 +413,11 @@ server and its port, but runs its project checks in the working directory, so ru
 it from the app. When that server is unhealthy it suggests `start` and
 `reset --force` with `--cwd` set to the directory that holds it (when that path needs
 shell quoting the commands are left out, the hint names the directory, and
-`doctor --json` returns the argument lists in `details.suggested_args` to run as they are). A
+`doctor --json` returns the argument lists in `details.suggested_args` to run as they are).
+The hint says the server is the parent's and that `reset --force` deletes the data in that
+directory, and it adds a plain `start`, which gives the working directory a server of its own
+because `start` does not look in parents; a healthy parent server is reported in the `runtime`
+check as started in the parent folder. A
 local server is healthy once its `/readyz` answers, which takes its database
 answering too: `start` waits for that, and the commands that read a server
 treat one whose database does not answer as unhealthy. `stop`,

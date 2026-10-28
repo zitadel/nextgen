@@ -8,6 +8,7 @@ import {
   addExactCommandFor,
   detectPackageManager,
   devCommandFor,
+  inDirectory,
   installCommandFor,
   type PackageManager,
 } from "../../../src/lib/package-manager";
@@ -68,6 +69,30 @@ describe("package manager commands", () => {
       expect(devCommandFor(packageManager).display).toBe(dev);
     },
   );
+
+  it("leaves a command alone for a run without --cwd", () => {
+    expect(inDirectory(devCommandFor("npm"), undefined, "/work/shop").display).toBe("npm run dev");
+  });
+
+  it.each([
+    ["npm", "npm --prefix shop run dev"],
+    ["pnpm", "pnpm --dir shop dev"],
+    ["yarn", "yarn --cwd /work/shop dev"],
+    ["bun", "bun --cwd /work/shop run dev"],
+  ] satisfies Array<[PackageManager, string]>)(
+    "runs %s's dev script in the --cwd directory from the shell's",
+    (packageManager, display) => {
+      expect(inDirectory(devCommandFor(packageManager), "shop", "/work/shop").display).toBe(
+        display,
+      );
+    },
+  );
+
+  it("quotes a directory the shell would split", () => {
+    expect(inDirectory(devCommandFor("npm"), "my shop", "/work/my shop").display).toBe(
+      "npm --prefix 'my shop' run dev",
+    );
+  });
 
   // The exact-save flag is the point: every manager's default save prefix is
   // a caret range, which would float a deliberately exact pin.

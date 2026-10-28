@@ -5,7 +5,7 @@
       "root": ".",
       "framework": "go",
       "entrypoint": "apps/cloud/launcher/main.go",
-      "buildCommand": "sh apps/cloud/build.sh",
+      "buildCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install && node_modules/.bin/turbo run deploy --filter=@zitadel/cloud",
       "functions": {
         "apps/cloud/launcher/main.go": {
           "regions": ["fra1"]
@@ -34,20 +34,20 @@
       "root": "apps/docs",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build --filter=@zitadel/api --filter=@zitadel/api-mock --filter=@zitadel/components && pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/docs"
     },
     "website": {
       "root": "apps/website",
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "turbo run build --filter=@zitadel/components && pnpm run build"
+      "buildCommand": "turbo run build --filter=@zitadel/website"
     },
     "schemas": {
       "root": "apps/cloud",
-      "installCommand": "true",
-      "buildCommand": "node ../../scripts/render-builtin-schemas.mjs",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run schemas --filter=@zitadel/cloud",
       "devCommand": "node ../../scripts/render-builtin-schemas.mjs --serve",
-      "outputDirectory": "../../dist/cloud-schemas",
+      "outputDirectory": "dist/cloud-schemas",
       "headers": [
         {
           "source": "/schemas/v1/(.*)",
@@ -140,6 +140,12 @@
     },
     {
       "source": "/changelog",
+      "destination": {
+        "service": "website"
+      }
+    },
+    {
+      "source": "/changelog/(.*)",
       "destination": {
         "service": "website"
       }
