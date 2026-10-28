@@ -17,7 +17,7 @@
 A developer, or an agent working for one, meets Zitadel's nouns before
 anything else. Three should be enough, named the way the rest of the market
 names them, and each thing a developer wants to do should be one object, or
-one config on one.
+one config on one, written in one call.
 
 Zitadel sits between two sides. On one side are the parties that rely on it:
 apps that sign users in with it, call APIs with its tokens, or receive users
@@ -26,9 +26,11 @@ in with, the directories that provision them, the CI systems that vouch for
 workloads. The model gives each side one noun, and each holds a config per
 protocol it speaks.
 
-The v4 lesson points the same way. A backend that serves an API and calls
+The v4 lessons point the same way. A backend that serves an API and calls
 other APIs ended up as two apps and a machine user, each with its own
-credential, and only the machine user could hold permissions.
+credential, and only the machine user could hold permissions. And every app
+took a project first, then the app in it, then its roles and keys, each a
+call that needed the id the last one returned ([One call](#one-call)).
 
 ## The model
 
@@ -214,6 +216,58 @@ GitHub Actions, deploying as the shop's `deploy` client without a secret:
 }
 ```
 
+## One call
+
+Each app and each connection is one document, and one call writes it:
+
+- **An app with every config it holds** is the body of `POST /apps`, which
+  creates the app or revises it by slug
+  ([ADR 082 §3](../../adrs/082-oauth-and-oidc-server.md#3-apps)). No
+  container comes first, as v4's project did, and a client, an API or a SAML
+  config is a field of the document, not a call of its own. Only clients that
+  register themselves arrive on their own.
+- **A connection with its configs and mappings** is one document too, so
+  Acme's Entra above signs users in and provisions them from one write.
+- **Documents name each other by slug**, as the GitHub Actions connection
+  names `shop/deploy`, so no call waits for an id that another returned.
+- **A release ships them together.** Declared apps and connections are files
+  in `.zitadel/`, and one `POST /releases/build` creates or revises them all
+  in one transaction
+  ([ADR 035](../../adrs/035-configuration-environments.md)), as it does for
+  connections today: a project's setup lands whole or not at all.
+- **The answer says what comes next**: each client's id, the issuer, and a
+  registered client's secret, shown once.
+
+**The console filters instead of adding nouns.** Apps hold many kinds of
+configs, so the console gives the common ones lists of their own: apps with
+a principal client, apps that delegate, APIs and MCP servers, SAML and SCIM
+configs, third parties that registered. Each list is a filter over apps, in
+the grammar the API and the CLI share
+([ADR 064 §11](../../adrs/064-cli-resource-commands.md#11-one-filter-grammar-whatever-the-transport)),
+so an agent finds the same apps, and every config is edited in the app that
+holds it.
+
+**The CLI makes the common case one command:**
+
+```bash
+zitadel app create shop --preset web --redirect-uri https://shop.example.com/callback
+zitadel app create repricer --preset service-account --role catalog.write
+```
+
+- A preset fills the document for a common shape: a web app, a SPA, a mobile
+  app, a backend with an API, a service account, an agent. Nobody picks grant
+  types or authentication methods, and `--file` takes a whole document
+  instead. The presets ship beside the JSON Schemas, so the console offers
+  the same ones and an agent can start from them.
+- A command writes every file its task needs. `app create` turns the
+  project's issuer on in `.zitadel/oauth.json` when it is off
+  ([ADR 081 §7](../../adrs/081-customer-hosted-login-and-oidc-provider.md#7-what-the-scaffold-reserves)),
+  and says so: no project step comes first. `auth-method sso enable` already
+  writes a whole connection this way.
+- It asks only for what it cannot default, such as a redirect URI, and its
+  `--json` envelope carries the client ids, the issuer and the
+  `next_commands`.
+
 ## Names
 
 | Name | Means | Instead of | Why |
@@ -238,6 +292,7 @@ Measured against what the repo has today:
 | #2430 | Machines are users of a `service` or `agent` kind; a client is owned by an app, an identity or both; client methods sit in `x-auth-methods` | Machines are apps; every client belongs to an app and can be a principal itself; client methods move to the client, and `x-auth-methods` keeps sign-in methods. Its secret format, hashing and PAT design carry over; its client table loses the identity column |
 | IdP connections | Project-level, OIDC only, one `protocol` block per connection | A connection holds several configs (OIDC, OAuth, WIF, SAML, SCIM) and the mappings between them |
 | ADR 082 | `Service` app kind; APIs are separate files; registered clients belong to the project; token exchange later | Any confidential client can be a principal; APIs are an app's config, still one audience per token; registered clients join an app; token exchange moves up for delegation, impersonation and WIF |
+| CLI | ADR 082 §12: `oauth enable`, `apps create` and `apis create`, each writing a file | `app create` writes an app with its clients and APIs from a preset, and turns the issuer on if it is off |
 | v4 import | — | v4 projects become apps; v4 apps become clients, SAML configs or APIs; v4 machine users become apps with a principal client |
 
 Clients become a sub-resource of their app, so a declared app and the clients
@@ -268,6 +323,9 @@ consents stay per user, client and scope.
    a user: Entra pairs an agent with a user account, one to one. Whether a
    connection maps such an agent to a user marked as an agent, or the app
    learns to take clients.
+9. **Presets.** Which shapes get one, and whether an app keeps the preset it
+   was made from, so the console can list agents and service accounts by
+   what they are rather than by what they hold.
 
 ## Prior art
 
