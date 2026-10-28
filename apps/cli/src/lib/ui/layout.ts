@@ -150,8 +150,11 @@ export class Prose implements Renderable {
     }
     const lead = /^\s*/.exec(line)?.[0] ?? "";
     const item = /^(\[\w+\]|\$|-|\d+\.) /.test(line.trimStart()) ? "  " : "";
-    // A line indented further than the width would otherwise ask for a
-    // negative one, which wraps every word onto its own line.
+    // A line indented further than the width it is folded to asks for a
+    // negative one. `wrap-ansi` happens to read that as one column today,
+    // which is not something it promises, so it is clamped here instead.
+    // Either way such a line folds a word to a line; there is nothing better
+    // to do with an indent wider than the terminal.
     return wrapAnsi(line.trimStart(), Math.max(1, this.width - lead.length - item.length))
       .split("\n")
       .map((part, index) => (index === 0 ? lead : lead + item) + part)
@@ -191,6 +194,12 @@ export class Facts implements Renderable {
  * arguments. A space inside quotes is not one of them, because `\` before a
  * newline is literal inside single quotes, so breaking there would change the
  * argument rather than continue the command.
+ *
+ * A quote only opens one where something closes it. An apostrophe reaches here
+ * on its own — a sentence that names a command carries the words after it into
+ * the command (`nextSteps`), and `the app's config` is one quote — and reading
+ * it as an opening quote left the whole rest of the line unbreakable and widened
+ * the box for it.
  */
 const argumentBreaks = (command: string): number[] => {
   const at: number[] = [];
@@ -198,7 +207,7 @@ const argumentBreaks = (command: string): number[] => {
   for (const [index, character] of [...command].entries()) {
     if (quote !== undefined) {
       quote = character === quote ? undefined : quote;
-    } else if (character === "'" || character === '"') {
+    } else if ((character === "'" || character === '"') && command.includes(character, index + 1)) {
       quote = character;
     } else if (character === " ") {
       at.push(index);

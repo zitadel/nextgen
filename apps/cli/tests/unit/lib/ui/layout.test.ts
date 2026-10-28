@@ -30,9 +30,16 @@ const inside = (box: string): string[] =>
     })
     .filter((line) => line !== "");
 
-/** What a shell makes of the lines a command was written over. */
-const pasted = (lines: readonly string[]): string =>
-  lines.join("\n").replaceAll("\\\n", "").replace(/ +/g, " ").trim();
+/**
+ * What a shell makes of the lines a command was written over: it removes
+ * `\`-newline and nothing else. A break taken between arguments carries the
+ * indent, which the shell sees as more space between two arguments that were
+ * already separate, so the indent goes with the join; a break taken inside
+ * an argument has no indent to drop. Nothing else is collapsed, so a
+ * character lost or gained anywhere shows up here.
+ */
+const pasted = (lines: readonly string[], lead = ""): string =>
+  lines.join("\n").replaceAll(` \\\n${lead}`, " ").replaceAll("\\\n", "").slice(lead.length);
 
 describe("Prose", () => {
   it("leaves a line that already fits", () => {
@@ -117,6 +124,15 @@ describe("Prose", () => {
     expect(new Prose(row, 30, false).render()).not.toContain(COLUMN_MARK);
   });
 
+  it("folds a line indented further than the width it is given", () => {
+    const line = `${" ".repeat(40)}${"word ".repeat(6).trim()}`;
+
+    const folded = new Prose(line, 30, false).render().split("\n");
+
+    expect(folded.length).toBeGreaterThan(1);
+    expect(folded.every((part) => part.trim() !== "")).toBe(true);
+  });
+
   it("folds a marked row when the caller says there are no columns", () => {
     const row = columnRow(`value  ${"x".repeat(120)}`);
 
@@ -150,11 +166,44 @@ describe("wrapCommand", () => {
   });
 
   // `\` before a newline is literal inside single quotes, so breaking there
-  // would change the argument rather than continue the command.
+  // would change the argument rather than continue the command. The width is
+  // chosen so the only break that fits is the one inside the quotes: without
+  // quote-awareness this breaks after `the`.
   it("never breaks inside a quoted argument", () => {
-    const lines = wrapCommand("npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server x", 40);
+    const lines = wrapCommand(
+      "zitadel release create -m 'fixed the login redirect loop today' --yes",
+      40,
+      "  ",
+    );
 
-    expect(lines.every((line) => !/'<what$|^changed>'/.test(line))).toBe(true);
+    expect(lines).toEqual([
+      "  zitadel release create -m \\",
+      "  'fixed the login redirect loop today' --yes",
+    ]);
+  });
+
+  it("never breaks inside a double-quoted argument either", () => {
+    const lines = wrapCommand('zitadel x --note "a double quoted phrase here" --yes', 30);
+
+    expect(lines).toEqual(["zitadel x --note \\", '"a double quoted phrase here" --yes']);
+  });
+
+  it("pastes back as itself with a quoted argument in it", () => {
+    const command = "zitadel release create -m 'fixed the login redirect loop today' --yes";
+
+    expect(pasted(wrapCommand(command, 40))).toBe(command);
+  });
+
+  // An apostrophe reaches a command on its own: a sentence that names one
+  // carries the words after it into it, so `the app's config` is one quote.
+  // Read as an opening quote it left everything after it unbreakable.
+  it("breaks a command that holds an apostrophe, not a quoted argument", () => {
+    const lines = wrapCommand(
+      "npx @zitadel/cli@0.1.0 deploy to update the app's own production configuration",
+      30,
+    );
+
+    expect(lines.every((line) => line.length <= 30)).toBe(true);
   });
 
   // A `\` inside a token does not survive being copied: a split URL stops
@@ -183,7 +232,7 @@ describe("wrapCommand", () => {
   it("pastes back as the command it was", () => {
     const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9 ${"-".repeat(90)}`;
 
-    expect(pasted(wrapCommand(command, 40, "  "))).toBe(command);
+    expect(pasted(wrapCommand(command, 40, "  "), "  ")).toBe(command);
   });
 });
 
@@ -295,7 +344,12 @@ describe("Frame", () => {
     const command = `npx @zitadel/cli@0.1.0 deploy -m '<what changed>' --server http://localhost:9`;
     const box = new Frame("Summary", [], [{ text: "Run next:", command }]).render();
 
-    expect(pasted(inside(box).filter((line) => line.trim() !== "Run next:"))).toBe(command);
+    expect(
+      pasted(
+        inside(box).filter((line) => line.trim() !== "Run next:"),
+        "  ",
+      ),
+    ).toBe(command);
   });
 
   it("puts each command on its own line under the sentence that asks for it", () => {
