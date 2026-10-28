@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 import { appendFileSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectRun } from "./dev-process.mjs";
-import { moonTargetOf, taskRunner } from "./task-runner.mjs";
 
 // Decides what the ci workflow runs, in three layers:
 //
@@ -118,18 +116,16 @@ const GO_TEST_TARGETS = [
 const TESTING_DEMO_TARGETS = ["testing:test-integration", "e2e:demo-next-real"];
 // Both real-instance console lanes: the dev-proxy suite and the embedded
 // suite (binary-served /ui/* + API at one origin). Either being affected
-// runs the console gate, which ci-turbo.yml's console steps read; ci.yml runs
-// both through e2e:all.
+// turns the console gate on; ci.yml runs both through e2e:all.
 const CONSOLE_E2E_TARGETS = ["e2e:console-real", "e2e:console-embedded"];
 // The lanes that need no backend: the console's preview smoke and the demos
-// against api-mock. ci-turbo.yml runs them in one step; moon runs them as part
-// of e2e:all.
+// against api-mock. Moon runs them as part of e2e:all.
 const MOCK_E2E_TARGETS = ["e2e:console-smoke", "e2e:demo-next-mock", "e2e:demo-nuxt-mock"];
 // The aggregate ci.yml runs in its own e2e step (`moon exec e2e:all`) when the
 // `e2e` gate is on: moon counts it affected whenever any lane is, and running it
 // runs every lane as its dependency, the journey included, whether or not a
 // journey trigger above moved (an api-mock change reaches it through the mock
-// lanes). ci-turbo.yml gates its lane steps one by one and ignores this gate.
+// lanes).
 const E2E_SUITE_TARGET = "e2e:all";
 
 const ALL_GATES = [
@@ -234,22 +230,10 @@ export function resolveGates({ mode, files, targets }) {
 }
 
 /**
- * The affected task set as moon `project:task` targets, from whichever task
- * runner is selected (scripts/task-runner.mjs): moon's own affected query, or
- * the same walk over turbo's task graph. `files` is the diff, which only the
- * turbo form needs. Returns null when the query failed — which fails open.
+ * The affected task set as moon `project:task` targets. Returns null when the
+ * query failed — which fails open.
  */
-export function queryAffectedTargets(
-  base,
-  spawn = spawnSync,
-  { runner = taskRunner(), files = [] } = {},
-) {
-  return runner === "turbo"
-    ? queryTurboAffectedTargets(files, spawn)
-    : queryMoonAffectedTargets(base, spawn);
-}
-
-function queryMoonAffectedTargets(base, spawn) {
+export function queryAffectedTargets(base, spawn = spawnSync) {
   // Asked as a local run would be. In CI, moon drops a task that does not run
   // there (`runInCI: false` or "skip") from the affected set when its own
   // inputs changed, yet the gates exist for exactly such tasks: the e2e lanes
@@ -283,120 +267,6 @@ function queryMoonAffectedTargets(base, spawn) {
     );
   } catch {
     console.error(`# moon query returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
-    return null;
-  }
-}
-
-// Every non-persistent task name in turbo.json: a `--dry=json` over all of
-// them is the whole task graph, with each task's hashed inputs and dependents.
-const TURBO_GRAPH_TASKS = [
-  "lint",
-  "typecheck",
-  "build",
-  "test",
-  "build-release",
-  "install-browsers",
-  "generate",
-  "sync-schemas",
-  "sync",
-  "sync:export",
-  "readme",
-  "format",
-  "vet",
-  "openapi",
-  "check-generate",
-  "check-generate-pruned",
-  "clean-generated",
-  "test-postgres",
-  "test-sqlite",
-  "test-spanner",
-  "test:integration",
-  "e2e",
-  "e2e-local",
-  "console-smoke",
-  "console-real",
-  "console-embedded",
-  "console-platform",
-  "console-deployment",
-  "demo-next-mock",
-  "demo-next-real",
-  "demo-nuxt-mock",
-  "journey",
-  "journey-local",
-  "changesets",
-  "check-graph",
-  "build-public-packages",
-  "version",
-  "pack",
-  "snapshot",
-  "publish",
-  "sweep",
-  "summarize",
-  "check-adrs",
-  "check-moon-graph",
-  "check-typecheck",
-  "check-openapi-rules",
-  "doctor",
-  "build-local-image",
-  "smoke-container",
-  "check",
-];
-
-/**
- * moon's `--affected --downstream deep` over turbo's graph: the tasks whose
- * hashed inputs include a changed file are the roots, and everything that
- * depends on a root, transitively, is affected. Dependencies of a root are
- * not — `turbo query affectedTasks` lists them, but the gates key on upstream
- * builds (`api:build`), so that answer would run every lane on every change.
- * A changed global input (root manifests, the shared configs) affects every
- * task, as moon's implicitInputs do.
- */
-export function affectedTurboTargets(graph, files) {
-  if (!Array.isArray(graph?.tasks)) {
-    return null;
-  }
-  const changed = new Set(files);
-  const globalChanged = Object.keys(graph.globalCacheInputs?.files ?? {}).some((file) =>
-    changed.has(file),
-  );
-  const tasks = graph.tasks.filter((task) => task.command !== "<NONEXISTENT>");
-  const byId = new Map(tasks.map((task) => [task.taskId, task]));
-  const roots = tasks.filter(
-    (task) =>
-      globalChanged ||
-      Object.keys(task.inputs ?? {}).some((input) =>
-        changed.has(posix.normalize(posix.join(task.directory ?? "", input))),
-      ),
-  );
-  const affected = new Set();
-  const pending = roots.map((task) => task.taskId);
-  while (pending.length > 0) {
-    const id = pending.pop();
-    if (affected.has(id)) continue;
-    affected.add(id);
-    for (const dependent of byId.get(id)?.dependents ?? []) pending.push(dependent);
-  }
-  return [...affected].map((id) => {
-    const [packageName, taskName] = id.split("#");
-    return moonTargetOf(packageName, taskName);
-  });
-}
-
-function queryTurboAffectedTargets(files, spawn) {
-  const result = spawn("turbo", ["run", ...TURBO_GRAPH_TASKS, "--dry=json"], {
-    encoding: "utf8",
-    env: { ...process.env, TURBO_TELEMETRY_DISABLED: "1" },
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  if (result.status !== 0) {
-    process.stderr.write(result.stderr ?? "");
-    console.error(`# turbo dry run failed (exit ${result.status})`);
-    return null;
-  }
-  try {
-    return affectedTurboTargets(JSON.parse(result.stdout), files);
-  } catch {
-    console.error(`# turbo returned non-JSON stdout: ${String(result.stdout).slice(0, 200)}`);
     return null;
   }
 }
@@ -480,7 +350,7 @@ function main() {
   const mode = computeMode(files);
 
   const needsQuery = mode === "full" && forceFullReason(files) === null;
-  const targets = needsQuery ? queryAffectedTargets(base, spawnSync, { files }) : [];
+  const targets = needsQuery ? queryAffectedTargets(base, spawnSync) : [];
   const { gates, matrix, reason } = resolveGates({ mode, files, targets });
 
   const lines = [

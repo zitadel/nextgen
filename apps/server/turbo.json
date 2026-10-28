@@ -5,8 +5,11 @@
   // package, so every task lists its inputs: the `serverInputs` file group of
   // apps/server/moon.yml, repeated per task because turbo has no file groups.
   // Also compiled in through //go:embed or read by tests: the config defaults
-  // (incl. presets), the integration-test fixtures, the events catalog and
-  // the product analytics catalog.
+  // (incl. presets), the error page and the design tokens it inlines, the
+  // integration-test fixtures, the events catalog and the product analytics
+  // catalog. The repository-wide globs leave out the ignored trees an explicit
+  // glob would otherwise match: node_modules, in the main checkout every
+  // worktree under .claude/, and on Vercel the Go caches under .vercel/.
   // GOFLAGS and the target platform change what Go produces, so they are
   // hashed; the cache locations pass through globally (root turbo.json).
   "tasks": {
@@ -16,11 +19,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -38,11 +49,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -63,11 +82,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -75,6 +102,7 @@
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],
       "outputs": [
@@ -94,7 +122,12 @@
     // filesystem.
     "clean-generated": {
       "cache": false,
-      "inputs": ["$TURBO_ROOT$/scripts/clean-generated.mjs", "$TURBO_ROOT$/scripts/generated-outputs.mjs"]
+      "inputs": [
+        "$TURBO_ROOT$/scripts/clean-generated.mjs",
+        "$TURBO_ROOT$/scripts/generated-outputs.mjs",
+        "$TURBO_ROOT$/scripts/dev-process.mjs",
+        "$TURBO_ROOT$/scripts/task-guard.mjs"
+      ]
     },
     "check-generate": {
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -102,11 +135,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -114,6 +155,7 @@
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
@@ -129,11 +171,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -141,6 +191,7 @@
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
         "$TURBO_ROOT$/scripts/clean-generated.mjs",
         "$TURBO_ROOT$/scripts/generated-outputs.mjs"
@@ -155,11 +206,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -177,11 +236,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -189,7 +256,8 @@
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-lint.mjs",
-        "$TURBO_ROOT$/biome.json"
+        "$TURBO_ROOT$/biome.json",
+        "$TURBO_ROOT$/biome-plugins/*.grit"
       ]
     },
     // The test binary embeds the console's dist. Listed directly and not only
@@ -202,11 +270,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -221,10 +297,10 @@
     // The database lanes talk to a database whose state no hash sees, so
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
     // them. They see the Docker and test-database variables. Their inputs
-    // still matter: they decide when a change marks the lane affected
-    // (scripts/ci-mode.mjs), as the server inputs do in moon. They wait for
-    // check-generate, which rewrites api/generated, a package they compile and
-    // type-load (api/internal/erroranalysis).
+    // still matter: they decide when a change marks the lane affected, which
+    // selects it in CI (`--affected`), as the server inputs do in moon. They
+    // wait for check-generate, which rewrites api/generated, a package they
+    // compile and type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
       "dependsOn": ["check-generate", "@zitadel/console#build"],
@@ -234,17 +310,28 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
+        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
+        // Read by the cloud launcher's tests, which `./...` includes, as in test.
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/apps/cloud/build.sh"
       ]
     },
     "test-spanner": {
@@ -256,11 +343,19 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
@@ -278,22 +373,34 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
+        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
+        // Read by the cloud launcher's tests, which `./...` includes, as in test.
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/apps/cloud/build.sh"
       ]
     },
-    // The binary embeds the console's dist; the dist bytes are inputs of the
-    // build alone, so a console-only change re-links the binary without
-    // re-running the Go checks and tests.
+    // The binary embeds the console's dist, which the console#build edge
+    // hashes. Its files are not inputs: turbo hashes a run's inputs before
+    // the run starts, so the build would hash them without that run's console
+    // build and miss the cache on the next run.
     "build": {
       "dependsOn": ["check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -301,18 +408,25 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/**/*.go",
         "$TURBO_ROOT$/**/*.sql",
+        "!$TURBO_ROOT$/**/node_modules/**",
+        "!$TURBO_ROOT$/.claude/**",
+        "!$TURBO_ROOT$/.codex/**",
+        "!$TURBO_ROOT$/.cursor/**",
+        "!$TURBO_ROOT$/.agents/**",
+        "!$TURBO_ROOT$/.vercel/**",
         "$TURBO_ROOT$/go.mod",
         "$TURBO_ROOT$/go.sum",
         "$TURBO_ROOT$/api/**/*.yaml",
         "$TURBO_ROOT$/api/**/*.json",
         "$TURBO_ROOT$/packages/config/defaults/**",
+        "$TURBO_ROOT$/internal/errorpage/*",
+        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
         "$TURBO_ROOT$/internal/**/*.json",
         "$TURBO_ROOT$/docs/design/api/events-catalog.md",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/internal/staticui/**",
         "$TURBO_ROOT$/scripts/server-build.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs"
       ],

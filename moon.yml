@@ -94,6 +94,7 @@ tasks:
     inputs:
       - "scripts/ci-mode.mjs"
       - "scripts/ci-mode.test.mjs"
+      - "scripts/server-build.mjs"
       - "scripts/dev-process.mjs"
       - "scripts/dev-process.test.mjs"
       - "scripts/shims/pnpm"
@@ -107,8 +108,10 @@ tasks:
       - "scripts/render-builtin-schemas.test.mjs"
       # Read by that test: it renders every built-in schema.
       - "api/openapi/endpoints/schemas/*.json"
-      # The server's default schema namespace, which the renderer must match.
+      # The server's default schema namespace, which the renderer must match,
+      # and the defaults it reads it from.
       - "packages/config/src/defaults.ts"
+      - "packages/config/defaults/**/*"
       # The task delegates to the package `test` script and its file-existence
       # guard, so both are behavioral inputs.
       - "package.json"
