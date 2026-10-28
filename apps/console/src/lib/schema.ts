@@ -47,8 +47,8 @@ export interface SchemaRevision {
 /**
  * Every revision of one schema, newest first. Schemas are immutable, so a
  * revision is a schema of its own sharing the `objectType`; the history is the
- * list filtered to that type with `revisions: all`. The server lists newest
- * first, and the sort keeps that order should a page land out of step.
+ * list filtered to that type with `revisions: all`, in the server's order
+ * (created at, then id, descending).
  */
 export async function fetchSchemaRevisions(
   projectId: string,
@@ -65,9 +65,7 @@ export async function fetchSchemaRevisions(
     });
     return { items: page.schemas, next: page.next_page_token };
   });
-  return entries
-    .map((entry) => ({ id: entry.id, createdAt: entry.metadata.created_at }))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return entries.map((entry) => ({ id: entry.id, createdAt: entry.metadata.created_at }));
 }
 
 /** One rendered form control, derived from a single schema property. */

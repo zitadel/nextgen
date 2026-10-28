@@ -21,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate, formatDateTime } from "@/lib/date";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
+import { field } from "@/lib/record";
 import {
   type SchemaRevision,
   type UserSchema,
@@ -42,9 +43,12 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
     const schema = body.schema as UserSchema;
     // The history is keyed by the document's own `objectType`, so it is read
     // after the document. A schema stored without one is a revision of
-    // nothing, and has no history to list.
-    const objectType = typeof schema.objectType === "string" ? schema.objectType : undefined;
-    const revisions = objectType ? await fetchSchemaRevisions(projectId, objectType) : [];
+    // nothing, and has no history to list. The history is chrome: a failed
+    // read leaves the schema on screen without a picker.
+    const objectType = field(schema, "objectType");
+    const revisions = objectType
+      ? await fetchSchemaRevisions(projectId, objectType).catch(() => [])
+      : [];
     return { schema, createdAt: body.metadata.created_at, revisions };
   },
   component: SchemaDetail,
@@ -68,10 +72,11 @@ function SchemaDetail() {
   const { schemaId } = Route.useParams();
   const name = schemaDisplayName(schema, schemaId);
   const methods = schemaAuthMethods(schema);
-  const older = revisions.length > 0 && revisions[0]?.id !== schemaId;
-  const picker = revisions.length > 0 && (
-    <RevisionSelect revisions={revisions} current={schemaId} />
-  );
+  // A document the history leaves out (stored without `kind`) has no place
+  // in the picker, and is not older than a list it is not on.
+  const listed = revisions.some((revision) => revision.id === schemaId);
+  const older = listed && revisions[0]?.id !== schemaId;
+  const picker = listed && <RevisionSelect revisions={revisions} current={schemaId} />;
   const note = older && (
     <p className="text-muted-foreground text-sm">
       Not the newest revision. Users stay on the revision they were created on until they are
@@ -90,8 +95,9 @@ function SchemaDetail() {
         <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
           <span className="flex flex-wrap items-center gap-x-1">
             <span className="whitespace-nowrap">Schema ID</span>
-            <span className="flex items-center gap-1">
-              <span className="text-foreground">{schemaId}</span>
+            <span className="flex min-w-0 items-center gap-1">
+              {/* `break-all`: a URI id has no break point and must not widen the page. */}
+              <span className="text-foreground min-w-0 break-all">{schemaId}</span>
               <CopyButton value={schemaId} label="Copy Schema ID" size="inline" />
             </span>
           </span>

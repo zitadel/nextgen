@@ -66,8 +66,8 @@ export function DetailSection({
     <Card className={cn(DETAIL_CARD, className)} {...props}>
       <CardContent className="flex flex-col gap-4 px-6 py-5">
         {action ? (
-          // Wraps so a wide action (the schema page's revision picker) drops
-          // under the title on a phone instead of pushing past the card.
+          // Wraps so a wide action drops under the title instead of widening
+          // the card.
           <div className="flex flex-wrap items-center justify-between gap-4">
             {heading}
             {action}

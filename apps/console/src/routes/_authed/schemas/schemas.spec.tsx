@@ -361,7 +361,7 @@ describe("user schema detail", () => {
   });
 
   it("carries the schema id and created date under the title", async () => {
-    // The same card as Login flows: the id, copyable, beside the created date.
+    // The id, copyable, beside the created date, in one line under the title.
     serveBusiness();
     await renderAt("/schemas/sch_business");
     await screen.findByRole("heading", { name: "Business" });
@@ -411,11 +411,48 @@ describe("user schema detail", () => {
     ]);
     await userEvent.click(options[0] as HTMLElement);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/schemas/sch_business_2"));
+    await waitFor(() =>
+      expect(router.state.resolvedLocation?.pathname).toBe("/schemas/sch_business_2"),
+    );
     await waitFor(() =>
       expect(screen.getByRole("combobox", { name: "Schema revision" })).toHaveTextContent("latest"),
     );
     expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
+  });
+
+  it("offers no revision picker for a schema the history leaves out", async () => {
+    // The list reads `kind` from the document and leaves out one stored
+    // without it; `GET /schemas/{id}` does not. A schema absent from its own
+    // history is not on the picker and is not called older than it.
+    const newer = envelope("sch_business_2", BUSINESS, "2026-08-01T09:30:00Z");
+    server.use(
+      http.get(SCHEMAS_URL, () => HttpResponse.json({ schemas: [newer] })),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not the newest revision/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the schema on screen when its history cannot be read", async () => {
+    // The history is chrome around the document, not the document.
+    server.use(
+      http.get(SCHEMAS_URL, () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+      http.get(`${SCHEMAS_URL}/sch_business`, () =>
+        HttpResponse.json(envelope("sch_business", BUSINESS)),
+      ),
+    );
+    await renderAt("/schemas/sch_business");
+    await screen.findByRole("heading", { name: "Business" });
+
+    expect(screen.queryByRole("combobox", { name: "Schema revision" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Field definitions" })).toBeInTheDocument();
   });
 
   it("offers no revision picker for a schema with no object type", async () => {

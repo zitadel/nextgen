@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test } from "@zitadel/testing/playwright";
 
-import { withErrorBody } from "../support/api";
+import { createSchemaFromSeed } from "../support/api";
 import { expectNoErrorBoundary } from "../support/screens";
 import { signIn } from "../support/sign-in";
 
@@ -21,18 +21,17 @@ test("opens another revision of a schema from its detail screen", async ({
   zitadel,
   seed,
 }) => {
-  const { projectId, schemaId: seededSchemaId } = zitadel.handle;
-  const { schema: template } = await zitadel.api.getSchemaById(seededSchemaId);
   const suffix = randomUUID();
-  // Its own `objectType`: a revision of the seeded one would become the newest
-  // revision other specs' Add user drawers pick from.
+  // The same `objectType` twice: the second is a revision of the first.
   const objectType = `e2e-revisions-${suffix}`;
-  const revise = (title: string) =>
-    withErrorBody(
-      zitadel.api.createSchema({ ...template, title, objectType }, { project_id: projectId }),
-    );
-  const first = await revise(`Revisions ${suffix} first`);
-  const second = await revise(`Revisions ${suffix} second`);
+  const first = await createSchemaFromSeed(zitadel, {
+    title: `Revisions ${suffix} first`,
+    objectType,
+  });
+  const second = await createSchemaFromSeed(zitadel, {
+    title: `Revisions ${suffix} second`,
+    objectType,
+  });
 
   const actor = await seed.user();
   await signIn(page, zitadel, actor);
