@@ -402,7 +402,8 @@ func (s *GrantService) loadPrincipal(ctx context.Context, stmts AllStatements, h
 	}
 }
 
-// emitManagedGrant writes a grant-API event on the assignment's project.
+// emitManagedGrant writes a grant event on the assignment's project, for the
+// grant API and for the revokes a user delete makes.
 // Project-scoped grants have no team_id; actor home is not copied onto the row.
 func emitManagedGrant(ctx context.Context, stmts EventStatements, typ domain.EventType, a *domain.AuthzAssignment, payload any) error {
 	ev := audit.WithEntity(audit.FromContext(ctx, typ, domain.EventCategoryAdmin), "authz_assignment", a.ID)
