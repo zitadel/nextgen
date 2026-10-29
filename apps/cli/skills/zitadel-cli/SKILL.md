@@ -240,6 +240,9 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deployment get <id>` emits the deployment as the API serves it; on a
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.

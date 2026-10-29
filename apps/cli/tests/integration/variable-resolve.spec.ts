@@ -51,14 +51,17 @@ describe("variable resolve", () => {
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
-      it("says the server cannot hand back a deployment's variables yet", async () => {
+      it("resolves the variables the live deployment froze", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
         await app.deployData();
 
         const result = await app.resolveVariables();
 
-        expect(result).toFailWith("E_NETWORK");
+        expect(result).toSucceed();
+        const data = app.envelopeOf<{ items: { name: string }[] }>(result).data;
+        expect(data.items.map((item) => item.name)).toContain("HOST");
       });
 
       it("is a miss for an origin with nothing deployed", async () => {
