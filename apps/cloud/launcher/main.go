@@ -149,7 +149,7 @@ func runMigrate(extra []string) error {
 	}
 	baseDSN := os.Getenv(migratorDatabaseURLVar)
 	fmt.Fprintf(os.Stderr, "launcher: preview migrate hit a poisoned sticky schema; recreating %s\n", name)
-	if dropErr := dropDatabase(context.Background(), baseDSN, name); dropErr != nil {
+	if dropErr := dropDatabase(context.Background(), baseDSN, time.Time{}, name); dropErr != nil {
 		return fmt.Errorf("%v (also failed to drop preview database: %w)", err, dropErr)
 	}
 	args, err = prepareMigration(extra)
@@ -185,13 +185,15 @@ func runDropPreview(args []string) error {
 	}
 
 	var names []string
+	// Zero for named branches, which go whatever their stamp says.
+	var idleBefore time.Time
 	if *idleDays > 0 {
 		databases, err := listDatabases(context.Background(), dsn)
 		if err != nil {
 			return err
 		}
-		cutoff := time.Now().Add(-time.Duration(*idleDays) * 24 * time.Hour)
-		idle, undated := idlePreviewDatabases(databases, cutoff)
+		idleBefore = time.Now().Add(-time.Duration(*idleDays) * 24 * time.Hour)
+		idle, undated := idlePreviewDatabases(databases, idleBefore)
 		for _, name := range undated {
 			fmt.Fprintf(os.Stderr, "launcher: keeping preview database %s: its stamp says no deployment time\n", name)
 		}
@@ -216,7 +218,9 @@ func runDropPreview(args []string) error {
 		}
 		return nil
 	}
-	return dropDatabase(context.Background(), dsn, names...)
+	// The list above is a snapshot; the drop reads each stamp again under the
+	// lock a deployment holds while it stamps.
+	return dropDatabase(context.Background(), dsn, idleBefore, names...)
 }
 
 // idlePreview is a preview database whose last deployment is older than a
@@ -231,16 +235,13 @@ type idlePreview struct {
 // leaves, cannot be dated and is never picked; it comes back as undated.
 func idlePreviewDatabases(databases []previewDatabase, cutoff time.Time) (idle []idlePreview, undated []string) {
 	for _, db := range databases {
-		var stamp struct {
-			Branch     string    `json:"branch"`
-			DeployedAt time.Time `json:"deployed_at"`
-		}
-		if json.Unmarshal([]byte(db.stamp), &stamp) != nil || stamp.DeployedAt.IsZero() {
+		branch, deployedAt, ok := parseStamp(db.stamp)
+		if !ok {
 			undated = append(undated, db.name)
 			continue
 		}
-		if stamp.DeployedAt.Before(cutoff) {
-			idle = append(idle, idlePreview{name: db.name, branch: stamp.Branch, deployedAt: stamp.DeployedAt})
+		if deployedAt.Before(cutoff) {
+			idle = append(idle, idlePreview{name: db.name, branch: branch, deployedAt: deployedAt})
 		}
 	}
 	slices.SortFunc(idle, func(a, b idlePreview) int { return a.deployedAt.Compare(b.deployedAt) })

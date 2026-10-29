@@ -125,7 +125,8 @@ migrates through, because migrations hold a session advisory lock.
   whose stamp is older than 30 days (`launcher drop-preview --idle-days
   30`). That sweep also takes an open pull request nobody pushed to for
   30 days; its next push starts it empty. A database without a stamp's
-  deployment time is kept and logged. The branch's preview deployments
+  deployment time is kept and logged, and so is one a deployment stamps
+  while the sweep runs. The branch's preview deployments
   stay up, without a database.
   - **By hand:** run the workflow from the Actions tab. It lists what the
     sweep would drop; tick *Drop* to drop it.

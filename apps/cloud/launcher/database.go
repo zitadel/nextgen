@@ -148,6 +148,27 @@ func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, erro
 	return conn, nil
 }
 
+// previewLockClass is the first key of the session advisory lock held on a
+// preview database's name while ensurePreviewDatabase looks at and stamps it
+// and while a drop rereads its stamp and drops it: "prev" in hex. The second
+// key is the name's hashtext; two names that share one only wait for each
+// other. Advisory locks are per database, and both sides connect to the
+// preview cluster's base database through the same URL.
+const previewLockClass = 0x70726576
+
+// lockPreviewDatabase takes the lock on name for the connection's session and
+// returns what releases it. It needs the direct URL, as the migrations' own
+// lock does: a transaction pooler could hand the session's later statements
+// to another server connection.
+func lockPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string) (func(), error) {
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1::int, hashtext($2::text))", previewLockClass, name); err != nil {
+		return nil, fmt.Errorf("lock preview database %s: %w", name, err)
+	}
+	return func() {
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, hashtext($2::text))", previewLockClass, name)
+	}, nil
+}
+
 // ensurePreviewDatabase creates the preview's database unless it exists and
 // stamps it with the branch and the time of this deployment, so a cleanup can
 // later drop what no deployment touched for a while. The connecting role
@@ -155,6 +176,10 @@ func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, erro
 // createDatabase); either way it may change the database, which the
 // migrations need (they set options on it). A failed stamp is logged, not
 // fatal: it only feeds the cleanup.
+//
+// It holds the database's lock throughout, so an idle sweep either drops the
+// database before this looks (and this creates it again) or reads the new
+// stamp and keeps it.
 func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now time.Time) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -164,6 +189,11 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 		return err
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	unlock, err := lockPreviewDatabase(ctx, conn, name)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	var exists bool
 	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
@@ -201,10 +231,14 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 // every idle one, for good. Production never calls this. A failed drop does
 // not stop the others; the errors come back together.
 //
+// With a non-zero idleBefore, a database goes only if its stamp, read again
+// under the lock ensurePreviewDatabase holds, is still older than that: a
+// deployment that stamped it after the sweep listed it keeps it.
+//
 // Preview databases are often owned by adminRole (createDatabase elevates when
 // the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
 // connecting role, then once as adminRole on insufficient_privilege.
-func dropPreviewDatabases(ctx context.Context, baseDSN string, names ...string) error {
+func dropPreviewDatabases(ctx context.Context, baseDSN string, idleBefore time.Time, names ...string) error {
 	connectCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	conn, err := connectPreviewCluster(connectCtx, baseDSN)
@@ -218,24 +252,36 @@ func dropPreviewDatabases(ctx context.Context, baseDSN string, names ...string) 
 
 	var errs []error
 	for _, name := range names {
-		if err := dropPreviewDatabase(ctx, conn, name); err != nil {
+		if err := dropPreviewDatabase(ctx, conn, name, idleBefore); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func dropPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string) error {
+func dropPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string, idleBefore time.Time) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-
-	var exists bool
-	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
-		return fmt.Errorf("look up preview database %s: %w", name, err)
+	unlock, err := lockPreviewDatabase(ctx, conn, name)
+	if err != nil {
+		return err
 	}
-	if !exists {
+	defer unlock()
+
+	var stamp string
+	err = conn.QueryRow(ctx, "SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = $1", name).Scan(&stamp)
+	if errors.Is(err, pgx.ErrNoRows) {
 		fmt.Fprintf(os.Stderr, "launcher: no preview database %s to drop\n", name)
 		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("look up preview database %s: %w", name, err)
+	}
+	if !idleBefore.IsZero() {
+		if _, deployedAt, ok := parseStamp(stamp); !ok || !deployedAt.Before(idleBefore) {
+			fmt.Fprintf(os.Stderr, "launcher: keeping preview database %s: its stamp changed since the sweep listed it\n", name)
+			return nil
+		}
 	}
 	identifier := pgx.Identifier{name}.Sanitize()
 	if err := dropDatabaseAsConnectingOrAdmin(ctx, conn, identifier); err != nil {
@@ -249,6 +295,19 @@ func dropPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string) error
 // left (ensurePreviewDatabase), empty when it has none.
 type previewDatabase struct {
 	name, stamp string
+}
+
+// parseStamp reads what ensurePreviewDatabase stamped. ok is false for a
+// stamp without a deployment time, which a failed stamp leaves.
+func parseStamp(stamp string) (branch string, deployedAt time.Time, ok bool) {
+	var s struct {
+		Branch     string    `json:"branch"`
+		DeployedAt time.Time `json:"deployed_at"`
+	}
+	if json.Unmarshal([]byte(stamp), &s) != nil || s.DeployedAt.IsZero() {
+		return "", time.Time{}, false
+	}
+	return s.Branch, s.DeployedAt, true
 }
 
 // listPreviewDatabases lists the preview cluster's preview databases with

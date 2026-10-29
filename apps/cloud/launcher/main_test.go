@@ -721,7 +721,8 @@ func TestRunMigrateRecreatesPreviewOnOutOfOrder(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped []string
 	previousDrop := dropDatabase
-	dropDatabase = func(_ context.Context, _ string, names ...string) error {
+	dropDatabase = func(_ context.Context, _ string, idleBefore time.Time, names ...string) error {
+		assert.True(t, idleBefore.IsZero(), "a recreate drops whatever the stamp says")
 		dropped = append(dropped, names...)
 		return nil
 	}
@@ -754,7 +755,8 @@ func TestRunMigrateRecreatesPreviewOnDuplicateColumn(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped []string
 	previousDrop := dropDatabase
-	dropDatabase = func(_ context.Context, _ string, names ...string) error {
+	dropDatabase = func(_ context.Context, _ string, idleBefore time.Time, names ...string) error {
+		assert.True(t, idleBefore.IsZero(), "a recreate drops whatever the stamp says")
 		dropped = append(dropped, names...)
 		return nil
 	}
@@ -787,7 +789,7 @@ func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {
 	ensureCalls := stubEnsureDatabase(t)
 	var dropped int
 	previousDrop := dropDatabase
-	dropDatabase = func(context.Context, string, ...string) error {
+	dropDatabase = func(context.Context, string, time.Time, ...string) error {
 		dropped++
 		return nil
 	}
@@ -811,18 +813,20 @@ func TestRunMigrateDoesNotDropProductionOnOutOfOrder(t *testing.T) {
 	assert.Empty(t, *ensureCalls, "production creates no preview database")
 }
 
-// stubDropDatabase records what runDropPreview drops, and through which URL.
-func stubDropDatabase(t *testing.T) (dsns, dropped *[]string) {
+// stubDropDatabase records what runDropPreview drops, through which URL and
+// with which cutoff.
+func stubDropDatabase(t *testing.T) (dsns, dropped *[]string, idleBefore *[]time.Time) {
 	t.Helper()
-	dsns, dropped = new([]string), new([]string)
+	dsns, dropped, idleBefore = new([]string), new([]string), new([]time.Time)
 	previousDrop := dropDatabase
-	dropDatabase = func(_ context.Context, dsn string, names ...string) error {
+	dropDatabase = func(_ context.Context, dsn string, cutoff time.Time, names ...string) error {
 		*dsns = append(*dsns, dsn)
+		*idleBefore = append(*idleBefore, cutoff)
 		*dropped = append(*dropped, names...)
 		return nil
 	}
 	t.Cleanup(func() { dropDatabase = previousDrop })
-	return dsns, dropped
+	return dsns, dropped, idleBefore
 }
 
 // stubListDatabases makes the preview cluster hold databases.
@@ -844,7 +848,7 @@ func stamped(t *testing.T, name, ref string, deployedAt time.Time) previewDataba
 }
 
 func TestRunDropPreviewDropsTheBranchesDatabases(t *testing.T) {
-	dsns, dropped := stubDropDatabase(t)
+	dsns, dropped, idleBefore := stubDropDatabase(t)
 	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
 	require.NoError(t, runDropPreview([]string{"--", branch, "feature/other"}))
@@ -852,10 +856,11 @@ func TestRunDropPreviewDropsTheBranchesDatabases(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{previewName(t), other}, *dropped, "the name each branch's build gives its database")
 	assert.Equal(t, []string{migratorURL}, *dsns, "through the direct URL, in one call")
+	assert.Equal(t, []time.Time{{}}, *idleBefore, "a merged branch goes whatever its stamp says")
 }
 
 func TestRunDropPreviewDropsIdleDatabases(t *testing.T) {
-	dsns, dropped := stubDropDatabase(t)
+	dsns, dropped, idleBefore := stubDropDatabase(t)
 	now := time.Now()
 	stubListDatabases(t,
 		stamped(t, "preview_recent", "recent", now.Add(-24*time.Hour)),
@@ -868,10 +873,13 @@ func TestRunDropPreviewDropsIdleDatabases(t *testing.T) {
 	require.NoError(t, runDropPreview([]string{"--idle-days", "30"}))
 	assert.Equal(t, []string{"preview_older", "preview_idle"}, *dropped, "oldest first; recent and undated ones kept")
 	assert.Equal(t, []string{migratorURL}, *dsns)
+	require.Len(t, *idleBefore, 1)
+	assert.WithinDuration(t, now.Add(-30*24*time.Hour), (*idleBefore)[0], time.Minute,
+		"the drop rechecks each stamp against the same cutoff")
 }
 
 func TestRunDropPreviewDryRunDropsNothing(t *testing.T) {
-	_, dropped := stubDropDatabase(t)
+	_, dropped, _ := stubDropDatabase(t)
 	stubListDatabases(t, stamped(t, "preview_idle", "idle", time.Now().Add(-40*24*time.Hour)))
 	t.Setenv("CLOUD_MIGRATOR_DATABASE_URL", migratorURL)
 
@@ -895,7 +903,7 @@ func TestIdlePreviewDatabases(t *testing.T) {
 
 func TestRunDropPreviewRefusesBadInput(t *testing.T) {
 	previousDrop := dropDatabase
-	dropDatabase = func(context.Context, string, ...string) error {
+	dropDatabase = func(context.Context, string, time.Time, ...string) error {
 		t.Fatal("nothing may be dropped")
 		return nil
 	}

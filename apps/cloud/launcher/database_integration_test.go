@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/url"
 	"testing"
 	"time"
@@ -101,9 +102,106 @@ func TestDropPreviewDatabasesListsAndDropsWhatExists(t *testing.T) {
 	assert.JSONEq(t, `{"branch":"feature/idle","deployed_at":"2026-09-01T13:00:00Z"}`, stamps[idle])
 	assert.NotContains(t, stamps, base, "only preview databases")
 
-	require.NoError(t, dropPreviewDatabases(ctx, baseDSN, merged, "preview_never_created", idle), "a database already gone is no error")
+	require.NoError(t, dropPreviewDatabases(ctx, baseDSN, time.Time{}, merged, "preview_never_created", idle), "a database already gone is no error")
 	assert.False(t, exists(merged), "dropped")
 	assert.False(t, exists(idle), "dropped through the same connection")
+}
+
+// An idle sweep lists stamps first and drops later. A deployment that stamps
+// the database in between, while the sweep waits for its lock, keeps it; one
+// that waits for the sweep's lock finds it gone and creates it again.
+func TestIdleSweepKeepsADatabaseADeploymentStampsMeanwhile(t *testing.T) {
+	ctx := context.Background()
+	dsn, stop, err := testdb.PostgresDSN(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	suffix := make([]byte, 4)
+	_, err = rand.Read(suffix)
+	require.NoError(t, err)
+	base := "launcher_race_base_" + hex.EncodeToString(suffix)
+	name := "preview_race_test_" + hex.EncodeToString(suffix)
+	identifier := pgx.Identifier{name}.Sanitize()
+
+	conn, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		for _, db := range []string{name, base} {
+			_, _ = conn.Exec(context.Background(), "DROP DATABASE IF EXISTS "+pgx.Identifier{db}.Sanitize()+" WITH (FORCE)")
+		}
+		_ = conn.Close(context.Background())
+	})
+	_, err = conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{base}.Sanitize())
+	require.NoError(t, err)
+	baseDSN, err := withDatabase(dsn, base)
+	require.NoError(t, err)
+	connect := func() *pgx.Conn {
+		t.Helper()
+		c, err := pgx.Connect(ctx, baseDSN)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = c.Close(context.Background()) })
+		return c
+	}
+	exists := func() bool {
+		t.Helper()
+		var found bool
+		require.NoError(t, conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&found))
+		return found
+	}
+	stampAt := func(c *pgx.Conn, at time.Time) {
+		t.Helper()
+		_, err := c.Exec(ctx, "COMMENT ON DATABASE "+identifier+" IS "+
+			quoteLiteral(fmt.Sprintf(`{"branch":"feature/back","deployed_at":%q}`, at.UTC().Format(time.RFC3339))))
+		require.NoError(t, err)
+	}
+	waits := func(done <-chan error, what string) {
+		t.Helper()
+		select {
+		case err := <-done:
+			t.Fatalf("%s did not wait for the lock: %v", what, err)
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+
+	now := time.Now()
+	idleBefore := now.Add(-30 * 24 * time.Hour)
+	require.NoError(t, ensurePreviewDatabase(ctx, baseDSN, name, "feature/back", now.Add(-40*24*time.Hour)))
+	listed, err := listPreviewDatabases(ctx, baseDSN)
+	require.NoError(t, err)
+	idle, _ := idlePreviewDatabases(listed, idleBefore)
+	var picked []string
+	for _, db := range idle {
+		picked = append(picked, db.name)
+	}
+	require.Contains(t, picked, name, "the sweep's snapshot picks it")
+
+	// A deployment of the branch stamps it, holding the lock as
+	// ensurePreviewDatabase does, while the sweep comes to drop it.
+	deployment := connect()
+	unlock, err := lockPreviewDatabase(ctx, deployment, name)
+	require.NoError(t, err)
+	swept := make(chan error, 1)
+	go func() { swept <- dropPreviewDatabases(ctx, baseDSN, idleBefore, name) }()
+	waits(swept, "the sweep")
+	stampAt(deployment, now)
+	unlock()
+	require.NoError(t, <-swept)
+	assert.True(t, exists(), "the deployment keeps its database")
+
+	// The other order: the sweep holds the lock and drops it while a
+	// deployment comes to stamp it.
+	stampAt(conn, now.Add(-40*24*time.Hour))
+	sweep := connect()
+	unlock, err = lockPreviewDatabase(ctx, sweep, name)
+	require.NoError(t, err)
+	deployed := make(chan error, 1)
+	go func() { deployed <- ensurePreviewDatabase(ctx, baseDSN, name, "feature/back", now) }()
+	waits(deployed, "the deployment")
+	_, err = sweep.Exec(ctx, "DROP DATABASE "+identifier+" WITH (FORCE)")
+	require.NoError(t, err)
+	unlock()
+	require.NoError(t, <-deployed)
+	assert.True(t, exists(), "the deployment creates it again")
 }
 
 // Production's database holds the server's schema; a drop through its URL,
@@ -140,7 +238,7 @@ func TestDropPreviewDatabaseRefusesADeploymentsDatabase(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, schema.Close(ctx))
 
-	err = dropPreviewDatabases(ctx, deploymentDSN, name)
+	err = dropPreviewDatabases(ctx, deploymentDSN, time.Time{}, name)
 	require.ErrorContains(t, err, "never Production's")
 	_, err = listPreviewDatabases(ctx, deploymentDSN)
 	require.ErrorContains(t, err, "never Production's", "an idle sweep refuses before it lists")
