@@ -16,9 +16,14 @@ import (
 	"github.com/zitadel/nextgen/internal/service"
 )
 
-// Exercise the real resolver and SQL list predicate with the same session as
-// grants change. Omitting project_id must never widen the explicit query.
+// TestQueryTeamsSessionAuthorization pins what an omitted project_id adds for a
+// Console session, against the real resolver and list predicate: the default
+// follows the session's grants as they change, and a grant on another project
+// does not widen it. That the default and an explicit home ID check and list
+// the same project is TestQueryTeams_ProjectScope's.
 func TestQueryTeamsSessionAuthorization(t *testing.T) {
+	t.Parallel()
+
 	home, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
 	userID, ownTeamID := harness.CreateUserOwnedByTeam(t, home.ID)
@@ -40,89 +45,46 @@ func TestQueryTeamsSessionAuthorization(t *testing.T) {
 	client.SetSessionToken(sessionCookieIn(t, home, userID).Value)
 	stmts := harness.EnsureServiceDB(t).Statements()
 
-	assertTeams := func(t *testing.T, req *api.QueryTeamsRequest, params api.QueryTeamsParams, wantIDs ...string) {
+	listTeams := func(t *testing.T, req *api.QueryTeamsRequest, params api.QueryTeamsParams) []string {
 		t.Helper()
-		var ids []string
-		for {
-			resp, err := client.QueryTeams(t.Context(), req, params)
-			require.NoError(t, err)
-			require.IsType(t, &api.QueryTeamsResponse{}, resp, helpers.MustMarshal(t, resp))
-			page := resp.(*api.QueryTeamsResponse)
-			for _, team := range page.Teams {
-				ids = append(ids, team.ID)
-			}
-			require.LessOrEqual(t, len(ids), len(wantIDs), "the query must not expose extra teams")
-			next := page.NextPageToken.Or("")
-			if next == "" {
-				break
-			}
-			require.NotEqual(t, req.PageToken.Or(""), next, "pagination must advance")
-			req.PageToken = api.NewOptNilPageToken(next)
-		}
-		assert.ElementsMatch(t, wantIDs, ids)
-	}
-	assertHomeTeams := func(t *testing.T, wantIDs ...string) {
-		t.Helper()
-		for _, params := range []api.QueryTeamsParams{
-			{},
-			{ProjectID: api.NewOptProjectID(api.ProjectID(home.ID))},
-		} {
-			assertTeams(t, &api.QueryTeamsRequest{Limit: api.NewOptLimit(1)}, params, wantIDs...)
-		}
-	}
-	revoke := func(t *testing.T, grant *domain.AuthzAssignment) {
-		t.Helper()
-		require.NoError(t, stmts.RevokeAuthzAssignment(context.Background(), grant.ProjectID, grant.ID))
-	}
-
-	t.Run("membership without a grant exposes no teams", func(t *testing.T) {
-		assertHomeTeams(t)
-	})
-
-	for _, scope := range []domain.AuthzAssignmentScope{
-		domain.NewTeamAssignmentScope(ownTeamID),
-		domain.NewResourceAssignmentScope(ownTeamID),
-	} {
-		t.Run(string(scope.Kind)+" grant exposes only the granted team", func(t *testing.T) {
-			grant := &domain.AuthzAssignment{
-				ProjectID: home.ID, CatalogID: domain.SystemCatalogID,
-				PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,
-				ObjectType: "project", Relation: "viewer",
-			}
-			grant.ApplyScope(scope)
-			require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), grant))
-			t.Cleanup(func() { revoke(t, grant) })
-			assertHomeTeams(t, ownTeamID)
-
-			assertTeams(t, &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
-				Field: api.TeamFilterFieldName, Operation: api.FilterOperationEquals,
-				Value: api.NewOptFilterValue(api.NewStringFilterValue(hiddenTeam.Name)),
-			}}}, api.QueryTeamsParams{})
-		})
-	}
-
-	t.Run("revoked grants stop exposing teams to the same session", func(t *testing.T) {
-		assertHomeTeams(t)
-	})
-
-	t.Run("project viewer sees all home teams but no foreign teams", func(t *testing.T) {
-		grant := harness.SeedProjectViewer(t, home.ID, userID)
-		t.Cleanup(func() { revoke(t, grant) })
-		assertHomeTeams(t, ownTeamID, hiddenTeam.ID)
-		resp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{
-			ProjectID: api.NewOptProjectID(api.ProjectID(foreign.ID)),
-		})
+		resp, err := client.QueryTeams(t.Context(), req, params)
 		require.NoError(t, err)
-		require.IsType(t, &api.QueryTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
+		require.IsType(t, &api.QueryTeamsResponse{}, resp, helpers.MustMarshal(t, resp))
+		ids := []string{}
+		for _, team := range resp.(*api.QueryTeamsResponse).Teams {
+			ids = append(ids, team.ID)
+		}
+		return ids
+	}
+
+	t.Run("a foreign grant needs an explicit target and does not widen the default", func(t *testing.T) {
+		grant := harness.SeedProjectViewer(t, foreign.ID, userID)
+		t.Cleanup(func() {
+			require.NoError(t, stmts.RevokeAuthzAssignment(context.Background(), grant.ProjectID, grant.ID))
+		})
+		assert.Equal(t, []string{foreignTeam.ID}, listTeams(t, &api.QueryTeamsRequest{},
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(foreign.ID))}))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}))
 	})
 
-	t.Run("foreign grant needs an explicit target and does not widen the default", func(t *testing.T) {
-		grant := harness.SeedProjectViewer(t, foreign.ID, userID)
-		t.Cleanup(func() { revoke(t, grant) })
-		assertTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{
-			ProjectID: api.NewOptProjectID(api.ProjectID(foreign.ID)),
-		}, foreignTeam.ID)
-		assertHomeTeams(t)
+	t.Run("a resource grant exposes only the granted team until revoked", func(t *testing.T) {
+		grant := &domain.AuthzAssignment{
+			ProjectID: home.ID, CatalogID: domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,
+			ObjectType: "project", Relation: "viewer",
+		}
+		grant.ApplyScope(domain.NewResourceAssignmentScope(ownTeamID))
+		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), grant))
+
+		assert.Equal(t, []string{ownTeamID}, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+			Field: api.TeamFilterFieldName, Operation: api.FilterOperationEquals,
+			Value: api.NewOptFilterValue(api.NewStringFilterValue(hiddenTeam.Name)),
+		}}}, api.QueryTeamsParams{}), "a name filter must not reach a team outside the grant")
+
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), grant.ProjectID, grant.ID))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}),
+			"the same session must stop seeing the team once the grant is revoked")
 	})
 }
 

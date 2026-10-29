@@ -70,8 +70,7 @@ func (h *Handler) DeleteTeam(ctx context.Context, params api.DeleteTeamParams) (
 }
 
 func (h *Handler) QueryTeams(ctx context.Context, req *api.QueryTeamsRequest, params api.QueryTeamsParams) (api.QueryTeamsRes, error) {
-	scopeCtx, _ := GetScopeContext(ctx)
-	projectID := string(params.ProjectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+	projectID := listProjectID(ctx, params.ProjectID)
 	ctx, _, err := h.requireProjectListAccess(ctx, projectID, teamAccess, domain.ResourceKindTeam)
 	if err != nil {
 		return nil, err
