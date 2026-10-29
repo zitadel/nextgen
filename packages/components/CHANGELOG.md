@@ -1,5 +1,13 @@
 # @zitadel/components
 
+## 0.3.0
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894), [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15)]:
+  - @zitadel/config@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

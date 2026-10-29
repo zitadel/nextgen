@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-qwik-router",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Qwik Router request handler and helpers for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router#readme",
   "bugs": {
