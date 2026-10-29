@@ -187,9 +187,9 @@ type Handler interface {
 	// `grant.invalid` on either user locator. Read the grant back for
 	// identifier and display.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Session callers are authorized as
+	// session cookie (`sessionCookie`). Session callers are authorized as
 	// the human against the target project (home may differ). Cookie-authenticated
-	// requests follow the scheme's CSRF rules (`nextgenSession`).
+	// requests follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants
 	CreateGrant(ctx context.Context, req *CreateGrantRequest, params CreateGrantParams) (CreateGrantRes, error)
@@ -294,7 +294,7 @@ type Handler interface {
 	// (`session.write`). The returned `session_token` is a session credential for the
 	// end-user client, not a management scope: it is delivered as the
 	// `__nextgen_session` cookie and authorises the self-service operations
-	// `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
+	// `GET /sessions/me` and `DELETE /sessions/me` (`sessionCookie` scheme). The
 	// by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
 	// are operator endpoints and require `session.read` / `session.delete` instead.
 	// The `session_token` is superseded when a handoff exchange completes — clients must
@@ -328,8 +328,8 @@ type Handler interface {
 	// return 404. The row is not un-revoked. Expired grants can still be
 	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// DELETE /grants/{id}
 	DeleteGrant(ctx context.Context, params DeleteGrantParams) (DeleteGrantRes, error)
@@ -523,8 +523,8 @@ type Handler interface {
 	// secrets. A user-bound Console session that already passed the project
 	// Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// GET /grants/{id}
 	GetGrant(ctx context.Context, params GetGrantParams) (GetGrantRes, error)
@@ -579,7 +579,7 @@ type Handler interface {
 	// Returns the session-bound token for cross-site request forgery protection
 	// (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
 	// state-changing requests the session cookie authenticates that require it
-	// — see the `nextgenSession` scheme. It authorizes nothing on its own: the
+	// — see the `sessionCookie` scheme. It authorizes nothing on its own: the
 	// HttpOnly cookie is still the credential, and a cross-site page cannot
 	// read this response. It stays the same for the life of the session, so a
 	// client fetches it once per session.
@@ -890,7 +890,7 @@ type Handler interface {
 	// grants.
 	// Ordered by `user_id` and paginated with `page_token`.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`) that can read the project.
+	// session cookie (`sessionCookie`) that can read the project.
 	//
 	// GET /projects/{project_id}/admins
 	ListProjectAdmins(ctx context.Context, params ListProjectAdminsParams) (ListProjectAdminsRes, error)
@@ -1003,8 +1003,8 @@ type Handler interface {
 	// body-conditional). A user-bound Console session that already passed
 	// the project Check may expand without those scopes.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /grants/query
 	QueryGrants(ctx context.Context, req *QueryGrantsRequest, params QueryGrantsParams) (QueryGrantsRes, error)
@@ -1047,8 +1047,8 @@ type Handler interface {
 	// `project_id` names the project to list; without it, the credential's own
 	// project is listed.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
-	// session cookie (`nextgenSession`). Cookie-authenticated requests
-	// follow the scheme's CSRF rules (`nextgenSession`).
+	// session cookie (`sessionCookie`). Cookie-authenticated requests
+	// follow the scheme's CSRF rules (`sessionCookie`).
 	//
 	// POST /users/query
 	QueryUsers(ctx context.Context, req *QueryUsersRequest, params QueryUsersParams) (QueryUsersRes, error)
@@ -1112,7 +1112,7 @@ type Handler interface {
 	// Permanently deletes the session, terminating it immediately.
 	// This is the operator revoke path and requires the `session.delete` scope on a
 	// project-bound credential. End-user logout with the `__nextgen_session` cookie is
-	// `DELETE /sessions/me` (`nextgenSession` scheme).
+	// `DELETE /sessions/me` (`sessionCookie` scheme).
 	// Idempotent: deleting a session that does not exist (or was already deleted)
 	// still returns 204. After deletion, any tokens derived from the session are
 	// invalidated.

@@ -18,7 +18,7 @@ import (
 const testPlatformProject = "proj_platform"
 
 // operatorScope is the Console session of a user homed in the platform
-// project, as HandleNextgenSession mints it (ADR 075).
+// project, as HandleSessionCookie mints it (ADR 075).
 var operatorScope = ScopeContext{
 	ProjectID:         testPlatformProject,
 	PrincipalType:     domain.AuthzPrincipalTypeUser,
@@ -26,7 +26,7 @@ var operatorScope = ScopeContext{
 	PlatformProjectID: testPlatformProject,
 }
 
-func TestHandleNextgenSession_PlatformProject(t *testing.T) {
+func TestHandleSessionCookie_PlatformProject(t *testing.T) {
 	t.Parallel()
 
 	scopeOf := func(t *testing.T, handler *SecurityHandler, tokens *servicemocks.MockTokenService, homeProjectID string) ScopeContext {
@@ -38,7 +38,7 @@ func TestHandleNextgenSession_PlatformProject(t *testing.T) {
 			Type:      domain.TokenTypeSessionToken,
 			SessionID: new("session-1"),
 		}, nil)
-		ctx, err := handler.HandleNextgenSession(safeRequestContext(t), api.GetMySessionOperation, api.NextgenSession{APIKey: "raw-cookie"})
+		ctx, err := handler.HandleSessionCookie(safeRequestContext(t), api.GetMySessionOperation, api.SessionCookie{APIKey: "raw-cookie"})
 		require.NoError(t, err)
 		scope, ok := GetScopeContext(ctx)
 		require.True(t, ok)

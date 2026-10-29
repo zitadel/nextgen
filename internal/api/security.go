@@ -71,13 +71,13 @@ func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.Ope
 	return ctx, nil
 }
 
-// HandleNextgenSession handles the nextgenSession security scheme: the
+// HandleSessionCookie handles the sessionCookie security scheme: the
 // __nextgen_session cookie. It verifies the cookie decrypts to a session
 // token and stashes it for handlers. User-bound sessions mint ScopeContext
 // so management ops can authorize the human, unless oauth2 already minted
 // one (dual-scheme OR). Anonymous sessions skip the grant/user-query ops
 // so a leftover building cookie cannot 401 a valid Bearer.
-func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName api.OperationName, t api.NextgenSession) (context.Context, error) {
+func (s SecurityHandler) HandleSessionCookie(ctx context.Context, operationName api.OperationName, t api.SessionCookie) (context.Context, error) {
 	// A Bearer that already satisfied a dual-scheme operation is the
 	// credential; the cookie is not consulted at all. Otherwise a stale or
 	// malformed cookie riding along would fail here and 401 a request the
@@ -265,7 +265,7 @@ func sessionCookieFromContext(ctx context.Context) (string, bool) {
 }
 
 // sessionTokenFromContext returns the session token parsed from the
-// __nextgen_session cookie by HandleNextgenSession.
+// __nextgen_session cookie by HandleSessionCookie.
 func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 	v, ok := ctx.Value(sessionTokenKey{}).(*domain.Token)
 	return v, ok && v != nil

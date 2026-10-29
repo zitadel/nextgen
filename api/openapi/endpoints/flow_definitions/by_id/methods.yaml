@@ -8,7 +8,7 @@ get:
   security:
     - oauth2:
         - flow_definition.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:

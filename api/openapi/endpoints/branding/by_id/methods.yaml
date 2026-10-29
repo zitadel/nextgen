@@ -8,7 +8,7 @@ get:
   security:
     - oauth2:
         - branding.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/branding-id.yaml
   responses:

@@ -34,16 +34,16 @@ func (f FakeSecuritySource) OAuth2(ctx context.Context, operationName api.Operat
 	}, nil
 }
 
-// NextgenSession provides the __nextgen_session cookie. With an empty
+// SessionCookie provides the __nextgen_session cookie. With an empty
 // SessionToken the scheme is skipped and the generated client fails fast with
 // "security requirement is not satisfied" instead of sending the request —
 // to exercise the server's missing-credential path, send a raw HTTP request
 // (see TestGetMyUser/missing_session_cookie).
-func (f FakeSecuritySource) NextgenSession(ctx context.Context, operationName api.OperationName) (api.NextgenSession, error) {
+func (f FakeSecuritySource) SessionCookie(ctx context.Context, operationName api.OperationName) (api.SessionCookie, error) {
 	if f.SessionToken == "" {
-		return api.NextgenSession{}, ogenerrors.ErrSkipClientSecurity
+		return api.SessionCookie{}, ogenerrors.ErrSkipClientSecurity
 	}
-	return api.NextgenSession{
+	return api.SessionCookie{
 		APIKey: f.SessionToken,
 	}, nil
 }
