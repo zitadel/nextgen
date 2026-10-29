@@ -60,15 +60,15 @@ func TestBuildHTTPMuxTracesTheAuditEventUnderTheServerSpan(t *testing.T) {
 			tokens := mocks.NewMockTokenService(gomock.NewController(t))
 			tokens.EXPECT().IntrospectToken(gomock.Any(), "secret").
 				Return(&domain.Token{Type: domain.TokenTypeProjectToken, ProjectID: "proj_1"}, nil)
-			apiServer, err := oasapi.NewServer(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(tokens),
+			apiServers, err := api.NewServers(oasapi.UnimplementedHandler{}, api.NewSecurityHandler(tokens),
 				apiServerOptions(muxTracerProvider, noop.NewMeterProvider(), nil)...)
 			require.NoError(t, err)
 			events := audit.NewRequestBuffer(audit.BatchInserter(func(context.Context, []*domain.Event) error { return nil }), audit.RequestBufferConfig{})
 			t.Cleanup(events.Close)
-			mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServer, idpCallbackEcho(), nil, events, nil)
+			mux, err := buildHTTPMux(ServerConfig{}, idgen.NewULID(), apiServers, idpCallbackEcho(), nil, events, nil)
 			require.NoError(t, err)
 
-			r := httptest.NewRequest(http.MethodPatch, "/users/user_1", strings.NewReader(tt.body))
+			r := httptest.NewRequest(http.MethodPatch, "/api/v1/users/user_1", strings.NewReader(tt.body))
 			r.Header.Set("Authorization", "Bearer secret")
 			r.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
