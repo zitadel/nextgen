@@ -44,6 +44,7 @@ Users and teams
   grants            Manage access grants
 
 Authentication
+  apps              Declare and manage apps
   auth-method       Configure how users sign in
   idps              Manage identity provider connections
   sessions          View and revoke sessions

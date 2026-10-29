@@ -4,6 +4,10 @@ content:
   application/json:
     schema:
       oneOf:
+        - $ref: '../../../components/schemas/errors/app-client_id_taken.yaml'
+        - $ref: '../../../components/schemas/errors/app-declared.yaml'
+        - $ref: '../../../components/schemas/errors/app-field_immutable.yaml'
+        - $ref: '../../../components/schemas/errors/app-identifier_taken.yaml'
         - $ref: '../../../components/schemas/errors/auth-unauthorized.yaml'
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/flowdef-invalid.yaml'
@@ -31,6 +35,10 @@ content:
       discriminator:
         propertyName: code
         mapping:
+          app.client_id_taken: '../../../components/schemas/errors/app-client_id_taken.yaml'
+          app.declared: '../../../components/schemas/errors/app-declared.yaml'
+          app.field_immutable: '../../../components/schemas/errors/app-field_immutable.yaml'
+          app.identifier_taken: '../../../components/schemas/errors/app-identifier_taken.yaml'
           auth.unauthorized: '../../../components/schemas/errors/auth-unauthorized.yaml'
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           flowdef.invalid: '../../../components/schemas/errors/flowdef-invalid.yaml'
@@ -56,6 +64,26 @@ content:
           flowdef.schema_fetch_failed: '../../../components/schemas/errors/flowdef-schema_fetch_failed.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
+      app.client_id_taken:
+        summary: app.client_id_taken
+        value:
+          code: app.client_id_taken
+          message: 'app: another client in the project holds the client_id'
+      app.declared:
+        summary: app.declared
+        value:
+          code: app.declared
+          message: 'app: declared in the release, so only a release changes it'
+      app.field_immutable:
+        summary: app.field_immutable
+        value:
+          code: app.field_immutable
+          message: 'app: the field is fixed for the life of the client'
+      app.identifier_taken:
+        summary: app.identifier_taken
+        value:
+          code: app.identifier_taken
+          message: 'app: another app in the project holds the API identifier'
       auth.unauthorized:
         summary: auth.unauthorized
         value:

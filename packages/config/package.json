@@ -38,6 +38,11 @@
       "types": "./dist/idp/index.d.mts",
       "import": "./dist/idp/index.mjs"
     },
+    "./app": {
+      "@zitadel/source": "./src/app/index.ts",
+      "types": "./dist/app/index.d.mts",
+      "import": "./dist/app/index.mjs"
+    },
     "./schemas": {
       "@zitadel/source": "./src/schemas.ts",
       "types": "./dist/schemas.d.mts",

@@ -85,6 +85,8 @@ func TestCursorBattle_DrainAllListIncarnations(t *testing.T) {
 		t.Run("previews", func(t *testing.T) { battlePreviews(t, d) })
 		t.Run("idp_connections", func(t *testing.T) { battleIDPConnections(t, d) })
 		t.Run("idp_connection_revisions", func(t *testing.T) { battleIDPConnectionRevisions(t, d) })
+		t.Run("apps", func(t *testing.T) { battleApps(t, d) })
+		t.Run("app_revisions", func(t *testing.T) { battleAppRevisions(t, d) })
 		t.Run("idp_identity_links", func(t *testing.T) { battleIDPIdentityLinks(t, d) })
 		t.Run("flow_definitions", func(t *testing.T) { battleFlowDefinitions(t, d) })
 		t.Run("json_schemas", func(t *testing.T) { battleJSONSchemas(t, d) })

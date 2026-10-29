@@ -102,6 +102,9 @@
       "idps": {
         "description": "Manage identity provider connections."
       },
+      "apps": {
+        "description": "Declare and manage apps: their clients and the APIs they serve."
+      },
       "flow-definitions": {
         "description": "View login flows."
       },

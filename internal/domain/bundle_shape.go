@@ -26,6 +26,11 @@ type BundleShapeIDP struct {
 }
 
 // BundleShapePolicy is one policies[] entry for shape validation.
+type BundleShapeApp struct {
+	Index    int
+	Document []byte
+}
+
 type BundleShapePolicy struct {
 	Index     int
 	Operation string
@@ -36,6 +41,7 @@ type BundleShapeInput struct {
 	Schemas     []BundleShapeSchema
 	Flows       []BundleShapeFlow
 	IDPs        []BundleShapeIDP
+	Apps        []BundleShapeApp
 	Policies    []BundleShapePolicy
 	HasBranding bool
 }
@@ -53,7 +59,7 @@ type BundleShapeFailure struct {
 // failure is returned so Build can report them together. An empty bundle is
 // not a resource failure — callers refuse it with ErrReleaseInvalid.
 func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
-	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Policies)
+	total := len(input.Schemas) + len(input.Flows) + len(input.IDPs) + len(input.Apps) + len(input.Policies)
 	if input.HasBranding {
 		total++
 	}
@@ -158,6 +164,37 @@ func ValidateBundleShape(input BundleShapeInput) []BundleShapeFailure {
 		seenIDP[slug] = idp.Index
 	}
 
+	seenApp := map[string]int{}
+	for _, app := range input.Apps {
+		// An app document's slug is its handle, as a connection's is.
+		slug, err := IDPDocumentSlug(app.Document)
+		if err != nil {
+			failures = append(failures, BundleShapeFailure{
+				Kind:  ReleasePointerKindApp,
+				Index: app.Index,
+				Err:   ErrReleaseInvalid(err.Error(), err),
+			})
+			continue
+		}
+		if slug == "" {
+			failures = append(failures, BundleShapeFailure{
+				Kind:  ReleasePointerKindApp,
+				Index: app.Index,
+				Err:   ErrReleaseInvalid("every bundled app needs a slug", nil),
+			})
+			continue
+		}
+		if prev, ok := seenApp[slug]; ok {
+			msg := fmt.Sprintf("app %q appears twice (indices %d and %d)", slug, prev, app.Index)
+			failures = append(failures,
+				BundleShapeFailure{Kind: ReleasePointerKindApp, Index: prev, Handle: slug, Err: ErrReleaseInvalid(msg, nil)},
+				BundleShapeFailure{Kind: ReleasePointerKindApp, Index: app.Index, Handle: slug, Err: ErrReleaseInvalid(msg, nil)},
+			)
+			continue
+		}
+		seenApp[slug] = app.Index
+	}
+
 	// The operation is the policy's handle: a project has one policy per
 	// operation, so a release cannot pin two. The decoder already holds it to
 	// a catalogued operation.
@@ -211,5 +248,5 @@ func IDPDocumentSlug(document []byte) (string, error) {
 
 // BundleEmpty reports whether the bundle carries no resources.
 func BundleEmpty(input BundleShapeInput) bool {
-	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Policies) == 0 && !input.HasBranding
+	return len(input.Schemas)+len(input.Flows)+len(input.IDPs)+len(input.Apps)+len(input.Policies) == 0 && !input.HasBranding
 }

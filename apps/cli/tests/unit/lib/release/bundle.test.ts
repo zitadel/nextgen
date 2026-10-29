@@ -99,6 +99,26 @@ describe("buildBundle", () => {
     expect(bundle).not.toHaveProperty("policies");
   });
 
+  it("carries app files under `apps`, named in step with their files", async () => {
+    const cwd = await project({
+      ".zitadel/apps/shop.json": { $schema: "../meta/app.json", slug: "shop", name: "Shop" },
+    });
+
+    const { bundle, resourceCount, appFiles } = await buildBundle(cwd);
+
+    expect(resourceCount).toBe(1);
+    expect(bundle.apps).toEqual([{ slug: "shop", name: "Shop" }]);
+    expect(appFiles).toEqual(["shop.json"]);
+  });
+
+  it("leaves `apps` out when there are none, so a server without the kind takes it", async () => {
+    const cwd = await project({ ".zitadel/schemas/human-user.json": { objectType: "human-user" } });
+
+    const { bundle } = await buildBundle(cwd);
+
+    expect(bundle).not.toHaveProperty("apps");
+  });
+
   it("refuses an empty .zitadel/ directory", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "zitadel-bundle-empty-"));
     dir = cwd;

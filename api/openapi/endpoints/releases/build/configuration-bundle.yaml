@@ -69,6 +69,21 @@ properties:
       carries no credentials.
     items:
       $ref: ../../idps/idp-connection.yaml
+  apps:
+    type: array
+    maxItems: 50
+    description: |
+      Apps, one per `.zitadel/apps/<slug>.json`, each the document
+      `POST /apps` takes as `app`. The handle is `slug`. A bundled app is
+      declared: it is created, or revised when its document changed, inside
+      the build's transaction, and only a release changes it afterwards. A
+      slug an app registered through the API holds is refused with a
+      `rel.invalid` entry, as is a document the rules across its fields
+      refuse. A confidential client names its secret as a `${{ NAME }}`
+      reference, so a bundle carries no credentials, and a deploy is refused
+      while the variable has no value.
+    items:
+      $ref: ../../schemas/app.yaml
   policies:
     type: array
     maxItems: 50

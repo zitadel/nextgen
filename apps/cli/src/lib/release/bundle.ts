@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { APPS_DIR } from "../app";
 import { BRANDING_DIR, toBrandingWireBody } from "../branding";
 import { ZitadelError } from "../errors";
 import { FLOWS_DIR } from "../flows";
@@ -24,6 +25,8 @@ export type ConfigurationBundle = {
   schemas: Record<string, unknown>[];
   flow_definitions: Record<string, unknown>[];
   idps: Record<string, unknown>[];
+  /** Absent when `.zitadel/apps/` holds none, so a server without the kind takes the bundle. */
+  apps?: Record<string, unknown>[];
   /** Absent when `.zitadel/policies/` holds none, so a server without the kind takes the bundle. */
   policies?: Record<string, unknown>[];
   branding?: Record<string, unknown>;
@@ -46,6 +49,8 @@ export type BuiltBundle = {
   idpFiles: string[];
   /** The policy files' names, positional with `bundle.policies`, likewise. */
   policyFiles: string[];
+  /** The app files' names, positional with `bundle.apps`, likewise. */
+  appFiles: string[];
 };
 
 /** The most resources a release may pin — the cap `POST /releases/build` enforces. */
@@ -72,6 +77,8 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
   // the file it came from, and the bundle carries only the bodies.
   const idpEntries = await readJsonDirEntries(join(cwd, IDPS_DIR));
   const idps = idpEntries.map((entry) => stripSchema(entry.body));
+  const appEntries = await readJsonDirEntries(join(cwd, APPS_DIR));
+  const apps = appEntries.map((entry) => stripSchema(entry.body));
   // Test files sit beside the policies; `policies test` runs them, and a
   // release never carries them.
   const policyEntries = await readJsonDirEntries(join(cwd, POLICIES_DIR), {
@@ -105,11 +112,12 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     schemas.length +
     flow_definitions.length +
     idps.length +
+    apps.length +
     policies.length +
     (branding === undefined ? 0 : 1);
   if (resourceCount === 0) {
     throw new ZitadelError("E_VALIDATION", "There is nothing in .zitadel/ to deploy", {
-      hint: "Add a schema, flow, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
+      hint: "Add a schema, flow, app, policy or branding under .zitadel/, or run `zitadel setup` to scaffold one.",
     });
   }
   if (resourceCount > MAX_BUNDLE_RESOURCES) {
@@ -124,6 +132,7 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
       schemas,
       flow_definitions,
       idps,
+      ...(apps.length === 0 ? {} : { apps }),
       ...(policies.length === 0 ? {} : { policies }),
       ...(branding === undefined ? {} : { branding }),
     },
@@ -131,5 +140,6 @@ export async function buildBundle(cwd: string): Promise<BuiltBundle> {
     brandingSources,
     idpFiles: idpEntries.map((entry) => entry.name),
     policyFiles: policyEntries.map((entry) => entry.name),
+    appFiles: appEntries.map((entry) => entry.name),
   };
 }

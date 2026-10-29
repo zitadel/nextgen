@@ -1,0 +1,12 @@
+type: object
+description: Creates or revises an app document.
+required:
+  - app
+properties:
+  app:
+    $ref: ../schemas/app.yaml
+    description: |
+      The app document, in the shape of a `.zitadel/apps/<slug>.json` file. If
+      its slug is new in the project, the app is created; if an app the API
+      registered has that slug, this is a new revision of it. An app the
+      release declares is changed only by a release.

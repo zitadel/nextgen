@@ -1250,6 +1250,198 @@
       ]
     },
     {
+      "id": "apps create",
+      "group": "Authentication",
+      "description": "Declare an app from a preset, or register one through the API.",
+      "args": [
+        {
+          "name": "slug",
+          "description": "The app's slug: lowercase letters, digits, - and _.",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "preset",
+          "description": "The shape of the app. web: A server-rendered web app that signs users in, with a secret; spa: A single-page app that signs users in with PKCE and holds no secret; native: A mobile or desktop app that signs users in with PKCE; cli: A command-line tool that signs users in through a loopback redirect; api: An API that accepts access tokens for its identifier; backend: A backend that serves an API and calls others as itself; service-account: A job or service that calls APIs as itself; mcp-server: An MCP server any MCP client can connect to with the user's consent.",
+          "type": "option",
+          "required": true,
+          "options": [
+            "web",
+            "spa",
+            "native",
+            "cli",
+            "api",
+            "backend",
+            "service-account",
+            "mcp-server"
+          ]
+        },
+        {
+          "name": "name",
+          "description": "The app's name, shown on the consent screen. The slug when left out.",
+          "type": "option"
+        },
+        {
+          "name": "redirect-uri",
+          "description": "Where the client may send the user back after sign-in. Repeat for several.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "identifier",
+          "description": "The URI of the API the app serves, which tokens for it carry as aud.",
+          "type": "option"
+        },
+        {
+          "name": "scope",
+          "description": "A scope the API defines. Repeat for several.",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "registered",
+          "description": "Register the app through the API instead of declaring it in .zitadel/apps/.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "apps create shop --preset web --redirect-uri https://shop.example.com/callback"
+        },
+        {
+          "command": "apps create orders --preset backend --identifier https://api.shop.example.com --scope orders.read"
+        },
+        {
+          "command": "apps create assistant --preset mcp-server --identifier https://shop.example.com/mcp"
+        },
+        {
+          "command": "apps create partner --preset web --redirect-uri https://partner.example/cb --registered"
+        }
+      ]
+    },
+    {
+      "id": "apps get",
+      "group": "Authentication",
+      "description": "Get one app by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "app id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "apps get <id>"
+        },
+        {
+          "command": "apps get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "apps list",
+      "group": "Authentication",
+      "description": "List apps.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: slug (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), source (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sort",
+          "description": "Sort as field:direction (asc|desc). Fields: slug, created_at.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "apps list --json"
+        },
+        {
+          "command": "apps list --all --json"
+        },
+        {
+          "command": "apps list --filter slug=equals:<value> --sort slug:desc"
+        }
+      ]
+    },
+    {
       "id": "auth-method passkey disable",
       "group": "Authentication",
       "description": "Disable passkey sign-in for a user schema.",

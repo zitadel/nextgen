@@ -1,0 +1,62 @@
+type: object
+description: |
+  An app at one revision, with the `client_id` of each client that revision
+  lists.
+required:
+  - id
+  - revision_id
+  - slug
+  - source
+  - definition
+  - clients
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    description: The app id, shared by every revision.
+    example: app_01KWH3B72K7M7F0N9WD3P2E4YM
+  revision_id:
+    type: string
+    description: |
+      The revision this row holds, pinned by releases. `GET /apps/{id}` and
+      the query return the newest one.
+    example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+  slug:
+    type: string
+    description: The app's slug, fixed for its life.
+    example: shop
+  source:
+    type: string
+    enum:
+      - declared
+      - registered
+    description: |
+      Who writes the app: `declared` apps are files in the release and change
+      only with it, `registered` apps are written through `POST /apps`.
+  definition:
+    $ref: ../schemas/app.yaml
+    description: The stored app document, as written.
+  clients:
+    type: array
+    description: The client_id of each client the document lists, in its order.
+    items:
+      $ref: app-client-id.yaml
+  client_secrets:
+    type: array
+    description: |
+      The client secrets this write generated: one for each confidential
+      client of a registered app that had none. Present only in the answer to
+      the write that generated them.
+    items:
+      $ref: app-client-secret.yaml
+  created_at:
+    type: string
+    format: date-time
+    description: When the app was created.
+    example: '2026-10-28T09:11:00Z'
+  updated_at:
+    type: string
+    format: date-time
+    description: When this revision was created.
+    example: '2026-10-28T09:11:00Z'

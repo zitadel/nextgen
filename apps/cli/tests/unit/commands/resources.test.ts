@@ -75,6 +75,13 @@ describe("resource registry", () => {
       if (topic === "release") {
         continue;
       }
+      // `apps` is the other: its hand-written `apps create` writes the
+      // developer's app as a file of the release by default, and registers
+      // one through the API only with --registered.
+      if (topic === "apps") {
+        expect(resource.create).toBeUndefined();
+        continue;
+      }
       expect(Boolean(COMMANDS[`${topic}:create`])).toBe(Boolean(resource.create));
       expect(Boolean(COMMANDS[`${topic}:update`])).toBe(Boolean(resource.update));
       const deleteVerb = resource.delete?.verb ?? "delete";
@@ -191,7 +198,7 @@ describe("resource registry", () => {
     }
     // Guard against this check quietly covering nothing, which is what it did
     // when the registry shape changed underneath it.
-    expect(checked).toBe(6);
+    expect(checked).toBe(7);
   });
 });
 

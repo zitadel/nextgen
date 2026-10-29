@@ -3,6 +3,7 @@ package domain
 import (
 	"cmp"
 	"encoding/json"
+	"slices"
 )
 
 // Typed event payloads (deny-by-default allowlists). Keep in sync with
@@ -394,4 +395,80 @@ func IDPConnectionPayloadDelta(previous, next *IDPConnection) (IDPConnectionPayl
 		payload.Template = cmp.Or(after.Template, new(""))
 	}
 	return payload, nil
+}
+
+// AppPayload is shared by app.created (snapshot) and app.updated (delta).
+// The app id is the event's entity_id. The document is never included: a
+// declared app's secret references and its redirect URIs stay out of the
+// stream; the slugs of what the app holds say what changed.
+type AppPayload struct {
+	Slug       string   `json:"slug,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Clients    []string `json:"clients,omitempty"`
+	APIs       []string `json:"apis,omitempty"`
+	RevisionID string   `json:"revision_id"`
+}
+
+// AppPayloadSnapshot is the allowlisted create snapshot for app.created.
+func AppPayloadSnapshot(app *App, doc AppDocument) AppPayload {
+	return AppPayload{
+		Slug:       app.Slug,
+		Source:     string(app.Source),
+		Name:       doc.Name,
+		Clients:    appClientSlugs(doc),
+		APIs:       appAPISlugs(doc),
+		RevisionID: app.RevisionID,
+	}
+}
+
+// AppPayloadDelta is the app.updated payload: the new revision id, plus the
+// name and the client and API slugs when they differ from previous. Slug and
+// source are fixed for the life of the app.
+func AppPayloadDelta(previous, next *App) (AppPayload, error) {
+	before, err := ParseAppDocument(previous.Document)
+	if err != nil {
+		return AppPayload{}, err
+	}
+	after, err := ParseAppDocument(next.Document)
+	if err != nil {
+		return AppPayload{}, err
+	}
+	payload := AppPayload{RevisionID: next.RevisionID}
+	if before.Name != after.Name {
+		payload.Name = after.Name
+	}
+	if clients := appClientSlugs(after); !slices.Equal(appClientSlugs(before), clients) {
+		payload.Clients = clients
+	}
+	if apis := appAPISlugs(after); !slices.Equal(appAPISlugs(before), apis) {
+		payload.APIs = apis
+	}
+	return payload, nil
+}
+
+func appClientSlugs(doc AppDocument) []string {
+	slugs := make([]string, len(doc.Clients))
+	for i, c := range doc.Clients {
+		slugs[i] = c.Slug
+	}
+	return slugs
+}
+
+func appAPISlugs(doc AppDocument) []string {
+	slugs := make([]string, len(doc.APIs))
+	for i, api := range doc.APIs {
+		slugs[i] = api.Slug
+	}
+	return slugs
+}
+
+// AppClientSecretAddedPayload is app.client_secret.added: which client of
+// the app (the entity) got a secret, and whether the server generated it or
+// it was imported. Never the secret or its hash.
+type AppClientSecretAddedPayload struct {
+	Client   string `json:"client"`
+	ClientID string `json:"client_id"`
+	SecretID string `json:"secret_id"`
+	Origin   string `json:"origin"`
 }

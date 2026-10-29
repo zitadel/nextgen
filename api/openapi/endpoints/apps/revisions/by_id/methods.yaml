@@ -1,0 +1,44 @@
+get:
+  operationId: getAppRevisionById
+  summary: Get one revision of an app
+  description: |
+    Reads one revision of an app by its `revision_id`, the value a release
+    pins.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.read
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../../components/parameters/project-id.yaml
+    - $ref: ../../../../components/parameters/app-revision-id.yaml
+  responses:
+    '200':
+      description: The revision was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../../app-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    '404':
+      description: No app with this id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../../components/error-details.yaml
+    default:
+      $ref: getAppRevisionById-error-response.yaml

@@ -1,0 +1,45 @@
+get:
+  operationId: getAppById
+  x-zitadel-cli: apps get
+  summary: Get an app by id
+  description: |
+    Reads an app by its id, at its newest revision, with the `client_id` of
+    each client. `GET /apps/{id}/revisions` lists every revision.
+
+    The lookup is scoped to the project in `project_id`.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.read
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/app-id.yaml
+  responses:
+    '200':
+      description: The app was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../app-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No app with this id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getAppById-error-response.yaml

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zitadel/nextgen/internal/storage/appstore"
 	"github.com/zitadel/nextgen/internal/storage/branding"
 	"github.com/zitadel/nextgen/internal/storage/deployment"
 	"github.com/zitadel/nextgen/internal/storage/dialect/authz"
@@ -54,7 +55,24 @@ func sharedSchemaColumns(t *testing.T) []schematest.ColumnNullability {
 	cols = append(cols, joined...)
 	joined, err = schematest.JoinColumns(map[string]string{"p": "policies", "r": "policy_revisions"}, policystore.Schema)
 	require.NoError(t, err)
-	return append(cols, joined...)
+	cols = append(cols, joined...)
+	joined, err = schematest.JoinColumns(map[string]string{"a": "apps", "r": "app_revisions"}, appstore.Schema)
+	require.NoError(t, err)
+	cols = append(cols, joined...)
+	// The rows beside an app bind no field schema: their statements are fixed
+	// SQL. Listing their columns keeps a dialect from dropping a NOT NULL.
+	cols = append(cols, notNullColumns("app_clients", "project_id", "id", "app_id", "slug", "client_id", "created_at")...)
+	cols = append(cols, notNullColumns("app_api_identifiers", "project_id", "identifier", "app_id", "created_at")...)
+	return append(cols, notNullColumns("app_client_secrets", "project_id", "id", "client_row_id", "encoded_hash", "created_at")...)
+}
+
+// notNullColumns lists NOT NULL columns of a table no field schema binds.
+func notNullColumns(table string, columns ...string) []schematest.ColumnNullability {
+	cols := make([]schematest.ColumnNullability, 0, len(columns))
+	for _, column := range columns {
+		cols = append(cols, schematest.ColumnNullability{Table: table, Column: column})
+	}
+	return cols
 }
 
 // A nullable column whose binding misses the Nullable flag silently drops its

@@ -27,6 +27,8 @@ api/openapi/openapi-spec.yaml:
     - '#/paths/~1idps~1revisions~1{revision_id}'
     # The same for policies, whose ids carry the `pol_` prefix.
     - '#/paths/~1policies~1revisions~1{revision_id}'
+    # The same for apps, whose ids carry the `app_` prefix.
+    - '#/paths/~1apps~1revisions~1{revision_id}'
 api/openapi/components/flows/flow-definition-step.yaml:
   no-required-schema-properties-undefined:
     # Every name is a step property defined at the schema root; each arm of the

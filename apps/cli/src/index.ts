@@ -2,6 +2,7 @@ import type { Command } from "@oclif/core";
 
 import Api from "./commands/api/index";
 import ApiLs from "./commands/api/ls";
+import AppsCreate from "./commands/apps/create";
 import AuthMethodPasskeyDisable from "./commands/auth-method/passkey/disable";
 import AuthMethodPasskeyEnable from "./commands/auth-method/passkey/enable";
 import AuthMethodPasswordDisable from "./commands/auth-method/password/disable";
@@ -78,6 +79,7 @@ export const COMMANDS: Record<string, typeof Command> = {
   "auth-method:sso:enable": AuthMethodSsoEnable,
   "auth-method:sso:disable": AuthMethodSsoDisable,
   "api:ls": ApiLs,
+  "apps:create": AppsCreate,
   "branding:eject": BrandingEject,
   "deployment:create": DeploymentCreate,
   "deployment:get": DeploymentGet,

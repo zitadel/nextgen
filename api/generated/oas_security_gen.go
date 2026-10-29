@@ -56,6 +56,8 @@ var operationRolesNextgenSession = map[string][]string{
 	DeleteGrantOperation:           []string{},
 	DeleteUserByIDOperation:        []string{},
 	EvaluatePolicyOperation:        []string{},
+	GetAppByIdOperation:            []string{},
+	GetAppRevisionByIdOperation:    []string{},
 	GetBrandingByIdOperation:       []string{},
 	GetDeploymentByIdOperation:     []string{},
 	GetFlowDefinitionOperation:     []string{},
@@ -95,6 +97,7 @@ var operationRolesNextgenSession = map[string][]string{
 	PatchMyUserOperation:           []string{},
 	PatchProjectOperation:          []string{},
 	PatchUserByIDOperation:         []string{},
+	QueryAppsOperation:             []string{},
 	QueryGrantsOperation:           []string{},
 	QueryIdpsOperation:             []string{},
 	QueryTeamsOperation:            []string{},
@@ -129,6 +132,9 @@ func GetRolesForNextgenSession(operation string) []string {
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
 var oauth2ScopesOAuth2 = map[string][]string{
+	AddAppClientSecretOperation: []string{
+		"app.write",
+	},
 	AddOriginOperation: []string{
 		"origin.write",
 	},
@@ -137,6 +143,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	BuildReleaseOperation: []string{
 		"release.write",
+	},
+	CreateAppOperation: []string{
+		"app.write",
 	},
 	CreateAuthAttemptOperation: []string{
 		"auth_attempt.write",
@@ -194,6 +203,12 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	FinishUserPasskeyRegistrationOperation: []string{
 		"user.write",
+	},
+	GetAppByIdOperation: []string{
+		"app.read",
+	},
+	GetAppRevisionByIdOperation: []string{
+		"app.read",
 	},
 	GetAuthAttemptOperation: []string{
 		"auth_attempt.read",
@@ -265,6 +280,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	IssueChallengeOperation: []string{
 		"auth_attempt.write",
 	},
+	ListAppRevisionsOperation: []string{
+		"app.read",
+	},
 	ListBrandingOperation: []string{
 		"branding.read",
 	},
@@ -316,6 +334,9 @@ var oauth2ScopesOAuth2 = map[string][]string{
 	},
 	PublishPolicyOperation: []string{
 		"policy.write",
+	},
+	QueryAppsOperation: []string{
+		"app.read",
 	},
 	QueryGrantsOperation: []string{
 		"project.read",

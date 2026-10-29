@@ -21,6 +21,7 @@ import {
   GetReleaseByIdResponse,
   GetSchemaByIdResponse,
   GetIdpByIdResponse,
+  GetAppByIdResponse,
   GetPolicyResponse,
   GetTeamResponse,
   GetUserByIDResponse,
@@ -34,6 +35,8 @@ import {
   QueryGrantsResponse,
   QueryIdpsBody,
   QueryIdpsResponse,
+  QueryAppsBody,
+  QueryAppsResponse,
   QueryProjectsResponse,
   QuerySessionsResponse,
   QueryTeamsResponse,
@@ -342,6 +345,36 @@ export const RESOURCES = {
           "--slug acme-sso --protocol oidc --display-name 'Acme SSO' --oidc-issuer https://sso.acme.example --oidc-client-id <client_id> --oidc-client-secret '${{ ACME_SSO_CLIENT_SECRET }}' --oidc-scopes openid --oidc-scopes profile --oidc-scopes email",
       },
     ),
+  },
+
+  // Apps (identity model): one document per app, holding its clients and the
+  // APIs it serves. The registry reads them; `apps create` is a hand-written
+  // command, because the developer's own app is a file of the release by
+  // default and only `--registered` writes through `POST /apps`. The revision
+  // routes wait for the sub-resource grammar, as for `idps`.
+  apps: {
+    group: CommandGroups.authentication,
+    singular: "app",
+    idField: "id",
+    columns: ["id", "slug", "source", "definition.name", "created_at"],
+    heading: "slug",
+    detail: ["id", "revision_id", "slug", "source", "clients", "created_at", "updated_at"],
+    list: list({
+      items: "apps",
+      body: QueryAppsBody,
+      response: QueryAppsResponse,
+      filters: [
+        { field: "slug", operations: FILTER_OPERATIONS },
+        { field: "source", operations: FILTER_OPERATIONS },
+        { field: "created_at", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["slug", "created_at"],
+      call: ({ client, projectId }, body) => client.queryApps(body, { project_id: projectId }),
+    }),
+    get: {
+      call: ({ client, projectId }, id) => client.getAppById(id, { project_id: projectId }),
+      response: GetAppByIdResponse,
+    },
   },
 
   projects: {

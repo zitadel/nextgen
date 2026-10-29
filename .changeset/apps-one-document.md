@@ -1,0 +1,7 @@
+---
+"@zitadel/server": minor
+"@zitadel/cli": minor
+"@zitadel/config": minor
+---
+
+Apps: one document per app that holds its OAuth and OIDC clients, the APIs it serves and whether clients may register into it. `POST /apps` creates an app or revises it by slug, `POST /apps/query`, `GET /apps/{id}` and the revision reads return it with each client's `client_id`, and `POST /apps/{id}/clients/{client}/secrets` adds a generated or imported secret, a v4 bcrypt hash included. A client keeps the `client_id` the server minted or the one its document chose, for life. A release declares the developer's own apps from `.zitadel/apps/<slug>.json`, and only a release changes them. `zitadel apps create <slug> --preset <preset>` writes that file from one of eight presets, or registers the app through the API with `--registered`; `zitadel apps list` and `apps get` read them. `@zitadel/config/app` exports the presets.

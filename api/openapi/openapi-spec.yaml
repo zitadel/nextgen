@@ -45,6 +45,13 @@ tags:
       revisioned connection document and referenced by its slug from user
       schemas and flow definitions. Create-or-revise, query, read by id, and
       revision reads. A slug resolves through the query.
+  - name: Apps
+    description: |
+      The software that uses Zitadel, each one document holding its OAuth and
+      OIDC clients, the APIs it serves and whether clients may register into
+      it. The developer's own apps are declared in the release; apps a product
+      creates for its customers are registered here. Create-or-revise, query,
+      read by id, revision reads, and client secrets.
   - name: Policies
     description: |
       Operation policies (ADR 066): a project publishes, per guarded
@@ -230,6 +237,18 @@ paths:
     $ref: endpoints/idps/by_id/revisions/methods.yaml
   /idps/revisions/{revision_id}:
     $ref: endpoints/idps/revisions/by_id/methods.yaml
+  /apps:
+    $ref: endpoints/apps/methods.yaml
+  /apps/query:
+    $ref: endpoints/apps/query/methods.yaml
+  /apps/{id}:
+    $ref: endpoints/apps/by_id/methods.yaml
+  /apps/{id}/revisions:
+    $ref: endpoints/apps/by_id/revisions/methods.yaml
+  /apps/{id}/clients/{client}/secrets:
+    $ref: endpoints/apps/by_id/clients/by_slug/secrets/methods.yaml
+  /apps/revisions/{revision_id}:
+    $ref: endpoints/apps/revisions/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
   /policies/evaluate:
@@ -274,6 +293,12 @@ paths:
 # One per domain event type, keyed by its event_type. gen_event_schemas writes
 # the files and fails until this list names exactly the domain's event types.
 webhooks:
+  app.client_secret.added:
+    $ref: endpoints/events/webhooks/app-client_secret-added.yaml
+  app.created:
+    $ref: endpoints/events/webhooks/app-created.yaml
+  app.updated:
+    $ref: endpoints/events/webhooks/app-updated.yaml
   auth.attempt.created:
     $ref: endpoints/events/webhooks/auth-attempt-created.yaml
   auth.attempt.handed_off:
