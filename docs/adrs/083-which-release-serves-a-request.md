@@ -10,7 +10,7 @@
 > policies) and [ADR 068](068-project-is-the-data-boundary.md) (a target
 > serves its newest deployment).
 > **Implemented by:** #2393 (default target), #2394 (pinned revisions only),
-> #2465 (the CLI deploys the default target), #2467 (the platform project).
+> #2465 (the CLI deploys the default target), #2469 (the platform project).
 
 ## Context
 
@@ -46,6 +46,27 @@ password set) is resolved in four steps:
 
 Calls that do not come from a browser page, `setUserPassword` and
 `createAuthAttempt`, resolve the `default` target and ignore `Origin`.
+
+```mermaid
+flowchart TD
+    request["A request for a project"] --> hasOrigin{"Does it carry an Origin?"}
+    hasOrigin -- "no, or setUserPassword /<br/>createAuthAttempt" --> defaultTarget["Target: default"]
+    hasOrigin -- "yes" --> check{"Primary origin, live preview URL<br/>or loopback of the project?"}
+    check -- "yes" --> exact["Target: that exact origin"]
+    check -- "no, but a console origin<br/>opening a flow" --> defaultTarget
+    check -- "no" --> refused["403 proj.origin_not_allowed<br/>or proj.preview_not_live"]
+    exact --> originDeployment{"Newest deployment to it?"}
+    defaultTarget --> defaultDeployment{"Newest deployment to default?"}
+    originDeployment -- "none" --> notDeployed["409 rel.not_deployed"]
+    defaultDeployment -- "none" --> noDefault["409 rel.no_default"]
+    originDeployment -- "found" --> release{"Is its release revoked?"}
+    defaultDeployment -- "found" --> release
+    release -- "yes" --> revoked["409 rel.revoked"]
+    release -- "no" --> served["Served that release:<br/>only the revisions it pins"]
+```
+
+The diagram is the opening of a flow and the calls above. A later step of a
+flow skips it and is served the release the flow opened with.
 
 ### A flow keeps its release
 
