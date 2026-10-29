@@ -1541,6 +1541,26 @@ export async function aSetUpApp(extraArgs: string[] = []): Promise<ScaffoldedApp
 }
 
 /**
+ * A set-up app with a second environment, `staging`, that `env add` bound and
+ * nothing has been deployed to: setup deploys its own project, so this is
+ * where a spec finds a first deploy. Address it with `--env staging`.
+ */
+export async function anUndeployedEnvironment(): Promise<ScaffoldedApp> {
+  const app = await aSetUpApp();
+  const added = await app.run([
+    "env",
+    "add",
+    "staging",
+    "--app-url",
+    "https://staging.acme.com",
+    "--non-interactive",
+    "--json",
+  ]);
+  expect(added, "arranging env add should have succeeded").toSucceed();
+  return app;
+}
+
+/**
  * An app through `setup` with its commit kept, so a release built from it
  * records a git sha and a later deploy has a baseline to diff against.
  */

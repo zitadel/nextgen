@@ -78,9 +78,13 @@ describe("api", () => {
         const app = await aSetUpApp();
         await reviseUserSchema(app);
 
+        const all = await app.api("listSchemas", "-F", "limit=100");
+        const total = app.envelopeOf<{ schemas: unknown[] }>(all).data.schemas.length;
+
         const result = await app.api("listSchemas", "-F", "limit=1", "--paginate");
 
-        expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(2);
+        expect(total).toBeGreaterThan(1);
+        expect(app.envelopeOf<{ schemas: unknown[] }>(result).data.schemas).toHaveLength(total);
       });
 
       it("fails as the server refuses", async () => {
