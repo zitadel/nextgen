@@ -1112,10 +1112,10 @@ func (o *DeleteUserAction) Apply(ctx context.Context, stmts AllStatements) error
 		return domain.ErrInternal(err).WithMessage("failed to delete user")
 	}
 	// A missing user stays the idempotent success below, and deletes nothing,
-	// so there is no administrator to keep. The check runs first: DeleteUserByID
+	// so there is no owner to keep. The check runs first: DeleteUserByID
 	// drops the membership edges it reads.
 	if exists {
-		if err := ensureProjectAdminRemains(ctx, stmts, domain.AdminRemoval{UserID: o.UserID}); err != nil {
+		if err := ensureProjectOwnerRemains(ctx, stmts, o.UserID); err != nil {
 			return err
 		}
 	}

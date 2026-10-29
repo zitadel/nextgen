@@ -28553,44 +28553,6 @@ func (s *CsrfTokenResponse) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes DeleteGrantConflict as json.
-func (s *DeleteGrantConflict) Encode(e *jx.Encoder) {
-	unwrapped := (*ErrorDetails)(s)
-
-	unwrapped.Encode(e)
-}
-
-// Decode decodes DeleteGrantConflict from json.
-func (s *DeleteGrantConflict) Decode(d *jx.Decoder) error {
-	if s == nil {
-		return errors.New("invalid: unable to decode DeleteGrantConflict to nil")
-	}
-	var unwrapped ErrorDetails
-	if err := func() error {
-		if err := unwrapped.Decode(d); err != nil {
-			return err
-		}
-		return nil
-	}(); err != nil {
-		return errors.Wrap(err, "alias")
-	}
-	*s = DeleteGrantConflict(unwrapped)
-	return nil
-}
-
-// MarshalJSON implements stdjson.Marshaler.
-func (s *DeleteGrantConflict) MarshalJSON() ([]byte, error) {
-	e := jx.Encoder{}
-	s.Encode(&e)
-	return e.Bytes(), nil
-}
-
-// UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *DeleteGrantConflict) UnmarshalJSON(data []byte) error {
-	d := jx.DecodeBytes(data)
-	return s.Decode(d)
-}
-
 // Encode encodes DeleteGrantErrorResponse as json.
 func (s DeleteGrantErrorResponse) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -28712,22 +28674,6 @@ func (s DeleteGrantErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastAdminDeleteGrantErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.last_admin")
-		{
-			s := s.ProjLastAdmin
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ReqInvalidDeleteGrantErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -28807,9 +28753,6 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedDeleteGrantErrorResponse
 					found = true
-				case "proj.last_admin":
-					s.Type = ProjLastAdminDeleteGrantErrorResponse
-					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteGrantErrorResponse
 					found = true
@@ -28856,10 +28799,6 @@ func (s *DeleteGrantErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedDeleteGrantErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ProjLastAdminDeleteGrantErrorResponse:
-		if err := s.ProjLastAdmin.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidDeleteGrantErrorResponse:
@@ -29152,22 +29091,6 @@ func (s DeleteTeamErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastAdminDeleteTeamErrorResponse:
-		e.FieldStart("code")
-		e.Str("proj.last_admin")
-		{
-			s := s.ProjLastAdmin
-			{
-				e.FieldStart("message")
-				e.Str(s.Message)
-			}
-			{
-				if s.Details.Set {
-					e.FieldStart("details")
-					s.Details.Encode(e)
-				}
-			}
-		}
 	case ReqInvalidDeleteTeamErrorResponse:
 		e.FieldStart("code")
 		e.Str("req.invalid")
@@ -29286,9 +29209,6 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedDeleteTeamErrorResponse
 					found = true
-				case "proj.last_admin":
-					s.Type = ProjLastAdminDeleteTeamErrorResponse
-					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteTeamErrorResponse
 					found = true
@@ -29332,10 +29252,6 @@ func (s *DeleteTeamErrorResponse) Decode(d *jx.Decoder) error {
 		}
 	case NotImplementedDeleteTeamErrorResponse:
 		if err := s.NotImplemented.Decode(d); err != nil {
-			return err
-		}
-	case ProjLastAdminDeleteTeamErrorResponse:
-		if err := s.ProjLastAdmin.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidDeleteTeamErrorResponse:
@@ -29580,11 +29496,11 @@ func (s DeleteUserByIDErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastAdminDeleteUserByIDErrorResponse:
+	case ProjLastOwnerDeleteUserByIDErrorResponse:
 		e.FieldStart("code")
-		e.Str("proj.last_admin")
+		e.Str("proj.last_owner")
 		{
-			s := s.ProjLastAdmin
+			s := s.ProjLastOwner
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -29701,8 +29617,8 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedDeleteUserByIDErrorResponse
 					found = true
-				case "proj.last_admin":
-					s.Type = ProjLastAdminDeleteUserByIDErrorResponse
+				case "proj.last_owner":
+					s.Type = ProjLastOwnerDeleteUserByIDErrorResponse
 					found = true
 				case "req.invalid":
 					s.Type = ReqInvalidDeleteUserByIDErrorResponse
@@ -29750,8 +29666,8 @@ func (s *DeleteUserByIDErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ProjLastAdminDeleteUserByIDErrorResponse:
-		if err := s.ProjLastAdmin.Decode(d); err != nil {
+	case ProjLastOwnerDeleteUserByIDErrorResponse:
+		if err := s.ProjLastOwner.Decode(d); err != nil {
 			return err
 		}
 	case ReqInvalidDeleteUserByIDErrorResponse:
@@ -54466,11 +54382,11 @@ func (s GetFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastAdminGetFlowStepErrorResponse:
+	case ProjLastOwnerGetFlowStepErrorResponse:
 		e.FieldStart("code")
-		e.Str("proj.last_admin")
+		e.Str("proj.last_owner")
 		{
-			s := s.ProjLastAdmin
+			s := s.ProjLastOwner
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -54775,8 +54691,8 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedGetFlowStepErrorResponse
 					found = true
-				case "proj.last_admin":
-					s.Type = ProjLastAdminGetFlowStepErrorResponse
+				case "proj.last_owner":
+					s.Type = ProjLastOwnerGetFlowStepErrorResponse
 					found = true
 				case "rel.not_found":
 					s.Type = RelNotFoundGetFlowStepErrorResponse
@@ -54928,8 +54844,8 @@ func (s *GetFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ProjLastAdminGetFlowStepErrorResponse:
-		if err := s.ProjLastAdmin.Decode(d); err != nil {
+	case ProjLastOwnerGetFlowStepErrorResponse:
+		if err := s.ProjLastOwner.Decode(d); err != nil {
 			return err
 		}
 	case RelNotFoundGetFlowStepErrorResponse:
@@ -84607,21 +84523,21 @@ func (s *OptProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
-// Encode encodes ProjLastAdminDetails as json.
-func (o OptProjLastAdminDetails) Encode(e *jx.Encoder) {
+// Encode encodes ProjLastOwnerDetails as json.
+func (o OptProjLastOwnerDetails) Encode(e *jx.Encoder) {
 	if !o.Set {
 		return
 	}
 	o.Value.Encode(e)
 }
 
-// Decode decodes ProjLastAdminDetails from json.
-func (o *OptProjLastAdminDetails) Decode(d *jx.Decoder) error {
+// Decode decodes ProjLastOwnerDetails from json.
+func (o *OptProjLastOwnerDetails) Decode(d *jx.Decoder) error {
 	if o == nil {
-		return errors.New("invalid: unable to decode OptProjLastAdminDetails to nil")
+		return errors.New("invalid: unable to decode OptProjLastOwnerDetails to nil")
 	}
 	o.Set = true
-	o.Value = make(ProjLastAdminDetails)
+	o.Value = make(ProjLastOwnerDetails)
 	if err := o.Value.Decode(d); err != nil {
 		return err
 	}
@@ -84629,14 +84545,14 @@ func (o *OptProjLastAdminDetails) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s OptProjLastAdminDetails) MarshalJSON() ([]byte, error) {
+func (s OptProjLastOwnerDetails) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *OptProjLastAdminDetails) UnmarshalJSON(data []byte) error {
+func (s *OptProjLastOwnerDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -98221,17 +98137,17 @@ func (s *ProjClaimWindowExpiredDetails) UnmarshalJSON(data []byte) error {
 }
 
 // Encode implements json.Marshaler.
-func (s *ProjLastAdmin) Encode(e *jx.Encoder) {
+func (s *ProjLastOwner) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields encodes fields.
-func (s *ProjLastAdmin) encodeFields(e *jx.Encoder) {
+func (s *ProjLastOwner) encodeFields(e *jx.Encoder) {
 	{
 		e.FieldStart("code")
-		e.Str("proj.last_admin")
+		e.Str("proj.last_owner")
 	}
 	{
 		e.FieldStart("message")
@@ -98245,16 +98161,16 @@ func (s *ProjLastAdmin) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfProjLastAdmin = [3]string{
+var jsonFieldsNameOfProjLastOwner = [3]string{
 	0: "code",
 	1: "message",
 	2: "details",
 }
 
-// Decode decodes ProjLastAdmin from json.
-func (s *ProjLastAdmin) Decode(d *jx.Decoder) error {
+// Decode decodes ProjLastOwner from json.
+func (s *ProjLastOwner) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ProjLastAdmin to nil")
+		return errors.New("invalid: unable to decode ProjLastOwner to nil")
 	}
 	var requiredBitSet [1]uint8
 
@@ -98299,7 +98215,7 @@ func (s *ProjLastAdmin) Decode(d *jx.Decoder) error {
 		}
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ProjLastAdmin")
+		return errors.Wrap(err, "decode ProjLastOwner")
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
@@ -98316,8 +98232,8 @@ func (s *ProjLastAdmin) Decode(d *jx.Decoder) error {
 				bitIdx := bits.TrailingZeros8(result)
 				fieldIdx := i*8 + bitIdx
 				var name string
-				if fieldIdx < len(jsonFieldsNameOfProjLastAdmin) {
-					name = jsonFieldsNameOfProjLastAdmin[fieldIdx]
+				if fieldIdx < len(jsonFieldsNameOfProjLastOwner) {
+					name = jsonFieldsNameOfProjLastOwner[fieldIdx]
 				} else {
 					name = strconv.Itoa(fieldIdx)
 				}
@@ -98338,27 +98254,27 @@ func (s *ProjLastAdmin) Decode(d *jx.Decoder) error {
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s *ProjLastAdmin) MarshalJSON() ([]byte, error) {
+func (s *ProjLastOwner) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ProjLastAdmin) UnmarshalJSON(data []byte) error {
+func (s *ProjLastOwner) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
 
 // Encode implements json.Marshaler.
-func (s ProjLastAdminDetails) Encode(e *jx.Encoder) {
+func (s ProjLastOwnerDetails) Encode(e *jx.Encoder) {
 	e.ObjStart()
 	s.encodeFields(e)
 	e.ObjEnd()
 }
 
 // encodeFields implements json.Marshaler.
-func (s ProjLastAdminDetails) encodeFields(e *jx.Encoder) {
+func (s ProjLastOwnerDetails) encodeFields(e *jx.Encoder) {
 	for k, elem := range s {
 		e.FieldStart(k)
 
@@ -98368,10 +98284,10 @@ func (s ProjLastAdminDetails) encodeFields(e *jx.Encoder) {
 	}
 }
 
-// Decode decodes ProjLastAdminDetails from json.
-func (s *ProjLastAdminDetails) Decode(d *jx.Decoder) error {
+// Decode decodes ProjLastOwnerDetails from json.
+func (s *ProjLastOwnerDetails) Decode(d *jx.Decoder) error {
 	if s == nil {
-		return errors.New("invalid: unable to decode ProjLastAdminDetails to nil")
+		return errors.New("invalid: unable to decode ProjLastOwnerDetails to nil")
 	}
 	m := s.init()
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
@@ -98389,21 +98305,21 @@ func (s *ProjLastAdminDetails) Decode(d *jx.Decoder) error {
 		m[string(k)] = elem
 		return nil
 	}); err != nil {
-		return errors.Wrap(err, "decode ProjLastAdminDetails")
+		return errors.Wrap(err, "decode ProjLastOwnerDetails")
 	}
 
 	return nil
 }
 
 // MarshalJSON implements stdjson.Marshaler.
-func (s ProjLastAdminDetails) MarshalJSON() ([]byte, error) {
+func (s ProjLastOwnerDetails) MarshalJSON() ([]byte, error) {
 	e := jx.Encoder{}
 	s.Encode(&e)
 	return e.Bytes(), nil
 }
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
-func (s *ProjLastAdminDetails) UnmarshalJSON(data []byte) error {
+func (s *ProjLastOwnerDetails) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -124837,11 +124753,11 @@ func (s SubmitFlowStepErrorResponse) encodeFields(e *jx.Encoder) {
 				}
 			}
 		}
-	case ProjLastAdminSubmitFlowStepErrorResponse:
+	case ProjLastOwnerSubmitFlowStepErrorResponse:
 		e.FieldStart("code")
-		e.Str("proj.last_admin")
+		e.Str("proj.last_owner")
 		{
-			s := s.ProjLastAdmin
+			s := s.ProjLastOwner
 			{
 				e.FieldStart("message")
 				e.Str(s.Message)
@@ -125178,8 +125094,8 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 				case "not_implemented":
 					s.Type = NotImplementedSubmitFlowStepErrorResponse
 					found = true
-				case "proj.last_admin":
-					s.Type = ProjLastAdminSubmitFlowStepErrorResponse
+				case "proj.last_owner":
+					s.Type = ProjLastOwnerSubmitFlowStepErrorResponse
 					found = true
 				case "proj.origin_not_allowed":
 					s.Type = ProjOriginNotAllowedSubmitFlowStepErrorResponse
@@ -125337,8 +125253,8 @@ func (s *SubmitFlowStepErrorResponse) Decode(d *jx.Decoder) error {
 		if err := s.NotImplemented.Decode(d); err != nil {
 			return err
 		}
-	case ProjLastAdminSubmitFlowStepErrorResponse:
-		if err := s.ProjLastAdmin.Decode(d); err != nil {
+	case ProjLastOwnerSubmitFlowStepErrorResponse:
+		if err := s.ProjLastOwner.Decode(d); err != nil {
 			return err
 		}
 	case ProjOriginNotAllowedSubmitFlowStepErrorResponse:

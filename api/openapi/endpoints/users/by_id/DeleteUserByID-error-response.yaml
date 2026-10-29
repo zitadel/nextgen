@@ -9,7 +9,7 @@ content:
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../../components/schemas/errors/proj-last_admin.yaml'
+        - $ref: '../../../components/schemas/errors/proj-last_owner.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
         - $ref: '../../../components/schemas/errors/user-not_found.yaml'
@@ -22,7 +22,7 @@ content:
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
-          proj.last_admin: '../../../components/schemas/errors/proj-last_admin.yaml'
+          proj.last_owner: '../../../components/schemas/errors/proj-last_owner.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
           user.not_found: '../../../components/schemas/errors/user-not_found.yaml'
@@ -53,11 +53,11 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
-      proj.last_admin:
-        summary: proj.last_admin
+      proj.last_owner:
+        summary: proj.last_owner
         value:
-          code: proj.last_admin
-          message: 'This change would leave a project without someone who can administer it. Grant admin to someone else, then try again.'
+          code: proj.last_owner
+          message: 'This user is the last active member of the team that owns a project. Add another member to that team, then try again.'
       req.invalid:
         summary: req.invalid
         value:

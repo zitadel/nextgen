@@ -154,9 +154,9 @@ delete:
 
       The user is removed, not deactivated, and the deletion emits `user.deleted`.
       With a project secret the request is idempotent: deleting a user that exists
-      in no project succeeds without changing anything. Deleting a user who is the
-      last person who can administer a project returns 409 `proj.last_admin` and
-      changes nothing.
+      in no project succeeds without changing anything. Deleting the last active
+      member of a project's owning team returns 409 `proj.last_owner` and changes
+      nothing.
     tags:
       - Users
     parameters:
@@ -182,9 +182,9 @@ delete:
               $ref: ../../../components/error-details.yaml
       '409':
         description: |
-          Deleting this user would leave a project without someone who can
-          administer it (`proj.last_admin`). Grant admin to someone else, then
-          retry. `details.details.project_ids` names the projects.
+          The user is the last active member of a project's owning team
+          (`proj.last_owner`). Add another member to that team, then retry.
+          `details.details.project_ids` names the projects.
         content:
           application/json:
             schema:

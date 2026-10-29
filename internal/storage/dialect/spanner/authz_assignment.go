@@ -388,22 +388,22 @@ func (s authzAssignmentStatements) ListProjectAdmins(ctx context.Context, projec
 	return &database.ListResult[*domain.ProjectAdminRecord]{Items: admins, NextCursor: next}, nil
 }
 
-// ListProjectsTouchedByAdminRemoval implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
-	return s.listAdminRemovalProjects(ctx, removal, false)
+// ListProjectsOwnedThroughMember implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, false)
 }
 
-// ListProjectsLosingLastAdmin implements [service.AuthzAssignmentStatements].
-func (s authzAssignmentStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
-	return s.listAdminRemovalProjects(ctx, removal, true)
+// ListProjectsLosingLastOwner implements [service.AuthzAssignmentStatements].
+func (s authzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
+	return s.listOwnerProjects(ctx, userID, true)
 }
 
-func (s authzAssignmentStatements) listAdminRemovalProjects(ctx context.Context, removal domain.AdminRemoval, losing bool) ([]string, error) {
+func (s authzAssignmentStatements) listOwnerProjects(ctx context.Context, userID string, losing bool) ([]string, error) {
 	var c statementCompiler
 	if losing {
-		authz.WriteProjectsLosingLastAdmin(&c, spannerAuthzEnv(), removal)
+		authz.WriteProjectsLosingLastOwner(&c, spannerAuthzEnv(), userID)
 	} else {
-		authz.WriteProjectsTouchedByAdminRemoval(&c, spannerAuthzEnv(), removal)
+		authz.WriteProjectsOwnedThroughMember(&c, spannerAuthzEnv(), userID)
 	}
 	var ids []string
 	err := s.db.Query(ctx, c.statement(), func(iter *spanner.RowIterator) error {

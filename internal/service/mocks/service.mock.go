@@ -5471,80 +5471,80 @@ func (c *MockAllStatementsListProjectsCall) DoAndReturn(f func(context.Context, 
 	return c
 }
 
-// ListProjectsLosingLastAdmin mocks base method.
-func (m *MockAllStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+// ListProjectsLosingLastOwner mocks base method.
+func (m *MockAllStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectsLosingLastAdmin", ctx, removal)
+	ret := m.ctrl.Call(m, "ListProjectsLosingLastOwner", ctx, userID)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectsLosingLastAdmin indicates an expected call of ListProjectsLosingLastAdmin.
-func (mr *MockAllStatementsMockRecorder) ListProjectsLosingLastAdmin(ctx, removal any) *MockAllStatementsListProjectsLosingLastAdminCall {
+// ListProjectsLosingLastOwner indicates an expected call of ListProjectsLosingLastOwner.
+func (mr *MockAllStatementsMockRecorder) ListProjectsLosingLastOwner(ctx, userID any) *MockAllStatementsListProjectsLosingLastOwnerCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastAdmin", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsLosingLastAdmin), ctx, removal)
-	return &MockAllStatementsListProjectsLosingLastAdminCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastOwner", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsLosingLastOwner), ctx, userID)
+	return &MockAllStatementsListProjectsLosingLastOwnerCall{Call: call}
 }
 
-// MockAllStatementsListProjectsLosingLastAdminCall wrap *gomock.Call
-type MockAllStatementsListProjectsLosingLastAdminCall struct {
+// MockAllStatementsListProjectsLosingLastOwnerCall wrap *gomock.Call
+type MockAllStatementsListProjectsLosingLastOwnerCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListProjectsLosingLastAdminCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsLosingLastAdminCall {
+func (c *MockAllStatementsListProjectsLosingLastOwnerCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListProjectsLosingLastAdminCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsLosingLastAdminCall {
+func (c *MockAllStatementsListProjectsLosingLastOwnerCall) Do(f func(context.Context, string) ([]string, error)) *MockAllStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListProjectsLosingLastAdminCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsLosingLastAdminCall {
+func (c *MockAllStatementsListProjectsLosingLastOwnerCall) DoAndReturn(f func(context.Context, string) ([]string, error)) *MockAllStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// ListProjectsTouchedByAdminRemoval mocks base method.
-func (m *MockAllStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+// ListProjectsOwnedThroughMember mocks base method.
+func (m *MockAllStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectsTouchedByAdminRemoval", ctx, removal)
+	ret := m.ctrl.Call(m, "ListProjectsOwnedThroughMember", ctx, userID)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectsTouchedByAdminRemoval indicates an expected call of ListProjectsTouchedByAdminRemoval.
-func (mr *MockAllStatementsMockRecorder) ListProjectsTouchedByAdminRemoval(ctx, removal any) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+// ListProjectsOwnedThroughMember indicates an expected call of ListProjectsOwnedThroughMember.
+func (mr *MockAllStatementsMockRecorder) ListProjectsOwnedThroughMember(ctx, userID any) *MockAllStatementsListProjectsOwnedThroughMemberCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsTouchedByAdminRemoval", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsTouchedByAdminRemoval), ctx, removal)
-	return &MockAllStatementsListProjectsTouchedByAdminRemovalCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsOwnedThroughMember", reflect.TypeOf((*MockAllStatements)(nil).ListProjectsOwnedThroughMember), ctx, userID)
+	return &MockAllStatementsListProjectsOwnedThroughMemberCall{Call: call}
 }
 
-// MockAllStatementsListProjectsTouchedByAdminRemovalCall wrap *gomock.Call
-type MockAllStatementsListProjectsTouchedByAdminRemovalCall struct {
+// MockAllStatementsListProjectsOwnedThroughMemberCall wrap *gomock.Call
+type MockAllStatementsListProjectsOwnedThroughMemberCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAllStatementsListProjectsOwnedThroughMemberCall) Return(arg0 []string, arg1 error) *MockAllStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAllStatementsListProjectsOwnedThroughMemberCall) Do(f func(context.Context, string) ([]string, error)) *MockAllStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAllStatementsListProjectsTouchedByAdminRemovalCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAllStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAllStatementsListProjectsOwnedThroughMemberCall) DoAndReturn(f func(context.Context, string) ([]string, error)) *MockAllStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -12908,80 +12908,80 @@ func (c *MockAuthzAssignmentStatementsListProjectAdminsCall) DoAndReturn(f func(
 	return c
 }
 
-// ListProjectsLosingLastAdmin mocks base method.
-func (m *MockAuthzAssignmentStatements) ListProjectsLosingLastAdmin(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+// ListProjectsLosingLastOwner mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectsLosingLastOwner(ctx context.Context, userID string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectsLosingLastAdmin", ctx, removal)
+	ret := m.ctrl.Call(m, "ListProjectsLosingLastOwner", ctx, userID)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectsLosingLastAdmin indicates an expected call of ListProjectsLosingLastAdmin.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsLosingLastAdmin(ctx, removal any) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+// ListProjectsLosingLastOwner indicates an expected call of ListProjectsLosingLastOwner.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsLosingLastOwner(ctx, userID any) *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastAdmin", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsLosingLastAdmin), ctx, removal)
-	return &MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsLosingLastOwner", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsLosingLastOwner), ctx, userID)
+	return &MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall{Call: call}
 }
 
-// MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall wrap *gomock.Call
-type MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall struct {
+// MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall) Do(f func(context.Context, string) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastAdminCall {
+func (c *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall) DoAndReturn(f func(context.Context, string) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsLosingLastOwnerCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
 
-// ListProjectsTouchedByAdminRemoval mocks base method.
-func (m *MockAuthzAssignmentStatements) ListProjectsTouchedByAdminRemoval(ctx context.Context, removal domain.AdminRemoval) ([]string, error) {
+// ListProjectsOwnedThroughMember mocks base method.
+func (m *MockAuthzAssignmentStatements) ListProjectsOwnedThroughMember(ctx context.Context, userID string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListProjectsTouchedByAdminRemoval", ctx, removal)
+	ret := m.ctrl.Call(m, "ListProjectsOwnedThroughMember", ctx, userID)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListProjectsTouchedByAdminRemoval indicates an expected call of ListProjectsTouchedByAdminRemoval.
-func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsTouchedByAdminRemoval(ctx, removal any) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+// ListProjectsOwnedThroughMember indicates an expected call of ListProjectsOwnedThroughMember.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) ListProjectsOwnedThroughMember(ctx, userID any) *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall {
 	mr.mock.ctrl.T.Helper()
-	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsTouchedByAdminRemoval", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsTouchedByAdminRemoval), ctx, removal)
-	return &MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall{Call: call}
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListProjectsOwnedThroughMember", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).ListProjectsOwnedThroughMember), ctx, userID)
+	return &MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall{Call: call}
 }
 
-// MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall wrap *gomock.Call
-type MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall struct {
+// MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall struct {
 	*gomock.Call
 }
 
 // Return rewrite *gomock.Call.Return
-func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall) Return(arg0 []string, arg1 error) *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.Return(arg0, arg1)
 	return c
 }
 
 // Do rewrite *gomock.Call.Do
-func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) Do(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall) Do(f func(context.Context, string) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.Do(f)
 	return c
 }
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
-func (c *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall) DoAndReturn(f func(context.Context, domain.AdminRemoval) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsTouchedByAdminRemovalCall {
+func (c *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall) DoAndReturn(f func(context.Context, string) ([]string, error)) *MockAuthzAssignmentStatementsListProjectsOwnedThroughMemberCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -8,7 +8,6 @@ content:
         - $ref: '../../../components/schemas/errors/evt-invalid.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../../components/schemas/errors/proj-last_admin.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/team-team_not_found.yaml'
         - $ref: '../../../components/schemas/errors/team-owns_project.yaml'
@@ -21,7 +20,6 @@ content:
           evt.invalid: '../../../components/schemas/errors/evt-invalid.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
-          proj.last_admin: '../../../components/schemas/errors/proj-last_admin.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           team.team_not_found: '../../../components/schemas/errors/team-team_not_found.yaml'
           team.owns_project: '../../../components/schemas/errors/team-owns_project.yaml'
@@ -48,11 +46,6 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
-      proj.last_admin:
-        summary: proj.last_admin
-        value:
-          code: proj.last_admin
-          message: 'This change would leave a project without someone who can administer it. Grant admin to someone else, then try again.'
       req.invalid:
         summary: req.invalid
         value:

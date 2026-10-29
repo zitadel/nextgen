@@ -794,26 +794,6 @@ func TestGrantService_Revoke(t *testing.T) {
 		require.ErrorIs(t, svc.Revoke(t.Context(), "proj_customer", "asgn_app"), domain.ErrGrantNotFound())
 	})
 
-	t.Run("last admin grant is refused before revoke", func(t *testing.T) {
-		t.Parallel()
-		asgn := testManagedGrant("asgn_1", "user_grant01")
-		asgn.Relation = "admin"
-		svc := newMockedGrantService(t, grantPlatformProjID, func(s *servicemocks.MockAllStatements) {
-			gomock.InOrder(
-				s.EXPECT().GetAuthzAssignment(gomock.Any(), "proj_customer", "asgn_1").Return(asgn, nil),
-				s.EXPECT().ListProjectsTouchedByAdminRemoval(gomock.Any(), domain.AdminRemoval{GrantID: "asgn_1"}).
-					Return([]string{"proj_customer"}, nil),
-				s.EXPECT().LockProject(gomock.Any(), "proj_customer").Return(nil),
-				s.EXPECT().ListProjectsLosingLastAdmin(gomock.Any(), domain.AdminRemoval{GrantID: "asgn_1"}).
-					Return([]string{"proj_customer"}, nil),
-			)
-		})
-		err := svc.Revoke(t.Context(), "proj_customer", "asgn_1")
-		require.ErrorIs(t, err, domain.ErrProjectLastAdmin(nil))
-		assert.Contains(t, err.Error(), "proj_customer")
-		assert.Contains(t, err.Error(), "Grant admin to someone else")
-	})
-
 	t.Run("team-scoped grant is not found", func(t *testing.T) {
 		t.Parallel()
 		teamID := "team_scoped"

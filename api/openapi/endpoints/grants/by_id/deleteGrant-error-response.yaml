@@ -11,7 +11,6 @@ content:
         - $ref: '../../../components/schemas/errors/grant-permission_denied.yaml'
         - $ref: '../../../components/schemas/errors/internal.yaml'
         - $ref: '../../../components/schemas/errors/not_implemented.yaml'
-        - $ref: '../../../components/schemas/errors/proj-last_admin.yaml'
         - $ref: '../../../components/schemas/errors/req-invalid.yaml'
         - $ref: '../../../components/schemas/errors/unavailable.yaml'
       discriminator:
@@ -24,7 +23,6 @@ content:
           grant.permission_denied: '../../../components/schemas/errors/grant-permission_denied.yaml'
           internal: '../../../components/schemas/errors/internal.yaml'
           not_implemented: '../../../components/schemas/errors/not_implemented.yaml'
-          proj.last_admin: '../../../components/schemas/errors/proj-last_admin.yaml'
           req.invalid: '../../../components/schemas/errors/req-invalid.yaml'
           unavailable: '../../../components/schemas/errors/unavailable.yaml'
     examples:
@@ -63,11 +61,6 @@ content:
         value:
           code: not_implemented
           message: 'This feature is not implemented yet.'
-      proj.last_admin:
-        summary: proj.last_admin
-        value:
-          code: proj.last_admin
-          message: 'This change would leave a project without someone who can administer it. Grant admin to someone else, then try again.'
       req.invalid:
         summary: req.invalid
         value:

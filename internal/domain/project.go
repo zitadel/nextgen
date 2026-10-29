@@ -58,21 +58,21 @@ func ErrProjectClaimWindowExpired() Error {
 	)
 }
 
-// ProjectLastAdminDetails names the projects a change would leave with nobody
-// who can administer them. The wire nests this under details.details.
-type ProjectLastAdminDetails struct {
+// ProjectLastOwnerDetails names the projects whose owning team would be left
+// without an active member. The wire nests this under details.details.
+type ProjectLastOwnerDetails struct {
 	ProjectIDs []string `json:"project_ids"`
 }
 
-// ErrProjectLastAdmin refuses a change that would remove the last person who
-// can administer a project. The literal message is what the error schema
+// ErrProjectLastOwner refuses removing the last active member of a project's
+// owning team (ADR 054 §8). The literal message is what the error schema
 // records; the call site overrides it with [Error.WithMessage] so the text a
-// client reads names projectIDs. Code stays proj.last_admin either way.
-func ErrProjectLastAdmin(projectIDs []string) Error {
+// client reads names projectIDs. Code stays proj.last_owner either way.
+func ErrProjectLastOwner(projectIDs []string) Error {
 	return newError(
-		PrefixProject.ErrorCodePrefix("last_admin"),
-		"This change would leave a project without someone who can administer it. Grant admin to someone else, then try again.",
-		ProjectLastAdminDetails{ProjectIDs: projectIDs},
+		PrefixProject.ErrorCodePrefix("last_owner"),
+		"This user is the last active member of the team that owns a project. Add another member to that team, then try again.",
+		ProjectLastOwnerDetails{ProjectIDs: projectIDs},
 		nil,
 	)
 }

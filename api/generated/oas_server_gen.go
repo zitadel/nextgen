@@ -326,9 +326,7 @@ type Handler interface {
 	// Soft-revokes a grant this API manages and emits `authz.revoked`.
 	// Already-revoked, missing, project-secret setup, and owning-team grants
 	// return 404. The row is not un-revoked. Expired grants can still be
-	// revoked so the unique binding can be reused. Revoking an admin grant
-	// that would leave the project with nobody who can administer it returns
-	// 409 `proj.last_admin` and changes nothing.
+	// revoked so the unique binding can be reused.
 	// Accepts either a project secret (`oauth2`) or a user-bound Console
 	// session cookie (`nextgenSession`). Cookie-authenticated requests
 	// follow the scheme's CSRF rules (`nextgenSession`).
@@ -347,8 +345,6 @@ type Handler interface {
 	// team.owns_project`: deactivating it would leave the project owned by a
 	// dead team and so unmanageable. No endpoint releases that ownership yet,
 	// so such a team cannot currently be deactivated through the API.
-	// Deactivating any other team that would leave a project with nobody who
-	// can administer it is refused with `409 proj.last_admin`.
 	//
 	// DELETE /teams/{team_id}
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
@@ -357,9 +353,9 @@ type Handler interface {
 	// Deletes a user and removes them from every team they belong to.
 	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
 	// With a project secret the request is idempotent: deleting a user that exists
-	// in no project succeeds without changing anything. Deleting a user who is the
-	// last person who can administer a project returns 409 `proj.last_admin` and
-	// changes nothing.
+	// in no project succeeds without changing anything. Deleting the last active
+	// member of a project's owning team returns 409 `proj.last_owner` and changes
+	// nothing.
 	//
 	// DELETE /users/{user_id}
 	DeleteUserByID(ctx context.Context, params DeleteUserByIDParams) (DeleteUserByIDRes, error)

@@ -23,7 +23,7 @@ const (
 
 	// FOR UPDATE takes an exclusive lock on the project row. A plain read would
 	// take only a shared lock, which two changes can hold at once, so both
-	// could remove the project's last administrator. With the exclusive lock a
+	// could remove the project's last owner. With the exclusive lock a
 	// concurrent change of the same project aborts, and ReadWriteTransaction
 	// replays it after the first commits.
 	lockProjectStmt = `SELECT id FROM projects WHERE id = @p1 FOR UPDATE`

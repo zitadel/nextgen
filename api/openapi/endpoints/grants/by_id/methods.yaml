@@ -77,9 +77,7 @@ delete:
     Soft-revokes a grant this API manages and emits `authz.revoked`.
     Already-revoked, missing, project-secret setup, and owning-team grants
     return 404. The row is not un-revoked. Expired grants can still be
-    revoked so the unique binding can be reused. Revoking an admin grant
-    that would leave the project with nobody who can administer it returns
-    409 `proj.last_admin` and changes nothing.
+    revoked so the unique binding can be reused.
 
     Accepts either a project secret (`oauth2`) or a user-bound Console
     session cookie (`nextgenSession`). Cookie-authenticated requests
@@ -112,15 +110,6 @@ delete:
       description: |
         No unrevoked collaboration grant was found for the given project and
         id (including setup and owning-team rows this API does not manage).
-      content:
-        application/json:
-          schema:
-            $ref: ../../../components/error-details.yaml
-    '409':
-      description: |
-        Revoking this admin grant would leave the project without someone
-        who can administer it (`proj.last_admin`). Grant admin to someone
-        else, then retry. `details.details.project_ids` names the projects.
       content:
         application/json:
           schema:

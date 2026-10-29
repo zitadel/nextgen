@@ -279,27 +279,18 @@ func (s *TeamService) Update(ctx context.Context, input UpdateTeamInput) (_ *dom
 // whose lifecycle it owns (ADR 024). The team is tombstoned, not erased, so it
 // stays readable through [TeamService.Get] with status deactivated.
 //
-// Delete is idempotent: an unknown or already-deactivated team reports success
-// without persisting any changes.
-//
-// A team that still owns a project is refused with [domain.ErrTeamOwnsProject]
-// before any write. Any other team is refused with [domain.ErrProjectLastAdmin]
-// when deactivating it would leave a project with nobody who can administer it.
-// Both checks run before DeactivateTeam, which deletes the membership edges
-// the administrator check reads.
+// Delete is idempotent: DeactivateTeam only touches an active team, so an
+// unknown or already-deactivated team reports success without persisting any changes.
 func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) (err error) {
 	ctx, end := startSpan(ctx, "TeamService.Delete")
 	defer end(&err)
 
 	err = s.v2Pool.Transaction(ctx, func(ctx context.Context, tx Statementer[AllStatements]) error {
-		team, err := tx.Statements().GetTeamByID(ctx, projectID, teamID)
+		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
 		if err != nil {
-			if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-				return nil
-			}
 			return err
 		}
-		if team.Status != domain.TeamStatusActive {
+		if !changed {
 			return nil
 		}
 		ownsAProject, err := tx.Statements().HasActiveOwningTeamGrant(ctx, teamID)
@@ -308,16 +299,6 @@ func (s *TeamService) Delete(ctx context.Context, projectID, teamID string) (err
 		}
 		if ownsAProject {
 			return domain.ErrTeamOwnsProject()
-		}
-		if err := ensureProjectAdminRemains(ctx, tx.Statements(), domain.AdminRemoval{TeamID: teamID}); err != nil {
-			return err
-		}
-		changed, err := tx.Statements().DeactivateTeam(ctx, projectID, teamID)
-		if err != nil {
-			return err
-		}
-		if !changed {
-			return nil
 		}
 		return audit.Emit(ctx, tx.Statements(), audit.EmitSpec{
 			Type:       domain.EventTypeTeamDeactivated,

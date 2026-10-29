@@ -61,9 +61,8 @@ const (
 	projectQuery          = "SELECT id, name, password_hash_policy, created_at, updated_at FROM zitadel_nextgen.projects"
 
 	// FOR UPDATE holds the project row until the transaction ends. A second
-	// change that would remove the project's last administrator waits here,
-	// then reads the first one's result. A plain SELECT would not wait at
-	// READ COMMITTED.
+	// removal of the project's last owner waits here, then reads the first
+	// one's result. A plain SELECT would not wait at READ COMMITTED.
 	lockProjectStmt = `SELECT id FROM zitadel_nextgen.projects WHERE id = $1 FOR UPDATE`
 )
 
