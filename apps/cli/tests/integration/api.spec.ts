@@ -98,7 +98,7 @@ describe("api", () => {
       it("refuses an operation only an end user's session authenticates", async () => {
         const app = await aSetUpApp();
 
-        const result = await app.api("getMyUser");
+        const result = await app.api("getMySession");
 
         expect(result).toFailWith("E_VALIDATION");
       });

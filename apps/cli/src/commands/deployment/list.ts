@@ -35,6 +35,7 @@ type DeploymentRow = {
 export default class DeploymentList extends EnvironmentCommand {
   static override description = "List the project's deployments, newest first.";
   static override group = CommandGroups.configuration;
+  static override acceptsDeveloperLogin = true;
   static override examples = [
     "<%= config.bin %> deployment list",
     "<%= config.bin %> deployment list --all",

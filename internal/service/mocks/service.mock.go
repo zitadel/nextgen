@@ -480,6 +480,45 @@ func (c *MockAllStatementsConsumeSSOStateCall) DoAndReturn(f func(context.Contex
 	return c
 }
 
+// ConsumeTokenByID mocks base method.
+func (m *MockAllStatements) ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumeTokenByID", ctx, projectID, tokenID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConsumeTokenByID indicates an expected call of ConsumeTokenByID.
+func (mr *MockAllStatementsMockRecorder) ConsumeTokenByID(ctx, projectID, tokenID any) *MockAllStatementsConsumeTokenByIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumeTokenByID", reflect.TypeOf((*MockAllStatements)(nil).ConsumeTokenByID), ctx, projectID, tokenID)
+	return &MockAllStatementsConsumeTokenByIDCall{Call: call}
+}
+
+// MockAllStatementsConsumeTokenByIDCall wrap *gomock.Call
+type MockAllStatementsConsumeTokenByIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsConsumeTokenByIDCall) Return(arg0 bool, arg1 error) *MockAllStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsConsumeTokenByIDCall) Do(f func(context.Context, string, string) (bool, error)) *MockAllStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsConsumeTokenByIDCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockAllStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateAuthAttempt mocks base method.
 func (m *MockAllStatements) CreateAuthAttempt(ctx context.Context, entity *domain.AuthAttempt) error {
 	m.ctrl.T.Helper()
@@ -1927,6 +1966,44 @@ func (c *MockAllStatementsDeleteTokenByIDCall) Do(f func(context.Context, string
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAllStatementsDeleteTokenByIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteTokenByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteTokensByOIDCSessionID mocks base method.
+func (m *MockAllStatements) DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteTokensByOIDCSessionID", ctx, projectID, oidcSessionID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteTokensByOIDCSessionID indicates an expected call of DeleteTokensByOIDCSessionID.
+func (mr *MockAllStatementsMockRecorder) DeleteTokensByOIDCSessionID(ctx, projectID, oidcSessionID any) *MockAllStatementsDeleteTokensByOIDCSessionIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteTokensByOIDCSessionID", reflect.TypeOf((*MockAllStatements)(nil).DeleteTokensByOIDCSessionID), ctx, projectID, oidcSessionID)
+	return &MockAllStatementsDeleteTokensByOIDCSessionIDCall{Call: call}
+}
+
+// MockAllStatementsDeleteTokensByOIDCSessionIDCall wrap *gomock.Call
+type MockAllStatementsDeleteTokensByOIDCSessionIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsDeleteTokensByOIDCSessionIDCall) Return(arg0 error) *MockAllStatementsDeleteTokensByOIDCSessionIDCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsDeleteTokensByOIDCSessionIDCall) Do(f func(context.Context, string, string) error) *MockAllStatementsDeleteTokensByOIDCSessionIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsDeleteTokensByOIDCSessionIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockAllStatementsDeleteTokensByOIDCSessionIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
@@ -9010,6 +9087,45 @@ func (m *MockTokenStatements) EXPECT() *MockTokenStatementsMockRecorder {
 	return m.recorder
 }
 
+// ConsumeTokenByID mocks base method.
+func (m *MockTokenStatements) ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ConsumeTokenByID", ctx, projectID, tokenID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ConsumeTokenByID indicates an expected call of ConsumeTokenByID.
+func (mr *MockTokenStatementsMockRecorder) ConsumeTokenByID(ctx, projectID, tokenID any) *MockTokenStatementsConsumeTokenByIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ConsumeTokenByID", reflect.TypeOf((*MockTokenStatements)(nil).ConsumeTokenByID), ctx, projectID, tokenID)
+	return &MockTokenStatementsConsumeTokenByIDCall{Call: call}
+}
+
+// MockTokenStatementsConsumeTokenByIDCall wrap *gomock.Call
+type MockTokenStatementsConsumeTokenByIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTokenStatementsConsumeTokenByIDCall) Return(arg0 bool, arg1 error) *MockTokenStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTokenStatementsConsumeTokenByIDCall) Do(f func(context.Context, string, string) (bool, error)) *MockTokenStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTokenStatementsConsumeTokenByIDCall) DoAndReturn(f func(context.Context, string, string) (bool, error)) *MockTokenStatementsConsumeTokenByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // CreateToken mocks base method.
 func (m *MockTokenStatements) CreateToken(ctx context.Context, entity *domain.Token) error {
 	m.ctrl.T.Helper()
@@ -9082,6 +9198,44 @@ func (c *MockTokenStatementsDeleteTokenByIDCall) Do(f func(context.Context, stri
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockTokenStatementsDeleteTokenByIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockTokenStatementsDeleteTokenByIDCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// DeleteTokensByOIDCSessionID mocks base method.
+func (m *MockTokenStatements) DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteTokensByOIDCSessionID", ctx, projectID, oidcSessionID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteTokensByOIDCSessionID indicates an expected call of DeleteTokensByOIDCSessionID.
+func (mr *MockTokenStatementsMockRecorder) DeleteTokensByOIDCSessionID(ctx, projectID, oidcSessionID any) *MockTokenStatementsDeleteTokensByOIDCSessionIDCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteTokensByOIDCSessionID", reflect.TypeOf((*MockTokenStatements)(nil).DeleteTokensByOIDCSessionID), ctx, projectID, oidcSessionID)
+	return &MockTokenStatementsDeleteTokensByOIDCSessionIDCall{Call: call}
+}
+
+// MockTokenStatementsDeleteTokensByOIDCSessionIDCall wrap *gomock.Call
+type MockTokenStatementsDeleteTokensByOIDCSessionIDCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockTokenStatementsDeleteTokensByOIDCSessionIDCall) Return(arg0 error) *MockTokenStatementsDeleteTokensByOIDCSessionIDCall {
+	c.Call = c.Call.Return(arg0)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockTokenStatementsDeleteTokensByOIDCSessionIDCall) Do(f func(context.Context, string, string) error) *MockTokenStatementsDeleteTokensByOIDCSessionIDCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockTokenStatementsDeleteTokensByOIDCSessionIDCall) DoAndReturn(f func(context.Context, string, string) error) *MockTokenStatementsDeleteTokensByOIDCSessionIDCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }

@@ -23,6 +23,31 @@ type SecurityHandler struct {
 	// session of a user homed there carries it in ScopeContext, which is what
 	// opens the platform operator path; empty opens it for nobody.
 	platformProjectID string
+	// userBearers verifies a user bearer (ADR 053 §5); nil accepts none.
+	userBearers UserBearerVerifier
+}
+
+// UserBearer is a verified user bearer: an access token the platform
+// project's authorization server issued for the platform API, which acts as
+// the user it names.
+type UserBearer struct {
+	ProjectID string
+	UserID    string
+	ClientID  string
+	ExpiresAt time.Time
+}
+
+// UserBearerVerifier verifies a user bearer. A token it refuses is
+// domain.ErrInvalidToken; any other error is a failure to decide.
+type UserBearerVerifier interface {
+	VerifyUserBearer(ctx context.Context, token string) (UserBearer, error)
+}
+
+// WithUserBearers accepts the platform project's access tokens as a user
+// bearer, a chainable setter like WithPlatformProject.
+func (s *SecurityHandler) WithUserBearers(verifier UserBearerVerifier) *SecurityHandler {
+	s.userBearers = verifier
+	return s
 }
 
 func NewSecurityHandler(
@@ -44,6 +69,10 @@ func (s *SecurityHandler) WithPlatformProject(projectID string) *SecurityHandler
 func (s SecurityHandler) HandleOAuth2(ctx context.Context, operationName api.OperationName, t api.OAuth2) (context.Context, error) {
 	if t.Token == "" {
 		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	// A JWS has three parts, the project secret's JWE five.
+	if s.userBearers != nil && strings.Count(t.Token, ".") == 2 {
+		return s.handleUserBearer(ctx, operationName, t.Token)
 	}
 
 	payload, err := s.tokenService.IntrospectToken(ctx, t.Token)
@@ -121,6 +150,46 @@ func (s SecurityHandler) HandleNextgenSession(ctx context.Context, operationName
 		ctx = WithScopeContext(ctx, scope)
 	}
 	return ctx, nil
+}
+
+// handleUserBearer authenticates a user bearer (ADR 053 §5). It is the same
+// principal a console session of that user is, with the same grants, and is
+// accepted exactly where such a session is: the operations a user may call.
+// Everywhere else the operation's ScopeContext assumptions (a project secret's
+// home is its target) do not hold, so the bearer is refused there.
+func (s SecurityHandler) handleUserBearer(ctx context.Context, operationName api.OperationName, token string) (context.Context, error) {
+	if !userBoundSessionOperations[operationName] && !userBearerSelfOperations[operationName] {
+		return nil, ogenerrors.ErrSecurityRequirementIsNotSatisfied
+	}
+	bearer, err := s.userBearers.VerifyUserBearer(ctx, token)
+	if err != nil {
+		return nil, introspectionFailure(err)
+	}
+	scope := ScopeContext{
+		ProjectID:     bearer.ProjectID,
+		PrincipalType: domain.AuthzPrincipalTypeUser,
+		PrincipalID:   bearer.UserID,
+	}
+	if s.platformProjectID != "" && bearer.ProjectID == s.platformProjectID {
+		scope.PlatformProjectID = s.platformProjectID
+	}
+	ctx = WithScopeContext(ctx, scope)
+	ctx = context.WithValue(ctx, userBearerKey{}, bearer)
+	ctx = withActorFromToken(ctx, &domain.Token{ProjectID: bearer.ProjectID, UserID: bearer.UserID, Type: domain.TokenTypeOIDCAccessToken})
+	return ctx, nil
+}
+
+// userBearerSelfOperations are the self-access operations a user bearer may
+// call besides the session's management ones: who the bearer is.
+var userBearerSelfOperations = map[api.OperationName]bool{
+	api.GetMyUserOperation: true,
+}
+
+type userBearerKey struct{}
+
+func userBearerFromContext(ctx context.Context) (UserBearer, bool) {
+	v, ok := ctx.Value(userBearerKey{}).(UserBearer)
+	return v, ok
 }
 
 var _ api.SecurityHandler = (*SecurityHandler)(nil)
@@ -277,6 +346,16 @@ func sessionTokenFromContext(ctx context.Context) (*domain.Token, bool) {
 // session, so it never tells a caller that its cookie is genuine but its user
 // is gone (#553).
 func requireSelf(ctx context.Context, projectID api.OptProjectID) (domain.Self, error) {
+	if bearer, ok := userBearerFromContext(ctx); ok {
+		if want, ok := projectID.Get(); ok && bearer.ProjectID != string(want) {
+			return domain.Self{}, domain.ErrSessionProjectMismatch()
+		}
+		self, err := domain.SelfFromAccessToken(bearer.ProjectID, bearer.UserID, bearer.ExpiresAt, time.Now())
+		if err != nil {
+			return domain.Self{}, invalidSessionCredential(err)
+		}
+		return self, nil
+	}
 	token, ok := sessionTokenFromContext(ctx)
 	if ok {
 		if err := holdSessionToProject(token, projectID); err != nil {

@@ -385,6 +385,12 @@ type TokenStatements interface {
 	ListTokens(ctx context.Context, filter *database.ListOptions[domain.TokenField]) (*database.ListResult[*domain.Token], error)
 	DeleteTokenByID(ctx context.Context, projectID, tokenID string) error
 	DeleteTokensBySessionID(ctx context.Context, projectID, sessionID string) error
+	// ConsumeTokenByID deletes the record and reports whether there was one,
+	// so of two callers presenting the same single-use token only one wins.
+	ConsumeTokenByID(ctx context.Context, projectID, tokenID string) (bool, error)
+	// DeleteTokensByOIDCSessionID deletes every record of one OAuth grant: its
+	// code and refresh tokens share the grant's id as oidc_session_id.
+	DeleteTokensByOIDCSessionID(ctx context.Context, projectID, oidcSessionID string) error
 }
 
 // TODO(adlerhurst): until go 1.27 only [StatementPool] and [Statements] are used, the rest is prepared for generic methods

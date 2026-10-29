@@ -30,6 +30,9 @@ Getting started
   start             Start a local Zitadel server
   status            Summarize the local Zitadel server and project state
   claim             Claim this project to make it permanent
+  login             Sign in to a Zitadel server as yourself, in the browser
+  whoami            Show who you are signed in as at a server
+  logout            Sign out of a server
 
 Local development
   console           Open the local console, signed in as the local admin

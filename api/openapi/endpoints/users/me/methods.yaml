@@ -9,12 +9,17 @@ get:
 
     With `project_id`, the user is returned only when the session belongs to
     that project.
+
+    A platform-project user may also call it with the access token the
+    platform project's authorization server issued them for this API (the
+    `zitadel login` credential), which names the same user.
   tags:
     - Users
   parameters:
     - $ref: ../../../components/parameters/session-project-id.yaml
   security:
     - nextgenSession: []
+    - oauth2: []
   responses:
     '200':
       description: Current user information retrieved successfully

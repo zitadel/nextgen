@@ -342,3 +342,68 @@ func TestTokenStatements_ListProjectPreview(t *testing.T) {
 		assert.Empty(t, listPreview().Items)
 	})
 }
+
+func TestTokenStatements_ConsumeTokenByID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr-tok-consume-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Consume Token User")))
+
+		grant := "grant-consume-" + uniqueSuffix(t)
+		tok := &domain.Token{
+			ProjectID:     projectID,
+			UserID:        userID,
+			Type:          domain.TokenTypeOIDCAccessToken,
+			OIDCSessionID: &grant,
+		}
+		require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+		t.Cleanup(func() {
+			_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+		})
+
+		first, err := d.stmts.ConsumeTokenByID(t.Context(), projectID, tok.TokenID)
+		require.NoError(t, err)
+		assert.True(t, first, "the first consume finds the record")
+
+		second, err := d.stmts.ConsumeTokenByID(t.Context(), projectID, tok.TokenID)
+		require.NoError(t, err)
+		assert.False(t, second, "a consumed record cannot be consumed again")
+
+		_, err = d.stmts.GetTokenByID(t.Context(), projectID, tok.TokenID)
+		assert.ErrorIs(t, err, new(database.NoRowFoundError))
+	})
+}
+
+func TestTokenStatements_DeleteTokensByOIDCSessionID(t *testing.T) {
+	forEachDialect(t, func(t *testing.T, d dialect) {
+		projectID, schemaURL := ensureUserTestProject(t, d.stmts)
+		userID := "usr-tok-grant-" + uniqueSuffix(t)
+		require.NoError(t, d.stmts.CreateUser(t.Context(), newTestUser(t, projectID, schemaURL, userID, userID+"@example.com", "Grant Token User")))
+
+		create := func(grant string) string {
+			tok := &domain.Token{
+				ProjectID:     projectID,
+				UserID:        userID,
+				Type:          domain.TokenTypeOIDCAccessToken,
+				OIDCSessionID: &grant,
+			}
+			require.NoError(t, d.stmts.CreateToken(t.Context(), tok))
+			t.Cleanup(func() {
+				_ = d.stmts.DeleteTokenByID(context.Background(), projectID, tok.TokenID)
+			})
+			return tok.TokenID
+		}
+		revoked := "grant-revoked-" + uniqueSuffix(t)
+		kept := "grant-kept-" + uniqueSuffix(t)
+		code, refresh, other := create(revoked), create(revoked), create(kept)
+
+		require.NoError(t, d.stmts.DeleteTokensByOIDCSessionID(t.Context(), projectID, revoked))
+
+		for _, id := range []string{code, refresh} {
+			_, err := d.stmts.GetTokenByID(t.Context(), projectID, id)
+			assert.ErrorIs(t, err, new(database.NoRowFoundError), "every record of the grant is gone")
+		}
+		_, err := d.stmts.GetTokenByID(t.Context(), projectID, other)
+		assert.NoError(t, err, "another grant's record stays")
+	})
+}

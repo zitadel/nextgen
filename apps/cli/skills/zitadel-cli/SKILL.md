@@ -583,6 +583,30 @@ new `--no-wait` link. A project that already has a team is `skipped` with
 `reason: "already-claimed"`; one past its 14 days fails with `E_VALIDATION`
 and no `next_commands`, since a new link cannot reopen it.
 
+## Signing in as the developer (proof of concept)
+
+`zitadel login --server <url>` signs the developer in as themselves on a
+server that runs the platform project's authorization server
+(`platform.oauth.enabled`): it finds the endpoints through
+`/.well-known/oauth-protected-resource`, opens a browser on the server's own
+login (PKCE, a loopback redirect on a free port), and stores the tokens in the
+CLI's user config directory (`credentials.json`, owner-only), never in the
+project. Signing in is the person's step, like claiming: under `--json` the
+link is printed to stderr as `Sign in at: <url>`, and the command blocks until
+the browser comes back or `--timeout` seconds pass (`E_CANCELLED`). A server
+without it fails with `E_NOT_IMPLEMENTED`.
+
+- `zitadel whoami` asks the server who the stored token is
+  (`data.user_id`, `data.identifier`), refreshing an expired token; nobody
+  signed in is `E_CREDENTIAL_MISSING` with `login` in `next_commands`, and a
+  refused refresh forgets the sign-in and fails with `E_AUTH`.
+- `zitadel logout` revokes the refresh token and forgets the sign-in;
+  nobody signed in is `skipped` with `reason: "not-signed-in"`.
+- `deployment list` acts as the signed-in developer when no
+  `ZITADEL_PROJECT_SECRET` resolves: it needs only `ZITADEL_URL` and
+  `ZITADEL_PROJECT_ID`, and sees the projects the developer's grants reach
+  (another project is `E_NOT_FOUND`). A secret that resolves always wins.
+
 ## Reference files
 
 Load on demand:

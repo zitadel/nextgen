@@ -80,6 +80,30 @@ func (k *SigningKey) IsRemoved() bool {
 }
 
 func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
+	return k.SignerWithOptions(kek, nil)
+}
+
+// SignerWithOptions is Signer with the JOSE header options a token profile
+// asks for, such as RFC 9068's `typ: at+jwt`.
+func (k *SigningKey) SignerWithOptions(kek crypto.Crypter, opts *jose.SignerOptions) (jose.Signer, error) {
+	private, err := k.PrivateKey(kek)
+	if err != nil {
+		return nil, err
+	}
+	return jose.NewSigner(
+		jose.SigningKey{
+			Algorithm: k.Algorithm,
+			Key: &jose.JSONWebKey{
+				Key:   private,
+				KeyID: k.ID,
+			},
+		},
+		opts,
+	)
+}
+
+// PrivateKey unwraps the key's seed with kek.
+func (k *SigningKey) PrivateKey(kek crypto.Crypter) (ed25519.PrivateKey, error) {
 	decrypted, err := kek.Decrypt(k.Key)
 	if err != nil {
 		return nil, ErrDecryptionFailed(err)
@@ -87,16 +111,22 @@ func (k *SigningKey) Signer(kek crypto.Crypter) (jose.Signer, error) {
 	if len(decrypted) != ed25519.SeedSize {
 		return nil, ErrDecryptionFailed(nil).WithDetails(fmt.Sprintf("signing key seed is not %d bytes", ed25519.SeedSize))
 	}
-	return jose.NewSigner(
-		jose.SigningKey{
-			Algorithm: k.Algorithm,
-			Key: &jose.JSONWebKey{
-				Key:   ed25519.NewKeyFromSeed([]byte(decrypted)),
-				KeyID: k.ID,
-			},
-		},
-		nil,
-	)
+	return ed25519.NewKeyFromSeed([]byte(decrypted)), nil
+}
+
+// PublicJWK is the key as a JWKS publishes it: the public half, its id, its
+// algorithm, and `use: sig`.
+func (k *SigningKey) PublicJWK(kek crypto.Crypter) (jose.JSONWebKey, error) {
+	private, err := k.PrivateKey(kek)
+	if err != nil {
+		return jose.JSONWebKey{}, err
+	}
+	return jose.JSONWebKey{
+		Key:       private.Public(),
+		KeyID:     k.ID,
+		Algorithm: string(k.Algorithm),
+		Use:       "sig",
+	}, nil
 }
 
 type SigningKeyField uint8

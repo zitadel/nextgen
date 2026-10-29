@@ -8366,6 +8366,9 @@ func (s *Server) handleGetMySessionCsrfTokenRequest(args [0]string, argsEscaped 
 // ever reads their own user.
 // With `project_id`, the user is returned only when the session belongs to
 // that project.
+// A platform-project user may also call it with the access token the
+// platform project's authorization server issued them for this API (the
+// `zitadel login` credential), which names the same user.
 //
 // GET /users/me
 func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {
@@ -8459,11 +8462,29 @@ func (s *Server) handleGetMyUserRequest(args [0]string, argsEscaped bool, w http
 				ctx = sctx
 			}
 		}
+		{
+			sctx, ok, err := s.securityOAuth2(ctx, GetMyUserOperation, r)
+			if err != nil {
+				err = &ogenerrors.SecurityError{
+					OperationContext: opErrContext,
+					Security:         "OAuth2",
+					Err:              err,
+				}
+				defer recordError("Security:OAuth2", err)
+				s.cfg.ErrorHandler(ctx, w, r, err)
+				return
+			}
+			if ok {
+				satisfied[0] |= 1 << 1
+				ctx = sctx
+			}
+		}
 
 		if ok := func() bool {
 		nextRequirement:
 			for _, requirement := range []bitset{
 				{0b00000001},
+				{0b00000010},
 			} {
 				for i, mask := range requirement {
 					if satisfied[i]&mask != mask {
