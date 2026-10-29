@@ -2,7 +2,9 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Separator } from "@/components/ui/separator";
+import { formatDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 import { MetaCard } from "./detail-meta";
@@ -15,9 +17,12 @@ import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
  * One shell draws all three; its measurements live in "Resource detail layout"
  * in `docs/styling.md`, which a change to a value here updates too.
  *
- * The login-flow and identity-provider screens are a different composition —
- * the whole screen is one panel ({@link DetailPanel}) — and keep it. They share
- * the icon tile ({@link ICON_PLATE}) and the header card (`MetaCard`).
+ * The user-schema screen heads the same body with {@link DetailTitle}: the
+ * title over one line of identity, with no icon tile or meta card. The
+ * login-flow, identity-provider and release screens are a different
+ * composition — the whole screen is one panel ({@link DetailPanel}) — and keep
+ * it. They share the icon tile ({@link ICON_PLATE}) and the header card
+ * (`MetaCard`) with the resource screens.
  */
 
 /** The 24px gap between the header row and the first body element. */
@@ -157,6 +162,51 @@ export function PanelTitle({
         heading
       )}
     </div>
+  );
+}
+
+/**
+ * A detail screen's header as the design draws the user-schema screen: the
+ * title over one line of identity, the resource's id (copyable) and its created
+ * date, with no icon tile and no meta card. The line stacks under `sm`, where
+ * the id alone fills it, and the rule between the two values exists only in the
+ * row layout.
+ */
+export function DetailTitle({
+  title,
+  idLabel,
+  id,
+  createdAt,
+}: {
+  title: string;
+  /** The id's label, e.g. `Schema ID`; the copy button's name follows it. */
+  idLabel: string;
+  id: string;
+  createdAt?: string;
+}) {
+  return (
+    <header className="flex flex-col gap-2 px-2">
+      <h1 className={cn(DETAIL_TITLE, "wrap-anywhere")}>{title}</h1>
+      <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
+        <span className="flex flex-wrap items-center gap-x-1">
+          <span className="whitespace-nowrap">{idLabel}</span>
+          <span className="flex min-w-0 items-center gap-1">
+            {/* `break-all`: a URI id has no break point and must not widen the page. */}
+            <span className="text-foreground min-w-0 break-all">{id}</span>
+            <CopyButton value={id} label={`Copy ${idLabel}`} size="inline" />
+          </span>
+        </span>
+        {createdAt && (
+          <>
+            <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
+            <span className="flex items-center gap-1">
+              <span>Created</span>
+              <span>{formatDate(createdAt)}</span>
+            </span>
+          </>
+        )}
+      </div>
+    </header>
   );
 }
 

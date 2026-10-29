@@ -2,13 +2,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Fragment } from "react";
 
 import { api } from "@/api/zitadel";
-import { DETAIL_BODY, DetailSection } from "@/components/detail-page";
+import { DETAIL_BODY, DetailSection, DetailTitle } from "@/components/detail-page";
 import { DocumentViewer } from "@/components/document-viewer";
 import { Page } from "@/components/layout";
 import { SchemaFieldsPanel } from "@/components/schema-fields-panel";
-import { PAGE_TITLE } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
-import { CopyButton } from "@/components/ui/copy-button";
 import { InlineCode } from "@/components/ui/inline-code";
 import {
   Select,
@@ -19,7 +17,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatDate, formatDateTime } from "@/lib/date";
+import { formatDateTime } from "@/lib/date";
+import { DOCS_URL } from "@/lib/docs";
 import { projectScopeDeps, requireProjectScope } from "@/lib/project-scope";
 import { field } from "@/lib/record";
 import {
@@ -29,7 +28,6 @@ import {
   schemaAuthMethods,
   schemaDisplayName,
 } from "@/lib/schema";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authed/schemas/$schemaId")({
   staticData: { scope: "project", resource: "user schema" },
@@ -62,10 +60,9 @@ export const Route = createFileRoute("/_authed/schemas/$schemaId")({
  * schema's. Users stay on the revision they were created on until they are
  * migrated through the API, which an older revision says under the card title.
  *
- * The header is the title over one line of identity (id and created date), not
- * the resource screens' icon tile and meta card: the design draws this screen
- * that way. Each tab is a `DetailSection`; the Fields card carries the
- * revision picker as its action.
+ * The header is `DetailTitle`, the title over one line of identity, as the
+ * design draws this screen. Each tab is a `DetailSection`; the Fields card
+ * carries the revision picker as its action.
  */
 function SchemaDetail() {
   const { schema, createdAt, revisions } = Route.useLoaderData();
@@ -80,34 +77,23 @@ function SchemaDetail() {
   const note = older && (
     <p className="text-muted-foreground text-sm">
       Not the newest revision. Users stay on the revision they were created on until they are
-      migrated through the API.
+      migrated.{" "}
+      <a
+        href={`${DOCS_URL}/guides/migrate-user-schema`}
+        target="_blank"
+        rel="noreferrer"
+        className="text-foreground underline underline-offset-2"
+      >
+        Migration guide
+      </a>
     </p>
   );
 
   return (
     <Page>
-      <header className="flex flex-col gap-2 px-2">
-        <h1 className={cn(PAGE_TITLE, "wrap-anywhere")}>{name}</h1>
-        {/* The design draws `Expires at` here; nothing on the schema resource
-            backs it, so the created date stands in. */}
-        {/* Stacked under `sm`, where the id alone fills the line; the rule
-            between the two values only exists in the row layout. */}
-        <div className="text-muted-foreground flex flex-col gap-1 text-xs leading-4 sm:flex-row sm:items-center">
-          <span className="flex flex-wrap items-center gap-x-1">
-            <span className="whitespace-nowrap">Schema ID</span>
-            <span className="flex min-w-0 items-center gap-1">
-              {/* `break-all`: a URI id has no break point and must not widen the page. */}
-              <span className="text-foreground min-w-0 break-all">{schemaId}</span>
-              <CopyButton value={schemaId} label="Copy Schema ID" size="inline" />
-            </span>
-          </span>
-          <span aria-hidden className="bg-border mx-4.5 hidden h-4 w-px shrink-0 sm:block" />
-          <span className="flex items-center gap-1">
-            <span>Created</span>
-            <span>{formatDate(createdAt)}</span>
-          </span>
-        </div>
-      </header>
+      {/* The design draws `Expires at` beside the id; nothing on the schema
+          resource backs it, so the created date stands in. */}
+      <DetailTitle title={name} idLabel="Schema ID" id={schemaId} createdAt={createdAt} />
 
       <Tabs defaultValue="fields" className={`${DETAIL_BODY} gap-6`}>
         <TabsList aria-label="Schema detail sections">

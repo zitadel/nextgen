@@ -160,8 +160,8 @@ inside `Page`: capped and centred, so the table does not stretch across the
 window.
 
 `inset="panel"` is for the configuration-panel screens (Login flows, Identity
-providers), whose single card the design insets by 24px on the sides. It
-changes the sides only, never the top.
+providers, Releases), whose single card the design insets by 24px on the
+sides. It changes the sides only, never the top.
 
 ## Resource list layout — one shell for every list screen
 
@@ -223,12 +223,15 @@ Detail screens come in three compositions, and each has one shell:
   card the design titles by name rather than a section title (Users: the profile,
   under its schema's name) leads with `PanelTitle as="h2"`; the header owns the
   `h1`.
-- **Configuration panel** (Login flows, Identity providers): the whole screen is
-  one `DetailPanel` headed by a `PanelTitle` (both in
+- **Resource detail, identity-line header** (User schemas): the resource
+  detail body under `DetailTitle` (`src/components/detail-page.tsx`) instead of
+  `DetailHeader`: the title over one 12/16 line with the id, its copy button
+  and the created date, no icon tile and no header card. The line stacks under
+  `sm`. Each tab is a `DetailSection`.
+- **Configuration panel** (Login flows, Identity providers, Releases): the whole
+  screen is one `DetailPanel` headed by a `PanelTitle` (both in
   `src/components/detail-page.tsx`), inside `<Page inset="panel">`
-  (`src/components/layout.tsx`). User schemas left this composition for the
-  resource detail one, with a title over an identity line instead of the icon
-  tile and meta card, and each tab a `DetailSection`.
+  (`src/components/layout.tsx`).
 - **Settings** (Profile): a bare title over one card of labelled rows, in a
   centred column `--zl-container-settings` wide. Compose `Page` +
   `SettingsColumn` (`src/components/layout.tsx`), a `DETAIL_TITLE` heading with
@@ -236,9 +239,10 @@ Detail screens come in three compositions, and each has one shell:
   holding `Field` rows: 24px inset, 20px block, 16px between rows. No icon tile
   and no header card: a settings screen is not a resource with an id.
 
-The first two share the icon tile (`ICON_PLATE`) and the header card
-(`MetaCard`, holding `MetaValue`s split by `MetaRule`): the resource id,
-copyable, and the created date.
+Resource detail and the configuration panel share the icon tile (`ICON_PLATE`)
+and the header card (`MetaCard`, holding `MetaValue`s split by `MetaRule`): the
+resource id, copyable, and the created date. The identity-line header carries
+the same two values in one line instead.
 
 | Region        | Value                                                 |
 | ------------- | ----------------------------------------------------- |
