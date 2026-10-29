@@ -3,12 +3,12 @@ type: string
 description: |
   The kind of resource a release pointer pins.
 
-  Carried explicitly rather than inferred from `revision_id`, because a
-  revision id is not always shaped distinctly enough to identify its kind: a
+  The kind is given explicitly instead of being inferred from `revision_id`.
+  A revision ID is not always distinct enough to identify its kind: a
   schema's is its `$id`, which may be any URL.
 
-  `flow_definition` rather than `flow`: a release pins the definitions served
-  at `/flow_definitions`, not the runtime flows at `/flow`.
+  The kind is `flow_definition`, not `flow`, because a release pins the
+  definitions served at `/flow_definitions`, not the runtime flows at `/flow`.
 enum:
   - schema
   - flow_definition

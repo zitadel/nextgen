@@ -1,6 +1,6 @@
 title: PasskeyProof
 type: object
-description: Proof for `passkey` method
+description: Proof for the `passkey` method.
 required:
   - passkey
 additionalProperties: false

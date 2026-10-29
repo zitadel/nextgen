@@ -1,20 +1,22 @@
 post:
   operationId: createIdp
   x-zitadel-cli: idps create
-  summary: Create or revise an identity provider connection
+  summary: Create or revise an identity provider
   description: |
-    Creates or revises a connection document. If the slug does not already
-    exist, a new connection is created. If a connection with that slug already
-    exists, a revision is created.
+    Creates an identity provider from a connection document, or revises it if the
+    slug already exists.
 
-    A revision gets a new `revision_id` and does not modify the connection
-    `id`, so identity links that reference the connection keep resolving while
-    releases and auth attempts stay pinned to the revision they captured.
+    If the slug does not already exist, a new identity provider is created. If an
+    identity provider with that slug already exists, a revision is created.
 
-    Identity fields are fixed for the life of the connection and a revision
-    that changes one is rejected: `protocol`, `subject_claim`, and `issuer`,
-    the field that names the authority. Their values decide which provider
-    account a stored subject belongs to, so changing one would silently
+    A revision gets a new `revision_id` and does not modify the identity provider's
+    `id`. Identity links that reference it keep resolving, while releases and
+    authentication attempts stay pinned to the revision they captured.
+
+    Identity fields are fixed for the life of the identity provider, and a
+    revision that changes one is rejected: `protocol`, `subject_claim`, and
+    `issuer`, the field that names the authority. Their values decide which
+    provider account a stored subject belongs to, so changing one would silently
     repoint existing identities at a different provider.
 
     `subject_claim` is optional, and `sub` is used as the default value. If a
@@ -24,12 +26,12 @@ post:
     OIDC is the only protocol.
 
     The document is validated against the `idp-connection.json` schema before
-    anything is stored. The rules the engine applies when it starts a sign-in
-    then run on the document, so a connection that could never start one is
-    refused here instead with `idp.endpoints_partial`: the OIDC block sets an
-    endpoint without the others. It either sets no endpoint, and discovery
-    fills them, or sets `authorization_endpoint`, `token_endpoint`, `jwks_uri`,
-    and `userinfo_endpoint`. `userinfo_endpoint` may be left out when
+    anything is stored. The server then checks that it can start a sign-in with
+    the document. A document that could never start one is refused with
+    `idp.endpoints_partial`: the OIDC block sets an endpoint without the others.
+    It must either set no endpoint, and discovery fills them, or set
+    `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and
+    `userinfo_endpoint`. `userinfo_endpoint` may be left out when
     `id_token_mapping` is on, but setting it alone still counts as setting an
     endpoint. The details list the missing endpoints.
 
@@ -50,7 +52,7 @@ post:
           $ref: create-idp-request.yaml
         examples:
           google:
-            summary: An OIDC connection for Google
+            summary: An OIDC identity provider for Google
             description: |
               Google connection document.
             value:
@@ -79,7 +81,7 @@ post:
                   static_authorize_parameters:
                     prompt: select_account
           endpoints:
-            summary: An OIDC connection that names every endpoint
+            summary: An OIDC identity provider that names every endpoint
             description: |
               A provider that exposes no discovery document. Every endpoint
               is set, so none is fetched.
@@ -110,19 +112,17 @@ post:
                     - email
   responses:
     '200':
-      description: |
-        The IdP connection document after revision.
+      description: The identity provider after the revision.
       content:
         application/json:
           schema:
             $ref: idp-response.yaml
           examples:
             revised:
-              summary: The Google connection after a revision
+              summary: The Google identity provider after a revision
               description: |
-                The scope list grew. `id` is the one allocated when the
-                connection was created, `revision_id` is new, and `updated_at`
-                has moved past `created_at`.
+                The scope list grew. `id` is the one allocated when the identity provider was
+                created, `revision_id` is new, and `updated_at` has moved past `created_at`.
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
@@ -158,15 +158,14 @@ post:
                     static_authorize_parameters:
                       prompt: select_account
     '201':
-      description: |
-        The IdP connection document after creation.
+      description: The created identity provider.
       content:
         application/json:
           schema:
             $ref: idp-response.yaml
           examples:
             created:
-              summary: A newly created connection
+              summary: A newly created identity provider
               description: |
                 The slug was new to the project, so `id` and `revision_id` were
                 both allocated and `updated_at` equals `created_at`.
@@ -205,9 +204,9 @@ post:
                       prompt: select_account
     '400':
       description: |
-        The document failed schema validation, the engine could not start a
-        sign-in with it, or it revises an existing connection and changes a
-        field that is fixed for its life.
+        The document failed schema validation, the server could not start a sign-in
+        with it, or it revises an existing identity provider and changes a field that
+        is fixed for its life.
       content:
         application/json:
           schema:

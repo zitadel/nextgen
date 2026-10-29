@@ -2,13 +2,14 @@ get:
   operationId: listUserTeams
   summary: List the teams a user belongs to
   description: |
-    The user's team roster, ordered by team name. Each entry carries the
-    team's name, so a client renders a page without resolving ids one by one.
+    Lists the teams a user belongs to, ordered by team name. Each entry
+    carries the team's name, so a client can render a page without resolving
+    IDs one by one.
 
-    This is the N:N roster and it is not lifecycle ownership: the single team
-    that owns the user's lifecycle is reported as `metadata.lifecycle_owner_team_id`
-    on the user read endpoints. Memberships the user was removed from are not
-    returned.
+    A user can belong to many teams. This is not lifecycle ownership: the
+    single team that owns the user's lifecycle is reported as
+    `metadata.lifecycle_owner_team_id` on the user read endpoints. Memberships
+    the user was removed from are not returned.
   tags:
     - Users
   parameters:
@@ -22,13 +23,13 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The teams of a user are returned
+      description: The teams of the user, ordered by team name.
       content:
         application/json:
           schema:
             $ref: list-user-teams-response.yaml
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
@@ -46,7 +47,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

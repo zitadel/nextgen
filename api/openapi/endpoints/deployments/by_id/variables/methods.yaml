@@ -17,7 +17,7 @@ get:
     - $ref: ../../../../components/parameters/deployment-id.yaml
   responses:
     '200':
-      description: The deployment's variables were retrieved successfully.
+      description: The variables the deployment froze, keyed by name.
       content:
         application/json:
           schema:

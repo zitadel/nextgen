@@ -1,5 +1,5 @@
 type: array
-description: Branding revisions, newest first.
+description: A list of branding revisions, newest first.
 items:
   type: object
   required:

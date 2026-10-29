@@ -4,8 +4,8 @@ description: |
   object saying so and withholding the value.
 
   The two forms mirror the update body, so a value read here can be written
-  back unchanged — with the one asymmetry that a secret read back has no value
-  to write.
+  back unchanged. The one exception is a secret, which reads back without a
+  value to write.
 oneOf:
   - $ref: variable-scalar.yaml
   - $ref: secret-variable.yaml

@@ -1,11 +1,11 @@
 ---
 title: Variables
-description: OpenAPI operations for project variables and secrets.
+description: Named values a project stores, and secrets, which are variables whose value is stored encrypted and never read back.
 ---
 
-Variables are named values a project stores. Today an OIDC identity provider
-connection references them as `${{ NAME }}` in its `client_id` and
-`client_secret`. Secrets are variables whose value is stored encrypted and never
-read back.
+A variable is a named value a project stores. Today an OIDC identity provider
+connection references variables as `${{ NAME }}` in its `client_id` and
+`client_secret`. A secret is a variable whose value is stored encrypted and is
+never read back.
 
 <Operations />

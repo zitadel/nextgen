@@ -1,5 +1,5 @@
 type: object
-description: Request to create a new authentication attempt
+description: Request to create an authentication attempt.
 required:
   - project_id
 properties:
@@ -9,8 +9,8 @@ properties:
     $ref: "../../components/schemas/challenge-nonce.yaml"
   session_id:
     description: |
-      Optional. If provided, this attempt adds factors to an existing session (step-up auth).
-      If omitted, a new session is created implicitly on successful handoff.
+      Optional. If provided, this attempt adds factors to an existing session (step-up authentication).
+      If omitted, a new session is created implicitly when the handoff succeeds.
       Requires `session_token`.
     oneOf:
       - $ref: "../../components/schemas/session-id.yaml"

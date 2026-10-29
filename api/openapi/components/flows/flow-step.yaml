@@ -1,10 +1,11 @@
 type: object
 required: [name, fields, actions, gates]
 description: |
-  A step contains ordered capability arrays: what to collect (fields),
-  what the user can do (actions), and what security gates must be satisfied (gates).
-  The LiquidJS template in `branding.liquid_template` iterates these arrays in order
-  and builds name-keyed indexes locally for lookup.
+  A step the frontend renders. It has three ordered lists: the input fields to
+  collect (`fields`), the actions the user can take (`actions`), and the
+  security gates that must be satisfied (`gates`). The LiquidJS template in
+  `branding.liquid_template` iterates these lists in order and builds
+  name-keyed indexes locally for lookup.
 example:
   name: login
   texts:
@@ -68,47 +69,49 @@ properties:
       - type: string
       - type: 'null'
     description: |
-      Localisation key that tells the user why the flow moved to this
-      step's `purpose` without being asked: `notice.user_not_found` (an
-      identifier with no account, now signing up),
+      Localization key that tells the user why the flow moved to this step's
+      `purpose` without being asked. The values are:
+      `notice.user_not_found` (an identifier with no account, now signing up),
       `notice.user_already_exists` (an identifier that has an account, now
-      signing in) or `notice.sso_user_not_found` (a provider's sign-in
-      with no account, now signing up). Present only on the step right
-      after the move, not when the user chose it.
+      signing in) and `notice.sso_user_not_found` (a provider's sign-in with
+      no account, now signing up). Present only on the step right after the
+      move, not when the user chose it.
   error:
     oneOf:
       - type: string
       - type: 'null'
     description: |
-      Error from a previous failed submission. Field-validation failures
-      carry localisation text keys: `error.<field>_<rule>` per violation
-      (e.g. `error.email_required`; the `format` rule is spelled
-      `error.<field>_invalid`), multiple violations joined with `"; "`.
-      Field names appear verbatim, so clients localise unknown keys via
-      the generic `error.field_<rule>` catalog entries. Other engine
-      failures carry `error.*` catalog keys as well (e.g.
-      `error.invalid_credentials`, `error.passkey_invalid`). An outcome
-      the step has no transition for sends `error.user_not_found`,
-      `error.user_already_exists`, `error.sso_user_not_found`, or
+      Error from a previous failed submission, as localization keys.
+
+      Field-validation failures carry one key per violation, `error.<field>_<rule>`
+      (for example `error.email_required`). The `format` rule is spelled
+      `error.<field>_invalid`. Multiple violations are joined with `"; "`. Field
+      names appear verbatim, so clients localize unknown keys through the generic
+      `error.field_<rule>` catalog entries.
+
+      Other failures carry `error.*` catalog keys as well (for example
+      `error.invalid_credentials` and `error.passkey_invalid`). An outcome the step
+      has no transition for sends `error.user_not_found`,
+      `error.user_already_exists` or `error.sso_user_not_found`, and
       `error.outcome_unhandled` for any other outcome.
   complete:
     type: string
     enum: [redirect, show]
     description: |
       Present only on terminal steps. Tells the frontend what to do:
-      - redirect: navigate to redirect_uri immediately (OIDC/SAML done)
-      - show: render the step as a success screen (e.g., registration confirmed)
+      - `redirect`: navigate to `redirect_uri` immediately (OIDC/SAML done).
+      - `show`: render the step as a success screen (for example, registration
+        confirmed).
   redirect_url:
     type: string
     format: uri
-    description: URL to navigate to (e.g., SSO provider redirect).
+    description: URL to navigate to (for example, an SSO provider redirect).
   fields:
     type: array
     description: |
-      Ordered list of input fields to collect. Field metadata (type, validation)
-      is resolved by the engine from the flow's user schema. The LiquidJS
-      template iterates this array; for keyed lookup it builds a name-indexed
-      map locally.
+      Ordered list of input fields to collect. The server resolves field metadata
+      (type, validation) from the flow's user schema. The LiquidJS template iterates
+      this list. For keyed lookup it builds a name-indexed map locally.
     items:
       $ref: field.yaml
     default: []
@@ -116,47 +119,41 @@ properties:
     type: object
     required: [value, autocomplete]
     description: |
-      The user's identifier, collected on an earlier step, for this
-      step's form to carry alongside the password. Present only when the
-      step collects a password and does not itself collect the
-      identifier — a step that collects the identifier carries it in
-      `fields` instead, and needs nothing here.
+      The user's identifier, collected on an earlier step, for this step's form to
+      carry alongside the password. Present only when the step collects a password
+      and does not itself collect the identifier. A step that collects the
+      identifier carries it in `fields` instead, and needs nothing here.
 
-      A password manager saves an identifier and a password as one
-      credential, and reads both from the same form. A step that
-      collects only the password leaves it nothing to pair with, so the
-      engine hands the identifier back here.
+      A password manager saves an identifier and a password as one credential, and
+      reads both from the same form. A step that collects only the password leaves
+      it nothing to pair with, so the server hands the identifier back here.
 
-      **What the client does with it.** Add one input to the same form
-      element as the password, carrying `value` and `autocomplete` as
-      given, and:
+      **What the client does with it.** Add one input to the same form element as
+      the password, carrying `value` and `autocomplete` as given, and make it:
 
-      - *with no `name`* — a control without a name is never submitted,
-        so the form data stays exactly the step's `fields`. That is what
-        keeps this input from reaching the engine as an unknown field,
-        whether the client builds its submission from `fields` or from
-        whatever the form contains;
-      - *read-only* — the engine already resolved the user from this
-        value, so a changed one would not change who is signing in;
-      - *hidden from view* — the user supplied it on the previous step
-        and is not being asked for it again. Prefer hiding a real input
-        with CSS over `type="hidden"`: a manager looks for a
-        credential-shaped control, and a hidden-typed input is easy to
-        skip.
+      - *nameless* (no `name`): a control without a name is never submitted, so the
+        form data stays exactly the step's `fields`. That keeps this input from
+        reaching the server as an unknown field, whether the client builds its
+        submission from `fields` or from whatever the form contains.
+      - *read-only*: the server already resolved the user from this value, so a
+        changed one would not change who is signing in.
+      - *hidden from view*: the user supplied it on the previous step and is not
+        being asked for it again. Prefer hiding a real input with CSS over
+        `type="hidden"`. A manager looks for a credential-shaped control, and a
+        hidden-typed input is easy to skip.
 
-      The client may also show it as the account being signed in to, next
-      to a way to change it (the step's `back` action, which returns to
-      the step that collects the identifier). Do not build other text from
-      it; `texts.description_key` is the place for that.
+      The client may also show it as the account being signed in to. It can sit
+      next to a way to change it: the step's `back` action, which returns to the
+      step that collects the identifier. Do not build other text from it.
+      `texts.description_key` is the place for that.
     properties:
       value:
         type: string
         description: |
-          The identifier the user supplied. Use it as the input's
-          `value`, verbatim. After an identity provider's sign-in
-          collided with an existing account, it is the address that
-          provider verified; an address the provider did not verify is
-          not sent unless the user typed it.
+          The identifier the user supplied. Use it as the input's `value`,
+          verbatim. After an identity provider's sign-in collided with an existing
+          account, it is the address that provider verified. An address the provider
+          did not verify is not sent unless the user typed it.
         example: alice@acme.com
       autocomplete:
         type: string
@@ -169,7 +166,7 @@ properties:
     type: array
     description: |
       Ordered list of available user actions. The LiquidJS template iterates
-      this array and builds a name-indexed map locally for keyed lookup.
+      this list and builds a name-indexed map locally for keyed lookup.
     items:
       $ref: flow-step-action.yaml
     default: []
@@ -177,7 +174,7 @@ properties:
     type: object
     description: |
       Security gates that must be satisfied before the step can be submitted.
-      The engine injects gates dynamically based on policy, even if they
+      The server adds gates dynamically based on policy, even if they
       are not declared in the flow definition.
     additionalProperties:
       $ref: gate.yaml
@@ -190,13 +187,17 @@ properties:
     default: []
   challenge:
     type: object
+    # A pending authentication challenge issued by the server. Present when the
+    # flow engine has issued a challenge via auth_attempts (e.g., after the user
+    # submits `action: "passkey"`).
     description: |
       A pending authentication challenge issued by the server. Present when the
-      flow engine has issued a challenge via auth_attempts (e.g., after the user
-      submits `action: "passkey"`). The `<zl-passkey>` component reads this and
-      triggers the appropriate WebAuthn ceremony.
+      server has issued a challenge (for example, after the user submits
+      `action: "passkey"`). The `<zl-passkey>` component reads this and triggers
+      the appropriate WebAuthn ceremony, the exchange between the browser and the
+      authenticator.
 
-      The challenge is NOT present on the initial step — it appears only after
+      The challenge is NOT present on the initial step. It appears only after
       the user explicitly selects a ceremony-based action.
     properties:
       method:

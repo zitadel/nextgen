@@ -4,7 +4,7 @@ get:
     - System
   summary: Check server readiness
   description: |
-    Answers whether the server can serve requests, which takes its database answering within a second.
+    Answers whether the server can serve requests, which requires its database to answer within a second.
 
     Point a readiness probe here, so that a server whose database does not
     answer gets no requests until it does. The check is one round trip to the

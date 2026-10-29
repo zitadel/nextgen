@@ -5,10 +5,9 @@ description: |
 properties:
   radius:
     description: |
-      Corner rounding for the card, inputs, buttons and alerts — either a
-      preset name or an integer number of pixels. One value scales the whole
-      corner ramp in proportion, so the card stays rounder than the controls
-      inside it.
+      Corner rounding for the card, inputs, buttons and alerts: either a
+      preset name or an integer number of pixels. One value scales all corner
+      sizes in proportion, so the card stays rounder than the controls inside it.
     oneOf:
       - $ref: branding-radius-preset.yaml
       - type: integer
@@ -25,6 +24,6 @@ properties:
     minimum: 0.5
     maximum: 2
     description: |
-      Multiplier on the logo's maximum height, `1` when omitted. The image keeps its intrinsic
-      aspect ratio inside that cap; no width, height or ratio is stored.
+      Multiplier on the logo's maximum height, `1` when omitted. The image keeps
+      its intrinsic aspect ratio inside that cap. No width, height or ratio is stored.
     example: 1

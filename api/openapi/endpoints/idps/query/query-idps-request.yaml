@@ -1,5 +1,5 @@
 type: object
-description: Request to query the identity provider connections of a project.
+description: Request to query the identity providers of a project.
 properties:
   limit:
     $ref: ../../../components/schemas/limit.yaml
@@ -13,7 +13,7 @@ properties:
       - type: 'null'
   sorting:
     type: object
-    description: Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+    description: Sort order. Defaults to `created_at` ascending. `id` breaks ties either way.
     required:
       - field
       - direction
@@ -26,7 +26,7 @@ properties:
         description: The direction to sort by.
   filter:
     type: array
-    description: Filter criteria for querying connections. Combined with AND.
+    description: Filter criteria for querying identity providers. Combined with AND.
     items:
       type: object
       required:

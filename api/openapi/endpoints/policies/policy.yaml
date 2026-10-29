@@ -1,8 +1,10 @@
 title: Policy
+# Maintainer note, moved verbatim from the description:
+# (ADR 066)
 description: |
-  One revision of a project's policy for an operation (ADR 066), typed by
-  `operation`. `id` is shared by every revision of the operation's policy;
-  `revision_id` names this revision.
+  One revision of a project's policy for an operation, typed by `operation`.
+  `id` is shared by every revision of the operation's policy; `revision_id`
+  names this revision.
 oneOf:
   - $ref: password-set-policy.yaml
 discriminator:

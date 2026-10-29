@@ -3,10 +3,11 @@ post:
   x-zitadel-cli: origin add
   summary: Add an origin pattern
   description: |
-    Adds one `{pattern, kind}` to the project's origins. A primary pattern
-    must be an exact URL (no wildcard). Preview patterns may include a single
-    DNS-label wildcard. Adding a pattern that already exists with the same
-    kind is idempotent and answers 201 with the stored origin.
+    Adds an origin pattern, with its `kind`, to the project's origins. A
+    `primary` pattern must be an exact URL with no wildcard. A `preview`
+    pattern may include a single DNS-label wildcard. Adding a pattern that
+    already exists with the same kind is idempotent and answers 201 with the
+    stored origin.
   tags:
     - Projects
   parameters:
@@ -23,7 +24,7 @@ post:
           $ref: ../../project-origin.yaml
   responses:
     '201':
-      description: The pattern was added.
+      description: The origin that was added.
       content:
         application/json:
           schema:

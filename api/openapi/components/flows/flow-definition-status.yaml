@@ -1,9 +1,11 @@
 type: string
 enum: [ active, draft ]
 description: |
-  The lifecycle state of this flow definition. 
-  
-  active: The flow definition is ready to be used. The flow engine can select it for new flows.
-  draft: The engine will not select it for new flows, and existing flows must handle it gracefully if they reference this definition.
+  The lifecycle state of this flow definition.
+
+  - `active`: the flow definition is ready to be used. The server can select it
+    for new flows.
+  - `draft`: the server will not select it for new flows. Existing flows must
+    handle it gracefully if they reference this definition.
 
   A revision's status is fixed at creation. Publish a new revision to change it.

@@ -1,15 +1,18 @@
 get:
   operationId: getClaimStatus
-  summary: Get claim status
+  summary: Get the status of a project claim
   description: |
-    Polled by the CLI while a browser completes the claim. Authorized by the
-    project secret that initiated the challenge. Returns `pending`, or
-    `completed` with the owning team, the claim timestamp, and the dashboard
-    URL once the project is claimed. The claim grant, not the polled
-    challenge, is the source of truth: a project claimed through another
-    concurrent challenge also reports `completed`, and a completed claim
-    keeps reporting `completed` past this challenge's expiry and past the
-    project's claim window.
+    Returns whether a project claim has completed, so the CLI can poll while a
+    browser finishes it.
+
+    The project secret that initiated the challenge authorizes the request. The
+    response is `pending`, or `completed` with the owning team, the claim
+    timestamp and the dashboard URL once the project is claimed.
+
+    The claim grant, not the polled challenge, is the source of truth. A
+    project claimed through another concurrent challenge also reports
+    `completed`. A completed claim keeps reporting `completed` after this
+    challenge expires and after the project's claim window closes.
   tags:
     - Projects
   parameters:
@@ -23,7 +26,7 @@ get:
         - project.write
   responses:
     '200':
-      description: Claim status.
+      description: The claim status, `pending` or `completed`.
       content:
         application/json:
           schema:
@@ -49,9 +52,9 @@ get:
     '410':
       description: |
         Gone, for one of two reasons told apart by `code`.
-        `proj.claim_expired` means this challenge lapsed and a fresh claim
+        `proj.claim_expired` means this challenge lapsed, and a fresh claim
         init recovers. `proj.claim_window_expired` means the project itself is
-        past its 14-day claim window; that refusal is final and no new
+        past its 14-day claim window. That refusal is final, and no new
         challenge can help.
       content:
         application/json:
@@ -69,7 +72,7 @@ get:
                 proj.claim_window_expired: ../../../../../components/schemas/errors/proj-claim_window_expired.yaml
     '429':
       description: |
-        Too many requests, the client has polled too many times in a given
+        Too many requests. The client has polled too many times in a given
         amount of time.
       content:
         application/json:

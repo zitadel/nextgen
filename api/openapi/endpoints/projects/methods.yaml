@@ -1,12 +1,12 @@
 post:
   operationId: createProject
-  summary: Create project
+  summary: Create a project
   description: |
     Creates a project and returns its project secret and preview secret, which no
     other endpoint returns.
 
     The request needs no credential and is rate-limited. Unless `seed_defaults` is
-    `false`, the project starts with a default user schema and flow; the CLI turns
+    `false`, the project starts with a default user schema and flow. The CLI turns
     that off and uploads its own from `.zitadel/`.
   tags:
     - Projects
@@ -19,14 +19,14 @@ post:
           $ref: create-project-request.yaml
   responses:
     '201':
-      description: The project was created successfully
+      description: The created project, with its project secret and preview secret.
       content:
         application/json:
           schema:
             $ref: create-project-response.yaml
     '429':
       description: |
-        Too many requests, the client has sent too many requests in a given
+        Too many requests. The client has sent too many requests in a given
         amount of time.
       content:
         application/json:

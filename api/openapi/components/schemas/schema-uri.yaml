@@ -1,8 +1,8 @@
 type: string
 format: uri
 description: |
-  URI of the server-published flow definition schema this definition was
-  authored against. The server uses this to validate the definition.
-  If not provided, the engine will use the latest schema version for validation.
+  The URI of the server-published flow definition schema this definition was
+  authored against. The server uses it to validate the definition.
+  If you omit it, the server validates against the latest schema version.
 example: https://raw.githubusercontent.com/zitadel/nextgen/refs/heads/main/api/openapi/endpoints/schemas/flow-definition.yaml
 

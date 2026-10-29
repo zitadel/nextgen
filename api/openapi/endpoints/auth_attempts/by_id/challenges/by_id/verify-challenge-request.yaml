@@ -2,8 +2,8 @@ type: object
 description: |
   Proof for verifying a factor challenge.
 
-  The exact format depends on the challenge method. The proof object should contain
-  only the credential/code/assertion relevant to the challenge method being verified.
+  The exact format depends on the challenge method. The proof object contains
+  only the credential, code or assertion for the challenge method being verified.
 
 oneOf:
   - $ref: "identifier-proof.yaml"

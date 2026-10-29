@@ -2,30 +2,29 @@ post:
   operationId: exchangeHandoff
   summary: Exchange handoff token for a session
   description: |
-    Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`
-    and returns the resulting session and a `session_token`.
+    Exchanges a one-time handoff token for a session and a `session_token`.
 
-    The server resolves the originating `auth_attempt` from the token and then:
+    The `handoff_token` comes from `POST /auth_attempts/{id}/handoff`. The server
+    finds the originating authentication attempt from the token and then:
 
-    | Originating auth_attempt | Outcome |
+    | Originating authentication attempt | Outcome |
     |---|---|
     | No `session_id` | A new authenticated session is **created**. |
-    | `session_id` points to an anonymous shell | Existing session is **upgraded** — user and factors written in, TTL reset to full session TTL. |
-    | `session_id` points to an active session (step-up) | Existing session is **upgraded** — new factors merged, `assurance_levels[]` expanded. |
+    | `session_id` points to an anonymous session | Existing session is **upgraded**: user and factors written in, TTL reset to full session TTL. |
+    | `session_id` points to an active session (step-up) | Existing session is **upgraded**: new factors merged, `assurance_levels[]` expanded. |
 
     The response shape is identical in all three cases.
 
-    The `session_token` supersedes any previously issued `session_token` for the same session.
-    Clients must replace their stored token at this point.
+    The `session_token` supersedes any previously issued `session_token` for the
+    same session. Clients must replace their stored token at this point.
 
-    Requires a project service key (OAuth2 client credentials).
+    The operation requires a project service key (OAuth2 client credentials).
 
     The project comes from the project secret. A query `project_id` that
     disagrees answers `403` with `proj.mismatch`. The exchange resolves a
-    deployment the same way as other runtime operations; with no browser
-    `Origin` and nothing deployed to the resolved target the response is
-    `409` with `rel.not_deployed`. A revoked release answers `409` with
-    `rel.revoked`.
+    deployment the same way as other runtime operations. With no browser `Origin`
+    and nothing deployed to the resolved target, the response is `409` with
+    `rel.not_deployed`. A revoked release answers `409` with `rel.revoked`.
   tags:
     - Sessions
   security:
@@ -35,7 +34,7 @@ post:
     - $ref: ../../../components/parameters/project-id.yaml
     - $ref: ../../../components/parameters/idempotency-key.yaml
       description: |
-        Optional retry key for safe retries of the handoff exchange (Category B idempotency).
+        Optional retry key for safe retries of the handoff exchange.
         Retries carrying the same key within the exchange window return the cached session
         payload without consuming the one-time handoff token again.
   requestBody:
@@ -46,7 +45,7 @@ post:
           $ref: exchange-request.yaml
   responses:
     '200':
-      description: Handoff exchanged successfully. Returns the session and new session_token.
+      description: The session, with the new `session_token`.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-session-token.yaml
@@ -57,7 +56,7 @@ post:
     '400':
       description: |
         Invalid request. A handoff token that is unknown, already exchanged, or
-        expired is refused with `sess.invalid_handoff_token`; the response does
+        expired is refused with `sess.invalid_handoff_token`. The response does
         not say which, and in each case the caller starts a new sign-in.
       content:
         application/json:

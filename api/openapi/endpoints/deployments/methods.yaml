@@ -3,20 +3,22 @@ post:
   x-zitadel-cli: deployment create
   summary: Create a deployment
   description: |
-    Makes a release live on its targets by recording a deployment,
-    atomically: on success every target serves the release and the record
-    exists; on failure nothing changes and no record is written.
+    Makes a release live on its targets by recording a deployment.
 
-    Name the release by exactly one of `release_id` or `content_hash`; it
+    The operation is atomic. On success every target serves the release and
+    the record exists. On failure nothing changes and no record is written.
+
+    Name the release by exactly one of `release_id` or `content_hash`. It
     must already exist in the project. `targets` is `primary` or preview
-    URLs. The deployment freezes the project's variable values for its kind,
-    with no fallback between primary and preview values.
+    URLs. The deployment freezes the project's variable values for its kind
+    (primary or preview), with no fallback between primary and preview values.
 
     A deployment to `primary` changes nothing when the project's newest
-    primary deployment has the same release and frozen values and covers
-    exactly the current primary origins: the call answers `200` with that
-    deployment. Any other request writes a new deployment and answers `201`;
-    for preview URLs that record renews their previews.
+    primary deployment already matches. It matches when it has the same
+    release and frozen values and covers exactly the current primary origins.
+    The call then answers `200` with that deployment. Any other request writes
+    a new deployment and answers `201`. For preview URLs, that record renews
+    their previews.
 
     Failures:
     - `400 dep.invalid`: both or neither of `release_id` and `content_hash`;
@@ -27,7 +29,7 @@ post:
       the kind; `details` names the kind and every missing variable.
     - `403 proj.origin_not_allowed`: a preview URL matches no preview
       pattern, or is a loopback URL.
-    - `404 rel.not_found`: the release id or digest names no release here.
+    - `404 rel.not_found`: the release ID or digest names no release here.
     - `409 dep.conflict`: `expected_deployment_id` is not the deployment
       this write replaces; `details.deployment` is that deployment.
     - `409 rel.revoked`: the release is revoked.
@@ -95,7 +97,7 @@ post:
                   deployed_by_type: human
     '201':
       description: |
-        The deployment was created and every target serves the release.
+        The new deployment. Every target serves the release.
       content:
         application/json:
           schema:
@@ -192,7 +194,7 @@ post:
                 details:
                   origin: https://acme.example
     '404':
-      description: 'The release id or digest names no release of the project: `rel.not_found`.'
+      description: 'The release ID or digest names no release of the project: `rel.not_found`.'
       content:
         application/json:
           schema:
@@ -213,7 +215,7 @@ post:
             conflict:
               summary: Another deployment reached the target first
               description: |
-                Inspect the deployment in the details, then retry with its id
+                Inspect the deployment in the details, then retry with its ID
                 as `expected_deployment_id`, or stop.
               value:
                 code: dep.conflict
@@ -247,21 +249,22 @@ get:
   x-zitadel-cli: deployment list
   summary: List deployments
   description: |
-    Lists what ran where, and when.
+    Lists the project's deployments: the history, or what each origin serves
+    now.
 
-    By default the list is the history, newest first: every deployment of
-    the project with every target it made the release live on. With
-    `origin`, the history of that origin alone.
+    By default the list is the history, newest first. It holds every
+    deployment of the project, with every target it made the release live on.
+    With `origin`, it is the history of that origin alone.
 
-    With `live=true`, the list is what is served now, newest first: the
-    project's newest primary deployment, narrowed to origins that are still
-    primary, and the newest deployment to each live preview URL, narrowed to
-    the URLs it still serves. Combined with `origin`, it is the one
-    deployment that origin serves, or empty.
+    With `live=true`, the list is what is served now, newest first. It holds
+    the project's newest primary deployment, narrowed to origins that are
+    still primary. It also holds the newest deployment to each live preview
+    URL, narrowed to the URLs it still serves. Combined with `origin`, it is
+    the one deployment that origin serves, or empty.
 
-    `expand: ["release"]` embeds the release each deployment made live; it
-    requires `release.read` and does not change the ordering or the page
-    tokens.
+    Setting `expand: ["release"]` embeds the release each deployment made
+    live. This requires `release.read`. It does not change the ordering or the
+    page tokens.
   tags:
     - Deployments
   parameters:
@@ -295,7 +298,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The deployments were listed successfully.
+      description: A page of deployments.
       content:
         application/json:
           schema:

@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserProperty",
   "type": "object",
-  "description": "The meta-schema one property of a customer's user schema is validated\nagainst. The generated `user-property.json` adds\n`allOf: [{$ref: draft-2020-12}]`, which cannot live here because code\ngenerators choke on it.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API; nothing\nenforces it today, so responses still include write-only properties.\n",
+  "description": "The meta-schema one property of a customer's user schema is validated\nagainst.\n\nNative JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`\nare accepted without being listed below. `writeOnly: true` is reserved for a\nvalue that may be written but is never returned by the read API. Nothing\nenforces it today, so responses still include write-only properties.\n",
   "additionalProperties": true,
   "properties": {
     "x-unique": {
@@ -20,7 +20,7 @@
           "type": "null"
         }
       ],
-      "description": "The level of uniqueness for this property, if applicable"
+      "description": "The level of uniqueness for this property, if applicable."
     },
     "x-claim": {
       "oneOf": [
@@ -31,7 +31,7 @@
           "type": "null"
         }
       ],
-      "description": "The claim name for this property, if applicable"
+      "description": "The claim name for this property, if applicable."
     },
     "x-audit": {
       "type": "boolean",

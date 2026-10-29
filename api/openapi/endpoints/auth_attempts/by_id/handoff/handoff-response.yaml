@@ -1,26 +1,29 @@
 type: object
 description: |
-  The handoff token and metadata for session exchange.
-  
-  This is a short-lived credential (TTL ≤ 60 seconds) that the client must exchange
-  at POST /sessions/exchange to receive the final session and session_token.
-  The handoff token is single-use and audience-bound to the project.
+  The handoff token and metadata for the session exchange.
+
+  The token is a short-lived credential (lifetime of 60 seconds or less) that
+  the client exchanges at POST /sessions/exchange for the final session and
+  `session_token`. The handoff token is single-use and audience-bound to the
+  project.
 required:
   - handoff_token
   - expires_at
 properties:
   handoff_token:
     type: string
+    # Maintainer notes moved here from the description: "Single-use (atomic GETDEL on exchange)" and
+    # "Idempotency-safe (Category B, 5-minute window)".
     description: |
-      The short-lived handoff token for session exchange.
-      
+      The short-lived handoff token for the session exchange.
+
       Exchange at: POST /sessions/exchange
-      
+
       Requirements:
-      - Single-use (atomic GETDEL on exchange)
-      - TTL ≤ 60 seconds
-      - Audience-bound to project (exchange requires sk_proj_… for matching project)
-      - Idempotency-safe (Category B, 5-minute window)
+      - Single-use
+      - Lifetime of 60 seconds or less
+      - Audience-bound to the project (the exchange requires `sk_proj_…` for the matching project)
+      - Safe to retry with an idempotency key within a 5-minute window
     example: handoff_abc123def456xyz
   expires_at:
     type: string

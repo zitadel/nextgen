@@ -1,5 +1,5 @@
 type: object
-description: Request to create an anonymous session shell.
+description: Request to create an anonymous session.
 required:
   - project_id
 properties:
@@ -8,8 +8,8 @@ properties:
   user_agent:
     type: object
     description: |
-      Optional user agent / device context to attach to the session.
-      Useful for correlating telemetry and device signals with the eventual
+      Optional user agent and device context to attach to the session.
+      It lets you correlate telemetry and device signals with the eventual
       authenticated session from the start.
     properties:
       fingerprint:

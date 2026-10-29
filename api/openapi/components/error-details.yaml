@@ -1,5 +1,5 @@
 type: object
-description: Standard error payload returned for failed API requests.
+description: The error payload that failed API requests return.
 required:
   - code
   - message

@@ -1,12 +1,12 @@
 ---
 title: Policies
-description: OpenAPI operations for operation policies, such as the password policy.
+description: The settings a project's operation is checked against, such as the minimum password length, published as immutable revisions.
 ---
 
-A policy holds the settings a project's operation is checked against, for
-example the minimum length a new password must have. A project has one policy
-per operation; each publish creates an immutable revision, and the newest one
-applies the next time the operation runs. Settings left out are off: Zitadel
-applies no defaults.
+A policy holds the settings that a project's operation is checked against. An
+example is the minimum length a new password must have. A project has one policy
+per operation. Each publish creates an immutable revision, and the newest one
+applies the next time the operation runs. Settings left out are off, because
+Zitadel applies no defaults.
 
 <Operations />

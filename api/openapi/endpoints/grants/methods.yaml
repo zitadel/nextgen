@@ -1,26 +1,28 @@
 post:
   operationId: createGrant
   x-zitadel-cli: grants create
-  summary: Create grant
+  summary: Create a grant
   description: |
-    Bind a user or team to `project.viewer`, `project.editor`, or
-    `project.admin` on the project identified by the `project-id` header.
-    Name the principal with `user` (`user_id` or `identifier`) or `team`
-    (`team_id` or `name`). IDs are `asgn_<opaque>`. Owning-team
-    (`project.team`) grants are not created here — claim owns that path. An
-    unrevoked grant with the same principal and relation occupies the unique
-    key even after `expires_at`; DELETE it before re-creating.
-    Create does not accept `expand`. The `user_id` and team locators
-    return 201, whose `user` / `team` carry only `user_id` / `team_id`,
-    and still 404 / 409 when the principal is missing or the tuple
-    already exists. Creating by `user.identifier` answers 202 with no
-    body on every outcome. Granting the session caller's own user is
-    `grant.invalid` on either user locator. Read the grant back for
-    identifier and display.
+    Creates a grant that binds a user or a team to `project.viewer`,
+    `project.editor` or `project.admin` on a project.
 
-    Accepts either a project secret (`oauth2`) or a user-bound Console
-    session cookie (`nextgenSession`). Session callers are authorized as
-    the human against the target project (home may differ). Cookie-authenticated
+    The `project-id` header identifies the project. Name the principal with
+    `user` (`user_id` or `identifier`) or `team` (`team_id` or `name`). Grant IDs
+    are `asgn_<opaque>`. Owning-team (`project.team`) grants are not created
+    here, because claiming a project creates them. An unrevoked grant with the
+    same principal and relation occupies the unique key even after `expires_at`,
+    so DELETE it before creating it again.
+
+    Create does not accept `expand`. The `user_id` and team locators return 201,
+    and the `user` or `team` in the response carries only `user_id` or `team_id`.
+    They still return 404 or 409 when the principal is missing or the tuple
+    already exists. Creating by `user.identifier` answers 202 with no body on
+    every outcome. Granting the session caller's own user is `grant.invalid` on
+    either user locator. Read the grant back for the identifier and display name.
+
+    The operation accepts a project secret (`oauth2`) or a user-bound console
+    session cookie (`nextgenSession`). Session callers are authorized as the
+    human against the target project, whose home may differ. Cookie-authenticated
     requests follow the scheme's CSRF rules (`nextgenSession`).
   tags:
     - Grants
@@ -71,7 +73,7 @@ post:
             $ref: ../../components/error-details.yaml
     '404':
       description: |
-        Project not found, or an id or team-name locator could not be
+        Project not found, or an ID or team-name locator could not be
         resolved. Identifier create answers 202 instead.
       content:
         application/json:
@@ -87,7 +89,7 @@ post:
             $ref: ../../components/error-details.yaml
     '429':
       description: |
-        Too many requests, the client has sent too many requests in a given
+        Too many requests. The client has sent too many requests in a given
         amount of time.
       content:
         application/json:

@@ -1,8 +1,8 @@
 title: UserUpdatedPayload
 type: object
 description: |
-  Payload for `user.updated`. Same attribute rules as create: keys touched
-  plus `x-audit` values only.
+  Payload for `user.updated`. The attribute rules match `user.created`: the
+  keys written, plus values only for schema fields marked `x-audit`.
 properties:
   attribute_keys:
     type: array

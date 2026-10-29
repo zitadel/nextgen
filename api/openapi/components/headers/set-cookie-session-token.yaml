@@ -1,7 +1,7 @@
 description: |
-  Secure cookie holding the token of the latest session. 
-  Rotated on every session exchange and used by clients for authenticating API requests.
-  And cleared on session revocation (logout).
+  The secure cookie that holds the token of the latest session. The server
+  rotates it on every session exchange, and clients use it to authenticate API
+  requests. Revoking the session (signing out) clears it.
 schema:
   type: string
   example: __nextgen_session=<session-token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=<ttl-seconds>

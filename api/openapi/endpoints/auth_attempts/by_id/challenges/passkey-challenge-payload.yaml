@@ -1,6 +1,6 @@
 title: PasskeyChallengePayload
 type: object
-description: WebAuthn-specific challenge data for passkey authentication
+description: WebAuthn challenge data for passkey authentication.
 required:
   - public_key
 properties:

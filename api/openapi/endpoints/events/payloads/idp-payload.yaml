@@ -1,10 +1,10 @@
 title: IdpPayload
 type: object
 description: |
-  Shared allowlisted fields for `idp.created` (snapshot) and `idp.updated`
-  (delta: only changed fields present, plus the new `revision_id`). The
-  connection id is the event's `entity_id`. The connection document, and with
-  it the `client_secret` reference, is never included.
+  The fields recorded for `idp.created` (a snapshot) and `idp.updated` (only
+  the changed fields, plus the new `revision_id`). The connection ID is the
+  event's `entity_id`. The connection document, and with it the
+  `client_secret` reference, is never included.
 required:
   - revision_id
 properties:

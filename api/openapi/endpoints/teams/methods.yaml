@@ -1,7 +1,7 @@
 post:
   operationId: createTeam
   x-zitadel-cli: teams create
-  summary: Create team
+  summary: Create a team
   description: |
     Creates a team in the project, with a name no other team in the project has.
 
@@ -23,13 +23,13 @@ post:
           $ref: create-team-request.yaml
   responses:
     '201':
-      description: The team was created successfully
+      description: The created team.
       content:
         application/json:
           schema:
             $ref: team-response.yaml
     '400':
-      description: The provided parameters were not acceptable
+      description: The provided parameters were not acceptable.
       content:
         application/json:
           schema:
@@ -61,7 +61,7 @@ post:
             $ref: ../../components/error-details.yaml
     '429':
       description: |
-        Too many requests, the client has sent too many requests in a given
+        Too many requests. The client has sent too many requests in a given
         amount of time.
       content:
         application/json:

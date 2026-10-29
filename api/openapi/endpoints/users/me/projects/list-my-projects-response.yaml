@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of projects, ordered by project id.
+description: Paginated list of projects, ordered by project ID.
 required:
   - projects
 properties:

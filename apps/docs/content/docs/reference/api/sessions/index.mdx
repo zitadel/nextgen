@@ -1,8 +1,11 @@
 ---
 title: Sessions
-description: OpenAPI operations for session creation, lookup, exchange, and teardown.
+description: What a user holds at runtime, either authenticated or anonymous, with operations to create, read, exchange and revoke it.
 ---
 
-Sessions represent authenticated and anonymous runtime state.
+A session is the runtime state of a user, either authenticated or anonymous.
+An anonymous session exists before the user is known. Signing in turns it into
+an authenticated session. Use these endpoints to create, read, exchange and
+revoke sessions.
 
 <Operations />

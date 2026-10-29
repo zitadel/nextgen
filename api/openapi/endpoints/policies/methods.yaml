@@ -4,9 +4,9 @@ get:
   summary: List policies
   description: |
     Lists the project's policies, one per operation, each as its newest
-    revision, ordered by `created_at` (first publish) and then `id`. Filter
-    by `operation` to read the policy of one operation; a project that never
-    published one gets an empty list.
+    revision. They are ordered by `created_at` (first publish), then `id`.
+    Filter by `operation` to read the policy of one operation. A project that
+    never published one gets an empty list.
 
     The lookup is scoped to the project in `project_id`.
   tags:
@@ -26,7 +26,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The policies were returned.
+      description: A page of the project's policies.
       content:
         application/json:
           schema:
@@ -53,21 +53,25 @@ post:
   description: |
     Publishes the project's policy for an operation as a new immutable
     revision, creating the policy on its first publish. The newest revision
-    applies to the next time the operation runs; nothing already stored is
+    applies the next time the operation runs. Nothing already stored is
     re-evaluated, so a stricter password policy applies the next time a
     password is set.
 
-    The request is typed by `operation`: an unknown operation or setting, or
+    The request is typed by `operation`. An unknown operation or setting, or
     a value of the wrong type or outside its bounds, answers `req.invalid`
-    like any malformed request. The operation's template then checks the
-    config again, together with the rules that relate settings to each other
-    (a `min_length` above `max_length`), and answers `pol.invalid`. Its
-    `details.details.violations` lists everything that failed, settings
-    first, then rules: `{"setting": "min_length"}` for one setting, or
+    like any malformed request.
+
+    The operation's template then checks the config again, together with the
+    rules that relate settings to each other (a `min_length` above
+    `max_length`), and answers `pol.invalid`. Its `details.details.violations`
+    lists everything that failed, settings first, then rules.
+    `{"setting": "min_length"}` names one setting.
     `{"config_rule": "min_length_not_above_max_length", "settings":
-    ["min_length", "max_length"]}` for a rule across settings, with the
-    settings it reads. A setting left out is off, and `{}` switches every
-    rule off; there are no defaults.
+    ["min_length", "max_length"]}` names a rule across settings, with the
+    settings it reads.
+
+    A setting left out is off, and `{}` switches every rule off. There are no
+    defaults.
   tags:
     - Policies
   parameters:
@@ -91,7 +95,7 @@ post:
                 history_depth: 4
   responses:
     '201':
-      description: The revision was published.
+      description: The published revision of the policy.
       content:
         application/json:
           schema:

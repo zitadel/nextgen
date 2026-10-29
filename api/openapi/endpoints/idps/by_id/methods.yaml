@@ -1,10 +1,10 @@
 get:
   operationId: getIdpById
   x-zitadel-cli: idps get
-  summary: Get an identity provider connection by id
+  summary: Get an identity provider by ID
   description: |
-    Reads a connection by its id, at its newest revision.
-    `GET /idps/{id}/revisions` lists every revision of the connection.
+    Returns an identity provider by its ID, at its newest revision.
+    `GET /idps/{id}/revisions` lists every revision of the identity provider.
 
     The lookup is scoped to the project in `project_id`.
   tags:
@@ -18,14 +18,14 @@ get:
     - $ref: ../../../components/parameters/idp-id.yaml
   responses:
     '200':
-      description: The identity provider connection was retrieved successfully.
+      description: The identity provider, at its newest revision.
       content:
         application/json:
           schema:
             $ref: ../idp-response.yaml
           examples:
             revised:
-              summary: A connection that has been revised since it was created.
+              summary: An identity provider that has been revised since it was created.
               value:
                 id: idp_01KWH3B72K7M7F0N9WD3P2E4YM
                 revision_id: idprev_01KWHF2XY6RN7F0N9WD3P2E4YM
@@ -72,9 +72,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: |
-        No identity provider connection with this id exists in the given
-        project.
+      description: No identity provider with this ID exists in the given project.
       content:
         application/json:
           schema:

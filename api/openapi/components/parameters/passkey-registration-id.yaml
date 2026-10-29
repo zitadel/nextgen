@@ -1,7 +1,7 @@
 name: registration_id
 in: path
 required: true
-description: The ceremony identifier returned by begin.
+description: The ceremony ID returned by begin.
 schema:
   type: string
 example: att_01J0Z9KX7Y0Q2Y7JX5M9K2YF3C

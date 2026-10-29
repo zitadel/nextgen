@@ -9,8 +9,8 @@ required:
 properties:
   user:
     description: |
-      The person. A user-ref: render `display`, falling back to `identifier`,
-      then `user_id`.
+      The person. Show `display`, falling back to `identifier`, then
+      `user_id`.
     $ref: ../../../../components/schemas/user-ref.yaml
   sources:
     type: array

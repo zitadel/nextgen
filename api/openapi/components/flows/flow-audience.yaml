@@ -2,8 +2,8 @@ type: object
 additionalProperties: false
 description: |
   Scopes which teams or apps this flow definition applies to. Empty or
-  omitted fields mean "no restriction"; when both are empty the definition
-  matches every request in the project. The engine picks the most specific
+  omitted fields mean "no restriction". When both are empty the definition
+  matches every request in the project. The server picks the most specific
   matching definition: app > team > project-wide.
 properties:
   team_ids:

@@ -1,7 +1,7 @@
 get:
   operationId: getProject
   x-zitadel-cli: projects get
-  summary: Get project
+  summary: Get a project by ID
   description: |
     Returns the current state of a project.
   tags:
@@ -21,7 +21,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: Project state.
+      description: The project, with its current state.
       content:
         application/json:
           schema:
@@ -44,9 +44,9 @@ get:
 patch:
   operationId: patchProject
   x-zitadel-cli: projects update
-  summary: Update project
+  summary: Update a project
   description: |
-    Updates the state of a project.
+    Updates the name or the password hashing method of a project.
   tags:
     - Projects
   parameters:
@@ -66,7 +66,7 @@ patch:
           $ref: patch-project-request.yaml
   responses:
     '200':
-      description: Updated project state.
+      description: The updated project.
       content:
         application/json:
           schema:

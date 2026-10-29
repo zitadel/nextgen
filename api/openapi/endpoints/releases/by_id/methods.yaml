@@ -1,21 +1,21 @@
 get:
   operationId: getReleaseById
   x-zitadel-cli: release get
-  summary: Get a release by id
+  summary: Get a release by ID
   description: |
-    Reads one release: its digest, its metadata, whether it was revoked, and
+    Returns one release: its digest, its metadata, whether it was revoked, and
     the `(kind, handle, revision_id)` tuples it pins.
 
-    The path takes the `rel_` id only. To find a release from its digest,
+    The path takes the `rel_` ID only. To find a release from its digest,
     list with the `content_hash` filter and read the matched entry's `id`.
 
-    Does not embed resource content. Resolve each `revision_id` through the
-    per-kind read endpoints when the bytes are needed.
+    The response does not embed resource content. Resolve each `revision_id`
+    through the per-kind read endpoints when the bytes are needed.
 
-    The lookup is scoped to the project in `project_id`: a release id belonging
-    to another project answers not found exactly as an unknown id does, so the
-    endpoint cannot be used to probe for releases in projects the caller cannot
-    read.
+    The lookup is scoped to the project in `project_id`. A release ID
+    belonging to another project answers not found, exactly as an unknown ID
+    does. So the endpoint cannot be used to probe for releases in projects the
+    caller cannot read.
   tags:
     - Releases
   security:
@@ -27,7 +27,7 @@ get:
     - $ref: ../../../components/parameters/release-id.yaml
   responses:
     '200':
-      description: The release was retrieved successfully.
+      description: The release, with the revisions it pins.
       content:
         application/json:
           schema:

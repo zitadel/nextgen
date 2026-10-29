@@ -3,8 +3,11 @@ post:
   summary: Begin passkey registration
   description: |
     Starts a WebAuthn registration ceremony for the user and returns the
-    creation options for `navigator.credentials.create()`. Complete the
-    ceremony with `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
+    creation options for `navigator.credentials.create()`.
+
+    A ceremony is one passkey registration attempt, from the creation options
+    to the browser's response. Complete it with
+    `POST /users/{user_id}/passkeys/registrations/{registration_id}` within
     five minutes. Credentials already registered for the user are excluded
     automatically.
   tags:
@@ -22,13 +25,13 @@ post:
           $ref: begin-user-passkey-registration-request.yaml
   responses:
     '201':
-      description: The registration ceremony was started
+      description: The started registration ceremony, with its ID and the creation options.
       content:
         application/json:
           schema:
             $ref: begin-user-passkey-registration-response.yaml
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
@@ -46,7 +49,7 @@ post:
           schema:
             $ref: ../../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

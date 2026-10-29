@@ -3,12 +3,13 @@ post:
   x-zitadel-cli: users list
   summary: Query users
   description: |
-    Returns the users of a project, paginated with a cursor.
+    Returns the users of a project in pages, with optional filtering and
+    sorting.
 
-    `project_id` names the project to list; without it, the credential's own
+    `project_id` names the project to list. Without it, the credential's own
     project is listed.
 
-    Accepts either a project secret (`oauth2`) or a user-bound Console
+    Accepts either a project secret (`oauth2`) or a user-bound console
     session cookie (`nextgenSession`). Cookie-authenticated requests
     follow the scheme's CSRF rules (`nextgenSession`).
   tags:
@@ -34,13 +35,13 @@ post:
           $ref: query-users-request.yaml
   responses:
     '200':
-      description: The list of users was returned successfully
+      description: The matching users, with a token for the next page.
       content:
         application/json:
           schema:
             $ref: query-users-response.yaml
     '400':
-      description: Invalid request (e.g., unknown filter field or unusable value).
+      description: The request was not valid, for example an unknown filter field or an unusable value.
       content:
         application/json:
           schema:

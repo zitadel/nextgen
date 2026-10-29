@@ -2,18 +2,20 @@ get:
   operationId: listEvents
   x-zitadel-cli: events list
   summary: List events
+  # Maintainer notes, moved verbatim from the description:
+  # newest-first by keyset on `(created_at, id)` (ADR 027 / ADR 049)
+  # (enforced when team-scoped tokens exist)
+  # Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
+  # see docs/design/api/events-catalog.md.
   description: |
-    Returns project-scoped audit events, newest-first by keyset on
-    `(created_at, id)` (ADR 027 / ADR 049). Pass `order=asc` for oldest-first.
-    Requires `events.read`.
+    Returns the audit events of one project, newest first. Pass `order=asc`
+    for oldest first. Requires `events.read`.
 
-    Pre-claim projects return an empty list (events are stored but not
-    visible until claim succeeds). Team-scoped credentials see only events
-    whose emit-time `team_id` matches the credential team (enforced when
-    team-scoped tokens exist).
+    Until a project is claimed, its events are stored but hidden, so the list
+    is empty. Team-scoped credentials see only events whose emit-time
+    `team_id` matches the credential's team.
 
-    Clients discriminate each item via `event_type` (OpenAPI Event oneOf) —
-    see docs/design/api/events-catalog.md.
+    The `event_type` of each item says which event schema it follows.
   tags:
     - Events
   security:
@@ -24,7 +26,8 @@ get:
     - name: category
       in: query
       description: |
-        Filter by wide-event category. Repeatable (OR within the parameter).
+        Filter by event category. Repeatable: an event matches any of the
+        given values.
       style: form
       explode: true
       schema:
@@ -41,7 +44,8 @@ get:
     - name: event_type
       in: query
       description: |
-        Exact-match filter on `event_type`. Repeatable (OR within the parameter).
+        Exact-match filter on `event_type`. Repeatable: an event matches any
+        of the given values.
       style: form
       explode: true
       schema:
@@ -82,7 +86,7 @@ get:
         type: string
     - name: team_id
       in: query
-      description: Filter by emit-time team scope stored on the event.
+      description: Filter by the emit-time team scope stored on the event.
       schema:
         type: string
     - name: created_after
@@ -100,8 +104,8 @@ get:
     - name: order
       in: query
       description: |
-        Sort direction on `(created_at, id)`. Default `desc` (newest first)
-        for audit UI. Pass `asc` for oldest-first.
+        Sort direction on `created_at`, then `id`. The default `desc` returns
+        the newest first, which suits an audit UI. Pass `asc` for oldest first.
       schema:
         type: string
         enum:
@@ -112,13 +116,13 @@ get:
     - $ref: ../../components/parameters/limit.yaml
   responses:
     '200':
-      description: Events were retrieved successfully.
+      description: A page of events.
       content:
         application/json:
           schema:
             $ref: list-events-response.yaml
     '400':
-      description: Invalid request (e.g., invalid query parameters or page token).
+      description: The request is invalid, for example because of a query parameter or page token.
       content:
         application/json:
           schema:

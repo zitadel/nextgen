@@ -3,7 +3,7 @@ post:
   operationId: authSsoExchangeFailed
   summary: auth.sso.exchange.failed
   description: |
-    An SSO sign-in failed after its code arrived: the token exchange, the ID
+    An SSO sign-in failed after its code arrived. The token exchange, the ID
     token or userinfo validation, or the connection's configuration failed.
 
     The body is the event as `GET /events` returns it.

@@ -2,9 +2,9 @@ name: _zflow
 in: cookie
 required: true
 description: |
-  Encrypted flow state cookie set by `POST /flow` or the previous
+  The encrypted flow state cookie, set by `POST /flow` or the previous
   `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-  flow; the `{id}` path parameter must name that flow, any other id is
+  flow. The `{id}` path parameter must name that flow, and any other ID is
   refused.
 
   Browsers send this automatically; non-browser clients must capture the

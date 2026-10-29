@@ -1,6 +1,6 @@
 description: |
-  The project is already claimed by a team. The `details` carry the owning
-  team and the dashboard where it can be managed.
+  The project is already claimed by a team. The `details` hold the owning
+  team and the dashboard where the team can be managed.
 allOf:
   - $ref: ../../../../../components/schemas/errors/proj-already_claimed.yaml
   - type: object

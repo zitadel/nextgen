@@ -2,11 +2,13 @@ post:
   operationId: initClaim
   summary: Initialize a project claim
   description: |
-    Starts a claim challenge for an unclaimed project. Authenticated by the
-    project secret, this mints a single-use, short-lived challenge and returns
-    the `claim_url` the developer opens in a browser to complete the claim,
-    together with the `challenge_id` the CLI polls with. The exact expiry is
-    carried by `expires_at` on the response.
+    Starts a claim challenge for an unclaimed project, so a developer can claim
+    it in a browser.
+
+    The project secret authenticates the request. It creates a single-use,
+    short-lived challenge and returns the `claim_url` the developer opens in a
+    browser to complete the claim. It also returns the `challenge_id` the CLI
+    polls with. `expires_at` on the response carries the exact expiry.
   tags:
     - Projects
   parameters:
@@ -19,7 +21,7 @@ post:
         - project.write
   responses:
     '201':
-      description: Claim challenge created.
+      description: The claim challenge, with the claim URL to open in a browser.
       content:
         application/json:
           schema:
@@ -45,7 +47,7 @@ post:
     '410':
       description: |
         The claim window has closed: the project was created more than 14 days
-        ago and can no longer be claimed. Unlike an expired challenge this is
+        ago and can no longer be claimed. Unlike an expired challenge, this is
         final, so clients must not present it as retryable.
       content:
         application/json:

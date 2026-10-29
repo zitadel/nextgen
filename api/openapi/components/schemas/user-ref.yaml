@@ -1,18 +1,19 @@
 type: object
 title: UserRef
+# Maintainer note moved here from the description: "(ADR 058 §3)" after "A resolved reference to a user".
 description: |
-  A resolved reference to a user (ADR 058 §3). Fields are role-named, not
-  property-named, so responses can mix users from different schemas.
-  `identifier` and `display` are resolved independently from the user
-  schema's `x-identifier` and `x-display` designations, live at read time.
-  Clients render `display`, falling back to `identifier`, then `user_id`.
-  Missing or deleted users degrade to `user_id` only.
+  A resolved reference to a user. Fields are role-named, not property-named, so
+  responses can mix users from different schemas. `identifier` and `display` are
+  resolved independently from the user schema's `x-identifier` and `x-display`
+  designations, live at read time. Clients render `display`, falling back to
+  `identifier`, then `user_id`. Missing or deleted users degrade to `user_id`
+  only.
 required:
   - user_id
 properties:
   user_id:
     $ref: ./user-id.yaml
-    description: The referenced user's id. Always present.
+    description: The ID of the referenced user. Always present.
   identifier:
     type: string
     description: |
@@ -31,8 +32,8 @@ properties:
   display:
     type: string
     description: |
-      The `x-display` rendering — the designated properties' values joined
-      in list order. Purely presentational, with no source attribution.
+      The `x-display` rendering: the designated properties' values joined
+      in list order. It is purely presentational, with no source attribution.
       Absent when the schema designates no display properties or the user
       carries no values for them.
     example: Ada Lovelace

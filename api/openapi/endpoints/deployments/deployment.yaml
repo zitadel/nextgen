@@ -3,7 +3,7 @@ description: |
   An immutable record of a release made live on a set of targets. Deploying
   and rolling back each append one, so the history is the audit trail.
 
-  All primary origins serve the project's newest primary deployment; one
+  All primary origins serve the project's newest primary deployment. An origin
   added after it serves nothing until the next deployment to `primary`. A
   preview URL serves the newest deployment to it while its preview is live.
 
@@ -21,7 +21,7 @@ required:
 properties:
   id:
     readOnly: true
-    description: The opaque, immutable resource id, assigned at creation.
+    description: The opaque, immutable resource ID, assigned at creation.
     $ref: ../../components/schemas/deployment-id.yaml
   project_id:
     readOnly: true
@@ -30,7 +30,7 @@ properties:
   release_id:
     readOnly: true
     description: |
-      The release this deployment made live. Always the release id, also
+      The release this deployment made live. Always the release ID, also
       when the request named the release by `content_hash`.
     $ref: ../../components/schemas/release-id.yaml
   kind:

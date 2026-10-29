@@ -1,11 +1,11 @@
 get:
   operationId: getFlowStep
-  summary: Get current step (re-render)
+  summary: Get the current step
   description: |
-    Returns the current capability step without advancing the state machine.
-    Useful for page reloads or re-rendering after a network error.
+    Returns the current step of a flow without advancing it. This is useful for
+    page reloads, or to render the step again after a network error.
 
-    Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+    Reuses the deployment sealed into `_zflow` at `createFlow`. It does not
     re-resolve from `Origin`. If that release was revoked since the attempt
     started, the response is `409` with `rel.revoked`.
   tags:
@@ -17,10 +17,10 @@ get:
   responses:
     '200':
       description: |
-        Current step. Only a render that resolved a parked SSO identity sets
-        the flow cookie; any other render leaves it unchanged. When that
-        render completed the sign-in, the step is terminal, the cookie is
-        cleared, and the step carries the handoff token.
+        The current step. Only a render that resolved a parked SSO identity sets
+        the flow cookie. Any other render leaves it unchanged. When that render
+        completed the sign-in, the step is terminal, the cookie is cleared, and the
+        step carries the handoff token.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
@@ -32,10 +32,9 @@ get:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: |
-        The flow must be restarted: the provider's identity belongs to a
-        user the flow cannot continue with, the flow's auth attempt
-        expired or was already handed off, or the sealed release was
-        revoked (`rel.revoked`).
+        The flow must be restarted. The provider's identity belongs to a user the
+        flow cannot continue with, the flow's authentication attempt expired or was
+        already handed off, or the sealed release was revoked (`rel.revoked`).
       content:
         application/json:
           schema:

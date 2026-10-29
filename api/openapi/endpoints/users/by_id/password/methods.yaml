@@ -1,10 +1,11 @@
 get:
   operationId: getUserPasswordState
-  summary: Get user password state
+  summary: Get a user's password state
   description: |
-    Reports when the user's current password was set, and leaves `set_at` out
-    when the user has none. The password and its hash are never returned;
-    setting one is `PUT` on the same path.
+    Returns when the user's current password was set. `set_at` is absent when
+    the user has no password. The password and its hash are never returned.
+
+    To set a password, send `PUT` to the same path.
   tags:
     - Users
   parameters:
@@ -19,7 +20,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The state of the user's password
+      description: The state of the user's password.
       content:
         application/json:
           schema:
@@ -37,7 +38,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:
@@ -52,7 +53,7 @@ get:
       $ref: getUserPasswordState-error-response.yaml
 put:
   operationId: setUserPassword
-  summary: Set user password
+  summary: Set a user's password
   description: |
     Sets a user's password, hashed with the project's current password hashing
     policy.
@@ -74,15 +75,15 @@ put:
           $ref: set-user-password-request.yaml
   responses:
     '204':
-      description: The user password was set successfully
+      description: The password was set.
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

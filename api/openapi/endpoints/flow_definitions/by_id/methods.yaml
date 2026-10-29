@@ -1,8 +1,10 @@
 get:
   operationId: getFlowDefinition
   x-zitadel-cli: flow-definitions get
-  summary: Get a flow definition by id
-  description: Get a flow definition by id
+  summary: Get a flow definition by ID
+  description: |
+    Returns one flow definition revision. Each ID names one revision, and
+    the revisions of a flow share its `name`.
   tags:
     - Flow Definitions
   security:
@@ -13,7 +15,7 @@ get:
     - $ref: ../../../components/parameters/flow-definition-id.yaml
   responses:
     '200':
-      description: Flow definition found.
+      description: The flow definition.
       content:
         application/json:
           schema:

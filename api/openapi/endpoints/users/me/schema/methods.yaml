@@ -2,7 +2,7 @@ get:
   operationId: getMyUserSchema
   summary: Get my user schema
   description: |
-    The schema the signed-in user's own record is validated against.
+    Returns the schema the signed-in user is validated against.
 
     With `project_id`, the schema is returned only when the session belongs to
     that project.

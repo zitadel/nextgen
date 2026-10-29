@@ -1,7 +1,7 @@
 type: object
 description: |
   A stored branding revision. `branding` echoes the canonical stored
-  configuration so clients (e.g. the CLI sync engine) can reconcile local
+  configuration so clients (for example the CLI sync engine) can reconcile local
   files with the server's stored state.
 required:
   - id

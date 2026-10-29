@@ -1,9 +1,9 @@
 get:
   operationId: getTeam
   x-zitadel-cli: teams get
-  summary: Get team
+  summary: Get a team by ID
   description: |
-    Returns a Team by its id.
+    Returns a team by its ID.
   tags:
     - Teams
   parameters:
@@ -37,21 +37,24 @@ get:
 delete:
   operationId: deleteTeam
   x-zitadel-cli: teams deactivate
-  summary: Delete team
+  summary: Delete a team
+  # Maintainer note moved here from the description: "No endpoint releases that
+  # ownership yet, so such a team cannot currently be deactivated through the
+  # API."
   description: |
-    Deactivates the team.
+    Deletes a team by deactivating it.
 
-    The team is tombstoned rather than erased: it stays readable through
-    getTeam with status `deactivated`. Its memberships are removed and the
-    users whose lifecycle it owns are deactivated with it.
+    The team is kept rather than erased. It stays readable through `getTeam`
+    with status `deactivated`. Its memberships are removed, and the users whose
+    lifecycle it owns are deactivated with it.
 
     The request is idempotent. Deleting a team that is already deactivated
     or doesn't exist succeeds without changing anything.
 
     A team that still owns a project is refused with `409
-    team.owns_project`: deactivating it would leave the project owned by a
-    dead team and so unmanageable. No endpoint releases that ownership yet,
-    so such a team cannot currently be deactivated through the API.
+    team.owns_project`. Deactivating it would leave the project owned by a
+    deactivated team and so unmanageable. The API has no endpoint that
+    releases that ownership, so such a team cannot be deactivated through it.
   tags:
     - Teams
   parameters:
@@ -94,9 +97,9 @@ delete:
 patch:
   operationId: updateTeam
   x-zitadel-cli: teams update
-  summary: Update team
+  summary: Update a team
   description: |
-    Update team. Only active teams can be updated.
+    Updates the name of a team. Only active teams can be updated.
   tags:
     - Teams
   parameters:
@@ -114,7 +117,7 @@ patch:
           $ref: ../update-team-request.yaml
   responses:
     '200':
-      description: Updated the team.
+      description: The updated team.
       content:
         application/json:
           schema:

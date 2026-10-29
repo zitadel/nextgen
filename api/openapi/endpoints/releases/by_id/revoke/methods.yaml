@@ -4,8 +4,9 @@ post:
   summary: Revoke a release
   description: |
     Marks the release revoked, so that its content is never served again.
-    From then on the release cannot be deployed and is refused on every path
-    that would serve it, including to a build that pins its digest, with
+
+    From then on the release cannot be deployed. Every path that would serve
+    it, including a build that pins its digest, refuses it with
     `rel.revoked`.
 
     A release that any origin still serves cannot be revoked. An origin
@@ -15,13 +16,14 @@ post:
     therefore never takes an origin down. Deployments that named the release
     earlier stay in the history.
 
-    Idempotent: revoking a release that is already revoked answers `200`
-    with the release unchanged, `revoked_at` still naming the first
-    revocation. There is no un-revoke; build a new release instead.
+    The operation is idempotent: revoking a release that is already revoked
+    answers `200` with the release unchanged, `revoked_at` still naming the
+    first revocation. There is no way to un-revoke. Build a new release
+    instead.
 
-    Takes no body. The lookup is scoped to the project in `project_id`, so a
-    release id of another project answers not found exactly as an unknown id
-    does.
+    The request takes no body. The lookup is scoped to the project in
+    `project_id`, so a release ID of another project answers not found,
+    exactly as an unknown ID does.
   tags:
     - Releases
   security:
@@ -33,7 +35,7 @@ post:
     - $ref: ../../../../components/parameters/release-id.yaml
   responses:
     '200':
-      description: The release is revoked.
+      description: The revoked release.
       content:
         application/json:
           schema:
@@ -42,7 +44,7 @@ post:
             revoked:
               summary: A release after revocation
               description: |
-                Only `revoked_at` changed; the pinned set and the metadata are
+                Only `revoked_at` changed. The pinned set and the metadata are
                 immutable and stay as they were.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1

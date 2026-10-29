@@ -1,28 +1,31 @@
 post:
   operationId: createSession
-  summary: Create an anonymous session shell
+  summary: Create an anonymous session
   description: |
-    Creates an anonymous session shell with no user and no factors (`state: building`).
+    Creates an anonymous session with no user and no factors (`state: building`).
 
-    This is optional — an `auth_attempt` will create a session implicitly if none is provided.
-    Use this explicitly when you want to:
-    - Pre-allocate a `session_id` before the user is known, so device/telemetry signals
-      can be correlated with the eventual authenticated session from the start.
-    - Track anonymous state (bot detection, device fingerprint) that survives until authentication.
+    This is optional. An authentication attempt creates a session implicitly if
+    none is provided. Create one explicitly when you want to:
+    - Pre-allocate a `session_id` before the user is known, so device and
+      telemetry signals can be correlated with the eventual authenticated session
+      from the start.
+    - Track anonymous state (bot detection, device fingerprint) that survives
+      until authentication.
 
     Creating a session is an app-plane operation on the project credential
     (`session.write`). The returned `session_token` is a session credential for the
-    end-user client, not a management scope: it is delivered as the
-    `__nextgen_session` cookie and authorises the self-service operations
+    end-user client, not a management scope. It is delivered as the
+    `__nextgen_session` cookie and authorizes the self-service operations
     `GET /sessions/me` and `DELETE /sessions/me` (`nextgenSession` scheme). The
     by-id operations `GET /sessions/{session_id}` and `DELETE /sessions/{session_id}`
     are operator endpoints and require `session.read` / `session.delete` instead.
 
-    The `session_token` is superseded when a handoff exchange completes — clients must
+    A completed handoff exchange supersedes the `session_token`. Clients must
     replace it at that point.
 
-    Anonymous sessions expire aggressively (10-minute TTL). The TTL resets to the configured
-    full session TTL when the first authentication factor is written via a completing `auth_attempt`.
+    Anonymous sessions expire quickly (10-minute TTL). The TTL resets to the
+    configured full session TTL when a completed authentication attempt writes
+    the first authentication factor.
   tags:
     - Sessions
   security:
@@ -36,7 +39,7 @@ post:
           $ref: create-session-request.yaml
   responses:
     '201':
-      description: Anonymous session created successfully.
+      description: The created anonymous session, with its `session_token`.
       content:
         application/json:
           schema:

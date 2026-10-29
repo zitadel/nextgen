@@ -4,8 +4,8 @@ get:
   description: |
     Returns the user signed in to the session that authenticates the request.
 
-    The project and the user both come from the session cookie, so a caller only
-    ever reads their own user.
+    The project and the user both come from the session cookie, so a caller
+    only ever reads their own user.
 
     With `project_id`, the user is returned only when the session belongs to
     that project.
@@ -17,13 +17,13 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: Current user information retrieved successfully
+      description: The signed-in user.
       content:
         application/json:
           schema:
             $ref: ../user.yaml
     '401':
-      description: Client was not authorized or the session is anonymous
+      description: Client was not authorized or the session is anonymous.
       content:
         application/json:
           schema:
@@ -35,7 +35,7 @@ get:
           schema:
             $ref: ../../../components/schemas/errors/sess-project_mismatch.yaml
     '404':
-      description: User referenced by the current session was not found
+      description: User referenced by the current session was not found.
       content:
         application/json:
           schema:
@@ -48,8 +48,8 @@ patch:
   summary: Update my user information
   description: |
     Partially updates the caller's own schema-defined attributes. The merged
-    result is validated against the user's schema before commit. Concurrent
-    writes are last-write-wins.
+    result is validated against the user's schema before it is saved. When
+    writes are concurrent, the last write wins.
 
     With `project_id`, the user is updated only when the session belongs to
     that project.
@@ -68,7 +68,7 @@ patch:
           $ref: patch-my-user-request.yaml
   responses:
     '200':
-      description: Updated user state.
+      description: The updated user.
       content:
         application/json:
           schema:
@@ -112,8 +112,9 @@ patch:
             $ref: ../../../components/schemas/errors/user-not_found.yaml
     '409':
       description: |
-        A patched value is unique and already taken by another user, or
-        concurrent writes kept the user changing under the patch; retry.
+        A patched value is unique and another user already holds it. Or
+        concurrent writes kept changing the user during the patch; retry in
+        that case.
 
         A taken value answers `user.already_exists`, with
         `details.details.fields` naming the attributes whose value is taken,

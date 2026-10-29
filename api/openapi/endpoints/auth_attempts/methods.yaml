@@ -1,20 +1,26 @@
 post:
   operationId: createAuthAttempt
-  summary: Create a new authentication attempt
+  summary: Create an authentication attempt
+  # Maintainer notes moved here from the description:
+  # - "This is the entry point for the auth_attempts state machine."
+  # - "An ephemeral (15-minute TTL) state machine."
+  # - "Sealed `deployment_id` / `release_id` are filled only when create runs with
+  #   a runtime resolution already on the context (the flow create path)."
   description: |
-    Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
+    Starts a new authentication attempt for a project, optionally to add factors
+    to an existing session.
 
-    An attempt is an ephemeral (15-minute TTL) state machine that drives a single authentication round.
-    It accepts factor challenges, verifies proofs, and completes into a session or handoff token.
+    An attempt drives a single authentication round and lives for 15 minutes. It
+    accepts factor challenges, verifies proofs, and completes into a session or
+    handoff token.
 
-    Accepts a project_id and challenge_nonce (from POST /bootstrap/challenge). For step-up re-auth,
-    also include session_id and that session's session_token to add factors to an existing session.
+    The request takes a `project_id` and a `challenge_nonce` (from POST
+    /bootstrap/challenge). For step-up re-authentication, also include the
+    `session_id` and that session's `session_token`.
 
     The project comes from the project secret. A body `project_id` that disagrees
-    answers `403` with `proj.mismatch`. Sealed `deployment_id` / `release_id` are
-    filled only when create runs with a runtime resolution already on the
-    context (the flow create path); this HTTP entry point does not resolve
-    Origin or refuse a revoked release itself.
+    answers `403` with `proj.mismatch`. This HTTP entry point does not resolve
+    the origin or refuse a revoked release itself.
   tags:
     - Authentication Attempts
   security:
@@ -28,7 +34,7 @@ post:
           $ref: create-auth-attempt-request.yaml
   responses:
     '201':
-      description: Authentication attempt created successfully
+      description: The created authentication attempt.
       content:
         application/json:
           schema:

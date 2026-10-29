@@ -1,6 +1,5 @@
 type: object
-description: |
-  Paginated list of identity provider connections.
+description: Paginated list of identity providers.
 required:
   - idps
 properties:

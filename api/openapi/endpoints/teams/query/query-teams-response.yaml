@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of teams.
+description: A page of teams.
 required:
   - teams
 properties:

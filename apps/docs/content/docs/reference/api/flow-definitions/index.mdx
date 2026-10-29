@@ -1,12 +1,15 @@
 ---
 title: Flow definitions
-description: OpenAPI operations for flow definition templates.
+description: Templates that describe a user journey, such as sign-in, registration or recovery, as an ordered list of steps.
 ---
 
-Flow definitions are templates for user journeys such as login, registration,
-and recovery. They describe the ordered capabilities a flow should resolve and
-execute at runtime. Each create publishes a new revision under the flow's name.
-A start request that names the flow runs its newest active revision; one
-without a name chooses among all active revisions in the project.
+A flow definition is a template for a user journey, such as sign-in,
+registration or recovery. It lists, in order, the capability steps a flow
+resolves and runs. A capability step is one step of the journey, such as a
+password prompt.
+
+Each create publishes a new revision under the flow's name. A start request that
+names the flow runs its newest active revision. A start request without a name
+chooses among all active revisions in the project.
 
 <Operations />

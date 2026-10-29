@@ -17,7 +17,7 @@ get:
         - deployment.read
   responses:
     '200':
-      description: The previews were listed successfully.
+      description: The project's live previews.
       content:
         application/json:
           schema:

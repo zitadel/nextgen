@@ -2,10 +2,10 @@ type: object
 description: |
   The current state of a session.
 
-  A session is the durable post-auth primitive. It accumulates verified authentication
-  factors and exposes `assurance_levels[]` — the set of assurance profiles its current
-  factors satisfy. Sessions are read-only from the client's perspective: factors flow
-  in through `auth_attempts`.
+  A session is the durable result of authentication. It accumulates verified
+  authentication factors and exposes `assurance_levels[]`, the set of assurance
+  profiles its current factors satisfy. Sessions are read-only from the client's
+  perspective. Factors flow in through authentication attempts.
 required:
   - session_id
   - project_id
@@ -24,7 +24,7 @@ properties:
       Current lifecycle state of the session:
       - `building`: no verified authentication factors yet
       - `active`: has at least one verified authentication factor; `assurance_levels[]` may shrink as factors age
-      - `expired`: TTL elapsed
+      - `expired`: the TTL has elapsed
     enum:
       - building
       - active
@@ -33,26 +33,27 @@ properties:
   user_id:
     description: |
       The authenticated user. Null for anonymous sessions and until the `user`
-      factor has been verified through an `auth_attempt`.
+      factor has been verified through an authentication attempt.
     oneOf:
       - $ref: ../../components/schemas/user-id.yaml
       - type: 'null'
   user:
     $ref: ../../components/schemas/user-ref.yaml
+    # Maintainer note moved here from the description: "(ADR 058)" after "`x-identifier`/`x-display` designations".
     description: |
-      The authenticated user's resolved reference, derived live from the
-      user schema's `x-identifier`/`x-display` designations (ADR 058).
-      Present on identity-hydrating reads (`GET /sessions/me`, session get
-      and query) whenever the session has an authenticated user; absent
-      for anonymous sessions. Clients render `display`, falling back to
-      `identifier`, then `user_id`.
+      The authenticated user's resolved reference, derived live from the user
+      schema's `x-identifier` and `x-display` designations. It is present on
+      identity-hydrating reads (`GET /sessions/me`, session get and query) whenever
+      the session has an authenticated user, and absent for anonymous sessions.
+      Clients render `display`, falling back to `identifier`, then `user_id`.
   factors:
     type: array
     description: |
       Verified authentication factors accumulated by this session.
-      Each key is a factor type (e.g. `password`, `totp`, `passkey`).
+      Each key is a factor type, for example `password`, `totp` or `passkey`.
       Each value is a factor event object with at least `verified_at` and
-      method-specific properties (e.g. `user_verified`, `hardware` for passkeys).
+      method-specific properties, for example `user_verified` and `hardware`
+      for passkeys.
     items:
       $ref: ../../components/checks/completed-factor.yaml
   assurance_levels:
@@ -60,7 +61,7 @@ properties:
     description: |
       All assurance levels whose schemas the current session factors satisfy.
       This list shrinks as factor freshness windows expire and grows when step-up
-      auth_attempts add or refresh factors.
+      authentication attempts add or refresh factors.
       Whether any level is "enough" is determined by the request context, not the session.
     items:
       type: string
@@ -97,7 +98,8 @@ properties:
     type: string
     format: date-time
     description: |
-      When this session expires. Short TTL (10 min) for anonymous sessions;
-      reset to the full configured session TTL once the first authentication factor is written.
+      When this session expires. Anonymous sessions have a short TTL (10 minutes).
+      It resets to the full configured session TTL once the first authentication
+      factor is written.
     example: '2026-04-30T10:00:00Z'
 

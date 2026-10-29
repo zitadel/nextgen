@@ -3,7 +3,7 @@ post:
   operationId: sessionEstablished
   summary: session.established
   description: |
-    A session was established, by a sign-in or by exchanging a session.
+    A session was established by a sign-in or by exchanging a session.
 
     The body is the event as `GET /events` returns it.
   tags:

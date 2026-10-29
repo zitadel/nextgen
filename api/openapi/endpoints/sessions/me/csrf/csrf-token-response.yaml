@@ -1,5 +1,6 @@
 type: object
-description: The session-bound CSRF token (ADR 053 §5).
+# Maintainer note moved here from the description: "(ADR 053 §5)".
+description: The session-bound CSRF token.
 required:
   - csrf_token
 properties:

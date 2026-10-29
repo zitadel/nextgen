@@ -1,15 +1,17 @@
 title: Preview
 type: object
+# Maintainer note moved here from the description: the deployment creates or
+# renews the preview "in the same transaction".
 description: |
   A preview URL that is live: an origin matching one of the project's
   preview patterns, with something deployed to it, until it expires.
 
   There is no create operation. A deployment whose targets are preview URLs
-  creates the preview for each of them, or renews it when it exists, in the
-  same transaction, so a preview with nothing deployed to it cannot exist.
-  A preview ends when it expires or is removed with
-  `POST /projects/{project_id}/previews/remove`;
-  the deployments to it stay in the history either way.
+  creates the preview for each target, or renews it if it exists. This
+  happens as part of the deployment, so a preview with nothing deployed to it
+  cannot exist. A preview ends when it expires or when
+  `POST /projects/{project_id}/previews/remove` removes it. The deployments
+  to it stay in the history either way.
 required:
   - origin
   - expires_at

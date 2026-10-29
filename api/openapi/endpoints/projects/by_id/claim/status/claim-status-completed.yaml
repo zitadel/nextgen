@@ -1,8 +1,8 @@
 type: object
 description: |
-  A completed claim. Carries the owning team, when the claim landed, and the
-  dashboard where it can be managed, so a generated client can rely on those
-  fields being present whenever `status` is `completed`.
+  A completed claim. It carries the owning team, when the claim landed and the
+  dashboard where the team can be managed, so a generated client can rely on
+  those fields being present whenever `status` is `completed`.
 required:
   - status
   - team_id

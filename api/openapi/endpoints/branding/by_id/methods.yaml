@@ -2,7 +2,7 @@ get:
   operationId: getBrandingById
   x-zitadel-cli: branding get
   summary: Get a branding revision by ID
-  description: Retrieves a single branding revision, including its stored configuration.
+  description: Returns one branding revision, including its stored configuration.
   tags:
     - Branding
   security:
@@ -13,13 +13,13 @@ get:
     - $ref: ../../../components/parameters/branding-id.yaml
   responses:
     '200':
-      description: The branding revision was retrieved successfully.
+      description: The branding revision.
       content:
         application/json:
           schema:
             $ref: ../branding-revision-response.yaml
     '404':
-      description: No branding revision was found with the given id.
+      description: No branding revision was found with the given ID.
       content:
         application/json:
           schema:

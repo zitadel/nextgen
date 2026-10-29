@@ -3,7 +3,8 @@ post:
   operationId: userCreateFailed
   summary: user.create.failed
   description: |
-    Creating a user failed because a unique attribute was already taken.
+    A user could not be created because a unique attribute was already
+    taken.
 
     The body is the event as `GET /events` returns it.
   tags:

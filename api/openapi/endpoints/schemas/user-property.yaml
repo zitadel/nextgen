@@ -2,15 +2,16 @@ x-meta-schema: json-schema
 "$schema": https://json-schema.org/draft/2020-12/schema
 title: UserProperty
 type: object
+# The generated `user-property.json` adds
+# `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
+# generators choke on it.
 description: |
   The meta-schema one property of a customer's user schema is validated
-  against. The generated `user-property.json` adds
-  `allOf: [{$ref: draft-2020-12}]`, which cannot live here because code
-  generators choke on it.
+  against.
 
   Native JSON Schema keywords such as `type`, `format`, `title` and `writeOnly`
   are accepted without being listed below. `writeOnly: true` is reserved for a
-  value that may be written but is never returned by the read API; nothing
+  value that may be written but is never returned by the read API. Nothing
   enforces it today, so responses still include write-only properties.
 additionalProperties: true
 properties:
@@ -22,12 +23,12 @@ properties:
           - project
           - team
       - type: 'null'
-    description: The level of uniqueness for this property, if applicable
+    description: The level of uniqueness for this property, if applicable.
   x-claim:
     oneOf:
       - type: string
       - type: 'null'
-    description: The claim name for this property, if applicable
+    description: The claim name for this property, if applicable.
   x-audit:
     type: boolean
     default: false

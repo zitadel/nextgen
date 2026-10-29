@@ -1,13 +1,13 @@
 get:
   operationId: getDeploymentById
   x-zitadel-cli: deployment get
-  summary: Get a deployment by id
+  summary: Get a deployment by ID
   description: |
-    Reads one deployment record.
+    Returns one deployment record.
 
-    The lookup is scoped to the project in `project_id`: a deployment id
-    belonging to another project answers not found exactly as an unknown id
-    does, so the endpoint cannot be used to probe for deployments in projects
+    The lookup is scoped to the project in `project_id`. A deployment ID
+    belonging to another project answers not found, exactly as an unknown ID
+    does. So the endpoint cannot be used to probe for deployments in projects
     the caller cannot read.
   tags:
     - Deployments
@@ -20,7 +20,7 @@ get:
     - $ref: ../../../components/parameters/deployment-id.yaml
   responses:
     '200':
-      description: The deployment was retrieved successfully.
+      description: The deployment.
       content:
         application/json:
           schema:

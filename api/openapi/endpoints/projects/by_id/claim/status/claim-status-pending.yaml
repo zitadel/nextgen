@@ -1,5 +1,5 @@
 type: object
-description: A claim challenge that is still awaiting the browser leg.
+description: A claim challenge that is still waiting for the browser to complete it.
 required:
   - status
 properties:

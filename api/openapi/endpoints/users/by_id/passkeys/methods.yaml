@@ -2,10 +2,9 @@ get:
   operationId: listUserPasskeys
   summary: List user passkeys
   description: |
-    Returns the passkeys registered for a user, newest first, paginated with a
-    cursor.
+    Returns the passkeys registered for a user, newest first, in pages.
 
-    Each passkey carries its id, its name and when it was registered, never the
+    Each passkey carries its ID, its name and when it was registered, never the
     credential itself.
   tags:
     - Users
@@ -19,13 +18,13 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The passkeys of a user are returned
+      description: The passkeys of the user, newest first.
       content:
         application/json:
           schema:
             $ref: list-user-passkeys-response.yaml
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
@@ -43,7 +42,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

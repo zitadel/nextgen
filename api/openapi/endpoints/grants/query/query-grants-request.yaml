@@ -13,10 +13,10 @@ properties:
       - type: 'null'
   expand:
     type: array
+    # Maintainer note moved here from the description: "(ADR 059 grant exception)" after "each grant's `user` or `team`".
     description: |
-      Extra principal fields to add onto each grant's `user` or `team`
-      (ADR 059 grant exception). Omit it and those objects stay refs. An
-      unrecognised value is rejected.
+      Extra principal fields to add onto each grant's `user` or `team`. Omit it and
+      those objects stay refs. An unrecognised value is rejected.
     uniqueItems: true
     items:
       $ref: grant-expand.yaml

@@ -1,31 +1,36 @@
 title: ConfigurationBundle
 type: object
+# Maintainer note, moved verbatim from the description:
+# More kinds join as they become release kinds.
 description: |
   The resources of a project's `.zitadel/` directory as authored on disk,
   grouped by kind.
 
-  Resources reference each other by handle: a flow definition's
-  `user_schema` names a schema by its `objectType`, and a flow step's
-  `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name IDP
-  connections by `slug`. A reference resolves to
-  the resource with that handle in this bundle; failing that, to the
+  Resources reference each other by handle. A flow definition's
+  `user_schema` names a schema by its `objectType`. A flow step's
+  `sso_providers`, like a schema's `x-auth-methods.sso.providers`, name
+  identity provider (IdP) connections by `slug`. A reference resolves to the
+  resource with that handle in this bundle. Failing that, it resolves to the
   project's newest revision of it, which the release then pins as well. A
   handle that neither holds refuses the release, naming the pointer and the
   handle. A bundle that references only resources it carries builds the
   same release on any project.
 
-  A handle names one resource of its kind in a bundle. Two schemas with the
-  same `objectType`, two flow definitions with the same `name`, two IDP
-  connections with the same `slug`, two policies for the same `operation`,
-  or a schema without an `objectType` refuse the release with `rel.invalid`,
-  with an entry for each such resource.
+  A handle names one resource of its kind in a bundle. These refuse the
+  release with `rel.invalid`, with an entry for each such resource:
+
+  - two schemas with the same `objectType`
+  - two flow definitions with the same `name`
+  - two IdP connections with the same `slug`
+  - two policies for the same `operation`
+  - a schema without an `objectType`
 
   Each kind is optional, and the arrays may be empty: a project that never
   ejected its branding omits `branding`. The bundle carries at least one
-  resource, and the release it builds pins at most 50, the most a release
-  pins: the resources the bundle carries plus those resolved from the
-  project. The server refuses anything outside that with `rel.invalid`.
-  Unknown keys are refused. More kinds join as they become release kinds.
+  resource. The release it builds pins at most 50 resources, which is the
+  most a release pins. That count is the resources the bundle carries plus
+  those resolved from the project. The server refuses anything outside these
+  limits with `rel.invalid`. Unknown keys are refused.
 additionalProperties: false
 properties:
   schemas:
@@ -41,8 +46,8 @@ properties:
       entry.
 
       A `schema-url` entry's handle is the `objectType` of the document the
-      URL serves. Its revision is identified by the URL, so the release
-      reuses the project's revision for a URL the project already holds and
+      URL serves. Its revision is identified by the URL. So the release
+      reuses the project's revision for a URL the project already holds, and
       fetches the document only for a URL it does not.
     items:
       oneOf:
@@ -63,7 +68,7 @@ properties:
     type: array
     maxItems: 50
     description: |
-      IDP connections, one per `.zitadel/idps/<slug>.json`, each the
+      IdP connections, one per `.zitadel/idps/<slug>.json`, each the
       connection document `POST /idps` takes as `idp`. Secrets appear only
       as `${{ NAME }}` references to variables, never as values, so a bundle
       carries no credentials.
@@ -77,13 +82,13 @@ properties:
       the body `POST /policies` takes. The handle is `operation`: a project
       has one policy per operation. An unknown setting or a value outside a
       setting's bounds is refused while the request is decoded, with
-      `req.invalid` and no `details.resources`; a config the operation's
+      `req.invalid` and no `details.resources`. A config the operation's
       template refuses beyond that, such as settings that contradict each
       other, gets a `rel.invalid` entry.
 
       A request served this release reads the policy revision it pins for
       the operation, as it reads the user schema, branding and identity
-      providers, once the release pins a flow; a release that pins a flow
+      providers, once the release pins a flow. A release that pins a flow
       and no policy for an operation means no policy for it.
     items:
       $ref: ../../policies/publish-policy-request.yaml

@@ -1,7 +1,7 @@
 type: object
 description: |
-  Paginated list of the project's policies, one per operation, each as its
-  newest revision.
+  A page of the project's policies, one per operation, each as its newest
+  revision.
 required:
   - policies
 properties:

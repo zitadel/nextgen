@@ -1,9 +1,8 @@
 description: |
-  The state of a claim challenge. While pending it carries only `status`; once
-  completed it also carries the owning team, the claim timestamp, and the
-  dashboard URL. Modelled as discriminated variants so a `pending` response can
-  never carry stale completion fields and a `completed` response always carries
-  them.
+  The state of a claim challenge. While pending it carries only `status`. Once
+  completed it also carries the owning team, the claim timestamp and the
+  dashboard URL. A `pending` response never carries completion fields, and a
+  `completed` response always carries them.
 oneOf:
   - $ref: ./claim-status-pending.yaml
   - $ref: ./claim-status-completed.yaml

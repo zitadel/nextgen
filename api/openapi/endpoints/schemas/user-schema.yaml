@@ -2,10 +2,9 @@ x-meta-schema: json-schema
 title: UserSchema
 "$schema": https://json-schema.org/draft/2020-12/schema
 type: object
-description: |
-  The meta-schema a customer's user schema document is validated against.
-  The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,
-  which cannot live here because code generators choke on it.
+# The generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,
+# which cannot live here because code generators choke on it.
+description: The meta-schema a customer's user schema document is validated against.
 required:
   - metaSchema
   - kind
@@ -21,7 +20,7 @@ properties:
     type: string
     maxLength: 256
     description: |
-      The type of user this schema describes. This is a customer chosen name.
+      The type of user this schema describes. This is a customer-chosen name.
       Every revision of a schema shares its `objectType`, and flow
       definitions name the schema they operate on by it.
     example: human-user

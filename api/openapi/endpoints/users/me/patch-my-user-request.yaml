@@ -1,12 +1,12 @@
 title: PatchMyUserRequest
 description: |
   A partial update of the caller's own attributes, merged into the current
-  state: an omitted key stays untouched, an object merges recursively,
-  `null` deletes the attribute, and any other value replaces the stored one.
-  The merged result is validated as a whole against the user's schema.
+  state. An omitted key stays untouched, an object merges recursively, `null`
+  deletes the attribute, and any other value replaces the stored one. The
+  merged result is validated as a whole against the user's schema.
 
-  Unlike `PATCH /users/{user_id}`, the schema pointer cannot be moved here:
-  schema upgrades are a management operation.
+  Unlike `PATCH /users/{user_id}`, this request cannot move the user to
+  another schema. Schema upgrades are a management operation.
 type: object
 additionalProperties: false
 required:

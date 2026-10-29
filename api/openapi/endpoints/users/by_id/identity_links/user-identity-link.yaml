@@ -13,8 +13,9 @@ properties:
   connection_id:
     type: string
     description: |
-      The IdP connection the account signs in through, by its id rather than a
-      revision id; `GET /idps/{id}` resolves it.
+      The ID of the identity provider (IdP) connection the account signs in
+      through. It is the connection ID, not a revision ID. `GET /idps/{id}`
+      resolves it.
     example: idp_01KWH3A9F2J7K5P3Q1W8E6Y4UB
   created_at:
     type: string

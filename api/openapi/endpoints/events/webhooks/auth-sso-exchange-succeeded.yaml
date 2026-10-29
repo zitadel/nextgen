@@ -3,8 +3,8 @@ post:
   operationId: authSsoExchangeSucceeded
   summary: auth.sso.exchange.succeeded
   description: |
-    The code an SSO sign-in returned was exchanged. This is not a sign-in:
-    the identity may still match no user.
+    The code from an SSO sign-in was exchanged. This is not yet a sign-in,
+    because the identity may match no user.
 
     The body is the event as `GET /events` returns it.
   tags:

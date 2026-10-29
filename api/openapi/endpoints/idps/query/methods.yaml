@@ -1,10 +1,11 @@
 post:
   operationId: queryIdps
   x-zitadel-cli: idps list
-  summary: Query identity provider connections
+  summary: Query identity providers
   description: |
-    Returns the identity provider connections of a project, paginated with a
-    cursor. One row per connection, carrying its newest revision.
+    Returns the identity providers of a project in pages, with optional filtering
+    and sorting. There is one entry per identity provider, carrying its newest
+    revision.
   tags:
     - Identity Providers
   security:
@@ -14,7 +15,7 @@ post:
   parameters:
     - $ref: ../../../components/parameters/project-id.yaml
   requestBody:
-    description: Request to query the identity provider connections of a project.
+    description: Request to query the identity providers of a project.
     required: true
     content:
       application/json:
@@ -22,7 +23,7 @@ post:
           $ref: query-idps-request.yaml
         examples:
           firstPage:
-            summary: The first page, newest connection first
+            summary: The first page, newest identity provider first
             value:
               limit: 2
               sorting:
@@ -32,7 +33,7 @@ post:
             summary: Resolve a single slug
             description: |
               A slug is unique within the project, so `equals` on it matches
-              at most one row.
+              at most one identity provider.
             value:
               filter:
                 - field: slug
@@ -40,7 +41,7 @@ post:
                   value: google
   responses:
     '200':
-      description: The list of identity provider connections was returned successfully.
+      description: The identity providers of the project, with a token for the next page.
       content:
         application/json:
           schema:
@@ -146,7 +147,7 @@ post:
                           - email
                         pkce_enabled: true
     '400':
-      description: Invalid request (e.g., invalid query parameters).
+      description: The request was not valid, for example because of invalid query parameters.
       content:
         application/json:
           schema:

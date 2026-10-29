@@ -1,8 +1,10 @@
 type: object
+# Maintainer note moved here from the description: "(ADR 046)" after the
+# fixed 14-day claim window.
 description: |
-  How long the project can still be claimed. Derived from the project's
-  creation time and the fixed 14-day claim window (ADR 046); it does not
-  depend on the challenge, which has its own much shorter expiry.
+  How long the project can still be claimed. It follows from the project's
+  creation time and the fixed 14-day claim window. It does not depend on the
+  challenge, which has its own much shorter expiry.
 required:
   - expires_at
   - expired
@@ -15,7 +17,7 @@ properties:
   expired:
     type: boolean
     description: |
-      Whether the window has already closed. Reported alongside `expires_at`
-      rather than left to the client so a skewed browser clock cannot show a
-      claimable project as expired, or the reverse.
+      Whether the window has already closed. The server reports it alongside
+      `expires_at`, so a skewed browser clock cannot show a claimable project
+      as expired, or the reverse.
     example: false

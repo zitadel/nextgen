@@ -1,6 +1,6 @@
 name: revision_id
 in: path
 required: true
-description: The identifier of the policy revision.
+description: The ID of the policy revision.
 schema:
   $ref: '../schemas/policy-revision-id.yaml'

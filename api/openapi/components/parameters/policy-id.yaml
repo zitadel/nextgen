@@ -1,6 +1,6 @@
 name: policy_id
 in: path
 required: true
-description: The identifier of the policy, shared by all of its revisions.
+description: The ID of the policy, shared by all of its revisions.
 schema:
   $ref: '../schemas/policy-id.yaml'

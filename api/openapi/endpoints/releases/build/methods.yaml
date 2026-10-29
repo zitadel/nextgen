@@ -4,33 +4,38 @@ post:
   summary: Build a release from files
   description: |
     Builds a release from the resources of `.zitadel/` as authored on disk,
-    grouped by kind, in one transaction: a failure anywhere leaves no
-    revision and no release. The caller records nothing.
+    grouped by kind.
+
+    The build runs in one transaction: a failure anywhere leaves no revision
+    and no release. The caller records nothing.
 
     If the project already holds a release with the same content, the same
     `content_hash`, the request answers `200` with that release and
-    allocates nothing, however long ago it was built. Otherwise every resource is compared against the
-    project's newest revision of the same handle: unchanged content reuses
-    that revision, changed content allocates a new one, and the request
-    answers `201` with the new release. A policy whose config matches only an
-    older revision allocates a new one too, so a request that resolves no
-    release, which reads the newest revision, applies it as well. Metadata is excluded from the
-    comparison, so the same content under a different `message` is the same
-    release.
+    allocates nothing, however long ago it was built.
+
+    Otherwise every resource is compared against the project's newest
+    revision of the same handle. Unchanged content reuses that revision, and
+    changed content allocates a new one. The request answers `201` with the
+    new release. A policy whose config matches only an older revision
+    allocates a new one too. That way a request that resolves no release, and
+    so reads the newest revision, applies it as well. Metadata is excluded
+    from the comparison, so the same content under a different `message` is
+    the same release.
 
     A structurally malformed request is refused while decoding with
     `req.invalid`, naming the offending fields. A well-formed bundle is then
     checked resource by resource, as each kind's create endpoint checks it,
-    and every failure is reported at once: the request answers `400` with
+    and every failure is reported at once. The request answers `400` with
     `rel.invalid`, and `details.resources` lists each resource that failed.
     A handle that resolves neither in the bundle nor in the project answers
     `rel.unresolved_reference`, naming the pointer and the handle.
 
-    Building writes revisions, so besides `release.write` it needs the write
+    Building writes revisions. Besides `release.write`, it needs the write
     scope of every kind the bundle carries a resource of: `schema.write`,
     `flow_definition.write`, `branding.write`, `idp.write` and
-    `policy.write`, as the per-kind create endpoints do. A missing scope answers `403` with `rel.permission_denied`,
-    naming the kind. An empty kind needs no scope.
+    `policy.write`, as the per-kind create endpoints do. A missing scope
+    answers `403` with `rel.permission_denied`, naming the kind. An empty
+    kind needs no scope.
 
     Building a release does not deploy it. A release is not tied to an
     origin, and the same release can later be deployed to any number of
@@ -128,9 +133,8 @@ post:
   responses:
     '200':
       description: |
-        The project already held a release with this content, built earlier,
-        and it was returned unchanged. No new release and no new revision was
-        created.
+        The existing release with this content, built earlier and returned
+        unchanged. No new release or revision was created.
       content:
         application/json:
           schema:
@@ -140,7 +144,7 @@ post:
               summary: The same files were built again under a new message
               description: |
                 The content matched an existing release, so that release is
-                returned — note the message it was originally created with,
+                returned. Note the message it was originally created with,
                 not the one just submitted.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
@@ -165,7 +169,7 @@ post:
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
     '201':
-      description: The release was built.
+      description: The new release.
       content:
         application/json:
           schema:
@@ -176,7 +180,7 @@ post:
               description: |
                 Each pointer carries the handle the server read from the
                 resource — `objectType` for a schema, `name` for a flow
-                definition, `default` for branding and `slug` for an IDP
+                definition, `default` for branding and `slug` for an IdP
                 connection — and the revision it reused or allocated for it.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
