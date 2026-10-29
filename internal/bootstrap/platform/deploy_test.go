@@ -10,7 +10,7 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-func TestPlatformBundleIsTheServersSchemaAndFlows(t *testing.T) {
+func TestPlatformBundleIsTheServersDefaults(t *testing.T) {
 	const builtinBase = "https://example.com/api/schemas"
 
 	bundle, err := platformBundle(builtinBase)
@@ -26,4 +26,8 @@ func TestPlatformBundleIsTheServersSchemaAndFlows(t *testing.T) {
 	for i, flow := range bundle.FlowDefinitions {
 		assert.Equal(t, defaults[i].Name, flow.Request.Name)
 	}
+
+	require.Len(t, bundle.Policies, 1, "the recommended password policy")
+	assert.Equal(t, "auth.factor.password.set", bundle.Policies[0].Operation)
+	assert.InDelta(t, 15, bundle.Policies[0].Config["min_length"], 0)
 }

@@ -34,7 +34,8 @@ func platformUserSchema(builtinBase string) ([]byte, error) {
 // EnsureDeployed deploys the platform project the way the CLI deploys any
 // project: consoleOrigin, where the console signs operators in, is a primary
 // origin of it, and the configuration this server ships (the platform user
-// schema and the default login flows) is built into one release and deployed
+// schema, the default login flows and the recommended password policy) is
+// built into one release and deployed
 // to its primary origins. It runs on every start, so an upgrade's default
 // flows go live; a start that changes nothing builds back to the same release
 // and deploys nothing.
@@ -89,10 +90,18 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 	if err != nil {
 		return service.BuildReleaseInput{}, fmt.Errorf("platform login flows: %w", err)
 	}
+	var policy struct {
+		Operation string         `json:"operation"`
+		Config    map[string]any `json:"config"`
+	}
+	if err := json.Unmarshal(configdefaults.DefaultPasswordPolicy(), &policy); err != nil {
+		return service.BuildReleaseInput{}, fmt.Errorf("platform password policy: %w", err)
+	}
 	message := platformReleaseMessage
 	bundle := service.BuildReleaseInput{
 		ProjectID: domain.PlatformProjectID,
 		Schemas:   []service.BuildSchema{{Index: 0, Document: schema}},
+		Policies:  []service.BuildPolicy{{Index: 0, Operation: policy.Operation, Config: policy.Config}},
 		Message:   &message,
 	}
 	for i, flow := range flows {
