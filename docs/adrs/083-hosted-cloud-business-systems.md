@@ -128,9 +128,10 @@ server's catch-all.
 ### 3. Sign-up (priority 1)
 
 - Sign-up stays the platform project's own `register` purpose in the
-  console's login. A self-hoster's console offers it whenever their flow
-  does, so it is no cloud screen. The console has `/console/signup`, the
-  widget opened on `register`.
+  console's login. Its page, `/console/signup` (the widget opened on
+  `register`), is the add-on's, a signed-out screen (Console ADR 0006 §2): a
+  self-hosted console signs in to the deployment's own project, where a
+  sign-up page would make accounts for the app's users in its management UI.
 - **Public sign-up waits for email verification** (decided 2026-10-29). Until
   §8.2 lands, nothing links to `/console/signup`, which is the address to
   show the flow, and the website gets no "Sign up" link. Account creation

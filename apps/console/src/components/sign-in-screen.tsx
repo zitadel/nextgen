@@ -1,14 +1,22 @@
 import { ZitadelLogin } from "@zitadel/sdk-react";
 
-import { NoProjectYet, StandaloneScreen } from "@/components/standalone-screen";
+import {
+  NoProjectYet,
+  STANDALONE_BODY,
+  StandaloneMessage,
+  StandaloneScreen,
+} from "@/components/standalone-screen";
 import { InlineCode } from "@/components/ui/inline-code";
 import { useConsoleProject } from "@/hooks/use-console-project";
 import { withBasePath } from "@/lib/base-path";
 import { useTheme } from "@/theme";
 
 /**
- * The screen `/login` and `/signup` share (Console ADR 0003): the embedded
- * `<zitadel-login>` widget, opened on the flow purpose the route names.
+ * The console's sign-in screen (Console ADR 0003), for `/login` and the hosted
+ * cloud's `/signup`: the embedded `<zitadel-login>` widget, opened on the flow
+ * purpose the route names, under a title and a line that say what the
+ * console is. The widget is the project's own login, in its branding, so
+ * without them the screen reads as an app's sign-in to that app's users.
  *
  * The widget gets a per-element `project` **handle** built from the
  * runtime-discovered project id (Console ADR 0004 §3), not discrete
@@ -33,11 +41,15 @@ import { useTheme } from "@/theme";
  */
 export function SignInScreen({
   purpose,
-  heading,
+  title,
+  description,
   next,
 }: {
   purpose: "login" | "register";
-  heading: string;
+  /** The screen's `h1`: what the visitor signs in to. */
+  title: string;
+  /** Under it: who the console is for, and that an app's users sign in elsewhere. */
+  description: string;
   next?: string;
 }) {
   const { resolved: theme } = useTheme();
@@ -49,7 +61,10 @@ export function SignInScreen({
   const project = useConsoleProject();
 
   return (
-    <StandaloneScreen heading={heading}>
+    <StandaloneScreen>
+      <StandaloneMessage title={title} level={1}>
+        <p className={STANDALONE_BODY}>{description}</p>
+      </StandaloneMessage>
       {project ? (
         <ZitadelLogin
           project={project}

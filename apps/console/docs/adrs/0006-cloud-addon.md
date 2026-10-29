@@ -3,10 +3,11 @@
 > **Status:** Proposed (the seam with five slots; the cloud's screens on mocks)
 > **Date:** 2026-10-29
 > **Implementation state:** §1 to §4 are implemented for the slots `Root`,
-> `track`, `screens` and `signInApiBase`, the component kit and the add-on's
-> Vite plugin. The cloud's Billing, Support and Email screens are scaffolded
-> against `apps/cloud-functions`, whose systems are mocks (root
-> [ADR 083](../../../../docs/adrs/083-hosted-cloud-business-systems.md)).
+> `track`, `screens`, `signedOutScreens` and `signInApiBase`, the component
+> kit and the add-on's Vite plugin. The cloud's Billing, Support and Email
+> screens are scaffolded against `apps/cloud-functions`, whose systems are
+> mocks (root [ADR 083](../../../../docs/adrs/083-hosted-cloud-business-systems.md)),
+> and its sign-up page is its signed-out screen.
 > Menu, help and banner slots are not built; the first screen that needs one
 > adds it (§2).
 > **Scope:** `apps/console` and `apps/cloud-console`. Amends
@@ -54,6 +55,9 @@ the builds that leave it empty nothing:
   `staticData.nav`, as every screen's is (ADR 0001), so a build without the
   add-on has neither the screen nor the entry. Its `load` is the route's
   loader, so pending and error states are the console's own;
+- `signedOutScreens`, each mounted at the root beside `/login` for a visitor
+  not signed in, as the cloud's `/signup` is. Like `/login`, it gets `?next=`
+  sanitized and sends a visitor who is signed in on to it;
 - `signInApiBase`, where the sign-in widget (login, sign-up, claim) sends its
   calls instead of the API base; the cloud routes them through its bot check
   (root ADR 083 §5).
@@ -65,7 +69,7 @@ in the account menu or the project switcher, help, banners.
 
 `@zitadel/console/addon/ui` (`src/addon/ui.ts`) exports the components an
 add-on screen is built from: the settings screen's frame, its sections and
-rows, and the primitives inside them. Each name in it is a promise to the
+rows, the primitives inside them, and the sign-in screen. Each name in it is a promise to the
 add-on; one is added when a screen needs it, never a folder. The add-on never
 imports the console's source (`@/…`) or a path into its folder, so the
 console stays free to change everything behind the two exports. Its typecheck

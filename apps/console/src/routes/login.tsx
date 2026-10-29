@@ -75,5 +75,12 @@ async function exchangeLinkHandoff(handoffToken: string): Promise<void> {
 
 function LoginScreen() {
   const { next } = Route.useSearch();
-  return <SignInScreen purpose="login" heading="Sign in to the Zitadel console" next={next} />;
+  return (
+    <SignInScreen
+      purpose="login"
+      title="Sign in to the Zitadel console"
+      description="Where you manage your Zitadel projects. Your app's users sign in through your app, not here."
+      next={next}
+    />
+  );
 }

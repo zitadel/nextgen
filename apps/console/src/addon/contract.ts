@@ -20,6 +20,8 @@ export interface ConsoleAddon {
   ) => void;
   /** Screens only this build has, beneath the signed-in shell (`AddonScreen`). */
   screens?: readonly AddonScreen[];
+  /** Screens only this build has, for a visitor not signed in (`AddonSignedOutScreen`). */
+  signedOutScreens?: readonly AddonSignedOutScreen[];
   /**
    * Where the sign-in widget (login, sign-up, claim) sends its calls instead of
    * the console's API base: a same-origin path that forwards them to the
@@ -42,6 +44,18 @@ export interface AddonScreen {
   load?: () => Promise<unknown>;
   /** The screen, given what `load` resolved to; `never` admits a function component of any data. */
   Screen: (props: AddonScreenProps<never>) => ReactNode;
+}
+
+/**
+ * A screen the add-on adds outside the signed-in layout, beside `/login`, for
+ * a visitor who is not signed in: one who is goes on to `?next=`, as `/login`
+ * sends them. No sidebar lists it.
+ */
+export interface AddonSignedOutScreen {
+  /** The router-relative path: `/signup`. */
+  path: `/${string}`;
+  /** The screen, given the sanitized `?next=` to land on once signed in. */
+  Screen: (props: { next?: string }) => ReactNode;
 }
 
 /** What the console renders an add-on screen with. */
