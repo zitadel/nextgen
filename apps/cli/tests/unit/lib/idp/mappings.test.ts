@@ -44,8 +44,8 @@ describe("reading a connection's mappings", () => {
       "f.json",
     );
 
-    expect(lines).toContain("  • email comes from the email claim, verified when always is true.");
-    expect(lines).toContain("  • phone comes from the phone claim, and is always trusted.");
+    expect(lines).toContain("  - email comes from the email claim, verified when always is true.");
+    expect(lines).toContain("  - phone comes from the phone claim, and is always trusted.");
   });
 
   it("reads a document with none of them as empty", () => {
@@ -58,14 +58,14 @@ describe("a connection's mapping as lines", () => {
 
   it("says which claim fills each attribute", () => {
     expect(lines).toContain(
-      "  • email comes from the mail claim, verified when mail_verified is true.",
+      "  - email comes from the mail claim, verified when mail_verified is true.",
     );
-    expect(lines).toContain("  • givenName comes from the given_name claim.");
+    expect(lines).toContain("  - givenName comes from the given_name claim.");
   });
 
   it("folds what verifies an attribute into the line that fills it", () => {
     expect(lines).toContain(
-      "  • email comes from the mail claim, verified when mail_verified is true.",
+      "  - email comes from the mail claim, verified when mail_verified is true.",
     );
   });
 
@@ -75,7 +75,7 @@ describe("a connection's mapping as lines", () => {
         { claim_mapping: { phone: "phone_number" }, verified_claims: { phone: true } },
         "f.json",
       ),
-    ).toContain("  • phone comes from the phone_number claim, and is always trusted.");
+    ).toContain("  - phone comes from the phone_number claim, and is always trusted.");
   });
 
   it("names the file to edit when there is no mapping", () => {
@@ -107,14 +107,14 @@ describe("the unmapped-attributes block", () => {
   it("calls an optional unmapped attribute fine to leave empty", () => {
     const lines = unmappedLines([{ name: "companyName", required: false }]);
 
-    expect(lines).toContain("  • companyName (optional) — fine to leave empty.");
+    expect(lines).toContain("  - companyName (optional) - fine to leave empty.");
   });
 
   it("tells a required unmapped attribute to be mapped before a deploy", () => {
     const lines = unmappedLines([{ name: "email", required: true }]);
 
     expect(lines.join("\n")).toContain(
-      "email (required) — a sign-in fills this, so map it before you deploy.",
+      "email (required) - a sign-in fills this, so map it before you deploy.",
     );
   });
 

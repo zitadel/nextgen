@@ -82,10 +82,10 @@ describe("renderBox", () => {
 
 describe("wrapForBox", () => {
   it("hangs a wrapped bullet under its text rather than back at the left margin", () => {
-    const lines = wrapForBox(`  • ${"word ".repeat(30).trim()}`, 40).split("\n");
+    const lines = wrapForBox(`  - ${"word ".repeat(30).trim()}`, 40).split("\n");
 
     expect(lines.length).toBeGreaterThan(1);
-    expect(lines[0]).toMatch(/^ {2}• \S/);
+    expect(lines[0]).toMatch(/^ {2}- \S/);
     for (const line of lines.slice(1)) {
       expect(line).toMatch(/^ {4}\S/);
     }

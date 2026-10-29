@@ -43,7 +43,7 @@ export function wrapForBox(message: string, columns = process.stdout.columns): s
  * paragraph. Tokens are never split, so URLs and commands stay whole.
  */
 function wrapLineHanging(line: string, width: number): string {
-  const prefix = (line.match(/^(\s*(?:•|\d+[.)])\s+)/) ?? line.match(/^(\s*)/))?.[1] ?? "";
+  const prefix = (line.match(/^(\s*(?:[-•]|\d+[.)])\s+)/) ?? line.match(/^(\s*)/))?.[1] ?? "";
   const content = line.slice(prefix.length);
   if (content === "") {
     return line;

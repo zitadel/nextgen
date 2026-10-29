@@ -83,7 +83,7 @@ export function mappingLines(connection: object, file: string): string[] {
           : how === true
             ? ", and is always trusted"
             : `, verified when ${how} is true`;
-      lines.push(`  • ${row.attribute} comes from the ${row.claim} claim${trusted}.`);
+      lines.push(`  - ${row.attribute} comes from the ${row.claim} claim${trusted}.`);
     }
   }
   if (scopes.length > 0) {
@@ -130,8 +130,8 @@ export function unmappedLines(unmapped: readonly UnmappedAttribute[]): string[] 
     "Some attributes have no claim yet:",
     ...unmapped.map((attribute) =>
       attribute.required
-        ? `  • ${attribute.name} (required) — a sign-in fills this, so map it before you deploy.`
-        : `  • ${attribute.name} (optional) — fine to leave empty.`,
+        ? `  - ${attribute.name} (required) - a sign-in fills this, so map it before you deploy.`
+        : `  - ${attribute.name} (optional) - fine to leave empty.`,
     ),
   ];
 }
