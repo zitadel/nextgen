@@ -15,7 +15,7 @@
  * sideways only on shared utilities under `apps/cli/src/lib/` — today
  * `lib/errors` (`ZitadelError`) and `lib/json` (`isObject`).
  */
-export { renderConnectionSummaries } from "./connection-summary";
+export { connectionSummaryBody, renderConnectionSummaries } from "./connection-summary";
 
 export {
   CONNECTION_SCHEMA_REF,
@@ -99,6 +99,7 @@ export {
   readMappings,
   statusLine,
   stillToConfigure,
+  type UnmappedAttribute,
   unmappedAttributes,
   unmappedLines,
   usedByLines,

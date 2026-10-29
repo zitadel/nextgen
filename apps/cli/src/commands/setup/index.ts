@@ -43,15 +43,17 @@ import {
   customFlagText,
   checkGivenCustomFlags,
   type ConnectionFile,
+  connectionSummaryBody,
   customExample,
   customFlagValues,
   flagText,
   givenCustomFlags,
   loopbackIssuerWarning,
-  mappingLines,
   publishClientId,
   readConnectionFiles,
   readMappings,
+  readSchemaFiles,
+  type SchemaFile,
   type PublishState,
   selectionFromFlags,
   reportClientIdOutcome,
@@ -299,7 +301,11 @@ export default class Setup extends Promptable(BaseCommand) {
    * and what is still to do. Read from the file, so it reports what is on disk
    * and not what setup meant to write.
    */
-  private connectionBlocks(sso: readonly SsoDraft[], files: readonly ConnectionFile[]): string[] {
+  private connectionBlocks(
+    sso: readonly SsoDraft[],
+    files: readonly ConnectionFile[],
+    schemas: readonly SchemaFile[],
+  ): string[] {
     return sso.flatMap((answer) => {
       const provider = providerOf(answer.selection);
       const file = files.find((entry) => entry.path === `.zitadel/idps/${provider.slug}.json`);
@@ -309,7 +315,7 @@ export default class Setup extends Promptable(BaseCommand) {
       return [
         "",
         dim(`SIGN IN WITH ${provider.displayName.toUpperCase()}`),
-        ...mappingLines(file.body, file.path),
+        ...connectionSummaryBody(file, schemas),
         "",
         statusLine("applied"),
         "Still to do:",
@@ -986,6 +992,7 @@ export default class Setup extends Promptable(BaseCommand) {
     // connection files say and not what setup meant to write.
     const connectionFiles =
       dryRun || answers.sso.length === 0 ? [] : await readConnectionFiles(cwd);
+    const schemaFiles = dryRun || answers.sso.length === 0 ? [] : await readSchemaFiles(cwd);
     // The structured report is human-only. Under `--json` we let the
     // envelope returned from `this.emit(...)` be the sole stdout
     // payload (oclif requires single-doc JSON).
@@ -1013,7 +1020,7 @@ export default class Setup extends Promptable(BaseCommand) {
         title: "Zitadel is ready",
         message: [
           renderSummary(sections),
-          ...this.connectionBlocks(answers.sso, connectionFiles),
+          ...this.connectionBlocks(answers.sso, connectionFiles, schemaFiles),
           "",
           renderBoxActions([
             ...installOutcome.boxActions,

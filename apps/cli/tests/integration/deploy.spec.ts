@@ -527,7 +527,9 @@ describe("deploy", () => {
       it("names the schema that signs in through the connection", async () => {
         const app = await anAppWithGoogle();
 
-        expect(await app.deployRendered(["--dry-run"])).toPrint("Used by: default-human-user");
+        expect(await app.deployRendered(["--dry-run"])).toPrint(
+          "default-human-user signs in through this connection",
+        );
       });
     });
 

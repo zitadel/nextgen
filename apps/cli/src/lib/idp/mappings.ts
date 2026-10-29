@@ -47,39 +47,50 @@ export function readMappings(connection: object): ConnectionMappings {
   };
 }
 
+/** A list as an English phrase: "a", "a and b", "a, b and c". */
+function sentenceList(items: readonly string[]): string {
+  if (items.length <= 1) {
+    return items.join("");
+  }
+  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
+}
+
 /**
- * The mapping as lines for a person, the attribute on the left and the claim
- * it is read from on the right. The email mapping and what makes it verified
- * are two different facts, so they are two separate blocks.
+ * The mapping as sentences for a person: one line per attribute saying which
+ * claim fills it and, folded into the same sentence, what makes it trusted —
+ * because to a reader "email comes from the email claim, verified when
+ * email_verified is true" is one fact about email, not two tables to cross-
+ * reference. A verification for an attribute that no claim fills has nothing to
+ * fold into and is left out; `deploy` is where such a mismatch is judged.
  *
  * @param file - The connection file, named so the person knows where to edit.
  */
 export function mappingLines(connection: object, file: string): string[] {
   const { mapping, verification, scopes } = readMappings(connection);
-  const table = (rows: readonly { attribute: string; claim: string }[]): string[] => {
-    const width = Math.max(...rows.map((row) => row.attribute.length));
-    return rows.map((row) => `  ${row.attribute.padEnd(width)}  →  ${row.claim}`);
-  };
+  const verifiedBy = new Map(verification.map((row) => [row.attribute, row.claim]));
   const lines: string[] = [];
   if (mapping.length === 0) {
-    lines.push(`Claim mapping: none. Add attribute: claim pairs to claim_mapping in ${file}.`);
-  } else {
-    lines.push("Claim mapping (user attribute → claim):", ...table(mapping));
-  }
-  if (verification.length > 0) {
     lines.push(
-      "",
-      "Verified when (user attribute → claim that must be true):",
-      ...table(
-        verification.map((row) => ({
-          attribute: row.attribute,
-          claim: row.claim === true ? "(always trusted)" : row.claim,
-        })),
-      ),
+      `No attribute is filled from a claim yet. Add attribute: claim pairs to claim_mapping in ${file}.`,
     );
+  } else {
+    lines.push("Each user attribute is filled from a claim your provider returns:");
+    for (const row of mapping) {
+      const how = verifiedBy.get(row.attribute);
+      const trusted =
+        how === undefined
+          ? ""
+          : how === true
+            ? ", and is always trusted"
+            : `, verified when ${how} is true`;
+      lines.push(`  • ${row.attribute} comes from the ${row.claim} claim${trusted}.`);
+    }
   }
   if (scopes.length > 0) {
-    lines.push("", `Scopes: ${scopes.join(" ")}`);
+    lines.push(
+      "",
+      `It asks your provider for the ${sentenceList(scopes)} scope${scopes.length > 1 ? "s" : ""}.`,
+    );
   }
   return lines;
 }
@@ -96,23 +107,32 @@ export function unmappedAttributes(connection: object, attributes: Iterable<stri
   return [...new Set(attributes)].filter((attribute) => !mapped.has(attribute)).sort();
 }
 
+/** An attribute no claim fills, and whether a sign-in needs it. */
+export type UnmappedAttribute = {
+  readonly name: string;
+  readonly required: boolean;
+};
+
 /**
- * The block naming the attributes still without a claim and the file to add
- * them to, so a developer sees what a sign-in will leave empty rather than
- * discovering it at the first login. Empty when every attribute the signing-in
- * schemas define is already mapped, so a finished connection shows nothing.
- *
- * @param file - The connection file, named so the person knows where to edit.
+ * The block naming the attributes still without a claim, told as information
+ * rather than an instruction: an attribute that no claim fills is only a
+ * problem when a sign-in needs it. A required one is flagged to map before a
+ * deploy; an optional one (an `employee_id` the provider may simply never
+ * send) is called fine to leave. Empty when every attribute the signing-in
+ * schemas define is already mapped.
  */
-export function unmappedLines(unmapped: readonly string[], file: string): string[] {
+export function unmappedLines(unmapped: readonly UnmappedAttribute[]): string[] {
   if (unmapped.length === 0) {
     return [];
   }
   return [
     "",
-    "Not mapped yet (no claim fills these):",
-    ...unmapped.map((attribute) => `  ${attribute}`),
-    `Add them to claim_mapping in ${file}.`,
+    "Some attributes have no claim yet:",
+    ...unmapped.map((attribute) =>
+      attribute.required
+        ? `  • ${attribute.name} (required) — a sign-in fills this, so map it before you deploy.`
+        : `  • ${attribute.name} (optional) — fine to leave empty.`,
+    ),
   ];
 }
 
@@ -124,9 +144,17 @@ export function unmappedLines(unmapped: readonly string[], file: string): string
  */
 export function usedByLines(schemas: readonly string[]): string[] {
   if (schemas.length === 0) {
-    return ["", "No user schema signs in through this connection yet."];
+    return [
+      "",
+      "No user schema signs in through this connection yet, so changing it affects nothing today.",
+    ];
   }
-  return ["", `Used by: ${schemas.join(", ")}`];
+  const verb = schemas.length > 1 ? "sign" : "signs";
+  const them = schemas.length > 1 ? "them" : "it";
+  return [
+    "",
+    `${sentenceList(schemas)} ${verb} in through this connection, so changes here affect ${them}.`,
+  ];
 }
 
 /**

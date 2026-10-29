@@ -53,13 +53,14 @@ import {
   customFlagValues,
   ENABLE_FLAG_KEYS,
   ENABLE_FLAG_NAMES,
+  connectionSummaryBody,
   loopbackIssuerWarning,
-  mappingLines,
   readMappings,
   planConnection,
   publishClientId,
   type PublishState,
   readConnectionFiles,
+  readSchemaFiles,
   refuseChangedIssuer,
   reportClientIdOutcome,
   republishArgs,
@@ -472,7 +473,8 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // has one, because the command refuses without it.
       reportSecretOutcome(secret, this.meta.cliVersion, reusing, this.environmentSelector());
     }
-    this.reportConnection({
+    await this.reportConnection({
+      cwd,
       body: connectionBody,
       file: reusing ? plan.file.path : plan.path,
       provider: entry.displayName,
@@ -540,18 +542,23 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
    * not end with the mapping known only to whoever opens the file. Not shown
    * under `--json`, which carries the mapping in its payload instead.
    */
-  private reportConnection(input: {
+  private async reportConnection(input: {
+    cwd: string;
     body: object;
     file: string;
     provider: string;
     status: ConnectionStatus;
-  }): void {
+  }): Promise<void> {
+    const schemas = await readSchemaFiles(input.cwd);
     printBox({
       title: `${input.provider} is set up`,
       message: [
         `Connection file   ${input.file}`,
         "",
-        ...mappingLines(input.body, input.file),
+        ...connectionSummaryBody(
+          { path: input.file, body: input.body as Record<string, unknown> },
+          schemas,
+        ),
         "",
         statusLine(input.status),
         "Still to do:",

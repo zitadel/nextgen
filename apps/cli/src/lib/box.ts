@@ -82,7 +82,14 @@ export function renderBox(options: BoxOptions): string {
   return box(wrapForBox(options.message), frame(options));
 }
 
-/** Log a box with consola, so it follows the same log level and `--json` silence as every message. */
+/**
+ * Log a box with consola, so it follows the same log level and `--json`
+ * silence as every message. Rendered through {@link renderBox} rather than
+ * `consola.box` so the rounded frame is drawn the same way everywhere: consola
+ * only draws it when attached to an interactive terminal and degrades to
+ * ` > ` lines otherwise (a pipe, a CI log, a captured run), which is the one
+ * place the box should still read as a box.
+ */
 export function printBox(options: BoxOptions): void {
-  consola.box({ ...frame(options), message: wrapForBox(options.message) });
+  consola.log(renderBox(options));
 }

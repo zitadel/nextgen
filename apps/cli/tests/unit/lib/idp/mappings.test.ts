@@ -37,12 +37,15 @@ describe("reading a connection's mappings", () => {
 
   it("keeps a claim literally named always apart from trusting the provider", () => {
     const lines = mappingLines(
-      { claim_mapping: { email: "email" }, verified_claims: { email: "always", phone: true } },
+      {
+        claim_mapping: { email: "email", phone: "phone" },
+        verified_claims: { email: "always", phone: true },
+      },
       "f.json",
     );
 
-    expect(lines).toContain("  email  →  always");
-    expect(lines).toContain("  phone  →  (always trusted)");
+    expect(lines).toContain("  • email comes from the email claim, verified when always is true.");
+    expect(lines).toContain("  • phone comes from the phone claim, and is always trusted.");
   });
 
   it("reads a document with none of them as empty", () => {
@@ -53,19 +56,26 @@ describe("reading a connection's mappings", () => {
 describe("a connection's mapping as lines", () => {
   const lines = mappingLines(CONNECTION, ".zitadel/idps/acme.json");
 
-  it("puts the attribute on the left of the arrow and the claim on the right", () => {
-    expect(lines).toContain("  email      →  mail");
-    expect(lines).toContain("  givenName  →  given_name");
+  it("says which claim fills each attribute", () => {
+    expect(lines).toContain(
+      "  • email comes from the mail claim, verified when mail_verified is true.",
+    );
+    expect(lines).toContain("  • givenName comes from the given_name claim.");
   });
 
-  it("keeps what verifies the email apart from what fills it", () => {
-    expect(lines.indexOf("  email  →  mail_verified")).toBeGreaterThan(
-      lines.indexOf("Verified when (user attribute → claim that must be true):"),
+  it("folds what verifies an attribute into the line that fills it", () => {
+    expect(lines).toContain(
+      "  • email comes from the mail claim, verified when mail_verified is true.",
     );
   });
 
   it("says when a provider is always trusted for an attribute", () => {
-    expect(lines).toContain("  phone  →  (always trusted)");
+    expect(
+      mappingLines(
+        { claim_mapping: { phone: "phone_number" }, verified_claims: { phone: true } },
+        "f.json",
+      ),
+    ).toContain("  • phone comes from the phone_number claim, and is always trusted.");
   });
 
   it("names the file to edit when there is no mapping", () => {
@@ -94,21 +104,30 @@ describe("the attributes a connection does not map", () => {
 });
 
 describe("the unmapped-attributes block", () => {
-  it("names each unmapped attribute and the file to add it to", () => {
-    const lines = unmappedLines(["companyName"], ".zitadel/idps/acme.json");
+  it("calls an optional unmapped attribute fine to leave empty", () => {
+    const lines = unmappedLines([{ name: "companyName", required: false }]);
 
-    expect(lines).toContain("  companyName");
-    expect(lines.at(-1)).toContain(".zitadel/idps/acme.json");
+    expect(lines).toContain("  • companyName (optional) — fine to leave empty.");
+  });
+
+  it("tells a required unmapped attribute to be mapped before a deploy", () => {
+    const lines = unmappedLines([{ name: "email", required: true }]);
+
+    expect(lines.join("\n")).toContain(
+      "email (required) — a sign-in fills this, so map it before you deploy.",
+    );
   });
 
   it("is empty when everything is mapped", () => {
-    expect(unmappedLines([], ".zitadel/idps/acme.json")).toEqual([]);
+    expect(unmappedLines([])).toEqual([]);
   });
 });
 
 describe("the used-by block", () => {
   it("names the schemas that sign in through the connection", () => {
-    expect(usedByLines(["customers", "employees"]).join("\n")).toContain("customers, employees");
+    expect(usedByLines(["customers", "employees"]).join("\n")).toContain(
+      "customers and employees sign in through this connection",
+    );
   });
 
   it("says when no schema uses the connection", () => {

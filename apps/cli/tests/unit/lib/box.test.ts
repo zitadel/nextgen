@@ -85,40 +85,42 @@ describe("printBox", () => {
     vi.restoreAllMocks();
   });
 
-  it("logs the box through consola, so it follows the log level", () => {
-    const spy = vi.spyOn(consola, "box").mockImplementation(() => undefined);
+  it("logs the framed box through consola, so it follows the log level and --json silence", () => {
+    const spy = vi.spyOn(consola, "log").mockImplementation(() => undefined);
 
     printBox({ title: "Done", message: "all good" });
 
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(spy.mock.calls[0]?.[0]).toMatchObject({ title: "Done", message: "all good" });
+    expect(spy.mock.calls[0]?.[0]).toBe(renderBox({ title: "Done", message: "all good" }));
   });
 
-  it("is green unless it is a hint", () => {
-    const spy = vi.spyOn(consola, "box").mockImplementation(() => undefined);
+  it("draws a rounded border around the title and message", () => {
+    const spy = vi.spyOn(consola, "log").mockImplementation(() => undefined);
+
+    printBox({ title: "Done", message: "all good" });
+
+    const out = stripAnsi(String(spy.mock.calls[0]?.[0]));
+    expect(out).toContain("╭");
+    expect(out).toContain("Done");
+    expect(out).toContain("all good");
+  });
+
+  it("is green for a result and cyan for a hint", () => {
+    const spy = vi.spyOn(consola, "log").mockImplementation(() => undefined);
 
     printBox({ title: "Done", message: "m" });
-
-    expect(spy.mock.calls[0]?.[0]).toMatchObject({
-      style: { borderColor: "green", borderStyle: "rounded", padding: 1 },
-    });
-  });
-
-  it("is cyan for a hint", () => {
-    const spy = vi.spyOn(consola, "box").mockImplementation(() => undefined);
-
     printBox({ title: "Hint", message: "m", tone: "info" });
 
-    expect(spy.mock.calls[0]?.[0]).toMatchObject({ style: { borderColor: "cyan" } });
+    expect(String(spy.mock.calls[0]?.[0])).toContain("\u001b[32m");
+    expect(String(spy.mock.calls[1]?.[0])).toContain("\u001b[36m");
   });
 
   it("wraps the message to the terminal before it is drawn", () => {
-    const spy = vi.spyOn(consola, "box").mockImplementation(() => undefined);
+    const spy = vi.spyOn(consola, "log").mockImplementation(() => undefined);
 
     printBox({ title: "T", message: "word ".repeat(60).trim() });
 
-    const [options] = spy.mock.calls[0] ?? [];
-    const message = (options as { message: string }).message;
-    expect(Math.max(...message.split("\n").map((line) => line.length))).toBeLessThanOrEqual(72);
+    const out = stripAnsi(String(spy.mock.calls[0]?.[0]));
+    expect(Math.max(...out.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
   });
 });

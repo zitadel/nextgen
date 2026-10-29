@@ -17,14 +17,49 @@ function connectionName(file: ConnectionFile): string {
   return (file.path.split("/").pop() ?? file.path).replace(/\.json$/, "");
 }
 
-/**
 /** The schemas that sign in through a connection, found by its slug. */
-function schemasUsing(file: ConnectionFile, schemas: readonly SchemaFile[]): SchemaFile[] {
+function schemasUsing(
+  file: Pick<ConnectionFile, "body">,
+  schemas: readonly SchemaFile[],
+): SchemaFile[] {
   const slug = String(file.body.slug ?? "").trim();
   if (slug === "") {
     return [];
   }
   return schemas.filter((schema) => schemaProviders(schema.body).includes(slug));
+}
+
+/**
+ * The body a connection is summarised by, the same in every command that shows
+ * a connection: what it maps, what makes it verified, the scopes it requests,
+ * the attributes the signing-in schemas define that no claim fills, and which
+ * schemas sign in through it. `setup` and `enable` add their own tail (where
+ * the connection stands and what is left to do); `deploy` shows this alone.
+ */
+export function connectionSummaryBody(
+  file: Pick<ConnectionFile, "path" | "body">,
+  schemas: readonly SchemaFile[],
+): string[] {
+  const usedBy = schemasUsing(file, schemas);
+  const attributes = usedBy.flatMap((schema) => schema.properties);
+  // An attribute a sign-in needs is more urgent unmapped than one the provider
+  // may never send; a schema marks the first in its `required` list.
+  const required = new Set(
+    usedBy.flatMap((schema) =>
+      Array.isArray(schema.body.required)
+        ? schema.body.required.filter((name): name is string => typeof name === "string")
+        : [],
+    ),
+  );
+  const unmapped = unmappedAttributes(file.body, attributes).map((name) => ({
+    name,
+    required: required.has(name),
+  }));
+  return [
+    ...mappingLines(file.body, file.path),
+    ...unmappedLines(unmapped),
+    ...usedByLines(usedBy.map((schema) => schema.name)),
+  ];
 }
 
 /**
@@ -44,16 +79,10 @@ function schemasUsing(file: ConnectionFile, schemas: readonly SchemaFile[]): Sch
  */
 export async function renderConnectionSummaries(cwd: string): Promise<string[]> {
   const [files, schemas] = await Promise.all([readConnectionFiles(cwd), readSchemaFiles(cwd)]);
-  return files.map((file) => {
-    const usedBy = schemasUsing(file, schemas);
-    const attributes = usedBy.flatMap((schema) => schema.properties);
-    return renderBox({
+  return files.map((file) =>
+    renderBox({
       title: `SIGN IN WITH ${connectionName(file).toUpperCase()}`,
-      message: [
-        ...mappingLines(file.body, file.path),
-        ...unmappedLines(unmappedAttributes(file.body, attributes), file.path),
-        ...usedByLines(usedBy.map((schema) => schema.name)),
-      ].join("\n"),
-    });
-  });
+      message: connectionSummaryBody(file, schemas).join("\n"),
+    }),
+  );
 }
