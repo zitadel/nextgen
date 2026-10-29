@@ -235,9 +235,9 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 // under the lock ensurePreviewDatabase holds, is still older than that: a
 // deployment that stamped it after the sweep listed it keeps it.
 //
-// Preview databases are often owned by adminRole (createDatabase elevates when
-// the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
-// connecting role, then once as adminRole on insufficient_privilege.
+// Preview databases are owned by adminRole, which createDatabase acts as, or,
+// made before it did, by the role that created them, so DROP runs as adminRole
+// first and then as the connecting role.
 func dropPreviewDatabases(ctx context.Context, baseDSN string, idleBefore time.Time, names ...string) error {
 	connectCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
@@ -361,7 +361,8 @@ func checkPreviewClusterBase(ctx context.Context, conn *pgx.Conn) error {
 
 func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identifier string) error {
 	drop := "DROP DATABASE IF EXISTS " + identifier + " WITH (FORCE)"
-	// Prefer adminRole first: createDatabase often owns the DB as postgres.
+	// adminRole first: it owns what createDatabase makes. A database made
+	// before createDatabase acted as adminRole is the connecting role's.
 	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
 		_, err := conn.Exec(ctx, drop)
 		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
@@ -378,23 +379,28 @@ func dropDatabaseAsConnectingOrAdmin(ctx context.Context, conn *pgx.Conn, identi
 // may create databases through that membership.
 const adminRole = "postgres"
 
-// createDatabase runs CREATE DATABASE as the connecting role and, when that
-// role lacks the CREATEDB attribute, once more as adminRole. Postgres never
-// passes attributes on through membership, so a role that may create
-// databases only as a member of the default role has to act as it for this
-// one statement. Either way the connecting role can reach the result: it owns
-// the database or is a member of its owner.
+// createDatabase runs CREATE DATABASE as adminRole, so adminRole owns the
+// result and every role that inherits it may drop it: the preview builds'
+// role, the cleanup workflow's and an operator's alike. Owned by the role
+// that happened to create it, a database could be dropped only with that
+// role's credentials, since PlanetScale grants no superuser and makes no role
+// a member of another dashboard role. The connecting role still reaches what
+// adminRole owns through the same inheritance, so it stamps and migrates it.
+//
+// A role that cannot act as adminRole, or acts as one that may not create
+// databases, creates it as itself and then needs CREATEDB of its own. Postgres
+// never passes that attribute on through membership.
 func createDatabase(ctx context.Context, conn *pgx.Conn, identifier string) error {
-	_, err := conn.Exec(ctx, "CREATE DATABASE "+identifier)
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
-		return err
+	create := "CREATE DATABASE " + identifier
+	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
+		_, err := conn.Exec(ctx, create)
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE")
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42501" { // insufficient_privilege
+			return err
+		}
 	}
-	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr != nil {
-		return fmt.Errorf("%w; the role has no CREATEDB and cannot act as %s: %v", err, adminRole, setErr)
-	}
-	defer func() { _, _ = conn.Exec(context.WithoutCancel(ctx), "RESET ROLE") }()
-	_, err = conn.Exec(ctx, "CREATE DATABASE "+identifier)
+	_, err := conn.Exec(ctx, create)
 	return err
 }
 

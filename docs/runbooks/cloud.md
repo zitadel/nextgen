@@ -131,13 +131,20 @@ migrates through, because migrations hold a session advisory lock.
   - **By hand:** run the workflow from the Actions tab. It lists what the
     sweep would drop; tick *Drop* to drop it.
   - **The secret:** the workflow expects the repository secret
-    `CLOUD_PREVIEW_MIGRATOR_DATABASE_URL`, the
-    value of `CLOUD_MIGRATOR_DATABASE_URL` in Vercel's **Preview** target,
-    never its Production one: the PlanetScale database `preview`, whose
-    `main` PlanetScale calls a production branch. The launcher refuses a
-    URL whose database holds the server's schema, as production's does.
-    Set it with `gh secret set CLOUD_PREVIEW_MIGRATOR_DATABASE_URL --repo
-    zitadel/nextgen`, which prompts for the value.
+    `CLOUD_PREVIEW_MIGRATOR_DATABASE_URL`: a role of the PlanetScale
+    database `preview` (whose `main` PlanetScale calls a production
+    branch) that inherits `postgres`, its database `postgres`, port 5432,
+    as Vercel's **Preview** `CLOUD_MIGRATOR_DATABASE_URL` is. Never
+    production's: the launcher refuses a URL whose database holds the
+    server's schema, as production's does. Set it with `gh secret set
+    CLOUD_PREVIEW_MIGRATOR_DATABASE_URL --repo zitadel/nextgen`, which
+    prompts for the value.
+  - **Ownership:** only a database's owner, or a role that inherits it, may
+    drop it. The launcher creates preview databases as `postgres`, so any
+    role inheriting `postgres` can. One the builds' role created as itself,
+    before the launcher did that, only that role can, until the dashboard's
+    *Reassign objects* on it (Settings, Roles) hands its databases to
+    `postgres`; the builds keep working, as they inherit `postgres`.
   - **One database by hand,** on `preview`:
 
     ```sql
@@ -158,10 +165,11 @@ cluster, a connection budget or an admin role with pull request code:
   `pg_write_all_data` for the running server, and one inheriting `postgres`
   for the migrations (they create extensions and the schema and set
   database options).
-- **`preview`**, single node. One role inheriting `postgres`: it creates the
-  preview databases, migrates them and serves from them. Postgres never
-  passes the `CREATEDB` attribute on through membership, so the launcher
-  creates a database as `postgres` when the role lacks the attribute itself.
+- **`preview`**, single node. One role inheriting `postgres`
+  (`vercel-preview-migrator`): it creates the preview databases, migrates
+  them and serves from them. The launcher creates each as `postgres`, which
+  then owns it, so the cleanup's role can drop it (Database, cleanup);
+  without `CREATEDB` of its own the role still may, as `postgres` has it.
 
 ### 2. Master keys and root admins
 
