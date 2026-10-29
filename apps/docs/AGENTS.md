@@ -59,6 +59,21 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Put explanations under `concepts/`, tasks under `guides/`, first runs under
   `get-started/`, exact parameters under `reference/`; SDK pages in `sdks/`.
 - Keep code blocks runnable; mark a placeholder `<like-this>`, never `...`.
+- Use the left term, never the right ones:
+
+| Use | Not |
+| --- | --- |
+| sign in, sign out | log in, log out |
+| ID (`id` only as a field name) | id in prose |
+| login component (`<zitadel-login>`) | widget, orchestrator |
+| local runtime | local server, local Zitadel, backend |
+| authentication attempt | auth attempt |
+| identity provider; IdP after first use | IDP |
+| for example | e.g. |
+| console | Console, management console |
+| project | tenant |
+| deploy | apply |
+| `@latest` | `@alpha` |
 
 ## Content
 

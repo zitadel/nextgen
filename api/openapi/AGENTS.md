@@ -75,7 +75,7 @@ else: the metadata and Open Graph image (cut at a word past 160 characters),
 `llms.txt` and the MCP server's page list
 ([`apps/docs/lib/description.ts`](../../apps/docs/lib/description.ts)).
 
-- Write in the docs' tone ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md#writing)).
+- Write in the docs' tone and terms ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md#writing)).
 - Open an operation with a third-person verb ("Creates a user"); open a
   webhook with what happened ("A token was revoked.").
 - Keep the first sentence to 160 characters or fewer.
