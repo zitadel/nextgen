@@ -44,6 +44,37 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 
+## Writing
+
+- Write for a senior engineer: direct, concrete, neutral; no marketing words.
+- Open a page with what the feature is, in plain words.
+- Aim for sentences under 20 words; split compound clauses.
+- Write procedures in the imperative: "Run `zitadel deploy`".
+- Use sentence case for titles and headings; lead a task heading with its
+  outcome: "Enable passkeys", not "How to configure passkey authentication".
+- State behaviour, defaults and limits, not adjectives: "Listens on 3000".
+- Never write "seamless", "robust", "leverage", "supercharge", "tailored",
+  "successor track", "harness" as a verb, "next-generation" as an adjective.
+- Never open a sentence with "Furthermore", "Moreover", "In summary", "Delve".
+- Put explanations under `concepts/`, tasks under `guides/`, first runs under
+  `get-started/`, exact parameters under `reference/`; SDK pages in `sdks/`.
+- Keep code blocks runnable; mark a placeholder `<like-this>`, never `...`.
+- Use the left term, never the right ones:
+
+| Use | Not |
+| --- | --- |
+| sign in, sign out | log in, log out |
+| ID (`id` only as a field name) | id in prose |
+| login component (`<zitadel-login>`) | widget, orchestrator |
+| local runtime | local server, local Zitadel, backend |
+| authentication attempt | auth attempt |
+| identity provider; IdP after first use | IDP |
+| for example | e.g. |
+| console | Console, management console |
+| project | tenant |
+| deploy | apply |
+| `@latest` | `@alpha` |
+
 ## Content
 
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
