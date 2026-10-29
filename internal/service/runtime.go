@@ -207,9 +207,9 @@ type matchedOrigin struct {
 // opens an origin of the deployment's console where the project's origins
 // refuse it: the console previews a project's login from there with the
 // project's own flow. A project that admits that origin itself keeps its own
-// rules there, deployments and previews included. Only the opening takes this exemption;
-// every later step answers to Gate alone, so that origin can show a project's
-// first step but never sign anyone in.
+// rules there, deployments and previews included. Only the opening takes
+// this exemption; every later step answers to Gate alone, so that origin can
+// show a project's first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {
 	matched, err := r.Gate(ctx, project, origin)
 	if err == nil {
