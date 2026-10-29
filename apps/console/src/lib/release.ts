@@ -7,6 +7,7 @@ import type {
 
 import { api } from "@/api/zitadel";
 import { flowDisplayName, humanise } from "./flow-definition";
+import { type PolicySetting, policyDisplayName, policyDocument, policySettings } from "./policy";
 import { type UserSchema, schemaDisplayName } from "./schema";
 
 /**
@@ -45,6 +46,7 @@ export const POINTER_KINDS: readonly {
   { kind: "flow_definition", label: "Login flows", noun: "definition" },
   { kind: "branding", label: "Branding", noun: "branding" },
   { kind: "idp", label: "Identity providers", noun: "connection" },
+  { kind: "policy", label: "Policies", noun: "policy" },
 ];
 
 /** A pointer with the revision it names read, or not. */
@@ -56,6 +58,8 @@ export interface ResolvedPointer {
   name: string;
   /** `undefined` when the revision could not be read for this caller. */
   document: unknown;
+  /** A policy's settings, summarised above its document; other kinds have none. */
+  settings?: PolicySetting[];
 }
 
 /**
@@ -65,8 +69,9 @@ export interface ResolvedPointer {
  * screen: the release is still what the operator came for, and the handle
  * still says which resource the pointer pins.
  *
- * Schema ids are unique per project only, so that read names the selected
- * project; the flow and branding reads take the revision id alone.
+ * Schema, identity provider and policy ids are unique per project only, so
+ * those reads name the selected project; the flow and branding reads take the
+ * revision id alone.
  */
 export async function resolvePointer(
   pointer: ReleasePointer,
@@ -96,11 +101,31 @@ export async function resolvePointer(
         const body = await api.getIdpRevisionById(pointer.revision_id, { project_id: projectId });
         return { ...base, name: humanise(pointer.handle), document: body.definition };
       }
+      case "policy": {
+        const revision = await api.getPolicyRevision(pointer.revision_id, {
+          project_id: projectId,
+        });
+        return {
+          ...base,
+          name: policyDisplayName(pointer.handle),
+          document: policyDocument(revision),
+          settings: policySettings(revision),
+        };
+      }
     }
   } catch {
     // Fall through to the unresolved shape.
   }
-  return { ...base, name: humanise(pointer.handle), document: undefined };
+  return { ...base, name: unresolvedName(pointer), document: undefined };
+}
+
+/**
+ * The name a pointer has without its revision. A policy's handle is its
+ * operation, so the row reads the same whether or not the read succeeded;
+ * every other kind falls back to its handle.
+ */
+function unresolvedName(pointer: ReleasePointer): string {
+  return pointer.kind === "policy" ? policyDisplayName(pointer.handle) : humanise(pointer.handle);
 }
 
 /** A group of the detail's pointer list: one per kind that the release pins. */
