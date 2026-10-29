@@ -124,6 +124,8 @@ function lines(stdout: string, separator: string): string[] {
 export function isolateGit(): void {
   vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
   vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
+  // Scratch directories are in no repository even where the temp directory sits in a checkout.
+  vi.stubEnv("GIT_CEILING_DIRECTORIES", tmpdir());
   // Where git also finds a global ignore and attributes file.
   vi.stubEnv("XDG_CONFIG_HOME", "/dev/null");
   for (const name of [

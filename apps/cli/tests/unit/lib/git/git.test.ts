@@ -126,6 +126,13 @@ describe("Git", () => {
     await expect(git(cwd, ["status"])).rejects.toBeInstanceOf(GitDidNotStartError);
   });
 
+  it("throws a GitDidNotStartError even where exit 1 is allowed", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await scratch.directory());
+
+    await expect(new Git(cwd).run(["status"], [1])).rejects.toBeInstanceOf(GitDidNotStartError);
+  });
+
   it("names git's first line for any other failure", async () => {
     const cwd = await scratch.directory();
     vi.stubEnv("PATH", await scratch.brokenGit());

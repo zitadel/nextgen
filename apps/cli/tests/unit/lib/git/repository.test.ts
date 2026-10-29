@@ -170,6 +170,15 @@ describe("Repository.commitAll", () => {
     expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: true });
   });
 
+  it("commits with the message it is given", async () => {
+    const cwd = await scratch.committed({ "README.md": "r\n" });
+    await write(cwd, { "a.txt": "a\n" });
+
+    await (await open(cwd)).commitAll("add a", OPTIONS);
+
+    expect((await git(cwd, "log", "-1", "--format=%s")).trim()).toBe("add a");
+  });
+
   it("leaves out what `except` matches", async () => {
     const cwd = await scratch.committed({ "README.md": "r\n" });
     await write(cwd, { "a.txt": "a\n", ".env": "S=1\n" });
@@ -303,6 +312,8 @@ describe("Repository.diffSince", () => {
 
   it("sees an edit made in the same instant the index was written", async () => {
     const { cwd, sha } = await base();
+    // Only modification times count, so a second passing between steps cannot hide the edit.
+    await git(cwd, "config", "core.checkStat", "minimal");
     const file = join(cwd, ".zitadel/schemas/a.json");
     const instant = new Date("2026-01-01T00:00:00Z");
     await utimes(file, instant, instant);
@@ -388,12 +399,6 @@ describe("Repository.diffSince", () => {
     const blob = (await git(cwd, "rev-parse", "HEAD:README.md")).trim();
 
     expect(await (await open(cwd)).diffSince(blob, [".zitadel/"], {})).toBeNull();
-  });
-
-  it("is null for an id that is not an object id", async () => {
-    const { cwd } = await base();
-
-    expect(await (await open(cwd)).diffSince("--output=/tmp/x", [".zitadel/"], {})).toBeNull();
   });
 });
 

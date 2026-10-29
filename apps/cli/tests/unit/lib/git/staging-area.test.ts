@@ -135,6 +135,19 @@ describe("StagingArea", () => {
     expect(await headChanges(cwd)).toEqual(["b.txt"]);
   });
 
+  it("commits with the message it is given", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "b.txt": "b\n" });
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll();
+      await staging.commit("add b", IDENTITY);
+    });
+
+    expect((await git(cwd, "log", "-1", "--format=%s")).trim()).toBe("add b");
+  });
+
   it("removes its staging area once the work is done", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
 

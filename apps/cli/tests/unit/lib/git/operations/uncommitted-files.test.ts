@@ -23,9 +23,12 @@ describe("UncommittedFiles", () => {
   });
 
   it.each(["R  new\0old\0", " R new\0old\0", "C  new\0old\0"])(
-    "skips where %j came from",
-    async (stdout) => {
-      expect(await listed("", stdout)).toEqual([{ path: "new", untracked: false }]);
+    "skips where %j came from, and only that",
+    async (entry) => {
+      expect(await listed("", `${entry}?? b.txt\0`)).toEqual([
+        { path: "new", untracked: false },
+        { path: "b.txt", untracked: true },
+      ]);
     },
   );
 

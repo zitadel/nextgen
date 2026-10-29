@@ -75,4 +75,22 @@ describe("CommitAll", () => {
       author: "yours",
     });
   });
+
+  it("commits with its message", async () => {
+    const calls: string[][] = [];
+    const git = fakeGit((args) => {
+      calls.push([...args]);
+      if (args.includes("--cached")) {
+        return { stdout: "a.txt\0" };
+      }
+      if (args.includes("HEAD^{commit}")) {
+        return { stdout: "abc\n" };
+      }
+      return {};
+    });
+
+    await new CommitAll("the message", OPTIONS).run(git);
+
+    expect(calls.find((args) => args.includes("commit"))).toContain("--message=the message");
+  });
 });
