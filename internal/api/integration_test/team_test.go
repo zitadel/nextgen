@@ -732,7 +732,7 @@ func TestQueryTeams(t *testing.T) {
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
 
-	params := api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)}
+	params := api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(project.ID))}
 
 	// A team in a second project must never surface in this project's results.
 	otherProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
@@ -1117,7 +1117,7 @@ func TestQueryTeamsPageTokenRequiresMatchingSorting(t *testing.T) {
 	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
 	require.NoError(t, err)
 	harness.SetProjectSecretOnApiClient(t, client, project)
-	params := api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)}
+	params := api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(project.ID))}
 
 	for _, name := range []string{"Alpha Team", "Beta Team"} {
 		_, err = harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{

@@ -66,13 +66,16 @@ Teams live inside projects. A team in the platform project is a paying developer
 /teams/{id}/api_keys
 ```
 
-Create/list with explicit scope:
+Create takes an explicit scope; the list defaults to the credential's project:
 
 ```http
-POST /teams                     # body: { project_id, name, ... }
+POST /teams?project_id=…         # body: { name, ... }
 POST /teams/query               # structured filters + cursor pagination (ADR 031)
 GET  /users/{user_id}/teams     # the teams a user belongs to
 ```
+
+`POST /teams/query` takes an optional `project_id`, defaulting to the
+credential's project, like `POST /users/query`.
 
 `DELETE /teams/{id}` deactivates/tombstones the team, revokes team-scoped API
 keys, and deactivates/removes memberships. Self-owned users survive. Users whose
