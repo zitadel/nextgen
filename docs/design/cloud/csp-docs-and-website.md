@@ -15,8 +15,8 @@ page.
 
 - **Nonces** cost little money (about $20 a month) but render every page per
   request. 99% of those renders would be our own deployment checks. A
-  visitor waits 50–400 ms longer on a warm instance and about 4 s on a cold
-  one. They also don't work on Vercel as #2480's first commit wired them:
+  visitor waits 50–400 ms longer on a warm instance and about 5 s on a cold
+  docs one. They also don't work on Vercel as #2480's first commit wired them:
   Next.js never finds the nonce.
 - **`experimental.sri`** covers no inline script at all.
 - **Staying as is** costs nothing, and inline script stays unchecked.
@@ -53,15 +53,21 @@ Francisco against previews in `sfo1`, as medians of 8–12 requests.
 
 | Page | Static, CDN hit | Nonce, warm | Nonce, cold |
 | --- | --- | --- | --- |
-| docs content (`/docs/concepts/flows-and-schemas`) | 36 ms | 93 ms | ≈4.1 s |
-| docs API operation (`…/api/users/createUser`) | 37 ms | 117 ms | ≈4.1 s |
-| docs API errors (`/docs/reference/api/errors`) | 41 ms | 411 ms | ≈4.1 s + render |
-| website `/` | 22 ms | 74 ms | 0.5–0.7 s |
+| docs content (`/docs/concepts/flows-and-schemas`) | 36 ms | 93 ms | ≈5 s |
+| docs API operation (`…/api/users/createUser`) | 37 ms | 117 ms | 5.0 s |
+| docs API errors (`/docs/reference/api/errors`) | 41 ms | 411 ms | ≈5 s + render |
+| website `/` | 22 ms | 74 ms | 1.7 s |
 
-The cold column is Vercel's function duration for a page served by a fresh
-instance (`functionStartType` `cold` or `prewarmed`). On the docs that's p50
-4.1 s and up to 5.3 s, of which 3.5 s is CPU spent loading the docs' server
-bundle. Prewarmed instances were no faster on their first page (3.6 s).
+The cold column is one request after 25 idle minutes, which found a cold
+instance in both measured rows. The same requests on the static preview
+took 81 ms and 33 ms. The rows marked ≈ take the measured cold start and
+the page's own render. Of the 5.0 s, the function took 4.1 s; on the
+website, 0.7 s of 1.7 s.
+
+Across all fresh docs instances (`functionStartType` `cold` or
+`prewarmed`), the function took p50 4.1 s and up to 5.3 s, of which 3.5 s is
+CPU spent loading the docs' server bundle. Prewarmed instances were no
+faster on their first page (3.6 s).
 
 Real visitors would meet cold instances often. The custom domain gets about
 26 docs page requests an hour, spread over five function regions. Over the
@@ -122,8 +128,6 @@ earlier gotcha (move the enforced policy to `next.config`) is right for
 
 A nonce rollout on Vercel would have to drop the enforced header from pages
 while it reports, or enforce the nonce policy right away. Neither was tried.
-`'strict-dynamic'` also ignores host allowlists, so Vercel's toolbar on
-previews would report.
 
 ### The changelog
 
@@ -164,8 +168,7 @@ about 70 lines) sends the hashes in the report-only policy. On its preview:
   `PRERENDER`, 36–41 ms).
 - The docs' browser tests saw no inline-script violation, client-side
   navigation and the live examples' service worker included. Their only
-  violation was Vercel's toolbar (`vercel.live`), which #2480's own preview
-  reports too.
+  violation was Vercel's toolbar (`vercel.live`), which #2480 now allows.
 
 What remains before enforcing:
 
@@ -177,8 +180,8 @@ What remains before enforcing:
   enforced header and the adapter's when a page has the same header name
   from each is untested. The prototype dropped `next.config`'s report-only
   policy.
-- **Previews:** allow `https://vercel.live` (no `'strict-dynamic'`, so host
-  allowlists work), as the console's policy does.
+- **Vercel's toolbar:** keep #2480's `https://vercel.live`. A hash policy
+  has no `'strict-dynamic'`, so the host allowlist still counts.
 - **The adapter is a seam:** if Vercel stops injecting its adapter through
   `NEXT_ADAPTER_PATH`, ours would wrap nothing. The test below catches that
   on the next deployment.
@@ -195,9 +198,8 @@ next bug.
 
 ## Recommendation
 
-1. Add the adapter to the docs and the website, report-only, with
-   `https://vercel.live` on previews and `dynamicParams = false` on the docs
-   route.
+1. Add the adapter to the docs and the website, report-only, keeping
+   `https://vercel.live`, and set `dynamicParams = false` on the docs route.
 2. In each app's `tests/`, assert that every inline script on every page
    carries a hash in its policy. Since the suite runs against each
    deployment, it also proves the adapter ran.
