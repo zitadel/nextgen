@@ -13,6 +13,13 @@ export async function POST(request: Request) {
   // VERCEL_AUTOMATION_BYPASS_SECRET, which the project's automation bypass sets.
   // It reports this route's URL as the event's page, so Web Analytics' Pages
   // shows /docs/api/feedback; the rated page is the `page` property.
-  await track(feedbackEvent, feedback.data, { request });
+  // The header every event carries (docs/product-analytics-events.yaml) leads:
+  // the surface and, on Vercel, the commit the docs were deployed from.
+  const version = process.env.VERCEL_GIT_COMMIT_SHA;
+  await track(
+    feedbackEvent,
+    { surface: "docs", ...(version ? { docs_version: version } : {}), ...feedback.data },
+    { request },
+  );
   return new Response(null, { status: 204 });
 }

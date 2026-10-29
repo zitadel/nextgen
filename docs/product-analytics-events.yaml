@@ -63,7 +63,9 @@ properties:
   # Interface and location
   page:
     type: string
-    description: A stable page category, never a URL.
+    description: >-
+      A stable page category, never a URL; on the docs, the page's path, such
+      as `/docs/reference/cli`.
   view:
     type: string
     values: [list, details]
@@ -72,6 +74,24 @@ properties:
     type: string
     values: [sign_in_methods, identity_providers, overview, authentication, active, deactivated]
     description: The selected tab, on pages with tracked tabs.
+  placement:
+    type: string
+    values: [hero, showcase, footer]
+    description: Where on its page a copy button or a call to action sits.
+  target:
+    type: string
+    values: [quickstart, github]
+    description: Where a link leads, as a stable name, never a URL.
+
+  # Calls to action
+  snippet:
+    type: string
+    values: [all, start, setup, dev, plan, apply, skills]
+    description: >-
+      What a copy button copied, never its text: the CLI command it runs
+      (`start`, `setup`, `plan`, `apply`), `dev` for the app's dev server,
+      `skills` for the coding agents' skills, or `all` for the website's whole
+      block of commands.
 
   # Journeys and actions
   flow:
@@ -189,6 +209,17 @@ properties:
   duration_ms:
     type: number
     description: How long the command, flow or operation took.
+
+  # Feedback
+  opinion:
+    type: string
+    values: [awful, bad, good, great]
+    description: How helpful a reader found a docs page, from the feedback card's four faces.
+  message:
+    type: string
+    description: >-
+      What the reader wrote on the feedback card, at most 255 characters; empty
+      when they wrote nothing. The one free-text property (product-analytics.md).
 
   # Platform
   os:
@@ -415,9 +446,19 @@ components:
       - $insert_id
     # The copy of an event sent to Vercel Web Analytics, from runs on the
     # production channel. It keeps the event's name and the first 8 of these
-    # properties that hold a value, in this order.
+    # properties that hold a value, in this order. `<dimension>` stands for the
+    # command's entry under `dimensions` below, the one dimension of its own the
+    # copy keeps; a command without one keeps none. On cli_command_failed,
+    # where `reason` holds the eighth value, it takes non_interactive's place.
     vercel:
-      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, non_interactive]
+      properties: [surface, cli_version, server_kind, command, status, reason, host_agent, <dimension>, non_interactive]
+      # Each answers one question while Mixpanel is paused.
+      dimensions:
+        setup: framework # Which frameworks do people set up, and which fail?
+        claim: claim_outcome # Do claims complete in the browser, or expire or time out?
+        doctor: failed_checks # Which checks fail? Doctor fails whenever one does.
+        api: operation # Which operations do people call without a command of their own?
+        start: runtime # Do people run the local server as the binary or in Docker?
     events:
       cli_command_started:
         status: emitted
@@ -524,6 +565,13 @@ components:
     automatic:
       - Vercel Web Analytics page views and Speed Insights, in the cloud build only (`CONSOLE_VERCEL_INSIGHTS=1`).
     events:
+      copied_command:
+        status: emitted
+        trigger: >-
+          The setup command on the Projects page is on the clipboard; only the
+          cloud build sends it, like the page views.
+        destinations: [vercel]
+        properties: [page, snippet]
       viewed_page:
         status: planned
         plan: "#2233"
@@ -595,13 +643,30 @@ components:
     source: apps/website
     automatic:
       - Vercel Web Analytics page views and Speed Insights.
-    events: {}
+    events:
+      copied_command:
+        status: emitted
+        trigger: A copy button put its command on the clipboard.
+        destinations: [vercel]
+        properties: [page, snippet, placement]
+      clicked_link:
+        status: emitted
+        trigger: A call to action, to the quickstart or to GitHub, is clicked.
+        destinations: [vercel]
+        properties: [page, target, placement]
 
   docs:
     source: apps/docs
     automatic:
       - Vercel Web Analytics page views and Speed Insights.
-    events: {}
+    events:
+      docs_feedback:
+        status: emitted
+        trigger: >-
+          A reader sends a rating from the feedback card at the end of a page;
+          the docs' feedback route sends it on from the server.
+        destinations: [vercel]
+        properties: [page, opinion, message]
 
   server:
     source: internal

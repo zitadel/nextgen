@@ -26,7 +26,7 @@ func EnsureListOptions(opts *database.ListOptions[domain.UserField]) *database.L
 }
 
 // ApplyCursor adds a keyset cursor predicate to filter when page.Cursor is set.
-func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[domain.UserField]) (database.Filter[domain.UserField], error) {
+func ApplyCursor(schema database.Schema[domain.UserField, domain.User], filter database.Filter[domain.UserField], page database.Page[domain.UserField]) (database.Filter[domain.UserField], error) {
 	if len(page.Cursor) == 0 {
 		return filter, nil
 	}
@@ -37,7 +37,7 @@ func ApplyCursor(filter database.Filter[domain.UserField], page database.Page[do
 	if !cursor.MatchesOrderBy(page.OrderBy) {
 		return nil, database.ErrCursorOrderMismatch()
 	}
-	values, err := Schema.CoerceCursorValues(cursor.Columns, cursor.Values)
+	values, err := schema.CoerceCursorValues(cursor.Columns, cursor.Values)
 	if err != nil {
 		return nil, database.ErrInvalidCursor().WithParent(err)
 	}

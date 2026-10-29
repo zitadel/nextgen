@@ -40,6 +40,13 @@ export const policyConfigSchema = z.strictObject({
 });
 
 /**
+ * The minimum password length NIST SP 800-63B-4 sets for a password that is
+ * the only factor. `setup` writes it when given none, and the console warns
+ * on a policy under it.
+ */
+export const RECOMMENDED_PASSWORD_MIN_LENGTH = 15;
+
+/**
  * A `.zitadel/policies/<operation>.test.json` file: cases `zitadel policies
  * test` evaluates (`POST /policies/evaluate`), each with the operation's
  * input, the facts it would look up, and the decision it expects. `input` and

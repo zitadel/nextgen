@@ -111,6 +111,8 @@ Exclude:
 
 Use stable page names, predefined categories, counts and error codes instead of raw values that may contain sensitive information.
 
+The one exception is a message a person writes to us in a feedback form and chooses to send. Keep it to one property of at most 255 characters, and never tie it to who sent it.
+
 ## Tracking behaviour
 
 - Tracking must preserve normal product behaviour, output and results; analytics delivery failures must not cause product operations to fail.
