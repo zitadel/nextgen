@@ -116,21 +116,19 @@ export function metaContent(html: string, key: string): string | undefined {
 }
 
 /**
- * What is wrong with a page's policies (lib/csp.ts), if anything: nothing may
- * frame it, and every script it carries holds the nonce its report-only
- * policy names, which that policy will need once it is enforced.
+ * What is wrong with a page's policies (next.config.mjs), if anything: the
+ * enforced one lets nothing frame it, and the report-only one keeps its
+ * requests on the docs' own origin.
  */
-export function policyProblem(headers: Record<string, string>, html: string): string | undefined {
+export function policyProblem(headers: Record<string, string>): string | undefined {
   const enforced = headers["content-security-policy"] ?? "(none)";
   if (!enforced.includes("frame-ancestors 'none'")) {
     return `its policy ${enforced} lets another site frame it`;
   }
-  const nonce = /'nonce-([^']+)'/.exec(headers["content-security-policy-report-only"] ?? "")?.[1];
-  if (!nonce) return "no nonce in its report-only policy";
-  const stray = (html.match(/<script\b[^>]*>/g) ?? []).find(
-    (tag) => !tag.includes(` nonce="${nonce}"`),
-  );
-  return stray && `a script without the page's nonce: ${stray.slice(0, 120)}`;
+  const reportOnly = headers["content-security-policy-report-only"] ?? "(none)";
+  return /(^|; )connect-src 'self'(;|$)/.test(reportOnly)
+    ? undefined
+    : `its report-only policy ${reportOnly} lets it connect elsewhere`;
 }
 
 /**

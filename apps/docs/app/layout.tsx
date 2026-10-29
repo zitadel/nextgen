@@ -3,9 +3,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { headers } from "next/headers";
-
-import { nonceHeader } from "@/lib/csp";
 import "./global.css";
 
 // The console's faces: Arimo for text, APK Futural (a licensed webfont, Regular
@@ -63,11 +60,7 @@ function favicons(): Metadata["icons"] {
 // Web Analytics has no sampling and counts every page view.
 const speedInsightsSampleRate = Number(process.env.DOCS_SPEED_INSIGHTS_SAMPLE_RATE || 1);
 
-export default async function Layout({ children }: LayoutProps<"/">) {
-  // The page's nonce (proxy.ts), for the theme's inline script; Next.js gives
-  // its own scripts the nonce itself. Reading it renders every page per
-  // request.
-  const nonce = (await headers()).get(nonceHeader) ?? undefined;
+export default function Layout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${arimo.variable} ${apkFutural.variable}`} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen">
@@ -76,7 +69,7 @@ export default async function Layout({ children }: LayoutProps<"/">) {
           search={{ options: { api: "/docs/api/search" } }}
           // Fumadocs styles the dark theme by the class; the design tokens
           // switch on data-theme, as in the console. Set both.
-          theme={{ attribute: ["class", "data-theme"], nonce }}
+          theme={{ attribute: ["class", "data-theme"] }}
         >
           {children}
         </RootProvider>

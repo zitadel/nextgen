@@ -107,7 +107,7 @@ test("every page answers as HTML, titled, described, in its size and under its p
     const html = body.toString("utf8");
     const expected = `<title>${escapeHtml(title)}</title>`;
     if (!html.includes(expected)) return `${url}: no ${expected}`;
-    const policy = policyProblem(response.headers(), html);
+    const policy = policyProblem(response.headers());
     if (policy) return `${url}: ${policy}`;
     const meta = metaContent(html, "description");
     if (meta === undefined) {
@@ -118,20 +118,6 @@ test("every page answers as HTML, titled, described, in its size and under its p
     return null;
   });
   expect(failures(results), "pages whose HTML is wrong").toEqual([]);
-});
-
-// A nonce someone has seen allows their script too: a page that a cache
-// served twice would hand out its nonce (proxy.ts renders each page anew).
-test("a page's nonce is new on every request", async ({ request }) => {
-  const nonces = new Set<string>();
-  for (let i = 0; i < 3; i++) {
-    const response = await request.get("/docs/get-started/quickstart");
-    expect(response.status()).toBe(200);
-    const html = await response.text();
-    expect(policyProblem(response.headers(), html)).toBeUndefined();
-    nonces.add(/ nonce="([^"]+)"/.exec(html)?.[1] ?? "");
-  }
-  expect(nonces.size).toBe(3);
 });
 
 test("every page has a Markdown twin whose links resolve", async ({ request }) => {
