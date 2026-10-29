@@ -9,7 +9,7 @@ description: Build a release from your local Zitadel configuration and deploy it
 npx @zitadel/cli@latest deploy
 ```
 
-`deploy` validates the configuration and shows a git diff of `.zitadel/` against the release that is live now. It then creates the release and deploys it to every primary origin, meaning each origin you added with `origin add --kind primary`. `--dry-run` stops after the diff and writes nothing:
+`deploy` validates the configuration and shows a git diff of `.zitadel/` against the release that is live now. It then creates the release and deploys it to every primary origin: the exact origins your app serves from. Setup registers your dev origin as one; add more with `origin add --kind primary`. `--dry-run` stops after the diff and writes nothing:
 
 ```sh
 npx @zitadel/cli@latest deploy --dry-run

@@ -68,7 +68,7 @@ Single-page apps (React, Vue, Angular, Solid, Svelte, Qwik) have no server of th
 
 The generated app sends no credential of its own. In production it needs a same-origin proxy that adds the project secret to the session exchange, and to no other call. A plain rewrite cannot do that.
 
-A planned change removes the project-secret requirement from this browser-facing path. A browser-safe credential replaces it, and the project's origin allowlist (the origins the project accepts) is what enforces it. A plain platform entry will then be enough:
+A planned change will remove the project-secret requirement from this browser-facing path. A browser-safe credential replaces it, and the project's origin allowlist (the origins the project accepts) is what enforces it. A plain platform entry will then be enough:
 
 - a `vercel.json` rewrite
 - a `netlify.toml` redirect

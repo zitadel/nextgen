@@ -16,7 +16,7 @@ Setup asks the same questions and writes the same Zitadel files as for a new app
 ## What setup writes, by framework
 
 - **Next.js and Nuxt:** before it creates anything, setup stops with `E_CONFLICT` rather than overwrite a file of yours that it would write, such as your own `proxy.ts` or `app/login/page.tsx`.
-  - Setup also writes a request boundary, the file that runs on every request before your routes. Next.js allows only one, so setup stops on yours under the other name too.
+  - For Next.js, setup also writes a request boundary, the file that runs on every request before your routes. Next.js allows only one, so setup stops on yours under the other name too.
   - On Next 16 setup writes `proxy.ts`, and Next refuses to run beside a `middleware.ts`. Move yours aside, rerun setup, and merge it into the file setup writes.
   - If `package.json` names Next.js by a tag such as `latest`, setup can't tell the version and writes `middleware.ts`. It then stops on an existing `proxy.ts`. Pin the version the app runs, such as `^16.0.0`, and rerun.
 - **SvelteKit, SolidStart, Qwik Router, and TanStack Start:** setup writes the server hook or middleware (`src/hooks.server.ts`, `src/middleware.ts`, `src/routes/plugin@nextgen.ts`, or `src/start.ts`). It also writes the landing, login, register, and profile routes.

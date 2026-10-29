@@ -63,12 +63,12 @@ Create a new, empty local app directory with a lowercase name, such as my-app, a
 3. npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 4. npm run dev
 
-Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
+Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, sign out, sign back in with the same user, and finish on the signed-in page.
 
-To reach the management console, run
+To reach the console, run
 npx @zitadel/cli@latest console --non-interactive --json and open data.sign_in_url
 right away. Each link signs in the local admin once and expires after a minute, so
-get a new one per visit. The link step 2 returns usually expires before setup finishes.
+get a new one per visit. Run it only after step 3: before setup, the console shows no projects.
 
 Summarize commands run, JSON statuses, files changed, browser steps completed, and any setup or UI friction.
 ```

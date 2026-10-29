@@ -10,7 +10,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Angular SDK (`@zitadel/sdk-angular`) wraps the shared Zitadel login and logout components for Angular single-page apps (SPAs).
 
 <Callout title="SPA proxy requirement" type="warn">
-  The components call `/__nextgen/*` on your app's own origin. The CLI sets up a dev-server proxy config (`proxy.conf.cjs`) for local development, not Vite middleware. In production, you supply a same-origin proxy. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
+  The components call `/__nextgen/*` on your app's own origin. The CLI sets up a dev-server proxy config (`proxy.conf.cjs`) for local development, not Vite middleware. In production, you supply a same-origin proxy. It must add the project secret to the session exchange, and to no other call, so a plain rewrite cannot do it. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
 ## Install the SDK

@@ -18,7 +18,7 @@ npm run dev
 
 - Node.js 24 or newer. Setup also checks your Node against the framework's own range. An Angular app needs a narrower one (see [Node versions](#node-versions)).
 - A package manager that your app supports.
-- Docker, only if you choose the [Docker backend](/docs/guides/local-runtime#start-the-docker-runtime) of the local runtime.
+- Docker, only if you run the local runtime [in Docker](/docs/guides/local-runtime#start-the-docker-runtime).
 
 ## Create an app directory
 
@@ -71,7 +71,7 @@ Setup writes:
 
 It adds the files that hold secrets to `.gitignore` ([Configuration as code](/docs/concepts/repo-config)). Then it installs dependencies with the detected package manager, unless you pass `--skip-install`.
 
-Setup also writes a request boundary, the file that runs on every request before your routes (Next.js's `proxy.ts`, for example). It and the pages are yours to change. Setup records each file. `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` restores only a file that is missing, never one you changed.
+For a server framework, setup also writes a request boundary, the file that runs on every request before your routes (Next.js's `proxy.ts`, for example). It and the pages are yours to change. Setup records each file. `doctor` reports a file you changed as edited, or as adopted once you delete its `zitadel-cli: managed-file` comment. `doctor --fix` restores only a file that is missing, never one you changed.
 
 Against the local runtime, setup by default also attaches the project to the local admin's team and prints `Project owned by admin@zitadel.localhost (team ...)`. There is nothing to [claim](/docs/concepts/project-team-user#claim).
 
@@ -90,7 +90,7 @@ npm run dev
 Then open the dev server URL, usually `http://localhost:3000/login`. **Use exactly the origin setup registered** (scheme, host, and port: `localhost`, not `127.0.0.1`). The origin allowlist and passkeys are bound to it, and a passkey registered under one hostname can never assert under another. Complete the browser proof:
 
 ```text
-register a user -> log out -> log in with the same user -> profile shows signed in
+register a user -> sign out -> sign in with the same user -> profile shows signed in
 ```
 
 A rendered login form proves nothing. Complete the full loop of register, sign out, and sign in in a real browser.
@@ -101,7 +101,7 @@ The user you just registered is an end user of your app. The console is a separa
 npx @zitadel/cli@latest console
 ```
 
-[Run Zitadel locally](/docs/guides/local-runtime#open-the-console) explains what that link does and how long it lasts.
+`console` prints a one-time link that signs you in as the local admin. [Run Zitadel locally](/docs/guides/local-runtime#open-the-console) says how long it lasts.
 
 ## Explore every command
 

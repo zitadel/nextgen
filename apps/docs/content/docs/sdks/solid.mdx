@@ -10,7 +10,7 @@ import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 The Solid SDK (`@zitadel/sdk-solid`) wraps the shared Zitadel login and logout components for Solid single-page apps (SPAs).
 
 <Callout title="SPA proxy requirement" type="warn">
-  The components call `/__nextgen/*` on your app's own origin, and a Solid SPA has no server middleware to answer. The CLI sets up a Vite dev proxy for local development. In production, you supply a same-origin proxy. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
+  The components call `/__nextgen/*` on your app's own origin, and a Solid SPA has no server middleware to answer. The CLI sets up a Vite dev proxy for local development. In production, you supply a same-origin proxy. It must add the project secret to the session exchange, and to no other call, so a plain rewrite cannot do it. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
 ## Install the SDK
