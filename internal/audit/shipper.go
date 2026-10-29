@@ -157,7 +157,7 @@ func (s *Shipper) shipOnce() {
 // listProjects lists the claimed projects under a job span of its own, ended
 // before any project is shipped.
 func (s *Shipper) listProjects() ([]string, error) {
-	ctx, span := startJobSpan("audit.ListClaimedProjects")
+	ctx, span := startJobSpan(context.Background(), "audit.ListClaimedProjects")
 	defer span.End()
 	ctx, cancel := context.WithTimeout(ctx, shipListTimeout)
 	defer cancel()
@@ -171,7 +171,7 @@ func (s *Shipper) listProjects() ([]string, error) {
 // shipProject ships one project to one sink under its own job span, so a
 // trace covers one pair rather than a whole tick.
 func (s *Shipper) shipProject(sink *domain.EventSink, projectID string) {
-	ctx, span := startJobSpan("audit.ShipEvents",
+	ctx, span := startJobSpan(context.Background(), "audit.ShipEvents",
 		attribute.String("zitadel.event_sink.id", sink.ID),
 		attribute.String("zitadel.project.id", projectID),
 	)

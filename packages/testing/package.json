@@ -42,6 +42,7 @@
     "test": "vitest run",
     "test:all": "pnpm run test",
     "test:integration": "ZITADEL_SERVER_BINARY=${ZITADEL_SERVER_BINARY-$PWD/../../dist/server/nextgen} NEXTGEN_SERVER_CONSOLE_ENABLED=${NEXTGEN_SERVER_CONSOLE_ENABLED-false} vitest run --config vitest.integration.config.ts",
+    "install-browsers": "playwright install chromium",
     "lint": "biome check .",
     "build-release": "node ../../scripts/release-clean.mjs local-dist && pnpm run build",
     "prepack": "publint --strict"

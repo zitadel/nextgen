@@ -7,3 +7,8 @@ properties:
     type: string
     format: date-time
     description: The time when the schema was created.
+  in_use:
+    type: boolean
+    description: |
+      Whether any user of the project is on this revision. Only set when
+      `GET /schemas` is asked for it with `expand=in_use`; omitted otherwise.

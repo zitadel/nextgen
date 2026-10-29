@@ -14,9 +14,12 @@
   // `--affected` and `turbo query affected` match changed files against each
   // task's `inputs` and follow task edges, the artifact edges included (the
   // server embeds the console): the same answer as the cache key gives
-  // (docs/design/build/turborepo-graph.md).
+  // (docs/design/build/turborepo-graph.md). `turbo watch` reruns by the same
+  // inputs; matched by package instead, it ignored every Go edit, because the
+  // Go code lives in the root package.
   "futureFlags": {
-    "affectedUsingTaskInputs": true
+    "affectedUsingTaskInputs": true,
+    "watchUsingTaskInputs": true
   },
   // Tasks see only the variables listed on them, turbo's built-in list (PATH,
   // HOME, SHELL, CI, TERM, GITHUB_ACTIONS, ...) and what framework inference
@@ -31,10 +34,14 @@
   "globalEnv": ["!VITE_VERCEL_*"],
   "globalPassThroughEnv": [
     // Where Go keeps its toolchain, module and build caches; their contents
-    // are keyed by Go itself. GOFLAGS and the target platform change outputs,
-    // so the Go tasks list those as hashed `env` instead.
+    // are keyed by Go itself. GOCACHEPROG is the cache program Depot's CI
+    // runners set (`depot gocache`), which authenticates with the job's
+    // DEPOT_CACHE_TOKEN. GOFLAGS and the target platform change outputs, so
+    // the Go tasks list those as hashed `env` instead.
     "GOPATH",
     "GOCACHE",
+    "GOCACHEPROG",
+    "DEPOT_CACHE_TOKEN",
     "GOMODCACHE",
     "GOTMPDIR",
     "GOTOOLCHAIN",
@@ -332,10 +339,13 @@
     },
     // `workspace:cli` is not a turbo task: it is interactive, which turbo only
     // supports inside its terminal UI. Run `pnpm run cli -- ...` directly.
+    // Under `turbo watch server` a Go or console edit restarts the server
+    // (`interruptible`): its edges reach both.
     "//#server": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/console#build"],
+      "interruptible": true,
+      "dependsOn": ["@zitadel/console#build", "@zitadel/server#go-sources"],
       "inputs": ["scripts/run-server.mjs", "scripts/dev-process.mjs", "scripts/task-runner.mjs"],
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },

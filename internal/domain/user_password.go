@@ -94,7 +94,8 @@ func (u *UserPassword) Verify(password string, verifier crypto.RehashingVerifier
 		return "", err
 	}
 	if err != nil {
-		return "", ErrUserPasswordInvalid()
+		// Keep the cause: it tells a wrong password from a hash that could not be read.
+		return "", ErrUserPasswordInvalid().WithParent(err)
 	}
 	return updated, nil
 }

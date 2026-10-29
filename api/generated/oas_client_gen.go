@@ -370,8 +370,10 @@ type Invoker interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID invokes DeleteUserByID operation.
 	//
-	// Deletes a user and removes them from every team they belong to.
-	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// Deletes a user, removes them from every team they belong to, and revokes
+	// every grant they hold, on any project.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+	// plus `authz.revoked` for each grant on that grant's project.
 	// With a project secret the request is idempotent: deleting a user that exists
 	// in no project succeeds without changing anything.
 	//
@@ -4273,8 +4275,10 @@ func (c *Client) sendDeleteTeam(ctx context.Context, params DeleteTeamParams) (r
 
 // DeleteUserByID invokes DeleteUserByID operation.
 //
-// Deletes a user and removes them from every team they belong to.
-// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// Deletes a user, removes them from every team they belong to, and revokes
+// every grant they hold, on any project.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+// plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
 // in no project succeeds without changing anything.
 //
@@ -12863,6 +12867,32 @@ func (c *Client) sendListSchemas(ctx context.Context, params ListSchemasParams) 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
 			if val, ok := params.Kind.Get(); ok {
 				return e.EncodeValue(conv.StringToString(string(val)))
+			}
+			return nil
+		}); err != nil {
+			return res, errors.Wrap(err, "encode query")
+		}
+	}
+	{
+		// Encode "expand" parameter.
+		cfg := uri.QueryParameterEncodingConfig{
+			Name:    "expand",
+			Style:   uri.QueryStyleForm,
+			Explode: true,
+		}
+
+		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
+			if params.Expand != nil {
+				return e.EncodeArray(func(e uri.Encoder) error {
+					for i, item := range params.Expand {
+						if err := func() error {
+							return e.EncodeValue(conv.StringToString(string(item)))
+						}(); err != nil {
+							return errors.Wrapf(err, "[%d]", i)
+						}
+					}
+					return nil
+				})
 			}
 			return nil
 		}); err != nil {

@@ -26,13 +26,15 @@ ALTER TABLE projects ADD COLUMN preview_origins STRING(MAX)
 UPDATE projects AS p
 SET preview_origins = COALESCE(
     (
-        SELECT TO_JSON_STRING(ARRAY_AGG(
-            CASE
-                WHEN JSON_TYPE(elem) = 'object' THEN JSON_VALUE(elem, '$.pattern')
-                ELSE JSON_VALUE(elem, '$')
-            END
-            ORDER BY off
-        ))
+        -- Joined by hand from JSON values: the emulator's TO_JSON_STRING
+        -- takes neither ARRAY<STRING> nor STRING.
+        SELECT CONCAT('[', STRING_AGG(
+            TO_JSON_STRING(CASE
+                WHEN JSON_TYPE(elem) = 'object' THEN JSON_QUERY(elem, '$.pattern')
+                ELSE elem
+            END),
+            ',' ORDER BY off
+        ), ']')
         FROM UNNEST(JSON_QUERY_ARRAY(PARSE_JSON(p.origins))) AS elem WITH OFFSET AS off
         WHERE CASE
             WHEN JSON_TYPE(elem) = 'object' THEN JSON_VALUE(elem, '$.pattern')

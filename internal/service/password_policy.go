@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 	"unicode/utf8"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/policy"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
@@ -268,7 +270,9 @@ func (h storedPasswordHistory) matches(ctx context.Context, in SetPasswordInput,
 	candidate := domain.NormalizePassword(in.Password)
 	matches := make([]bool, 0, min(int64(len(kept)), depth))
 	for _, pw := range kept[:min(int64(len(kept)), depth)] {
+		start := time.Now()
 		err := h.verifier.VerifyHash(pw.EncodedHash, candidate)
+		metrics.RecordPasswordVerification(ctx, metrics.PasswordHistory, passwordResult("", err), time.Since(start))
 		switch {
 		case err == nil:
 			matches = append(matches, true)
