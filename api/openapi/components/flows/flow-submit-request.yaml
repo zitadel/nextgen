@@ -4,37 +4,38 @@ additionalProperties: false
 properties:
   session_token:
     type: string
-    description: Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+    # Reserved for future rotation. The sealed `_zflow` cookie carries the flow state today.
+    description: Reserved. The sealed `_zflow` cookie carries the flow state.
   action:
     type: string
     description: |
-      Which action to take. Must be a key from the step's `actions` dictionary:
-      - A regular action (e.g., "submit", "register", "back")
-      - The reserved value "sso" — triggers SSO redirect (requires `sso_provider_id`)
+      Which action to take. Must be one of the names in the step's `actions` list:
+      - A regular action (for example "submit", "register", "back")
+      - The reserved value "sso", which triggers an SSO redirect (requires
+        `sso_provider_id`)
 
       A name the current step does not declare is refused with 400
-      (`flow.invalid_action`). That includes the outcome names the engine
-      routes on its own (`user_not_found`, `user_already_exists`,
-      `sso_user_not_found`, `sso_authenticated`), which are never actions.
+      (`flow.invalid_action`). That includes the outcome names the server routes on
+      its own (`user_not_found`, `user_already_exists`, `sso_user_not_found`,
+      `sso_authenticated`), which are never actions.
   fields:
     type: object
-    description: |
-      User input values. Keys match field names from the step's `fields` dictionary.
+    description: User input values. Keys match field names from the step's `fields` list.
     additionalProperties: true
     example:
       identifier: "alice@acme.com"
   gate_proofs:
     type: object
     description: |
-      Solutions for security gates. Keys match gate names from the step's `gates` dictionary.
-      The orchestrator collects these from `<zl-captcha>` component events.
+      Solutions for security gates. Keys match gate names from the step's `gates` object.
+      The login component collects these from `<zl-captcha>` component events.
     additionalProperties:
       type: string
   challenge_response:
     type: object
     description: |
       Response to a pending challenge on the step. Required when the step has a
-      `challenge` property (e.g., after submitting a passkey action).
+      `challenge` property (for example, after submitting a passkey action).
       The `<zl-passkey>` component populates this after the WebAuthn ceremony.
     properties:
       challenge_id:
@@ -44,7 +45,7 @@ properties:
           Matches the server-side challenge for verification.
       method:
         type: string
-        description: Which auth method this response is for (e.g., 'passkey').
+        description: Which authentication method this response is for (for example, 'passkey').
       proof:
         type: object
         description: |
@@ -61,12 +62,11 @@ properties:
     type: string
     maxLength: 2048
     description: |
-      The page hosting the orchestrator, where the flow resumes after an
-      external sign-in: the callback sends the browser here unchanged, and
-      the page loads `GET /flow/{id}` to render the next step. The client
-      puts the flow id in it; the orchestrator reads `?flow=<id>` on the
-      reload. Required when `action` is "sso". An absolute URL; the server
-      parses it and keeps a fragment, so a hash-routed page returns to its
-      route. Its origin must equal the request origin; any other origin is
-      rejected and no sign-in is started.
+      The page hosting the login component, where the flow resumes after an
+      external sign-in. The callback sends the browser here unchanged, and the page
+      loads `GET /flow/{id}` to render the next step. The client puts the flow ID in
+      it: the login component reads `?flow=<id>` on the reload. Required when
+      `action` is "sso". An absolute URL. The server parses it and keeps a fragment,
+      so a hash-routed page returns to its route. Its origin must equal the request
+      origin. Any other origin is rejected and no sign-in is started.
     example: https://login.example.com/login?flow=flow_2

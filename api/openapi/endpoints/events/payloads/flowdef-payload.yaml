@@ -1,8 +1,8 @@
 title: FlowdefPayload
 type: object
 description: |
-  Allowlisted fields of the created revision. Retired `flowdef.updated`
-  rows carry a delta in the same shape. Steps are omitted.
+  The fields recorded for the created revision. Retired `flowdef.updated`
+  events carry the changed fields in the same shape. Steps are left out.
 properties:
   name:
     type: string

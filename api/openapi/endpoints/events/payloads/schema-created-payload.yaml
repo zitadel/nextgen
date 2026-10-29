@@ -1,9 +1,9 @@
 title: SchemaCreatedPayload
 type: object
 description: |
-  Allowlisted fields for `schema.created`. The schema document itself is
-  omitted — it is customer-authored and unbounded, and the event's `entity_id`
-  already identifies which schema was created.
+  The fields recorded for `schema.created`. The schema document itself is
+  left out: it is customer-authored and unbounded, and the event's `entity_id`
+  already identifies the schema.
 properties:
   kind:
     type: string

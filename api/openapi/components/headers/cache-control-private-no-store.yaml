@@ -1,4 +1,4 @@
-description: Prevents browsers and shared caches from storing session-specific responses.
+description: Stops browsers and shared caches from storing session-specific responses.
 schema:
   type: string
   const: private, no-store

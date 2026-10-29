@@ -16,11 +16,11 @@ properties:
   project_secret:
     type: string
     description: |
-      Secret which can be used for authentication when modifying the project.
+      The secret that authenticates requests that modify the project.
   preview_secret:
     type: string
     description: |
-      Secret which can be used for previewing and testing the project.
+      The secret for previewing and testing the project.
   origins:
     type: array
     items:

@@ -1,14 +1,14 @@
 post:
   operationId: submitFlowStep
-  summary: Submit step data and advance
+  summary: Submit a step and advance
   description: |
-    Submits user input for the current step. The server validates,
-    processes (e.g., verifies a credential), advances the state machine
-    through any invisible steps, and returns the next visible step.
+    Submits user input for the current step of a flow and returns the next visible
+    step. The server validates the input, processes it (for example, verifies a
+    credential) and moves the flow through any steps the user does not see.
 
     The response sets an updated encrypted `HttpOnly` cookie (`_zflow`)
-    with the new flow state. The server is stateless — all orchestration
-    state is carried in this cookie between requests.
+    with the new flow state. The server keeps no state between requests: all
+    flow state is carried in this cookie.
 
     **Important:** The `id` in the response may differ from the `id` used in
     the request. This happens when a flow pivots (pushes a new flow onto the
@@ -23,18 +23,18 @@ post:
     | `behavior`   | Action                                                     |
     |------------- |------------------------------------------------------------|
     | `redirect`   | Navigate to `redirect_uri` (OIDC/SAML auth request done). |
-    | `show`       | Render the step as a success screen (e.g., registration).  |
+    | `show`       | Render the step as a success screen (for example, registration). |
 
     A `complete` step is only returned when the **entire flow stack** is done.
-    If a stacked flow (e.g., recovery pivoted from login) finishes, the server
-    auto-pops to the parent flow and returns the parent's next step — the
+    If a stacked flow (for example, recovery pivoted from login) finishes, the
+    server auto-pops to the parent flow and returns the parent's next step. The
     frontend never sees a `complete` for intermediate flows.
 
     ## External sign-in
 
     `{action: "sso", sso_provider_id, return_target}` on a step that offers
-    `sso_providers` returns the engine-emitted `sso-redirect` step, whose
-    `redirect_url` the frontend navigates to.
+    `sso_providers` returns the `sso-redirect` step that the server emits. The
+    frontend navigates to its `redirect_url`.
 
     - The flow state does not change, but `_zflow` is re-sealed like on
       every response, so its ten-minute window restarts at this submission;
@@ -43,15 +43,15 @@ post:
       callback checks: `HttpOnly`, `Path=/`, `SameSite=Lax`.
     - On every host except http loopback it is `__Host-_zsso` with `Secure`.
     - When the request host is http loopback (local development, where
-      Safari rejects `Secure`), it is `_zsso` with no `Secure`; the
+      Safari rejects `Secure`), it is `_zsso` with no `Secure`. The
       `__Host-` prefix is dropped because it requires `Secure`.
 
-    A connection whose `client_id` is a `${{ NAME }}` reference has it filled
-    from the project's variables. A provider the engine cannot start a
-    sign-in with, including a reference with no variable behind it,
-    re-renders the step with `error.sso_unavailable`.
+    An identity provider whose `client_id` is a `${{ NAME }}` reference has it
+    filled from the project's variables. If the server cannot start a sign-in
+    with a provider, including when a reference has no variable behind it, it
+    renders the step again with `error.sso_unavailable`.
 
-    Reuses the deployment sealed into `_zflow` at `createFlow`; it does not
+    Reuses the deployment sealed into `_zflow` at `createFlow`. It does not
     re-resolve from `Origin`. If that release was revoked since the attempt
     started, the response is `409` with `rel.revoked`.
   tags:
@@ -65,7 +65,7 @@ post:
       required: false
       description: |
         Standard browser `Origin` header. When a step issues a passkey
-        challenge, the server derives the WebAuthn relying-party id and the
+        challenge, the server derives the WebAuthn relying-party ID and the
         allowed origin from this value. An sso submission is bound to it as
         well: `return_target` must be on this origin, and the callback route
         is built under it (see External sign-in above). Browsers send it
@@ -83,9 +83,8 @@ post:
   responses:
     '200':
       description: |
-        Advanced to next step. The `id` may have changed if a pivot
-        or stack-pop occurred — always use the returned `id` for the
-        next request.
+        The next step. The `id` may have changed if a pivot or stack-pop occurred;
+        always use the returned `id` for the next request.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-flow.yaml
@@ -110,11 +109,11 @@ post:
             $ref: ../../../components/flows/flow-response.yaml
     '409':
       description: |
-        Conflict. The flow session moved on under another request
-        (`flow.session_conflict`), the flow's auth attempt expired or was
-        already handed off (`flow.restart_required`): start a new flow, or
-        the sealed release was revoked (`rel.revoked`). A submission racing
-        the request that hands the attempt off can still fail with
+        The request conflicts with the flow's state. The flow session moved on under
+        another request (`flow.session_conflict`), the flow's authentication attempt
+        expired or was already handed off (`flow.restart_required`) so a new flow must
+        be started, or the sealed release was revoked (`rel.revoked`). A submission
+        racing the request that hands the attempt off can still fail with
         `att.already_handed_off`.
       content:
         application/json:

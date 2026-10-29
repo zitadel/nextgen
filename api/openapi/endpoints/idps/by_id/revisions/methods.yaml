@@ -1,9 +1,9 @@
 get:
   operationId: listIdpRevisions
-  summary: List the revisions of an identity provider connection
+  summary: List the revisions of an identity provider
   description: |
-    Returns every revision of one connection, newest first, paginated with a
-    cursor. The order is fixed, so there is no `sorting`.
+    Returns every revision of one identity provider, newest first, in pages. The
+    order is fixed, so there is no `sorting`.
 
     The lookup is scoped to the project in `project_id`.
   tags:
@@ -18,16 +18,16 @@ get:
     - $ref: ../../../../components/parameters/page-token.yaml
   responses:
     '200':
-      description: The revisions of the identity provider connection were returned successfully.
+      description: The revisions of the identity provider, newest first.
       content:
         application/json:
           schema:
             $ref: list-idp-revisions-response.yaml
           examples:
             twoRevisions:
-              summary: A connection revised once
+              summary: An identity provider revised once
               description: |
-                Both rows share `id` and `slug`. The second revision added a
+                Both revisions share `id` and `slug`. The second revision added a
                 scope, so `revision_id` and `updated_at` differ. It is newest,
                 so it comes first.
               value:
@@ -110,9 +110,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: |
-        No identity provider connection with this id exists in the given
-        project.
+      description: No identity provider with this ID exists in the given project.
       content:
         application/json:
           schema:

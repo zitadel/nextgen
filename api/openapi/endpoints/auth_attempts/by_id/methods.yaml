@@ -1,14 +1,14 @@
 get:
   operationId: getAuthAttempt
-  summary: Get authentication attempt state
+  summary: Get an authentication attempt by ID
   description: |
-    Polls the current state of an authentication attempt.
+    Returns the current state of an authentication attempt.
 
-    Returns the attempt's state, available factors for the next challenge,
-    challenges issued so far, and any errors preventing progress.
+    The response has the attempt's state, the factors available for the next
+    challenge, the challenges issued so far, and any errors preventing progress.
 
-    Use this for polling during long-running factor verifications (e.g., waiting for
-    a federated IdP callback or a device flow).
+    Use this to poll during long-running factor verifications, for example while
+    waiting for a federated identity provider (IdP) callback or a device flow.
   tags:
     - Authentication Attempts
   security:
@@ -18,7 +18,7 @@ get:
     - $ref: ../../../components/parameters/attempt-id.yaml
   responses:
     '200':
-      description: Current state of the authentication attempt
+      description: The authentication attempt, with its current state.
       content:
         application/json:
           schema:

@@ -1,5 +1,5 @@
 type: object
-description: One page of deployments, ordered as the operation describes.
+description: A page of deployments, ordered as the operation describes.
 required:
   - deployments
 properties:

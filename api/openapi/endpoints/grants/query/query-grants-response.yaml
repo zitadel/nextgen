@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of grants.
+description: A page of grants.
 required:
   - grants
 properties:

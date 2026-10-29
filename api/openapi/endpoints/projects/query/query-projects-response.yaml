@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of projects.
+description: A page of projects.
 required:
   - projects
 properties:

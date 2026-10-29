@@ -1,5 +1,5 @@
 type: object
-description: The claim challenge minted for a project.
+description: The claim challenge created for a project.
 required:
   - claim_url
   - challenge_id
@@ -10,7 +10,7 @@ properties:
     format: uri
     description: |
       The browser URL a developer opens to complete the claim. It embeds the
-      `challenge_id` so the browser leg does not need the project secret.
+      `challenge_id`, so the browser step does not need the project secret.
   challenge_id:
     $ref: ../../../../../components/schemas/challenge-id.yaml
   expires_at:

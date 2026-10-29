@@ -1,16 +1,15 @@
 post:
   operationId: createSchema
-  summary: Create new schema
+  summary: Create a schema
   description: |
-    Create a new schema. The optional `$id` field is the JSON Schema document
-    URI used to identify the schema in future requests (GitOps-stable identity,
-    not a free-form resource primary key). When `$id` is omitted, the server
-    generates a `sch_*` URL. When provided, `$id` must be unique within the
-    project and should ideally be a valid URI pointing at where the schema can
-    be accessed.
+    Creates a schema, either a concrete schema such as a user schema or a schema
+    URL that the server resolves.
 
-    The schema can either be a concrete schema, e.g. a user schema, or a 
-    schema-url which will be resolved by the server.
+    The optional `$id` field is the JSON Schema document URI that identifies the
+    schema in later requests. It is a stable identity for GitOps, not a free-form
+    resource ID. When `$id` is omitted, the server generates a `sch_*` URL. When
+    provided, `$id` must be unique within the project and should be a valid URI
+    pointing at where the schema can be accessed.
   tags:
     - Schemas
   parameters:
@@ -46,7 +45,7 @@ post:
             externalValue: examples/default-human-user-schema.json
   responses:
     '201':
-      description: The schema was created successfully
+      description: The ID of the created schema.
       content:
         application/json:
           schema:
@@ -54,7 +53,7 @@ post:
           examples:
             userSchemaResponse:
               summary: |
-                An example of a successful response for creating a user schema.
+                An example response for creating a user schema.
               externalValue: examples/create-user-schema-response-example.yaml
     default:
       $ref: createSchema-error-response.yaml
@@ -62,10 +61,10 @@ post:
 get:
   operationId: listSchemas
   x-zitadel-cli: schemas list
-  summary: List all schemas
+  summary: List schemas
   description: |
-    Retrieve a list of all schemas available in the system. This endpoint 
-    supports pagination and filtering based on schema attributes.
+    Lists the schemas available in the system, newest first, in pages. Query
+    parameters filter the list by schema attributes.
   tags:
     - Schemas
   parameters:
@@ -82,11 +81,11 @@ get:
       in: query
       description: |
         Which revisions to return. Schemas are immutable and versioned by URL,
-        so editing one mints a new row sharing its `objectType`.
+        so editing one creates a new revision that shares its `objectType`.
 
-        `all` (the default) returns every revision — the full history an
+        `all` (the default) returns every revision: the full history that an
         export, an audit or a GitOps diff needs. `latest` returns the newest
-        revision of each `objectType`, which is one row per schema.
+        revision of each `objectType`, which is one entry per schema.
 
         A schema stored without an `objectType` is a revision of nothing, and
         is returned by both.
@@ -118,7 +117,7 @@ get:
     - name: expand
       in: query
       required: false
-      description: Extra fields to add onto each returned schema.
+      description: Extra fields to include on each returned schema.
       style: form
       explode: true
       schema:
@@ -132,7 +131,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: A list of schemas was retrieved successfully.
+      description: The schemas, newest first, with a token for the next page.
       content:
         application/json:
           schema:

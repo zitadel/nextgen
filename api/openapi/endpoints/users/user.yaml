@@ -1,16 +1,16 @@
 title: User
 description: |
-  A user represents an individual identity in the system. It can be used to
-  represent a human user, but also a service account or any other type of
-  identity.
+  A user is an individual identity in the system. It can represent a person,
+  a service account or any other type of identity.
 
   `attributes` is the document that satisfies the user schema named by
   `schema`: its property names and types are defined entirely by that schema,
   and it is what the schema validates. The rest of the object — `id`,
   `schema`, `metadata` — is the server-owned envelope. Keeping the two apart
-  means a schema may name a property `id` or `metadata` without colliding with
-  the envelope, and closed-world keywords (`additionalProperties: false`,
-  `propertyNames`, `unevaluatedProperties`) behave as their author expects.
+  lets a schema name a property `id` or `metadata` without colliding with the
+  envelope. It also lets the keywords that close a schema
+  (`additionalProperties: false`, `propertyNames`, `unevaluatedProperties`)
+  behave as their author expects.
 type: object
 required:
   - id
@@ -58,8 +58,8 @@ properties:
     readOnly: true
     type: string
     description: |
-      The `x-display` rendering — the designated properties' values joined
-      in list order, resolved live at read time. Purely presentational.
+      The `x-display` rendering: the designated properties' values joined
+      in list order, resolved live at read time. It is for presentation only.
       Absent when the schema designates no display properties or the user
       carries no values for them. Clients render `display`, falling back
       to `identifier`, then `id`.
@@ -67,14 +67,19 @@ properties:
   teams:
     readOnly: true
     type: array
+    # Asked for with `expand: ["teams"]` (ADR 059).
+    #
+    # Deliberately outside `metadata`: memberships are a related collection, not
+    # part of the server-owned envelope, and it is a different concept from
+    # `metadata.lifecycle_owner_team_id` (ADR 024).
     description: |
-      The user's team memberships, present only when the request asked for them with
-      `expand: ["teams"]` (ADR 059). Absent means it was not requested; `[]`
-      means the user has none.
+      The user's team memberships, present only when the request asked for them
+      with `expand: ["teams"]`. Absent means it was not requested. `[]` means
+      the user has none.
 
-      Deliberately outside `metadata`: memberships are a related collection, not
-      part of the server-owned envelope, and it is a different concept from
-      `metadata.lifecycle_owner_team_id` (ADR 024).
+      Memberships are a related collection, not part of the server-owned
+      envelope. They are a different concept from
+      `metadata.lifecycle_owner_team_id`.
     items:
       $ref: by_id/teams/user-team.yaml
   teams_truncated:

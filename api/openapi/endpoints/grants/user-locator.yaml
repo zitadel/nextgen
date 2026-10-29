@@ -1,23 +1,24 @@
 title: UserLocator
+# Maintainer note moved here from the description: "rejected by `additionalProperties: false` as `req.invalid` before the handler runs".
 description: |
-  Name a user with exactly one of `user_id` or `identifier`. Sending both
-  or neither is `grant.invalid`. Unknown properties are rejected by
-  `additionalProperties: false` as `req.invalid` before the handler runs.
+  Names a user with exactly one of `user_id` or `identifier`. Sending both or
+  neither is `grant.invalid`. Unknown properties are rejected as `req.invalid`,
+  before the request is processed.
 type: object
 additionalProperties: false
 properties:
   user_id:
     $ref: ../../components/schemas/user-id.yaml
     description: |
-      Platform-homed user id (`user_<opaque>`). The user must be active.
-      Granting the session caller's own user id is `grant.invalid`.
+      The ID of a platform-homed user (`user_<opaque>`). The user must be
+      active. Granting the session caller's own user ID is `grant.invalid`.
   identifier:
     type: string
     minLength: 1
     description: |
       The user schema's designated identifier (`x-identifier`), looked
       up in the platform project. Create answers 202 with no body on
-      every outcome: a hit, a duplicate, a miss, and several matches are
+      every outcome. A hit, a duplicate, a miss and several matches are
       indistinguishable, and a miss or several matches write nothing.
       The server logs the lookup outcome. Granting the session caller's
       own resolved user is `grant.invalid`.

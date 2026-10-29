@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "UserSchema",
   "type": "object",
-  "description": "The meta-schema a customer's user schema document is validated against.\nThe generated `user-schema.json` adds `allOf: [{$ref: draft-2020-12}]`,\nwhich cannot live here because code generators choke on it.\n",
+  "description": "The meta-schema a customer's user schema document is validated against.",
   "required": [
     "metaSchema",
     "kind",
@@ -20,7 +20,7 @@
     "objectType": {
       "type": "string",
       "maxLength": 256,
-      "description": "The type of user this schema describes. This is a customer chosen name.\nEvery revision of a schema shares its `objectType`, and flow\ndefinitions name the schema they operate on by it.\n",
+      "description": "The type of user this schema describes. This is a customer-chosen name.\nEvery revision of a schema shares its `objectType`, and flow\ndefinitions name the schema they operate on by it.\n",
       "examples": [
         "human-user"
       ]

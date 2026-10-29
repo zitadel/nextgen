@@ -1,14 +1,16 @@
 title: ProjectOrigin
 type: object
 description: |
-  One of a project's origins: a pattern and what it is for. A `primary`
-  pattern is an exact origin (scheme and host, no `*`) that admits requests
-  from the URLs it matches. A `preview` pattern only bounds which URLs a
-  preview deploy may register; it may include at most one `*` inside a single
-  host label (`*` matches one or more characters, none of them a dot). A
-  literal beats a wildcard. Unknown hosts are accepted as written. An empty
-  list means every origin is admitted until the first pattern is added.
-  Loopback origins are admitted without a pattern.
+  One of a project's origins: a pattern and what it is for.
+
+  A `primary` pattern is an exact origin (scheme and host, no `*`). It admits
+  requests from the URLs it matches. A `preview` pattern only bounds which URLs
+  a preview deploy may register. It may include at most one `*`, inside a
+  single host label. The `*` matches one or more characters, none of them a
+  dot. A literal beats a wildcard. Unknown hosts are accepted as written.
+
+  An empty list means every origin is admitted until the first pattern is
+  added. Loopback origins are admitted without a pattern.
 required:
   - pattern
   - kind

@@ -1,23 +1,23 @@
 type: object
 required: [name, type, text_key]
 description: |
-  A data input capability. Describes what the user must provide.
-  Does not contain display text — only a `text_key` resolved client-side.
+  An input the user must provide on a step. It contains no display text, only
+  a `text_key` that the client resolves to text.
 properties:
   name:
     type: string
     description: |
       Field name, matching a property in the flow's user schema. Carries
-      the submitted value back to the engine.
+      the submitted value back to the server.
     example: email
   type:
     type: string
     enum: [text, email, password, tel, number, url, date, hidden, checkbox, select]
     description: |
-      The input kind the client should render. Encodes the formats and
-      JSON types that map to a familiar HTML input: `email`, `url`,
-      `date` come from `format`; `checkbox` from JSON `type: boolean`;
-      `select` from a closed `enum`. For other formats (e.g. uuid) the
+      The input kind the client should render. It encodes the formats and
+      JSON types that map to a familiar HTML input: `email`, `url` and
+      `date` come from `format`, `checkbox` from JSON `type: boolean`, and
+      `select` from a closed `enum`. For other formats (for example `uuid`) the
       type is `text` and `validation.format` carries the rule.
   text_key:
     type: string
@@ -28,22 +28,24 @@ properties:
     description: |
       Value for the HTML `autocomplete` attribute of the input rendered
       for this field, so password managers and browser autofill
-      recognise it. A space-separated token list; put it on the
+      recognize it. It is a space-separated token list. Put it on the
       attribute verbatim and do not reinterpret it.
 
-      The engine emits `username` on the field carrying the user's
-      identifier, whatever that field's `type` is: `username` is the
+      The server sets `username` on the field carrying the user's
+      identifier, whatever that field's `type` is. `username` is the
       token a password manager pairs with a password, while `email`
-      means contact information, so an email-typed identifier still
+      means contact information. So an email-typed identifier still
       takes `username` and matches the `identifier` a later password
-      step carries. On a password field it emits `current-password`
-      where the submitted value is verified against the stored
-      credential, and `new-password` where the value is saved as the
-      user's password — so a manager offers to fill on sign-in and to
-      generate on registration. A journey whose purpose does not
-      establish or verify a password yet emits neither.
+      step carries.
 
-      Omitted when no token applies, in which case render no attribute
+      On a password field the server sets `current-password` where the
+      submitted value is verified against the stored credential, and
+      `new-password` where the value is saved as the user's password.
+      A manager then offers to fill on sign-in and to generate on
+      registration. A flow whose purpose does not yet establish or verify
+      a password sets neither.
+
+      Omitted when no token applies. In that case render no attribute
       rather than an empty one.
 
       Autofill only: it says nothing about validation, and the input's
@@ -56,7 +58,7 @@ properties:
       The field MUST be present and non-empty on submit. Mirrors the
       schema's top-level `required` array.
   value:
-    description: Pre-filled value (e.g., an identifier carried over from a pivot).
+    description: Pre-filled value (for example, an identifier carried over from a pivot).
   read_only:
     type: boolean
     default: false
@@ -72,12 +74,12 @@ properties:
     description: |
       Schema-derived rules the frontend SHOULD apply at input time. The
       server runs the same rules on submit and is the only authority on
-      whether the step advances — these rules are a UX hint to reduce
-      round trips, not a contract guarantee.
+      whether the step advances. These rules are a hint to reduce round
+      trips, not a guarantee.
 
       Omitted entirely when the field has no rules beyond its `type`.
       Each key mirrors a JSON Schema keyword on the underlying user
-      property; absent keys mean no rule.
+      property. Absent keys mean no rule.
     properties:
       format:
         type: string
@@ -87,7 +89,7 @@ properties:
           meta-schema. When `type` already encodes the format (email,
           url, date), this key is informative and the input type is
           sufficient for client-side validation. When `type` is `text`
-          (e.g. `format: uuid`), this key is the only signal.
+          (for example `format: uuid`), this key is the only signal.
       min_length:
         type: integer
         minimum: 0

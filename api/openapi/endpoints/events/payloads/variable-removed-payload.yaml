@@ -1,6 +1,6 @@
 title: VariableRemovedPayload
 type: object
-description: Payload for `variable.removed` events, one row removed.
+description: Payload for `variable.removed` events. Each event removes one entry.
 properties:
   kind:
     type: string

@@ -1,16 +1,17 @@
+# Maintainer note moved here from the description: "the generated server emits
+# the lines separately, since the comma-joined form OpenAPI prescribes for array
+# headers is invalid for `Set-Cookie`".
 description: |
-  The cookies this response sets, one `Set-Cookie` line per element; the
-  generated server emits the lines separately, since the comma-joined form
-  OpenAPI prescribes for array headers is invalid for `Set-Cookie`
-  (RFC 6265). Browsers never expose the header to script, so this shape
-  concerns server-side and generated non-browser clients only.
+  The cookies this response sets, one `Set-Cookie` line per element. Each cookie
+  is its own line, because the comma-joined form is invalid for `Set-Cookie`
+  (RFC 6265). Browsers never expose the header to script, so this shape concerns
+  server-side and non-browser clients only.
 
   The first element is always `_zflow`, the encrypted flow state: HttpOnly,
-  Secure, SameSite=Strict, Path=/. Starting a flow and every submit
-  response rotate it, including validation failures; `GET /flow/{id}`
-  sets it only when the render resolved a parked SSO identity. The
-  `sso-redirect` response appends the browser-binding cookie the callback
-  checks.
+  Secure, SameSite=Strict, Path=/. Starting a flow and every submit response
+  rotate it, including validation failures. `GET /flow/{id}` sets it only when
+  the render resolved a parked SSO identity. The `sso-redirect` response appends
+  the browser-binding cookie the callback checks.
 schema:
   type: array
   items:

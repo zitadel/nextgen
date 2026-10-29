@@ -2,14 +2,16 @@ get:
   operationId: getMySession
   summary: Get my session state
   description: |
-    Returns the current state of the current session including its factors and all currently
-    satisfied assurance levels.
+    Returns the current state of the current session, including its factors and
+    all currently satisfied assurance levels.
 
-    With `project_id`, the session is returned only when it belongs to that project.
+    With `project_id`, the session is returned only when it belongs to that
+    project.
 
     `assurance_levels[]` may shrink over time as factor freshness windows expire,
-    without the session itself expiring. Use step-up authentication (a new `auth_attempt`
-    against the same `session_id`) to restore a dropped assurance level.
+    without the session itself expiring. Use step-up authentication to restore a
+    dropped assurance level. Step-up creates a new authentication attempt against
+    the same `session_id`.
   tags:
     - Sessions
   parameters:
@@ -18,7 +20,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: Session state.
+      description: The current session, with its state.
       headers:
         Cache-Control:
           $ref: ../../../components/headers/cache-control-private-no-store.yaml
@@ -60,15 +62,16 @@ delete:
   operationId: revokeMySession
   summary: Revoke my session
   description: |
-    Logs out by permanently deleting the session.
+    Signs the user out by revoking the session, which permanently deletes it.
 
-    The `__nextgen_session` cookie issued at creation (or superseded by a handoff
-    exchange) is required, with the session's token from `GET /sessions/me/csrf`
-    in the `X-Zitadel-CSRF` header. Idempotent: if the session is already gone
-    this still returns 204. Any tokens derived from the session are invalidated,
-    and the cookie itself is cleared in the response.
+    The request needs the `__nextgen_session` cookie issued at creation (or
+    superseded by a handoff exchange). It also needs the session's token from
+    `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header. The operation is
+    idempotent: if the session is already gone, it still returns 204. Any tokens
+    derived from the session are invalidated, and the response clears the cookie
+    itself.
 
-    With `project_id`, only a session of that project is deleted. A session of
+    With `project_id`, only a session of that project is revoked. A session of
     another project is left alone, and so is its cookie.
   tags:
     - Sessions
@@ -78,7 +81,7 @@ delete:
     - nextgenSession: []
   responses:
     '204':
-      description: Session deleted; cookie cleared. Idempotent — also returned when the session was already absent.
+      description: The session was revoked and deleted, and the cookie is cleared. The response is the same when the session was already absent.
       headers:
         Set-Cookie:
           $ref: ../../../components/headers/set-cookie-session-token.yaml
@@ -91,7 +94,7 @@ delete:
     '403':
       description: |
         `sess.project_mismatch`: the session belongs to a different project than
-        `project_id`. It is not deleted, and its cookie is not cleared.
+        `project_id`. It is not revoked, and its cookie is not cleared.
 
         `auth.csrf_invalid`: the request came from another site, or did not carry
         the session's `X-Zitadel-CSRF` token (see the `nextgenSession` scheme).

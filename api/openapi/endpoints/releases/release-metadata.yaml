@@ -1,8 +1,8 @@
 title: ReleaseMetadata
 type: object
 description: |
-  Who assembled the release, when, and from what source. Set when the release
-  is assembled and never mutated afterwards.
+  Who created the release, when, and from what source. Set when the release
+  is created and never changed afterwards.
 required:
   - git_dirty
   - created_at
@@ -30,20 +30,21 @@ properties:
     type: boolean
     default: false
     description: |
-      True when the working tree had uncommitted changes at construction time.
+      True when the working tree had uncommitted changes when the release was
+      created.
       `git_sha` still points at HEAD, but the release content does not
       correspond to that commit exactly, so consumers of the git-diff mechanism
       should skip it when either side is dirty.
   created_at:
     type: string
     format: date-time
-    description: When the release was assembled.
+    description: When the release was created.
     example: '2026-07-14T09:11:00Z'
   created_by:
     description: |
-      The identity that assembled the release. Absent when the caller is a
+      The identity that created the release. Absent when the caller is a
       machine principal carrying no user identity, which is the common case for
-      releases constructed from CI or the CLI.
+      releases created from CI or the CLI.
     oneOf:
       - type: string
       - type: 'null'

@@ -6,7 +6,7 @@ description: |
   only relevant for specific methods:
   - `passkey_options` is optional and only used when `method` is `passkey`.
   - `idp_provider` is required when `method` is `idp` and must be omitted otherwise.
-    This conditional requirement is enforced server-side.
+    The server enforces this conditional requirement.
 required:
   - method
 additionalProperties: false

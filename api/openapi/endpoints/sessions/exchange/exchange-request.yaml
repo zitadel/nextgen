@@ -6,16 +6,18 @@ properties:
   handoff_token:
     type: string
     description: |
-      The one-time handoff token minted by `POST /auth_attempts/{id}/handoff`.
-      Single-use — replaying it after a successful exchange returns `400` with
-      `sess.invalid_handoff_token`, the same answer as an unknown or expired token.
+      The one-time handoff token created by `POST /auth_attempts/{id}/handoff`.
+      It is single-use. Replaying it after an exchange succeeded returns `400`
+      with `sess.invalid_handoff_token`, the same answer as for an unknown or
+      expired token.
     example: handoff_abc123def456xyz
   ttl:
     type: string
     format: duration
     x-ogen-type: github.com/zitadel/nextgen/internal/api/ogenx.ISODuration
     description: |
-      Optional session lifetime after exchange as an ISO-8601 duration. When omitted, the server
-      uses the configured default. Must not exceed the configured maximum.
+      Optional session lifetime after the exchange, as an ISO-8601 duration. When
+      omitted, the server uses the configured default. It must not exceed the
+      configured maximum.
     example: PT1H
 

@@ -1128,7 +1128,6 @@ type CreateUserParams struct {
 	// who may deprovision the user, and the created user stays self-owned
 	// either way. The owning team is reported on reads as
 	// `metadata.lifecycle_owner_team_id` and cannot be set through this API.
-	// See ADR 024.
 	// The team also scopes team-unique attributes for this create: an
 	// attribute the schema marks unique per team is checked against this
 	// team's members.
@@ -1276,7 +1275,7 @@ func decodeCreateUserParams(args [0]string, argsEscaped bool, r *http.Request) (
 
 // DeleteGrantParams is parameters of deleteGrant operation.
 type DeleteGrantParams struct {
-	// Managed assignment id (`asgn_<opaque>`).
+	// The ID of the managed assignment (`asgn_<opaque>`).
 	ID string
 	// The unique identifier of the project.
 	ProjectID ProjectID
@@ -1975,7 +1974,7 @@ func decodeExchangeHandoffParams(args [0]string, argsEscaped bool, r *http.Reque
 type FinishUserPasskeyRegistrationParams struct {
 	// The unique identifier of the user.
 	UserID UserID
-	// The ceremony identifier returned by begin.
+	// The ceremony ID returned by begin.
 	RegistrationID string
 }
 
@@ -2257,7 +2256,7 @@ func decodeGetBrandingByIdParams(args [1]string, argsEscaped bool, r *http.Reque
 type GetClaimStatusParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The challenge minted by the matching claim init, as the claim URL carries
+	// The challenge created by the matching claim init, as the claim URL carries
 	// it.
 	ChallengeID ChallengeID
 }
@@ -2400,7 +2399,7 @@ func decodeGetClaimStatusParams(args [1]string, argsEscaped bool, r *http.Reques
 type GetClaimWindowParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The challenge minted by the matching claim init, as the claim URL carries
+	// The challenge created by the matching claim init, as the claim URL carries
 	// it.
 	ChallengeID ChallengeID
 }
@@ -2825,7 +2824,7 @@ func decodeGetDeploymentVariablesParams(args [1]string, argsEscaped bool, r *htt
 
 // GetEventParams is parameters of getEvent operation.
 type GetEventParams struct {
-	// Managed event id (`evt_<opaque>`).
+	// The ID of the managed event (`evt_<opaque>`).
 	ID string
 	// The unique identifier of the project.
 	ProjectID ProjectID
@@ -2952,7 +2951,7 @@ func decodeGetEventParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 
 // GetFlowDefinitionParams is parameters of getFlowDefinition operation.
 type GetFlowDefinitionParams struct {
-	// The id returned by the POST /flow_definitions endpoint.
+	// The ID returned by the POST /flow_definitions endpoint.
 	ID string
 }
 
@@ -3018,14 +3017,14 @@ func decodeGetFlowDefinitionParams(args [1]string, argsEscaped bool, r *http.Req
 
 // GetFlowStepParams is parameters of getFlowStep operation.
 type GetFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// The flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// It selects the correct flow state in the encrypted cookie, which can hold
+	// multiple concurrent flows. The ID may change between responses when a flow
+	// pivot or pop occurs, so always use the `id` from the latest response.
 	ID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// The encrypted flow state cookie, set by `POST /flow` or the previous
 	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{id}` path parameter must name that flow, any other id is
+	// flow. The `{id}` path parameter must name that flow, and any other ID is
 	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
@@ -3136,12 +3135,13 @@ func decodeGetFlowStepParams(args [1]string, argsEscaped bool, r *http.Request) 
 
 // GetGrantParams is parameters of getGrant operation.
 type GetGrantParams struct {
-	// Managed assignment id (`asgn_<opaque>`).
+	// The ID of the managed assignment (`asgn_<opaque>`).
 	ID string
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Extra principal fields to add onto `user` or `team`. Same enum and
-	// `user.read` + `team.read` gate as `POST /grants/query`.
+	// Extra principal fields to add onto `user` or `team`. It takes the same
+	// values, and needs the same `user.read` and `team.read` scopes, as
+	// `POST /grants/query`.
 	Expand []GrantExpand `json:",omitempty"`
 }
 
@@ -3356,7 +3356,7 @@ func decodeGetGrantParams(args [1]string, argsEscaped bool, r *http.Request) (pa
 type GetIdpByIdParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The connection id, allocated when the connection was created.
+	// The connection ID, allocated when the connection was created.
 	ID string
 }
 
@@ -3483,7 +3483,7 @@ func decodeGetIdpByIdParams(args [1]string, argsEscaped bool, r *http.Request) (
 type GetIdpRevisionByIdParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The revision id, allocated when the revision was written.
+	// The revision ID, allocated when the revision was written.
 	RevisionID string
 }
 
@@ -4090,7 +4090,7 @@ func decodeGetMyUserSchemaParams(args [0]string, argsEscaped bool, r *http.Reque
 type GetPolicyParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The identifier of the policy, shared by all of its revisions.
+	// The ID of the policy, shared by all of its revisions.
 	PolicyID PolicyID
 }
 
@@ -4232,7 +4232,7 @@ func decodeGetPolicyParams(args [1]string, argsEscaped bool, r *http.Request) (p
 type GetPolicyRevisionParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The identifier of the policy revision.
+	// The ID of the policy revision.
 	RevisionID PolicyRevisionID
 }
 
@@ -4973,18 +4973,18 @@ func decodeGetTeamParams(args [1]string, argsEscaped bool, r *http.Request) (par
 
 // GetUserByIDParams is parameters of GetUserByID operation.
 type GetUserByIDParams struct {
-	// Serves the user only when they hold an active membership in this team,
+	// Returns the user only when they hold an active membership in this team,
 	// and answers `404` otherwise.
-	// This is team membership, not lifecycle ownership: it asks which team
+	// This is team membership, not lifecycle ownership. It asks which team
 	// the user collaborates in, not which team may deprovision them. The
 	// owning team is reported separately as
-	// `metadata.lifecycle_owner_team_id`, and a user can belong to many teams
-	// while owning their own lifecycle. See ADR 024.
+	// `metadata.lifecycle_owner_team_id`. A user can belong to many teams
+	// while owning their own lifecycle.
 	// Only active memberships match. A user who has been invited but has not
 	// accepted is not served.
 	// It reads the user's memberships, so it takes the same permission as the
 	// `team_id` filter on `POST /users/query`: `team_membership.read` for a
-	// project secret, read on the whole project for a Console session.
+	// project secret, read on the whole project for a console session.
 	// Otherwise the answer is `403 user.permission_denied`.
 	TeamID OptTeamID `json:",omitempty,omitzero"`
 	// The unique identifier of the user.
@@ -6245,9 +6245,11 @@ func decodeListDeploymentsParams(args [0]string, argsEscaped bool, r *http.Reque
 type ListEventsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Filter by wide-event category. Repeatable (OR within the parameter).
+	// Filter by event category. Repeatable: an event matches any of the
+	// given values.
 	Category []ListEventsCategoryItem `json:",omitempty"`
-	// Exact-match filter on `event_type`. Repeatable (OR within the parameter).
+	// Exact-match filter on `event_type`. Repeatable: an event matches any
+	// of the given values.
 	EventType   []string  `json:",omitempty"`
 	ActorID     OptString `json:",omitempty,omitzero"`
 	ClientID    OptString `json:",omitempty,omitzero"`
@@ -6257,14 +6259,14 @@ type ListEventsParams struct {
 	Fingerprint OptString `json:",omitempty,omitzero"`
 	EntityType  OptString `json:",omitempty,omitzero"`
 	EntityID    OptString `json:",omitempty,omitzero"`
-	// Filter by emit-time team scope stored on the event.
+	// Filter by the emit-time team scope stored on the event.
 	TeamID OptString `json:",omitempty,omitzero"`
 	// Inclusive lower bound on `created_at` (RFC 3339).
 	CreatedAfter OptDateTime `json:",omitempty,omitzero"`
 	// Exclusive upper bound on `created_at` (RFC 3339).
 	CreatedBefore OptDateTime `json:",omitempty,omitzero"`
-	// Sort direction on `(created_at, id)`. Default `desc` (newest first)
-	// for audit UI. Pass `asc` for oldest-first.
+	// Sort direction on `created_at`, then `id`. The default `desc` returns
+	// the newest first, which suits an audit UI. Pass `asc` for oldest first.
 	Order OptListEventsOrder `json:",omitempty,omitzero"`
 	// Token for fetching the next page of results.
 	// Obtain this value from `next_page_token` in the previous response.
@@ -7233,7 +7235,7 @@ type ListFlowDefinitionsParams struct {
 	PageToken OptPageToken `json:",omitempty,omitzero"`
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// Filter flow definitions by purpose (e.g., registration, login).
+	// Filter flow definitions by purpose, for example registration or login.
 	Purpose OptListFlowDefinitionsPurpose `json:",omitempty,omitzero"`
 	// The flow name to filter by. Every revision of a flow shares its
 	// `name`, so the result is that flow's revisions, newest by creation
@@ -7241,10 +7243,10 @@ type ListFlowDefinitionsParams struct {
 	Name OptString `json:",omitempty,omitzero"`
 	// Which revisions to return. Every revision of a flow shares its
 	// `name`, so publishing a definition under an existing `name` generates
-	// a new row.
+	// a new revision.
 	// `all` (the default) returns every revision — the full history an
 	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `name`, which is one row per flow.
+	// revision of each `name`, which is one revision per flow.
 	// A `page_token` is bound to the mode it was issued in and is rejected by
 	// the other.
 	Revisions OptListFlowDefinitionsRevisions `json:",omitempty,omitzero"`
@@ -7743,7 +7745,7 @@ func decodeListFlowDefinitionsParams(args [0]string, argsEscaped bool, r *http.R
 type ListIdpRevisionsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The connection id, allocated when the connection was created.
+	// The connection ID, allocated when the connection was created.
 	ID string
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -9296,7 +9298,7 @@ func decodeListPoliciesParams(args [0]string, argsEscaped bool, r *http.Request)
 type ListPolicyRevisionsParams struct {
 	// The unique identifier of the project.
 	ProjectID ProjectID
-	// The identifier of the policy, shared by all of its revisions.
+	// The ID of the policy, shared by all of its revisions.
 	PolicyID PolicyID
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -10027,10 +10029,10 @@ type ListReleasesParams struct {
 	// Narrows the list to the release with this content digest, given in full
 	// with its `sha256:` prefix. A project holds at most one release per digest,
 	// so the result has one entry or none.
-	// A digest no release of the project carries answers an empty list, not an
-	// error: the filter asks which release has this content, and "none" is a
-	// valid answer. Paths never take a digest; read the matched entry's `id`
-	// and use that.
+	// A digest that no release of the project carries answers an empty list, not
+	// an error. The filter asks which release has this content, and "none" is a
+	// valid answer. Paths never take a digest. Read the matched entry's `id` and
+	// use that.
 	ContentHash OptReleaseContentHash `json:",omitempty,omitzero"`
 	// Maximum number of items to return.
 	Limit OptLimit `json:",omitempty,omitzero"`
@@ -10328,10 +10330,10 @@ type ListSchemasParams struct {
 	// The type of object of the schema to filter by.
 	ObjectType OptString `json:",omitempty,omitzero"`
 	// Which revisions to return. Schemas are immutable and versioned by URL,
-	// so editing one mints a new row sharing its `objectType`.
-	// `all` (the default) returns every revision — the full history an
+	// so editing one creates a new revision that shares its `objectType`.
+	// `all` (the default) returns every revision: the full history that an
 	// export, an audit or a GitOps diff needs. `latest` returns the newest
-	// revision of each `objectType`, which is one row per schema.
+	// revision of each `objectType`, which is one entry per schema.
 	// A schema stored without an `objectType` is a revision of nothing, and
 	// is returned by both.
 	// A `page_token` is bound to the mode it was issued in and is rejected by
@@ -10345,7 +10347,7 @@ type ListSchemasParams struct {
 	// A schema stored without its document being parsed has no kind that
 	// could be read, and is excluded from every filtered result.
 	Kind OptListSchemasKind `json:",omitempty,omitzero"`
-	// Extra fields to add onto each returned schema.
+	// Extra fields to include on each returned schema.
 	Expand []SchemaExpand `json:",omitempty"`
 }
 
@@ -12936,20 +12938,20 @@ func decodeSetUserPasswordParams(args [1]string, argsEscaped bool, r *http.Reque
 
 // SubmitFlowStepParams is parameters of submitFlowStep operation.
 type SubmitFlowStepParams struct {
-	// Flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
-	// Used to look up the correct flow state from the encrypted cookie,
-	// which can hold multiple concurrent flows. May change between responses
-	// when a flow pivot or pop occurs — always use the `id` from the latest response.
+	// The flow ID returned by POST /flow or the latest POST /flow/{id}/submit.
+	// It selects the correct flow state in the encrypted cookie, which can hold
+	// multiple concurrent flows. The ID may change between responses when a flow
+	// pivot or pop occurs, so always use the `id` from the latest response.
 	ID string
-	// Encrypted flow state cookie set by `POST /flow` or the previous
+	// The encrypted flow state cookie, set by `POST /flow` or the previous
 	// `POST /flow/{id}/submit`. The cookie holds the sealed state of one
-	// flow; the `{id}` path parameter must name that flow, any other id is
+	// flow. The `{id}` path parameter must name that flow, and any other ID is
 	// refused.
 	// Browsers send this automatically; non-browser clients must capture the
 	// `Set-Cookie` header and resend it.
 	Zflow string
 	// Standard browser `Origin` header. When a step issues a passkey
-	// challenge, the server derives the WebAuthn relying-party id and the
+	// challenge, the server derives the WebAuthn relying-party ID and the
 	// allowed origin from this value. An sso submission is bound to it as
 	// well: `return_target` must be on this origin, and the callback route
 	// is built under it (see External sign-in above). Browsers send it

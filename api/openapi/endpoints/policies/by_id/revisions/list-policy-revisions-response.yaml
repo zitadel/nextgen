@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of the revisions of one policy, newest first.
+description: A page of the revisions of one policy, newest first.
 required:
   - revisions
 properties:

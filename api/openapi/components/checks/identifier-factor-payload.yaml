@@ -1,6 +1,6 @@
 title: IdentifierFactorPayload
 type: object
-description: Identifier-specific factor metadata
+description: Factor metadata for the `identifier` method.
 required:
   - method
   - user_id
@@ -11,4 +11,4 @@ properties:
     description: Always `identifier`; the discriminator of the payload union.
   user_id:
     $ref: ../../components/schemas/user-id.yaml
-    description: The identified user ID
+    description: The ID of the identified user.

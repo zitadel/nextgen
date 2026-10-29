@@ -1,9 +1,11 @@
 type: object
+# Maintainer note moved here from the description: "ephemeral state machine (15-minute TTL)".
 description: |
   The current state of an authentication attempt.
 
-  An attempt is an ephemeral state machine (15-minute TTL) that drives a single authentication round.
-  It accepts factor challenges, verifies proofs, and completes into a handoff token.
+  An attempt drives a single authentication round and lives for 15 minutes. It
+  accepts challenges for authentication factors (such as a password or a
+  passkey), verifies proofs, and completes into a handoff token.
   Clients drive the attempt by:
   1. Issuing challenges: POST /auth_attempts/{attempt_id}/challenges
   2. Verifying proofs: POST /auth_attempts/{attempt_id}/challenges/{challenge_id}/verify
@@ -24,8 +26,8 @@ properties:
       Overall state of the authentication attempt:
       - `in_progress`: factors are still being collected; continue issuing challenges.
       - `completed`: all required factors have been verified; the attempt is ready for handoff.
-      - `failed`: the attempt has failed (e.g. too many failed proofs) and cannot be continued.
-      - `expired`: the 15-minute TTL has been exceeded.
+      - `failed`: the attempt has failed, for example after too many failed proofs, and cannot be continued.
+      - `expired`: the 15-minute lifetime has passed.
     enum:
       - in_progress
       - completed
@@ -34,8 +36,9 @@ properties:
     example: in_progress
   session_id:
     description: |
-      The session being authenticated into. Either newly created or passed in on POST.
-      For step-up (re-auth), this is the existing session_id provided on creation.
+      The session being authenticated into. Either newly created or passed in when
+      the attempt was created. For step-up (re-authentication), this is the
+      existing `session_id` provided on creation.
     oneOf:
       - $ref: ../../components/schemas/session-id.yaml
       - type: 'null'
@@ -49,22 +52,23 @@ properties:
   required_factors:
     type: array
     description: |
-      The authentication factor methods that the project policy requires in order
-      to complete this attempt. Computed by the server from the project's auth policy.
-      Clients should use this to determine which challenges still need to be issued.
+      The authentication factor methods that the project policy requires to
+      complete this attempt. The server computes them from the project's
+      authentication policy. Clients use this to determine which challenges still
+      need to be issued.
     items:
       $ref: ../../components/schemas/factor-method.yaml
     example: [identifier, password]
   completed_factors:
     type: array
     description: |
-      The factors that have been successfully verified in this attempt so far.
-      Each item includes method-specific metadata in the payload field.
-      
-      The flow engine uses verified_at timestamps to enforce time-based policies, such as
-      requiring password verification within the last 5 minutes for step-up auth to
-      access sensitive operations.
-      
+      The factors that have been verified in this attempt so far. Each item
+      includes method-specific metadata in the `payload` field.
+
+      The server uses the `verified_at` timestamps to enforce time-based policies.
+      For example, a policy can require password verification within the last
+      5 minutes for step-up authentication to access sensitive operations.
+
       A factor appears here once its challenge reaches `verified` state.
     items:
       $ref: ../../components/checks/completed-factor.yaml
@@ -78,7 +82,7 @@ properties:
   expires_at:
     type: string
     format: date-time
-    description: When this attempt expires (15-minute TTL from creation)
+    description: When this attempt expires, 15 minutes after it was created.
     example: '2026-04-28T15:45:00Z'
   created_at:
     type: string

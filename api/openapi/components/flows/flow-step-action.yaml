@@ -2,9 +2,9 @@ type: object
 required: [name, kind]
 additionalProperties: false
 description: |
-  An action the engine offers on a runtime step. Every declared action of the
-  definition's step appears here, plus the engine-injected `back` whenever
-  returning to the previous step is possible.
+  An action the server offers on a runtime step. Every declared action of the
+  definition's step appears here, plus the `back` action that the server adds
+  whenever returning to the previous step is possible.
 properties:
   name:
     type: string
@@ -21,14 +21,14 @@ properties:
       - `passkey`: run a WebAuthn assertion, then submit the result.
       - `passkey_register`: run a WebAuthn registration, then submit the result.
       - `navigate`: submit without collecting fields; pure routing.
-      - `back`: return the user to the previous step. Engine-injected, never
-        declared in a flow definition.
+      - `back`: return the user to the previous step. The server adds it, and a
+        flow definition never declares it.
   primary:
     type: boolean
     default: false
     example: true
     description: |
-      Marks this as the default/primary action. The runtime template uses
+      Marks this as the default (primary) action. The runtime template uses
       this hint to choose visual emphasis.
   text_key:
     type: string

@@ -2,25 +2,25 @@ post:
   operationId: createRelease
   summary: Create a release
   description: |
-    Assembles a release from existing revisions, given as
-    `(kind, revision_id)` pairs. To build one from files on disk, use
-    `POST /releases/build`.
+    Creates a release from existing revisions, given as `(kind, revision_id)`
+    pairs. To build one from files on disk, use `POST /releases/build`.
 
     Each revision must exist in the project and is recorded under the handle
     it declares. The release must be complete and consistent:
 
     - Every handle its revisions name must be in the release: a flow's
-      `user_schema`, and the IDP connections named by a flow step's
-      `sso_providers` or a schema's `x-auth-methods.sso.providers`. A missing
-      one answers `rel.unresolved_reference`, naming the resource and the
-      handle, e.g. `flow_definition default-login: user_schema human-user not found`.
+      `user_schema`, and the identity provider (IdP) connections named by a
+      flow step's `sso_providers` or a schema's `x-auth-methods.sso.providers`.
+      A missing one answers `rel.unresolved_reference`, naming the resource and
+      the handle, for example
+      `flow_definition default-login: user_schema human-user not found`.
     - Every flow is validated as on save, against the user schema revision
       in the release. A flow that fails answers `rel.invalid`, with the
       reason in `details`.
 
-    Idempotent on the set of revisions: the same revisions with a different
-    `message` answer `200` with the existing release. A new release answers
-    `201`. Creating a release does not deploy it.
+    The operation is idempotent on the set of revisions: the same revisions
+    with a different `message` answer `200` with the existing release. A new
+    release answers `201`. Creating a release does not deploy it.
   tags:
     - Releases
   parameters:
@@ -40,7 +40,7 @@ post:
             description: |
               A project has several user schemas and several flow definitions,
               so `schema` and `flow_definition` each appear more than once.
-              Branding appears once because a project has one, and each IDP
+              Branding appears once because a project has one, and each IdP
               connection is pinned by its own revision.
             value:
               pointers:
@@ -62,8 +62,8 @@ post:
   responses:
     '200':
       description: |
-        A release pinning this exact set already existed and was returned
-        unchanged. No new release was created.
+        The existing release that pins this exact set, returned unchanged. No
+        new release was created.
       content:
         application/json:
           schema:
@@ -73,7 +73,7 @@ post:
               summary: The same set was submitted again under a new message
               description: |
                 The pinned set matched an existing release, so that release is
-                returned — note the message it was originally created with,
+                returned. Note the message it was originally created with,
                 not the one just submitted.
               value:
                 id: rel_01KX3RG8A7F0N9WD3P2E4YM5C1
@@ -98,7 +98,7 @@ post:
                     handle: default
                     revision_id: brnd_01KWH1P4MYS7F0N9WD3P2E4YM5
     '201':
-      description: The release was created successfully.
+      description: The new release.
       content:
         application/json:
           schema:
@@ -108,8 +108,8 @@ post:
               summary: Pinned from a pipeline, with a dirty tree
               description: |
                 A project secret names no user, so `created_by` is null while
-                `created_by_type` still reports `service` — the release was
-                assembled by a machine. `git_dirty` records that the working
+                `created_by_type` still reports `service`, because a machine
+                created the release. `git_dirty` records that the working
                 tree had uncommitted changes, so the content does not
                 correspond exactly to `git_sha`.
               value:
@@ -150,15 +150,15 @@ get:
   description: |
     Lists the project's releases, newest first.
 
-    Entries carry the digest, the metadata and `revoked_at` — the pinned set
-    is omitted.
-    Read one release with `GET /releases/{release_id}` to get its pointers.
+    Entries carry the digest, the metadata and `revoked_at`. The pinned set
+    is omitted: read one release with `GET /releases/{release_id}` to get its
+    pointers.
 
-    `content_hash` looks a release up by its content, as the CLI does when a
-    person types the digest a transcript printed. The project holds at most
-    one release per digest, so the filtered list has one entry or none, and
-    an unknown digest is an empty list rather than an error. Paths take the
-    `rel_` id only; the matched entry's `id` is what to use there.
+    The `content_hash` filter looks a release up by its content, as the CLI
+    does when a person types a digest from a transcript. The project holds at
+    most one release per digest, so the filtered list has one entry or none.
+    An unknown digest gives an empty list, not an error. Paths take the
+    `rel_` ID only, so use the matched entry's `id` there.
   tags:
     - Releases
   parameters:
@@ -172,7 +172,7 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The releases were retrieved successfully.
+      description: A page of the project's releases, newest first.
       content:
         application/json:
           schema:

@@ -2,8 +2,8 @@ get:
   operationId: listMyIdentityLinks
   summary: List the provider accounts linked to me
   description: |
-    The identity provider accounts a sign-in linked to the signed-in user,
-    oldest first. The provider's subject and claims are never returned.
+    Lists the identity provider accounts linked to the signed-in user, oldest
+    first. The provider's subject and claims are never returned.
 
     With `project_id`, the links are listed only when the session belongs to
     that project.

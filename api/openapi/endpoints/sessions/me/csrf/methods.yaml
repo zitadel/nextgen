@@ -1,14 +1,17 @@
 get:
   operationId: getMySessionCsrfToken
   summary: Get my session's CSRF token
+  # Maintainer note moved here from the description: "(ADR 053 §5)" after "cross-site request forgery protection".
   description: |
-    Returns the session-bound token for cross-site request forgery protection
-    (ADR 053 §5). Browser code sends it in the `X-Zitadel-CSRF` header on the
-    state-changing requests the session cookie authenticates that require it
-    — see the `nextgenSession` scheme. It authorizes nothing on its own: the
-    HttpOnly cookie is still the credential, and a cross-site page cannot
-    read this response. It stays the same for the life of the session, so a
-    client fetches it once per session.
+    Returns the session-bound token that protects against cross-site request
+    forgery (CSRF).
+
+    Browser code sends it in the `X-Zitadel-CSRF` header on the state-changing
+    requests that the session cookie authenticates and that require it. See the
+    `nextgenSession` scheme. It authorizes nothing on its own: the HttpOnly
+    cookie is still the credential, and a cross-site page cannot read this
+    response. The token stays the same for the life of the session, so a client
+    fetches it once per session.
 
     With `project_id`, the token is returned only when the session belongs to
     that project.

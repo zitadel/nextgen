@@ -1,5 +1,5 @@
 type: object
-description: Paginated list of sessions.
+description: A page of sessions.
 required:
   - sessions
 properties:

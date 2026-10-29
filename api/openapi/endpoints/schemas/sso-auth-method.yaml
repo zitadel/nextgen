@@ -7,7 +7,7 @@ additionalProperties: false
 properties:
   enabled:
     type: boolean
-    description: Whether the authentication method is enabled or not
+    description: Whether the authentication method is enabled.
   providers:
     type: array
     minItems: 1
@@ -19,9 +19,11 @@ properties:
       examples:
       - google
       - corp_idp
-    description: Slugs of the Project-level identity provider connections available to users of this schema.
-      Each entry must match the `slug` of a connection under `.zitadel/idps/`; a connection existing does
-      not by itself make it available here.
+    description: |
+      Slugs of the project-level identity providers available to users of this schema.
+      Each entry must match the `slug` of a connection document under
+      `.zitadel/idps/`. A connection document existing does not by itself make it
+      available here.
 if:
   properties:
     enabled:

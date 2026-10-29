@@ -1,10 +1,14 @@
 ---
 title: Authentication attempts
-description: OpenAPI operations for the authentication attempt state machine.
+description: One short-lived round of proving who a user is, with factor challenges, proof checks and a handoff token that is exchanged for a session.
 ---
 
-Authentication attempts hold the short-lived state for a login, registration,
-step-up, or recovery journey. Use these endpoints to start an attempt, issue
-factor challenges, verify proofs, and mint a handoff token for session exchange.
+An authentication attempt is one round of proving who a user is. It covers
+sign-in, registration, step-up and recovery. Step-up adds factors to an existing
+session.
+
+Use these endpoints to start an attempt and issue challenges for authentication
+factors, such as a password or a passkey. Then verify the proofs and create a
+handoff token. The handoff token is exchanged for a session.
 
 <Operations />

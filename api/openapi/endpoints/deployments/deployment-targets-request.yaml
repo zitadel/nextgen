@@ -4,7 +4,7 @@ minItems: 1
 maxItems: 50
 uniqueItems: true
 description: |
-  Where the release goes live: either `primary`, which resolves to every
+  Where the release goes live. Either `primary`, which resolves to every
   current primary origin, or preview URLs in `Origin` form, each matching one
   of the project's preview patterns. Primary origins cannot be named one by
   one, and the two forms cannot be mixed.

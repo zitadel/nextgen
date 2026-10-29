@@ -2,12 +2,14 @@ post:
   operationId: finishUserPasskeyRegistration
   summary: Finish passkey registration
   description: |
-    Verifies the attestation against the ceremony started by
-    `POST /users/{user_id}/passkeys/registrations` and persists the new credential. A
-    rejected attestation counts against the ceremony's failure budget and the
-    ceremony stays open for a retry. An expired ceremony surfaces as
-    `att.stale_challenge`; an unknown or already-consumed registration id
-    surfaces as `att.not_found`.
+    Completes a passkey registration by verifying the attestation against the
+    ceremony that `POST /users/{user_id}/passkeys/registrations` started.
+
+    The attestation is the authenticator's signed response. On success the
+    new credential is saved. A rejected attestation counts against the
+    ceremony's failure limit, and the ceremony stays open for a retry. An
+    expired ceremony answers `att.stale_challenge`. An unknown or
+    already-used registration ID answers `att.not_found`.
   tags:
     - Users
   parameters:
@@ -24,13 +26,13 @@ post:
           $ref: finish-user-passkey-registration-request.yaml
   responses:
     '201':
-      description: The passkey was registered
+      description: The registered passkey.
       content:
         application/json:
           schema:
             $ref: finish-user-passkey-registration-response.yaml
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
@@ -48,7 +50,7 @@ post:
           schema:
             $ref: ../../../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

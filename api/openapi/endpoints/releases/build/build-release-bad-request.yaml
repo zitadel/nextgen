@@ -1,15 +1,17 @@
 title: BuildReleaseBadRequest
+# Maintainer note, moved verbatim from the description:
+# The handler returns this response directly, with `resources` at the top
+# of `details`, rather than through the shared error path, which would nest
+# a producer's payload under `details.details`.
 description: |
-  The bundle cannot build a release. `code` says why. A structurally
-  malformed request, such as a wrong type, a missing required field, an
-  unknown key or a kind over its cap, is refused while decoding with
-  `req.invalid`, naming the offending fields. A well-formed bundle whose
-  resources fail the checks their kinds' create endpoints run answers
-  `rel.invalid`, and `details.resources` lists every resource that failed.
+  The bundle cannot build a release. `code` says why.
 
-  The handler returns this response directly, with `resources` at the top
-  of `details`, rather than through the shared error path, which would nest
-  a producer's payload under `details.details`.
+  A structurally malformed request is refused while decoding with
+  `req.invalid`, naming the offending fields. That covers a wrong type, a
+  missing required field, an unknown key and a kind over its cap. A
+  well-formed bundle whose resources fail the checks run by their kinds'
+  create endpoints answers `rel.invalid`. `details.resources` lists every
+  resource that failed.
 allOf:
   - $ref: ../../../components/error-details.yaml
   - type: object

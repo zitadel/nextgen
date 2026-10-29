@@ -1,9 +1,9 @@
 title: GrantTeam
+# Maintainer note moved here from the description: "(ADR 059 grant exception)" after "with or without expand".
 description: |
-  Team bound by this grant. Always a team-ref (`team_id`, never `id`).
-  `expand: ["principal"]` adds `status`, `created_at`, and `updated_at` on
-  this same object. Missing teams degrade to `team_id` only, with or without
-  expand (ADR 059 grant exception).
+  The team bound by this grant. Always a team-ref (`team_id`, never `id`).
+  `expand: ["principal"]` adds `status`, `created_at` and `updated_at` on this
+  same object. Missing teams degrade to `team_id` only, with or without expand.
 allOf:
   - $ref: ../../components/schemas/team-ref.yaml
   - type: object

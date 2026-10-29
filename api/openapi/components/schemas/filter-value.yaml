@@ -1,7 +1,6 @@
 description: |
-  Filter-value specifies which values can be filtered by a query endpoint. This
-  is a union of types. When a value is specified which is not assignable to the
-  field which is being filtered, a 400 error will be returned.
+  The value to filter by in a query endpoint. It is a union of types. A value
+  that is not assignable to the field being filtered returns a 400 error.
 oneOf:
   - type: string
   - type: number

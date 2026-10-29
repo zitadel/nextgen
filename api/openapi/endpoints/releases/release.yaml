@@ -3,7 +3,7 @@ description: |
   An immutable, project-scoped snapshot that pins one revision of every
   resource it includes.
 
-  A release owns pointers and metadata, not content — it records *which*
+  A release owns pointers and metadata, not content: it records *which*
   revisions belong together. Callers that need the resource bytes resolve each
   `revision_id` through the per-kind read endpoints (`GET /schemas/{id}`,
   `GET /flow_definitions/{id}`, …).
@@ -11,9 +11,9 @@ description: |
   A release exists on its own and is not tied to an origin. Deploying it is a
   separate call.
 
-  Two identifiers: `id` is the one paths and `release_id` fields take;
-  `content_hash` is the digest of the content the release pins, printed by
-  the CLI and pinned by builds, and looked up through fields that name it.
+  A release has two identifiers. `id` is the one paths and `release_id` fields
+  take. `content_hash` is the digest of the content the release pins. The CLI
+  prints it, builds pin it, and fields that name it look the release up.
 type: object
 required:
   - id
@@ -25,7 +25,7 @@ required:
 properties:
   id:
     readOnly: true
-    description: The opaque, immutable resource id, assigned at construction.
+    description: The opaque, immutable resource ID, assigned at creation.
     $ref: ../../components/schemas/release-id.yaml
   project_id:
     readOnly: true
@@ -46,8 +46,8 @@ properties:
       When the release was revoked, or null while it is not. A revoked
       release cannot be deployed and is refused on every path that would
       serve it, including to a build that pins its digest. No origin serves
-      a revoked release, since a release an origin still serves cannot be
-      revoked; earlier deployments that named it stay in the history.
+      a revoked release, because a release an origin still serves cannot be
+      revoked. Earlier deployments that named it stay in the history.
     oneOf:
       - type: string
         format: date-time
@@ -60,7 +60,7 @@ properties:
     maxItems: 50
     description: |
       The revisions this release pins, one entry per `(kind, handle)`. Never
-      empty: a release must contain at least one resource, and never longer
+      empty, because a release must contain at least one resource. Never longer
       than the set `POST /releases` accepts.
     items:
       $ref: release-pointer.yaml

@@ -2,7 +2,7 @@ get:
   operationId: listUserIdentityLinks
   summary: List the provider accounts linked to a user
   description: |
-    The identity provider accounts a sign-in linked to the user, oldest first.
+    Lists the identity provider accounts linked to a user, oldest first.
     The provider's subject and claims are never returned.
   tags:
     - Users
@@ -16,13 +16,13 @@ get:
     - nextgenSession: []
   responses:
     '200':
-      description: The identity links of a user are returned
+      description: The identity links of the user, oldest first.
       content:
         application/json:
           schema:
             $ref: list-user-identity-links-response.yaml
     '400':
-      description: The provided input was not valid
+      description: The provided input was not valid.
       content:
         application/json:
           schema:
@@ -40,7 +40,7 @@ get:
           schema:
             $ref: ../../../../components/error-details.yaml
     '404':
-      description: No user was found for the provided user ID
+      description: No user was found for the provided user ID.
       content:
         application/json:
           schema:

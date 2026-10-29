@@ -55,15 +55,15 @@ not:
                     - { required: [purpose], properties: { purpose: { type: string } } }
                     - { required: [action], properties: { action: { type: string } } }
 description: |
-  A step in a flow definition. This is the admin-authored configuration,
-  not the runtime payload sent to the frontend.
+  A step in a flow definition. This is the configuration an administrator
+  writes, not the runtime payload sent to the frontend.
 
-  Steps are schema-driven: `fields` references properties from the flow's
-  user schema, and the engine resolves field metadata (type, validation,
+  Steps are driven by the user schema: `fields` references properties from the
+  flow's user schema, and the server resolves field metadata (type, validation,
   implicit outcomes) from schema annotations at runtime.
 
   A step with only `complete` set is a terminal step. All other steps are
-  rendered to the frontend as capability payloads.
+  rendered to the frontend with their fields, actions and gates.
 properties:
   name:
     type: string
@@ -77,9 +77,9 @@ properties:
     type: array
     description: |
       Schema property names to collect from the user. Each entry references
-      a property in the flow's user schema. The engine resolves field type,
+      a property in the flow's user schema. The server resolves field type,
       validation rules, and implicit outcomes from schema annotations
-      (e.g. a property with `x-unique` set implies a `user_not_found`
+      (for example, a property with `x-unique` set implies a `user_not_found`
       transition outcome).
     items:
       type: string
@@ -91,7 +91,7 @@ properties:
     type: array
     description: |
       Ordered list of actions the user can take. The action name is what the
-      frontend sends back in the submit request. If omitted, the engine
+      frontend sends back in the submit request. If omitted, the server
       provides a default `submit` action.
     items:
       $ref: step-action.yaml
@@ -107,8 +107,8 @@ properties:
     type: object
     description: |
       Security gates that must be satisfied before submission. Keyed by gate
-      name. Each gate selects a kind (e.g. "captcha") and provider-specific
-      configuration. The engine may also inject gates dynamically based on
+      name. Each gate selects a kind (for example "captcha") and provider-specific
+      configuration. The server may also add gates dynamically based on
       policy.
     additionalProperties:
       $ref: gate.yaml
@@ -121,12 +121,12 @@ properties:
   sso_providers:
     type: array
     description: |
-      Slugs of the identity provider connections this step offers, in display
-      order. Each names the `slug` of a connection under `.zitadel/idps/`; the
-      connection carries the display name and template, so a rename there
-      reaches every step without editing the flow. The rendered step the client
-      receives carries the resolved `{id, name, template}` objects instead. A
-      step offers at most 20 providers.
+      Slugs of the identity providers this step offers, in display order. Each
+      names the `slug` of a connection document under `.zitadel/idps/`. That
+      document carries the display name and template, so a rename there reaches
+      every step without editing the flow. The rendered step the client receives
+      carries the resolved `{id, name, template}` objects instead. A step offers at
+      most 20 providers.
     uniqueItems: true
     maxItems: 20
     items:
@@ -143,11 +143,11 @@ properties:
       Server-side mutation to execute when this step completes successfully.
       Runs after field validation passes, before the transition fires.
 
-      - create_user: creates the user record (registration flows)
-      - create_user_with_sso: creates the user record from the identity an
+      - `create_user`: creates the user record (registration flows).
+      - `create_user_with_sso`: creates the user record from the identity an
         external provider returned and the values the step collected, and
         links it to that identity. A unique value another user holds binds
-        that user and routes user_already_exists instead.
+        that user and routes `user_already_exists` instead.
     example: create_user
 
   complete:
@@ -156,18 +156,18 @@ properties:
     example: redirect
     description: |
       Marks this as a terminal step. Tells the frontend what to do:
-      - redirect: navigate to redirect_uri (OIDC/SAML callback done)
-      - show: render as a success/info screen
+      - `redirect`: navigate to `redirect_uri` (OIDC/SAML callback done).
+      - `show`: render as a success or info screen.
 
   transitions:
     type: object
     description: |
-      Maps action/outcome names to their transition descriptor.
+      Maps action and outcome names to their transition descriptor.
 
       Keys match action names from the `actions` array. Additional keys
       come from implicit outcomes based on schema annotations
-      (e.g. `user_not_found` from `x-unique` fields) and engine
-      events (e.g. `sso_authenticated`, `sso_user_not_found`).
+      (for example `user_not_found` from `x-unique` fields) and server
+      events (for example `sso_authenticated`, `sso_user_not_found`).
     additionalProperties:
       type: object
       required: [target]
@@ -186,10 +186,10 @@ properties:
           description: |
             How to interpret `target`:
             - null (omitted): transition to a step in the current flow.
-            - switch: replace the current flow with the target flow.
-              No return — the current flow is discarded.
+            - `switch`: replace the current flow with the target flow.
+              No return: the current flow is discarded.
               Example: login ↔ register.
-            - pivot: push the target flow onto the stack. The current flow
+            - `pivot`: push the target flow onto the stack. The current flow
               is paused and resumes when the target flow completes (auto-pop).
               Example: login → recovery → back to login.
         purpose:
@@ -198,13 +198,12 @@ properties:
               enum: [login, register, recovery, profiling, reauth, link_account]
             - type: 'null'
           description: |
-            Local re-purposing. When set, taking this transition changes the
-            flow's current purpose to this value — the dispatch mode a step's
-            challenges run under — while the flow's original purpose stays
-            pinned. Must be a purpose this definition serves, and `target`
-            must be that purpose's entry step. Mutually exclusive with
-            `action`: a transition either re-purposes within this flow or
-            targets another flow, never both.
+            Changes the purpose within this flow. When set, taking this transition
+            changes the flow's current purpose to this value, which decides how the
+            step's challenges run. The flow's original purpose stays pinned. Must be a
+            purpose this definition serves, and `target` must be that purpose's entry
+            step. Mutually exclusive with `action`: a transition either changes the
+            purpose within this flow or targets another flow, never both.
             Example: a "Sign up" navigation on the login identifier step
             (`{ target: register, purpose: register }`).
       additionalProperties: false

@@ -1,19 +1,20 @@
 title: TeamLocator
+# Maintainer note moved here from the description: "rejected by `additionalProperties: false` as `req.invalid` before the handler runs".
 description: |
-  Name a team with exactly one of `team_id` or `name`. Sending both
-  or neither is `grant.invalid`. Unknown properties are rejected by
-  `additionalProperties: false` as `req.invalid` before the handler runs.
+  Names a team with exactly one of `team_id` or `name`. Sending both or neither
+  is `grant.invalid`. Unknown properties are rejected as `req.invalid`, before
+  the request is processed.
 type: object
 additionalProperties: false
 properties:
   team_id:
     $ref: ../../components/schemas/team-id.yaml
     description: |
-      Platform-homed team id (`team_<opaque>`). The team must be active.
+      The ID of a platform-homed team (`team_<opaque>`). The team must be active.
   name:
     type: string
     minLength: 1
     description: |
-      Team name, unique per project case-insensitively. Looked up in
+      The team name, unique per project case-insensitively. It is looked up in
       the platform project. The team must be active.
     example: Acme AI Admins

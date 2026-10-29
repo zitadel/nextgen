@@ -1,8 +1,8 @@
 title: IdpIdentityLinkCreatedPayload
 type: object
 description: |
-  Snapshot for `idp.identity_link.created`, written when a sign-in creates a
-  user and links the provider account to it. The link id is the event's
+  A snapshot for `idp.identity_link.created`, written when a sign-in creates a
+  user and links the provider account to it. The link ID is the event's
   `entity_id`. The provider's subject and claims are never included.
 required:
   - connection_id
@@ -10,7 +10,7 @@ required:
 properties:
   connection_id:
     type: string
-    description: The IdP connection the account signed in through.
+    description: The identity provider (IdP) connection the account signed in through.
   user_id:
     type: string
     description: The user the provider account is linked to.

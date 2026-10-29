@@ -3,21 +3,21 @@ type: object
 required: [ name, status, user_schema, purposes, steps ]
 description: |
   A flow definition is the server-side configuration that describes a complete
-  authentication or identity flow. It is NOT sent to the frontend — the flow
-  engine evaluates it and produces FlowResponse payloads (steps with capability
-  dictionaries) for the client.
+  authentication or identity flow. It is NOT sent to the frontend. The server
+  evaluates it and produces FlowResponse payloads (steps with their fields,
+  actions and gates) for the client.
 
-  Flow definitions are created by administrators and stored in the project/team
-  configuration hierarchy. The engine selects the matching definition based on
-  the purpose + audience when a flow is created via POST /flow.
+  Administrators create flow definitions, which are stored in the project and
+  team configuration hierarchy. The server selects the matching definition by
+  purpose and audience when a flow is created with `POST /flow`.
 additionalProperties: false
 properties:
   "$schema":
     type: string
     description: |
       Editor affordance: path or URL of this file's JSON meta-schema, so an
-      editor validates and autocompletes it. The CLI strips it before upload;
-      the platform ignores it.
+      editor validates and autocompletes it. The CLI strips it before upload.
+      The platform ignores it.
   name:
     type: string
     pattern: '^[a-z][a-z0-9-]*$'
@@ -25,10 +25,10 @@ properties:
     description: |
       Stable identifier for this flow, used as the target of cross-flow
       `switch` and `pivot` transitions. Every revision of a flow shares its
-      `name`; publishing a definition under an existing `name` adds a
-      revision to that flow. Renaming is not supported — the `name` is part
-      of the public contract another definition may reference. Acts as the
-      human display label as well; no separate slug.
+      `name`. Publishing a definition under an existing `name` adds a
+      revision to that flow. Renaming is not supported, because the `name` is part
+      of the public contract another definition may reference. It is also the
+      display label: there is no separate slug.
 
   status:
     $ref: flow-definition-status.yaml
@@ -38,12 +38,12 @@ properties:
     description: |
       The user schema this flow operates on, named by its `objectType`. The
       flow runs against the project's newest revision of that schema, so
-      publishing a schema revision needs no change to the flow. A schema id
+      publishing a schema revision needs no change to the flow. A schema ID
       as returned by `POST /schemas` is also accepted and is stored as that
-      schema's `objectType`; reading the definition back returns the
+      schema's `objectType`. Reading the definition back returns the
       `objectType`. A value naming no schema of the project is refused with
       `flowdef.invalid`. Step `fields` reference properties defined in the
-      resolved schema; the engine resolves field types, validation, and
+      resolved schema. The server resolves field types, validation, and
       implicit outcomes from schema annotations at runtime.
     example: human-user
 
@@ -52,7 +52,7 @@ properties:
     description: |
       Maps each purpose this definition handles to its entry-point step.
       Keys are purpose names; values must match a `name` in `steps`. A
-      definition can serve multiple purposes (e.g. a combined login/register
+      definition can serve multiple purposes (for example a combined login/register
       flow) by listing one entry per purpose.
     minProperties: 1
     propertyNames:
@@ -74,8 +74,8 @@ properties:
       $ref: flow-definition-step.yaml
     minItems: 1
     description: |
-      Ordered list of steps in this flow. The order is for human readability —
-      actual step sequencing is determined by transitions.
+      Ordered list of steps in this flow. The order is for readability:
+      transitions determine the actual sequence.
     example:
       - name: identify
         fields: [ email ]

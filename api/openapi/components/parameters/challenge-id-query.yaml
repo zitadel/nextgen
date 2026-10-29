@@ -2,7 +2,7 @@ name: challenge_id
 in: query
 required: true
 description: |
-  The challenge minted by the matching claim init, as the claim URL carries
+  The challenge created by the matching claim init, as the claim URL carries
   it.
 schema:
   $ref: '../schemas/challenge-id.yaml'

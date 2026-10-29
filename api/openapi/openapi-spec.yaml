@@ -20,37 +20,47 @@ servers:
 
 tags:
   - name: System
-    description: Health, liveness, and readiness endpoints.
+    description: |
+      Health, liveness and readiness endpoints. They report whether the server is running and ready to take requests.
   - name: Flows
-    description: Runtime flow orchestration endpoints for login, registration, and recovery screens.
+    description: |
+      Runtime flows for sign-in, registration and recovery. A flow takes a user through the screens of a flow definition, one step at a time.
   - name: Flow Definitions
-    description: Flow definition templates that describe user journeys.
+    description: |
+      Templates that describe user journeys, such as sign-in and registration. Runtime flows follow a definition. Create and read definitions here.
   - name: Authentication Attempts
-    description: Authentication attempt state machine, challenges, verification, and handoff endpoints.
+    description: |
+      One authentication round for a user, which lives for 15 minutes. Issue challenges for authentication factors, verify proofs, and complete the attempt into a handoff token.
   - name: Sessions
-    description: Session creation, lookup, exchange, and teardown endpoints.
+    description: |
+      A user's runtime state, anonymous or signed in. Create anonymous sessions, read and query sessions, exchange a handoff token for a session, and revoke sessions.
   - name: Projects
-    description: Project management endpoints.
+    description: |
+      A project is the top-level boundary that holds users, sessions and their sign-in configuration. Create and update projects, manage their origins, claim a project for a team, and list who administers it.
   - name: Teams
-    description: Team management endpoints.
+    description: |
+      Teams are groups of people that own projects and give their members access to them. Create, read, update, query and delete the teams of a project.
   - name: Users
-    description: User creation, lookup, current-user, and password endpoints.
+    description: |
+      The identities of a project, such as people or service accounts. Create and look up users, read the current user, and set passwords.
   - name: Schemas
-    description: User schema creation and lookup endpoints.
+    description: |
+      User schemas, which define the attributes of a user and which attribute identifies it. Create and look up schemas.
   - name: Branding
-    description: Branding revision publication and lookup endpoints for the login UI (layout, asset URLs, Liquid template).
+    description: |
+      The look of the login UI: its layout, asset URLs and a Liquid template. Publish a branding revision and read revisions back.
   - name: Identity Providers
     description: |
-      External login providers a project offers, each published as a
-      revisioned connection document and referenced by its slug from user
-      schemas and flow definitions. Create-or-revise, query, read by id, and
-      revision reads. A slug resolves through the query.
+      The external identity providers (IdPs) a project offers for sign-in. Each is
+      published as a revisioned connection document and referenced by its slug from
+      user schemas and flow definitions. Create or revise, query, read by ID, and
+      read revisions. A slug resolves through the query.
   - name: Policies
+    # Maintainer note moved here from the description: "Operation policies (ADR 066)".
     description: |
-      Operation policies (ADR 066): a project publishes, per guarded
-      operation, the settings that operation is checked against, such as a
-      password policy's minimum length. Every publish is an immutable
-      revision.
+      Policies are the settings a project publishes for each guarded operation, such
+      as the minimum length of a password. The operation is checked against them.
+      Every publish is an immutable revision.
   - name: Releases
     description: |
       A release is a snapshot of a project's configuration: one revision of
@@ -59,7 +69,7 @@ tags:
       each resource's own endpoints.
 
       Create a release from the files in your `.zitadel/` directory, or from
-      revision ids you already have. Creating a release doesn't deploy it,
+      revision IDs you already have. Creating a release doesn't deploy it,
       and you can deploy the same release to any number of origins.
 
       Every release carries a digest of its content, so you can check
@@ -70,37 +80,41 @@ tags:
       it.
   - name: Deployments
     description: |
-      A deployment makes one release live on one or more targets — the
-      project's primary origins, or preview URLs — and freezes the variable
-      values those targets use.
+      A deployment makes one release live on one or more targets: the project's
+      primary origins or its preview URLs. It also freezes the variable values those
+      targets use.
 
       Deployments form an append-only history of what ran where, and when. A
-      rollback is another deployment: it re-deploys an earlier one with the
+      rollback is another deployment. It re-deploys an earlier one with the
       variable values it froze, and the deployments in between stay in the
       history.
   - name: Previews
     description: |
-      Preview URLs that are live. A deployment to a URL matching one of the
-      project's preview patterns creates or renews its preview; list them
-      here and remove one before it expires.
+      The live preview URLs of a project. A deployment to a URL that matches one of
+      the project's preview patterns creates or renews its preview. List previews
+      here, and remove one before it expires.
   - name: Grants
+    # Maintainer note moved here from the description: "role-change PATCH is a follow-up".
     description: |
-      Collaboration grants that bind a user or team to project.viewer,
-      project.editor, or project.admin. Create, get, query, and revoke;
-      role-change PATCH is a follow-up.
+      Collaboration grants that bind a user or a team to `project.viewer`,
+      `project.editor` or `project.admin`. Create, get, query and revoke grants.
   - name: Events
+    # Maintainer notes moved here from the description: "(ADR 049)" after "Project-scoped
+    # audit event list and get", and "with typed payloads per
+    # docs/design/api/events-catalog.md".
     description: |
-      Project-scoped audit event list and get (ADR 049). Unified surface for
-      identity, session, admin, and entity events; filter by `category` /
-      `event_type`. Response items are a discriminated Event union on
-      `event_type` with typed payloads per docs/design/api/events-catalog.md.
+      The audit events of a project, as one list of identity, session, admin and
+      entity events. List and get events, and filter by `category` or `event_type`.
+      Each item is one of several event types, told apart by `event_type`, and has a
+      typed payload for that type.
   - name: Event Webhooks
+    # Maintainer note moved here from the description: "(ADR 049)" after "as it stores them".
     description: |
-      Events the server POSTs to a webhook sink as it stores them (ADR 049),
-      one event per request and, within a project, in the order they were
-      stored. The body is the event as `GET /events` returns it; `event_type`
-      tells the webhooks apart. Delivery is at least once, so drop duplicates
-      by `id`. The sink is set in the server's configuration, under
+      Events the server POSTs to a webhook sink, which is the receiving endpoint, as
+      it stores them. It sends one event per request and, within a project, in the
+      order they were stored. The body is the event as `GET /events` returns it, and
+      `event_type` tells the webhooks apart. Delivery is at least once, so drop
+      duplicates by `id`. The sink is set in the server's configuration, under
       `events.export`.
   - name: Variables
     description: |
@@ -110,7 +124,7 @@ tags:
       between kinds.
 
       Secrets are the same resource with the value stored encrypted: same
-      names, same references, same endpoints. They are write-only — a read says
+      names, same references, same endpoints. They are write-only. A read says
       that a secret is held, never what it is.
 
 paths:

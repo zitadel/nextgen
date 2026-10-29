@@ -3,29 +3,31 @@ additionalProperties: false
 required: [kind, provider]
 description: |
   A security challenge that must be satisfied before this step's submission
-  is accepted. The engine may also inject gates at runtime based on policy
+  is accepted. The server may also add gates at runtime based on policy
   or risk evaluation.
 properties:
   kind:
     type: string
     enum: [captcha]
     example: captcha
+    # Authenticator ceremonies (e.g. passkey) are modelled as credential auth_attempts via
+    # `x-credential` on a field, not as gates.
     description: |
       The gate category. Only `captcha` is currently defined. Authenticator
-      ceremonies (e.g. passkey) are modelled as credential auth_attempts via
-      `x-credential` on a field, not as gates.
+      ceremonies (for example passkey) are modeled with `x-credential` on a
+      field, not as gates.
   provider:
     type: string
     description: |
-      Provider identifier within the gate kind — e.g. `altcha`, `turnstile`,
-      `hcaptcha`. The engine looks up an implementation in its provider
+      Provider identifier within the gate kind, for example `altcha`, `turnstile`
+      or `hcaptcha`. The server looks up an implementation in its provider
       registry.
     example: altcha
   config:
     type: object
     description: |
       Provider-specific configuration consumed by the implementation when
-      issuing the per-render challenge. Opaque to the engine.
+      issuing the per-render challenge. Opaque to the server.
     additionalProperties: true
     example:
       site_key: "0x4AAAAAAA-example-site-key"

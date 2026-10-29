@@ -1,9 +1,10 @@
 title: GrantUser
+# Maintainer note moved here from the description: "(ADR 059 grant exception)" after "with or without expand".
 description: |
-  User bound by this grant. Always a user-ref (`user_id`, never `id`).
-  `expand: ["principal"]` adds the User envelope fields `schema`,
-  `attributes`, and `metadata` on this same object. Missing users degrade to
-  `user_id` only, with or without expand (ADR 059 grant exception).
+  The user bound by this grant. Always a user-ref (`user_id`, never `id`).
+  `expand: ["principal"]` adds the user envelope fields `schema`, `attributes`
+  and `metadata` on this same object. Missing users degrade to `user_id` only,
+  with or without expand.
 allOf:
   - $ref: ../../components/schemas/user-ref.yaml
   - type: object

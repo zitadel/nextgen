@@ -1,7 +1,7 @@
 name: id
 in: path
 required: true
-description: Managed event id (`evt_<opaque>`).
+description: The ID of the managed event (`evt_<opaque>`).
 schema:
   type: string
 example: evt_01HZYABCDEFGHJKMNPQRSTVWXY

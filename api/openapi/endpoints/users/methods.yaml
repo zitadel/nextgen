@@ -1,11 +1,11 @@
 post:
   operationId: createUser
   x-zitadel-cli: users create
-  summary: Create user
+  summary: Create a user
   description: |
     Creates a user whose attributes satisfy the user schema the request names.
 
-    The server assigns the user's id. With `team_id`, the user also becomes an
+    The server assigns the user's ID. With `team_id`, the user also becomes an
     active member of that team. A value the schema marks unique that another
     user already holds is refused with `409`.
   tags:
@@ -21,6 +21,7 @@ post:
     # membership, and saying so is the whole point of spelling it out locally.
     - name: team_id
       in: query
+      # See ADR 024.
       description: |
         Adds the new user to this team: creating the user also creates an
         active membership in it. Omit it to create a user with no memberships.
@@ -29,7 +30,6 @@ post:
         who may deprovision the user, and the created user stays self-owned
         either way. The owning team is reported on reads as
         `metadata.lifecycle_owner_team_id` and cannot be set through this API.
-        See ADR 024.
 
         The team also scopes team-unique attributes for this create: an
         attribute the schema marks unique per team is checked against this
@@ -44,7 +44,7 @@ post:
           $ref: create-user-request.yaml
   responses:
     '201':
-      description: The user was created successfully
+      description: The created user.
       content:
         application/json:
           schema:
@@ -76,9 +76,9 @@ post:
             $ref: ../../components/error-details.yaml
     '409':
       description: |
-        A user already exists with one of the unique values. E.g.: when the
-        schema indicates that the email field should be unique across the team,
-        only one user can have a given `email` attribute.
+        Another user already holds one of the unique values. For example, when
+        the schema marks the email field as unique across the team, only one
+        user can have a given `email` attribute.
 
         `details.details.fields` names the attributes whose value is taken in
         the same dotted form as a `400`, such as `attributes.email`. The user
@@ -94,7 +94,7 @@ post:
 
         One case is recoverable: the user was created but the server could not
         read it back to answer with. The body then carries the created user's
-        id in `details.user_id`. Fetch that user by id — repeating the create
+        id in `details.user_id`. Fetch that user by ID. Repeating the create
         would conflict with the one that already exists.
       content:
         application/json:

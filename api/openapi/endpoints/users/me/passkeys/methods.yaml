@@ -2,8 +2,8 @@ get:
   operationId: listMyPasskeys
   summary: List my passkeys
   description: |
-    The signed-in user's own passkeys, newest first, paginated with a cursor.
-    Each passkey carries its id, its name and when it was registered, never the
+    Lists the signed-in user's own passkeys, newest first, in pages. Each
+    passkey carries its ID, its name and when it was registered, never the
     credential itself.
 
     With `project_id`, the passkeys are listed only when the session belongs to

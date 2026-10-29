@@ -1,13 +1,18 @@
 get:
   operationId: getEvent
   x-zitadel-cli: events get
-  summary: Get event by ID
+  summary: Get an event by ID
+  # Maintainer note, moved verbatim from the description:
+  # Events are not registered in `resource_scope_index`; project scope is
+  # required on the query (ADR 049).
   description: |
-    Loads a single event by `(project_id, id)`. Requires `events.read`.
-    Events are not registered in `resource_scope_index`; project scope is
-    required on the query (ADR 049). Misses and cross-project ids return 404.
+    Returns one event of a project, found by its ID. Requires `events.read`.
 
-    Pre-claim projects return 404 (stored events stay invisible until claim).
+    The query must name the project. An event that does not exist, or that
+    belongs to another project, returns 404.
+
+    Until a project is claimed, its stored events stay hidden and the request
+    returns 404.
   tags:
     - Events
   security:
@@ -18,7 +23,7 @@ get:
     - $ref: ../../../components/parameters/project-id.yaml
   responses:
     '200':
-      description: The event was retrieved successfully.
+      description: The event.
       content:
         application/json:
           schema:
@@ -36,7 +41,7 @@ get:
           schema:
             $ref: ../../../components/error-details.yaml
     '404':
-      description: No event was found for the given project and id (or the project is pre-claim).
+      description: No event was found for the given project and ID, or the project is not yet claimed.
       content:
         application/json:
           schema:

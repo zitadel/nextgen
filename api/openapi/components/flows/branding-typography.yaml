@@ -2,9 +2,10 @@ type: object
 additionalProperties: false
 dependentRequired:
   font_url: [font_family]
+# One face covers both body and headings; separate heading and mono faces are not modelled yet.
 description: |
   The typeface the login surface renders in. One face covers both body and
-  headings; separate heading and mono faces are not modelled yet.
+  headings.
 properties:
   font_family:
     type: string
@@ -17,7 +18,7 @@ properties:
 
       Comma-separated family names, each either an identifier (`Inter`,
       `ui-sans-serif`, `Helvetica Neue`) or a quoted name (`"APK Futural"`).
-      Anything else is rejected — the stack is written into a stylesheet, so
+      Anything else is rejected. The stack is written into a stylesheet, so
       only names are stored, and a quoted name must close the quote it opened.
     example: Inter, ui-sans-serif, sans-serif
   font_url:
@@ -25,10 +26,10 @@ properties:
     format: uri
     maxLength: 2048
     description: |
-      Stylesheet that loads `font_family` — a Google Fonts CSS URL, for
-      example. Must be https; unlike the logo and hero assets there is no
-      loopback carve-out. Rejected without `font_family`, which would name
-      nothing to paint with.
+      Stylesheet that loads `font_family`, for example a Google Fonts CSS URL.
+      Must be https. Unlike the logo and hero URLs, it does not accept http on
+      loopback. Rejected without `font_family`, which would name nothing to paint
+      with.
 
       Loaded only when the login component runs as `variant="page"`, the
       full-page login. In the default `variant="widget"` it is stored but not

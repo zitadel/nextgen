@@ -14,17 +14,17 @@ import (
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
 	// HandleNextgenSession handles nextgenSession security.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
-	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`
-	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
-	// cookie authenticates must come from the same origin — a cross-site browser
-	// request is refused with `403` and code `auth.csrf_invalid`. Every such
-	// request must also send the session's token from `GET /sessions/me/csrf` in the
-	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
-	// project secret
-	// authenticates is not affected.
+	// The `__nextgen_session` cookie, issued when a session is created or a
+	// handoff is exchanged for a new session.
+	// A missing or invalid cookie answers `401` with code `auth.unauthorized` and
+	// the message `Missing or invalid session token.`
+	// A state-changing request that this cookie authenticates must come from the
+	// same origin. A cross-site browser request is refused with `403` and code
+	// `auth.csrf_invalid`. Every such request must also send the session's token
+	// from `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header, or it gets the
+	// same `403`. The exceptions are the `POST …/query` reads, which need no
+	// token. Safe methods (`GET`) are not checked. A request authenticated by a
+	// project secret is not affected.
 	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
 	// HandleOAuth2 handles oauth2 security.
 	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
@@ -429,17 +429,17 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
 	// NextgenSession provides nextgenSession security value.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
-	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
-	// `Missing or invalid session token.`
-	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
-	// cookie authenticates must come from the same origin — a cross-site browser
-	// request is refused with `403` and code `auth.csrf_invalid`. Every such
-	// request must also send the session's token from `GET /sessions/me/csrf` in the
-	// `X-Zitadel-CSRF` header, or it answers the same `403`. The only exceptions are
-	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
-	// project secret
-	// authenticates is not affected.
+	// The `__nextgen_session` cookie, issued when a session is created or a
+	// handoff is exchanged for a new session.
+	// A missing or invalid cookie answers `401` with code `auth.unauthorized` and
+	// the message `Missing or invalid session token.`
+	// A state-changing request that this cookie authenticates must come from the
+	// same origin. A cross-site browser request is refused with `403` and code
+	// `auth.csrf_invalid`. Every such request must also send the session's token
+	// from `GET /sessions/me/csrf` in the `X-Zitadel-CSRF` header, or it gets the
+	// same `403`. The exceptions are the `POST …/query` reads, which need no
+	// token. Safe methods (`GET`) are not checked. A request authenticated by a
+	// project secret is not affected.
 	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
 	// OAuth2 provides oauth2 security value.
 	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)

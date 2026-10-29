@@ -1,5 +1,5 @@
 type: object
-description: The project's releases, newest first.
+description: A page of the project's releases, newest first.
 required:
   - releases
 properties:

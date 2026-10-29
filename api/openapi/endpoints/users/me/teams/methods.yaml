@@ -2,7 +2,7 @@ get:
   operationId: listMyTeams
   summary: List the teams I belong to
   description: |
-    The signed-in user's own team roster, ordered by team name.
+    Lists the teams the signed-in user belongs to, ordered by team name.
 
     With `project_id`, the teams are listed only when the session belongs to
     that project.

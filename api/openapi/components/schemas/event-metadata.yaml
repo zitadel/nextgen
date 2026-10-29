@@ -1,14 +1,20 @@
 type: object
+# Maintainer note moved here from the description: "Path A request.api may set
+# client (ip, user_agent, origin) for SIEM join on request_id. Not a live
+# risk-evaluator input."
 description: |
-  Emit-time metadata, already redacted at write. Path A request.api may
-  set client (ip, user_agent, origin) for SIEM join on request_id. Not a
-  live risk-evaluator input.
+  Metadata recorded when the event was emitted, already redacted when written.
+  On `request.api` events, the `client` object can carry the requester's IP
+  address, user agent and origin. A security information and event management
+  (SIEM) system can join the request's other events to it on `request_id`. It
+  is not an input for live risk evaluation.
 additionalProperties: true
 properties:
   authorization:
+    # Maintainer note moved here from the description: "(ADR 053 §8)" after "event's project".
     description: |
       What authorized the request, when it was not a grant on the event's
-      project (ADR 053 §8). Every event of such a request carries it.
+      project. Every event of such a request carries it.
     type: object
     additionalProperties: false
     required:
@@ -16,25 +22,31 @@ properties:
     properties:
       path:
         type: string
+        # Maintainer note moved here from the description: "(ADR 075)" after "platform operator relation".
         description: |
-          `platform_operator`: the deployment's platform operator relation
-          (ADR 075), which administers every project.
+          `platform_operator`: the deployment's platform operator relation, which
+          administers every project.
         enum:
           - platform_operator
       actor_home_project_id:
         type: string
         description: The project the actor's user belongs to.
   client:
-    description: Observed HTTP requestor context on Path A request.api only.
+    # Original text: "Observed HTTP requestor context on Path A request.api only."
+    description: |
+      The requester's HTTP context. Recorded only on `request.api` events: join
+      the request's other events to it through `request_id`.
     type: object
     additionalProperties: false
     properties:
       ip:
         type: string
-        description: Client IP from the first X-Forwarded-For hop or RemoteAddr.
+        # Original text: "Client IP from the first X-Forwarded-For hop or RemoteAddr."
+        description: |
+          The client IP from the first `X-Forwarded-For` hop, or the remote address of the connection.
       user_agent:
         type: string
-        description: Observed User-Agent header.
+        description: The observed `User-Agent` header.
       origin:
         type: string
-        description: Origin header when present.
+        description: The `Origin` header, when present.

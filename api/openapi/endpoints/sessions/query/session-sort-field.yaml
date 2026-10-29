@@ -1,8 +1,8 @@
 type: string
+# Maintainer note moved here from the description: "the keyset cursor holds the last row's sort values".
 description: |
-  Field to sort sessions by. Only stored columns are sortable: the keyset
-  cursor holds the last row's sort values, so a computed value such as
-  `state` would skip or duplicate rows between pages.
+  Field to sort sessions by. Only stored fields are sortable. A computed value
+  such as `state` would skip or duplicate rows between pages.
 enum:
   - created_at
   - user_id

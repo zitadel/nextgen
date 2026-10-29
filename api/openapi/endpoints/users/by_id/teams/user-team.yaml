@@ -1,12 +1,12 @@
 title: UserTeam
 type: object
 description: |
-  One entry of a user's team roster: a team the user belongs to, with the
-  membership's participation state. The team's `name` travels with the entry, so
-  a page renders without a follow-up `POST /teams/query` per row.
+  A team the user belongs to, with the membership's participation state. The
+  team's `name` is included, so a page renders without a follow-up
+  `POST /teams/query` per row.
 
-  Roster membership is not lifecycle ownership. A user can belong to many teams
-  while still owning their own lifecycle — that single owning team is reported
+  Membership is not lifecycle ownership. A user can belong to many teams
+  while still owning their own lifecycle. That single owning team is reported
   as `metadata.lifecycle_owner_team_id` on the user itself.
 required:
   - id
