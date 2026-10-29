@@ -1171,6 +1171,33 @@ describe("ManagedFilesCheck", () => {
     expect((await check.run(ctxFor(cwd))).status).toBe("pass");
   });
 
+  // A v2 proxy signs users in while the app's packages call the root paths;
+  // once they call /api/v1 (ADR 077) it no longer attaches the project secret.
+  it("warns while the managed proxy knows only the bare exchange, and --fix moves it to both paths", async () => {
+    const cwd = await makeAngularProject();
+    const proxyPath = join(cwd, "proxy.conf.cjs");
+    const v2 = proxyConfTemplate()
+      .replace("/* zitadel:proxy:v3 */", "/* zitadel:proxy:v2 */")
+      .replace(
+        '(pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange")',
+        'pathname === "/sessions/exchange"',
+      );
+    expect(v2).not.toBe(proxyConfTemplate());
+    await writeFile(proxyPath, v2);
+    const check = new ManagedFilesCheck();
+
+    const outcome = await check.run(ctxFor(cwd));
+    expect(outcome.status).toBe("warn");
+    expect(outcome.message).toContain(
+      "unapplied managed config edit(s): proxy.conf.cjs (doctor --fix applies them)",
+    );
+
+    await check.fix(ctxFor(cwd));
+
+    expect(await readFile(proxyPath, "utf8")).toBe(proxyConfTemplate());
+    expect((await check.run(ctxFor(cwd))).status).toBe("pass");
+  });
+
   // The edit leaves a managed proxy it cannot recognize as it is, so that
   // --fix does not fail; the doctor must not read that as applied.
   it("warns that the session-cookie hooks need adding by hand to a managed proxy changed since", async () => {
@@ -1195,13 +1222,14 @@ describe("ManagedFilesCheck", () => {
   it("warns when an unrecognized legacy proxy may still over-forward the project secret", async () => {
     const cwd = await makeAngularProject();
     const proxyPath = join(cwd, "proxy.conf.cjs");
-    const unsafe = (await readFile(proxyPath, "utf8")).replace(
-      `/* zitadel:proxy:v2 */
+    const managed = await readFile(proxyPath, "utf8");
+    const unsafe = managed.replace(
+      `/* zitadel:proxy:v3 */
 function setBearer(proxyReq) {
   const pathname = new URL(proxyReq.path, "http://zitadel.local").pathname;
   if (
     proxyReq.method === "POST" &&
-    pathname === "/sessions/exchange" &&
+    (pathname === "/sessions/exchange" || pathname === "/api/v1/sessions/exchange") &&
     !proxyReq.getHeader("authorization")
   ) {
     proxyReq.setHeader("authorization", bearer);
@@ -1212,6 +1240,7 @@ function setBearer(proxyReq) {
     .setHeader("authorization", bearer);
 }`,
     );
+    expect(unsafe).not.toBe(managed);
     await writeFile(proxyPath, unsafe);
 
     const outcome = await new ManagedFilesCheck().run(ctxFor(cwd));

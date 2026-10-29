@@ -220,6 +220,10 @@ describe("requiresProjectSecret", () => {
     expect(requiresProjectSecret("POST", "/sessions/exchange")).toBe(true);
   });
 
+  it("allows the secret on the handoff exchange under the API prefix", () => {
+    expect(requiresProjectSecret("POST", "/api/v1/sessions/exchange")).toBe(true);
+  });
+
   it("matches the method case-insensitively", () => {
     expect(requiresProjectSecret("post", "/sessions/exchange")).toBe(true);
   });
@@ -232,6 +236,13 @@ describe("requiresProjectSecret", () => {
     ["POST", "/sessions/exchange/"],
     ["POST", "/sessions/exchangex"],
     ["POST", "/sessions"],
+    ["GET", "/api/v1/sessions/exchange"],
+    ["POST", "/api/v1"],
+    ["POST", "/api/v1/"],
+    ["POST", "/api/v1x/sessions/exchange"],
+    ["POST", "/api/sessions/exchange"],
+    ["POST", "/api/v1/api/v1/sessions/exchange"],
+    ["POST", "/v1/sessions/exchange"],
   ])("withholds the secret from %s %s", (method, pathname) => {
     expect(requiresProjectSecret(method, pathname)).toBe(false);
   });
@@ -634,18 +645,39 @@ describe("proxySessionCookies", () => {
   describe("a session kept under the server's name", () => {
     const PROBE = { method: "GET", path: "/sessions/me", search: `?project_id=${PROJECT}` };
 
-    it("goes up to the session probe of this project", () => {
+    it.each(["/sessions/me", "/api/v1/sessions/me"])(
+      "goes up to the session probe of this project at %s",
+      (path) => {
+        const cookies = proxySessionCookies(
+          proxied({ ...PROBE, path, cookie: "__nextgen_session=old" }),
+          PROJECT,
+          UPSTREAM,
+        );
+
+        expect(cookies.upstreamCookie).toBe("__nextgen_session=old");
+      },
+    );
+
+    it("is copied to the project's cookie when the probe under the API prefix signs its user in", async () => {
       const cookies = proxySessionCookies(
-        proxied({ ...PROBE, cookie: "__nextgen_session=old" }),
+        proxied({ ...PROBE, path: "/api/v1/sessions/me", cookie: "__nextgen_session=old" }),
         PROJECT,
         UPSTREAM,
       );
 
-      expect(cookies.upstreamCookie).toBe("__nextgen_session=old");
+      const { setCookies } = await cookies.toBrowser(
+        answer(200, { project_id: PROJECT, user_id: "u1" }),
+      );
+
+      expect(setCookies).toEqual([`${OWN}=old; Path=/; HttpOnly; SameSite=Lax`]);
     });
 
     it.each([
       ["DELETE /sessions/me", { method: "DELETE", path: "/sessions/me", search: PROBE.search }],
+      [
+        "DELETE /api/v1/sessions/me",
+        { method: "DELETE", path: "/api/v1/sessions/me", search: PROBE.search },
+      ],
       ["the probe without a project", { method: "GET", path: "/sessions/me", search: "" }],
       [
         "the probe of another project",
@@ -653,6 +685,14 @@ describe("proxySessionCookies", () => {
       ],
       ["GET /sessions/me/csrf", { method: "GET", path: "/sessions/me/csrf", search: "" }],
       ["GET /users/me", { method: "GET", path: "/users/me", search: "" }],
+      [
+        "the probe under a doubled prefix",
+        { method: "GET", path: "/api/v1/api/v1/sessions/me", search: PROBE.search },
+      ],
+      [
+        "the probe under another prefix",
+        { method: "GET", path: "/api/v2/sessions/me", search: PROBE.search },
+      ],
     ])("stays back from %s", (_label, request) => {
       const cookies = proxySessionCookies(
         proxied({ ...request, cookie: "__nextgen_session=old" }),
@@ -885,6 +925,33 @@ describe("proxySessionCookies", () => {
         ["http://auth.test/sessions/me", "DELETE"],
       ]);
     });
+
+    it.each([
+      [
+        "sign-out",
+        { ...SIGN_OUT, path: "/api/v1/sessions/me" },
+        answer(204, null, [CLEARED_SHARED]),
+      ],
+      [
+        "sign-in",
+        { ...SIGN_IN, path: "/api/v1/sessions/exchange" },
+        answer(200, {}, ["__nextgen_session=new; Path=/; HttpOnly"]),
+      ],
+    ])(
+      "clears a second session of this project on %s under the API prefix",
+      async (_label, request, response) => {
+        server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
+        const cookies = proxySessionCookies(
+          proxied({ ...request, cookie: `${OWN}=current; __nextgen_session=earlier` }),
+          PROJECT,
+          UPSTREAM,
+        );
+
+        const { setCookies } = await cookies.toBrowser(response);
+
+        expect(setCookies).toContain(CLEARED_SHARED);
+      },
+    );
 
     it("clears a session of this project on sign-in without ending it", async () => {
       const fetchMock = server(() => Response.json({ project_id: PROJECT, user_id: "earlier" }));
