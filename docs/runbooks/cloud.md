@@ -581,9 +581,9 @@ project and imports the root admin.
 - **Policy violations:** a browser's report of a Content-Security-Policy
   violation is a `WARN` line `content security policy violation` from the
   `server` function, naming the page, the directive and what it blocked.
-  Reports from previews include Vercel's toolbar on the docs' and the
-  website's pages, whose policies do not allow it; first-party code reports
-  nothing.
+  First-party code reports nothing. The docs' and the website's policies
+  allow only the script of Vercel's toolbar, which Vercel builds into their
+  bundles, so a team member who opens the toolbar there reports the rest.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

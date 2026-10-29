@@ -18,12 +18,9 @@ if (!deployment) {
   throw new Error("CLOUD_URL names the deployment to test");
 }
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-// The skip keeps Vercel's toolbar out of a preview's pages, so a policy
-// violation a browser spec sees is the docs' own.
-const bypass: Record<string, string> = {
-  ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
-  "x-vercel-skip-toolbar": "1",
-};
+const bypass: Record<string, string> = bypassSecret
+  ? { "x-vercel-protection-bypass": bypassSecret }
+  : {};
 // GitHub Actions (deployment-checks.yml): annotations on the check that name
 // the failing test and its assertion.
 const onGitHub = !!process.env.GITHUB_RUN_ID;

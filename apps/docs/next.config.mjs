@@ -33,8 +33,10 @@ const enforcedPolicy = [
 // go to, so what a script could carry off.
 const reportOnlyPolicy = [
   "default-src 'self'",
-  // React rebuilds server error stacks with eval in development only.
-  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+  // Vercel builds its toolbar's loader into every deployment's bundle, which
+  // fetches the toolbar from vercel.live. React rebuilds server error stacks
+  // with eval in development only.
+  `script-src 'self' 'unsafe-inline' https://vercel.live${dev ? " 'unsafe-eval'" : ""}`,
   // Code blocks colour their tokens with style attributes (Shiki).
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",

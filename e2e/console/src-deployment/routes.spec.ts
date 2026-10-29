@@ -137,14 +137,14 @@ test("no service's page may be framed", async ({ request }) => {
 });
 
 // The console service's policies are the ones the server sends for the same
-// page (internal/staticui/console holds vercel.json to them): enforced, its
-// scripts from its own origin and its inline one by hash, and a stricter one
-// reported on.
+// page, plus Vercel's toolbar (internal/staticui/console holds vercel.json to
+// them): enforced, its scripts from its own origin and its inline one by hash,
+// and a stricter one reported on.
 test("the console's page carries its policies", async ({ request }) => {
   const response = await request.get("/console/users");
   expect(response.status()).toBe(200);
   const enforced = response.headers()["content-security-policy"];
-  expect(enforced).toMatch(/(^|; )script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'(;|$)/);
+  expect(enforced).toMatch(/(^|; )script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'( [^;]+)?(;|$)/);
   expect(enforced).toContain("frame-ancestors 'none'");
   expect(enforced).toContain("report-uri /csp-report");
   expect(response.headers()["content-security-policy-report-only"]).toContain("default-src 'self'");
