@@ -14,7 +14,7 @@
 | Piece | Where | Shape |
 | --- | --- | --- |
 | The `zitadel` app | `internal/oauth/app.go` | Declared in the server binary: client `cli` (public, first-party, loopback on any port), API `platform` (`aud` = the public base), API `mcp` (`aud` = `<base>/mcp`), and registration through client ID metadata documents (CIMD) and RFC 7591 |
-| Authorization server | `internal/oauth` | Issuer `<base>/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register |
+| Authorization server | `internal/oauth` | Issuer `<base>`, the domain the console shares with the server, with its endpoints under `/oauth/proj_platform`. RFC 8414 and RFC 9728 metadata, JWKS, authorize, consent, token, revoke and register; zitadel/oidc's `op.Server` answers token, revoke and JWKS |
 | Tokens | `internal/oauth/token.go` | JWT access tokens (`typ: at+jwt`, EdDSA) signed with the platform project's existing token signing key, one `aud` each (RFC 8707). Codes and refresh tokens are sealed JWEs whose single-use records sit in `tokens` |
 | User bearer | `internal/api/security.go` | The API takes a platform access token where a console session may act, as the same principal and grants (ADR 053 §5) |
 | `/mcp` | `internal/oauth/mcp.go` | A Streamable HTTP stub: JSON responses, no stream, and a `whoami` tool |
@@ -85,10 +85,10 @@ Postgres and Spanner were not run.
 
 ## What was missing
 
-- **The issuer.** ADR 081 §5 says the server's own origin is never an issuer
+- **The issuer.** ADR 081 §5 said the server's own origin is never an issuer
   and §6 puts the browser endpoints under an app's `/__nextgen` proxy. The
   platform project's login is the console, on the server's origin, so its
-  issuer has to be there. ADR 081 needs a carve-out for it.
+  issuer has to be there. §5 now carves it out (see below).
 - **Login handoff.** ADR 081 §8's `auth_request` through `<zitadel-login>` is
   not built. The `next` route is fragile:
   - it ties the server to the console's mount path, and does not route on the
@@ -193,13 +193,33 @@ went to `attacker.example`.
   until a grant exists. The console list "third parties that registered" can
   only come from grants.
 
-## Follow-ups worth deciding
+## Decided after the POC (2026-10-29)
 
-1. Add a grants table: consent, connected apps, and per-client revocation.
-2. Add a `userBearer` security scheme, with the operations it reaches
-   declared in the spec.
+- **The issuer** is the domain the console is served on. Where the console
+  shares it with the server, as in the cloud and on a self-hosted server,
+  that domain is the platform project's issuer (ADR 081 §5). Its metadata
+  sits at the domain's root, and its endpoints under `/oauth/{project_id}/`
+  (§6).
+- **The library.** zitadel/oidc v3.51.16's `op.Server` answers token,
+  revocation and JWKS. Authorize stays this package's: the library renders
+  the errors `VerifyAuthRequest` returns instead of redirecting them, leaves
+  `iss` (RFC 9207) off its error redirects, and has no `resource`
+  (RFC 8707).
+- **Consent** is transient data stored like sessions: a record with a
+  lifetime that the user lists and revokes (ADR 082 §8), with an audit event
+  for each grant and revoke.
+- **The CLI's credentials.** A secret named for the run, in the environment
+  or `--env-file`, wins; then the developer's login; then the secret setup
+  stored. `--credential project|login` forces one, the envelope names the
+  one used, and nothing falls back to the other after a failure.
+
+## Follow-ups
+
+1. Store consents as decided above: connected apps and per-client
+   revocation.
+2. Add a `projectSecret` security scheme beside `oauth2`, with the
+   operations each reaches declared in the spec.
 3. Choose a scope vocabulary for the management API, or capability consent,
    before the platform API is opened to third parties.
-4. Amend ADR 081 for the platform project's issuer and login, and build
-   §8's `auth_request` handoff to replace the `next` route.
-5. Decide the CLI's credential precedence and `deploy` with a user bearer.
+4. Build ADR 081 §8's `auth_request` handoff to replace the `next` route.
+5. `deploy` with a user bearer.

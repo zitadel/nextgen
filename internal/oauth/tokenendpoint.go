@@ -1,12 +1,17 @@
 package oauth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
@@ -34,91 +39,102 @@ type tokenResponse struct {
 // maxFormSize bounds a back-channel request body.
 const maxFormSize = 64 << 10
 
-// token serves POST /oauth/{project}/token: the code exchange and refresh.
-// Public clients only, so client_id is in the body and PKCE proves it.
-func (s *Server) token(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, maxFormSize)
-	if err := r.ParseForm(); err != nil {
-		writeError(w, http.StatusBadRequest, errInvalidRequest, "The request body is not a form.")
-		return
+// backChannel serves the token, revocation and JWKS endpoints through
+// zitadel/oidc's op.Server: the library routes them, parses their forms and
+// client credentials, and encodes their errors (RFC 6749 §5.2), and this
+// package answers. Authorization stays outside it: the library renders an
+// error its VerifyAuthRequest returns instead of redirecting it, leaves iss
+// (RFC 9207) off the error redirects it builds, and has no resource
+// parameter (RFC 8707).
+type backChannel struct {
+	op.UnimplementedServer
+	s *Server
+}
+
+// newBackChannel is the one handler the back channel's routes share.
+func (s *Server) newBackChannel() http.Handler {
+	ns := s.namespace()
+	handler := op.RegisterServer(backChannel{s: s}, op.Endpoints{
+		Token:      op.NewEndpoint(ns + "/token"),
+		Revocation: op.NewEndpoint(ns + "/revoke"),
+		JwksURI:    op.NewEndpoint(ns + "/jwks"),
+	}, op.WithServerCORSOptions(nil)) // cors answers CORS, without credentials (ADR 081 §6)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxFormSize)
+		handler.ServeHTTP(w, r)
+	})
+}
+
+// VerifyClient finds the client a token or revocation request names. Clients
+// here are public: PKCE proves a code's client, and nothing else
+// authenticates one.
+func (b backChannel) VerifyClient(ctx context.Context, r *op.Request[op.ClientCredentials]) (op.Client, error) {
+	if r.Header.Get("Authorization") != "" || r.Data.ClientSecret != "" || r.Data.ClientAssertion != "" {
+		return nil, invalidClient("Clients here are public: send client_id, not credentials.")
 	}
-	if r.Header.Get("Authorization") != "" {
-		writeError(w, http.StatusUnauthorized, errInvalidClient, "Clients here are public: send client_id, not credentials.")
-		return
+	if err := singleValued(r.Form); err != nil {
+		return nil, err
 	}
-	form := r.PostForm
-	for _, single := range []string{"grant_type", "client_id", "code", "code_verifier", "redirect_uri", "refresh_token"} {
-		if len(form[single]) > 1 {
-			writeError(w, http.StatusBadRequest, errInvalidRequest, single+" is repeated.")
-			return
+	client, err := b.s.resolveClient(ctx, r.Data.ClientID)
+	if errors.Is(err, errUnknownClient) {
+		return nil, invalidClient("The client is not known.")
+	}
+	if err != nil {
+		return nil, serverFault(ctx, err)
+	}
+	return opClient{client: client}, nil
+}
+
+// singleValued refuses a repeated parameter (RFC 6749 §3.1) and a second
+// resource: a token is for one API (RFC 8707 §2).
+func singleValued(form url.Values) error {
+	for _, name := range []string{"grant_type", "client_id", "code", "code_verifier", "redirect_uri", "refresh_token", "scope", "token"} {
+		if len(form[name]) > 1 {
+			return oidc.ErrInvalidRequest().WithDescription("%s is repeated.", name)
 		}
 	}
 	if len(form["resource"]) > 1 {
-		writeError(w, http.StatusBadRequest, errInvalidTarget, "A token is for one API: name one resource.")
-		return
+		return oidc.ErrInvalidTarget().WithDescription("A token is for one API: name one resource.")
 	}
-	switch form.Get("grant_type") {
-	case "authorization_code":
-		s.exchangeCode(w, r)
-	case "refresh_token":
-		s.refresh(w, r)
-	default:
-		writeError(w, http.StatusBadRequest, errUnsupportedGrantType, "Use authorization_code or refresh_token.")
-	}
+	return nil
 }
 
-func (s *Server) exchangeCode(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	form := r.PostForm
+// CodeExchange redeems a code (RFC 6749 §4.1.3). The code is bound to the
+// client and the redirect URI it was issued for, and PKCE to the request
+// that started it.
+func (b backChannel) CodeExchange(ctx context.Context, r *op.ClientRequest[oidc.AccessTokenRequest]) (*op.Response, error) {
+	s := b.s
+	client := clientOf(r.Client)
 	var code codePayload
-	if err := s.unseal(ctx, kindCode, form.Get("code"), &code); err != nil {
+	if err := s.unseal(ctx, kindCode, r.Data.Code, &code); err != nil {
 		if errors.Is(err, errSealed) {
-			writeError(w, http.StatusBadRequest, errInvalidGrant, "The code is not valid or expired.")
-			return
+			return nil, oidc.ErrInvalidGrant().WithDescription("The code is not valid or expired.")
 		}
-		writeServerFault(w, r, err)
-		return
+		return nil, serverFault(ctx, err)
 	}
-	// RFC 6749 §4.1.3: the code is bound to the client and the redirect URI
-	// it was issued for, and PKCE to the request that started it.
+	resource := r.Form.Get("resource")
 	switch {
-	case form.Get("client_id") != code.ClientID:
-		writeError(w, http.StatusBadRequest, errInvalidGrant, "The code was issued to another client.")
-		return
-	case form.Get("redirect_uri") != code.RedirectURI:
-		writeError(w, http.StatusBadRequest, errInvalidGrant, "redirect_uri does not match the authorization request.")
-		return
-	case verifyPKCE(code.CodeChallenge, form.Get("code_verifier")) != nil:
-		writeError(w, http.StatusBadRequest, errInvalidGrant, "code_verifier does not match the code_challenge.")
-		return
-	case form.Get("resource") != "" && form.Get("resource") != code.Resource:
-		writeError(w, http.StatusBadRequest, errInvalidTarget, "The code was issued for another resource.")
-		return
-	}
-	client, err := s.resolveClient(ctx, code.ClientID)
-	if err != nil {
-		if errors.Is(err, errUnknownClient) {
-			writeError(w, http.StatusUnauthorized, errInvalidClient, "The client is not known.")
-			return
-		}
-		writeServerFault(w, r, err)
-		return
+	case client.ID != code.ClientID:
+		return nil, oidc.ErrInvalidGrant().WithDescription("The code was issued to another client.")
+	case r.Data.RedirectURI != code.RedirectURI:
+		return nil, oidc.ErrInvalidGrant().WithDescription("redirect_uri does not match the authorization request.")
+	case verifyPKCE(code.CodeChallenge, r.Data.CodeVerifier) != nil:
+		return nil, oidc.ErrInvalidGrant().WithDescription("code_verifier does not match the code_challenge.")
+	case resource != "" && resource != code.Resource:
+		return nil, oidc.ErrInvalidTarget().WithDescription("The code was issued for another resource.")
 	}
 	if err := s.grants.Redeem(ctx, s.projectID, code.TokenID); err != nil {
-		if errors.Is(err, service.ErrOAuthGrantTokenSpent) {
-			// A code presented twice may have leaked: whatever it issued goes
-			// too (RFC 6749 §4.1.2).
-			if err := s.grants.Revoke(ctx, s.projectID, code.GrantID); err != nil {
-				writeServerFault(w, r, err)
-				return
-			}
-			writeError(w, http.StatusBadRequest, errInvalidGrant, "The code was already used.")
-			return
+		if !errors.Is(err, service.ErrOAuthGrantTokenSpent) {
+			return nil, serverFault(ctx, err)
 		}
-		writeServerFault(w, r, err)
-		return
+		// A code presented twice may have leaked: whatever it issued goes
+		// too (RFC 6749 §4.1.2).
+		if err := s.grants.Revoke(ctx, s.projectID, code.GrantID); err != nil {
+			return nil, serverFault(ctx, err)
+		}
+		return nil, oidc.ErrInvalidGrant().WithDescription("The code was already used.")
 	}
-	s.issueTokens(w, r, client, refreshPayload{
+	return s.issueTokens(ctx, client, refreshPayload{
 		GrantID:  code.GrantID,
 		ClientID: code.ClientID,
 		Resource: code.Resource,
@@ -127,77 +143,92 @@ func (s *Server) exchangeCode(w http.ResponseWriter, r *http.Request) {
 	}, "")
 }
 
-func (s *Server) refresh(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	form := r.PostForm
+// RefreshToken rotates a refresh token (RFC 6749 §6): the next one replaces
+// it, and presenting it again revokes the grant (ADR 037).
+func (b backChannel) RefreshToken(ctx context.Context, r *op.ClientRequest[oidc.RefreshTokenRequest]) (*op.Response, error) {
+	s := b.s
+	client := clientOf(r.Client)
 	var grant refreshPayload
-	if err := s.unseal(ctx, kindRefresh, form.Get("refresh_token"), &grant); err != nil {
+	if err := s.unseal(ctx, kindRefresh, r.Data.RefreshToken, &grant); err != nil {
 		if errors.Is(err, errSealed) {
-			writeError(w, http.StatusBadRequest, errInvalidGrant, "The refresh token is not valid or expired.")
-			return
+			return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid or expired.")
 		}
-		writeServerFault(w, r, err)
-		return
+		return nil, serverFault(ctx, err)
 	}
+	resource := r.Form.Get("resource")
 	switch {
-	case form.Get("client_id") != grant.ClientID:
-		writeError(w, http.StatusBadRequest, errInvalidGrant, "The refresh token was issued to another client.")
-		return
-	case form.Get("resource") != "" && form.Get("resource") != grant.Resource:
-		writeError(w, http.StatusBadRequest, errInvalidTarget, "The refresh token was issued for another resource.")
-		return
+	case client.ID != grant.ClientID:
+		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token was issued to another client.")
+	case resource != "" && resource != grant.Resource:
+		return nil, oidc.ErrInvalidTarget().WithDescription("The refresh token was issued for another resource.")
 	}
-	// A refresh may narrow the scope, never widen it (RFC 6749 §6).
-	if requested := strings.Fields(form.Get("scope")); len(requested) > 0 {
+	// A refresh may narrow the scope, never widen it (RFC 6749 §6). The
+	// library's own split keeps empty entries, so the raw value is read.
+	if requested := strings.Fields(r.Form.Get("scope")); len(requested) > 0 {
 		for _, scope := range requested {
 			if !slices.Contains(grant.Scope, scope) {
-				writeError(w, http.StatusBadRequest, "invalid_scope", "A refresh cannot add the scope "+scope+".")
-				return
+				return nil, oidc.ErrInvalidScope().WithDescription("A refresh cannot add the scope %s.", scope)
 			}
 		}
 		grant.Scope = requested
 	}
-	client, err := s.resolveClient(ctx, grant.ClientID)
-	if err != nil {
-		if errors.Is(err, errUnknownClient) {
-			writeError(w, http.StatusUnauthorized, errInvalidClient, "The client is not known.")
-			return
+	return s.issueTokens(ctx, client, grant, grant.TokenID)
+}
+
+// Revocation serves RFC 7009. A refresh token ends its grant. An access
+// token cannot be revoked: nothing stores it, and it expires in minutes
+// (ADR 037). Either way the answer is 200, so a caller learns nothing about a
+// token it sends.
+func (b backChannel) Revocation(ctx context.Context, r *op.ClientRequest[oidc.RevocationRequest]) (*op.Response, error) {
+	s := b.s
+	var grant refreshPayload
+	if err := s.unseal(ctx, kindRefresh, r.Data.Token, &grant); err != nil {
+		if !errors.Is(err, errSealed) {
+			return nil, serverFault(ctx, err)
 		}
-		writeServerFault(w, r, err)
-		return
+		return op.NewResponse(nil), nil
 	}
-	s.issueTokens(w, r, client, grant, grant.TokenID)
+	// RFC 7009 §2.1: a client revokes only its own tokens.
+	if grant.ClientID == r.Client.GetID() {
+		if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
+			return nil, serverFault(ctx, err)
+		}
+	}
+	return op.NewResponse(nil), nil
+}
+
+// Keys publishes the keys access tokens are signed with.
+func (b backChannel) Keys(ctx context.Context, _ *op.Request[struct{}]) (*op.Response, error) {
+	keys, err := b.s.publicKeys(ctx)
+	if err != nil {
+		return nil, serverFault(ctx, err)
+	}
+	return op.NewResponse(keys), nil
 }
 
 // issueTokens mints the access token for the grant's API and, for a
 // first-party client or a third party that was granted offline_access, the
 // next refresh token: written fresh after a code, rotated from rotateFrom
 // after a refresh.
-func (s *Server) issueTokens(w http.ResponseWriter, r *http.Request, client Client, grant refreshPayload, rotateFrom string) {
-	ctx := r.Context()
+func (s *Server) issueTokens(ctx context.Context, client Client, grant refreshPayload, rotateFrom string) (*op.Response, error) {
 	api, ok := s.app.apiByIdentifier(grant.Resource)
 	if !ok {
 		// The API left the app since the grant began: the grant cannot widen
 		// to another (ADR 081 §10).
-		writeError(w, http.StatusBadRequest, errInvalidTarget, "The resource is no longer served.")
-		return
+		return nil, oidc.ErrInvalidTarget().WithDescription("The resource is no longer served.")
 	}
 	// A user gone from the project ends the grant at its next use.
 	if _, err := s.users.GetMyUser(ctx, service.GetMyUserInput{Self: s.selfOf(grant.UserID)}); err != nil {
-		if errors.Is(err, domain.ErrUserNotFound()) {
-			if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
-				writeServerFault(w, r, err)
-				return
-			}
-			writeError(w, http.StatusBadRequest, errInvalidGrant, "The user no longer exists.")
-			return
+		if !errors.Is(err, domain.ErrUserNotFound()) {
+			return nil, serverFault(ctx, err)
 		}
-		writeServerFault(w, r, err)
-		return
+		if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
+			return nil, serverFault(ctx, err)
+		}
+		return nil, oidc.ErrInvalidGrant().WithDescription("The user no longer exists.")
 	}
-	issueRefresh := client.FirstParty || slices.Contains(grant.Scope, "offline_access")
 	var refreshToken string
-	if issueRefresh {
+	if client.FirstParty || slices.Contains(grant.Scope, "offline_access") {
 		next := service.OAuthGrantToken{
 			ProjectID: s.projectID,
 			GrantID:   grant.GrantID,
@@ -214,69 +245,69 @@ func (s *Server) issueTokens(w http.ResponseWriter, r *http.Request, client Clie
 		} else {
 			tokenID, err = s.grants.Rotate(ctx, s.projectID, rotateFrom, next)
 		}
+		if errors.Is(err, service.ErrOAuthGrantTokenSpent) {
+			return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token was already used; the grant is revoked.")
+		}
 		if err != nil {
-			if errors.Is(err, service.ErrOAuthGrantTokenSpent) {
-				writeError(w, http.StatusBadRequest, errInvalidGrant, "The refresh token was already used; the grant is revoked.")
-				return
-			}
-			writeServerFault(w, r, err)
-			return
+			return nil, serverFault(ctx, err)
 		}
 		grant.TokenID = tokenID
-		refreshToken, err = s.seal(ctx, kindRefresh, grant, s.cfg.RefreshTokenTTL)
-		if err != nil {
-			writeServerFault(w, r, err)
-			return
+		if refreshToken, err = s.seal(ctx, kindRefresh, grant, s.cfg.RefreshTokenTTL); err != nil {
+			return nil, serverFault(ctx, err)
 		}
 	} else if rotateFrom != "" {
 		// A third party without offline_access never got a refresh token.
-		writeError(w, http.StatusBadRequest, errInvalidGrant, "The refresh token is not valid.")
-		return
+		return nil, oidc.ErrInvalidGrant().WithDescription("The refresh token is not valid.")
 	}
 	access, expires, err := s.mintAccessToken(ctx, grant.UserID, client.ID, api, grant.Scope)
 	if err != nil {
-		writeServerFault(w, r, err)
-		return
+		return nil, serverFault(ctx, err)
 	}
-	w.Header().Set("Pragma", "no-cache")
-	writeJSON(w, http.StatusOK, tokenResponse{
+	resp := op.NewResponse(tokenResponse{
 		AccessToken:  access,
 		TokenType:    "Bearer",
 		ExpiresIn:    int64(expires.Sub(s.now()).Round(time.Second) / time.Second),
 		RefreshToken: refreshToken,
 		Scope:        strings.Join(grant.Scope, " "),
 	})
+	// RFC 6749 §5.1.
+	resp.Header.Set("Cache-Control", "no-store")
+	resp.Header.Set("Pragma", "no-cache")
+	return resp, nil
 }
 
-// revoke serves POST /oauth/{project}/revoke (RFC 7009). A refresh token
-// ends its grant. An access token cannot be revoked: nothing stores it, and
-// it expires in minutes (ADR 037). Either way the answer is 200, so a caller
-// learns nothing about a token it sends.
-func (s *Server) revoke(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	r.Body = http.MaxBytesReader(w, r.Body, maxFormSize)
-	if err := r.ParseForm(); err != nil {
-		writeError(w, http.StatusBadRequest, errInvalidRequest, "The request body is not a form.")
-		return
-	}
-	var grant refreshPayload
-	if err := s.unseal(ctx, kindRefresh, r.PostForm.Get("token"), &grant); err != nil {
-		if !errors.Is(err, errSealed) {
-			writeServerFault(w, r, err)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	// RFC 7009 §2.1: a client revokes only its own tokens.
-	if r.PostForm.Get("client_id") == grant.ClientID {
-		if err := s.grants.Revoke(ctx, s.projectID, grant.GrantID); err != nil {
-			writeServerFault(w, r, err)
-			return
-		}
-	}
-	w.WriteHeader(http.StatusOK)
+// opClient is a client as zitadel/oidc reads one: native and public, with
+// the authorization code and refresh grants. This package checks redirect
+// URIs and scopes itself, so the rest answers nothing.
+type opClient struct{ client Client }
+
+// clientOf is the client VerifyClient found.
+func clientOf(c op.Client) Client { return c.(opClient).client }
+
+func (c opClient) GetID() string                     { return c.client.ID }
+func (c opClient) RedirectURIs() []string            { return c.client.RedirectURIs }
+func (opClient) PostLogoutRedirectURIs() []string    { return nil }
+func (opClient) ApplicationType() op.ApplicationType { return op.ApplicationTypeNative }
+func (opClient) AuthMethod() oidc.AuthMethod         { return oidc.AuthMethodNone }
+func (opClient) ResponseTypes() []oidc.ResponseType {
+	return []oidc.ResponseType{oidc.ResponseTypeCode}
 }
+func (opClient) GrantTypes() []oidc.GrantType {
+	return []oidc.GrantType{oidc.GrantTypeCode, oidc.GrantTypeRefreshToken}
+}
+func (opClient) LoginURL(string) string                                   { return "" }
+func (opClient) AccessTokenType() op.AccessTokenType                      { return op.AccessTokenTypeJWT }
+func (opClient) IDTokenLifetime() time.Duration                           { return 0 }
+func (opClient) DevMode() bool                                            { return false }
+func (opClient) RestrictAdditionalIdTokenScopes() func([]string) []string { return keepScopes }
+func (opClient) RestrictAdditionalAccessTokenScopes() func([]string) []string {
+	return keepScopes
+}
+func (opClient) IsScopeAllowed(string) bool           { return false }
+func (opClient) IDTokenUserinfoClaimsAssertion() bool { return false }
+func (opClient) ClockSkew() time.Duration             { return 0 }
+
+func keepScopes(scopes []string) []string { return scopes }
 
 // register serves POST /oauth/{project}/register (RFC 7591): a client joins
 // the app as a third party. Nothing is stored; the client_id seals the

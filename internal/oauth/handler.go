@@ -14,25 +14,27 @@ type Route struct {
 // metadata and /mcp answer. The mux mounts each behind the API's request
 // middleware.
 func (s *Server) Routes() []Route {
-	issuer := s.issuerPath()
+	ns := s.namespace()
 	metadata := cors(http.HandlerFunc(s.serveMetadata))
+	back := cors(s.backChannel)
 	return []Route{
-		// RFC 8414 §3.1 inserts the well-known segment before the issuer's
-		// path; ADR 081 §6 also reserves the appended form under the issuer.
-		{"GET /.well-known/oauth-authorization-server" + issuer, metadata},
-		{"OPTIONS /.well-known/oauth-authorization-server" + issuer, metadata},
-		{"GET " + issuer + "/.well-known/oauth-authorization-server", metadata},
-		{"OPTIONS " + issuer + "/.well-known/oauth-authorization-server", metadata},
-		{"GET " + issuer + "/jwks", cors(http.HandlerFunc(s.serveJWKS))},
-		{"OPTIONS " + issuer + "/jwks", cors(http.HandlerFunc(s.serveJWKS))},
-		{"GET " + issuer + "/authorize", http.HandlerFunc(s.authorize)},
-		{"POST " + issuer + "/consent", http.HandlerFunc(s.consent)},
-		{"POST " + issuer + "/token", cors(http.HandlerFunc(s.token))},
-		{"OPTIONS " + issuer + "/token", cors(http.HandlerFunc(s.token))},
-		{"POST " + issuer + "/revoke", cors(http.HandlerFunc(s.revoke))},
-		{"OPTIONS " + issuer + "/revoke", cors(http.HandlerFunc(s.revoke))},
-		{"POST " + issuer + "/register", cors(http.HandlerFunc(s.serveRegister))},
-		{"OPTIONS " + issuer + "/register", cors(http.HandlerFunc(s.serveRegister))},
+		// The issuer is the domain the console shares with the server, so its
+		// metadata sits at the root (RFC 8414 §3), and also at the path ADR
+		// 081 §6 fixes for a project's.
+		{"GET /.well-known/oauth-authorization-server", metadata},
+		{"OPTIONS /.well-known/oauth-authorization-server", metadata},
+		{"GET " + ns + "/.well-known/oauth-authorization-server", metadata},
+		{"OPTIONS " + ns + "/.well-known/oauth-authorization-server", metadata},
+		{"GET " + ns + "/authorize", http.HandlerFunc(s.authorize)},
+		{"POST " + ns + "/consent", http.HandlerFunc(s.consent)},
+		{"GET " + ns + "/jwks", back},
+		{"OPTIONS " + ns + "/jwks", back},
+		{"POST " + ns + "/token", back},
+		{"OPTIONS " + ns + "/token", back},
+		{"POST " + ns + "/revoke", back},
+		{"OPTIONS " + ns + "/revoke", back},
+		{"POST " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
+		{"OPTIONS " + ns + "/register", cors(http.HandlerFunc(s.serveRegister))},
 		{"GET " + s.consolePath + continuePath, http.HandlerFunc(s.resume)},
 		// RFC 9728 §3.1: the platform API's metadata at the root, the MCP
 		// server's with its path inserted.
@@ -65,13 +67,13 @@ func cors(next http.Handler) http.Handler {
 
 // serveMetadata answers RFC 8414's authorization server metadata.
 func (s *Server) serveMetadata(w http.ResponseWriter, _ *http.Request) {
-	issuer := s.issuer
+	ns := s.namespace()
 	meta := map[string]any{
-		"issuer":                                         issuer,
-		"authorization_endpoint":                         issuer + "/authorize",
-		"token_endpoint":                                 issuer + "/token",
-		"jwks_uri":                                       issuer + "/jwks",
-		"revocation_endpoint":                            issuer + "/revoke",
+		"issuer":                                         s.issuer,
+		"authorization_endpoint":                         s.url(ns + "/authorize"),
+		"token_endpoint":                                 s.url(ns + "/token"),
+		"jwks_uri":                                       s.url(ns + "/jwks"),
+		"revocation_endpoint":                            s.url(ns + "/revoke"),
 		"response_types_supported":                       []string{"code"},
 		"response_modes_supported":                       []string{"query"},
 		"grant_types_supported":                          []string{"authorization_code", "refresh_token"},
@@ -83,19 +85,10 @@ func (s *Server) serveMetadata(w http.ResponseWriter, _ *http.Request) {
 		"client_id_metadata_document_supported":          s.app.Registration.ClientIDMetadataDocuments,
 	}
 	if s.app.Registration.Dynamic {
-		meta["registration_endpoint"] = issuer + "/register"
+		meta["registration_endpoint"] = s.url(ns + "/register")
 	}
 	w.Header().Set("Content-Type", "application/json")
 	writeJSON(w, http.StatusOK, meta)
-}
-
-func (s *Server) serveJWKS(w http.ResponseWriter, r *http.Request) {
-	keys, err := s.publicKeys(r.Context())
-	if err != nil {
-		writeServerFault(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, keys)
 }
 
 func (s *Server) serveRegister(w http.ResponseWriter, r *http.Request) {

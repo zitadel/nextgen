@@ -35,16 +35,19 @@ async function fakeAuthorizationServer(
     const json = (status: number, body: unknown) => {
       response.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(body));
     };
-    const issuer = `${origin}/oauth/proj_platform`;
+    // The issuer is the domain the console shares with the server, and the
+    // endpoints sit under the platform project's namespace.
+    const issuer = origin;
+    const namespace = `${origin}/oauth/proj_platform`;
     switch (url.pathname) {
       case "/.well-known/oauth-protected-resource":
         return json(200, { resource: origin, authorization_servers: [issuer] });
-      case "/.well-known/oauth-authorization-server/oauth/proj_platform":
+      case "/.well-known/oauth-authorization-server":
         return json(200, {
           issuer,
-          authorization_endpoint: `${issuer}/authorize`,
-          token_endpoint: `${issuer}/token`,
-          revocation_endpoint: `${issuer}/revoke`,
+          authorization_endpoint: `${namespace}/authorize`,
+          token_endpoint: `${namespace}/token`,
+          revocation_endpoint: `${namespace}/revoke`,
           code_challenge_methods_supported: ["S256"],
         });
       case "/oauth/proj_platform/authorize": {
@@ -264,7 +267,7 @@ describe("the credentials file", () => {
     const config = await mkdtemp(join(tmpdir(), "zitadel-login-"));
     const env = { XDG_CONFIG_HOME: config };
     const login = {
-      issuer: "https://z.example/oauth/proj_platform",
+      issuer: "https://z.example",
       client_id: "cli",
       resource: "https://z.example",
       token_endpoint: "https://z.example/oauth/proj_platform/token",

@@ -71,6 +71,6 @@ func TestAuthorizeRedirectsToTheCheckedURI(t *testing.T) {
 		"error":             {errUnsupportedResponseType},
 		"error_description": {"Only response_type=code is supported."},
 		"state":             {"s1"},
-		"iss":               {"https://zitadel.example.com/oauth/proj_platform"},
+		"iss":               {"https://zitadel.example.com"},
 	}, location.Query())
 }

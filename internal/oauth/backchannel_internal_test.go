@@ -1,0 +1,112 @@
+package oauth
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// serve answers r through the routes the server's mux mounts.
+func serve(s *Server, r *http.Request) *httptest.ResponseRecorder {
+	mux := http.NewServeMux()
+	for _, route := range s.Routes() {
+		mux.Handle(route.Pattern, route.Handler)
+	}
+	w := httptest.NewRecorder()
+	mux.ServeHTTP(w, r)
+	return w
+}
+
+// post sends a back-channel form to path under the platform project's
+// namespace.
+func post(s *Server, path string, form url.Values, prepare ...func(*http.Request)) *httptest.ResponseRecorder {
+	r := httptest.NewRequest(http.MethodPost, s.namespace()+path, strings.NewReader(form.Encode()))
+	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, p := range prepare {
+		p(r)
+	}
+	return serve(s, r)
+}
+
+// The issuer is the domain the console shares with the server, so its
+// metadata sits at that domain's root and names the endpoints under the
+// platform project's namespace (ADR 081 §5, §6).
+func TestMetadataNamesTheConsolesDomain(t *testing.T) {
+	s := newPlainServer(t)
+	for _, path := range []string{
+		"/.well-known/oauth-authorization-server",
+		"/oauth/proj_platform/.well-known/oauth-authorization-server",
+	} {
+		t.Run(path, func(t *testing.T) {
+			w := serve(s, httptest.NewRequest(http.MethodGet, path, nil))
+
+			require.Equal(t, http.StatusOK, w.Code)
+			var meta map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &meta))
+			assert.Equal(t, "https://zitadel.example.com", meta["issuer"])
+			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/authorize", meta["authorization_endpoint"])
+			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/token", meta["token_endpoint"])
+			assert.Equal(t, "https://zitadel.example.com/oauth/proj_platform/jwks", meta["jwks_uri"])
+		})
+	}
+}
+
+// Every client here is public, and the token endpoint refuses a request it
+// cannot read as one public client's before it looks at the code.
+func TestTokenEndpointRefusesWhatNoPublicClientSends(t *testing.T) {
+	exchange := func(edit func(url.Values)) url.Values {
+		form := url.Values{
+			"grant_type":    {"authorization_code"},
+			"client_id":     {CLIClientID},
+			"code":          {"code"},
+			"redirect_uri":  {"http://127.0.0.1/callback"},
+			"code_verifier": {"verifier"},
+		}
+		edit(form)
+		return form
+	}
+	unchanged := func(url.Values) {}
+	for name, tc := range map[string]struct {
+		form    url.Values
+		prepare func(*http.Request)
+		status  int
+		code    string
+	}{
+		"client credentials": {
+			form:    exchange(unchanged),
+			prepare: func(r *http.Request) { r.SetBasicAuth(CLIClientID, "secret") },
+			status:  http.StatusUnauthorized, code: "invalid_client",
+		},
+		"an unknown client": {
+			form:   exchange(func(f url.Values) { f.Set("client_id", "unknown") }),
+			status: http.StatusUnauthorized, code: "invalid_client",
+		},
+		"a repeated parameter": {
+			form:   exchange(func(f url.Values) { f.Add("code", "again") }),
+			status: http.StatusBadRequest, code: "invalid_request",
+		},
+		"two resources": {
+			form:   exchange(func(f url.Values) { f["resource"] = []string{"https://a.example", "https://b.example"} }),
+			status: http.StatusBadRequest, code: "invalid_target",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var prepare []func(*http.Request)
+			if tc.prepare != nil {
+				prepare = append(prepare, tc.prepare)
+			}
+			w := post(newPlainServer(t), "/token", tc.form, prepare...)
+
+			assert.Equal(t, tc.status, w.Code, w.Body.String())
+			var body map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+			assert.Equal(t, tc.code, body["error"])
+		})
+	}
+}

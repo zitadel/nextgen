@@ -89,7 +89,7 @@ func (s *Server) showConsent(w http.ResponseWriter, r *http.Request, client Clie
 		RedirectHost: redirect.Host,
 		APIName:      api.Name,
 		User:         s.displayUser(r, user),
-		Action:       s.issuerPath() + "/consent",
+		Action:       s.namespace() + "/consent",
 		Request:      sealed,
 		CSRF:         consentToken(cookie.Value, sealed),
 	}

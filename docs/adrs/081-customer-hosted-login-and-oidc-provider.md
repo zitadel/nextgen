@@ -120,7 +120,10 @@ code and tokens carry it as `iss` (OpenID Connect Core §3.1.3.7).
 Only a loopback origin while developing, or an origin a primary pattern of
 the project names, can be an issuer. A project without patterns admits every
 origin (ADR 036, 2026-10-08 amendment) but has no other issuer, and the
-server's own origin and preview URLs (§10) never are one. A forged
+server's own origin and preview URLs (§10) never are one. The platform
+project is the exception: where its login app, the Console, shares a domain
+with the server, that domain is the platform project's issuer and no other
+project's. A forged
 `X-Forwarded-Host` must not mint an issuer, and shared caches never store
 origin-dependent answers.
 

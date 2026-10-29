@@ -1,11 +1,15 @@
 package oauth
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
+
+	"github.com/zitadel/oidc/v3/pkg/oidc"
+	"github.com/zitadel/oidc/v3/pkg/op"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/errorpage"
@@ -41,16 +45,32 @@ func writeError(w http.ResponseWriter, status int, code, description string) {
 	writeJSON(w, status, map[string]string{"error": code, "error_description": description})
 }
 
-// writeServerFault answers an error that is the server's, not the client's,
-// keeping a classified failure's status (503 for an unavailable store) so
-// clients retry rather than drop their tokens.
+// writeServerFault answers an error that is the server's, not the client's.
 func writeServerFault(w http.ResponseWriter, r *http.Request, err error) {
-	status := http.StatusInternalServerError
-	if e, ok := errors.AsType[domain.Error](err); ok && errors.Is(e, domain.ErrUnavailable()) {
-		status = http.StatusServiceUnavailable
-	}
 	zlog.Error(r.Context(), "oauth: server fault", slog.Any("error", err))
-	writeError(w, status, errServerError, "The server could not complete the request.")
+	writeError(w, faultStatus(err), errServerError, faultDescription)
+}
+
+// serverFault is writeServerFault for the endpoints op.Server answers.
+func serverFault(ctx context.Context, err error) error {
+	zlog.Error(ctx, "oauth: server fault", slog.Any("error", err))
+	return op.NewStatusError(oidc.ErrServerError().WithDescription(faultDescription), faultStatus(err))
+}
+
+const faultDescription = "The server could not complete the request."
+
+// faultStatus keeps a classified failure's status (503 for an unavailable
+// store), so clients retry rather than drop their tokens.
+func faultStatus(err error) int {
+	if e, ok := errors.AsType[domain.Error](err); ok && errors.Is(e, domain.ErrUnavailable()) {
+		return http.StatusServiceUnavailable
+	}
+	return http.StatusInternalServerError
+}
+
+// invalidClient fails a client's authentication with 401 (RFC 6749 §5.2).
+func invalidClient(description string) error {
+	return op.NewStatusError(oidc.ErrInvalidClient().WithDescription("%s", description), http.StatusUnauthorized)
 }
 
 // redirectError sends the browser back to a validated redirect URI with an

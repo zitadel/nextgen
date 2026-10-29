@@ -7,6 +7,7 @@
 // It is deliberately small: one project (the platform project), public
 // clients only, the authorization code grant with PKCE and rotating refresh
 // tokens, client ID metadata documents and stateless dynamic registration.
+// zitadel/oidc's op.Server answers the back channel (tokenendpoint.go).
 package oauth
 
 import (
@@ -66,6 +67,7 @@ type Server struct {
 	users       Users
 	grants      service.OAuthGrantService
 	documents   *documentCache
+	backChannel http.Handler
 	now         func() time.Time
 }
 
@@ -101,18 +103,23 @@ func New(deps Deps) (*Server, error) {
 		documents:   newDocumentCache(deps.Fetch, now),
 		now:         now,
 	}
-	s.issuer = s.url(s.issuerPath())
+	// The console is served on the server's domain, so that domain is the
+	// platform project's issuer (ADR 081 §5).
+	s.issuer = base.String()
+	s.backChannel = s.newBackChannel()
 	return s, nil
 }
 
 // App is the app this server serves, for its callers to describe.
 func (s *Server) App() App { return s.app }
 
-// Issuer is the issuer identifier, `<public base>/oauth/<project id>`, the
-// namespace ADR 081 §6 reserves for a project's authorization server.
+// Issuer is the issuer identifier: the origin the console is served on,
+// which it shares with the server (ADR 081 §5).
 func (s *Server) Issuer() string { return s.issuer }
 
-func (s *Server) issuerPath() string { return "/oauth/" + s.projectID }
+// namespace is where the platform project's endpoints live on the server,
+// `/oauth/<project id>` (ADR 081 §6).
+func (s *Server) namespace() string { return "/oauth/" + s.projectID }
 
 func (s *Server) url(path string) string {
 	u := *s.publicBase

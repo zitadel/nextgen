@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/zitadel/oidc/v3/pkg/op"
@@ -99,12 +100,9 @@ func newTestServer(t *testing.T) *Server {
 // postToken calls the token endpoint and decodes its answer.
 func postToken(t *testing.T, s *Server, form url.Values) (int, map[string]any) {
 	t.Helper()
-	r := httptest.NewRequest(http.MethodPost, "/oauth/proj_platform/token", strings.NewReader(form.Encode()))
-	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	w := httptest.NewRecorder()
-	s.token(w, r)
+	w := post(s, "/token", form)
 	var body map[string]any
-	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body), w.Body.String())
 	return w.Code, body
 }
 
@@ -229,10 +227,45 @@ func TestRefreshIsBoundToItsClient(t *testing.T) {
 	platform, _ := s.app.api(PlatformAPISlug)
 	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
 	require.Equal(t, http.StatusOK, status, first)
+	other, err := s.seal(t.Context(), kindClient, registration{ClientName: "Other", RedirectURIs: []string{testRedirect}}, 0)
+	require.NoError(t, err)
 
 	form := refresh(first["refresh_token"].(string))
-	form.Set("client_id", "https://other-client.example/metadata.json")
+	form.Set("client_id", other)
 	status, body := postToken(t, s, form)
 	assert.Equal(t, http.StatusBadRequest, status)
 	assert.Equal(t, errInvalidGrant, body["error"])
+}
+
+func TestRevocationEndsTheGrant(t *testing.T) {
+	s := newTestServer(t)
+	platform, _ := s.app.api(PlatformAPISlug)
+	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
+	require.Equal(t, http.StatusOK, status, first)
+	rt := first["refresh_token"].(string)
+
+	w := post(s, "/revoke", url.Values{"token": {rt}, "client_id": {CLIClientID}})
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	status, body := postToken(t, s, refresh(rt))
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, errInvalidGrant, body["error"])
+}
+
+func TestKeysVerifyTheAccessTokens(t *testing.T) {
+	s := newTestServer(t)
+	platform, _ := s.app.api(PlatformAPISlug)
+	status, first := postToken(t, s, exchange(codeFor(t, s, platform.Identifier), rfcVerifier))
+	require.Equal(t, http.StatusOK, status, first)
+
+	w := serve(s, httptest.NewRequest(http.MethodGet, s.namespace()+"/jwks", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+	var set jose.JSONWebKeySet
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &set))
+	token, err := jose.ParseSigned(first["access_token"].(string), []jose.SignatureAlgorithm{jose.EdDSA})
+	require.NoError(t, err)
+	keys := set.Key(token.Signatures[0].Header.KeyID)
+	require.Len(t, keys, 1, "the token's key is published")
+	_, err = token.Verify(keys[0])
+	assert.NoError(t, err)
 }
