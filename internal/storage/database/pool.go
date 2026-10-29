@@ -5,6 +5,8 @@ import (
 )
 
 type Pool interface {
+	// Close closes the pool and stops reporting its connections; it returns
+	// the error of either.
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
 	// Migrate applies all pending database migrations. It is expected to be

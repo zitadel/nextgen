@@ -3,6 +3,7 @@ import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
 import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import pc from "picocolors";
 import semver from "semver";
 
@@ -10,7 +11,7 @@ import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { type Fact, type Section as UiSection, section as uiSection } from "../../lib/ui";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../lib/policies";
+import type { PasswordMinLength } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary: one row per fact, grouped under a

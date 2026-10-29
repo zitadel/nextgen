@@ -1,4 +1,5 @@
-import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../../lib/policies";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
+import type { PasswordMinLength } from "../../../lib/policies";
 import type { PromptContext, SetupAnswers, SetupPrompt } from "./types";
 
 /**

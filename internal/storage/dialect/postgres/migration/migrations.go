@@ -32,24 +32,29 @@ const migrationLockID = int64(0x7a69746164656c)
 // the loser fails on pg_type's unique index). Goose runs SQL migrations on the
 // locked connection, so single-connection pools remain supported.
 func Migrate(ctx context.Context, db *sql.DB) (err error) {
-	locker := migrationSessionLocker{}
-	if err := createSchema(ctx, db, locker); err != nil {
+	if err := createSchema(ctx, db, migrationSessionLocker{}); err != nil {
 		return err
 	}
 
-	sqlFS, err := fs.Sub(sqlFiles, "sql")
-	if err != nil {
-		return err
-	}
-	p, err := goose.NewProvider(goose.DialectPostgres, db, sqlFS,
-		goose.WithTableName(schemaName+".goose_db_version"),
-		goose.WithSessionLocker(locker),
-	)
+	p, err := newProvider(db)
 	if err != nil {
 		return err
 	}
 	_, err = p.Up(ctx)
 	return err
+}
+
+// newProvider builds the goose provider over the embedded migrations. Shared
+// with the round-trip test, which walks the Down direction too.
+func newProvider(db *sql.DB) (*goose.Provider, error) {
+	sqlFS, err := fs.Sub(sqlFiles, "sql")
+	if err != nil {
+		return nil, err
+	}
+	return goose.NewProvider(goose.DialectPostgres, db, sqlFS,
+		goose.WithTableName(schemaName+".goose_db_version"),
+		goose.WithSessionLocker(migrationSessionLocker{}),
+	)
 }
 
 // createSchema bootstraps the schema under the same advisory lock goose uses.

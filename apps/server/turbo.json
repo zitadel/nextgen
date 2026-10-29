@@ -2,18 +2,24 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   // The Go server. Its code lives at the repository root, not in this
-  // package, so every task lists its inputs: the `serverInputs` file group of
-  // apps/server/moon.yml, repeated per task because turbo has no file groups.
+  // package, so the files every Go task reads are the inputs of `go-sources`
+  // (moon's `serverInputs` file group): a task with no script, which turbo
+  // hashes but never runs. Each Go task depends on it, and a dependency's
+  // hash is part of the dependent's, so an edit to one of these files misses
+  // every Go task's cache and marks it affected. A task's own `inputs` list
+  // only what that task alone reads.
+  //
   // Also compiled in through //go:embed or read by tests: the config defaults
   // (incl. presets), the error page and the design tokens it inlines, the
-  // integration-test fixtures, the events catalog and the product analytics
-  // catalog. The repository-wide globs leave out the ignored trees an explicit
-  // glob would otherwise match: node_modules, in the main checkout every
-  // worktree under .claude/, and on Vercel the Go caches under .vercel/.
-  // GOFLAGS and the target platform change what Go produces, so they are
-  // hashed; the cache locations pass through globally (root turbo.json).
+  // integration-test fixtures, the events catalog, the product analytics
+  // catalog and the cloud launcher's build files. The repository-wide globs
+  // leave out the ignored trees an explicit glob would otherwise match:
+  // node_modules, in the main checkout every worktree under .claude/, and on
+  // Vercel the Go caches under .vercel/. GOFLAGS and the target platform
+  // change what Go produces, so they are hashed; the cache locations pass
+  // through globally (root turbo.json).
   "tasks": {
-    "openapi": {
+    "go-sources": {
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -38,38 +44,19 @@
         "$TURBO_ROOT$/api/.ogen.yaml",
         "$TURBO_ROOT$/scripts/check-go-generate.mjs",
         "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/scripts/lint-openapi.mjs",
-        "$TURBO_ROOT$/redocly.yaml",
-        "$TURBO_ROOT$/.redocly.lint-ignore.yaml"
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/apps/cloud/build-launcher.sh"
       ]
     },
-    "format": {
+    "openapi": {
+      "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/scripts/go-format-check.mjs"
-      ]
+      "inputs": ["$TURBO_ROOT$/scripts/lint-openapi.mjs", "$TURBO_ROOT$/redocly.yaml", "$TURBO_ROOT$/.redocly.lint-ignore.yaml"]
+    },
+    "format": {
+      "dependsOn": ["go-sources"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
+      "inputs": ["$TURBO_ROOT$/scripts/go-format-check.mjs"]
     },
     // Not `go generate ./...`: scripts/go-generate.mjs runs packages in
     // parallel behind the one ordering constraint that matters. The script
@@ -77,30 +64,9 @@
     // packages read mid-graph (config's meta-schemas, api's error responses).
     // Outputs are mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs.
     "generate": {
+      "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs"
@@ -130,30 +96,9 @@
       ]
     },
     "check-generate": {
+      "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
@@ -166,30 +111,9 @@
     // CI runner and rude on a machine someone is working in. CI runs it in
     // place of the plain check.
     "check-generate-pruned": {
+      "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
         "$TURBO_ROOT$/scripts/go-generate.mjs",
         "$TURBO_ROOT$/scripts/task-guard.mjs",
         "$TURBO_ROOT$/scripts/dev-process.mjs",
@@ -200,99 +124,22 @@
     // go vet compiles //go:embed all:dist, so the console build goes first (a
     // concurrent build can emptyOutDir the placeholder).
     "vet": {
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
-      ]
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The custom go/analysis checks and the Biome lint of the JavaScript
     // launcher in bin/: scripts/go-lint.mjs, a copy of moon's inline script.
     "lint": {
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/scripts/go-lint.mjs",
-        "$TURBO_ROOT$/biome.json",
-        "$TURBO_ROOT$/biome-plugins/*.grit"
-      ]
+      "inputs": ["$TURBO_ROOT$/scripts/go-lint.mjs", "$TURBO_ROOT$/biome.json", "$TURBO_ROOT$/biome-plugins/*.grit"]
     },
     // The test binary embeds the console's dist. Listed directly and not only
     // through vet: turbo hashes every dependency's result, but the direct edge
     // keeps the intent visible, as in moon.yml.
     "test": {
-      "dependsOn": ["openapi", "format", "vet", "lint", "@zitadel/console#build"],
-      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        // Read by the cloud launcher's tests, as in moon.yml.
-        "$TURBO_ROOT$/vercel.json",
-        "$TURBO_ROOT$/apps/cloud/build-launcher.sh"
-      ]
+      "dependsOn": ["go-sources", "openapi", "format", "vet", "lint", "@zitadel/console#build"],
+      "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     // The database lanes talk to a database whose state no hash sees, so
     // neither turbo's cache nor Go's (-count=1 in the scripts) may replay
@@ -303,133 +150,30 @@
     // compile and type-load (api/internal/erroranalysis).
     "test-postgres": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        // Read by the cloud launcher's tests, which `./...` includes, as in test.
-        "$TURBO_ROOT$/vercel.json",
-        "$TURBO_ROOT$/apps/cloud/build.sh"
-      ]
+      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "test-spanner": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH", "ZITADEL_TEST_SPANNER_INSTANCE"],
-      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts"
-      ]
+      "passThroughEnv": ["ZITADEL_TEST_*", "DOCKER_*", "TESTCONTAINERS_*", "GOOGLE_*", "CLOUDSDK_*", "SPANNER_EMULATOR_HOST"]
     },
     "test-sqlite": {
       "cache": false,
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "passThroughEnv": ["ZITADEL_TEST_*"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        // Read by the cloud launcher's tests, which `./...` includes, as in test.
-        "$TURBO_ROOT$/vercel.json",
-        "$TURBO_ROOT$/apps/cloud/build.sh"
-      ]
+      "passThroughEnv": ["ZITADEL_TEST_*"]
     },
     // The binary embeds the console's dist, which the console#build edge
     // hashes. Its files are not inputs: turbo hashes a run's inputs before
     // the run starts, so the build would hash them without that run's console
     // build and miss the cache on the next run.
     "build": {
-      "dependsOn": ["check-generate", "@zitadel/console#build"],
+      "dependsOn": ["go-sources", "check-generate", "@zitadel/console#build"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/**/*.go",
-        "$TURBO_ROOT$/**/*.sql",
-        "!$TURBO_ROOT$/**/node_modules/**",
-        "!$TURBO_ROOT$/.claude/**",
-        "!$TURBO_ROOT$/.codex/**",
-        "!$TURBO_ROOT$/.cursor/**",
-        "!$TURBO_ROOT$/.agents/**",
-        "!$TURBO_ROOT$/.vercel/**",
-        "$TURBO_ROOT$/go.mod",
-        "$TURBO_ROOT$/go.sum",
-        "$TURBO_ROOT$/api/**/*.yaml",
-        "$TURBO_ROOT$/api/**/*.json",
-        "$TURBO_ROOT$/packages/config/defaults/**",
-        "$TURBO_ROOT$/internal/errorpage/*",
-        "$TURBO_ROOT$/packages/design-tokens/src/generated/tokens.css",
-        "$TURBO_ROOT$/internal/**/*.json",
-        "$TURBO_ROOT$/docs/design/api/events-catalog.md",
-        "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/api/.ogen.yaml",
-        "$TURBO_ROOT$/scripts/check-go-generate.mjs",
-        "$TURBO_ROOT$/scripts/generate-meta-schemas.ts",
-        "$TURBO_ROOT$/scripts/server-build.mjs",
-        "$TURBO_ROOT$/scripts/dev-process.mjs"
-      ],
+      "inputs": ["$TURBO_ROOT$/scripts/server-build.mjs", "$TURBO_ROOT$/scripts/dev-process.mjs"],
       "outputs": ["$TURBO_ROOT$/dist/server/nextgen", "$TURBO_ROOT$/dist/server/metadata.json"]
     }
   }

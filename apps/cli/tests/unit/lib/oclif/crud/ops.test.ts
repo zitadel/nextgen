@@ -9,7 +9,7 @@ vi.mock("@clack/prompts", async () => (await import("../../../../helpers/clack")
 
 import { confirm, isCancel } from "@clack/prompts";
 
-import { asTerminalTyping } from "../../../../helpers/terminal";
+import { asTerminal, asTerminalTyping } from "../../../../helpers/terminal";
 import { EXIT_CODES } from "../../../../../src/lib/errors";
 import { BaseCommand } from "../../../../../src/lib/oclif";
 import {
@@ -463,6 +463,42 @@ describe("assembling a body", () => {
         },
       },
     ]);
+  });
+});
+
+describe("get sections", () => {
+  const getting = bindOperation(GetOperation as OperationClass<Ctx, GetSpec<Ctx>>, {
+    ...definition<GetSpec<Ctx>>({
+      call: async () => ({ id: "team_1", name: "core" }),
+      sections: () => ["members\n  ada"],
+    }),
+  }) as unknown as { run(argv: string[]): Promise<unknown> };
+
+  /** What a run prints on a terminal. */
+  const printed = async (argv: string[]): Promise<string> => {
+    const written: string[] = [];
+    const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      written.push(String(chunk));
+      return true;
+    });
+    const log = vi.spyOn(console, "log").mockImplementation((...args) => {
+      written.push(`${args.join(" ")}\n`);
+    });
+    try {
+      await asTerminal(() => getting.run(argv));
+    } finally {
+      write.mockRestore();
+      log.mockRestore();
+    }
+    return written.join("");
+  };
+
+  it("shows a spec's sections under the fields", async () => {
+    expect(await printed(["team_1"])).toContain("name  core\n\nmembers\n  ada");
+  });
+
+  it("leaves them out when --fields picks the view", async () => {
+    expect(await printed(["team_1", "--fields", "name"])).not.toContain("members");
   });
 });
 

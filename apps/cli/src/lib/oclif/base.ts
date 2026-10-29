@@ -33,7 +33,7 @@ import {
   commandEventProperties,
   deviceProfileProperties,
   FIRST_RUN_NOTICE,
-  VERCEL_EVENT_KEYS,
+  vercelEventKeys,
 } from "./command-telemetry";
 import type { CommandGroup } from "./groups";
 import type {
@@ -360,7 +360,7 @@ export abstract class BaseCommand extends Command {
       env: process.env,
       flag,
       debug: this.meta.debug,
-      vercelKeys: VERCEL_EVENT_KEYS,
+      vercelKeys: vercelEventKeys(this.meta.command),
     });
     if (!this.telemetry.enabled) {
       return;

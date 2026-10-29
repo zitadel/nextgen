@@ -27,6 +27,7 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     "import.meta.env.CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE": JSON.stringify(
       speedInsightsSampleRate(mode),
     ),
+    "import.meta.env.CONSOLE_VERSION": JSON.stringify(consoleVersion(mode)),
     // The Zitadel server the dev loop proxies to, which the page cannot see
     // from its own origin (`src/lib/server-origin.ts`). Empty in a build, where
     // the console is served with the API, and in tests, which have no server.
@@ -204,6 +205,14 @@ function speedInsightsSampleRate(mode: string): string {
     throw new Error(`${name} must be a number from 0 to 1, got "${value}".`);
   }
   return value;
+}
+
+// The commit Vercel builds the hosted cloud from (src/vite-env.d.ts). It
+// changes with every commit, so the cloud's console build is never restored
+// from the cache: its `vite build` takes about two seconds there, while the
+// packages it depends on still are.
+function consoleVersion(mode: string): string {
+  return loadEnv(mode, import.meta.dirname, "").VERCEL_GIT_COMMIT_SHA ?? "";
 }
 
 function keepGoEmbedPlaceholder(outDir: string) {

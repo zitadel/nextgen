@@ -6,8 +6,10 @@
  * through the task graph instead of calling the tools directly, so the
  * graph's dependencies and caches apply. They name their targets in moon's
  * `project:task` form and go through here, which maps them to the runner in
- * use: moon by default, turbo with NEXTGEN_TASK_RUNNER=turbo. That lets both
- * runners be exercised during the dual-run period of
+ * use: moon by default, turbo with NEXTGEN_TASK_RUNNER=turbo or when the
+ * script runs inside a turbo task (turbo sets TURBO_HASH for each), whose
+ * dependencies already built those targets. That lets both runners be
+ * exercised during the dual-run period of
  * docs/design/build/turborepo-migration.md; at the cutover the default flips.
  */
 
@@ -27,7 +29,7 @@ const SCRIPT_OF_TASK = new Map([
 ]);
 
 export function taskRunner(env = process.env) {
-  const runner = env.NEXTGEN_TASK_RUNNER || "moon";
+  const runner = env.NEXTGEN_TASK_RUNNER || (env.TURBO_HASH ? "turbo" : "moon");
   if (runner !== "moon" && runner !== "turbo") {
     throw new Error(`NEXTGEN_TASK_RUNNER must be "moon" or "turbo", not "${runner}"`);
   }
@@ -81,15 +83,4 @@ export function workspaceCommand(tasks, env = process.env) {
     return { command: "moon", args: ["ci", ...tasks.map((task) => `:${task}`)] };
   }
   return { command: "turbo", args: ["run", ...tasks, "--continue=dependencies-successful"] };
-}
-
-const PROJECT_OF_PACKAGE = new Map([...PACKAGE_OF_PROJECT].map(([id, name]) => [name, id]));
-const TASK_OF_SCRIPT = new Map([...SCRIPT_OF_TASK].map(([task, script]) => [script, task]));
-
-/** The moon `project:task` id of a turbo task (`@zitadel/server#test` → `server:test`). */
-export function moonTargetOf(packageName, taskName) {
-  const project =
-    PROJECT_OF_PACKAGE.get(packageName) ??
-    (packageName.startsWith("@zitadel/") ? packageName.slice("@zitadel/".length) : packageName);
-  return `${project}:${TASK_OF_SCRIPT.get(taskName) ?? taskName}`;
 }

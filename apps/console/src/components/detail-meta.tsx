@@ -85,17 +85,9 @@ export function MetaValue({
         >
           {value}
         </span>
-        {/* Sized under the 19px value line so the copy affordance never drives
-            the row height — the card is 66px tall in the design, and a 24px
-            button pushes it to 71. */}
-        {copyable && (
-          <CopyButton
-            value={value}
-            label={`Copy ${label}`}
-            size="icon-xs"
-            className="size-4 shrink-0"
-          />
-        )}
+        {/* Inline, under the 19px value line: the card is 66px tall in the
+            design, and a 24px button pushes it to 71. */}
+        {copyable && <CopyButton value={value} label={`Copy ${label}`} size="inline" />}
       </div>
     </div>
   );

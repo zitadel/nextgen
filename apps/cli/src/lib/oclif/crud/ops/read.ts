@@ -58,10 +58,14 @@ export class GetOperation<Ctx> extends ResourceCommand<Ctx, GetSpec<Ctx>> {
     if (!process.stdout.isTTY) {
       return { status: "ok", data: item, pretty: JSON.stringify(item, null, 2) };
     }
+    const sections = flags.fields === undefined ? (spec.sections?.(item) ?? []) : [];
     return {
       status: "ok",
       data: item,
-      pretty: renderDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+      pretty: [
+        renderDetail(headingOf(resource.heading ?? resource.idField, item), fields, item),
+        ...sections,
+      ].join("\n\n"),
     };
   }
 }

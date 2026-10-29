@@ -27,6 +27,13 @@ interface ImportMetaEnv {
    */
   readonly CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE: string;
   /**
+   * The commit the hosted cloud's build comes from (Vercel's
+   * `VERCEL_GIT_COMMIT_SHA`), which the console's analytics events report as
+   * `console_version` (src/lib/analytics.ts). Inlined by vite.config.ts
+   * through `define`; an empty string outside Vercel.
+   */
+  readonly CONSOLE_VERSION: string;
+  /**
    * The Zitadel server's origin under the dev loop, where the page runs on
    * Vite's origin and reaches the server through its proxy. Inlined by
    * vite.config.ts through `define`; an empty string in a build.

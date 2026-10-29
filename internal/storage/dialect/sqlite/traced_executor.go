@@ -4,14 +4,16 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
-const dbSystem = "sqlite"
+const dbSystem = metrics.DBSystemSQLite
 
-// tracedExecutor wraps every statement call in a span named after the
-// statement method. It hides the BeginTx of the wrapped executor, so code
-// that type-asserts an executor must look at [untraced] instead.
+// tracedExecutor traces and times every statement call under the name of the
+// statement method, through [database.StartStatement]. It hides the BeginTx
+// of the wrapped executor, so code that type-asserts an executor must look at
+// [untraced] instead.
 type tracedExecutor struct {
 	next queryExecutor
 }
@@ -34,16 +36,16 @@ func untraced(e queryExecutor) queryExecutor {
 
 // Exec implements [queryExecutor].
 func (t tracedExecutor) Exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	ctx, end := database.StartStatementSpan(ctx, dbSystem)
+	ctx, end := database.StartStatement(ctx, dbSystem)
 	res, err := t.next.Exec(ctx, query, args...)
 	end(err)
 	return res, err
 }
 
-// Query implements [queryExecutor]. The span ends when Query returns, before
-// the rows are read.
+// Query implements [queryExecutor]. The span and the timing end when Query
+// returns, before the rows are read.
 func (t tracedExecutor) Query(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	ctx, end := database.StartStatementSpan(ctx, dbSystem)
+	ctx, end := database.StartStatement(ctx, dbSystem)
 	rows, err := t.next.Query(ctx, query, args...)
 	end(err)
 	return rows, err
@@ -51,7 +53,7 @@ func (t tracedExecutor) Query(ctx context.Context, query string, args ...any) (*
 
 // QueryRow implements [queryExecutor].
 func (t tracedExecutor) QueryRow(ctx context.Context, query string, args ...any) *sql.Row {
-	ctx, end := database.StartStatementSpan(ctx, dbSystem)
+	ctx, end := database.StartStatement(ctx, dbSystem)
 	row := t.next.QueryRow(ctx, query, args...)
 	end(row.Err())
 	return row

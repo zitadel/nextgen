@@ -63,6 +63,8 @@ built with, a pool client or an open transaction.
   where a field schema exists, otherwise `WriteString` for the static base and
   `WriteArg` for each value. A package-level `const` holding one complete
   static statement is fine.
+- Run every statement through the dialect's traced executor (`traced`), never
+  the raw pool or transaction: it is what traces and meters the statement.
 
 ## Authz persistence
 

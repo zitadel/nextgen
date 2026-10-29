@@ -49,6 +49,7 @@ import {
   buildResourceCommands,
   type CreateSpec,
   type ListSpec,
+  renderTable,
   type ResourceRegistry,
   type Schema,
   type UpdateSpec,
@@ -95,6 +96,15 @@ const FILTER_OPERATIONS = [
 
 const EVENT_CATEGORIES = ["request", "auth", "session", "admin", "entity", "signal"] as const;
 
+/** A release's pointers as an indented table, one pinned revision per row. */
+export const releasePointers = (release: unknown): string => {
+  const pointers = (release as { pointers?: readonly unknown[] }).pointers ?? [];
+  const table = renderTable(["kind", "handle", "revision_id"], pointers)
+    .split("\n")
+    .map((line) => `  ${line}`);
+  return ["resources", ...table].join("\n");
+};
+
 /** The operations a policy can guard, as the generated publish body names them. */
 const POLICY_OPERATIONS = PublishPolicyBody.shape.operation.options;
 
@@ -132,6 +142,7 @@ export const RESOURCES = {
         { field: "created_at", operations: FILTER_OPERATIONS },
         { field: "id", operations: FILTER_OPERATIONS },
         { field: "schema", operations: FILTER_OPERATIONS },
+        { field: "schema_object_type", operations: ["equals", "not_equals", "contains"] },
         { field: "status", operations: FILTER_OPERATIONS },
         { field: "team_id", operations: FILTER_OPERATIONS },
         { field: "lifecycle_owner_team_id", operations: FILTER_OPERATIONS },
@@ -438,7 +449,7 @@ export const RESOURCES = {
     singular: "release",
     plural: "releases",
     idField: "id",
-    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at"],
+    columns: ["id", "metadata.message", "metadata.git_sha", "revoked_at", "metadata.created_at"],
     heading: "id",
     detail: [
       "id",
@@ -458,6 +469,7 @@ export const RESOURCES = {
     get: {
       call: ({ client, projectId }, id) => client.getReleaseById(id, { project_id: projectId }),
       response: GetReleaseByIdResponse,
+      sections: (release) => [releasePointers(release)],
     },
   },
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { aSetUpApp, onATerminal } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -50,6 +50,21 @@ describe("deployment get", () => {
         ]);
 
         expect(result).toFail();
+      });
+    });
+
+    describe("rendered for a terminal", () => {
+      it("shows the variables the deployment froze", async () => {
+        const app = await aSetUpApp();
+        await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
+        const deployed = await app.deployData();
+
+        const result = await onATerminal(() =>
+          app.run(["deployment", "get", deployed.deployment_id ?? ""]),
+        );
+
+        expect(result).toPrint("HOST  app.acme.com");
       });
     });
   });

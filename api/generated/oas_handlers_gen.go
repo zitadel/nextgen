@@ -4226,8 +4226,10 @@ func (s *Server) handleDeleteTeamRequest(args [1]string, argsEscaped bool, w htt
 
 // handleDeleteUserByIDRequest handles DeleteUserByID operation.
 //
-// Deletes a user and removes them from every team they belong to.
-// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+// Deletes a user, removes them from every team they belong to, and revokes
+// every grant they hold, on any project.
+// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+// plus `authz.revoked` for each grant on that grant's project.
 // With a project secret the request is idempotent: deleting a user that exists
 // in no project succeeds without changing anything.
 //
@@ -14795,6 +14797,10 @@ func (s *Server) handleListSchemasRequest(args [0]string, argsEscaped bool, w ht
 					Name: "kind",
 					In:   "query",
 				}: params.Kind,
+				{
+					Name: "expand",
+					In:   "query",
+				}: params.Expand,
 			},
 			Raw: r,
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zitadel/nextgen/internal/api"
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/service"
 	"github.com/zitadel/nextgen/internal/staticui/console"
 	"github.com/zitadel/nextgen/internal/storage/dialect/idgen"
@@ -55,7 +56,7 @@ func newTestMux(t *testing.T, cfg ServerConfig) *http.ServeMux {
 	t.Helper()
 	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil)
+		nil, nil)
 	require.NoError(t, err)
 	return mux
 }
@@ -154,7 +155,7 @@ func TestBuildHTTPMuxHandsTheCallbackItsConnectionSlug(t *testing.T) {
 		recorder := &slugRecorder{}
 		mux, err := buildHTTPMux(uiConfig(false), idgen.NewULID(), apiEcho(), api.NewIDPCallbackHandler(recorder),
 			staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-			nil)
+			nil, nil)
 		require.NoError(t, err)
 
 		rec := get(t, mux, path+"?state=s&code=c")
@@ -179,6 +180,33 @@ func TestBuildHTTPMuxServesRuntimeDocumentWithTheConsoleOff(t *testing.T) {
 	assert.Equal(t, "api", get(t, mux, "/ui/console/").Header().Get("X-Test-Handler"))
 }
 
+// The event retention trigger is a mount only when a scheduler outside the
+// process runs the purge; otherwise its path is the API's like any other. It
+// takes the request ID the proxy sent, so the scheduler's log and the
+// server's lines name the same run.
+func TestBuildHTTPMuxMountsTheRetentionTriggerOnlyWhenGiven(t *testing.T) {
+	cfg := ServerConfig{RequestIDHeader: "x-vercel-id"}
+	trigger := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("X-Test-Handler", "retention-trigger")
+	})
+	mux, err := buildHTTPMux(cfg, idgen.NewULID(), apiEcho(), idpCallbackEcho(),
+		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone}, nil),
+		nil, trigger)
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodGet, audit.RetentionTriggerPath, nil)
+	r.Header.Set("x-vercel-id", "fra1::2vxlh-1792820352212-3ce3eb4ad630")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, r)
+	assert.Equal(t, "retention-trigger", rec.Header().Get("X-Test-Handler"))
+	assert.Equal(t, "2vxlh-1792820352212-3ce3eb4ad630", rec.Header().Get("X-Request-Id"))
+	// A longer path is not the trigger and stays with the API namespace.
+	assert.Equal(t, "api", get(t, mux, audit.RetentionTriggerPath+"/x").Header().Get("X-Test-Handler"))
+
+	assert.Equal(t, "api", get(t, newTestMux(t, cfg), audit.RetentionTriggerPath).Header().Get("X-Test-Handler"),
+		"without a trigger the path falls through to the API")
+}
+
 // checkSessionCSRF refuses every cookie-authenticated request that did not pass
 // through api.WithCSRFRequest, so a mux without it would lock the Console out;
 // pinned here so a refactor of the chain cannot drop it unnoticed.
@@ -192,7 +220,7 @@ func TestBuildHTTPMuxRecordsCSRFRequestState(t *testing.T) {
 		}),
 		idpCallbackEcho(),
 		staticResolver(consoleRuntime{Mode: ConsoleModeStandalone, ConsoleProjectID: "proj_first"}, nil),
-		nil)
+		nil, nil)
 	require.NoError(t, err)
 
 	rec := httptest.NewRecorder()
