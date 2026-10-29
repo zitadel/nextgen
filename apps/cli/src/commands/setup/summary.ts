@@ -3,13 +3,14 @@ import { basename, join } from "node:path";
 
 import type { SetupPreset } from "@zitadel/config/defaults";
 import { type ProviderSelection, providerOf } from "@zitadel/config/idp";
+import { RECOMMENDED_PASSWORD_MIN_LENGTH } from "@zitadel/config/schemas";
 import pc from "picocolors";
 import semver from "semver";
 
 import { detectors } from "../../lib/orca/detectors";
 import type { Detector } from "../../lib/orca/detectors/types";
 import { detectPackageManager, type PackageManager } from "../../lib/package-manager";
-import { type PasswordMinLength, RECOMMENDED_PASSWORD_MIN_LENGTH } from "../../lib/policies";
+import type { PasswordMinLength } from "../../lib/policies";
 
 /**
  * Structured end-of-command summary, modelled on the report layout the

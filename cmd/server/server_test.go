@@ -17,6 +17,7 @@ import (
 	"github.com/zitadel/passwap/argon2"
 	"github.com/zitadel/passwap/bcrypt"
 
+	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/instrumentation"
 	"github.com/zitadel/nextgen/internal/instrumentation/zlog"
@@ -139,6 +140,35 @@ func TestLoadConfigSessionDefaults(t *testing.T) {
 	assert.Equal(t, 168*time.Hour, cfg.Session.DefaultTTL)
 }
 
+// TestLoadConfigEventRetention pins the purge a server runs with no retention
+// settings, its own hourly loop, and the trigger secret that hands the
+// schedule to something outside the process: the key the cloud's launcher
+// renders, or the environment, which outranks it.
+func TestLoadConfigEventRetention(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "")
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, audit.RetentionConfig{Retention: 720 * time.Hour, Interval: time.Hour, Enabled: true}, cfg.Events.Retention)
+
+	require.NoError(t, os.WriteFile(configPath, []byte("events:\n  retention:\n    trigger_secret: '0123456789abcdef-file'\n"), 0o600))
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "0123456789abcdef-file", cfg.Events.Retention.TriggerSecret)
+
+	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "0123456789abcdef-env")
+	cfg, err = loadConfig(configPath)
+	require.NoError(t, err)
+	assert.Equal(t, "0123456789abcdef-env", cfg.Events.Retention.TriggerSecret)
+
+	t.Setenv("NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET", "too short")
+	_, err = loadConfig(configPath)
+	assert.ErrorContains(t, err, "events.retention.trigger_secret must be at least 16 printable ASCII characters")
+}
+
 // TestLoadConfigErrorDefaults pins the error capture defaults of ADR 030
 // Decision 5: the report location is on and the stack trace is off.
 func TestLoadConfigErrorDefaults(t *testing.T) {
@@ -175,7 +205,7 @@ func TestLoadConfigDefaultsToArgon2id(t *testing.T) {
 	// Pre-existing bcrypt hash still verifies and is rehashed to argon2id.
 	legacy, err := bcrypt.New(10, nil).Hash(password)
 	require.NoError(t, err)
-	rehashed, err := hasher.Verify(legacy, password)
+	rehashed, err := hasher.VerifyAndRehash(legacy, password)
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(rehashed, argon2.Prefix), "bcrypt hash should rehash to argon2id, got %q", rehashed)
 }

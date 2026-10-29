@@ -5,6 +5,11 @@
 > **Context:** Operator and integrator access to the wide event audit stream
 > **Builds on:** [ADR 048](048-wide-events-internal-audit-primitive.md), [ADR 027](027-cursor-based-pagination.md), [ADR 033](033-internal-permission-management.md), [ADR 036](036-api-credential-planes.md), [ADR 046](046-claim-lifecycle-v2.md), [ADR 047](047-dialect-id-generation.md)
 > **Related:** [resource-map](../design/api/resource-map.md)
+>
+> **Amendment (2026-10-27):** §2's purge can run on a scheduler's request
+> instead of on the server's own timer, and it runs as the server's role, not
+> a dedicated one. See
+> [the amendment](#amendment-2026-10-27-who-starts-the-purge-and-as-which-role).
 
 ## Context
 
@@ -397,3 +402,43 @@ Per [ADR 046](046-claim-lifecycle-v2.md) and
 | [036 API Credential Planes](036-api-credential-planes.md) | `/events` is operator/confidential-plane |
 | [046 Claim Lifecycle v2](046-claim-lifecycle-v2.md) | Pre-claim: store always; visibility/export gated until claim |
 | [047 Dialect-Owned ID Generation](047-dialect-id-generation.md) | Event and sink managed ids |
+
+## Amendment (2026-10-27): who starts the purge, and as which role
+
+§2's background job runs in the server's process: one purge as the server
+starts, then one every `events.retention.interval`. That fits a server that
+runs until it is stopped. A server that runs only while it serves a request,
+as a Vercel function does, cannot keep a timer: its purge starts at a cold
+start, outside the request that started the instance, and its hourly runs
+happen only while an instance is up. On the hosted cloud those runs failed
+while connecting to the database.
+
+**Trigger.** `events.retention.trigger_secret` hands the schedule to a
+scheduler outside the process.
+
+- Unset, the default, a server purges on its own timer as before.
+- Set, the server keeps no timer. Each `GET` or `POST` to
+  `/cron/events-retention` that carries the secret as a bearer token runs one
+  purge; any other request to the path gets 401.
+- A run is the same purge: it deletes what is older than the window. A missed
+  run leaves its events to the next, and a second run at the same time
+  deletes what the first left, or nothing; within one process, runs wait for
+  each other.
+- The path is the operator's, not the API's: it is not in the OpenAPI
+  document and takes no API credential.
+- The hosted cloud calls it hourly from a Vercel Cron Job in `vercel.json`,
+  which sends the project's `CRON_SECRET` as the bearer token; the launcher
+  makes it the trigger secret ([runbook](../runbooks/cloud.md#operating)).
+
+[ADR 065](065-background-jobs.md) proposes moving the purge onto an in-process
+job loop with no HTTP surface. On such a platform that loop needs a trigger
+like this one.
+
+**Role.** §2 gives the purge a dedicated role with `DELETE` on `events` and
+the application none. No deployment has one: the server opens one pool and
+purges through it, as the server's role. On the hosted cloud that role
+inherits `pg_write_all_data`, so it may delete from every table. A dedicated
+role needs a second connection for the purge and an application role with
+grants of its own in place of `pg_write_all_data`. Until a deployment needs
+that, the code holds the line: one statement deletes events,
+`DeleteEventsOlderThan`, and only the purge calls it.

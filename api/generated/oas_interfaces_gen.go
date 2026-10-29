@@ -149,6 +149,10 @@ type DeploymentCreatedRes interface {
 	deploymentCreatedRes()
 }
 
+type EvaluatePolicyRes interface {
+	evaluatePolicyRes()
+}
+
 type ExchangeHandoffRes interface {
 	exchangeHandoffRes()
 }

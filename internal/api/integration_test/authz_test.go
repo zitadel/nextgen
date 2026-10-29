@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"encoding/json"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -404,7 +405,8 @@ func TestManagementAuthz(t *testing.T) {
 // grant is team-scoped project.viewer gets a filtered 200, not 403.
 // QueryTeams / ListBranding / ListFlowDefinitions return the granted row and
 // omit the outsider (RSI.team_id stamped after create). ListSchemas is empty
-// because schema RSI rows are project-scoped. QueryUsers is 200 [] because
+// because schema RSI rows are project-scoped, and its in_use expansion is 403
+// because it reads past the list predicate. QueryUsers is 200 [] because
 // user RSI rows have NULL team_id; a by-id user read is outside the grant's
 // scope for the same reason, so it answers not found (#2112).
 //
@@ -522,6 +524,15 @@ func TestListAuthzTeamScopedOnlyPartialView(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &api.ListSchemasResponse{}, listResp, helpers.MustMarshal(t, listResp))
 	require.Empty(t, listResp.(*api.ListSchemasResponse).Schemas)
+
+	// in_use counts every user of the project, past the list predicate, so a
+	// caller without read on the whole project is refused it.
+	inUseResp, err := client.ListSchemas(t.Context(), api.ListSchemasParams{
+		ProjectID: api.ProjectID(project.ID),
+		Expand:    []api.SchemaExpand{api.SchemaExpandInUse},
+	})
+	require.NoError(t, err)
+	assertAuthzStatus(t, inUseResp, http.StatusForbidden, domain.ErrJSONSchemaPermissionDenied().Code)
 
 	teamsResp, err := client.QueryTeams(t.Context(), &api.QueryTeamsRequest{}, api.QueryTeamsParams{ProjectID: api.ProjectID(project.ID)})
 	require.NoError(t, err)

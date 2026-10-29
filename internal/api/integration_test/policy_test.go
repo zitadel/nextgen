@@ -561,3 +561,99 @@ func TestPasswordPolicyDefaultTargetIgnoresOrigin(t *testing.T) {
 	}
 	assert.Equal(t, api.NewOptInt(12), shown.MinLength, "the origin's release still applies its policy")
 }
+
+func evaluatePasswordPolicy(t *testing.T, client *helpers.ApiClient, projectID string, config api.PasswordSetConfig, password string, facts api.OptPasswordSetEvaluateFacts) api.EvaluatePolicyRes {
+	t.Helper()
+	resp, err := client.EvaluatePolicy(t.Context(), api.NewPasswordSetEvaluateRequestEvaluatePolicyRequest(api.PasswordSetEvaluateRequest{
+		Operation: api.PasswordSetEvaluateRequestOperationAuthFactorPasswordSet,
+		Config:    config,
+		Input:     api.PasswordSetEvaluateInput{Password: password},
+		Facts:     facts,
+	}), api.EvaluatePolicyParams{ProjectID: api.ProjectID(projectID)})
+	require.NoError(t, err)
+	return resp
+}
+
+// TestEvaluatePolicy covers the dry run: it answers what a password set would,
+// in the live error's terms, and stores nothing (ADR 066, #1445).
+func TestEvaluatePolicy(t *testing.T) {
+	t.Parallel()
+
+	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	harness.SetProjectSecretOnApiClient(t, client, project)
+	config := api.PasswordSetConfig{MinLength: api.NewOptInt(12), HistoryDepth: api.NewOptInt(2)}
+
+	decision := func(t *testing.T, resp api.EvaluatePolicyRes) *api.EvaluatePolicyResponse {
+		t.Helper()
+		require.IsType(t, &api.EvaluatePolicyResponse{}, resp, helpers.MustMarshal(t, resp))
+		return resp.(*api.EvaluatePolicyResponse)
+	}
+
+	t.Run("allowed", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "a-long-enough-one", api.OptPasswordSetEvaluateFacts{}))
+		assert.True(t, got.Allowed)
+		assert.False(t, got.Code.IsSet())
+		assert.False(t, got.Violations.IsSet())
+	})
+
+	t.Run("refused with the live code and violations", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "short1", api.OptPasswordSetEvaluateFacts{}))
+		assert.False(t, got.Allowed)
+		assert.Equal(t, "user.password_policy_violation", got.Code.Or(""))
+		violations, ok := got.Violations.Get()
+		require.True(t, ok)
+		assert.JSONEq(t, `12`, string(violations["min_length"]))
+	})
+
+	t.Run("the stated history counts for a user's own set", func(t *testing.T) {
+		facts := api.NewOptPasswordSetEvaluateFacts(api.PasswordSetEvaluateFacts{HistoryMatches: []bool{false, true}})
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "a-long-enough-one", facts))
+		assert.False(t, got.Allowed)
+		violations, _ := got.Violations.Get()
+		assert.Contains(t, violations, "history_depth")
+	})
+
+	t.Run("an empty password answers the live guard", func(t *testing.T) {
+		got := decision(t, evaluatePasswordPolicy(t, client, project.ID, config, "", api.OptPasswordSetEvaluateFacts{}))
+		assert.False(t, got.Allowed)
+		assert.Equal(t, "user.password_empty", got.Code.Or(""))
+	})
+
+	t.Run("an invalid config is refused as a publish refuses it", func(t *testing.T) {
+		resp := evaluatePasswordPolicy(t, client, project.ID,
+			api.PasswordSetConfig{MinLength: api.NewOptInt(20), MaxLength: api.NewOptInt(10)}, "x", api.OptPasswordSetEvaluateFacts{})
+		require.IsType(t, &api.EvaluatePolicyErrorResponseStatusCode{}, resp, helpers.MustMarshal(t, resp))
+		denied := resp.(*api.EvaluatePolicyErrorResponseStatusCode)
+		assert.Equal(t, http.StatusBadRequest, denied.StatusCode)
+		assert.True(t, denied.Response.IsPolInvalid(), helpers.MustMarshal(t, resp))
+	})
+
+	t.Run("an oversized body is refused before evaluating", func(t *testing.T) {
+		for name, req := range map[string]api.PasswordSetEvaluateRequest{
+			"a password above 4096 characters": {Input: api.PasswordSetEvaluateInput{Password: strings.Repeat("a", 4097)}},
+			"more history than any depth reads": {
+				Input: api.PasswordSetEvaluateInput{Password: "x"},
+				Facts: api.NewOptPasswordSetEvaluateFacts(api.PasswordSetEvaluateFacts{HistoryMatches: make([]bool, 5)}),
+			},
+		} {
+			t.Run(name, func(t *testing.T) {
+				req.Operation = api.PasswordSetEvaluateRequestOperationAuthFactorPasswordSet
+				req.Config = config
+				_, err := client.EvaluatePolicy(t.Context(), api.NewPasswordSetEvaluateRequestEvaluatePolicyRequest(req), api.EvaluatePolicyParams{ProjectID: api.ProjectID(project.ID)})
+				// The generated client validates its own request, so the bound
+				// is part of the contract both sides read.
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("nothing is stored", func(t *testing.T) {
+		resp, err := client.ListPolicies(t.Context(), api.ListPoliciesParams{ProjectID: api.ProjectID(project.ID)})
+		require.NoError(t, err)
+		require.IsType(t, &api.ListPoliciesResponse{}, resp, helpers.MustMarshal(t, resp))
+		assert.Empty(t, resp.(*api.ListPoliciesResponse).Policies)
+	})
+}

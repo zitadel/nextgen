@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -15,6 +16,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
+	"github.com/zitadel/nextgen/internal/audit"
 )
 
 const testPEM = "-----BEGIN RSA PRIVATE KEY-----\nMIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf9Cnzj4p4WGeKLs1Pt8Qu\n-----END RSA PRIVATE KEY-----\n"
@@ -58,7 +62,11 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", dataDir)
 	t.Setenv("MASTER_KEY_PEM_B64", base64.StdEncoding.EncodeToString([]byte(testPEM)))
 	t.Setenv("MASTER_KEY_ID", "cloud-2026-10")
+	// Every deployment has one; a case about a local run clears it.
+	t.Setenv("CRON_SECRET", testCronSecret)
 }
+
+const testCronSecret = "0123456789abcdef-cron"
 
 type ensureCall struct {
 	baseDSN, name, ref string
@@ -89,6 +97,8 @@ func TestPrepareServerRendersTheMasterKeyIntoTheConfig(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
 	t.Setenv("PORT", "9090")
+	// A local run has no cron job, so the server keeps its own purge loop.
+	t.Setenv("CRON_SECRET", "")
 
 	args, err := prepareServer(nil)
 	require.NoError(t, err)
@@ -138,6 +148,7 @@ func TestPrepareServerNormalizesThePEM(t *testing.T) {
 func TestPrepareServerRendersThePreviousMasterKeyForDecryption(t *testing.T) {
 	dataDir := t.TempDir()
 	setLauncherEnv(t, dataDir)
+	t.Setenv("CRON_SECRET", "")
 	const previousPEM = "-----BEGIN RSA PRIVATE KEY-----\nOLDKEY\n-----END RSA PRIVATE KEY-----\n"
 	t.Setenv("MASTER_KEY_PREVIOUS_PEM_B64", base64.StdEncoding.EncodeToString([]byte(previousPEM)))
 	t.Setenv("MASTER_KEY_PREVIOUS_ID", "cloud-2026-09")
@@ -185,6 +196,35 @@ func TestPrepareServerServesProductionFromThePooledURL(t *testing.T) {
 		"pool_max_conns":          {"4"},
 		"default_query_exec_mode": {"cache_describe"},
 	}, served.Query())
+}
+
+// A function runs only while it serves a request, so the server's own purge
+// loop cannot run here: the cron job in vercel.json calls the server's
+// trigger with CRON_SECRET, which the server takes from the config file.
+func TestPrepareServerLeavesThePurgeToTheCronJob(t *testing.T) {
+	dataDir := t.TempDir()
+	setLauncherEnv(t, dataDir)
+	t.Setenv("VERCEL_ENV", "production")
+	t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+	// A quote is the one character the YAML string has to escape.
+	const secret = "0123456789'abcdef"
+	t.Setenv("CRON_SECRET", secret)
+
+	_, err := prepareServer(nil)
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(filepath.Join(dataDir, "nextgen.yaml"))
+	require.NoError(t, err)
+	var config struct {
+		Events struct {
+			Retention struct {
+				TriggerSecret string `yaml:"trigger_secret"`
+			} `yaml:"retention"`
+		} `yaml:"events"`
+	}
+	require.NoError(t, yaml.Unmarshal(raw, &config))
+	assert.Equal(t, secret, config.Events.Retention.TriggerSecret)
+	assert.Empty(t, os.Getenv("CRON_SECRET"), "the secret leaves the environment once it is on disk")
 }
 
 func TestPrepareServerServesAPreviewFromItsOwnDatabase(t *testing.T) {
@@ -334,11 +374,61 @@ func TestVercelJSONKeepsTheServerInFrankfurt(t *testing.T) {
 	assert.Equal(t, []string{"fra1"}, function.Regions, "the region of the PlanetScale databases")
 }
 
+// The cron job is the only caller of the audit event purge in the cloud, so
+// its path is the server's trigger, and nothing routes it anywhere but the
+// server: a redirect would end the run, which a cron job does not follow, and
+// another service would answer 404.
+func TestVercelJSONSchedulesTheEventRetentionPurge(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "vercel.json"))
+	require.NoError(t, err)
+	var config struct {
+		Crons []struct {
+			Path     string `json:"path"`
+			Schedule string `json:"schedule"`
+		} `json:"crons"`
+		Redirects []struct {
+			Source string `json:"source"`
+		} `json:"redirects"`
+		Rewrites []struct {
+			Source      string          `json:"source"`
+			Destination json.RawMessage `json:"destination"`
+		} `json:"rewrites"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &config))
+
+	require.Len(t, config.Crons, 1)
+	assert.Equal(t, audit.RetentionTriggerPath, config.Crons[0].Path)
+	assert.Equal(t, "17 * * * *", config.Crons[0].Schedule, "hourly, as a self-hosted server purges")
+
+	for _, redirect := range config.Redirects {
+		assert.False(t, routeMatches(redirect.Source, audit.RetentionTriggerPath), "redirected by %s", redirect.Source)
+	}
+	var service string
+	for _, rewrite := range config.Rewrites {
+		if routeMatches(rewrite.Source, audit.RetentionTriggerPath) {
+			var destination struct{ Service string }
+			require.NoError(t, json.Unmarshal(rewrite.Destination, &destination))
+			service = destination.Service
+			break
+		}
+	}
+	assert.Equal(t, "server", service, "the first rewrite that matches the trigger's path")
+}
+
+// routeMatches reports whether a vercel.json source matches path, for the
+// forms the file uses: literal paths, (.*) and a named :param(.*).
+func routeMatches(source, path string) bool {
+	pattern := strings.ReplaceAll(regexp.QuoteMeta(source), `\(\.\*\)\?`, `(.*)`)
+	pattern = strings.ReplaceAll(pattern, `\(\.\*\)`, `(.*)`)
+	pattern = regexp.MustCompile(`:\w+`).ReplaceAllString(pattern, "")
+	return regexp.MustCompile("^" + pattern + "$").MatchString(path)
+}
+
 // The console service builds into the server's embed directory in the same
 // checkout, so the function is compiled without it; a plain build would
 // carry the console whenever that service built first.
 func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "build.sh"))
+	raw, err := os.ReadFile(filepath.Join("..", "build-launcher.sh"))
 	require.NoError(t, err)
 	var builds []string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -346,7 +436,7 @@ func TestBuildScriptLeavesTheConsoleOut(t *testing.T) {
 			builds = append(builds, line)
 		}
 	}
-	require.Len(t, builds, 1, "build.sh compiles the function once")
+	require.Len(t, builds, 1, "build-launcher.sh compiles the function once")
 	assert.Contains(t, builds[0], "-tags noconsole")
 }
 
@@ -548,6 +638,21 @@ func TestPrepareServerRefusesBadInput(t *testing.T) {
 			_, err := prepareServer(nil)
 			assert.ErrorContains(t, err, "does not decode to a bootstrap user document")
 		},
+		"a deployment without a cron secret, which would never purge expired audit events": func(t *testing.T) {
+			t.Setenv("CLOUD_DATABASE_URL", pooledURL)
+			t.Setenv("VERCEL_GIT_COMMIT_REF", branch)
+			t.Setenv("CRON_SECRET", "")
+			for _, env := range []string{"production", "preview"} {
+				t.Setenv("VERCEL_ENV", env)
+				_, err := prepareServer(nil)
+				assert.ErrorContains(t, err, "CRON_SECRET must be set for a "+env+" deployment")
+			}
+		},
+		"a cron secret short enough to guess": func(t *testing.T) {
+			t.Setenv("CRON_SECRET", "0123456789")
+			_, err := prepareServer(nil)
+			assert.ErrorContains(t, err, "CRON_SECRET must be at least 16 printable ASCII characters")
+		},
 	}
 	for name, check := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -710,6 +815,7 @@ func TestPrepareMigrationRefusesWhatTheFunctionWouldRefuse(t *testing.T) {
 		"no database to serve":          {map[string]string{"CLOUD_DATABASE_URL": ""}, "CLOUD_DATABASE_URL must be set"},
 		"a broken admin document":       {map[string]string{"BOOTSTRAP_ADMIN_USER_JSON_B64": "%%%"}, "BOOTSTRAP_ADMIN_USER_JSON_B64 is not base64"},
 		"a previous key without its id": {map[string]string{"MASTER_KEY_PREVIOUS_PEM_B64": base64.StdEncoding.EncodeToString([]byte(testPEM))}, "go together"},
+		"no cron secret":                {map[string]string{"CRON_SECRET": ""}, "CRON_SECRET must be set"},
 	}
 	for _, env := range []string{"production", "preview"} {
 		for name, tc := range cases {

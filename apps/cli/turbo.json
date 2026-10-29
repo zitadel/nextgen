@@ -2,8 +2,15 @@
   "$schema": "https://turborepo.dev/schema.json",
   "extends": ["//"],
   "tasks": {
+    // The spec program type-checks the root scripts tests/unit/scripts imports.
     "typecheck": {
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"]
+      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/scripts/**/*.mjs",
+        "$TURBO_ROOT$/scripts/**/*.d.mts",
+        "$TURBO_ROOT$/e2e/journey/scripts/*.mjs"
+      ]
     },
     "build": {
       "dependsOn": ["@zitadel/sdk-next#build"]
@@ -20,14 +27,36 @@
     // names the api-coverage test checks against the commands, the product
     // analytics catalog the catalog test checks telemetry against, and the
     // cloud's rewrite the CLI's Mixpanel endpoint has to match.
+    //
+    // Its inputs replace the shared shape's: tests/unit/docs reads README.md
+    // and skills/, which the shape leaves out. tests/unit/scripts tests the
+    // root scripts (and the journey scripts they import; check-pr-title reads
+    // .github/semantic.yml), and the release manifest's test reads
+    // .changeset/config.json, .moon/workspace.yml and every package's
+    // package.json and moon.yml. The local runtime's launcher test reads the
+    // Dockerfile, the IdP document tests the design docs' scaffold schemas.
     "test": {
       "dependsOn": ["build", "@zitadel/api-mock#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "!**/AGENTS.md",
+        "!**/CLAUDE.md",
+        "!**/CHANGELOG.md",
+        "!LICENSE",
+        "!src/**/README.md",
         "$TURBO_ROOT$/apps/server/bin/**",
         "$TURBO_ROOT$/api/openapi/endpoints/**/methods.yaml",
         "$TURBO_ROOT$/docs/product-analytics-events.yaml",
-        "$TURBO_ROOT$/vercel.json"
+        "$TURBO_ROOT$/vercel.json",
+        "$TURBO_ROOT$/scripts/**/*.mjs",
+        "$TURBO_ROOT$/e2e/journey/scripts/*.mjs",
+        "$TURBO_ROOT$/.github/semantic.yml",
+        "$TURBO_ROOT$/Dockerfile",
+        "$TURBO_ROOT$/docs/design/idp/schemas/**",
+        "$TURBO_ROOT$/.changeset/config.json",
+        "$TURBO_ROOT$/.moon/workspace.yml",
+        "$TURBO_ROOT$/{apps,packages}/*/package.json",
+        "$TURBO_ROOT$/{apps,packages}/*/moon.yml"
       ]
     },
     // It asks the npm advisory database, whose answer changes when an

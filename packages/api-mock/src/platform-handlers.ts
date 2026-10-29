@@ -95,6 +95,9 @@ import {
   ListDeploymentsQueryParams,
   ListFlowDefinitionsQueryParams,
   ListFlowDefinitionsResponse,
+  ListPreviewsParams,
+  ListPreviewsQueryParams,
+  ListPreviewsResponse,
   ListReleasesQueryParams,
   ListPoliciesQueryParams,
   ListPoliciesResponse,
@@ -103,6 +106,9 @@ import {
   ListPolicyRevisionsResponse,
   ListSchemasQueryParams,
   PublishPolicyQueryParams,
+  EvaluatePolicyBody,
+  EvaluatePolicyQueryParams,
+  EvaluatePolicyResponse,
   PublishPolicyResponse,
   QueryIdpsBody,
   QueryIdpsQueryParams,
@@ -110,6 +116,8 @@ import {
   QueryUsersBody,
   RemoveOriginBody,
   RemoveOriginParams,
+  RemovePreviewBody,
+  RemovePreviewParams,
   RevokeReleaseParams,
   RevokeReleaseQueryParams,
   RollbackDeploymentBody,
@@ -124,7 +132,7 @@ import { getDefaultHumanUserSchema, getDefaultLoginFlow } from "@zitadel/config/
 import { missingEndpoints } from "@zitadel/config/idp";
 import { policyConfigSchema } from "@zitadel/config/schemas";
 import { http, HttpResponse } from "msw";
-import type { z } from "zod";
+import { z } from "zod";
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -409,6 +417,21 @@ type DeploymentRecord = {
   seq: number;
 };
 
+/**
+ * A live preview: an origin matching one of the project's preview patterns
+ * that a preview deployment wrote. `createdAt` is set by the first deployment
+ * to the URL and kept across renewals; `expiresAt` is reset from each
+ * deployment's `ttl`. Removed outright by `POST /previews/remove` and treated
+ * as gone once past `expiresAt`. Keyed by {@link previewKey}.
+ */
+type PreviewRecord = {
+  projectId: string;
+  origin: string;
+  expiresAt: string;
+  createdAt: string;
+  seq: number;
+};
+
 type Store = {
   projects: Map<string, ProjectRecord>;
   schemas: Map<string, SchemaRecord>;
@@ -416,6 +439,7 @@ type Store = {
   idps: Map<string, IdpConnectionRecord>;
   releases: Map<string, ReleaseRecord>;
   deployments: Map<string, DeploymentRecord>;
+  previews: Map<string, PreviewRecord>;
   policies: Map<string, PolicyRecord>;
   /**
    * Owner key -> variable name -> value. The project level and each
@@ -441,6 +465,7 @@ function makeStore(): Store {
     idps: new Map(),
     releases: new Map(),
     deployments: new Map(),
+    previews: new Map(),
     policies: new Map(),
     variables: new Map(),
     claimChallenges: new Map(),
@@ -706,6 +731,64 @@ function publishPolicyRevision(
       };
   store.policies.set(record.id, record);
   return { record, revision };
+}
+
+/**
+ * The evaluate body as the server decodes it. The generated schema is not
+ * strict (orval's `strict.body: false`), so it would drop an unknown key the
+ * server refuses with `req.invalid`: `config`, `input` and `facts` are closed
+ * here, while an extra top-level key is ignored, as on publish.
+ */
+const EvaluatePolicyStrictBody = EvaluatePolicyBody.extend({
+  config: policyConfigSchema.shape.config,
+  input: z.strictObject(EvaluatePolicyBody.shape.input.shape),
+  facts: z.strictObject(EvaluatePolicyBody.shape.facts.unwrap().shape).optional(),
+});
+
+/** The server's length cap on a password (`domain.MaxPasswordLength`). */
+const MAX_PASSWORD_LENGTH = 64;
+
+/**
+ * What `POST /policies/evaluate` answers for a password set: the server's
+ * `CheckPassword` (internal/service/password_policy.go) on the given config.
+ * The empty guard comes first, then the template's rules on the length in
+ * code points after NFC, the history only for a user's own set within the
+ * cap, and the cap as `max_length`. A rule the template gains must be added
+ * here.
+ */
+function evaluatePasswordSet(
+  config: Record<string, unknown>,
+  password: string,
+  facts: { self_service: boolean; history_matches: boolean[] },
+): { allowed: boolean; code?: string; violations?: Record<string, unknown> } {
+  const normalized = password.normalize("NFC");
+  if (normalized === "") {
+    return { allowed: false, code: "user.password_empty" };
+  }
+  const length = [...normalized].length;
+  const { min_length: min, max_length: max, history_depth: depth } = config;
+  const violations: Record<string, unknown> = {};
+  if (typeof min === "number" && length < min) {
+    violations.min_length = min;
+  }
+  if (typeof max === "number" && length > max) {
+    violations.max_length = max;
+  }
+  if (
+    typeof depth === "number" &&
+    facts.self_service &&
+    length <= MAX_PASSWORD_LENGTH &&
+    facts.history_matches.slice(0, depth).some(Boolean)
+  ) {
+    violations.history_depth = depth;
+  }
+  if (!("max_length" in violations) && length > MAX_PASSWORD_LENGTH) {
+    violations.max_length = MAX_PASSWORD_LENGTH;
+  }
+  if (Object.keys(violations).length === 0) {
+    return { allowed: true };
+  }
+  return { allowed: false, code: "user.password_policy_violation", violations };
 }
 
 /** A shallow copy with its keys in order, so two configs compare by value. */
@@ -1287,15 +1370,43 @@ function pointerHandle(kind: string, revisionId: string): string {
   return revisionId;
 }
 
-/** Turn a `ttl` (`30m`, `168h`, `7d`) into an ISO expiry counted from now. */
-function ttlToExpiry(ttl: string): string {
-  const match = /^([1-9][0-9]*)([mhd])$/.exec(ttl);
+/**
+ * The project's default preview lifetime, applied when a preview deployment
+ * omits `ttl`. A real project configures this; the mock stands in one value
+ * for every project, matching the spec's "omitted, the project's default
+ * applies" (create-deployment-request.yaml).
+ */
+const DEFAULT_PREVIEW_TTL = "P7D";
+
+/** The milliseconds an ISO-8601 duration spans, or undefined when it is not one. */
+function isoDurationMs(ttl: string): number | undefined {
+  // The same shapes the server's parser takes (internal/api/ogenx): whole days
+  // and a time part in hours, minutes or fractional seconds. Weeks, months and
+  // years are not among them, so the mock refuses what the server would.
+  const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(ttl);
   if (!match) {
+    return undefined;
+  }
+  const [, days, hours, minutes, seconds] = match;
+  // A bare `P` or `PT` carries no components and is not a duration.
+  if ([days, hours, minutes, seconds].every((part) => part === undefined)) {
+    return undefined;
+  }
+  return (
+    Number(days ?? 0) * 86_400_000 +
+    Number(hours ?? 0) * 3_600_000 +
+    Number(minutes ?? 0) * 60_000 +
+    Number(seconds ?? 0) * 1_000
+  );
+}
+
+/** Turn a `ttl` (`PT30M`, `PT168H`, `P7D`) into an ISO expiry counted from now. */
+function ttlToExpiry(ttl: string): string {
+  const ms = isoDurationMs(ttl);
+  if (ms === undefined) {
     return new Date().toISOString();
   }
-  const amount = Number(match[1]);
-  const unitMs = match[2] === "m" ? 60_000 : match[2] === "h" ? 3_600_000 : 86_400_000;
-  return new Date(Date.now() + amount * unitMs).toISOString();
+  return new Date(Date.now() + ms).toISOString();
 }
 
 /** The project's primary origins, as exact URLs, sorted. */
@@ -1326,19 +1437,32 @@ function matchesPreviewPattern(project: ProjectRecord, origin: string): boolean 
   return false;
 }
 
-/** The newest deployment to an origin, treating an expired preview as gone. */
+/** The store key for a preview: unique per `(project, origin)`. */
+function previewKey(projectId: string, origin: string): string {
+  return `${projectId}\u0000${origin}`;
+}
+
+/** Whether a preview is still live: it exists and has not passed its expiry. */
+function previewIsLive(preview: PreviewRecord | undefined): preview is PreviewRecord {
+  return preview !== undefined && new Date(preview.expiresAt).getTime() > Date.now();
+}
+
+/**
+ * The newest deployment to an origin, treating a preview that is gone as gone.
+ * A preview's liveness is its preview row, not the expiry frozen onto the
+ * deployment: `preview rm` deletes the row and a renewal moves its expiry, and
+ * every endpoint has to agree on which previews are live.
+ */
 function newestDeploymentForOrigin(
   projectId: string,
   origin: string,
 ): DeploymentRecord | undefined {
-  const now = Date.now();
+  const previewLive = previewIsLive(store.previews.get(previewKey(projectId, origin)));
   return [...store.deployments.values()]
     .filter((deployment) => deployment.projectId === projectId)
     .filter((deployment) =>
       deployment.targets.some(
-        (target) =>
-          target.origin === origin &&
-          (target.expiresAt === null || new Date(target.expiresAt).getTime() > now),
+        (target) => target.origin === origin && (target.expiresAt === null || previewLive),
       ),
     )
     .sort((a, b) => b.seq - a.seq)[0];
@@ -1459,14 +1583,6 @@ function upsertRelease(
   store.releases.set(id, record);
   return HttpResponse.json(releaseResponse(record), { status: 201 });
 }
-
-/**
- * The project's default preview lifetime, applied when a preview deployment
- * omits `ttl`. A real project configures this; the mock stands in one value
- * for every project, matching the spec's "omitted, the project's default
- * applies" (create-deployment-request.yaml).
- */
-const DEFAULT_PREVIEW_TTL = "7d";
 
 export function setupPlatformHandlers() {
   return [
@@ -1879,6 +1995,13 @@ export function setupPlatformHandlers() {
       }
 
       const requested = data.targets as string[];
+      // The contract's targets are unique items: a repeated one is a malformed
+      // request, not something to fold quietly.
+      if (new Set(requested).size !== requested.length) {
+        return HttpResponse.json(errorBody("dep.invalid", "deployment: targets must be unique"), {
+          status: 400,
+        });
+      }
       const primaries = primaryOrigins(project);
       const resolved = new Set<string>();
       let sawPreview = false;
@@ -1922,13 +2045,21 @@ export function setupPlatformHandlers() {
           { status: 400 },
         );
       }
-      const ttl = typeof data.ttl === "string" ? data.ttl : undefined;
-      if (ttl !== undefined && !sawPreview) {
+      const requestedTtl = typeof data.ttl === "string" ? data.ttl : undefined;
+      if (requestedTtl !== undefined && !sawPreview) {
         return HttpResponse.json(
           errorBody("dep.invalid", "deployment: ttl is only valid for preview URLs"),
           { status: 400 },
         );
       }
+      // A preview URL expires, so a deployment to one always gets a ttl. An
+      // omitted ttl is not refused: the project's default applies, per
+      // create-deployment-request.yaml, so a caller (the CLI included) need not
+      // pin a lifetime of its own. A primary-only deployment keeps none.
+      const ttl = sawPreview ? (requestedTtl ?? DEFAULT_PREVIEW_TTL) : undefined;
+      // Resolved up here: the preview rows are renewed from this ttl before the
+      // new deployment, which carries the same expiry, is written below.
+      const expiresAt = sawPreview && ttl ? ttlToExpiry(ttl) : null;
 
       const targets = [...resolved].sort();
       const expectedId =
@@ -1948,6 +2079,29 @@ export function setupPlatformHandlers() {
             ),
             { status: 409 },
           );
+        }
+      }
+
+      // A preview deploy always renews its targets' previews — writing a new one
+      // or extending the live one's expiry from this deploy's ttl — so
+      // re-deploying unchanged content keeps the preview URL alive rather than
+      // letting it expire on its old clock.
+      if (sawPreview && expiresAt !== null) {
+        for (const origin of targets) {
+          const key = previewKey(project.id, origin);
+          const existing = store.previews.get(key);
+          // Renew a still-live preview in place (keep its creation time and
+          // order); but an expired one is gone, so redeploying it is a new
+          // preview and gets a fresh createdAt/seq rather than resurrecting
+          // stale metadata that would missort it in `preview list`.
+          const live = previewIsLive(existing);
+          store.previews.set(key, {
+            projectId: project.id,
+            origin,
+            expiresAt,
+            createdAt: live ? existing.createdAt : nowIso(),
+            seq: live ? existing.seq : ++store.lastSeq,
+          });
         }
       }
 
@@ -1972,8 +2126,8 @@ export function setupPlatformHandlers() {
         }
       }
 
-      const expiresAt = sawPreview ? ttlToExpiry(ttl ?? DEFAULT_PREVIEW_TTL) : null;
       const id = `dep_${shortId()}`;
+      const createdAt = nowIso();
       const record: DeploymentRecord = {
         id,
         projectId: project.id,
@@ -1982,7 +2136,7 @@ export function setupPlatformHandlers() {
         reason: data.reason === "rollback" ? "rollback" : "deploy",
         message: typeof data.message === "string" ? data.message : null,
         rollbackTo: null,
-        deployedAt: nowIso(),
+        deployedAt: createdAt,
         seq: ++store.lastSeq,
       };
       store.deployments.set(id, record);
@@ -2026,7 +2180,6 @@ export function setupPlatformHandlers() {
         // What each target serves now: the newest deployment per origin, each
         // carrying only the targets it still serves.
         const serving = new Map<string, DeploymentTargetRow[]>();
-        const now = Date.now();
         const liveOrigins = new Set(
           deployments.flatMap((deployment) => deployment.targets.map((target) => target.origin)),
         );
@@ -2034,20 +2187,37 @@ export function setupPlatformHandlers() {
           if (origin !== undefined && target !== origin) {
             continue;
           }
-          const newest = newestDeploymentForOrigin(query.data.project_id, target);
+          // Pick the newest deployment targeting this origin by sequence,
+          // without applying the target's frozen historical expiry: a renewed
+          // preview extends its own row's clock (checked below), so filtering on
+          // the deployment's stale expiry here would wrongly drop a live preview.
+          const newest = [...store.deployments.values()]
+            .filter((deployment) => deployment.projectId === query.data.project_id)
+            .filter((deployment) => deployment.targets.some((t) => t.origin === target))
+            .sort((a, b) => b.seq - a.seq)[0];
           if (!newest) {
             continue;
           }
-          const row = newest.targets.find(
-            (candidate) =>
-              candidate.origin === target &&
-              (candidate.expiresAt === null || new Date(candidate.expiresAt).getTime() > now),
-          );
+          const row = newest.targets.find((candidate) => candidate.origin === target);
           if (!row) {
             continue;
           }
+          // A preview-origin target (one with an expiry) is admitted by its
+          // preview row, not by the expiry frozen onto the deployment: removing
+          // the preview drops the URL from this live view without the historical
+          // deployment being rewritten, and a renewed preview is reported on the
+          // clock it now runs on. A primary target has no preview row and stands
+          // on the deployment alone.
+          let served = row;
+          if (row.expiresAt !== null) {
+            const preview = store.previews.get(previewKey(query.data.project_id, target));
+            if (!previewIsLive(preview)) {
+              continue;
+            }
+            served = { origin: row.origin, expiresAt: preview.expiresAt };
+          }
           const rows = serving.get(newest.id) ?? [];
-          rows.push(row);
+          rows.push(served);
           serving.set(newest.id, rows);
         }
         items = [...serving.entries()]
@@ -2212,6 +2382,86 @@ export function setupPlatformHandlers() {
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
+    }),
+
+    // --- previews --------------------------------------------------------
+    // A preview is written by a preview deployment above and lives until it
+    // expires or is removed here. There is no create endpoint. Kept in its own
+    // block so parallel PRs do not collide. Auth matches the deployments
+    // endpoints: no bearer check, so the narrower preview token the CLI uses
+    // works — the Go handlers are unimplemented stubs regardless.
+
+    http.get("*/projects/:project_id/previews", ({ params, request }) => {
+      const path = parse(ListPreviewsParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      // `limit` arrives as a string on the URL and the generated zod does not
+      // coerce, so build it before validating, as the deployments list does.
+      const record = queryRecord(request);
+      const { limit, ...rest } = record;
+      const query = parse(
+        ListPreviewsQueryParams,
+        { ...rest, ...(limit === undefined ? {} : { limit: Number(limit) }) },
+        "invalid_query",
+      );
+      if (!query.ok) {
+        return query.response;
+      }
+
+      const live = [...store.previews.values()]
+        .filter((preview) => preview.projectId === path.data.project_id && previewIsLive(preview))
+        .sort(compareNewestFirst)
+        .map((preview) => ({
+          origin: preview.origin,
+          expires_at: preview.expiresAt,
+          created_at: preview.createdAt,
+        }));
+
+      // Offset paging, like the schemas list: the opaque real cursor is the next
+      // start index here, a page is `limit` rows from it, and a token the mock
+      // never minted is rejected with req.invalid. `next_page_token` is the next
+      // start when more rows remain, else null.
+      const start = query.data.page_token === undefined ? 0 : Number(query.data.page_token);
+      if (!Number.isInteger(start) || start < 0) {
+        return HttpResponse.json(errorBody("req.invalid", "invalid page token"), { status: 400 });
+      }
+      const previews = live.slice(start, start + query.data.limit);
+      const nextPageToken =
+        start + query.data.limit < live.length ? String(start + query.data.limit) : null;
+      const out = parse(
+        ListPreviewsResponse,
+        { previews, next_page_token: nextPageToken },
+        "mock_response_invalid",
+      );
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
+    }),
+
+    http.post("*/projects/:project_id/previews/remove", async ({ params, request }) => {
+      const path = parse(RemovePreviewParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(RemovePreviewBody, raw, "invalid_request");
+      if (!body.ok) {
+        return body.response;
+      }
+
+      // Idempotent: a URL with no live preview answers 204 too. The preview row
+      // is what admits the URL, so deleting it is the whole removal: the live
+      // previews list and the live deployments view both stop showing the URL
+      // because its preview is gone. The deployments that served it keep their
+      // real target timestamps — removing a preview ends it, it does not rewrite
+      // the history of what ran where and when.
+      store.previews.delete(previewKey(path.data.project_id, body.data.origin));
+      return new HttpResponse(null, { status: 204 });
     }),
 
     // POST /projects/:project_id/claim/init — mint a claim challenge. Auth
@@ -2460,7 +2710,14 @@ export function setupPlatformHandlers() {
     }),
 
     http.get("*/schemas", ({ request }) => {
-      const query = parse(ListSchemasQueryParams, listQueryRecord(request), "invalid_query");
+      // `expand` repeats (`expand=in_use&expand=…`) and is an array in the
+      // spec; queryRecord keeps only its last value.
+      const expand = new URL(request.url).searchParams.getAll("expand");
+      const raw = {
+        ...listQueryRecord(request),
+        ...(expand.length === 0 ? {} : { expand }),
+      };
+      const query = parse(ListSchemasQueryParams, raw, "invalid_query");
       if (!query.ok) {
         return query.response;
       }
@@ -2483,11 +2740,13 @@ export function setupPlatformHandlers() {
         return paged.response;
       }
       const { page, next } = paged;
+      // The mock keeps no users, so no revision is ever in use.
+      const inUse = query.data.expand?.includes("in_use") ? { in_use: false } : {};
       const responseBody: ListSchemas200 = {
         schemas: page.map((r) => ({
           id: r.id,
           schema: r.body,
-          metadata: { created_at: r.createdAt },
+          metadata: { created_at: r.createdAt, ...inUse },
         })),
         next_page_token: next,
       };
@@ -2806,6 +3065,40 @@ export function setupPlatformHandlers() {
         return out.response;
       }
       return HttpResponse.json(out.data, { status: 201 });
+    }),
+
+    // A dry run: nothing is read or stored. The config is checked as a
+    // publish checks it, then evaluated as the server's password set would.
+    http.post("*/policies/evaluate", async ({ request }) => {
+      const query = parse(EvaluatePolicyQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const raw = await readJson(request);
+      if (raw === null) {
+        return HttpResponse.json(INVALID_JSON, { status: 400 });
+      }
+      const body = parse(EvaluatePolicyStrictBody, raw, "req.invalid");
+      if (!body.ok) {
+        return body.response;
+      }
+      if (policyRuleViolated(body.data.config)) {
+        return HttpResponse.json(
+          errorBody("pol.invalid", "policy: invalid", {
+            details: { violations: [MIN_ABOVE_MAX_VIOLATION] },
+          }),
+          { status: 400 },
+        );
+      }
+      const decision = evaluatePasswordSet(body.data.config, body.data.input.password, {
+        self_service: body.data.facts?.self_service ?? true,
+        history_matches: body.data.facts?.history_matches ?? [],
+      });
+      const out = parse(EvaluatePolicyResponse, decision, "mock_response_invalid");
+      if (!out.ok) {
+        return out.response;
+      }
+      return HttpResponse.json(out.data);
     }),
 
     http.get("*/policies", ({ request }) => {

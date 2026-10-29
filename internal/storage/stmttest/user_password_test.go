@@ -105,6 +105,21 @@ func TestUserPasswordStatements_SetAddsCurrentPassword(t *testing.T) {
 		assert.Equal(t, first.ID, history[0].ID)
 		_, err = d.stmts.GetUserPassword(t.Context(), userPasswordByID(first.ID))
 		assert.ErrorIs(t, err, new(database.NoRowFoundError), "a previous password is not readable as current")
+
+		// A rehash keeps the row, its created_at and the history.
+		require.NoError(t, d.stmts.UpdateUserPasswordHash(t.Context(), got2, "rehash"))
+		got3, err := d.stmts.GetUserPassword(t.Context(), byUser)
+		require.NoError(t, err)
+		assert.Equal(t, got2.ID, got3.ID)
+		assert.Equal(t, got2.CreatedAt, got3.CreatedAt)
+		assert.Equal(t, "rehash", got3.EncodedHash)
+		history, err = d.stmts.GetUserPasswordHistory(t.Context(), projectID, userID)
+		require.NoError(t, err)
+		require.Len(t, history, 1)
+		assert.Equal(t, first.ID, history[0].ID)
+		// got2 still carries the hash the rehash replaced.
+		require.NoError(t, d.stmts.UpdateUserPasswordHash(t.Context(), got2, "rehash-b"))
+		assert.Equal(t, "rehash", currentUserPasswordHash(t, d, projectID, userID), "a stale hash changes nothing")
 	})
 }
 

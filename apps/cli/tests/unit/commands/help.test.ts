@@ -50,13 +50,14 @@ Authentication
 
 Configuration and releases
   deploy            Apply your local configuration to Zitadel
+  preview           Deploy and manage pull-request preview URLs
   pull              Rebuild your .zitadel/ files from a release
   branding          Manage the login branding
   deployment        Deploy releases and roll them back
   env               Show and bind environments
   flow-definitions  View login flows
   origin            Manage the project's allowed origins
-  policies          View policies
+  policies          View and test policies
   projects          View and update projects
   release           Build and manage releases
   schemas           View user schemas

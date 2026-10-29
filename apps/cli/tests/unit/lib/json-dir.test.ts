@@ -66,4 +66,13 @@ describe("readJsonDirEntries", () => {
   it("returns an empty array when the directory is missing", async () => {
     expect(await readJsonDirEntries(join(dir, "missing"))).toEqual([]);
   });
+
+  it("leaves out the files skip names without reading them", async () => {
+    await writeFile(join(dir, "a.json"), JSON.stringify({ id: "a" }));
+    await writeFile(join(dir, "a.test.json"), "not json");
+
+    const entries = await readJsonDirEntries(dir, { skip: (name) => name.endsWith(".test.json") });
+
+    expect(entries).toEqual([{ name: "a.json", body: { id: "a" } }]);
+  });
 });

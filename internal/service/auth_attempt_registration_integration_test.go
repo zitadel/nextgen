@@ -232,7 +232,7 @@ func TestAuthAttemptService_PasskeyRegistration_integration(t *testing.T) {
 		sessions, _ := newSessionServiceForIntegration(t)
 
 		ctrl := gomock.NewController(t)
-		hasher := cryptomock.NewMockHasher(ctrl)
+		hasher := cryptomock.NewMockPasswordHasher(ctrl)
 		hasher.EXPECT().Hash(gomock.Any()).Return("hashed:pw", nil)
 		handler := service.NewFlowCreateUserHandler(
 			service.FixedProjectHasherResolver{Hasher: hasher},

@@ -17,6 +17,9 @@ const badgeVariants = cva(
         // Tinted, not solid, matching `Button`'s destructive variant.
         destructive:
           "bg-destructive/10 text-destructive focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 [a&]:hover:bg-destructive/20",
+        // The same tint, in the warning colour, for a setting below a recommendation.
+        warning:
+          "bg-warning/10 text-warning focus-visible:ring-warning/20 dark:bg-warning/20 dark:focus-visible:ring-warning/40 [a&]:hover:bg-warning/20",
         outline:
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",

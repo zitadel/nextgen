@@ -237,6 +237,9 @@ export const de: Locale = {
   "error.field_max_length_value": "{0} darf höchstens {1} Zeichen lang sein.",
   "error.field_invalid": "Bitte überprüfe {0}.",
 
+  // --- Feldhinweise aus Validierungsregeln ({0} = Grenzwert der Regel) ---
+  "hint.field_min_length": "Mindestens {0} Zeichen.",
+
   // --- Formular-Alerts ---
   "error.sign_in_server.title": "Anmeldung konnte nicht abgeschlossen werden.",
   "error.sign_in_server.body": "Bitte versuche es in einigen Minuten erneut",

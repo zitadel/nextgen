@@ -11,6 +11,7 @@ import (
 
 	"github.com/zitadel/nextgen/internal/audit"
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -146,6 +147,11 @@ func tokenUserID(tok *domain.Token) *string {
 func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *domain.Token, err error) {
 	ctx, end := startSpan(ctx, "TokenService.IntrospectToken")
 	defer end(&err)
+	// err is the named result, so this sees every return below.
+	start := time.Now()
+	defer func() {
+		metrics.RecordCredentialValidation(ctx, credentialResult(err), time.Since(start))
+	}()
 
 	payload, err := domain.ParseAndValidateToken(ctx, token,
 		func(ctx context.Context, keyID string, algorithm jose.ContentEncryption) (op.Decrypter, error) {
@@ -168,8 +174,11 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *do
 	}
 
 	record, err := s.v2Pool.Statements().GetTokenByID(ctx, payload.ProjectID, payload.TokenID)
+	revocation := metrics.RevocationError
+	defer func() { metrics.RecordRevocationCheck(ctx, revocation) }()
 	if err != nil {
 		if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
+			revocation = metrics.RevocationRevoked
 			return nil, domain.ErrTokenRevoked()
 		}
 		// A classified failure keeps its code, so a token store that is
@@ -180,8 +189,10 @@ func (s *tokenService) IntrospectToken(ctx context.Context, token string) (_ *do
 		return nil, domain.ErrInternal(err).WithMessage("failed to read token record")
 	}
 	if !record.Active(time.Now()) {
+		revocation = metrics.RevocationRevoked
 		return nil, domain.ErrTokenRevoked()
 	}
+	revocation = metrics.RevocationActive
 
 	return payload, nil
 }

@@ -14,7 +14,7 @@ deployment as five [services](https://vercel.com/docs/services):
 | `server` | `.` | the Go server on Vercel's Go preset, console off and left out of the build (`-tags noconsole`) | everything else, including `/console/runtime.json` |
 | `console` | `apps/console` | the console SPA, built for `/console/` with Vercel Web Analytics and Speed Insights | `/console/*` |
 | `docs` | `apps/docs` | the docs site, Fumadocs on Next.js, with Vercel Web Analytics and Speed Insights | `/docs`, `/docs/*` |
-| `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
+| `website` | `apps/website` | the front page and the changelog, on Next.js, with Vercel Web Analytics and Speed Insights | `/`, `/changelog`, `/changelog/*`, `/llms.txt`, `/_next/*`, `/favicon.ico`, `/favicons/*` |
 | `schemas` | `apps/cloud` | the built-in schemas, static files that [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) renders from the server's embedded copies | `/schemas/v1/*` |
 
 The console is served on the same origin, so the session cookie and CSRF work
@@ -38,24 +38,39 @@ the document whose `$id` is that URL, while the API keeps `/schemas` and
 The services install and build from `vercel.json` itself. The install
 leaves out the other platforms' native packages, so Vercel's build cache
 stays under its 1.5 GB limit, and pnpm skips it once a service built earlier
-in the deployment has installed (`--optimistic-repeat-install`). The console
-builds with `turbo run build`, which reads and writes the team's remote cache
-as Vercel sets it up; the docs and the website run their own
-`pnpm run build` after turbo has built the packages they render: the
-website's showcase the atoms of `@zitadel/components`, the docs' live
+in the deployment has installed (`--optimistic-repeat-install`). Every
+service builds through turbo, so CI and the deployments share one task graph
+and the team's remote cache, which each build reads and writes as Vercel
+sets it up. The console runs `turbo run build`; the docs and the website run
+`turbo run build --filter=…`, which builds the packages they render first:
+the website's showcase the atoms of `@zitadel/components`, the docs' live
 examples the same package, `@zitadel/api-mock` and the `@zitadel/api` client
-the mock calls. The schemas
-need no install: their build is one Node script, and the service is rooted
-here, where no `package.json` makes Vercel detect a framework.
+the mock calls. Their own builds never come from the cache: Skew Protection
+bakes the deployment's ID into a Next.js build, and their keys hold it.
+
+This folder is the package `@zitadel/cloud`, whose tasks
+([`turbo.json`](turbo.json)) build the `server` and `schemas` services.
+The `server` service's build command installs, since the Go preset runs no
+`installCommand`, and runs `deploy`, which turbo orders after `build` (the
+launcher) and `migrate`. None of the three is cached: the launcher runs with
+the deployment's secrets, and any branch's build can write the team's cache.
+`migrate` sees the deployment's whole environment. The `schemas` service
+runs `schemas` and is rooted here, where `package.json` has no
+dependencies, so Vercel detects no framework (a service takes no
+`framework: null`); a framework dependency in it would change how that
+service builds. Moon has no project for the package: the launcher's Go
+tests run in the server's `test`.
 
 | File | Role |
 |---|---|
-| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
-| [`build.sh`](build.sh) | the `server` service's build: launcher, migrations |
+| [`launcher/`](launcher/) | the function binary: maps `CLOUD_DATABASE_URL` / `CLOUD_MIGRATOR_DATABASE_URL`, the master key, `CRON_SECRET` (the token of the cron job that purges expired audit events), Vercel's `PORT` and its `x-vercel-id` request ID onto the server's configuration; at build time it creates a preview's database, checks the function's configuration and migrates |
+| [`build-launcher.sh`](build-launcher.sh) | the `build` task: compiles the launcher, without the console, into `dist/nextgen-launcher`; it stamps in the branch, which picks a preview's database |
+| [`deploy.sh`](deploy.sh) | the `deploy` task, last in the `server` service's build: copies the migrated launcher to `$VERCEL_OUTPUT_FILE` |
 | [`setup-secrets.sh`](setup-secrets.sh) | mints an environment's master key and root admin (with [`admin-document.mjs`](admin-document.mjs)) and sets them on the Vercel project; the originals go to 1Password |
 
-`pnpm run cloud` runs the same services on http://localhost:3000 with
-`vercel dev`, the server on SQLite and a throwaway master key
+`pnpm run cloud` (turbo: this package's `dev`) runs the same services on
+http://localhost:3000 with `vercel dev`, the server on SQLite and a
+throwaway master key
 ([`scripts/run-cloud.mjs`](../../scripts/run-cloud.mjs); the runbook's
 [Running the cloud locally](../../docs/runbooks/cloud.md#running-the-cloud-locally)).
 
