@@ -57,38 +57,6 @@ function hasProperty(schema: object, name: string): boolean {
   return isObject(properties) && Object.hasOwn(properties, name);
 }
 
-/** The `x-unique` scopes that make a property one the engine asks to be verified. */
-const UNIQUE_SCOPES = new Set(["project", "team"]);
-
-/**
- * Whether a schema scopes a property's uniqueness. Verification is only ever
- * consulted for these: the engine asks whether a value arrived verified to
- * decide if it may be claimed, and a property that need not be unique is
- * never asked.
- */
-function isUnique(schema: object, name: string): boolean {
-  const property = (schema as Json).properties;
-  return hasUniqueLeaf(isObject(property) ? property[name] : undefined);
-}
-
-/**
- * Whether a property, or any property nested inside it, scopes uniqueness. The
- * engine asks about a verified value at the top-level property even when only
- * a nested leaf is unique, so an object that holds one counts.
- */
-function hasUniqueLeaf(definition: unknown): boolean {
-  if (!isObject(definition)) {
-    return false;
-  }
-  const scope = definition["x-unique"];
-  if (typeof scope === "string" && UNIQUE_SCOPES.has(scope)) {
-    return true;
-  }
-  return (
-    isObject(definition.properties) && Object.values(definition.properties).some(hasUniqueLeaf)
-  );
-}
-
 /** "a" or "an" before a type name. */
 const article = (word: string) => (/^[aeiou]/.test(word) ? "an" : "a");
 
@@ -140,12 +108,6 @@ const MUTABLE_SUBJECTS = new Set(["login", "username"]);
 
 /** A Unicode space at either end of a name: the set Go's strings.TrimSpace trims, so both sides agree. */
 const EDGE_SPACE = /^\p{White_Space}|\p{White_Space}$/u;
-
-/** The standard claim each standard verification claim vouches for. */
-const VOUCHES_FOR: Readonly<Record<string, string>> = {
-  email_verified: "email",
-  phone_number_verified: "phone_number",
-};
 
 /** Edit distance between two names, for telling a typo from a different name. */
 function distance(a: string, b: string): number {
@@ -648,7 +610,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         add({
           rule: "sso/verification-source-not-boolean",
           file: path,
-          message: `verified_claims reads ${q(source)} to verify ${q(key)}, but that is ${article(standard.type)} ${standard.type} claim and only a boolean true counts as verified, so it never verifies. Read the boolean claim the provider sends for this value (such as "email_verified"). Only use true to trust the provider outright, which is safe only if it never returns an unverified value.`,
+          message: `verified_claims reads ${q(source)} to verify ${q(key)}, but that is ${article(standard.type)} ${standard.type} claim, not one that says whether a value is verified, so it never verifies. Read the claim the provider sends for that (such as "email_verified").`,
         });
       }
     }
@@ -680,25 +642,6 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         file: path,
         message: `subject_claim is ${q(body.subject_claim)}, a profile claim the user can change, and identity keys on the subject, so a change would sign them in as a stranger. Use a claim that never changes: "sub", or a provider-specific one such as "oid".`,
       });
-    }
-    // `email_verified` vouches for the claim `email` and nothing else: reading
-    // it for a property filled from another claim marks a value verified that
-    // the provider never vouched for.
-    for (const [key, source] of Object.entries(
-      isObject(body.verified_claims) ? body.verified_claims : {},
-    )) {
-      const vouchesFor =
-        typeof source === "string" && Object.hasOwn(VOUCHES_FOR, source)
-          ? VOUCHES_FOR[source]
-          : undefined;
-      const read = isObject(body.claim_mapping) ? body.claim_mapping[key] : undefined;
-      if (vouchesFor !== undefined && typeof read === "string" && read !== vouchesFor) {
-        add({
-          rule: "sso/verification-claim-mismatch",
-          file: path,
-          message: `verified_claims reads ${q(source as string)} for ${q(key)}, but ${q(source as string)} only vouches for the claim ${q(vouchesFor)} and ${q(key)} is filled from ${q(read)}, so a value the provider never vouched for would count as verified. Fill ${q(key)} from ${q(vouchesFor)}, or read a claim that vouches for ${q(read)}.`,
-        });
-      }
     }
     if (referencing.length === 0) {
       continue;
@@ -744,13 +687,6 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
           rule: "sso/orphaned-verification-key",
           file: path,
           message: `verified_claims key ${q(key)} is not a property of any schema that lists ${q(slug)} in sso.providers, so it can never verify.${didYouMean(key, propertyNames(referencing))} Fix the name, or remove it.`,
-        });
-      } else if (mapping.includes(key) && !referencing.some((schema) => isUnique(schema, key))) {
-        add({
-          rule: "sso/verification-needs-unique",
-          file: path,
-          severity: "warning",
-          message: `verified_claims marks ${q(key)} as verified, but ${q(key)} is not unique in any schema that lists ${q(slug)} in sso.providers, so nothing reads that verification today. It is harmless to keep; to make it take effect give ${q(key)} an x-unique scope of "project" or "team" in the schema, or remove it from verified_claims to silence this.`,
         });
       }
     }

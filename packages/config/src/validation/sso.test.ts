@@ -395,52 +395,6 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
-    name: "a mapped property is verified but not unique, so nothing reads the verification",
-    edit: (p) => {
-      schemaOf(p).properties.givenName = {};
-      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
-      connectionOf(p).verified_claims = { givenName: "given_name_verified" };
-    },
-    expect: [
-      {
-        rule: "sso/verification-needs-unique",
-        file: GOOGLE,
-        severity: "warning",
-        says: ["givenName", "not unique", "x-unique", "remove it from verified_claims"],
-      },
-    ],
-  },
-  {
-    name: "a mapped property is verified and its x-unique scope is unspecified",
-    edit: (p) => {
-      schemaOf(p).properties.email = { "x-unique": "unspecified" };
-      connectionOf(p).verified_claims = { email: "email_verified" };
-    },
-    expect: [
-      {
-        rule: "sso/verification-needs-unique",
-        file: GOOGLE,
-        severity: "warning",
-        says: ["email", "not unique"],
-      },
-    ],
-  },
-  {
-    name: "a mapped property is verified and its x-unique scope is null",
-    edit: (p) => {
-      schemaOf(p).properties.email = { "x-unique": null };
-      connectionOf(p).verified_claims = { email: "email_verified" };
-    },
-    expect: [
-      {
-        rule: "sso/verification-needs-unique",
-        file: GOOGLE,
-        severity: "warning",
-        says: ["email", "not unique"],
-      },
-    ],
-  },
-  {
     name: "a custom connection maps a standard claim without the scope that returns it",
     edit: (p) => {
       schemaOf(p).properties.givenName = { type: "string" };
@@ -552,7 +506,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       {
         rule: "sso/verification-source-not-boolean",
         file: GOOGLE,
-        says: ["email", "string claim", "email_verified", "use true"],
+        says: ["email", "string claim", "email_verified"],
       },
     ],
   },
@@ -677,36 +631,6 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
-    name: "the email is filled from one claim and verified by the verification of another",
-    edit: (p) => {
-      schemaOf(p).properties.email = { "x-unique": "project" };
-      connectionOf(p).claim_mapping = { email: "preferred_username" };
-      connectionOf(p).verified_claims = { email: "email_verified" };
-    },
-    expect: [
-      {
-        rule: "sso/verification-claim-mismatch",
-        file: GOOGLE,
-        says: ["email_verified", '"preferred_username"', 'Fill "email" from "email"'],
-      },
-    ],
-  },
-  {
-    name: "the phone number is verified by a claim that vouches for something else",
-    edit: (p) => {
-      schemaOf(p).properties.phone = { "x-unique": "project" };
-      connectionOf(p).claim_mapping = { email: "email", phone: "email" };
-      connectionOf(p).verified_claims = { phone: "phone_number_verified" };
-    },
-    expect: [
-      {
-        rule: "sso/verification-claim-mismatch",
-        file: GOOGLE,
-        says: ["phone_number_verified", '"phone_number"'],
-      },
-    ],
-  },
-  {
     name: "a step list where two user-creating steps each miss a different required property",
     edit: (p) => {
       schemaOf(p).properties.a = { type: "string" };
@@ -802,6 +726,22 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
 /** The edits that sit on a rule's boundary and must be accepted. */
 const accepted: Array<{ name: string; edit: (project: Project) => void }> = [
   { name: "the project as scaffolded", edit: () => {} },
+  {
+    name: "a verified property that is not unique, since a shared value can still be verified",
+    edit: (p) => {
+      schemaOf(p).properties.givenName = {};
+      connectionOf(p).claim_mapping = { email: "email", givenName: "given_name" };
+      connectionOf(p).verified_claims = { givenName: "given_name_verified" };
+    },
+  },
+  {
+    name: "a verification claim the admin chose for a property filled from another claim",
+    edit: (p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).claim_mapping = { email: "preferred_username" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+  },
   {
     name: "a schema with sso off that no flow offers providers from",
     edit: (p) => {
@@ -1118,6 +1058,15 @@ describe("validateProject: the SSO rules", () => {
 
   it.each(accepted)("accepts $name", ({ edit }) => {
     expect(validate(edit)).toEqual([]);
+  });
+
+  it("never suggests trusting the provider outright when a verification reads a claim that is not a flag", () => {
+    const [issue] = validate((p) => {
+      schemaOf(p).properties.email = { "x-unique": "project" };
+      connectionOf(p).verified_claims = { email: "email" };
+    });
+
+    expect(issue?.message).not.toMatch(/\btrue\b/);
   });
 
   it("has a failing case for every project rule in the registry", () => {

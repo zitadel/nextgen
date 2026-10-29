@@ -476,13 +476,11 @@ claim, edit `claim_mapping` in the connection file named there, then run
 `deploy`; the connection is not tested until a real sign-in.
 `deploy` refuses a mapping that cannot work and names the file, the
 problem and the fix: a target no schema defines (with a "Did you mean" when one
-is close), a standard claim of a type the property cannot hold, an email
-verified by a claim that vouches for another, and a `subject_claim` that is a
-profile claim. A catalog connection that reads a standard claim without its
-scope is refused too. Two softer mistakes warn but do not stop, so `deploy`
-carries on: a verification of a property that is not unique (nothing reads it
-today), and a custom connection that reads a standard claim without the scope
-that returns it.
+is close), a standard claim of a type the property cannot hold, and a
+`subject_claim` that is a profile claim. A catalog connection that reads a
+standard claim without its scope is refused too. One softer mistake warns but
+does not stop, so `deploy` carries on: a custom connection that reads a
+standard claim without the scope that returns it.
 Fix the file named; do not set `ZITADEL_SKIP_FLOW_VALIDATION`, which skips them.
 
 After `setup`, follow `data.next_commands` to start the app. Prove the generated

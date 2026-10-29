@@ -81,13 +81,6 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
       }),
   ],
   [
-    "an email verified by a claim that vouches for another",
-    (app) =>
-      app.editConnection("google", (c) => {
-        c.claim_mapping = { ...c.claim_mapping, email: "preferred_username" };
-      }),
-  ],
-  [
     "a subject that is a claim the user can change",
     (app) =>
       app.editConnection("google", (c) => {
@@ -478,19 +471,6 @@ describe("deploy", () => {
         });
 
         expect(await app.deployDryRun()).toSucceed();
-      });
-
-      it("warns that a verification of a non-unique property is not read", async () => {
-        const app = await anAppWithGoogle();
-        await app.editUserSchema((schema) => {
-          schema.properties.nickname = { type: "string" };
-        });
-        await app.editConnection("google", (c) => {
-          c.claim_mapping = { ...c.claim_mapping, nickname: "nickname" };
-          c.verified_claims = { ...c.verified_claims, nickname: "nickname_ok" };
-        });
-
-        expect(await app.deployRendered(["--dry-run"])).toSay("not unique");
       });
 
       it("lets a custom connection whose scopes omit a claim it reads through", async () => {
