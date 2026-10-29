@@ -17208,6 +17208,8 @@ func (s *Server) handleQuerySessionsRequest(args [0]string, argsEscaped bool, w 
 // handleQueryTeamsRequest handles queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 //
 // POST /teams/query
 func (s *Server) handleQueryTeamsRequest(args [0]string, argsEscaped bool, w http.ResponseWriter, r *http.Request) {

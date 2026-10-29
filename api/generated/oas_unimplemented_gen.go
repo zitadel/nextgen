@@ -1290,6 +1290,8 @@ func (UnimplementedHandler) QuerySessions(ctx context.Context, req *QuerySession
 // QueryTeams implements queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 //
 // POST /teams/query
 func (UnimplementedHandler) QueryTeams(ctx context.Context, req *QueryTeamsRequest, params QueryTeamsParams) (r QueryTeamsRes, _ error) {
