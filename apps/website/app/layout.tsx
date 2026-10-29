@@ -2,6 +2,8 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
+import { NONCE_HEADER } from "./csp";
 import og from "./og.jpg";
 import "./globals.css";
 import { THEME_SCRIPT } from "./theme";
@@ -89,7 +91,10 @@ function favicons(): Metadata["icons"] {
 // Web Analytics has no sampling and counts every page view.
 const speedInsightsSampleRate = Number(process.env.WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE || 1);
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // The page's nonce (proxy.ts), for the theme script; Next.js gives its own
+  // scripts the nonce itself. Reading it renders every page per request.
+  const nonce = (await headers()).get(NONCE_HEADER) ?? undefined;
   return (
     // The theme script, inlined to run before the first paint, sets data-theme
     // before React hydrates (theme.ts).
@@ -99,7 +104,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="bg-background text-foreground antialiased">
         {children}

@@ -17,6 +17,15 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - It does not use `@zitadel/design-tokens`; only the login previews paint with
   them, on the login's own atoms.
 
+## Content-Security-Policy
+
+- The front page renders per request with a nonce (`proxy.ts`,
+  `app/csp.ts`); give an inline `<script>` the layout's nonce. The changelog
+  is prerendered, so its policy has none: keep `proxy.ts`' list of
+  prerendered paths in step with the pages that are.
+- The enforced policy is `next.config.ts`', never the proxy's: Next.js would
+  read the nonce from it.
+
 ## The fonts
 
 - Load every face through `next/font/local` from `app/fonts/`, never

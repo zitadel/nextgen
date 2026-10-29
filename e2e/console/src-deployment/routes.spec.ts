@@ -6,8 +6,9 @@ import { expect, test } from "@playwright/test";
  * path, and the old /ui/console links sent on. A wrong rule shows here by
  * name, where the browser test (console.browser.spec.ts) only times out on a
  * blank page. It also holds the Mixpanel proxy the CLI's usage analytics and
- * the server's service ping go through, which no other suite reaches, and
- * what answers a path no service serves.
+ * the server's service ping go through, which no other suite reaches, what
+ * answers a path no service serves, and the security headers each service's
+ * responses carry.
  */
 
 test("the server answers /console/runtime.json, under the console's path", async ({ request }) => {
@@ -86,4 +87,91 @@ test("a path no service answers: a page for a browser, the envelope for a progra
   expect(envelope.status()).toBe(404);
   expect(envelope.headers()["x-request-id"]).toMatch(vercelRequestID);
   expect(await envelope.json()).toEqual({ code: "req.not_found", message: expect.any(String) });
+});
+
+// The edge sets the same three headers on every response, whichever service
+// answers it, the Mixpanel proxy's too; only vercel.json's own redirects,
+// which have no body, go without. A service that sets one as well sends the
+// same value, so a header may arrive twice, never two ways.
+test("every service's responses carry the security headers", async ({ request }) => {
+  const paths = [
+    "/", // website
+    "/changelog",
+    "/docs",
+    "/docs/llms.txt",
+    "/console/users", // console service
+    "/console/runtime.json", // server
+    "/sessions/me",
+    "/no-such-page-routes-spec",
+    "/schemas/v1/user-schema.json",
+  ];
+  const want = {
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-frame-options": "DENY",
+  };
+
+  const wrong: string[] = [];
+  for (const path of paths) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    for (const [name, value] of Object.entries(want)) {
+      const got = response.headers()[name];
+      if (!got || got.split(/,\s*/).some((each) => each !== value)) {
+        wrong.push(`${path}: ${name} ${got ?? "(none)"}, want ${value}`);
+      }
+    }
+  }
+  expect(wrong).toEqual([]);
+});
+
+// Each service's pages carry an enforced policy that lets nothing frame them,
+// beside the edge's X-Frame-Options.
+test("no service's page may be framed", async ({ request }) => {
+  const wrong: string[] = [];
+  for (const path of ["/", "/changelog", "/docs", "/console/users", "/no-such-page-routes-spec"]) {
+    const response = await request.get(path, { headers: { accept: "text/html" } });
+    const policy = response.headers()["content-security-policy"] ?? "(none)";
+    if (!policy.includes("frame-ancestors 'none'")) wrong.push(`${path}: ${policy}`);
+  }
+  expect(wrong).toEqual([]);
+});
+
+// The website renders its front page per request, so every script on it
+// holds the nonce its report-only policy names (apps/website/proxy.ts); the
+// docs' own suite checks theirs.
+test("the website's front page gives each script its nonce", async ({ request }) => {
+  const response = await request.get("/");
+  expect(response.status()).toBe(200);
+  const nonce = /'nonce-([^']+)'/.exec(
+    response.headers()["content-security-policy-report-only"] ?? "",
+  )?.[1];
+  expect(nonce).toBeTruthy();
+  const scripts = (await response.text()).match(/<script\b[^>]*>/g) ?? [];
+  expect(scripts.length).toBeGreaterThan(0);
+  expect(scripts.filter((tag) => !tag.includes(` nonce="${nonce}"`))).toEqual([]);
+});
+
+// The console service's policies are the ones the server sends for the same
+// page (internal/staticui/console holds vercel.json to them): enforced, its
+// scripts from its own origin and its inline one by hash, and a stricter one
+// reported on.
+test("the console's page carries its policies", async ({ request }) => {
+  const response = await request.get("/console/users");
+  expect(response.status()).toBe(200);
+  const enforced = response.headers()["content-security-policy"];
+  expect(enforced).toMatch(/(^|; )script-src 'self' 'sha256-[A-Za-z0-9+/]+=*'(;|$)/);
+  expect(enforced).toContain("frame-ancestors 'none'");
+  expect(enforced).toContain("report-uri /csp-report");
+  expect(response.headers()["content-security-policy-report-only"]).toContain("default-src 'self'");
+});
+
+// Where every page's policy sends its violations: the server's catch-all, ahead
+// of the API, takes a browser's report without a session. The report names no
+// violation, so the deployment logs none; the API would answer 404.
+test("/csp-report takes a violation report", async ({ request }) => {
+  const response = await request.post("/csp-report", {
+    headers: { "content-type": "application/csp-report" },
+    data: JSON.stringify({ "csp-report": {} }),
+  });
+  expect(response.status()).toBe(204);
 });

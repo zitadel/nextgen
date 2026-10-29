@@ -1,6 +1,7 @@
 import { isMarkdownPreferred, rewritePath } from "fumadocs-core/negotiation";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { createNonce, nonceHeader, reportOnlyPolicy } from "@/lib/csp";
 import { docsContentRoute, docsRoute } from "@/lib/shared";
 
 const { rewrite: rewriteDocs } = rewritePath(
@@ -29,7 +30,29 @@ export default function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return withPolicy(request);
+}
+
+/**
+ * A page with its report-only policy (lib/csp.ts) and a nonce of its own,
+ * which the request hands to Next.js and the layout. Rendering a nonce into a
+ * page takes a render per request: the root layout reads it, so no page is
+ * prerendered.
+ *
+ * Next.js copies the headers a proxy answers with onto the request and takes
+ * the nonce from its Content-Security-Policy before its report-only one, so
+ * the enforced policy, which has none, is set by next.config.mjs instead.
+ */
+function withPolicy(request: NextRequest) {
+  const nonce = createNonce();
+  const reportOnly = reportOnlyPolicy(nonce);
+  const headers = new Headers(request.headers);
+  headers.set(nonceHeader, nonce);
+  headers.set("content-security-policy-report-only", reportOnly);
+
+  const response = NextResponse.next({ request: { headers } });
+  response.headers.set("Content-Security-Policy-Report-Only", reportOnly);
+  return response;
 }
 
 export const config = {

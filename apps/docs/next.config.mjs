@@ -33,6 +33,23 @@ const config = {
   // service worker the package ships beside itself
   // (app/docs/mock-service-worker.js).
   serverExternalPackages: ["@zitadel/api-mock"],
+  async headers() {
+    return [
+      {
+        // Every response, the pages' and the other routes': nothing frames the
+        // docs, embeds a plugin or moves their base URL. Each page also
+        // carries a report-only policy with its own nonce (proxy.ts).
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; report-uri /csp-report",
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     // The root serves nothing; locally (next dev, next start) it opens the
     // docs. On the cloud's host the root is the website's start page.
