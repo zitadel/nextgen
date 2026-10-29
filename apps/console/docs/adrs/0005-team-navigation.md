@@ -75,6 +75,10 @@ The tabs from §1 become the team nav's first entries, so nothing built under
 
 ### 3. Accounts are not surfaced yet
 
+> **Note (2026-10-29):** the hosted cloud now bills per team (root
+> [ADR 083](../../../../docs/adrs/083-hosted-cloud-business-systems.md) §3,
+> §6), so accounts matter, and §4 is due.
+
 The Settings view is the person's own space, with no section headings, and
 holds one screen: **Settings**, their profile. The cloud does not use
 accounts (teams in the platform project) for anything a person acts on, so

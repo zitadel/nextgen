@@ -16,7 +16,7 @@
       "root": "apps/console",
       "framework": "vite",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
-      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_VERCEL_INSIGHTS=1 turbo run build",
+      "buildCommand": "CONSOLE_BASE_PATH=/console/ CONSOLE_ADDON=../cloud-console turbo run build",
       "devCommand": "NODE_ENV=production CONSOLE_BASE_PATH=/console/ vite build --outDir node_modules/.cloud-dev && vite preview --outDir node_modules/.cloud-dev --base / --port $PORT --strictPort",
       "outputDirectory": "../../internal/staticui/console/dist",
       "rewrites": [
@@ -41,6 +41,12 @@
       "framework": "nextjs",
       "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
       "buildCommand": "turbo run build --filter=@zitadel/website"
+    },
+    "cloud-functions": {
+      "root": "apps/cloud-functions",
+      "framework": "nextjs",
+      "installCommand": "pnpm install --os=current --cpu=current --optimistic-repeat-install",
+      "buildCommand": "turbo run build --filter=@zitadel/cloud-functions"
     },
     "schemas": {
       "root": "apps/cloud",
@@ -166,6 +172,12 @@
       "source": "/llms.txt",
       "destination": {
         "service": "website"
+      }
+    },
+    {
+      "source": "/cloud/(.*)",
+      "destination": {
+        "service": "cloud-functions"
       }
     },
     {

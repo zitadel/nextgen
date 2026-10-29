@@ -1,0 +1,20 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  // The hosted cloud's add-on to the console. Mirrors
+  // apps/cloud-console/moon.yml; `lint` and `test` are the root's, and nothing
+  // builds here: the cloud's console build compiles the add-on in.
+  "tasks": {
+    // The add-on implements the console's contract and composes the
+    // components it exports, and calls the functions' contract, all read
+    // from source. Turbo hashes another package's files only through a task
+    // edge, and there is no task to depend on, so they are listed.
+    "typecheck": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/apps/console/src/**",
+        "$TURBO_ROOT$/apps/cloud-functions/src/contract.ts"
+      ]
+    }
+  }
+}

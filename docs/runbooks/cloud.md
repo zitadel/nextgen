@@ -26,10 +26,11 @@ One Vercel deployment, five [services](https://vercel.com/docs/services):
 
 | Service | Built by | Serves |
 |---|---|---|
-| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's and the Mixpanel proxy's, including `/console/runtime.json` |
-| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_VERCEL_INSIGHTS=1`, so it reports Vercel Web Analytics and Speed Insights; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
+| `server` | Go preset; the build command installs, because Vercel's Go builder runs no `installCommand`, and then runs `node_modules/.bin/turbo run deploy --filter=@zitadel/cloud`. turbo goes by its path because, unlike the JS builders, the Go builder puts no `node_modules/.bin` on `PATH`. `@zitadel/cloud`'s `build` compiles `apps/cloud/launcher` without the console (`-tags noconsole`), then `migrate` migrates and `deploy` hands the binary to the preset, none of them cached | every path except the console's, the docs', the website's, the cloud functions' and the Mixpanel proxy's, including `/console/runtime.json` |
+| `console` | Vite; `turbo run build` with `CONSOLE_BASE_PATH=/console/` and `CONSOLE_ADDON=../cloud-console`, which compiles in the cloud's add-on ([`apps/cloud-console`](../../apps/cloud-console/AGENTS.md)): it reports Vercel Web Analytics and Speed Insights, and in previews also sends the sign-in widget's calls through BotID's check in `cloud-functions` and adds the Billing, Support and Email screens; the service serves the build where it lands, `internal/staticui/console/dist` | `/console/*` (bare `/console` redirects to the slash form; `/ui/console` and `/ui/console/*` redirect here with a 307) |
 | `docs` | Next.js; `turbo run build --filter=@zitadel/docs`, after `@zitadel/components`, `@zitadel/api-mock` and the `@zitadel/api` client the mock calls, which the live examples render, and the docs' typecheck. The build's cache key holds the deployment's ID, which Skew Protection bakes into it, so it never comes from the cache; never moon, which cannot archive the symlinks Vercel's Next.js adapter writes | `/docs` and `/docs/*`: pages, assets (`/docs/_next/`), search, `llms.txt`, each page's `.md` and the MCP server |
 | `website` | Next.js; `turbo run build --filter=@zitadel/website`, after the atoms of `@zitadel/components` its showcase renders; keyed by the deployment's ID, as the docs' | `/`, the front page, `/changelog` (`/changelog/` redirects there) with its entries' pages and its feed under it, `/changelog/*`, and their assets at `/_next/*`; the host's `/llms.txt`; the host's favicons at `/favicon.ico` and `/favicons/*`, which the console, the login UI and the docs link |
+| `cloud-functions` | Next.js; `turbo run build --filter=@zitadel/cloud-functions`, route handlers and the Workflow SDK's routes, no pages ([`apps/cloud-functions`](../../apps/cloud-functions/AGENTS.md), [ADR 083](../adrs/083-hosted-cloud-business-systems.md)); keyed by the deployment's ID, as the website's. Its systems are mocks, and production answers `503 cloud.not_live` | `/cloud/*`: the console add-on's calls (`/cloud/api/*`), the sign-in widget's calls through BotID's check (`/cloud/zitadel/*`), Stripe's webhooks (`/cloud/hooks/stripe`) and its cron routes (`/cloud/cron/*`, none scheduled yet) |
 | `schemas` | Static files: `turbo run schemas --filter=@zitadel/cloud` renders them with [`scripts/render-builtin-schemas.mjs`](../../scripts/render-builtin-schemas.mjs) into `apps/cloud/dist/cloud-schemas`. The service is rooted at `apps/cloud`, whose `package.json` has no dependencies, so Vercel detects no framework: a service takes no `framework: null`, and a framework dependency there would change how it builds | `/schemas/v1/*`: the [built-in schemas](#built-in-schemas), as `application/schema+json`, fresh for an hour and readable from any origin |
 
 The console lives on the same origin, at `/console/` rather than a
@@ -217,6 +218,15 @@ Environment variables (add secrets with
 | `TURBO_TELEMETRY_DISABLED` | Production, Preview | `1`: turbo sends no telemetry from the builds, as in CI |
 | `TURBO_PLATFORM_ENV_DISABLED` | Production, Preview | `1`: stops turbo listing, under every task, each project variable `turbo.json` does not pass; the JS builds are not meant to see them (strict environment mode) |
 | `CLOUD_PRODUCTION_BRANCH` | Production; only while testing a pull request as production | the branch production deploys from; unset means `main` (see Deploying) |
+
+The cloud functions read no Stripe or HubSpot key yet: their systems are
+mocks ([ADR 083](../adrs/083-hosted-cloud-business-systems.md) §9), and each
+live adapter adds its variables to this table. Two project settings serve
+them already: "Automatically expose System Environment Variables" stays on,
+since the Workflow SDK picks Vercel's world from `VERCEL_DEPLOYMENT_ID`, and
+Protection Bypass for Automation gives a preview's functions
+`VERCEL_AUTOMATION_BYPASS_SECRET`, which their calls to the preview's own
+server carry.
 
 Database URLs take the form PlanetScale's Connect dialog gives,
 `postgresql://<role>.<branch id>:<password>@<host>:<port>/postgres?sslmode=verify-full&sslrootcert=system`,

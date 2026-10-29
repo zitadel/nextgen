@@ -1,0 +1,25 @@
+id: "cloud-functions"
+language: "typescript"
+layer: "application"
+stack: "backend"
+
+tasks:
+  # lint and test are the inherited tasks unchanged.
+  typecheck:
+    deps:
+      # After the build, never beside it, for apps/website/moon.yml's reason:
+      # `next build` empties .next/types and fills it again, and tsc reads it.
+      - "build"
+
+  build:
+    outputs:
+      - ".next/**/*"
+    options:
+      # Replaces the inherited dist/**/* rather than adding to it.
+      mergeOutputs: "replace"
+
+  dev:
+    command: "corepack pnpm run dev"
+    options:
+      persistent: true
+      runInCI: false

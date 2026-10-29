@@ -35,6 +35,7 @@ vi.mock("@/auth/session", async (importOriginal) => {
 
 vi.mock("@zitadel/sdk-react", () => ({
   ZitadelLogin: (props: {
+    purpose?: string;
     postSignInUrl?: string;
     forcePostSignInUrl?: boolean;
     theme?: string;
@@ -42,6 +43,7 @@ vi.mock("@zitadel/sdk-react", () => ({
   }) => (
     <div
       data-testid="zitadel-login"
+      data-purpose={props.purpose}
       data-post-sign-in-url={props.postSignInUrl}
       data-force-post-sign-in-url={props.forcePostSignInUrl ? "" : undefined}
       data-project-id={props.project?.projectId}
@@ -256,5 +258,24 @@ describe("authentication guard", () => {
       errorSpy.mockRestore();
       warnSpy.mockRestore();
     }
+  });
+});
+
+describe("sign-up", () => {
+  it("opens the widget on its register purpose, landing where ?next= says", async () => {
+    fetchSession.mockResolvedValue(null);
+    await renderAt("/signup?next=/schemas");
+
+    const widget = await screen.findByTestId("zitadel-login");
+    expect(widget).toHaveAttribute("data-purpose", "register");
+    expect(widget).toHaveAttribute("data-post-sign-in-url", "/schemas");
+  });
+
+  it("sends a signed-in visitor on to the requested path", async () => {
+    fetchSession.mockResolvedValue(makeTestSession());
+    const router = await renderAt("/signup?next=/schemas");
+
+    expect(await screen.findByRole("heading", { name: "User schemas" })).toBeInTheDocument();
+    await waitFor(() => expect(router.state.resolvedLocation?.pathname).toBe("/schemas"));
   });
 });
