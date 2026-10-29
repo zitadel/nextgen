@@ -1,5 +1,17 @@
 # @zitadel/config
 
+## 0.3.0
+
+### Minor Changes
+
+- [#2353](https://github.com/zitadel/nextgen/pull/2353) [`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894) - `zitadel policies test` runs the cases in `.zitadel/policies/<operation>.test.json` against your policy. Each case gives the operation's input (for the password policy, the password itself), optionally the facts the operation would look up (`self_service`, `history_matches`), and the decision it expects: `allowed`, and optionally the error `code` and exactly the `violations`. Zitadel evaluates every case as a real password set would, so a case also covers how the password is counted. By default the cases run against the policy file beside them; `--release <id>` runs them against the policy a built release pins, before you deploy it. A failing case fails the command with `E_VALIDATION` and lists what was expected and what Zitadel decided. `deploy` never carries test files, editors validate them against the new `.zitadel/meta/policy-test.json`, and the policies README that `setup` writes shows an example.
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3)]:
+  - @zitadel/api@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

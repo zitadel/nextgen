@@ -238,6 +238,9 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deployment get <id>` emits the deployment as the API serves it; on a
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
@@ -379,6 +382,13 @@ is not yet a repository, then one commit, `chore: scaffold the project with
 zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
+
+Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
+to verify is served the release it built. `data.deployment` carries the
+`release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
+`--dry-run` or when the deploy failed. A failed deploy is a warning, never a
+failed setup, and `data.next_commands` then leads with the `deploy` that fixes
+it.
 
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately

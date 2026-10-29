@@ -148,6 +148,27 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
+	t.Run("every console origin opens a flow the project's origins refuse", func(t *testing.T) {
+		const other = "https://console-abc123.example.com"
+		ctrl := gomock.NewController(t)
+		pool := servicemocks.NewMockPool(ctrl)
+		statements := servicemocks.NewMockAllStatements(ctrl)
+		pool.EXPECT().Statements().Return(statements).AnyTimes()
+		// Spelled as configured, not as a browser sends it: the resolver
+		// normalizes it as it does the request's origin.
+		resolver := service.NewRuntimeResolver(service.NewPool(pool), servicemocks.NewMockReleaseService(ctrl), ownOrigin, " HTTPS://Console-ABC123.example.com ")
+		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
+			ID:      projectID,
+			Origins: []domain.Origin{{Pattern: origin, Kind: domain.OriginKindPrimary}},
+		}, nil)
+		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{other}).
+			Return([]domain.OriginDeployment{}, nil)
+
+		got, err := resolver.Resolve(t.Context(), projectID, other)
+		require.NoError(t, err)
+		assert.Nil(t, got)
+	})
+
 	// A project that lists the deployment's own origin keeps its own rules
 	// there: the exemption only opens what the project would refuse.
 	t.Run("own origin a project lists serves what is deployed there", func(t *testing.T) {

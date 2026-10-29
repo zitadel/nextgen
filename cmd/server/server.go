@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -310,9 +311,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	if err != nil {
 		return err
 	}
-	// The console previews a project's login from the public base, so opening
-	// a flow admits its origin for every project; no later step does.
-	ownOrigin, err := publicOrigin(cfg.Server.PublicBase)
+	// The console previews a project's login from these origins, so opening a
+	// flow admits them for every project; no later step does.
+	consoleHosts, err := consoleOrigins(cfg.Server.PublicBase, cfg.Server.ConsoleOrigins)
 	if err != nil {
 		return err
 	}
@@ -445,7 +446,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	pinger.Start()
 	defer pinger.Close()
 
-	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, ownOrigin)
+	runtimeResolver := service.NewRuntimeResolver(serviceDBPool, releaseService, consoleHosts...)
 	apiServers, err := api.NewServers(
 		api.NewHandler(
 			flowService,
@@ -561,19 +562,79 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 // its console runs. A browser never spells out the scheme's default port, so
 // neither does this.
 func publicOrigin(publicBase string) (string, error) {
-	base, err := url.Parse(publicBase)
+	origin, err := browserOrigin(publicBase)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse server public base: %w", err)
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
+}
+
+// consoleOrigins are the origins a browser can open the console on: the
+// public base's, plus each of server.console_origins.
+func consoleOrigins(publicBase string, extra []string) ([]string, error) {
+	own, err := publicOrigin(publicBase)
+	if err != nil {
+		return nil, err
+	}
+	configured, err := configuredConsoleOrigins(extra)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{own}, configured...), nil
+}
+
+// configuredConsoleOrigins are the entries of server.console_origins as a
+// browser sends them; a blank entry names none.
+func configuredConsoleOrigins(entries []string) ([]string, error) {
+	var origins []string
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		origin, err := consoleOrigin(entry)
+		if err != nil {
+			return nil, fmt.Errorf("server.console_origins: %q is not an origin: %w", entry, err)
+		}
+		origins = append(origins, origin)
+	}
+	return origins, nil
+}
+
+// consoleOrigin is entry as a browser sends it in an Origin header. What a
+// browser never sends there would never match, so it is refused rather than
+// dropped: a path, query or credentials, a wildcard, an empty port, or a host
+// not in its ASCII (punycode) form.
+func consoleOrigin(entry string) (string, error) {
+	u, err := url.Parse(entry)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case u.User != nil || (u.Path != "" && u.Path != "/") || strings.ContainsAny(entry, "?#"):
+		return "", errors.New("an origin is scheme://host[:port] and nothing more")
+	case strings.Contains(u.Host, "*"):
+		return "", errors.New("an origin names one host, not a pattern")
+	case strings.HasSuffix(u.Host, ":"):
+		return "", errors.New("an origin's port is never empty")
+	case strings.IndexFunc(u.Host, func(r rune) bool { return r > unicode.MaxASCII }) >= 0:
+		return "", errors.New("a browser sends the host in its ASCII (punycode) form")
+	}
+	return browserOrigin(entry)
+}
+
+// browserOrigin is the origin of raw as a browser sends it: lowercase, with no
+// path and no default port.
+func browserOrigin(raw string) (string, error) {
+	base, err := url.Parse(raw)
+	if err != nil {
+		return "", err
 	}
 	host := base.Host
 	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
 		host = strings.TrimSuffix(host, ":"+port)
 	}
-	origin, err := domain.NormalizeOrigin(base.Scheme + "://" + host)
-	if err != nil {
-		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
-	}
-	return origin, nil
+	return domain.NormalizeOrigin(base.Scheme + "://" + host)
 }
 
 // ----------------------------- CONFIG --------------------------------------
@@ -614,6 +675,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
+	v.SetDefault("server.console_origins", []string{})
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)

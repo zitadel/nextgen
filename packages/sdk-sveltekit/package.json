@@ -1,6 +1,6 @@
 {
   "name": "@zitadel/sdk-sveltekit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SvelteKit handle hook and helpers for Zitadel",
   "homepage": "https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit#readme",
   "bugs": {

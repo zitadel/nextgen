@@ -76,6 +76,27 @@ func TestConsoleBaseURL(t *testing.T) {
 	}
 }
 
+func TestConsoleOrigins(t *testing.T) {
+	got, err := consoleOrigins("https://zitadel.example.com/nextgen", []string{" https://Console.Example.com:443 ", ""})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://zitadel.example.com", "https://console.example.com"}, got,
+		"the public base's origin first, then each configured one as a browser sends it")
+
+	// A browser never sends these as an Origin, so they would never match.
+	for _, entry := range []string{
+		"console.example.com",
+		"https://console.example.com/path",
+		"https://console.example.com?q",
+		"https://user:pass@console.example.com",
+		"https://*.vercel.app",
+		"https://console.example.com:",
+		"https://bücher.example",
+	} {
+		_, err = consoleOrigins("https://zitadel.example.com", []string{entry})
+		require.ErrorContains(t, err, "server.console_origins", entry)
+	}
+}
+
 func TestPublicOrigin(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -273,6 +294,19 @@ func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"user_platformadmin", "user_01H0000000000000000000000"}, cfg.Platform.Operators)
+}
+
+func TestLoadConfigReadsConsoleOriginsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", "https://a.example.com,https://b.example.com")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"https://a.example.com", "https://b.example.com"}, cfg.Server.ConsoleOrigins)
 }
 
 // TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record

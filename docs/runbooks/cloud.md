@@ -60,7 +60,9 @@ same origin.
 The launcher pins what follows from this layout (listen address from
 `PORT`, console off with its links at `/console`) and defaults the rest
 (platform project bootstrapped, JSON logs, public base from Vercel's URL).
-Any `NEXTGEN_*` variable overrides a default.
+Any `NEXTGEN_*` variable overrides a default. The URLs Vercel serves a
+deployment at are added to `NEXTGEN_SERVER_CONSOLE_ORIGINS`, never replaced
+by it.
 
 ## Built-in schemas
 

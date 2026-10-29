@@ -1,5 +1,12 @@
 # @zitadel/sdk-core
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [[`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3), [`ae0f5eb`](https://github.com/zitadel/nextgen/commit/ae0f5ebf8de64dde144b4748307df315b09607f3)]:
+  - @zitadel/api@0.3.0
+
 ## 0.2.0
 
 ### Patch Changes
