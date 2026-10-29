@@ -1,0 +1,75 @@
+x-meta-schema: true
+title: App
+description: |
+  One piece of software that uses Zitadel, with every config it holds: its OAuth and OIDC clients,
+  the APIs it serves, and whether other clients may register into it. The same document is a file
+  in the release (`.zitadel/apps/<slug>.json`) and the body of `POST /apps`.
+type: object
+required:
+- slug
+- name
+additionalProperties: false
+properties:
+  $schema:
+    type: string
+    minLength: 1
+    description: 'Editor affordance: path or URL of this schema so editors validate and autocomplete the
+      file (scaffolded app files point at `.zitadel/meta/app.json`). Ignored by the platform.'
+  slug:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*$
+    maxLength: 64
+    description: Stable identifier of the app, unique within the project and fixed for its life.
+      Flows, branding and other apps name it.
+    examples:
+    - shop
+  name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: The app's name, shown on the consent screen.
+    examples:
+    - Shop
+  logo_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's logo, shown on the consent and account-choice screens. The display fields
+      are those a client ID metadata document carries (RFC 7591), so the screens read both alike.
+  client_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's home page, linked from the consent screen.
+  policy_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's privacy policy, linked from the consent screen.
+  tos_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's terms of service, linked from the consent screen.
+  preset:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*$
+    maxLength: 64
+    description: The preset the app was made from, such as `web` or `service-account`. A label for
+      the console and agents; it carries no behavior, which comes only from the configs.
+    examples:
+    - web
+  clients:
+    type: array
+    maxItems: 20
+    items:
+      $ref: app-client.yaml
+    description: The app's OAuth and OIDC clients. A slug is unique among the app's clients and APIs.
+  apis:
+    type: array
+    maxItems: 20
+    items:
+      $ref: app-api.yaml
+    description: The APIs the app serves, MCP servers among them.
+  registration:
+    $ref: app-registration.yaml

@@ -1,0 +1,7 @@
+name: revision_id
+in: path
+required: true
+description: The id of one revision of an app, the value a release pins.
+schema:
+  type: string
+example: apprev_01KWH3B72K7M7F0N9WD3P2E4YN

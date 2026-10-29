@@ -108,6 +108,29 @@ upgrade, so upgrade the app and rerun rather than retrying.
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary.
+- **Apps.** `zitadel apps create <slug> --preset <preset>` writes
+  `.zitadel/apps/<slug>.json`: one document per app, holding its OAuth and OIDC
+  clients and the APIs it serves; the next `deploy` declares it. The presets
+  are `web`, `spa`, `native`, `cli`, `api`, `backend`, `service-account` and
+  `mcp-server`. Pass `--redirect-uri` (repeatable) to a preset that signs users
+  in and `--identifier` to one that serves an API; a missing one fails with
+  `E_VALIDATION` naming the flag. A confidential client's secret is a
+  `${{ NAME }}` variable: `data.variables` names each one, and `next_commands`
+  sets it (`variable set <NAME> --secret`) before the `deploy`. The file is
+  yours to edit, and the command never overwrites one (`E_CONFLICT`).
+  `--registered` writes the same document through the API instead, for an app
+  a product creates outside its repository: `data.clients` holds each
+  client's `client_id`, and `data.client_secrets` the generated secrets, shown
+  once. `apps list` and `apps get` read what the server holds; a declared app
+  changes only with a release, and the API refuses a write to it
+  (`app.declared`).
+- **Client registrations.** A client that registered itself through dynamic
+  client registration belongs to the project, not to an app, and expires an
+  hour after registering unless a user consented to it.
+  `client-registrations list` and `get` show what clients claim about
+  themselves; `client-registrations delete <id>` also deletes the consents
+  users gave the client and their tokens. Clients register at the
+  authorization server, so there is no `create`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need

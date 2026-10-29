@@ -34,6 +34,7 @@ Individual decisions are marked inline in each doc:
 8. [`authz-testing.md`](authz-testing.md) — L1–L4 fuzzy/property strategy for compiler, persist, and (later) resolver oracles.
 9. [`security-and-origins.md`](security-and-origins.md) — environment-gated origin wildcards, CORS, CSRF.
 10. [`resource-map.md`](resource-map.md) — the full endpoint surface grouped by concern.
+11. [`apps.md`](apps.md) — the app document: clients, APIs and registration in one document, its storage, release path and the directory the authorization server reads.
 
 ## Sibling doc sets
 

@@ -1,0 +1,137 @@
+post:
+  operationId: createApp
+  x-zitadel-cli: apps create
+  summary: Create or revise an app
+  description: |
+    Creates or revises an app document. If the slug is new in the project, the
+    app is created; if an app this endpoint registered has the slug, the
+    document becomes its new revision. An app the release declares
+    (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
+    one is refused with `app.declared`.
+
+    The answer carries what comes next: the `client_id` of each client, and a
+    generated secret for each confidential client that had none, shown once.
+    A client keeps its `client_id` for life: one the document leaves out is
+    minted on first write and kept, one it sets is used as given, and a
+    revision that changes it is refused with `app.field_immutable`. No two
+    clients in a project share a `client_id`, and no two apps an API
+    identifier.
+
+    The document is validated against the `app.json` schema, then against the
+    rules across its fields: a client's `apis` name APIs the app serves, a
+    redirect URI is https or a loopback http URI in canonical form, and a
+    registered app's secrets come from the server, never a `${{ NAME }}`
+    reference. A refused document stores nothing.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.write
+  parameters:
+    - $ref: ../../components/parameters/project-id.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: create-app-request.yaml
+        examples:
+          shop:
+            summary: A web app with an API
+            value:
+              app:
+                slug: shop
+                name: Shop
+                preset: web
+                clients:
+                  - slug: web
+                    type: confidential
+                    grants:
+                      - authorization_code
+                      - refresh_token
+                    redirect_uris:
+                      - https://shop.example.com/callback
+                    apis:
+                      - api: orders
+                apis:
+                  - slug: orders
+                    identifier: https://api.shop.example.com
+                    scopes:
+                      - name: orders.read
+                        description: Read your orders
+  responses:
+    '200':
+      description: The app after the revision.
+      content:
+        application/json:
+          schema:
+            $ref: app-response.yaml
+    '201':
+      description: The app after creation.
+      content:
+        application/json:
+          schema:
+            $ref: app-response.yaml
+          examples:
+            created:
+              summary: A newly registered app
+              value:
+                id: app_01KWH3B72K7M7F0N9WD3P2E4YM
+                revision_id: apprev_01KWH3B72K7M7F0N9WD3P2E4YN
+                slug: shop
+                source: registered
+                created_at: '2026-10-28T09:11:00Z'
+                updated_at: '2026-10-28T09:11:00Z'
+                definition:
+                  slug: shop
+                  name: Shop
+                  clients:
+                    - slug: web
+                      type: confidential
+                      grants:
+                        - authorization_code
+                        - refresh_token
+                      redirect_uris:
+                        - https://shop.example.com/callback
+                clients:
+                  - slug: web
+                    client_id: client_01KWH3B72K7M7F0N9WD3P2E4YP
+                client_secrets:
+                  - client: web
+                    secret: zcs_9h2Qx2nU1yQ8mXkP0r4sT7vW5zA3bC6dE8fG1hJ2kL4
+    '400':
+      description: |
+        The document failed schema validation or the rules across its fields,
+        or a revision changes a client's `client_id`.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '404':
+      description: Project not found.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    '409':
+      description: |
+        The slug names an app the release declares, or a `client_id` or API
+        identifier another app in the project holds.
+      content:
+        application/json:
+          schema:
+            $ref: ../../components/error-details.yaml
+    default:
+      $ref: createApp-error-response.yaml

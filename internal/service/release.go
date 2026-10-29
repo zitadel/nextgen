@@ -65,20 +65,23 @@ type releaseService struct {
 	flows    *flowDefinitionService
 	branding *BrandingService
 	idps     *idpConnectionService
+	apps     *appService
 	policies *PolicyService
 	// builtinBases resolves a schema given as a built-in schema's `$id` under
 	// whichever base the project stores it; the release pins the row found.
 	builtinBases domain.BuiltinSchemaBases
 }
 
-// NewReleaseService wires Build's kind writers. flows and idps are the
-// concretes from NewFlowDefinitionService and NewIDPConnectionService.
+// NewReleaseService wires Build's kind writers. flows, idps and apps are the
+// concretes from NewFlowDefinitionService, NewIDPConnectionService and
+// NewAppService.
 func NewReleaseService(
 	v2Pool *DB,
 	schemas *SchemaService,
 	flows *flowDefinitionService,
 	branding *BrandingService,
 	idps *idpConnectionService,
+	apps *appService,
 	policies *PolicyService,
 	builtinBases domain.BuiltinSchemaBases,
 ) ReleaseService {
@@ -88,6 +91,7 @@ func NewReleaseService(
 		flows:        flows,
 		branding:     branding,
 		idps:         idps,
+		apps:         apps,
 		policies:     policies,
 		builtinBases: builtinBases,
 	}

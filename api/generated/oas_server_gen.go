@@ -8,6 +8,16 @@ import (
 
 // Handler handles operations described by OpenAPI v3 specification.
 type Handler interface {
+	// AddAppClientSecret implements addAppClientSecret operation.
+	//
+	// Adds a secret to a confidential client of an app registered through the
+	// API: a generated one, shown once, or an imported value or hash, so a client
+	// with a secret it cannot change keeps working. An app the release declares
+	// names its secrets as `${{ NAME }}` variables instead, and is refused with
+	// `app.declared`.
+	//
+	// POST /apps/{id}/clients/{client}/secrets
+	AddAppClientSecret(ctx context.Context, req *AddAppClientSecretRequest, params AddAppClientSecretParams) (AddAppClientSecretRes, error)
 	// AddOrigin implements addOrigin operation.
 	//
 	// Adds one `{pattern, kind}` to the project's origins. A primary pattern
@@ -70,6 +80,28 @@ type Handler interface {
 	//
 	// POST /projects/{project_id}/claim/complete
 	CompleteClaim(ctx context.Context, req *CompleteClaimRequest, params CompleteClaimParams) (CompleteClaimRes, error)
+	// CreateApp implements createApp operation.
+	//
+	// Creates or revises an app document. If the slug is new in the project, the
+	// app is created; if an app this endpoint registered has the slug, the
+	// document becomes its new revision. An app the release declares
+	// (`.zitadel/apps/<slug>.json`) changes only with a release, and a write to
+	// one is refused with `app.declared`.
+	// The answer carries what comes next: the `client_id` of each client, and a
+	// generated secret for each confidential client that had none, shown once.
+	// A client keeps its `client_id` for life: one the document leaves out is
+	// minted on first write and kept, one it sets is used as given, and a
+	// revision that changes it is refused with `app.field_immutable`. No two
+	// clients in a project share a `client_id`, and no two apps an API
+	// identifier.
+	// The document is validated against the `app.json` schema, then against the
+	// rules across its fields: a client's `apis` name APIs the app serves, a
+	// redirect URI is https or a loopback http URI in canonical form, and a
+	// registered app's secrets come from the server, never a `${{ NAME }}`
+	// reference. A refused document stores nothing.
+	//
+	// POST /apps
+	CreateApp(ctx context.Context, req *CreateAppRequest, params CreateAppParams) (CreateAppRes, error)
 	// CreateAuthAttempt implements createAuthAttempt operation.
 	//
 	// Starts a new authentication attempt. This is the entry point for the auth_attempts state machine.
@@ -321,6 +353,14 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
+	// DeleteClientRegistration implements deleteClientRegistration operation.
+	//
+	// Deletes a client that registered itself, together with the consents users
+	// gave it and the tokens issued under them, so the client can no longer get
+	// or refresh a token. Emits `client_registration.deleted`.
+	//
+	// DELETE /client_registrations/{id}
+	DeleteClientRegistration(ctx context.Context, params DeleteClientRegistrationParams) (DeleteClientRegistrationRes, error)
 	// DeleteGrant implements deleteGrant operation.
 	//
 	// Soft-revokes a grant this API manages and emits `authz.revoked`.
@@ -425,6 +465,22 @@ type Handler interface {
 	//
 	// POST /users/{user_id}/passkeys/registrations/{registration_id}
 	FinishUserPasskeyRegistration(ctx context.Context, req *FinishUserPasskeyRegistrationRequest, params FinishUserPasskeyRegistrationParams) (FinishUserPasskeyRegistrationRes, error)
+	// GetAppById implements getAppById operation.
+	//
+	// Reads an app by its id, at its newest revision, with the `client_id` of
+	// each client. `GET /apps/{id}/revisions` lists every revision.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /apps/{id}
+	GetAppById(ctx context.Context, params GetAppByIdParams) (GetAppByIdRes, error)
+	// GetAppRevisionById implements getAppRevisionById operation.
+	//
+	// Reads one revision of an app by its `revision_id`, the value a release
+	// pins.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /apps/revisions/{revision_id}
+	GetAppRevisionById(ctx context.Context, params GetAppRevisionByIdParams) (GetAppRevisionByIdRes, error)
 	// GetAuthAttempt implements getAuthAttempt operation.
 	//
 	// Polls the current state of an authentication attempt.
@@ -465,6 +521,13 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/claim/window
 	GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (GetClaimWindowRes, error)
+	// GetClientRegistrationById implements getClientRegistrationById operation.
+	//
+	// Reads a client that registered itself through dynamic client registration,
+	// by its client_id. The lookup is scoped to the project in `project_id`.
+	//
+	// GET /client_registrations/{id}
+	GetClientRegistrationById(ctx context.Context, params GetClientRegistrationByIdParams) (GetClientRegistrationByIdRes, error)
 	// GetDeploymentById implements getDeploymentById operation.
 	//
 	// Reads one deployment record.
@@ -736,6 +799,14 @@ type Handler interface {
 	//
 	// POST /auth_attempts/{attempt_id}/challenges
 	IssueChallenge(ctx context.Context, req *IssueChallengeRequest, params IssueChallengeParams) (IssueChallengeRes, error)
+	// ListAppRevisions implements listAppRevisions operation.
+	//
+	// Returns every revision of one app, newest first, paginated with a cursor.
+	// The order is fixed, so there is no `sorting`.
+	// The lookup is scoped to the project in `project_id`.
+	//
+	// GET /apps/{id}/revisions
+	ListAppRevisions(ctx context.Context, params ListAppRevisionsParams) (ListAppRevisionsRes, error)
 	// ListBranding implements listBranding operation.
 	//
 	// Lists branding revisions for the project, newest first, capped at the
@@ -988,6 +1059,22 @@ type Handler interface {
 	//
 	// POST /policies
 	PublishPolicy(ctx context.Context, req PublishPolicyRequest, params PublishPolicyParams) (PublishPolicyRes, error)
+	// QueryApps implements queryApps operation.
+	//
+	// Returns the apps of a project, paginated with a cursor. One row per app,
+	// carrying its newest revision and the `client_id` of each client.
+	//
+	// POST /apps/query
+	QueryApps(ctx context.Context, req *QueryAppsRequest, params QueryAppsParams) (QueryAppsRes, error)
+	// QueryClientRegistrations implements queryClientRegistrations operation.
+	//
+	// Returns the clients that registered themselves into the project through
+	// dynamic client registration (RFC 7591), paginated with a cursor. Clients
+	// register at the authorization server's registration endpoint, never
+	// through this API.
+	//
+	// POST /client_registrations/query
+	QueryClientRegistrations(ctx context.Context, req *QueryClientRegistrationsRequest, params QueryClientRegistrationsParams) (QueryClientRegistrationsRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.

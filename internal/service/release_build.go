@@ -26,6 +26,12 @@ type BuildIDP struct {
 	Document []byte
 }
 
+// BuildApp is one apps[] entry.
+type BuildApp struct {
+	Index    int
+	Document []byte
+}
+
 // BuildPolicy is one policies[] entry: the operation and the config its
 // template validates.
 type BuildPolicy struct {
@@ -46,6 +52,7 @@ type BuildReleaseInput struct {
 	Schemas         []BuildSchema
 	FlowDefinitions []BuildFlowDefinition
 	IDPs            []BuildIDP
+	Apps            []BuildApp
 	Policies        []BuildPolicy
 	Branding        *CreateBrandingInput
 	Message         *string
@@ -56,6 +63,12 @@ type BuildReleaseInput struct {
 type preparedIDP struct {
 	index    int
 	slug     string
+	document []byte
+}
+
+type preparedApp struct {
+	index    int
+	doc      domain.AppDocument
 	document []byte
 }
 
@@ -90,6 +103,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 
 	preparedSchemas, schemaByHandle := s.prepareBundleSchemas(input, failures)
 	preparedIDPs := s.prepareBundleIDPs(input, failures)
+	preparedApps := s.prepareBundleApps(input, failures)
 	preparedPolicies, err := s.prepareBundlePolicies(ctx, input, failures)
 	if err != nil {
 		return nil, err
@@ -105,7 +119,7 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 	// In-tx checks (flows, schema-URL resolve, IDP immutables) can still add
 	// to the bag. When nothing in-tx can run, surface pure-prepare failures
 	// without opening a transaction.
-	needsInTxChecks := len(input.FlowDefinitions) > 0 || hasSchemaURL(input.Schemas) || len(preparedIDPs) > 0
+	needsInTxChecks := len(input.FlowDefinitions) > 0 || hasSchemaURL(input.Schemas) || len(preparedIDPs) > 0 || len(preparedApps) > 0
 	if !needsInTxChecks && len(failures.Resources) > 0 {
 		return nil, failures
 	}
@@ -165,6 +179,20 @@ func (s *releaseService) Build(ctx context.Context, input BuildReleaseInput) (_ 
 				return err
 			}
 			content.IDPConnections = append(content.IDPConnections, connection.Connection)
+		}
+		for _, prepared := range preparedApps {
+			app, err := s.apps.resolveOrCreateDeclared(ctx, stmts, input.ProjectID, prepared.doc, prepared.document)
+			if err != nil {
+				if de, ok := errors.AsType[domain.Error](err); ok && appRefusal(de) {
+					failures.add(domain.ReleasePointerKindApp, prepared.index, prepared.doc.Slug, de)
+					continue
+				}
+				return err
+			}
+			content.Apps = append(content.Apps, app.App)
+		}
+		if len(failures.Resources) > 0 {
+			return failures
 		}
 		for _, prepared := range preparedPolicies {
 			revision, err := s.policies.resolveOrPublish(ctx, stmts, input.ProjectID, prepared.operation, prepared.config)
@@ -236,6 +264,10 @@ func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
 	for i, flow := range input.FlowDefinitions {
 		flows[i] = domain.BundleShapeFlow{Index: flow.Index, Name: flow.Request.Name}
 	}
+	apps := make([]domain.BundleShapeApp, len(input.Apps))
+	for i, app := range input.Apps {
+		apps[i] = domain.BundleShapeApp{Index: app.Index, Document: app.Document}
+	}
 	idps := make([]domain.BundleShapeIDP, len(input.IDPs))
 	for i, idp := range input.IDPs {
 		idps[i] = domain.BundleShapeIDP{Index: idp.Index, Document: idp.Document}
@@ -248,6 +280,7 @@ func bundleShapeInput(input BuildReleaseInput) domain.BundleShapeInput {
 		Schemas:     schemas,
 		Flows:       flows,
 		IDPs:        idps,
+		Apps:        apps,
 		Policies:    policies,
 		HasBranding: input.Branding != nil,
 	}
@@ -413,6 +446,41 @@ func resolveBundleOrProjectSchema(
 		return schema, nil
 	}
 	return resolveUserSchema(ctx, stmts, bases, projectID, handle)
+}
+
+// prepareBundleApps validates each bundled app as a declared one: the
+// meta-schema, then the rules across its fields.
+func (s *releaseService) prepareBundleApps(input BuildReleaseInput, failures *BundleValidationError) []preparedApp {
+	apps := make([]preparedApp, 0, len(input.Apps))
+	for _, app := range input.Apps {
+		if shapeFailed(failures, domain.ReleasePointerKindApp, app.Index) {
+			continue
+		}
+		doc, err := s.apps.validate(app.Document, domain.AppSourceDeclared)
+		if err != nil {
+			slug, _ := domain.IDPDocumentSlug(app.Document)
+			failures.add(domain.ReleasePointerKindApp, app.Index, slug, err)
+			continue
+		}
+		apps = append(apps, preparedApp{index: app.Index, doc: doc, document: app.Document})
+	}
+	return apps
+}
+
+// appRefusal reports whether writing a bundled app failed on what the bundle
+// says, so the release is refused naming the app, rather than on the server.
+func appRefusal(err domain.Error) bool {
+	for _, refusal := range []domain.Error{
+		domain.ErrAppDeclared(),
+		domain.ErrAppFieldImmutable(nil),
+		domain.ErrAppClientIDTaken(nil),
+		domain.ErrAppIdentifierTaken(nil),
+	} {
+		if err.Code == refusal.Code {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *releaseService) prepareBundleIDPs(input BuildReleaseInput, failures *BundleValidationError) []preparedIDP {

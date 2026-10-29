@@ -28,6 +28,7 @@ const (
 	ReleasePointerKindBranding
 	ReleasePointerKindIDP
 	ReleasePointerKindPolicy
+	ReleasePointerKindApp
 )
 
 // ReleaseBrandingHandle is the handle every branding pointer carries. Branding
@@ -165,6 +166,7 @@ type ReleaseContent struct {
 	Schemas         []*JSONSchema
 	FlowDefinitions []*FlowDefinition
 	IDPConnections  []*IDPConnection
+	Apps            []*App
 	Policies        []*Policy
 	Branding        *Branding
 }
@@ -195,6 +197,9 @@ func (c ReleaseContent) pointers() ([]ReleasePointer, error) {
 	}
 	for _, idp := range c.IDPConnections {
 		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindIDP, Handle: idp.Slug, RevisionID: idp.RevisionID})
+	}
+	for _, app := range c.Apps {
+		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindApp, Handle: app.Slug, RevisionID: app.RevisionID})
 	}
 	for _, policy := range c.Policies {
 		pointers = append(pointers, ReleasePointer{Kind: ReleasePointerKindPolicy, Handle: policy.Operation, RevisionID: policy.RevisionID})

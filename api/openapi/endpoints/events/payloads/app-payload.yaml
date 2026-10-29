@@ -1,0 +1,31 @@
+title: AppPayload
+type: object
+description: |
+  Shared allowlisted fields for `app.created` (snapshot) and `app.updated`
+  (delta: only changed fields present, plus the new `revision_id`). The app id
+  is the event's `entity_id`. The document is never included: a declared
+  app's secret references and its redirect URIs stay out of the stream, and
+  the slugs of what the app holds say what changed.
+required:
+  - revision_id
+properties:
+  slug:
+    type: string
+  source:
+    type: string
+    description: '`declared` or `registered`.'
+  name:
+    type: string
+  clients:
+    type: array
+    description: The slugs of the app's clients; on `app.updated`, present only when they changed.
+    items:
+      type: string
+  apis:
+    type: array
+    description: The slugs of the app's APIs; on `app.updated`, present only when they changed.
+    items:
+      type: string
+  revision_id:
+    type: string
+    description: The revision the write appended.

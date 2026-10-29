@@ -1,0 +1,58 @@
+x-meta-schema: true
+title: AppAPI
+description: |
+  An API the app serves, an MCP server among them. Its identifier is the `aud` of every access token
+  for it, and a token is for one API (RFC 8707).
+type: object
+required:
+- slug
+- identifier
+additionalProperties: false
+properties:
+  slug:
+    type: string
+    pattern: ^[a-z0-9][a-z0-9_-]*$
+    maxLength: 64
+    description: Stable identifier of the API, unique among the app's clients and APIs. Clients of
+      other apps name it as `<app>/<api>`.
+    examples:
+    - orders
+    - mcp
+  name:
+    type: string
+    minLength: 1
+    maxLength: 256
+    description: Shown on the consent screen. Optional.
+  identifier:
+    type: string
+    pattern: ^(https://|http://|urn:)
+    maxLength: 2048
+    description: |
+      The API's canonical URI: what a client sends as `resource` and what its access tokens carry as
+      `aud`. An `https` URL, an `http` URL on a loopback host while developing, or a `urn:`. An MCP
+      server's identifier is the URL clients connect to (RFC 9728). No two APIs in a project share
+      an identifier, and an identifier an app has used stays with that app.
+    examples:
+    - https://api.shop.example.com
+    - https://shop.example.com/mcp
+  scopes:
+    type: array
+    maxItems: 100
+    items:
+      $ref: app-api-scope.yaml
+    description: |
+      The scopes the API defines on top of the built-in OpenID Connect ones. A request for a scope
+      neither defines fails with `invalid_scope`; it is never dropped silently. Granted scopes reach
+      the token in `scope` only, never as claims.
+  signing_alg:
+    type: string
+    enum:
+    - RS256
+    - ES256
+    description: The algorithm access tokens for the API are signed with. RS256 when left out
+      (ADR 082 §7).
+  third_party:
+    type: boolean
+    description: Lets clients that registered themselves into the app (client ID metadata documents
+      or dynamic registration) ask for this API and any of its scopes, each with the user's consent.
+      Off when left out.

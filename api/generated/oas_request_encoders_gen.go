@@ -10,6 +10,20 @@ import (
 	ht "github.com/ogen-go/ogen/http"
 )
 
+func encodeAddAppClientSecretRequest(
+	req *AddAppClientSecretRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
 func encodeAddOriginRequest(
 	req *ProjectOrigin,
 	r *http.Request,
@@ -54,6 +68,20 @@ func encodeBuildReleaseRequest(
 
 func encodeCompleteClaimRequest(
 	req *CompleteClaimRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeCreateAppRequest(
+	req *CreateAppRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"
@@ -348,6 +376,34 @@ func encodePatchUserByIDRequest(
 
 func encodePublishPolicyRequest(
 	req PublishPolicyRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryAppsRequest(
+	req *QueryAppsRequest,
+	r *http.Request,
+) error {
+	const contentType = "application/json"
+	e := new(jx.Encoder)
+	{
+		req.Encode(e)
+	}
+	encoded := e.Bytes()
+	ht.SetBody(r, bytes.NewReader(encoded), contentType)
+	return nil
+}
+
+func encodeQueryClientRegistrationsRequest(
+	req *QueryClientRegistrationsRequest,
 	r *http.Request,
 ) error {
 	const contentType = "application/json"

@@ -3,6 +3,9 @@ description: |
   Discriminated wide-event union (ADR 048 / ADR 049). Clients select the
   member via event_type; each member carries a typed payload.
 oneOf:
+  - $ref: types/app-client_secret-added-event.yaml
+  - $ref: types/app-created-event.yaml
+  - $ref: types/app-updated-event.yaml
   - $ref: types/auth-attempt-created-event.yaml
   - $ref: types/auth-attempt-handed_off-event.yaml
   - $ref: types/auth-check-failed-event.yaml
@@ -17,6 +20,8 @@ oneOf:
   - $ref: types/authz-granted-event.yaml
   - $ref: types/authz-revoked-event.yaml
   - $ref: types/branding-created-event.yaml
+  - $ref: types/client_registration-created-event.yaml
+  - $ref: types/client_registration-deleted-event.yaml
   - $ref: types/deployment-created-event.yaml
   - $ref: types/flowdef-created-event.yaml
   - $ref: types/flowdef-deleted-event.yaml
@@ -50,6 +55,9 @@ oneOf:
 discriminator:
   propertyName: event_type
   mapping:
+    app.client_secret.added: types/app-client_secret-added-event.yaml
+    app.created: types/app-created-event.yaml
+    app.updated: types/app-updated-event.yaml
     auth.attempt.created: types/auth-attempt-created-event.yaml
     auth.attempt.handed_off: types/auth-attempt-handed_off-event.yaml
     auth.check.failed: types/auth-check-failed-event.yaml
@@ -64,6 +72,8 @@ discriminator:
     authz.granted: types/authz-granted-event.yaml
     authz.revoked: types/authz-revoked-event.yaml
     branding.created: types/branding-created-event.yaml
+    client_registration.created: types/client_registration-created-event.yaml
+    client_registration.deleted: types/client_registration-deleted-event.yaml
     deployment.created: types/deployment-created-event.yaml
     flowdef.created: types/flowdef-created-event.yaml
     flowdef.deleted: types/flowdef-deleted-event.yaml
