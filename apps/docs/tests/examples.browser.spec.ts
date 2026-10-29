@@ -61,6 +61,70 @@ test("the components page renders its atoms", async ({ page }) => {
     .toEqual(["zl-button", "zl-field", "zl-alert", "zl-checkbox", "zl-pill"]);
 });
 
+test("the playground uses the reader's session after visiting a live example", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const origin = new URL(baseURL!).origin;
+  const csrfToken = "docs-regression-csrf";
+  const calls: string[] = [];
+  let writeCsrf: string | undefined;
+
+  // Intercept the network below the example's worker. A page route misses
+  // the worker's own fetches; a context route answers those too, so this
+  // test never writes real data when it runs against a deployment.
+  await context.route(
+    (url) =>
+      url.origin === origin &&
+      ["/sessions/me", "/sessions/me/csrf", "/teams"].includes(url.pathname),
+    async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      calls.push(`${request.method()} ${path}`);
+      if (path === "/sessions/me") {
+        await route.fulfill({
+          json: { user: { user_id: "usr_docs_test", display: "Docs regression reader" } },
+        });
+      } else if (path === "/sessions/me/csrf") {
+        await route.fulfill({ json: { csrf_token: csrfToken } });
+      } else {
+        writeCsrf = request.headers()["x-zitadel-csrf"];
+        await route.fulfill({ status: 201, json: { id: "team_docs_test", name: "Docs test" } });
+      }
+    },
+  );
+
+  await page.goto("/docs/sdks/components");
+  const login = page.locator("zitadel-login");
+  await login.getByRole("textbox", { name: /^Email/ }).fill("ada@example.com");
+  await login.getByRole("button", { name: "Continue" }).click();
+  await expect(login.getByText("Enter your password")).toBeVisible();
+
+  // Preserve this document and its running mock across the navigation.
+  // A full reload would hide the collision by removing MSW's page handlers.
+  const document = await page.locator("html").elementHandle();
+  const sidebar = page.locator("#nd-sidebar");
+  await sidebar.getByRole("link", { name: "API reference", exact: true }).click();
+  await sidebar.getByRole("link", { name: "Teams", exact: true }).click();
+  await sidebar.getByRole("link", { name: /^Create team/ }).click();
+  await expect(page).toHaveURL(/\/docs\/reference\/api\/teams\/createTeam$/);
+  expect(await document!.evaluate((element) => element.isConnected)).toBe(true);
+
+  await page.getByRole("button", { name: "Try in Playground" }).click();
+  const playground = page.getByRole("dialog", { name: "Create team" });
+  await expect(
+    playground.getByText("Sent with your session, signed in as", { exact: false }),
+  ).toContainText("Docs regression reader");
+  await playground.getByRole("textbox", { name: "name", exact: true }).fill("Docs test");
+  await playground.getByRole("button", { name: /^Send/ }).click();
+
+  await expect
+    .poll(() => calls)
+    .toEqual(["GET /sessions/me", "GET /sessions/me/csrf", "POST /teams"]);
+  expect(writeCsrf).toBe(csrfToken);
+});
+
 test("the design guide's login wears the stylesheet it shows", async ({ page }) => {
   await page.goto("/docs/guides/customize-design");
   const button = page.locator("zitadel-login").getByRole("button", { name: /continue/i });
