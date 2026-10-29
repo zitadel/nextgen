@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -44,21 +44,24 @@ describe("variable resolve", () => {
   describe("against a valid server", () => {
     describe("--json", () => {
       it("is a miss when nothing is deployed", async () => {
-        const app = await aSetUpApp();
+        const app = await anUndeployedEnvironment();
 
-        const result = await app.resolveVariables();
+        const result = await app.run(["variable", "resolve", "--env", "staging", "--json"]);
 
         expect(result).toFailWith("E_NOT_FOUND");
       });
 
-      it("says the server cannot hand back a deployment's variables yet", async () => {
+      it("resolves the variables the live deployment froze", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
+        await app.setVariable("HOST", "app.acme.com");
         await app.deployData();
 
         const result = await app.resolveVariables();
 
-        expect(result).toFailWith("E_NETWORK");
+        expect(result).toSucceed();
+        const data = app.envelopeOf<{ items: { name: string }[] }>(result).data;
+        expect(data.items.map((item) => item.name)).toContain("HOST");
       });
 
       it("is a miss for an origin with nothing deployed", async () => {

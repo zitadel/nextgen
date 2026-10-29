@@ -113,15 +113,15 @@ describe("setup", () => {
 
   describe("against a valid server", () => {
     describe("--json", () => {
-      it("publishes nothing, leaving the deploy to the developer", async () => {
+      it("deploys what it wrote, so the first sign-in is served a release", async () => {
         const app = await anApp();
 
         await app.setup();
 
-        expect(await app.liveDeploymentCount()).toBe(0);
+        expect(await app.liveDeploymentCount()).toBe(1);
       });
 
-      it("names the deploy that publishes what it wrote", async () => {
+      it("names the deploy that publishes an edit", async () => {
         const app = await anApp();
 
         const result = await app.setup();
@@ -131,14 +131,14 @@ describe("setup", () => {
         ).toContain("deploy -m '<what changed>'");
       });
 
-      it("says the configuration is not live yet", async () => {
+      it("says an edit takes effect once it is deployed", async () => {
         const app = await anApp();
 
         const result = await app.setup();
 
         expect(
           app.envelopeOf<{ next_actions: string[] }>(result).data.next_actions.join("\n"),
-        ).toContain("Nothing is released yet");
+        ).toContain("serves only what is deployed");
       });
 
       it("reports the commit it made", async () => {

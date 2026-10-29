@@ -112,6 +112,7 @@ import {
   materializeSetupResources,
   type MaterializeSetupResourcesResult,
 } from "../../lib/setup-resources";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { installDependenciesForSetup } from "./install";
 import {
   assertCleanWorktree,
@@ -177,6 +178,9 @@ const RENDERER_FLAG_DESCRIPTION =
   UNAVAILABLE_RENDERER_IDS.length === 0
     ? "Renderer (default: react)."
     : `Renderer (default: react). Not yet available: ${UNAVAILABLE_RENDERER_IDS.join(", ")}.`;
+
+/** The message the release setup publishes carries. */
+const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel setup";
 
 /**
  * The selector appended to setup's credential-recovery commands. `variable set`
@@ -885,6 +889,37 @@ export default class Setup extends Promptable(BaseCommand) {
     // one after it can show no diff (#1651).
     const commit = await this.makeInitialCommit(cwd, dryRun, flags.git !== false);
 
+    // Setup publishes what it scaffolded, after the commit so the release
+    // records it, so the sign-in setup asks the developer to verify next is
+    // served that release rather than the newest stored revisions (#2331).
+    const deployment = await this.deployScaffoldedProject({
+      cwd,
+      server: answers.server,
+      project,
+      dryRun,
+      selector: recoverySelector(flags.cwd),
+    });
+    // A failed deploy leaves the project on its newest stored revisions
+    // rather than a release, so the deploy that fixes it leads both surfaces.
+    const deployCommand = projectCommand(
+      DEPLOY_ARGS,
+      recoverySelector(flags.cwd),
+      this.meta.cliVersion,
+    );
+    const deployStep =
+      deployment === undefined && !dryRun
+        ? {
+            actions: [`Deploy .zitadel/ so the project serves its release: ${deployCommand}`],
+            boxActions: [
+              {
+                text: "Deploy .zitadel/ so the project serves its release:",
+                command: deployCommand,
+              },
+            ],
+            commands: [deployCommand],
+          }
+        : { actions: [], boxActions: [], commands: [] as SuggestedCommand[] };
+
     const writtenRel = allFilesWritten.map((file) => relativeDisplay(cwd, file));
     // The nudge rides both surfaces from one decision: the box for humans, the
     // envelope for agents.
@@ -1026,6 +1061,7 @@ export default class Setup extends Promptable(BaseCommand) {
           ...this.connectionBlocks(answers.sso, connectionFiles, schemaFiles),
           "",
           renderBoxActions([
+            ...deployStep.boxActions,
             ...installOutcome.boxActions,
             ...consoleStep.boxActions,
             ...claimNudge.boxActions,
@@ -1108,7 +1144,19 @@ export default class Setup extends Promptable(BaseCommand) {
         }),
         // Branding guidance before the claim nudge: make it yours, then
         // claim to keep it (the same order the manifesto's journey walks).
+        // What setup's first deploy published, or null when there was none:
+        // a dry run, or a deploy that failed, which is a warning.
+        deployment:
+          deployment === undefined
+            ? null
+            : {
+                release_id: deployment.releaseId,
+                content_hash: deployment.contentHash,
+                deployment_id: deployment.deploymentId,
+                origins: [...deployment.origins],
+              },
         next_actions: [
+          ...deployStep.actions,
           ...installOutcome.nextActions,
           brandingGuidanceAction(this.meta.cliVersion),
           ...consoleStep.actions,
@@ -1138,6 +1186,7 @@ export default class Setup extends Promptable(BaseCommand) {
             this.meta.cliVersion,
             recoverySelector(flags.cwd),
           ),
+          ...deployStep.commands,
           ...installOutcome.nextCommands,
           ...consoleStep.commands,
           ...claimNudge.commands,
@@ -1189,6 +1238,50 @@ export default class Setup extends Promptable(BaseCommand) {
       );
     }
     return outcome;
+  }
+
+  /**
+   * Deploy `.zitadel/` to the project setup just created, to its primary
+   * origin. Narrated but never fatal: the app is scaffolded and committed, and
+   * a failure leaves the deploy one command away.
+   */
+  private async deployScaffoldedProject(opts: {
+    cwd: string;
+    server: string;
+    project: CreateProject201;
+    dryRun: boolean;
+    selector: EnvironmentSelector;
+  }): Promise<InitialDeployment | undefined> {
+    if (opts.dryRun) {
+      consola.info("Would deploy .zitadel/ to the project (dry run)");
+      return undefined;
+    }
+    const json = this.jsonEnabled();
+    consola.start("Deploying .zitadel/ to the project");
+    try {
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({
+          baseUrl: opts.server,
+          token: opts.project.project_secret,
+        }),
+        projectId: opts.project.id,
+        cwd: opts.cwd,
+        env: this.meta.env,
+        json,
+        color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
+        message: INITIAL_DEPLOY_MESSAGE,
+        suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
+      });
+      consola.success(
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} origin${deployment.origins.length === 1 ? "" : "s"}`,
+      );
+      return deployment;
+    } catch (error) {
+      reportWarning(
+        `The project was set up but its first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish .zitadel/.`,
+      );
+      return undefined;
+    }
   }
 
   /**
