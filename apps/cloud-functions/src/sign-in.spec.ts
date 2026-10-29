@@ -1,11 +1,17 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { forwardSignIn, isFlowWrite } from "./sign-in";
 
 const human = async () => ({ isBot: false, isVerifiedBot: false });
 const bot = async () => ({ isBot: true, isVerifiedBot: false });
 
-afterEach(() => vi.unstubAllGlobals());
+// Unset unless a test sets it, whatever the shell running the tests exports.
+beforeEach(() => vi.stubEnv("CLOUD_ZITADEL_URL", ""));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("the sign-in widget's calls", () => {
   it("checks only the two calls that start or advance a flow", () => {
@@ -48,5 +54,18 @@ describe("the sign-in widget's calls", () => {
     expect(url.href).toBe("https://cloud.example/flow/flw_1/submit?x=1");
     expect(new Headers(init.headers).get("cookie")).toBe("__nextgen_flow=f");
     expect(answer.headers.getSetCookie()).toEqual(["__nextgen_session=new; Path=/"]);
+  });
+
+  it("forwards to CLOUD_ZITADEL_URL, not its own origin, when it names the server", async () => {
+    // As behind the console's dev proxy, which hands the functions their own host.
+    vi.stubEnv("CLOUD_ZITADEL_URL", "http://localhost:8094");
+    const upstream = vi.fn(async () => new Response("{}"));
+    vi.stubGlobal("fetch", upstream);
+    await forwardSignIn(
+      new Request("http://localhost:5180/cloud/zitadel/flow", { method: "POST", body: "{}" }),
+      human,
+    );
+    const [url] = upstream.mock.calls[0] as unknown as [URL];
+    expect(url.href).toBe("http://localhost:8094/flow");
   });
 });

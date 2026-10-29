@@ -14,12 +14,22 @@ tasks:
   build:
     outputs:
       - ".next/**/*"
+      # `next dev`'s own folder, which is no part of the build; its links into
+      # node_modules would fail the remote cache's manifest.
+      - "!.next/dev/**/*"
     options:
       # Replaces the inherited dist/**/* rather than adding to it.
       mergeOutputs: "replace"
 
   dev:
     command: "corepack pnpm run dev"
+    env:
+      # The Zitadel server the sign-in widget's calls go on to (src/sign-in.ts).
+      # Deployed, it answers on the functions' own origin. Here the functions
+      # sit behind the console's dev proxy, so that origin is their own, and
+      # the server is the instance `console:dev-real` boots on its default
+      # port (CONSOLE_DEV_ZITADEL_PORT). A value exported in the shell wins.
+      CLOUD_ZITADEL_URL: "http://localhost:8094"
     options:
       persistent: true
       runInCI: false

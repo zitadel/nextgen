@@ -25,6 +25,9 @@ takes Stripe's webhooks and runs the workflows that talk to Stripe and HubSpot.
   moon run cloud-functions:typecheck cloud-functions:test cloud-functions:build
   ```
 
+- Start the dev server through moon, whose task points the sign-in calls at
+  `console:dev-real`'s instance; bare `next dev` sends them back to itself.
+
 - Secrets (Stripe, HubSpot, `CRON_SECRET`, the bypass secret) live in the
   `cloud` project's environment; the [runbook](../../docs/runbooks/cloud.md)
   lists them.

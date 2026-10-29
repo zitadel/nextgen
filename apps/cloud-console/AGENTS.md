@@ -34,5 +34,8 @@ contains it.
   CONSOLE_ADDON=../cloud-console moon run console:dev-real
   ```
 
+- When `CONSOLE_DEV_ZITADEL_PORT` moves dev-real's instance, export
+  `CLOUD_ZITADEL_URL` to match for `cloud-functions:dev`.
+
 - That `dev-real` also builds the console its server embeds with the add-on
   in; the next build without `CONSOLE_ADDON` restores the embedded one.
