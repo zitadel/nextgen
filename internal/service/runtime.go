@@ -20,8 +20,8 @@ type RuntimeResolution struct {
 	// request carried none.
 	Origin string
 	// Target is the project origin pattern that admitted Origin, "" when
-	// admission was open (empty allowlist, loopback or the deployment's own
-	// origin) rather than a stored pattern.
+	// admission was open (empty allowlist, loopback or an origin of the
+	// deployment's console) rather than a stored pattern.
 	Target string
 	// Source is "origin" when a deployment to the exact origin answered, or
 	// empty when resolution refused before a target was found.
@@ -61,12 +61,14 @@ type RuntimeResolver struct {
 }
 
 // NewRuntimeResolver builds the resolver. ownOrigins are the origins the
-// deployment's console runs on; a blank one names none.
+// deployment's console runs on, normalized here as a request's origin is;
+// one that is blank or not an origin names none.
 func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...string) *RuntimeResolver {
 	var origins []string
 	for _, origin := range ownOrigins {
-		if origin = strings.TrimSpace(origin); origin != "" && !slices.Contains(origins, origin) {
-			origins = append(origins, origin)
+		normalized, err := domain.NormalizeOrigin(origin)
+		if err == nil && !slices.Contains(origins, normalized) {
+			origins = append(origins, normalized)
 		}
 	}
 	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigins: origins, now: time.Now}
@@ -176,8 +178,8 @@ func (r *RuntimeResolver) newestDeployment(ctx context.Context, projectID, origi
 // matchedOrigin is an origin the gate admitted: the normalized request
 // origin, the project origin pattern that matched it (empty when open),
 // whether it was admitted by a preview row rather than a primary pattern,
-// and whether admission was open (empty allowlist, loopback or the
-// deployment's own origin).
+// and whether admission was open (empty allowlist, loopback or an origin of
+// the deployment's console).
 type matchedOrigin struct {
 	origin  string
 	pattern string

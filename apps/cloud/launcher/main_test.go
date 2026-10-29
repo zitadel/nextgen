@@ -462,16 +462,20 @@ func TestConsoleOrigins(t *testing.T) {
 	t.Setenv("VERCEL_URL", "nextgen-preview-cloud-abc123-zitadel.vercel.app")
 	t.Setenv("VERCEL_BRANCH_URL", "nextgen-preview-cloud-git-feature-zitadel.vercel.app")
 
-	assert.Equal(t,
-		"https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app",
-		consoleOrigins(""), "a preview serves the console on its own URL and its branch's")
-	assert.Equal(t,
-		"https://preview.zitadel.com,https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app",
-		consoleOrigins("https://preview.zitadel.com"), "a configured custom domain keeps Vercel's hosts beside it")
+	t.Setenv("VERCEL_PROJECT_PRODUCTION_URL", "preview.zitadel.com")
+
+	previewHosts := "https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app"
+	assert.Equal(t, previewHosts, consoleOrigins("preview", ""),
+		"a preview serves the console on its own URL and its branch's, never on the production domain")
+	assert.Equal(t, "https://console.example.com,"+previewHosts, consoleOrigins("preview", " https://console.example.com "),
+		"a configured custom domain keeps Vercel's hosts beside it")
+	assert.Equal(t, previewHosts, consoleOrigins("preview", previewHosts), "a second call adds nothing")
+	assert.Equal(t, previewHosts+",https://preview.zitadel.com", consoleOrigins("production", ""),
+		"production also serves it on the production domain")
 
 	t.Setenv("VERCEL_URL", "")
 	t.Setenv("VERCEL_BRANCH_URL", "")
-	assert.Empty(t, consoleOrigins(""), "a local run names none")
+	assert.Empty(t, consoleOrigins("", ""), "a local run names none")
 }
 
 func TestPublicBase(t *testing.T) {

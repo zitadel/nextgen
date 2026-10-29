@@ -205,6 +205,12 @@ type ServerConfig struct {
 }
 
 func (c ServerConfig) Validate() error {
+	// Checked here rather than at startup, so `migrate` refuses an entry the
+	// server could not serve with, before anything is written. It applies with
+	// the embedded console off too.
+	if _, err := configuredConsoleOrigins(c.ConsoleOrigins); err != nil {
+		return err
+	}
 	// ensure there are no path collisions between idp callbacks and the console path
 	if !c.ConsoleEnabled {
 		return nil
