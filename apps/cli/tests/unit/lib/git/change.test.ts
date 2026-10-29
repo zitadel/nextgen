@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { Change } from "../../../../src/lib/git/change";
-import { GitResult } from "../../../../src/lib/git/git";
-
-const isEnv = (path: string): boolean => path.endsWith(".env");
 
 describe("Change.listedIn", () => {
   it("reads each status and path", () => {
-    const listed = new GitResult(0, "M\0a\0A\0b\0D\0c\0T\0d\0", "");
+    const listed = [
+      ":100644 100644 1 2 M",
+      "a",
+      ":000000 100644 0 2 A",
+      "b",
+      ":100644 000000 1 0 D",
+      "c",
+      ":100644 120000 1 2 T",
+      "d",
+    ];
 
     expect(Change.listedIn(listed).map(({ path, status }) => ({ path, status }))).toEqual([
       { path: "a", status: "modified" },
@@ -17,40 +23,23 @@ describe("Change.listedIn", () => {
     ]);
   });
 
-  it("reads a rename's source and destination", () => {
-    const [change] = Change.listedIn(new GitResult(0, "R100\0old\0new\0", ""));
+  it.each([
+    ["R100", "renamed"],
+    ["C075", "copied"],
+  ])("reads where a %s entry came from and went", (letter, status) => {
+    const [change] = Change.listedIn([`:100644 100644 1 1 ${letter}`, "old", "new"]);
 
-    expect(change).toMatchObject({ path: "new", status: "renamed", previousPath: "old" });
-  });
-});
-
-describe("Change.without", () => {
-  it("keeps a change to a file not excluded", () => {
-    const change = new Change("a", "modified");
-
-    expect(change.without(isEnv)).toBe(change);
+    expect(change).toMatchObject({ path: "new", status, previousPath: "old" });
   });
 
-  it("drops a change to an excluded file", () => {
-    expect(new Change(".env", "modified").without(isEnv)).toBeNull();
+  it("reads a path that starts like an entry", () => {
+    expect(Change.listedIn([":100644 100644 1 2 M", ":odd name"])).toEqual([
+      new Change(":odd name", "modified"),
+    ]);
   });
 
-  it("keeps only the deletion of a file renamed to an excluded name", () => {
-    expect(new Change(".env", "renamed", "a").without(isEnv)).toEqual(new Change("a", "deleted"));
-  });
-
-  it("keeps only the addition of a file renamed from an excluded name", () => {
-    expect(new Change("a", "renamed", ".env").without(isEnv)).toEqual(new Change("a", "added"));
-  });
-
-  it("drops a rename between two excluded names", () => {
-    expect(new Change("b.env", "renamed", "a.env").without(isEnv)).toBeNull();
-  });
-});
-
-describe("Change.paths", () => {
-  it("covers both ends of a rename", () => {
-    expect(new Change("new", "renamed", "old").paths()).toEqual(["old", "new"]);
+  it("lists nothing for an empty list", () => {
+    expect(Change.listedIn([])).toEqual([]);
   });
 });
 
@@ -62,24 +51,6 @@ describe("Change.diffedWith", () => {
       previous_path: "old",
       patch: "p",
     });
-  });
-});
-
-describe("Change, beyond renames", () => {
-  it("reads a copy's source and destination", () => {
-    const [change] = Change.listedIn(new GitResult(0, "C075\0old\0new\0", ""));
-
-    expect(change).toMatchObject({ path: "new", status: "copied", previousPath: "old" });
-  });
-
-  it("keeps a rename whole when neither end is excluded", () => {
-    const change = new Change("b", "renamed", "a");
-
-    expect(change.without(isEnv)).toBe(change);
-  });
-
-  it("covers only its own path for a plain change", () => {
-    expect(new Change("a", "modified").paths()).toEqual(["a"]);
   });
 
   it("reports a plain change with no previous path", () => {

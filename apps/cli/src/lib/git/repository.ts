@@ -10,7 +10,6 @@ import { DiffSince } from "./operations/diff-since";
 import { IsDirty } from "./operations/is-dirty";
 import { UncommittedFiles } from "./operations/uncommitted-files";
 import type {
-  ColoredDiffOptions,
   CommitOptions,
   CommitOutcome,
   DiffedFile,
@@ -56,8 +55,9 @@ export class Repository {
     if (/^fatal: not a git repository/m.test(result.stderr)) {
       return null;
     }
+    // All of git's message, which for a refusal over ownership says how to allow the repository.
     if (!result.succeeded()) {
-      throw new RepositoryError(result.reason());
+      throw new RepositoryError(result.stderr.trim());
     }
     return new Repository(dir, result.text());
   }
@@ -92,18 +92,14 @@ export class Repository {
   diffSince(
     commit: string,
     paths: readonly string[],
-    options: ColoredDiffOptions,
+    options: DiffOptions,
   ): Promise<string | null> {
     return this.perform(new DiffSince(commit, paths, options));
   }
 
   /** {@link diffSince}, uncoloured and split into one entry per changed file. */
-  diffFilesSince(
-    commit: string,
-    paths: readonly string[],
-    options: DiffOptions,
-  ): Promise<DiffedFile[] | null> {
-    return this.perform(new DiffFilesSince(commit, paths, options));
+  diffFilesSince(commit: string, paths: readonly string[]): Promise<DiffedFile[] | null> {
+    return this.perform(new DiffFilesSince(commit, paths));
   }
 
   /** Runs `operation` once all its checks hold; what it returns when refused, otherwise. */

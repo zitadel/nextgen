@@ -1,5 +1,4 @@
 import { type DiffedFile, Repository } from "../git";
-import { isSecretPath } from "../secret-paths";
 
 /**
  * The directories a release is built from, the only paths a deploy diffs. Not
@@ -48,8 +47,7 @@ export async function diffConfigAgainst(
 ): Promise<string | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
   return quietly(
-    async () =>
-      (await Repository.open(cwd))?.diffSince(sha, paths, { except: isSecretPath, color }) ?? null,
+    async () => (await Repository.open(cwd))?.diffSince(sha, paths, { color }) ?? null,
     null,
   );
 }
@@ -66,8 +64,7 @@ export async function diffConfigFilesAgainst(
 ): Promise<DiffedFile[] | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
   return quietly(
-    async () =>
-      (await Repository.open(cwd))?.diffFilesSince(sha, paths, { except: isSecretPath }) ?? null,
+    async () => (await Repository.open(cwd))?.diffFilesSince(sha, paths) ?? null,
     null,
   );
 }

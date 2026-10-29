@@ -27,12 +27,6 @@ export type CommitOutcome =
 
 /** How a diff is taken. */
 export interface DiffOptions {
-  /** Files never shown, not even their name: their content must not be printed. */
-  readonly except: PathFilter;
-}
-
-/** How a diff for a terminal is taken. */
-export interface ColoredDiffOptions extends DiffOptions {
   /** Colour the diff. */
   readonly color?: boolean;
 }

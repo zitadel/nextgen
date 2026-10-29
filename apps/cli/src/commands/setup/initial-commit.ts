@@ -1,6 +1,6 @@
 import { ZitadelError } from "../../lib/errors";
 import { type Author, Repository, type UncommittedFile } from "../../lib/git";
-import { isSecretPath } from "../../lib/secret-paths";
+import { isLocalRuntimePath, isSecretPath } from "../../lib/secret-paths";
 
 /**
  * The subject of the commit setup makes. Conventional-commit style, like every
@@ -44,12 +44,7 @@ export type InitialCommitOutcome =
  * uncommitted edit there must not be committed under setup's subject.
  */
 function isCliOwned(path: string): boolean {
-  // `.zitadel/local/` at any depth: a nested app has its own, holding its own admin credential.
-  return (
-    path === ".gitignore" ||
-    path.endsWith("/.gitignore") ||
-    /(^|\/)\.zitadel\/local(\/|$)/.test(path)
-  );
+  return path === ".gitignore" || path.endsWith("/.gitignore") || isLocalRuntimePath(path);
 }
 
 /**

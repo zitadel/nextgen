@@ -1,26 +1,21 @@
 import { Change } from "../change";
-import { CommitIsHere } from "../checks/commit-is-here";
 import type { Git } from "../git";
 import type { Check, Operation } from "../operation";
-import { StagingArea } from "../staging-area";
-import type { ColoredDiffOptions, DiffedFile } from "../types";
+import type { DiffedFile } from "../types";
+import { DiffSince } from "./diff-since";
 
 /** The changed files under `paths` since `commit`, untracked files as added, each with its part of the diff. */
 export class DiffFilesSince implements Operation<DiffedFile[] | null> {
-  private readonly commit: string;
-  private readonly paths: readonly string[];
-  private readonly options: ColoredDiffOptions;
+  private readonly diff: DiffSince;
 
-  /** Diffs `paths` since `commit`, as `options` say. */
-  constructor(commit: string, paths: readonly string[], options: ColoredDiffOptions) {
-    this.commit = commit;
-    this.paths = paths;
-    this.options = options;
+  /** Diffs `paths` since `commit`, uncoloured, with the list of changed files ahead of the patch. */
+  constructor(commit: string, paths: readonly string[]) {
+    this.diff = new DiffSince(commit, paths, {}, ["--raw", "-z", "--patch"]);
   }
 
-  /** The commit is in local history. */
+  /** Those of the diff. */
   checks(): Check[] {
-    return [new CommitIsHere(this.commit)];
+    return this.diff.checks();
   }
 
   /** No diff: there is nothing to diff against. */
@@ -28,56 +23,26 @@ export class DiffFilesSince implements Operation<DiffedFile[] | null> {
     return null;
   }
 
-  /** Diffs in a copy of the developer's staging area with untracked files marked as added; plainly if that fails. */
+  /** Each listed file paired with its section of the patch: git writes both from one list, in one order. */
   async run(git: Git): Promise<DiffedFile[]> {
-    try {
-      return await StagingArea.temporary(git, async (staging) => {
-        await staging.startFromDevelopers(git);
-        await staging.markAsAdded(this.paths);
-        return this.files(staging.git);
-      });
-    } catch {
-      return this.files(git);
+    const output = await this.diff.run(git);
+    // One more NUL ends the list; the patch follows.
+    const end = output.indexOf("\0\0");
+    if (end === -1) {
+      return [];
     }
-  }
-
-  /** Each changed file `git` sees, with excluded files left out, and its patch. */
-  private async files(git: Git): Promise<DiffedFile[]> {
-    let color = "--no-color";
-    if (this.options.color) {
-      color = "--color=always";
-    }
-    const listed = await git.run([
-      "diff",
-      "--no-ext-diff",
-      "--relative",
-      "--name-status",
-      "-z",
-      this.commit,
-      "--",
-      ...this.paths,
-    ]);
-    const changes = Change.listedIn(listed).flatMap(
-      (change) => change.without(this.options.except) ?? [],
-    );
-    // Each file is diffed on its own, so an excluded one is never diffed and its
-    // content never reaches the output; a few at a time, so hundreds of changed
-    // files do not run out of open files.
+    const changes = Change.listedIn(output.slice(0, end).split("\0"));
+    const sections = output.slice(end + 2).split(/^(?=diff --git )/m);
     const files: DiffedFile[] = [];
-    for (let start = 0; start < changes.length; start += 16) {
-      const batch = changes.slice(start, start + 16).map(async (change) => {
-        const diff = [
-          "diff",
-          "--no-ext-diff",
-          "--relative",
-          color,
-          this.commit,
-          "--",
-          ...change.paths(),
-        ];
-        return change.diffedWith((await git.run(diff)).stdout);
-      });
-      files.push(...(await Promise.all(batch)));
+    let next = 0;
+    for (const change of changes) {
+      let patch = sections[next++] ?? "";
+      // A file whose type changed (a file replaced by a symlink) has two sections under one header.
+      const header = patch.split("\n")[0];
+      while (next < sections.length && sections[next]?.split("\n")[0] === header) {
+        patch += sections[next++];
+      }
+      files.push(change.diffedWith(patch));
     }
     return files;
   }

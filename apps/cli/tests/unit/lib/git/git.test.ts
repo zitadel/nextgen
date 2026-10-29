@@ -79,6 +79,12 @@ describe("Git", () => {
     await expect(git(cwd, ["status"])).rejects.toThrow("Command failed");
   });
 
+  it("takes in a few megabytes of output", async () => {
+    const cwd = await scratch.committed({ "big.txt": "x".repeat(2 * 1024 * 1024) });
+
+    expect((await git(cwd, ["show", "HEAD:big.txt"])).length).toBe(2 * 1024 * 1024);
+  });
+
   it("says so when git prints more than it may", async () => {
     const cwd = await scratch.committed({ "big.txt": "x".repeat(17 * 1024 * 1024) });
 
@@ -125,8 +131,11 @@ describe("GitResult", () => {
     expect(new GitResult(0, "abc\n", "").text()).toBe("abc");
   });
 
-  it("gives no text when git did not exit 0", () => {
-    expect(new GitResult(1, "abc\n", "").textIfSucceeded()).toBeNull();
+  it("has succeeded only when git exited 0", () => {
+    expect([new GitResult(0, "", "").succeeded(), new GitResult(1, "", "").succeeded()]).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("splits NUL-separated paths", () => {

@@ -34,4 +34,45 @@ describe("CommitAll", () => {
       "the commit left no HEAD to record",
     );
   });
+
+  it("commits nothing when an excluded file is still staged", async () => {
+    const calls: string[][] = [];
+    const git = fakeGit((args) => {
+      calls.push([...args]);
+      if (args.includes("--cached")) {
+        return { stdout: "a.txt\0.env\0" };
+      }
+      return {};
+    });
+
+    const outcome = await new CommitAll("m", { ...OPTIONS, except: (path) => path === ".env" }).run(
+      git,
+    );
+
+    expect({ outcome, committed: calls.some((args) => args.includes("commit")) }).toMatchObject({
+      outcome: { committed: false },
+      committed: false,
+    });
+  });
+
+  it("still reports the commit when the developer's index cannot be reset afterwards", async () => {
+    const git = fakeGit((args) => {
+      if (args.includes("--cached")) {
+        return { stdout: "a.txt\0" };
+      }
+      if (args[0] === "reset" && args.includes(".")) {
+        return { exitCode: 1 };
+      }
+      if (args.includes("HEAD^{commit}")) {
+        return { stdout: "abc\n" };
+      }
+      return {};
+    });
+
+    expect(await new CommitAll("m", OPTIONS).run(git)).toEqual({
+      committed: true,
+      sha: "abc",
+      author: "yours",
+    });
+  });
 });

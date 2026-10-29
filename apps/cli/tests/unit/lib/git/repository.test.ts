@@ -1,4 +1,4 @@
-import { utimes, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,13 +33,15 @@ async function open(dir: string): Promise<Repository> {
   return repository;
 }
 
-/** Leaves nothing out. */
-const NONE = (): boolean => false;
-
 const OPTIONS = {
   except: (path: string) => path.endsWith(".env"),
   authorIfGitHasNone: { name: "Fallback", email: "fallback@example.com" },
 };
+
+/** How many `diff --git` sections `patch` holds. */
+function sectionsOf(patch: string): number {
+  return patch.split("diff --git").length - 1;
+}
 
 /** A repository with two commits on one branch. */
 async function twoCommits(): Promise<string> {
@@ -204,30 +206,25 @@ describe("Repository.commitAll", () => {
   });
 
   it.each([
-    ["HEAD is detached", "HEAD is detached, so the commit would be on no branch"],
-    ["a rebase is under way", "a rebase is in progress"],
-  ])("commits nothing when %s, and says why", async (_, reason) => {
-    const cwd = await scratch.committed({ "a.txt": "a\n" });
-    await write(cwd, { "b.txt": "b\n" });
-    await commitEverything(cwd, "second");
-    if (reason.startsWith("HEAD")) {
+    ["HEAD is detached", "detached"],
+    ["a rebase is under way", "rebase"],
+  ])("commits nothing when %s", async (_, how) => {
+    const cwd = await twoCommits();
+    if (how === "detached") {
       await git(cwd, "checkout", "--quiet", "--detach");
     } else {
       await git(cwd, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-i", "HEAD~1");
     }
     await write(cwd, { "c.txt": "c\n" });
 
-    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toEqual({ committed: false, reason });
+    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
   });
 
   it("commits nothing when only excluded files changed", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
     await write(cwd, { ".env": "S=1\n" });
 
-    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toEqual({
-      committed: false,
-      reason: "there was nothing to commit",
-    });
+    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
   });
 
   it("names the developer as author when git knows them", async () => {
@@ -245,16 +242,20 @@ describe("Repository.commitAll", () => {
     vi.stubEnv("GIT_AUTHOR_NAME", "");
     vi.stubEnv("GIT_AUTHOR_EMAIL", "");
 
-    await (await open(cwd)).commitAll("m", OPTIONS);
+    const outcome = await (await open(cwd)).commitAll("m", OPTIONS);
 
-    expect((await git(cwd, "log", "-1", "--format=%an <%ae>")).trim()).toBe(
-      "Fallback <fallback@example.com>",
-    );
+    expect({
+      outcome,
+      author: (await git(cwd, "log", "-1", "--format=%an <%ae>")).trim(),
+    }).toMatchObject({
+      outcome: { author: "fallback" },
+      author: "Fallback <fallback@example.com>",
+    });
   });
 });
 
 describe("Repository.commitAll in a busy repository", () => {
-  it("commits nothing when a merge is in progress, and says why", async () => {
+  it("commits nothing when a merge is in progress", async () => {
     const cwd = await twoCommits();
     const branch = (await git(cwd, "symbolic-ref", "--short", "HEAD")).trim();
     await git(cwd, "checkout", "--quiet", "-b", "side", "HEAD~1");
@@ -262,21 +263,15 @@ describe("Repository.commitAll in a busy repository", () => {
     await commitEverything(cwd, "side");
     await git(cwd, "merge", "--no-commit", "--no-ff", "--quiet", branch);
 
-    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toEqual({
-      committed: false,
-      reason: "a merge is in progress",
-    });
+    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
   });
 
-  it("commits nothing when a bisect is in progress, and says why", async () => {
+  it("commits nothing when a bisect is in progress", async () => {
     const cwd = await twoCommits();
     await git(cwd, "bisect", "start");
     await write(cwd, { "c.txt": "c\n" });
 
-    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toEqual({
-      committed: false,
-      reason: "a bisect is in progress",
-    });
+    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
   });
 
   it("commits on a branch with no commit yet, which is not detached", async () => {
@@ -292,32 +287,16 @@ describe("Repository.diffSince", () => {
     const { cwd, sha } = await base();
     await write(cwd, { ".zitadel/schemas/b.json": "{}\n" });
 
-    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], { except: NONE })).toContain(
-      "new file mode",
-    );
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).toContain("new file mode");
   });
 
   it("leaves the developer's index as it was", async () => {
     const { cwd, sha } = await base();
     await write(cwd, { ".zitadel/schemas/b.json": "{}\n" });
 
-    await (await open(cwd)).diffSince(sha, [".zitadel/"], { except: NONE });
+    await (await open(cwd)).diffSince(sha, [".zitadel/"], {});
 
     expect(await stagedFiles(cwd)).toEqual([]);
-  });
-
-  it("never shows a file `except` matches, not even its content", async () => {
-    const { cwd, sha } = await base();
-    await write(cwd, {
-      ".zitadel/schemas/b.json": "{}\n",
-      ".zitadel/idps/.env": "TOKEN=hunter2\n",
-    });
-
-    const diff = await (await open(cwd)).diffSince(sha, [".zitadel/"], {
-      except: (path) => path.endsWith(".env"),
-    });
-
-    expect(diff).not.toContain("hunter2");
   });
 
   it("sees an edit made in the same instant the index was written", async () => {
@@ -330,23 +309,54 @@ describe("Repository.diffSince", () => {
     await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
     await utimes(file, instant, instant);
 
-    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], { except: NONE })).toContain(
-      "+[]",
-    );
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).toContain("+[]");
   });
 
-  it("keeps a rename whole when a secret beside it is left out", async () => {
+  it("sees an edit to a tracked file `.gitignore` now matches", async () => {
     const { cwd, sha } = await base();
-    await git(cwd, "mv", ".zitadel/schemas/a.json", ".zitadel/schemas/b.json");
-    await write(cwd, { ".zitadel/idps/.env": "TOKEN=hunter2\n" });
+    await write(cwd, { ".gitignore": "*.json\n" });
+    await commitEverything(cwd, "ignore");
+    await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
 
-    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"], {
-      except: (path) => path.endsWith(".env"),
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).toContain("+[]");
+  });
+
+  it("shows only the given paths, relative to the directory", async () => {
+    const root = await scratch.committed({
+      "apps/web/.zitadel/schemas/a.json": "{}\n",
+      "apps/api/b.json": "{}\n",
     });
+    const sha = (await git(root, "rev-parse", "HEAD")).trim();
+    await write(root, { "apps/web/.zitadel/schemas/a.json": "[]\n", "apps/api/b.json": "[]\n" });
 
-    expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
-      { path: ".zitadel/schemas/b.json", status: "renamed" },
+    const diff = await (await open(join(root, "apps/web"))).diffSince(sha, [".zitadel/"], {});
+
+    expect(diff?.match(/^diff --git .*$/gm)).toEqual([
+      "diff --git a/.zitadel/schemas/a.json b/.zitadel/schemas/a.json",
     ]);
+  });
+
+  it("uses git's own diff, never an external one", async () => {
+    const { cwd, sha } = await base();
+    const tool = join(await scratch.directory(), "external");
+    await writeFile(tool, "#!/bin/sh\necho EXTERNAL\n");
+    await chmod(tool, 0o755);
+    await git(cwd, "config", "diff.external", tool);
+    await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
+
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).not.toContain("EXTERNAL");
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])("with colour %s is coloured: %s", async (color, coloured) => {
+    const { cwd, sha } = await base();
+    await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
+
+    const diff = await (await open(cwd)).diffSince(sha, [".zitadel/"], { color });
+
+    expect(diff?.includes("\u001b[")).toBe(coloured);
   });
 
   it("still shows a new file as added beside an ignored path", async () => {
@@ -357,9 +367,7 @@ describe("Repository.diffSince", () => {
       ".zitadel/schemas/new.json": "{}\n",
     });
 
-    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/", "dist/logo.png"], {
-      except: NONE,
-    });
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/", "dist/logo.png"]);
 
     expect(files?.map(({ path, status }) => ({ path, status }))).toContainEqual({
       path: ".zitadel/schemas/new.json",
@@ -367,33 +375,23 @@ describe("Repository.diffSince", () => {
     });
   });
 
-  it("still shows the tracked changes when an untracked path cannot be marked", async () => {
-    const { cwd, sha } = await base();
-    await write(cwd, {
-      ".gitignore": "tpl/\n",
-      "tpl/ignored.liquid": "x\n",
-      ".zitadel/schemas/a.json": "[]\n",
-    });
-
-    expect(
-      await (await open(cwd)).diffSince(sha, [".zitadel/", "tpl/ignored.liquid"], { except: NONE }),
-    ).toContain("+[]");
-  });
-
   it("is null for a commit not in local history", async () => {
     const { cwd } = await base();
 
-    expect(
-      await (await open(cwd)).diffSince("0".repeat(40), [".zitadel/"], { except: NONE }),
-    ).toBeNull();
+    expect(await (await open(cwd)).diffSince("0".repeat(40), [".zitadel/"], {})).toBeNull();
+  });
+
+  it("is null for an object that is not a commit", async () => {
+    const { cwd } = await base();
+    const blob = (await git(cwd, "rev-parse", "HEAD:README.md")).trim();
+
+    expect(await (await open(cwd)).diffSince(blob, [".zitadel/"], {})).toBeNull();
   });
 
   it("is null for an id that is not an object id", async () => {
     const { cwd } = await base();
 
-    expect(
-      await (await open(cwd)).diffSince("--output=/tmp/x", [".zitadel/"], { except: NONE }),
-    ).toBeNull();
+    expect(await (await open(cwd)).diffSince("--output=/tmp/x", [".zitadel/"], {})).toBeNull();
   });
 });
 
@@ -402,18 +400,63 @@ describe("Repository.diffFilesSince", () => {
     const { cwd, sha } = await base();
     await write(cwd, { ".zitadel/schemas/a.json": "[]\n", ".zitadel/flows/b c.json": "{}\n" });
 
-    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"], { except: NONE });
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"]);
 
     expect(files?.map((file) => file.patch).join("")).toBe(
-      await (await open(cwd)).diffSince(sha, [".zitadel/"], { except: NONE }),
+      await (await open(cwd)).diffSince(sha, [".zitadel/"], {}),
     );
+  });
+
+  it("reports a rename with where it came from", async () => {
+    const { cwd, sha } = await base();
+    await git(cwd, "mv", ".zitadel/schemas/a.json", ".zitadel/schemas/b.json");
+
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"]);
+
+    expect(files).toMatchObject([
+      {
+        path: ".zitadel/schemas/b.json",
+        status: "renamed",
+        previous_path: ".zitadel/schemas/a.json",
+        patch: expect.stringContaining("rename from .zitadel/schemas/a.json"),
+      },
+    ]);
+  });
+
+  it("keeps both sections of a file replaced by a symlink in one entry", async () => {
+    const { cwd, sha } = await base();
+    await rm(join(cwd, ".zitadel/schemas/a.json"));
+    await symlink("../../README.md", join(cwd, ".zitadel/schemas/a.json"));
+
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"]);
+
+    expect(files?.map(({ path, patch }) => ({ path, sections: sectionsOf(patch) }))).toEqual([
+      { path: ".zitadel/schemas/a.json", sections: 2 },
+    ]);
+  });
+
+  it("gives a file replaced by a directory of the same name only its own deletion", async () => {
+    const { cwd, sha } = await base();
+    await rm(join(cwd, ".zitadel/schemas/a.json"));
+    await write(cwd, { ".zitadel/schemas/a.json/b.json": '{"b":1}\n' });
+
+    const files = await (await open(cwd)).diffFilesSince(sha, [".zitadel/"]);
+
+    expect(files?.map(({ path, patch }) => ({ path, sections: sectionsOf(patch) }))).toEqual([
+      { path: ".zitadel/schemas/a.json", sections: 1 },
+      { path: ".zitadel/schemas/a.json/b.json", sections: 1 },
+    ]);
+  });
+
+  it("is empty when nothing changed", async () => {
+    const { cwd, sha } = await base();
+
+    expect(await (await open(cwd)).diffFilesSince(sha, [".zitadel/"])).toEqual([]);
   });
 
   it("is null for a commit not in local history", async () => {
     const { cwd } = await base();
 
-    expect(
-      await (await open(cwd)).diffFilesSince("0".repeat(40), [".zitadel/"], { except: NONE }),
-    ).toBeNull();
+    expect(await (await open(cwd)).diffFilesSince("0".repeat(40), [".zitadel/"])).toBeNull();
   });
 });

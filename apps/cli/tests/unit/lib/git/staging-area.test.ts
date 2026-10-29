@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { chmod, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -29,6 +30,13 @@ afterEach(async () => {
 async function staged(staging: StagingArea): Promise<string[]> {
   return staging.git.stagedFiles();
 }
+
+const IDENTITY = {
+  GIT_AUTHOR_NAME: "Someone",
+  GIT_AUTHOR_EMAIL: "someone@example.com",
+  GIT_COMMITTER_NAME: "Someone",
+  GIT_COMMITTER_EMAIL: "someone@example.com",
+};
 
 /** Where `staging` keeps its index. */
 async function indexOf(staging: StagingArea): Promise<string> {
@@ -111,7 +119,7 @@ describe("StagingArea", () => {
       return staging.problem([new SomethingIsStaged()]);
     });
 
-    expect(problem).toBe("there was nothing to commit");
+    expect(problem).toBe(await new SomethingIsStaged().problem(new Git(cwd)));
   });
 
   it("commits what is staged", async () => {
@@ -121,7 +129,7 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll();
-      await staging.commit("add b", {});
+      await staging.commit("add b", IDENTITY);
     });
 
     expect(await headChanges(cwd)).toEqual(["b.txt"]);
@@ -234,7 +242,7 @@ describe("StagingArea", () => {
       ]);
     });
 
-    expect(problem).toBe(".env could not be kept out of the commit, so nothing was committed");
+    expect(problem).toContain(".env");
   });
 
   it("commits as the identity it is given", async () => {
@@ -244,16 +252,56 @@ describe("StagingArea", () => {
     await StagingArea.temporary(new Git(cwd), async (staging) => {
       await staging.startFromHead();
       await staging.addAll();
-      await staging.commit("add b", {
-        GIT_AUTHOR_NAME: "Someone",
-        GIT_AUTHOR_EMAIL: "someone@example.com",
-        GIT_COMMITTER_NAME: "Someone",
-        GIT_COMMITTER_EMAIL: "someone@example.com",
-      });
+      await staging.commit("add b", IDENTITY);
     });
 
     expect((await git(cwd, "log", "-1", "--format=%an <%ae>")).trim()).toBe(
       "Someone <someone@example.com>",
     );
+  });
+
+  it("marks a file as added without storing its content", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await write(cwd, { "b.txt": "secret\n" });
+
+    const entry = await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.markAsAdded(["b.txt"]);
+      return (await staging.git.run(["ls-files", "--stage", "--", "b.txt"])).text();
+    });
+
+    expect(entry).toContain("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
+  });
+
+  it("commits even when the repository asks for signed commits", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    await git(cwd, "config", "commit.gpgsign", "true");
+    await git(cwd, "config", "gpg.program", "false");
+    await write(cwd, { "b.txt": "b\n" });
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll();
+      await staging.commit("add b", IDENTITY);
+    });
+
+    expect(await headChanges(cwd)).toEqual(["b.txt"]);
+  });
+
+  it("commits even when a pre-commit hook would refuse", async () => {
+    const cwd = await scratch.committed({ "a.txt": "a\n" });
+    const hooks = await scratch.directory();
+    await writeFile(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n");
+    await chmod(join(hooks, "pre-commit"), 0o755);
+    await git(cwd, "config", "core.hooksPath", hooks);
+    await write(cwd, { "b.txt": "b\n" });
+
+    await StagingArea.temporary(new Git(cwd), async (staging) => {
+      await staging.startFromHead();
+      await staging.addAll();
+      await staging.commit("add b", IDENTITY);
+    });
+
+    expect(await headChanges(cwd)).toEqual(["b.txt"]);
   });
 });

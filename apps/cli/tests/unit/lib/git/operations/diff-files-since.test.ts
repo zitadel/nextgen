@@ -6,84 +6,70 @@ import { fakeGit } from "../../../../helpers/git-repo";
 
 const SHA = "a".repeat(40);
 
-const NONE = (): boolean => false;
-
-/** A git that lists `listed` as changed and answers each file's diff with `patch <path>`; `calls` collects every call. */
-function gitListing(listed: string, calls: string[][] = [], existing: string[] = []) {
-  return fakeGit((args) => {
-    calls.push([...args]);
-    if (args.includes("--name-status")) {
-      return { stdout: listed };
-    }
-    if (args.includes("--intent-to-add")) {
-      return { exitCode: 2, stderr: "fatal: cannot mark" };
-    }
-    if (args[0] === "diff") {
-      return { stdout: `patch ${args[args.length - 1]}\n` };
-    }
-    return {};
-  }, existing);
+/** What files `git diff --raw -z --patch` printing `list` and then `patch` comes to. */
+function filesFrom(list: string[], patch: string) {
+  const output = list.length === 0 ? "" : `${list.join("\0")}\0\0${patch}`;
+  return new DiffFilesSince(SHA, ["."]).run(fakeGit(() => ({ stdout: output })));
 }
 
 describe("DiffFilesSince", () => {
   it("is checked for the commit being here", () => {
-    expect(new DiffFilesSince(SHA, ["."], { except: NONE }).checks()).toEqual([
-      new CommitIsHere(SHA),
-    ]);
+    expect(new DiffFilesSince(SHA, ["."]).checks()).toEqual([new CommitIsHere(SHA)]);
   });
 
   it("is null when refused", () => {
-    expect(new DiffFilesSince(SHA, ["."], { except: NONE }).refused()).toBeNull();
+    expect(new DiffFilesSince(SHA, ["."]).refused()).toBeNull();
   });
 
-  it("gives each changed file its own patch", async () => {
-    const files = await new DiffFilesSince(SHA, ["."], { except: NONE }).run(
-      gitListing("M\0a\0A\0b\0"),
+  it("asks git for the list of files ahead of an uncoloured patch", async () => {
+    const calls: string[][] = [];
+
+    await new DiffFilesSince(SHA, ["."]).run(
+      fakeGit((args) => {
+        calls.push([...args]);
+        return {};
+      }),
     );
 
-    expect(files).toEqual([
-      { path: "a", status: "modified", patch: "patch a\n" },
-      { path: "b", status: "added", patch: "patch b\n" },
+    expect(calls.find((args) => args[0] === "diff")).toEqual([
+      "diff",
+      "--no-ext-diff",
+      "--relative",
+      "--no-color",
+      "--raw",
+      "-z",
+      "--patch",
+      SHA,
+      "--",
+      ".",
     ]);
   });
 
-  it("never diffs a file `except` matches", async () => {
-    const calls: string[][] = [];
-
-    await new DiffFilesSince(SHA, ["."], { except: (path) => path === ".env" }).run(
-      gitListing("M\0a\0M\0.env\0", calls),
+  it("pairs each listed file with its section of the patch", async () => {
+    const files = await filesFrom(
+      [":100644 100644 1 2 M", "a", ":000000 100644 0 2 A", "b"],
+      "diff --git a/a b/a\n-x\ndiff --git a/b b/b\n+y\n",
     );
 
-    expect(calls.filter((args) => args.includes(".env"))).toEqual([]);
+    expect(files).toEqual([
+      { path: "a", status: "modified", patch: "diff --git a/a b/a\n-x\n" },
+      { path: "b", status: "added", patch: "diff --git a/b b/b\n+y\n" },
+    ]);
   });
 
-  it.each([
-    [true, "--color=always"],
-    [false, "--no-color"],
-    [undefined, "--no-color"],
-  ])("with colour %s diffs with %s", async (color, flag) => {
-    const calls: string[][] = [];
-
-    await new DiffFilesSince(SHA, ["."], { except: NONE, color }).run(gitListing("M\0a\0", calls));
-
-    expect(calls.find((args) => args.at(-1) === "a")).toContain(flag);
-  });
-
-  it("diffs every file of a long list, in order", async () => {
-    const names = Array.from({ length: 40 }, (_, index) => `f${index}`);
-
-    const files = await new DiffFilesSince(SHA, ["."], { except: NONE }).run(
-      gitListing(names.map((name) => `M\0${name}\0`).join("")),
+  it("joins the two sections of a file whose type changed", async () => {
+    const files = await filesFrom(
+      [":100644 120000 1 2 T", "a", ":100644 100644 1 2 M", "b"],
+      "diff --git a/a b/a\n-x\ndiff --git a/a b/a\n+y\ndiff --git a/b b/b\n+z\n",
     );
 
-    expect(files.map((file) => file.path)).toEqual(names);
+    expect(files.map((file) => file.patch)).toEqual([
+      "diff --git a/a b/a\n-x\ndiff --git a/a b/a\n+y\n",
+      "diff --git a/b b/b\n+z\n",
+    ]);
   });
 
-  it("still diffs plainly when untracked files cannot be marked as added", async () => {
-    const files = await new DiffFilesSince(SHA, ["new.json"], { except: NONE }).run(
-      gitListing("M\0a\0", [], ["new.json"]),
-    );
-
-    expect(files).toEqual([{ path: "a", status: "modified", patch: "patch a\n" }]);
+  it("lists nothing when nothing changed", async () => {
+    expect(await filesFrom([], "")).toEqual([]);
   });
 });

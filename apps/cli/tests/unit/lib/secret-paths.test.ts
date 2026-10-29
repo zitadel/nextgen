@@ -23,6 +23,7 @@ describe("isSecretPath", () => {
     "src/env.ts",
     ".zitadel/schemas/user.json",
     ".zitadel/secrets/readme.md",
+    ".zitadel/locales/en.json",
     "docs/local/readme.md",
     ".npmrc",
     "certs/server.pem",

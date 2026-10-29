@@ -16,6 +16,9 @@ export class CurrentCommit implements Operation<string | null> {
   /** Asks git for HEAD's commit. */
   async run(git: Git): Promise<string | null> {
     const result = await git.run(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], [1]);
-    return result.textIfSucceeded();
+    if (!result.succeeded()) {
+      return null;
+    }
+    return result.text();
   }
 }

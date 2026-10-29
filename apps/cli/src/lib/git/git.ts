@@ -27,14 +27,6 @@ export class GitResult {
     return this.stdout.replace(/\n$/, "");
   }
 
-  /** What git printed, or null when it did not exit 0. */
-  textIfSucceeded(): string | null {
-    if (!this.succeeded()) {
-      return null;
-    }
-    return this.text();
-  }
-
   /** The NUL-separated paths git printed, for a `-z` command. */
   paths(): string[] {
     return this.stdout.split("\0").filter((path) => path !== "");
