@@ -3,7 +3,13 @@ import { ApiError } from "@zitadel/api/runtime/fetch";
 import { api } from "@/api/zitadel";
 
 import { displayValue, field, isPresent } from "./record";
-import { type SchemaField, type SchemaLineage, type UserSchema, schemaFields } from "./schema";
+import {
+  type SchemaEntry,
+  type SchemaField,
+  type UserSchema,
+  schemaDisplayName,
+  schemaFields,
+} from "./schema";
 import {
   type UserTeam,
   userAttributes,
@@ -76,35 +82,50 @@ export interface UsersSearch {
 
 type UserFilter = NonNullable<Parameters<typeof api.queryUsers>[0]["filter"]>;
 
-/** The newest revision's id of the schema with this object type, if the lineages hold it. */
-export function latestRevisionId(
-  lineages: SchemaLineage[],
-  objectType: string | undefined,
-): string | undefined {
-  return lineages.find((lineage) => lineage.objectType === objectType)?.revisions[0]?.id;
+/** One schema as the Users filter offers it: its object type, title and newest revision. */
+export interface SchemaOption {
+  objectType: string;
+  /** The newest revision's title, else its id. */
+  title: string;
+  /** The newest revision's id, which `latest` and `older` compare with. */
+  latestId: string;
+  /** The newest revision's document, for the column groups. */
+  schema: UserSchema;
 }
 
-/** The documents the lineages carry, keyed by revision id. */
-export function lineageDocuments(lineages: SchemaLineage[]): Map<string, UserSchema> {
-  return new Map(
-    lineages.flatMap((lineage) =>
-      lineage.revisions.map((revision) => [revision.id, revision.schema] as const),
-    ),
-  );
+/**
+ * The filter's options from the project's schemas at their latest revision,
+ * by title. A schema stored without an object type has no lineage to filter
+ * by and is left out. The server calls every revision latest that none of its
+ * type was created after, so two minted in the same instant both arrive; the
+ * first listed (created at, then id, descending) stands for the type.
+ */
+export function schemaOptions(entries: SchemaEntry[]): SchemaOption[] {
+  const byType = new Map<string, SchemaOption>();
+  for (const entry of entries) {
+    const objectType = field(entry.schema, "objectType");
+    if (!objectType || byType.has(objectType)) continue;
+    byType.set(objectType, {
+      objectType,
+      title: schemaDisplayName(entry.schema, entry.id),
+      latestId: entry.id,
+      schema: entry.schema,
+    });
+  }
+  return [...byType.values()].sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /**
  * The server-side criteria for a search (#1669). Every revision of a schema
  * shares its `object_type`; `latest` and `older` compare the user's `schema`
- * with the newest revision's id, which the lineages supply. The route sends
- * neither without it, so a URL never claims a narrower list than it shows.
+ * with the newest revision's id, `latest`. The route sends neither without
+ * it, so a URL never claims a narrower list than it shows.
  */
-export function userFilter(search: UsersSearch, lineages: SchemaLineage[]): UserFilter {
+export function userFilter(search: UsersSearch, latest: string | undefined): UserFilter {
   if (!search.schema) return [];
   const criteria: UserFilter = [
     { field: "schema_object_type", operation: "equals", value: search.schema },
   ];
-  const latest = latestRevisionId(lineages, search.schema);
   if (search.revision === "latest") {
     if (latest) criteria.push({ field: "schema", operation: "equals", value: latest });
   } else if (search.revision === "older") {

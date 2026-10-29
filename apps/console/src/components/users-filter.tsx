@@ -10,11 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDateTime } from "@/lib/date";
-import type { SchemaLineage } from "@/lib/schema";
-import type { UsersSearch } from "@/lib/user-list";
+import type { SchemaRevision } from "@/lib/schema";
+import type { SchemaOption, UsersSearch } from "@/lib/user-list";
 
 /** The value standing for no narrowing, in either select. */
 const ALL = "all";
+
+/** The revision choices that name a comparison rather than one revision. */
+const REVISION_CHOICES = { latest: "Latest only", older: "Older revisions" } as const;
 
 /**
  * The Users list's filter on the title row (#1669): a schema by object type,
@@ -22,17 +25,23 @@ const ALL = "all";
  * second names the newest revision (`Latest only`, `Older revisions`) or one
  * revision by id, each marked when some user is still on it. Nothing here
  * counts users: the API has no total, by design.
+ *
+ * A value the URL carries that no option matches (a deleted schema, an
+ * unreadable list) still shows on its trigger, so the filter can be cleared.
  */
 export function UsersFilter({
-  lineages,
+  options,
+  revisions,
   search,
   onChange,
 }: {
-  lineages: SchemaLineage[];
+  options: SchemaOption[];
+  /** The chosen schema's revisions, newest first; empty when none is chosen or they could not be read. */
+  revisions: SchemaRevision[];
   search: UsersSearch;
   onChange: (next: UsersSearch) => void;
 }) {
-  const lineage = lineages.find((entry) => entry.objectType === search.schema);
+  const chosen = options.find((option) => option.objectType === search.schema);
   return (
     <>
       <Select
@@ -41,21 +50,18 @@ export function UsersFilter({
       >
         <SelectTrigger aria-label="Filter by schema" className="font-medium">
           <Braces aria-hidden strokeWidth={1.5} className="text-foreground" />
-          {/* Named here rather than by the matching item: a URL can carry an
-              object type no lineage has (a deleted schema), and the trigger
-              must still say what the list is narrowed to. */}
-          <SelectValue>{lineage?.title ?? search.schema ?? "All schemas"}</SelectValue>
+          <SelectValue>{chosen?.title ?? search.schema ?? "All schemas"}</SelectValue>
         </SelectTrigger>
         <SelectContent position="popper" align="end">
           <SelectItem value={ALL}>All schemas</SelectItem>
-          {lineages.map((entry) => (
-            <SelectItem key={entry.objectType} value={entry.objectType}>
-              {entry.title}
+          {options.map((option) => (
+            <SelectItem key={option.objectType} value={option.objectType}>
+              {option.title}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      {lineage && (
+      {search.schema && (
         <Select
           value={search.revision ?? ALL}
           onValueChange={(value) =>
@@ -71,10 +77,13 @@ export function UsersFilter({
           </SelectTrigger>
           <SelectContent position="popper" align="end">
             <SelectItem value={ALL}>All revisions</SelectItem>
-            <SelectItem value="latest">Latest only</SelectItem>
-            <SelectItem value="older">Older revisions</SelectItem>
-            <SelectSeparator />
-            {lineage.revisions.map((revision, index) => (
+            {Object.entries(REVISION_CHOICES).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+            {revisions.length > 0 && <SelectSeparator />}
+            {revisions.map((revision, index) => (
               <SelectItem key={revision.id} value={revision.id} className="gap-2">
                 <span className="text-xs font-medium">{revision.id}</span>
                 <span className="text-muted-foreground text-xs">
@@ -101,7 +110,7 @@ export function UsersFilter({
 
 function revisionLabel(revision: string | undefined): string {
   if (!revision) return "All revisions";
-  if (revision === "latest") return "Latest only";
-  if (revision === "older") return "Older revisions";
-  return revision;
+  return revision in REVISION_CHOICES
+    ? REVISION_CHOICES[revision as keyof typeof REVISION_CHOICES]
+    : revision;
 }

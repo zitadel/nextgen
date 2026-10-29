@@ -54,20 +54,21 @@ import { Table, TableBody, TableCell, TableHeader } from "@/components/ui/table"
 import { useLoadMore } from "@/hooks/use-load-more";
 import { useScrollEdges } from "@/hooks/use-scroll-edges";
 import { requireProjectScope, useRequiredProjectScope } from "@/lib/project-scope";
-import { fetchSchemaLineages } from "@/lib/schema";
+import { fetchAllSchemas, fetchSchemaRevisions } from "@/lib/schema";
+import type { UserSchema } from "@/lib/schema";
 import type { UserTeam } from "@/lib/user";
 import {
   type ColumnGroup,
   type ColumnPins,
+  type SchemaOption,
   type UsersSearch,
   attributeSummary,
   columnsBeyondIdentity,
   columnsForUsers,
   fetchUsers,
-  latestRevisionId,
-  lineageDocuments,
   pinnedColumns,
   readColumnPins,
+  schemaOptions,
   toUserRow,
   userFilter,
   writeColumnPins,
@@ -82,47 +83,61 @@ export const Route = createFileRoute("/_authed/users/")({
   staticData: { scope: "project", nav: { label: "Users", order: 3, icon: User } },
   // The filter lives in the URL, as the Teams tabs do: it is a server-side
   // filter, so it belongs to the request the loader makes, is linkable and
-  // survives a reload. Only strings the filter can send are kept.
-  validateSearch: (search: Record<string, unknown>): UsersSearch => ({
-    ...(typeof search.schema === "string" && search.schema ? { schema: search.schema } : {}),
-    ...(typeof search.revision === "string" && search.revision
-      ? { revision: search.revision }
-      : {}),
-  }),
+  // survives a reload. Only what the filter can send is kept: a revision
+  // belongs to a schema, so it goes without one.
+  validateSearch: (search: Record<string, unknown>): UsersSearch => {
+    const schema = typeof search.schema === "string" && search.schema ? search.schema : undefined;
+    const revision =
+      schema && typeof search.revision === "string" && search.revision
+        ? search.revision
+        : undefined;
+    return { ...(schema ? { schema } : {}), ...(revision ? { revision } : {}) };
+  },
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const projectId = requireProjectScope(deps.project);
-    // The lineages are the filter's options and name the newest revision a
-    // `latest` or `older` criterion compares with. They are chrome: unreadable,
-    // the list still renders, narrowed by whatever the URL can still express.
-    // `in_use` is asked for only once a schema is chosen, where the revision
-    // menu shows it.
-    const reading = fetchSchemaLineages(projectId, { inUse: Boolean(deps.schema) }).catch(() => []);
+    // The filter's options are the project's schemas at their latest revision,
+    // which also names the newest id a `latest` or `older` criterion compares
+    // with; the chosen schema's revisions, with whether each is in use, are
+    // read for it alone. Both are chrome: unreadable, the list still renders,
+    // narrowed by whatever the URL can still express.
+    const readingOptions = fetchAllSchemas(projectId).then(schemaOptions, () => []);
     const needsLatest = deps.revision === "latest" || deps.revision === "older";
-    // Only those two criteria wait for the lineages; the users read runs beside
-    // the lineage read otherwise.
-    const lineagesFirst = needsLatest ? await reading : [];
-    if (needsLatest && !latestRevisionId(lineagesFirst, deps.schema)) {
+    // Only those two criteria wait for the options; the users read runs
+    // beside the schema reads otherwise.
+    const chosenFirst = needsLatest
+      ? (await readingOptions).find((option) => option.objectType === deps.schema)
+      : undefined;
+    if (needsLatest && !chosenFirst) {
       // The URL asks for a comparison nobody can make. Dropping it from the URL
       // keeps the list from claiming a narrower filter than it sends.
       throw redirect({ to: "/users", search: { ...deps, revision: undefined } });
     }
-    const filter = userFilter(deps, lineagesFirst);
-    const [page, lineages] = await Promise.all([
+    const filter = userFilter(deps, chosenFirst?.latestId);
+    const [page, options, revisions] = await Promise.all([
       fetchUsers(projectId, undefined, true, filter),
-      reading,
+      readingOptions,
+      deps.schema
+        ? fetchSchemaRevisions(projectId, deps.schema, { inUse: true }).catch(() => [])
+        : [],
     ]);
     return {
       users: page.users,
       teamsExpanded: page.teamsExpanded,
       nextPageToken: page.next_page_token ?? undefined,
-      columns: await columnsForUsers(projectId, page.users, lineageDocuments(lineages)),
-      lineages,
+      columns: await columnsForUsers(projectId, page.users, latestDocuments(options)),
+      options,
+      revisions,
       filter,
     };
   },
   component: UsersScreen,
 });
+
+/** The latest revisions' documents, keyed by id: what `columnsForUsers` need not read again. */
+function latestDocuments(options: SchemaOption[]): Map<string, UserSchema> {
+  return new Map(options.map((option) => [option.latestId, option.schema]));
+}
 
 /** One fetched page, with the list state it carries besides its rows. */
 interface UsersPage {
@@ -158,7 +173,7 @@ function UsersScreen() {
         columns: await columnsForUsers(
           projectId,
           [...users, ...page.users],
-          lineageDocuments(loaded.lineages),
+          latestDocuments(loaded.options),
         ),
         teamsExpanded: page.teamsExpanded,
       };
@@ -220,9 +235,10 @@ function UsersScreen() {
           is a console-wide solution (D19). */}
       <ResourceTitle
         filter={
-          loaded.lineages.length > 0 && (
+          (loaded.options.length > 0 || search.schema) && (
             <UsersFilter
-              lineages={loaded.lineages}
+              options={loaded.options}
+              revisions={loaded.revisions}
               search={search}
               onChange={(next) =>
                 void navigate({

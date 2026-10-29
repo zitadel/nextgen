@@ -59,8 +59,9 @@ export const RESOURCE_TITLE = PAGE_TITLE;
 
 /**
  * The title row of a list screen: the heading with, where the screen has one,
- * its primary action beside it at every width (D19). 36px tall with or without
- * the button (`PAGE_TITLE_ROW`).
+ * its primary action beside it at every width (D19), and any filter beside
+ * that. 36px tall (`PAGE_TITLE_ROW`), except on a phone with a filter, where
+ * the filter takes a second row under the title.
  */
 export function ResourceTitle({
   children,
@@ -76,20 +77,14 @@ export function ResourceTitle({
    */
   filter?: ReactNode;
 }) {
-  if (!filter) {
-    return (
-      <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW)}>
-        <h1 className={RESOURCE_TITLE}>{children}</h1>
-        {action}
-      </div>
-    );
-  }
   return (
-    <div className={cn(RESOURCE_HEADER, "flex min-h-9 flex-wrap items-center gap-x-2 gap-y-4")}>
+    <div className={cn(RESOURCE_HEADER, PAGE_TITLE_ROW, "flex-wrap gap-x-2 gap-y-4")}>
       <h1 className={RESOURCE_TITLE}>{children}</h1>
-      <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
-        {filter}
-      </div>
+      {filter && (
+        <div className="order-3 flex basis-full items-center gap-2 sm:order-2 sm:ml-auto sm:basis-auto">
+          {filter}
+        </div>
+      )}
       <div className="order-2 ml-auto sm:order-3 sm:ml-0">{action}</div>
     </div>
   );

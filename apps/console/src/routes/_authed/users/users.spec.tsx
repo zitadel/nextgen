@@ -1279,27 +1279,29 @@ describe("users screen", () => {
     expect(bodies.at(-1)).not.toHaveProperty("expand");
   });
 
-  /** Two revisions of one schema, the newer one still in use, for the filter. */
+  /**
+   * One schema in two revisions, the newer one still in use: the latest-only
+   * read the filter's options come from, and the full history the revision
+   * menu reads for the chosen schema.
+   */
   function serveLineage() {
+    const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+    const newer = {
+      id: "sch_business_2",
+      schema: business,
+      metadata: { created_at: "2026-08-01T09:30:00Z", in_use: true },
+    };
+    const older = {
+      id: "sch_business",
+      schema: business,
+      metadata: { created_at: "2026-07-01T00:00:00Z", in_use: false },
+    };
     server.use(
       http.get(SCHEMAS_URL, ({ request }) => {
-        if (new URL(request.url).searchParams.get("revisions") !== "all") {
-          return HttpResponse.json({ schemas: [] });
-        }
-        const business = { ...BUSINESS_SCHEMA.schema, objectType: "business" };
+        const params = new URL(request.url).searchParams;
+        if (params.get("revisions") !== "all") return HttpResponse.json({ schemas: [newer] });
         return HttpResponse.json({
-          schemas: [
-            {
-              id: "sch_business_2",
-              schema: business,
-              metadata: { created_at: "2026-08-01T09:30:00Z", in_use: true },
-            },
-            {
-              id: "sch_business",
-              schema: business,
-              metadata: { created_at: "2026-07-01T00:00:00Z", in_use: false },
-            },
-          ],
+          schemas: params.get("object_type") === "business" ? [newer, older] : [],
         });
       }),
     );
@@ -1422,9 +1424,10 @@ describe("users screen", () => {
     expect(screen.getByText("No users match this filter.")).toBeInTheDocument();
   });
 
-  it("filters by one revision from the URL, with the list left when the lineages cannot be read", async () => {
-    // The lineages are chrome: unreadable, the filter leaves the title row and
-    // the list still narrows by what the URL carries.
+  it("filters by one revision from the URL, and keeps the filter in view when the schemas cannot be read", async () => {
+    // The schema reads are chrome: unreadable, the list still narrows by what
+    // the URL carries, and the filter stays on the title row naming it, so
+    // it can be cleared from there rather than by editing the URL.
     server.use(
       http.get(SCHEMAS_URL, () =>
         HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
@@ -1440,6 +1443,11 @@ describe("users screen", () => {
         { field: "schema", operation: "equals", value: "sch_business" },
       ],
     });
-    expect(screen.queryByRole("combobox", { name: "Filter by schema" })).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filter by schema" })).toHaveTextContent(
+      "business",
+    );
+    expect(screen.getByRole("combobox", { name: "Filter by revision" })).toHaveTextContent(
+      "sch_business",
+    );
   });
 });
