@@ -30,9 +30,9 @@ A few commands add one property of their own. When a failed command's event alre
 | Command | Property | What it holds |
 | --- | --- | --- |
 | `setup` | `framework` | The framework it set up. |
-| `claim` | `claim_outcome` | How the claim ended, such as `completed`, `link_issued` or `expired`. |
+| `claim` | `claim_outcome` | How the [claim](/docs/concepts/project-team-user#claim) ended, such as `completed`, `link_issued` or `expired`. |
 | `doctor` | `failed_checks` | The names of the checks that failed, never their messages. |
-| `api` | `operation` | The operation it called, such as `listReleases`, never a path, an id or a field. |
+| `api` | `operation` | The operation it called, such as `listReleases`, never a path, an ID or a field. |
 | `start` | `runtime` | The runtime: `binary` or `docker`. |
 
 Vercel records a location (country, region and city) worked out from the IP address an event comes from. Runs in CI send nothing.
@@ -55,8 +55,8 @@ The CLI can also send its events to [Mixpanel](https://mixpanel.com), in its EU 
 | `host_agent` | What ran it: `claude_code`, `cursor`, `vscode` or `unknown`. |
 | `invocation_channel` | The package manager that started it: `npm`, `pnpm`, `yarn`, `bun` or `unknown`. |
 | `server_kind` | The kind of server it talked to: `cloud`, `local`, `self_hosted` or `unknown`, never its URL. |
-| `invocation_id` | A random id that ties one run's events together. |
-| `distinct_id` | The [install id](#the-install-id). |
+| `invocation_id` | A random ID that ties one run's events together. |
+| `distinct_id` | The [install ID](#the-install-id). |
 
 Some commands add what they did, as counts and fixed values:
 
@@ -76,11 +76,11 @@ Mixpanel is told not to locate you by your IP address (`ip: 0`); the country com
 
 ## What it never sends
 
-Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource id, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Vercel locates an event by the IP address it comes from.
+Nothing that identifies you, your machine or your project: no name, email address, server URL, project or resource ID, file path, secret, variable, or error message. Every value is a fixed name, a boolean, a count or a version. Vercel locates an event by the IP address it comes from.
 
-## The install id
+## The install ID
 
-The first time it sends anything, the CLI creates a random id for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The id ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new id.
+The first time it sends anything, the CLI creates a random ID for the install and keeps it in `~/.config/zitadel/cli/telemetry.json`: under `$XDG_CONFIG_HOME` when that is set, and under `%APPDATA%` on Windows. The ID ties the runs of one install together in Mixpanel, and holds nothing about you or the machine. The events for Vercel leave it out, so while Mixpanel is paused it stays on your machine. Delete the file to start over with a new one. Where the file cannot be written, every run takes a new ID.
 
 On that first run, in an interactive terminal, the CLI says on stderr that it collects analytics, and how to opt out. With Mixpanel, it also records the install itself, with the platform, versions, country and `host_agent` its events carry.
 
@@ -98,7 +98,7 @@ Any of these turns telemetry off:
 | `DO_NOT_TRACK=1` | Telemetry for every tool that follows [Console Do Not Track](https://consoledonottrack.com); any value but `0` counts. |
 | `ZITADEL_TELEMETRY=0` | Telemetry for the Zitadel CLI; `false`, `off` and `no` work too. |
 
-Set the variable in your shell's profile, or in your CI's environment, to keep it off for good. The CLI also sends nothing under a test runner: with `VITEST` set, or `NODE_ENV=test`. Turned off, it builds no event and writes no install id.
+Set the variable in your shell's profile, or in your CI's environment, to keep it off for good. The CLI also sends nothing under a test runner: with `VITEST` set, or `NODE_ENV=test`. Turned off, it builds no event and writes no install ID.
 
 To see what it decided, run a command with `--debug`: it prints `[telemetry] consent:` and the reason to stderr, such as `do-not-track` or `enabled`.
 

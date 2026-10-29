@@ -1,9 +1,9 @@
 ---
 title: Agent setup
-description: Install the Zitadel Agent Skills, drive the CLI with JSON envelopes, and prove auth in a browser.
+description: Install the Zitadel Agent Skills, drive the CLI with JSON envelopes, and prove sign-in in a browser.
 ---
 
-The CLI is an agent-facing product surface. Agents should prefer structured JSON over prose hints and should prove the generated app in a browser.
+A coding agent can drive the Zitadel CLI and prove the generated app in a browser. The CLI answers each command with an envelope: one JSON object on stdout with a fixed set of fields. Prefer the envelope over prose hints.
 
 ## Agent Skills
 
@@ -34,18 +34,24 @@ When operating outside the current directory, also pass:
 --cwd <path>
 ```
 
-The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress belongs on stderr. Capture stdout and stderr separately when scripting, into files outside the app directory: setup scaffolds a new app only into an empty directory. The contract covers the Zitadel commands; oclif's built-in `help`, `version`, and `commands` print no envelope.
+The CLI prints one parseable JSON object on stdout. Installer, audit, and package-manager progress goes to stderr. When scripting, capture stdout and stderr separately, into files outside the app directory. Setup scaffolds a new app only into an empty directory. The contract covers the Zitadel commands. The built-in `help`, `version`, and `commands` print no envelope.
 
 ## Envelope shape
 
-Every JSON envelope includes:
+Every envelope includes:
 
 - `cli_version`
 - `command`
 - `source`
 - `status`: `ok`, `skipped`, or `error`
 
-`ok` responses include command-specific `data` and a `warnings` list. `skipped` is a deliberate no-op, not a failure, with a stable `reason` such as `already-claimed`. `error` responses include `code`, `message`, and usually a `hint`. Agents should prefer `next_commands` over prose hints: it sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
+`ok` responses include command-specific `data` and a `warnings` list.
+
+`skipped` is a deliberate no-op, not a failure. It has a stable `reason`, such as `already-claimed`.
+
+`error` responses include `code`, `message`, and usually a `hint`.
+
+Prefer `next_commands` over prose hints. It sits inside `data` on `ok` responses and at the top level on `skipped` and `error` responses.
 
 ## Agent prompt
 
@@ -57,25 +63,25 @@ Create a new, empty local app directory with a lowercase name, such as my-app, a
 3. npx @zitadel/cli@latest setup --framework next --server local --non-interactive --json
 4. npm run dev
 
-Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, log out, log back in with the same user, and finish on the signed-in page.
+Use the available browser automation to open the generated app. Register a unique user, verify the signed-in profile state, sign out, sign back in with the same user, and finish on the signed-in page.
 
-To reach the management console, run
+To reach the console, run
 npx @zitadel/cli@latest console --non-interactive --json and open data.sign_in_url
 right away. Each link signs in the local admin once and expires after a minute, so
-get a new one per visit. The link step 2 returns usually expires before setup finishes.
+get a new one per visit. Run it only after step 3: before setup, the console shows no projects.
 
 Summarize commands run, JSON statuses, files changed, browser steps completed, and any setup or UI friction.
 ```
 
 ## Stable UI proof
 
-`<zitadel-login>` and `<zitadel-session>` are web components with shadow DOM, and the fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers need to recurse through every shadow root.
+`<zitadel-login>` and `<zitadel-session>` are web components with shadow DOM, an encapsulated DOM tree. The fields and buttons inside them have shadow roots of their own. Browser drivers with shadow-DOM-aware locators can target the test hooks directly. Generic DOM-eval drivers must recurse through every shadow root.
 
-The hooks are `data-testid` values. Useful ones include:
+The hooks are `data-testid` values. Useful ones are:
 
 - `zitadel-field-email` and `zitadel-field-password` (the field elements)
 - `zitadel-input-email` and `zitadel-input-password` (the native inputs inside them)
 - `zitadel-action-submit` (the submit button element)
 - `zitadel-action-submit-button` (the native button inside it)
 
-For sign-out, the generated profile page renders `<zitadel-session>`: target `[data-testid="zitadel-session-logout"]`. An app that renders `<zitadel-logout>` instead, as the React, Vue, Solid, Svelte, and Qwik manual samples do, has no test id there: click its "Open user menu" button, then target the `.signout-btn` button.
+To sign out, target `[data-testid="zitadel-session-logout"]`: the generated profile page renders `<zitadel-session>`. An app that renders `<zitadel-logout>` instead has no test ID there. The React, Vue, Solid, Svelte, and Qwik manual samples do this. Click its "Open user menu" button, then target the `.signout-btn` button.

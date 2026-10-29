@@ -1,6 +1,6 @@
 ---
 title: SolidStart SDK
-description: Request middleware and helpers for SolidStart applications.
+description: Add Zitadel sign-in to a SolidStart app with request middleware that proxies requests and verifies sessions.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,13 +8,13 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The SolidStart SDK is request middleware that proxies and verifies sessions on the server. The login and logout widgets come from the [Solid SDK](/docs/sdks/solid).
+The SolidStart SDK is request middleware that proxies Zitadel requests and verifies sessions on the server. The login and logout components come from the [Solid SDK](/docs/sdks/solid).
 
 <Callout title="Generated setup" type="info">
-  The CLI targets SolidStart 2. It writes `src/middleware.ts`, registers it in `vite.config.ts`, and writes the backend URL, the project secret, and the project id to `.env.local`.
+  The CLI targets SolidStart 2. It writes `src/middleware.ts`, registers it in `vite.config.ts`, and writes the Zitadel URL, the project secret and the project ID to `.env.local`.
 </Callout>
 
-## Install
+## Install the SDK
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -34,11 +34,11 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
   </Tab>
 </Tabs>
 
-## Setup
+## Add the middleware
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the middleware, the routes, environment files, and both SDK packages, and points the `solidStart()` plugin in `vite.config.ts` at the middleware.
+    The CLI adds the middleware, the routes, environment files and both SDK packages. It also points the `solidStart()` plugin in `vite.config.ts` at the middleware.
 
     <Files>
       <File name="src/middleware.ts" />
@@ -52,10 +52,10 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
       <File name="package.json" />
     </Files>
 
-    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder. It adds entries to `.gitignore` and managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/middleware.ts`. SolidStart 2 registers this module's default export as h3 middleware, so wrap the config in its `createMiddleware`; a bare config object registers nothing.
+    Create `src/middleware.ts`. SolidStart 2 registers this module's default export as h3 middleware. Wrap the config in its `createMiddleware`, because a bare config object registers nothing.
 
     ```ts
     import { createMiddleware } from "@solidjs/start/middleware";
@@ -81,7 +81,7 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
     });
     ```
 
-    Load the widget with `clientOnly`. It registers custom elements when imported, which throws during server rendering, so a top-level import in a route renders an empty page:
+    Load the login component with `clientOnly`. It registers custom elements when imported, which throws during server rendering. A top-level import in a route therefore renders an empty page:
 
     ```tsx
     import { clientOnly } from "@solidjs/start";
@@ -104,24 +104,24 @@ The SolidStart SDK is request middleware that proxies and verifies sessions on t
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the middleware does
 
 <Steps>
-  <Step>The middleware proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The middleware proxies same-origin `/__nextgen/*` requests to Zitadel. It adds the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(getRequestEvent()!)` in a server function.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 
-Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` there. Only `VITE_`-prefixed variables reach the browser.
+Nitro loads `.env` and `.env.local` into `process.env` in development, so the middleware finds `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET` and `ZITADEL_PROJECT_ID` there. Only `VITE_`-prefixed variables reach the browser.
 
-## Verify
+## Verify the setup
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`.
+- Sign out and confirm `/profile` redirects to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-solid-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid-start) and the [CLI SolidStart patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/solid-start).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-solid-start` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-solid-start).

@@ -1,22 +1,26 @@
 ---
 title: Project, team, and user
-description: Core resource vocabulary for the preview.
+description: The three core resources, project, team, and user, and how a project is claimed.
 ---
+
+Zitadel stores its data as projects, teams, and users. A project contains the other two.
 
 ## Project
 
-A project is the top-level tenant and the data boundary. Every user, session, credential, team, audit event, and variable is stored in exactly one project, as is its configuration: schemas, flows, branding, identity providers, and releases. Data that must stay separate, such as a staging user base, belongs in a second project. Only access crosses projects: a user or team can hold a role on another project, and one team can own several projects.
+A project is the top-level container and the data boundary. Every user, session, credential, team, audit event, and variable is stored in exactly one project, as is its configuration: schemas, flows, branding, identity providers, and releases. Data that must stay separate, such as a staging user base, belongs in a second project. Only access crosses projects: a user or team can hold a role on another project, and one team can own several projects.
 
 ## Team
 
-A team is a tenant-grouping inside a project. It can represent a paying customer or a B2B end-customer depending on which project it lives in.
+A team is a group inside a project. Depending on the project, it can represent a paying customer or a B2B end-customer.
 
 ## User
 
-A user is an identity inside a project. Users can be self-owned or team-owned depending on lifecycle policy.
+A user is an identity inside a project. Depending on lifecycle policy, a user can be self-owned or team-owned.
 
 ## Claim
 
-A project is created first and claimed later: claiming attaches it to your team, and a claimed project is one that carries an active owning-team grant. Claim is implemented end to end: the `zitadel claim` command, the OpenAPI endpoints, the server handlers, and the console claim page, the browser leg where you sign in on the platform project and complete the claim, are all shipped. Some design docs still describe target claim and platform lifecycle behavior.
+You create a project first and claim it later. Claiming attaches it to your team. A claimed project carries an active owning-team grant, the record that makes your team its owner.
 
-A local project skips the browser leg by default. `zitadel start` creates a local admin, `admin@zitadel.localhost`, with a team of its own, and `zitadel setup --server local` attaches the new project to that team, so a local project is owned by the local admin from the moment setup finishes. `zitadel claim` then reports it as already owned; it is the fallback for when that step failed.
+Claim works end to end. The `zitadel claim` command, the OpenAPI endpoints, the server handlers, and the console claim page are all shipped. On the console claim page you sign in on the platform project and complete the claim in the browser.
+
+A local project skips the browser step by default. `zitadel start` creates a local admin, `admin@zitadel.localhost`, with a team of its own. `zitadel setup --server local` attaches the new project to that team, so the local admin owns a local project as soon as setup finishes. `zitadel claim` then reports it as already owned. Use it as the fallback when that step failed.

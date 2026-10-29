@@ -1,6 +1,6 @@
 ---
 title: Qwik Router SDK
-description: An onRequest plugin and helpers for Qwik Router (formerly Qwik City) applications.
+description: Add Zitadel sign-in to a Qwik Router (formerly Qwik City) app with an onRequest plugin that proxies requests and verifies sessions.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,15 +8,15 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Qwik Router SDK is an `onRequest` plugin that proxies and verifies sessions on the server. The login and logout widgets come from the [Qwik SDK](/docs/sdks/qwik).
+The Qwik Router SDK is an `onRequest` plugin that proxies Zitadel requests and verifies sessions on the server. The login and logout components come from the [Qwik SDK](/docs/sdks/qwik).
 
-<Callout title="Qwik 2 required" type="warn">
-  The SDK peers Qwik 2: `@qwik.dev/core` and `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City). A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the widgets need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
+<Callout title="Requires Qwik 2" type="warn">
+  The SDK has peer dependencies on Qwik 2: `@qwik.dev/core` and `@qwik.dev/router` (Qwik Router, which Qwik 2 renamed from Qwik City). A Qwik 1 app (`@builder.io/qwik-city`) is not supported, because the login components need Qwik 2. Migrate the app to `@qwik.dev/*` first. The CLI scaffolds new apps on Qwik 2.
 </Callout>
 
-## Install
+## Install the SDK
 
-Install both packages as dev dependencies. Qwik bundles `devDependencies` into the server build, and its starter `vite.config.ts` refuses to start when a package is listed in both sections.
+Install both packages as dev dependencies. Qwik bundles `devDependencies` into the server build. Its starter `vite.config.ts` refuses to start when a package is listed in both sections.
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -36,11 +36,11 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
   </Tab>
 </Tabs>
 
-## Setup
+## Add the plugin
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the plugin, the routes, environment files, and both SDK packages. No config file changes: Qwik Router picks up `plugin@*.ts` route files on its own.
+    The CLI adds the plugin, the routes, environment files and both SDK packages. It changes no config file, because Qwik Router picks up `plugin@*.ts` route files on its own.
 
     <Files>
       <File name="src/routes/plugin@nextgen.ts" />
@@ -53,10 +53,10 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
       <File name="package.json" />
     </Files>
 
-    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder. It adds entries to `.gitignore` and managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET`, and `ZITADEL_PROJECT_ID` per request from the request event's `env`, which is where Vite loads `.env.local`:
+    Create `src/routes/plugin@nextgen.ts`. The handler reads `ZITADEL_URL`, `ZITADEL_PROJECT_SECRET` and `ZITADEL_PROJECT_ID` on each request from the request event's `env`, which is where Vite loads `.env.local`:
 
     ```ts
     import { createNextgenOnRequest } from "@zitadel/sdk-qwik-router/server";
@@ -67,7 +67,7 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
     });
     ```
 
-    Render the widget from a route:
+    Render the login component from a route:
 
     ```tsx
     import { component$ } from "@qwik.dev/core";
@@ -85,22 +85,22 @@ Install both packages as dev dependencies. Qwik bundles `devDependencies` into t
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the plugin does
 
 <Steps>
-  <Step>The plugin proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The plugin proxies same-origin `/__nextgen/*` requests to Zitadel. It adds the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and stores the result on the request's `sharedMap`; read it with `getAuth(ev)` in a `routeLoader$`, action, or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in. A route matches with or without a trailing slash, since Qwik Router serves `/profile/` by default.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in. A route matches with or without a trailing slash, because Qwik Router serves `/profile/` by default.</Step>
 </Steps>
 
-## Verify
+## Verify the setup
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`.
+- Sign out and confirm `/profile` redirects to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-qwik-router` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router) and the [CLI Qwik Router patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/qwik-router).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-qwik-router` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik-router).

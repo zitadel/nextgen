@@ -5,23 +5,23 @@ description: Change the login's wording, translate it, and label the steps you a
 
 import { story as CopyStory } from "@/components/examples/copy.story";
 
-The login component looks up every title, description, field label, button and error message by a key: `identifier.title`, for example, is the title of the screen that asks for the email, "Sign in" in English. It ships dictionaries in English, German and Italian that cover every step of the login flow `zitadel setup` creates, and picks the visitor's language from the browser.
+The login component looks up every title, description, field label, button and error message by a key. For example, `identifier.title` is the title of the screen that asks for the email, "Sign in" in English. The login ships dictionaries in English, German and Italian. They cover every step of the login flow `zitadel setup` creates. It picks the visitor's language from the browser.
 
-To change a text, pass `locales` to `ZitadelLogin`: for each language, the keys you want to change and their new text. Every key you leave out keeps its built-in text.
+To change a text, pass `locales` to `ZitadelLogin`. For each language, list the keys you want to change and their new text. Every key you leave out keeps its built-in text.
 
 ```tsx
 <ZitadelLogin locales={{ en: { "identifier.title": "Welcome back" } }} />
 ```
 
-Every SDK's `ZitadelLogin` takes `locales` ([SDKs](/docs/sdks)). On a plain `<zitadel-login>` element, set it as a JavaScript property: it is not an attribute. German and Italian visitors keep the built-in translation of a text you change only in `en` ([Choose the language](#choose-the-language)).
+Every SDK's `ZitadelLogin` takes `locales` ([SDKs](/docs/sdks)). On a plain `<zitadel-login>` element, set it as a JavaScript property, not an attribute. German and Italian visitors keep the built-in translation of a text you change only in `en` ([Choose the language](#choose-the-language)).
 
-The example sets `identifier.title` this way on a live login, which runs against a mock of the flow API in your browser. Change the text, or the language it is set for and shown in:
+The example sets `identifier.title` this way on a live login. The login runs against a mock of the flow API in your browser. Change the text, or the language it is set for and shown in:
 
 <CopyStory.WithControl />
 
 ## Find the key for a text
 
-A key starts with the name of the step that shows the text, as your flow file, `.zitadel/flows/default-login.json`, names it:
+A key starts with the name of the step that shows the text. Your flow file, `.zitadel/flows/default-login.json`, names the steps:
 
 | Text | Key |
 | --- | --- |
@@ -34,11 +34,17 @@ A key starts with the name of the step that shows the text, as your flow file, `
 | Error message | `error.<code>`, such as `error.invalid_credentials` |
 | Notice that a sign-in went on as a sign-up, or the reverse | `notice.<reason>`, such as `notice.user_not_found` |
 
-`<field>` is the field's name in the step's `fields`; a sign-in method field such as `x-auth-methods#password` uses the method, `password`. The flows `zitadel setup` creates give every button a `text_key`, so the email screen's Continue button, for example, is `identifier.action.continue`, not `identifier.action.submit`. Every built-in key and its English text is in the [English dictionary](https://github.com/zitadel/nextgen/blob/main/packages/components/src/orchestrator/locales/en.ts). Keep any placeholder in braces, such as `{0}` or `{name}`, in a text you replace: the login fills it in, with a field's label or a provider's name.
+`<field>` is the field's name in the step's `fields`. A sign-in method field such as `x-auth-methods#password` uses the method, `password`.
+
+The flows `zitadel setup` creates give every button a `text_key`. The email screen's Continue button, for example, is `identifier.action.continue`, not `identifier.action.submit`.
+
+The [English dictionary](https://github.com/zitadel/nextgen/blob/main/packages/components/src/orchestrator/locales/en.ts) lists every built-in key and its English text.
+
+Keep any placeholder in braces, such as `{0}` or `{name}`, in a text you replace. The login fills it in with a field's label or a provider's name.
 
 ## Label a step you add
 
-A step you add to your flow has no built-in text, so supply its keys in `en`: every visitor sees your English until you add their language. For a step named `company-details` with a `company` field and a `submit` action:
+A step you add to your flow has no built-in text, so supply its keys in `en`. Every visitor sees your English until you add their language. For a step named `company-details` with a `company` field and a `submit` action:
 
 ```tsx
 <ZitadelLogin
@@ -52,11 +58,15 @@ A step you add to your flow has no built-in text, so supply its keys in `en`: ev
 />
 ```
 
-A key that no dictionary has shows on screen as the key itself, and the browser console warns `missing text key`: a button that reads `company-details.action.submit` names the entry to add. Fields are the exception: a missing label shows the field's name made readable, so `dateOfBirth` reads "Date of birth", and a missing placeholder or help text shows nothing. Keys that your own [login design](/docs/guides/customize-design) adds to its template work the same way.
+A key that no dictionary has shows on screen as the key itself, and the browser console warns `missing text key`. A button that reads `company-details.action.submit` names the entry to add.
+
+Fields are the exception. A missing label shows the field's name made readable, so `dateOfBirth` reads "Date of birth". A missing placeholder or help text shows nothing.
+
+Keys that your own [login design](/docs/guides/customize-design) adds to its template work the same way.
 
 ## Choose the language
 
-The login shows the language set by `lang`, or the browser's language when `lang` is unset. It reads only the language, not the region: a browser set to `de-CH` gets `de`, so key `locales` by `de`, never `de-CH`.
+The login shows the language set by `lang`, or the browser's language when `lang` is unset. It reads only the language, not the region. A browser set to `de-CH` gets `de`, so key `locales` by `de`, never `de-CH`.
 
 For each key, a visitor gets the first of these that has a text for it:
 
@@ -65,10 +75,10 @@ For each key, a visitor gets the first of these that has a text for it:
 3. your `en` entries;
 4. the built-in English texts.
 
-So your English is the fallback for every language: a step you labelled only in `en` reads in English for everyone. A built-in translation still beats it, so change a built-in text for German or Italian visitors with a `de` or `it` entry, or set `lang="en"` to show everyone English.
+So your English is the fallback for every language. A step you labelled only in `en` reads in English for everyone. A built-in translation still beats it. To change a built-in text for German or Italian visitors, add a `de` or `it` entry. To show everyone English, set `lang="en"`.
 
-## Steps that offer sign-in providers
+## Steps that offer identity providers
 
-A step that shows sign-in provider buttons asks for `<step>.description.sso` instead of `<step>.description`, because its text must also suit users who have no password. Only the password step has one built in, "Enter your password or continue with your sign-in provider"; every other step shows its plain description.
+A step that shows identity provider buttons asks for `<step>.description.sso` instead of `<step>.description`. Its text must also suit users who have no password. Only the password step has one built in: "Enter your password or continue with your sign-in provider". Every other step shows its plain description.
 
-If you change a step's `.description` but not its `.description.sso`, your text shows whether or not the step offers providers.
+If you change a step's `.description` but not its `.description.sso`, your text shows whether or not the step offers identity providers.

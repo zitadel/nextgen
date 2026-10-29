@@ -1,23 +1,23 @@
 ---
 title: Deploy
-description: Build a release from local Zitadel configuration and deploy it.
+description: Build a release from your local Zitadel configuration and deploy it to your project's origins.
 ---
 
-`.zitadel/schemas/*.json`, `.zitadel/flows/*.json` and `.zitadel/branding/` are the source of truth for your project's user schemas, login flows and branding. Edit them, then publish with `deploy`: it builds the files into one immutable release and makes that release live on your project's origins.
+`deploy` publishes your project's local configuration to Zitadel as one release. The files in `.zitadel/schemas/*.json`, `.zitadel/flows/*.json` and `.zitadel/branding/` are the source of truth for your user schemas, login flows and branding. Edit them, then run `deploy`. It builds the files into one immutable release, a snapshot that never changes, and makes that release live on your project's origins, the web addresses it serves.
 
 ```sh
-npx @zitadel/cli@alpha deploy
+npx @zitadel/cli@latest deploy
 ```
 
-`deploy` validates the configuration, shows a git diff of `.zitadel/` against the release that is live now, creates the release, and deploys it to every primary origin. `--dry-run` stops after the diff and writes nothing:
+`deploy` validates the configuration and shows a git diff of `.zitadel/` against the release that is live now. It then creates the release and deploys it to every primary origin: the exact origins your app serves from. Setup registers your dev origin as one; add more with `origin add --kind primary`. `--dry-run` stops after the diff and writes nothing:
 
 ```sh
-npx @zitadel/cli@alpha deploy --dry-run
+npx @zitadel/cli@latest deploy --dry-run
 ```
 
-A release carries a content digest, so re-running `deploy` on unchanged configuration returns the same release and changes nothing.
+A release carries a content digest. Running `deploy` again on unchanged configuration returns the same release and changes nothing.
 
-## Walkthrough: add a field to registration
+## Add a field to registration
 
 Add an optional `company` property to `.zitadel/schemas/default-human-user.json`:
 
@@ -27,22 +27,22 @@ Add an optional `company` property to `.zitadel/schemas/default-human-user.json`
 }
 ```
 
-(Leave `required` untouched to keep the field optional.)
+Leave `required` untouched to keep the field optional.
 
-Then let users enter it during registration — add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
+Then let users enter it during registration. Add `"company"` to the `register` step's `fields` in `.zitadel/flows/default-login.json`.
 
-Preview, then publish:
+Preview the change, then deploy it:
 
 ```sh
-npx @zitadel/cli@alpha deploy --dry-run
-npx @zitadel/cli@alpha deploy
+npx @zitadel/cli@latest deploy --dry-run
+npx @zitadel/cli@latest deploy
 ```
 
-## Walkthrough: a second flow, selected by name
+## Serve a second flow by name
 
-Every file in `.zitadel/flows/` goes into the release, but the widget runs exactly one flow per sign-in — an extra flow needs a distinct `name` so the app can ask for it.
+Every file in `.zitadel/flows/` goes into the release. The login component runs exactly one flow per sign-in, so an extra flow needs a distinct `name` that the app can ask for.
 
-Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `default-login.json` (start from a copy), with its own `name` and whatever steps the journey needs:
+Create `.zitadel/flows/kiosk-login.json` next to the default flow. Start from a copy of `default-login.json`, then give it its own `name` and the steps the journey needs:
 
 ```json
 {
@@ -51,44 +51,44 @@ Drop `.zitadel/flows/kiosk-login.json` next to the default flow. Same shape as `
   "status": "active",
   "user_schema": "human-user",
   "purposes": { "login": "identifier" },
-  "steps": [ "…copied from default-login.json, then edited…" ]
+  "steps": [ "<steps copied from default-login.json, then edited>" ]
 }
 ```
 
-Deploy it, then point the widget at it:
+Deploy it, then point the login component at it:
 
 ```tsx
 <ZitadelLogin flowName="kiosk-login" />
 ```
 
-(or `flow-name="kiosk-login"` on the plain `<zitadel-login>` element). An unknown name or a flow that doesn't serve the requested purpose surfaces as a startup error in the widget.
+On the plain `<zitadel-login>` element, set `flow-name="kiosk-login"` instead. An unknown name, or a flow that doesn't serve the requested purpose, shows as a startup error in the login component.
 
-Without `flowName`, the platform serves the newest active flow that has no `audience`. A flow scoped via `audience.app_ids` / `audience.team_ids` is selected only when the flow-start request's hints identify that app or team (app match beats team match) — it never captures the project default.
+Without `flowName`, Zitadel serves the newest active flow that has no `audience`. A flow scoped with `audience.app_ids` or `audience.team_ids` is selected only when the hints in the flow-start request identify that app or team. An app match beats a team match. Such a flow never replaces the project default.
 
 ## Releases, deployments and rollback
 
-- A **release** is an immutable snapshot of `.zitadel/`, identified by a `rel_` id and a content digest. Build one without deploying it with `release create`, and stop a release from ever being served again with `release revoke`.
-- A **deployment** makes a release live on a set of origins. `deploy` creates one to every primary origin; `deployment create --release <id>` deploys an existing release. Primary origins are never named one by one.
-- `deployment list` shows the history (newest first), `deployment get <id>` reads one, and `deployment rollback` re-applies an earlier deployment — bare, it undoes the last deploy. It prints the revisions the restored release pins, including the schema revision new registrations use.
+- A **release** is an immutable snapshot of `.zitadel/`, identified by a `rel_` ID and a content digest. `release create` builds one without deploying it. `release revoke` stops a release from ever being served again.
+- A **deployment** makes a release live on a set of origins. `deploy` creates one to every primary origin. `deployment create --release <id>` deploys an existing release. You never name primary origins one by one.
+- `deployment list` shows the history, newest first. `deployment get <id>` reads one deployment. `deployment rollback` makes an earlier deployment live again; bare, it undoes the last deploy. It prints the revisions the restored release pins, including the schema revision new registrations use.
 - A rollback restores configuration, not user data. Users keep the schema revision and attributes they have, including users you migrated to a newer revision.
 
-Add the origins a project serves with `origin add` before the first deploy; `deploy` needs at least one primary origin.
+Add the origins a project serves with `origin add` before the first deploy. `deploy` needs at least one primary origin.
 
-## How publishing works
+## What deploy checks before it publishes
 
-- **Flows are validated before the release is built** against the same rules the platform enforces — transition wiring, step reachability, schema field references, and cross-purpose invariants (e.g. a login entry step must wire `user_not_found` when `register` is also a purpose). Violations fail `deploy` before anything is uploaded, with the same error text the server would return. Non-blocking product guidance is reported as warnings.
-- The release carries the resources as authored. The server reuses the revision it already holds when the content matches and allocates a new one otherwise, so an unchanged resource is never re-revisioned.
-- Every `${VAR}` and `*_env` reference is checked against the running environment before the release is built, so a missing variable fails locally rather than shipping a placeholder.
-- Flow files carry `"$schema": "../meta/flow-definition.json"` — a pointer at the flow dialect spec setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It is local-only and stripped before upload.
-- Your local files stay as written — `deploy` never rewrites them.
+- **Flows are validated before the release is built.** The checks match the rules the server enforces: transition wiring, step reachability, schema field references and cross-purpose rules. For example, a login entry step must wire `user_not_found` when `register` is also a purpose. A violation fails `deploy` before anything is uploaded, with the error text the server would return. Guidance that doesn't block a deploy appears as a warning.
+- **The release carries the resources as authored.** The server reuses a revision it already holds when the content matches, and allocates a new one otherwise. An unchanged resource never gets a new revision.
+- **Every `${VAR}` and `*_env` reference is checked** against the running environment before the release is built. A missing variable fails locally instead of shipping a placeholder.
+- **Flow files carry `"$schema": "../meta/flow-definition.json"`.** It points at the flow dialect spec that setup copies into `.zitadel/meta/`, so editors validate and autocomplete flow edits offline. It stays local and is stripped before upload.
+- **Your local files stay as written.** `deploy` never rewrites them.
 
 For agents:
 
 ```sh
-npx @zitadel/cli@alpha deploy --dry-run --non-interactive --json
-npx @zitadel/cli@alpha deploy -m "<message>" --non-interactive --json
+npx @zitadel/cli@latest deploy --dry-run --non-interactive --json
+npx @zitadel/cli@latest deploy -m "<message>" --non-interactive --json
 ```
 
-Under `--json`, both carry the diff the terminal shows in `data.diff`: `files` lists each changed file with its `status` and its `patch`, the file's part of the diff. `files` is `null` when there is nothing to diff against yet, such as before the first deploy, and `note` says why.
+Under `--json`, both commands carry the diff the terminal shows in `data.diff`. `files` lists each changed file with its `status` and its `patch`, the file's part of the diff. `files` is `null` when there is nothing to diff against yet, such as before the first deploy, and `note` says why.
 
 Keep source-controlled configuration in `zitadel.json` and `.zitadel/**`. Keep `.zitadel/local/**` out of source control.

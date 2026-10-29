@@ -1,8 +1,8 @@
 ---
 title: Concepts
-description: The minimum vocabulary for the Zitadel preview, and how the pieces fit together.
+description: The vocabulary of the Zitadel preview and how its pieces fit together.
 ---
 
-These pages explain the model behind the preview: the current surface, and the direction the ADRs and design docs record.
+These pages explain the model behind the preview and how its pieces fit together.
 
-A [project](/docs/concepts/project-team-user) holds everything else: its users and teams, their sessions, and its configuration. That configuration lives in your repository as files ([Configuration as code](/docs/concepts/repo-config)), above all the [user schemas and login flows](/docs/concepts/flows-and-schemas) that decide what a user is and how they sign in. A sign-in runs as an [auth attempt](/docs/concepts/sessions-auth-attempts) and ends in a session. The server keeps all of it in one of the [databases](/docs/concepts/databases) it supports.
+A [project](/docs/concepts/project-team-user) holds your users and teams, their sessions, and your configuration. That configuration lives in your repository as files ([Configuration as code](/docs/concepts/repo-config)). The [user schemas and login flows](/docs/concepts/flows-and-schemas) decide what a user is and how they sign in. A sign-in runs as an [authentication attempt](/docs/concepts/sessions-auth-attempts) and ends in a session. The server keeps all of it in one of the [databases](/docs/concepts/databases) it supports.

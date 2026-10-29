@@ -1,24 +1,23 @@
 ---
 title: Qwik SDK
-description: Client-side Qwik wrappers for the Zitadel login and logout components.
+description: Add the Zitadel login and logout components to a Qwik 2 app with @zitadel/sdk-qwik.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
 import { File, Files } from "fumadocs-ui/components/files";
-import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
+The Qwik SDK (`@zitadel/sdk-qwik`) wraps the shared Zitadel login and logout components for Qwik single-page apps (SPAs).
 
-<Callout title="Requires Qwik 2" type="info">
-  `@zitadel/sdk-qwik` peers `@qwik.dev/core` (`^2.0.0-beta.45`), so your app must be on Qwik 2. A Qwik 1 (`@builder.io/qwik`) app is not supported — migrate it to `@qwik.dev/core` first.
+<Callout title="Requires Qwik 2" type="warn">
+  `@zitadel/sdk-qwik` has a peer dependency on `@qwik.dev/core` (`^2.0.0-beta.45`), so your app must use Qwik 2. A Qwik 1 app (`@builder.io/qwik`) is not supported. Migrate it to `@qwik.dev/core` first.
 </Callout>
 
 <Callout title="SPA proxy requirement" type="warn">
-  Vite-based Qwik SPAs do not have server middleware by default. The CLI configures a Vite dev proxy; production deployments need an equivalent same-origin proxy for `/__nextgen/*`. See [SDK proxy](/docs/sdks/proxy).
+  The components call `/__nextgen/*` on your app's own origin, and Vite-based Qwik SPAs have no server middleware to answer. The CLI sets up a Vite dev proxy for local development. In production, you supply a same-origin proxy. It must add the project secret to the session exchange, and to no other call, so a plain rewrite cannot do it. See [SPAs in production](/docs/sdks/proxy#spas-in-production).
 </Callout>
 
-## Install
+## Install the SDK
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -38,11 +37,11 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
   </Tab>
 </Tabs>
 
-## Setup
+## Add the login component
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI configures the Vite proxy, writes app-level auth UI, adds environment files, and installs the SDK.
+    The CLI installs the SDK, configures the Vite proxy, writes the sign-in UI in your app and adds environment files.
 
     <Files>
       <File name="src/app.tsx" />
@@ -52,10 +51,10 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
       <File name="package.json" />
     </Files>
 
-    In an existing app, the CLI edits the `vite.config.*` you already have. Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+    In an existing app, the CLI edits the `vite.config.*` you already have. Every setup also writes `zitadel.json` and the `.zitadel/` folder. It adds entries to `.gitignore` and managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Configure Zitadel once, then render login and logout widgets:
+    Configure Zitadel once, then render the login and logout components:
 
     ```tsx
     import { component$ } from "@qwik.dev/core";
@@ -74,43 +73,43 @@ The Qwik SDK is the SPA wrapper for the shared Zitadel login and logout widgets.
       return <ZitadelLogout project={project} postSignOutUrl="/login" />;
     });
     ```
-
-    `ZitadelLogin` also takes `resumeFlowId`, an existing flow to resume instead of starting a new one; unset, `null` or `""` falls back to the `flow` query parameter.
   </Tab>
 </Tabs>
 
-## Widget props and events
+## Props
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below, spelled the same in every SPA SDK. An unset prop keeps the widget's own default.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` take the props below. Every SPA SDK spells them the same. An unset prop keeps the component's default.
 
-| Prop | Type | Default | Widgets | Description |
+| Prop | Type | Default | Used by | Description |
 | --- | --- | --- | --- | --- |
-| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle from `configureZitadel(...)`. Wins over `projectId` and `proxyPath`. |
-| `projectId` | `string` | unset | Login, Logout, Session | Project id, read when no `project` handle is passed. |
-| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | Same-origin path the widget calls. |
-| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | Flow purpose. |
-| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`; unset runs the project's default flow for the purpose. |
-| `postSignInUrl` | `string` | unset | Login | Where to navigate after a completed sign-in. When the page's `next` query parameter names a path on the same origin, as the server SDKs' middleware sets it for a signed-out visit to a protected route, the widget returns there instead. |
-| `forcePostSignInUrl` | `boolean` | `false` | Login | Navigates to `postSignInUrl` even when the page's `next` query parameter names a path, for a page that uses `next` for something of its own. |
-| `postSignOutUrl` | `string` | unset | Logout, Session | Where to navigate after sign-out. |
-| `resumeFlowId` | `string` or `null` | unset | Login | An existing flow's id to resume instead of starting a new flow; unset, `null` or `""` falls back to the `flow` query parameter, and an id that no longer resolves starts a new flow. |
-| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` is content-sized and paints no page chrome; `page` claims the viewport, paints the surface background and loads the brand font, and on Login focuses the first field. |
-| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | Colour mode. Unset follows the tenant's branding theme on Login, then the variant default (`dark` for `page`, `auto` for `widget`); Logout defaults to `auto`. `auto` follows `prefers-color-scheme`. |
-| `suppressHeader` | `boolean` | `false` | Login, Session | Visually hides the widget's own heading block while keeping it in the accessibility tree, for pages that already carry the heading. |
+| `project` | `ZitadelProject` | unset | Login, Logout, Session | The handle that `configureZitadel()` returns. It takes precedence over `projectId` and `proxyPath`. |
+| `projectId` | `string` | unset | Login, Logout, Session | The project ID. Read only when you pass no `project` handle. |
+| `proxyPath` | `string` | `"/__nextgen"` | Login, Logout, Session | The same-origin path the component calls. |
+| `purpose` | `CreateFlowBodyPurpose` | `"login"` | Login | The purpose of the sign-in flow. |
+| `flowName` | `string` | unset | Login | Runs the flow definition with this `name`. Unset runs the project's default flow for the purpose. |
+| `postSignInUrl` | `string` | unset | Login | Where to go after a completed sign-in. If the page's `next` query parameter holds a path on the same origin, the component goes there instead. The server SDKs' middleware sets `next` when a signed-out visitor opens a protected route. |
+| `forcePostSignInUrl` | `boolean` | `false` | Login | Goes to `postSignInUrl` even when `next` holds a path. Use it when your page uses `next` for something else. |
+| `postSignOutUrl` | `string` | unset | Logout, Session | Where to go after sign-out. |
+| `resumeFlowId` | `string` or `null` | unset | Login | The ID of an existing flow to resume instead of starting a new one. Unset, `null` and `""` fall back to the `flow` query parameter. An ID that no longer resolves starts a new flow. |
+| `variant` | `"widget"` or `"page"` | `"widget"` | Login, Session | `widget` sizes to its content and adds no page styling. `page` fills the viewport, paints the surface background and loads the brand font. On Login, `page` also focuses the first field. |
+| `theme` | `"light"`, `"dark"` or `"auto"` | unset | Login, Logout, Session | The color mode. On Login, unset follows the project's branding theme, then the variant default (`dark` for `page`, `auto` for `widget`). On Logout, unset means `auto`. `auto` follows `prefers-color-scheme`. |
+| `suppressHeader` | `boolean` | `false` | Login, Session | Hides the component's heading visually but keeps it in the accessibility tree. Use it when the page already has a heading. |
 | `suppressPasswordToggle` | `boolean` | `false` | Login | Hides the show/hide button on password fields. |
-| `heading` | `string` | `"Signed in as"` | Session | Heading text override. |
-| `logoutLabel` | `string` | `"Sign out"` | Session | Logout action label override. |
-| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Copy overrides merged over the builtin dictionaries, keyed by primary language subtag, for example `{ en: { "identifier.title": "Welcome back" } }`. |
-| `lang` | `string` | browser language | Login | BCP-47 language override. |
+| `heading` | `string` | `"Signed in as"` | Session | Overrides the heading text. |
+| `logoutLabel` | `string` | `"Sign out"` | Session | Overrides the label of the sign-out action. |
+| `locales` | `Record<string, Partial<Record<string, string>>>` | unset | Login | Text overrides merged over the built-in dictionaries, keyed by primary language subtag. For example: `{ en: { "identifier.title": "Welcome back" } }`. |
+| `lang` | `string` | browser language | Login | A BCP-47 language tag that overrides the browser language. |
 
-Each widget event reaches the callback in the last column, which receives the event's `detail` payload.
+## Events
 
-| Widget event | Fires when | Detail | Widgets | Callback |
+Each event reaches the callback in the last column. The callback receives the event's `detail` payload.
+
+| Event | Fires when | Detail | Used by | Callback |
 | --- | --- | --- | --- | --- |
-| `zitadel-flow-step` | Login shows a step, the first one included. | `{ step }` | Login | `onFlowStep$` |
-| `zitadel-flow-input` | The visitor edits a field. | `{ name, value }` | Login | `onFlowInput$` |
-| `zitadel-flow-complete` | The flow reaches a terminal step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete$` |
-| `zitadel-flow-redirect` | The widget hands the browser to an identity provider; nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect$` |
+| `zitadel-flow-step` | Login shows a step, including the first. | `{ step }` | Login | `onFlowStep$` |
+| `zitadel-flow-input` | The user edits a field. | `{ name, value }` | Login | `onFlowInput$` |
+| `zitadel-flow-complete` | The flow reaches its final step. | `{ behavior, redirect_uri?, handoff_token?, handoff_token_expires_at? }` | Login | `onFlowComplete$` |
+| `zitadel-flow-redirect` | The login component sends the browser to an identity provider (IdP). Nobody is signed in yet. | `{ redirect_url, step }` | Login | `onFlowRedirect$` |
 | `zitadel-flow-error` | The flow reports an error. | `{ message }` | Login | `onFlowError$` |
 | `zitadel-signout` | The user signs out. | `{ display, identifier }` | Logout, Session | `onSignout$` |
 
@@ -120,31 +119,29 @@ Each widget event reaches the callback in the last column, which receives the ev
 
 ## Standard HTML attributes
 
-`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also take the standard HTML attributes (`class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`) and pass them to the widget element, so you can position, style and label the widget without an extra wrapper element. Nothing else reaches the element: any other prop is ignored.
+`ZitadelLogin`, `ZitadelLogout` and `ZitadelSession` also accept the standard HTML attributes: `class`, `style`, `id`, `title`, `slot`, `hidden`, `role`, `tabIndex`, `data-*` and `aria-*`. They pass these to the underlying element, so you can position, style and label a component without a wrapper element. The element receives nothing else, and other props are ignored.
 
 ```tsx
 <ZitadelLogin project={project} class="login" data-testid="login" aria-label="Sign in" />
 ```
 
-## Runtime model
+## Render on the server
 
-<Steps>
-  <Step>The widgets call the configured proxy path on the same origin.</Step>
-  <Step>In local Vite development, the generated proxy forwards `/__nextgen/*` to Zitadel and adds the project secret to the session exchange, and to no other call.</Step>
-  <Step>In production, you supply the same-origin proxy yourself. The generated app sends no credential, so that proxy must add the project secret to the session exchange, and to no other call. A plain rewrite cannot do that (see [SDK proxy](/docs/sdks/proxy#spas-in-production)).</Step>
-</Steps>
+If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings. The wrapper writes them as the `project-id` and `proxy-path` attributes. Use those hyphenated names only on a raw `<zitadel-login>` element. A component that starts before its configuration arrives shows an error instead of the flow.
 
-If your app renders on the server, pass `projectId` and `proxyPath` to the `ZitadelLogin` wrapper as strings (it writes them as the `project-id` and `proxy-path` attributes; use those hyphenated names only on a raw `<zitadel-login>` element), because a widget that starts before its configuration arrives shows an error instead of the flow. `ZitadelLogout` and `ZitadelSession` do the same, and the other string and boolean options (`purpose`, `flowName`, `postSignInUrl`, `forcePostSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader`, `suppressPasswordToggle`) are written as attributes too. A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes; the rest of the handle, and `locales`, are set as element properties after hydration, so a widget that needs `locales` still gets them only on the client.
+`ZitadelLogout` and `ZitadelSession` do the same. The wrapper also writes the other string and boolean options as attributes: `purpose`, `flowName`, `postSignInUrl`, `forcePostSignInUrl`, `resumeFlowId`, `postSignOutUrl`, `variant`, `theme`, `heading`, `logoutLabel`, `lang`, `suppressHeader` and `suppressPasswordToggle`.
 
-## Verify
+A `project` handle contributes its `projectId`, `proxyPath`, `url` and `publishableKey` as attributes. The rest of the handle, and `locales`, are set as element properties after hydration. A component that needs `locales` therefore gets them only on the client.
 
-- Run the Vite app with generated environment variables.
-- Register or sign in through the rendered widget.
-- Confirm logout returns to the configured login path.
-- In browser automation, use shadow-DOM-aware locators because the native inputs live inside shared web components.
+## Verify the setup
+
+- Run the Vite app with the generated environment variables.
+- Register or sign in through the rendered login component.
+- Sign out and confirm you return to the configured login path.
+- In browser automation, use locators that reach into the shadow DOM. The native inputs live inside shared web components.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why SPAs need a same-origin `/__nextgen/*` proxy and what it must do in production.
-- [Components](/docs/sdks/components) — the shared web components these wrappers render.
-- [`@zitadel/sdk-qwik` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik) and the [CLI Qwik patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/qwik).
+- [SDK proxy](/docs/sdks/proxy): why SPAs need a same-origin `/__nextgen/*` proxy and what it does in production.
+- [Components](/docs/sdks/components): the shared web components these wrappers render.
+- [`@zitadel/sdk-qwik` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-qwik).
