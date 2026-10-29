@@ -44,15 +44,12 @@ export type InitialCommitOutcome =
  * uncommitted edit there must not be committed under setup's subject.
  */
 function isCliOwned(path: string): boolean {
-  return path === ".gitignore" || path.endsWith("/.gitignore") || isLocalRuntimePath(path);
-}
-
-/**
- * `.zitadel/local/` at any depth, not only at the project root: a nested app
- * inside the project directory has its own, holding its own admin credential.
- */
-function isLocalRuntimePath(path: string): boolean {
-  return /(^|\/)\.zitadel\/local(\/|$)/.test(path);
+  // `.zitadel/local/` at any depth: a nested app has its own, holding its own admin credential.
+  return (
+    path === ".gitignore" ||
+    path.endsWith("/.gitignore") ||
+    /(^|\/)\.zitadel\/local(\/|$)/.test(path)
+  );
 }
 
 /**
@@ -149,8 +146,12 @@ export async function ensureInitialCommit(cwd: string): Promise<InitialCommitOut
     if (!outcome.committed) {
       return { kind: "unavailable", reason: outcome.reason };
     }
+    let kind: "created" | "committed" = "committed";
+    if (existing === null) {
+      kind = "created";
+    }
     return {
-      kind: existing === null ? "created" : "committed",
+      kind,
       sha: outcome.sha,
       guessedIdentity: outcome.author !== "yours",
       invented: outcome.author === "fallback",

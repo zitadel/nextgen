@@ -1,7 +1,6 @@
 import type { Git } from "../git";
 import type { Check } from "../operation";
 import type { PathFilter } from "../types";
-import { STAGED_FILES } from "./staged-files";
 
 /** No staged file is one `except` matches. Checked, not assumed: `reset` succeeds for a path it did not match. */
 export class NothingExcludedIsStaged implements Check {
@@ -14,7 +13,7 @@ export class NothingExcludedIsStaged implements Check {
 
   /** Which excluded file is still staged, or null. */
   async problem(git: Git): Promise<string | null> {
-    const leaked = (await git.run(STAGED_FILES)).paths().find(this.except);
+    const leaked = (await git.stagedFiles()).find(this.except);
     if (leaked === undefined) {
       return null;
     }

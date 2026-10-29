@@ -1,11 +1,11 @@
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GitDidNotStartError, RepositoryError } from "../../../../src/lib/git/errors";
 import { Git, GitResult } from "../../../../src/lib/git/git";
-import { GitScratch, write } from "../../../helpers/git-repo";
+import { GitScratch, isolateGit, write } from "../../../helpers/git-repo";
 
 const scratch = new GitScratch();
 
@@ -13,6 +13,8 @@ const scratch = new GitScratch();
 async function git(cwd: string, args: string[]): Promise<string> {
   return (await new Git(cwd).run(args)).stdout;
 }
+
+beforeEach(isolateGit);
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -53,6 +55,46 @@ describe("Git", () => {
     expect((await git(cwd, ["rev-parse", "--absolute-git-dir"])).trim()).toBe(
       await realpath(join(cwd, ".git")),
     );
+  });
+
+  it("acts on its own work tree, not one an inherited GIT_WORK_TREE names", async () => {
+    const other = await scratch.repository();
+    const cwd = await scratch.repository();
+    vi.stubEnv("GIT_WORK_TREE", other);
+
+    expect((await git(cwd, ["rev-parse", "--show-toplevel"])).trim()).toBe(await realpath(cwd));
+  });
+
+  it("uses its own staging area, not one an inherited GIT_INDEX_FILE names", async () => {
+    const cwd = await scratch.repository();
+    vi.stubEnv("GIT_INDEX_FILE", join(await scratch.directory(), "index"));
+
+    expect((await git(cwd, ["rev-parse", "--git-path", "index"])).trim()).toBe(".git/index");
+  });
+
+  it("names git's own error when git wrote nothing to stderr", async () => {
+    const cwd = await scratch.directory();
+    vi.stubEnv("PATH", await scratch.brokenGit(""));
+
+    await expect(git(cwd, ["status"])).rejects.toThrow("Command failed");
+  });
+
+  it("says so when git prints more than it may", async () => {
+    const cwd = await scratch.committed({ "big.txt": "x".repeat(17 * 1024 * 1024) });
+
+    await expect(git(cwd, ["show", "HEAD:big.txt"])).rejects.toThrow("git printed more than 16 MB");
+  });
+
+  it("lists the files staged under the directory, relative to it", async () => {
+    const root = await scratch.committed({ "README.md": "r\n" });
+    await write(root, { "apps/web/a.txt": "a\n", "apps/api/b.txt": "b\n" });
+    await new Git(root).run(["add", "--all"]);
+
+    expect(await new Git(join(root, "apps/web")).stagedFiles()).toEqual(["a.txt"]);
+  });
+
+  it("does not take an empty path to exist", async () => {
+    expect(new Git(await scratch.directory()).exists("")).toBe(false);
   });
 
   it("names git's first line in its error, in English whatever the locale", async () => {

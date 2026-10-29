@@ -4,7 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { type Git, GitResult } from "../../src/lib/git/git";
+import { vi } from "vitest";
+
+import { RepositoryError } from "../../src/lib/git/errors";
+import { Git, GitResult } from "../../src/lib/git/git";
 
 const exec = promisify(execFile);
 
@@ -41,10 +44,10 @@ export class GitScratch {
     return dir;
   }
 
-  /** A `git` on PATH that fails whatever it is asked. Returns its directory. */
-  async brokenGit(): Promise<string> {
+  /** A `git` on PATH that prints `stderr` and exits `exitCode` whatever it is asked. Returns its directory. */
+  async brokenGit(stderr = "git: not available", exitCode = 1): Promise<string> {
     const dir = await this.directory();
-    await writeFile(join(dir, "git"), "#!/bin/sh\necho 'git: not available' >&2\nexit 1\n");
+    await writeFile(join(dir, "git"), `#!/bin/sh\nprintf '%s' '${stderr}' >&2\nexit ${exitCode}\n`);
     await chmod(join(dir, "git"), 0o755);
     return dir;
   }
@@ -113,22 +116,72 @@ function lines(stdout: string, separator: string): string[] {
 }
 
 /**
+ * Keeps the developer's own git setup out of a test that runs the module on
+ * real git: no global or system config (a global hook, `diff.renames=false`)
+ * and no inherited identity or editor. Call it in `beforeEach`.
+ */
+export function isolateGit(): void {
+  vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
+  vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
+  for (const name of [
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_SEQUENCE_EDITOR",
+  ]) {
+    vi.stubEnv(name, undefined);
+  }
+}
+
+/** What a {@link fakeGit} answers for one call. */
+interface Answer {
+  readonly exitCode?: number;
+  readonly stdout?: string;
+  readonly stderr?: string;
+}
+
+/** A `Git` that runs nothing and answers every call from `answer`. */
+class FakeGit extends Git {
+  private readonly answer: (args: readonly string[]) => Answer;
+  private readonly existing: readonly string[];
+
+  /** Answers from `answer`; of paths, only `existing` exist. */
+  constructor(answer: (args: readonly string[]) => Answer, existing: readonly string[]) {
+    super("/fake");
+    this.answer = answer;
+    this.existing = existing;
+  }
+
+  /** The same fake, whatever is added to its environment. */
+  override with(): Git {
+    return this;
+  }
+
+  /** What `answer` gives; throws, as git would, for an exit code other than 0 or `allow`. */
+  override async run(args: readonly string[], allow: readonly number[] = []): Promise<GitResult> {
+    const { exitCode = 0, stdout = "", stderr = "" } = this.answer(args);
+    const result = new GitResult(exitCode, stdout, stderr);
+    if (exitCode !== 0 && !allow.includes(exitCode)) {
+      throw new RepositoryError(result.reason());
+    }
+    return result;
+  }
+
+  /** Whether `path` is one of the existing ones. */
+  override exists(path: string): boolean {
+    return this.existing.includes(path);
+  }
+}
+
+/**
  * A stand-in for `Git` that answers every call with what `answer` returns for
  * its arguments, so a check or an operation can be tested on every outcome
  * without building a repository for each.
  */
 export function fakeGit(
-  answer: (args: readonly string[]) => { exitCode?: number; stdout?: string; stderr?: string },
+  answer: (args: readonly string[]) => Answer,
   existing: readonly string[] = [],
 ): Git {
-  const git = {
-    dir: "/fake",
-    with: () => git,
-    exists: (path: string) => existing.includes(path),
-    run: async (args: readonly string[]) => {
-      const { exitCode = 0, stdout = "", stderr = "" } = answer(args);
-      return new GitResult(exitCode, stdout, stderr);
-    },
-  };
-  return git as unknown as Git;
+  return new FakeGit(answer, existing);
 }

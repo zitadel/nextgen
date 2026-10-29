@@ -1,4 +1,5 @@
 import { AuthorIdentity } from "../author-identity";
+import { RepositoryError } from "../errors";
 import { HeadIsOnABranch } from "../checks/head-is-on-a-branch";
 import { NoOperationUnderWay } from "../checks/no-operation-under-way";
 import { NothingExcludedIsStaged } from "../checks/nothing-excluded-is-staged";
@@ -47,7 +48,7 @@ export class CommitAll implements Operation<CommitOutcome> {
       await staging.commit(this.message, author.environment());
       const sha = await new CurrentCommit().run(git);
       if (sha === null) {
-        return this.refused("the commit left no HEAD to record");
+        throw new RepositoryError("the commit left no HEAD to record");
       }
       // Without this the developer would see the commit staged for deletion; best effort.
       await git.run(["reset", "--quiet", "--", "."]).catch(() => undefined);

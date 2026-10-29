@@ -103,7 +103,7 @@ export class Repository {
     paths: readonly string[],
     options: DiffOptions,
   ): Promise<DiffedFile[] | null> {
-    return this.perform(new DiffFilesSince(commit, paths, options.except, ["--no-color"]));
+    return this.perform(new DiffFilesSince(commit, paths, options));
   }
 
   /** Runs `operation` once all its checks hold; what it returns when refused, otherwise. */

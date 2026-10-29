@@ -1,7 +1,7 @@
 import { utimes, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Repository } from "../../../../src/lib/git";
 import {
@@ -9,12 +9,15 @@ import {
   commitAll as commitEverything,
   git,
   headChanges,
+  isolateGit,
   stagedFiles,
   treeFiles,
   write,
 } from "../../../helpers/git-repo";
 
 const scratch = new GitScratch();
+
+beforeEach(isolateGit);
 
 afterEach(async () => {
   vi.unstubAllEnvs();
@@ -80,6 +83,13 @@ describe("Repository.open", () => {
     vi.stubEnv("PATH", await scratch.brokenGit());
 
     await expect(Repository.open(cwd)).rejects.toThrow("git: not available");
+  });
+
+  it("throws when git refuses the repository, rather than answering no repository", async () => {
+    const cwd = await scratch.repository();
+    vi.stubEnv("PATH", await scratch.brokenGit("fatal: detected dubious ownership", 128));
+
+    await expect(Repository.open(cwd)).rejects.toThrow("fatal: detected dubious ownership");
   });
 });
 
@@ -174,6 +184,15 @@ describe("Repository.commitAll", () => {
     expect(await headChanges(root)).toEqual(["apps/web/a.txt"]);
   });
 
+  it("leaves out what `except` matches in a subdirectory", async () => {
+    const root = await scratch.committed({ "README.md": "r\n" });
+    await write(root, { "apps/web/a.txt": "a\n", "apps/web/.env": "S=1\n" });
+
+    await (await open(join(root, "apps/web"))).commitAll("m", OPTIONS);
+
+    expect(await treeFiles(root)).toEqual(["README.md", "apps/web/a.txt"]);
+  });
+
   it("leaves a sibling package's staged work staged", async () => {
     const root = await scratch.committed({ "README.md": "r\n" });
     await write(root, { "apps/web/a.txt": "a\n", "apps/api/b.txt": "b\n" });
@@ -223,8 +242,6 @@ describe("Repository.commitAll", () => {
   it("names the fallback only where git has no identity at all", async () => {
     const cwd = await scratch.repository();
     await write(cwd, { "a.txt": "a\n" });
-    vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
-    vi.stubEnv("GIT_CONFIG_SYSTEM", "/dev/null");
     vi.stubEnv("GIT_AUTHOR_NAME", "");
     vi.stubEnv("GIT_AUTHOR_EMAIL", "");
 
@@ -390,5 +407,13 @@ describe("Repository.diffFilesSince", () => {
     expect(files?.map((file) => file.patch).join("")).toBe(
       await (await open(cwd)).diffSince(sha, [".zitadel/"], { except: NONE }),
     );
+  });
+
+  it("is null for a commit not in local history", async () => {
+    const { cwd } = await base();
+
+    expect(
+      await (await open(cwd)).diffFilesSince("0".repeat(40), [".zitadel/"], { except: NONE }),
+    ).toBeNull();
   });
 });

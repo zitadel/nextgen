@@ -54,9 +54,6 @@ export async function diffConfigAgainst(
   );
 }
 
-/** One changed file of a deploy's diff, as `deploy --json` reports it. */
-export type ConfigDiffFile = DiffedFile;
-
 /**
  * {@link diffConfigAgainst}, uncoloured and split by file: joined back
  * together, the patches are the diff the terminal shows. Null when no diff can
@@ -66,7 +63,7 @@ export async function diffConfigFilesAgainst(
   cwd: string,
   sha: string,
   referenced: readonly string[] = [],
-): Promise<ConfigDiffFile[] | null> {
+): Promise<DiffedFile[] | null> {
   const paths = [...CONFIG_PATHS, ...referenced];
   return quietly(
     async () =>

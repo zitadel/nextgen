@@ -3,9 +3,9 @@ import { copyFile, mkdtemp, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { STAGED_FILES } from "./checks/staged-files";
 import type { Git } from "./git";
 import type { Check } from "./operation";
+import { CurrentCommit } from "./operations/current-commit";
 import type { PathFilter } from "./types";
 
 /**
@@ -25,7 +25,7 @@ export class StagingArea {
 
   /** Runs `work` with a new staging area for `git`'s directory, removed afterwards. */
   static async temporary<T>(git: Git, work: (staging: StagingArea) => Promise<T>): Promise<T> {
-    const scratch = await mkdtemp(join(tmpdir(), "zitadel-git-"));
+    const scratch = await mkdtemp(join(tmpdir(), "git-staging-"));
     try {
       return await work(new StagingArea(git, join(scratch, "index")));
     } finally {
@@ -35,9 +35,7 @@ export class StagingArea {
 
   /** Starts from the last commit, so a commit carries the rest of the repository unchanged; empty before one. */
   async startFromHead(): Promise<void> {
-    const head = (
-      await this.git.run(["rev-parse", "--verify", "--quiet", "HEAD^{commit}"], [1])
-    ).textIfSucceeded();
+    const head = await new CurrentCommit().run(this.git);
     if (head !== null) {
       await this.git.run(["read-tree", head]);
     }
@@ -77,7 +75,7 @@ export class StagingArea {
   /** Takes every staged file `except` matches back out, to what the last commit has. */
   async unstage(except: PathFilter): Promise<void> {
     // `git reset` with no path would take everything out.
-    const unwanted = (await this.git.run(STAGED_FILES)).paths().filter(except);
+    const unwanted = (await this.git.stagedFiles()).filter(except);
     if (unwanted.length > 0) {
       await this.git.run(["reset", "--quiet", "--", ...unwanted]);
     }

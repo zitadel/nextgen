@@ -64,3 +64,29 @@ describe("Change.diffedWith", () => {
     });
   });
 });
+
+describe("Change, beyond renames", () => {
+  it("reads a copy's source and destination", () => {
+    const [change] = Change.listedIn(new GitResult(0, "C075\0old\0new\0", ""));
+
+    expect(change).toMatchObject({ path: "new", status: "copied", previousPath: "old" });
+  });
+
+  it("keeps a rename whole when neither end is excluded", () => {
+    const change = new Change("b", "renamed", "a");
+
+    expect(change.without(isEnv)).toBe(change);
+  });
+
+  it("covers only its own path for a plain change", () => {
+    expect(new Change("a", "modified").paths()).toEqual(["a"]);
+  });
+
+  it("reports a plain change with no previous path", () => {
+    expect(new Change("a", "modified").diffedWith("p")).toEqual({
+      path: "a",
+      status: "modified",
+      patch: "p",
+    });
+  });
+});

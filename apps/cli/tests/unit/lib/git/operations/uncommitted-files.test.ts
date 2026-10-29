@@ -33,3 +33,11 @@ describe("UncommittedFiles", () => {
     expect(await listed("", "")).toEqual([]);
   });
 });
+
+describe("UncommittedFiles outside the directory", () => {
+  it("keeps a path that does not start with the directory as git gave it", async () => {
+    expect(await listed("apps/web/", " M other/a.txt\0")).toEqual([
+      { path: "other/a.txt", untracked: false },
+    ]);
+  });
+});

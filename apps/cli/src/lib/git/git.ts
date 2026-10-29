@@ -4,21 +4,6 @@ import { resolve } from "node:path";
 
 import { GitDidNotStartError, RepositoryError } from "./errors";
 
-/** The output git may print for one call before it is cut off. */
-const MAX_OUTPUT = 16 * 1024 * 1024;
-
-/** How long one call may take before it is stopped, so a stuck git cannot hang the CLI. */
-const TIMEOUT_MS = 5 * 60 * 1000;
-
-/** Settings passed with every call. */
-const SAFE_SETTINGS = [
-  // Take paths literally, so `app/[id].tsx` matches only itself and not `app/i.tsx`.
-  "--literal-pathspecs",
-];
-
-/** Inherited variables dropped from every call: a git hook sets them to point at its own repository. */
-const DROPPED_VARIABLES = ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"];
-
 /** What one git call returned, and ways to read it. */
 export class GitResult {
   readonly exitCode: number;
@@ -80,8 +65,9 @@ export class Git {
 
   /** Runs git with `args`; throws a {@link RepositoryError} for an exit code other than 0 or `allow`. */
   run(args: readonly string[], allow: readonly number[] = []): Promise<GitResult> {
+    // A git hook sets these to point at its own repository.
     const inherited = { ...process.env };
-    for (const name of DROPPED_VARIABLES) {
+    for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) {
       delete inherited[name];
     }
     // English messages, so a failure is recognised by its wording; never a prompt.
@@ -89,8 +75,10 @@ export class Git {
     return new Promise((resolveResult, reject) => {
       execFile(
         "git",
-        [...SAFE_SETTINGS, ...args],
-        { cwd: this.dir, env, maxBuffer: MAX_OUTPUT, timeout: TIMEOUT_MS },
+        // Paths are taken literally, so `app/[id].tsx` matches only itself and not `app/i.tsx`.
+        ["--literal-pathspecs", ...args],
+        // A stuck git is stopped after five minutes rather than hang the CLI.
+        { cwd: this.dir, env, maxBuffer: 16 * 1024 * 1024, timeout: 5 * 60 * 1000 },
         (error, stdout, stderr) => {
           const failure = error as (NodeJS.ErrnoException & { killed?: boolean }) | null;
           if (failure === null) {
@@ -107,6 +95,8 @@ export class Git {
             resolveResult(result);
           } else if (failure.code === "ENOENT") {
             reject(new GitDidNotStartError(failure.message));
+          } else if (failure.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+            reject(new RepositoryError("git printed more than 16 MB"));
           } else if (failure.killed) {
             reject(new RepositoryError("git did not finish in time"));
           } else {
@@ -115,6 +105,12 @@ export class Git {
         },
       );
     });
+  }
+
+  /** Every file staged under the directory, relative to it. */
+  async stagedFiles(): Promise<string[]> {
+    const staged = ["diff", "--cached", "-z", "--name-only", "--no-renames", "--relative"];
+    return (await this.run(staged)).paths();
   }
 
   /** Whether `path`, relative to the directory, names something that exists. */

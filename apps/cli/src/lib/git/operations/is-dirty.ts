@@ -16,6 +16,6 @@ export class IsDirty implements Operation<boolean> {
   /** Asks git whether `status` lists anything. */
   async run(git: Git): Promise<boolean> {
     const result = await git.run(["status", "--porcelain"]);
-    return result.text().trim() !== "";
+    return result.stdout.trim() !== "";
   }
 }

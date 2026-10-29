@@ -1,14 +1,6 @@
 import type { GitResult } from "./git";
 import type { DiffedFile, PathFilter } from "./types";
 
-/** The status of a changed file, by the letter `git diff --name-status` gives it; any other letter is a modification. */
-const STATUS_BY_LETTER: Readonly<Record<string, DiffedFile["status"]>> = {
-  A: "added",
-  D: "deleted",
-  R: "renamed",
-  C: "copied",
-};
-
 /** One changed file, as `git diff --name-status` lists it. */
 export class Change {
   readonly path: string;
@@ -28,10 +20,17 @@ export class Change {
     // Each entry is a status letter (with a score after R or C), then the path,
     // or for a rename or a copy where it came from and where it went.
     const fields = result.paths();
+    // Any letter not here is a modification.
+    const statuses: Record<string, DiffedFile["status"]> = {
+      A: "added",
+      D: "deleted",
+      R: "renamed",
+      C: "copied",
+    };
     const changes: Change[] = [];
     let index = 0;
     while (index < fields.length) {
-      const status = STATUS_BY_LETTER[(fields[index++] ?? "").charAt(0)] ?? "modified";
+      const status = statuses[(fields[index++] ?? "").charAt(0)] ?? "modified";
       const first = fields[index++] ?? "";
       if (status === "renamed" || status === "copied") {
         changes.push(new Change(fields[index++] ?? "", status, first));
