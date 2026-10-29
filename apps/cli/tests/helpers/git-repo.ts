@@ -117,13 +117,15 @@ function lines(stdout: string, separator: string): string[] {
 
 /**
  * Keeps the developer's own git setup out of a test that runs the module on
- * real git: no global or system config (a global hook, `diff.renames=false`)
+ * real git: no global or system config, ignore or attributes (a global hook, `diff.renames=false`)
  * and no inherited repository, identity or editor, as a git hook running the
  * suite would set. Call it in `beforeEach`.
  */
 export function isolateGit(): void {
   vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
   vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
+  // Where git also finds a global ignore and attributes file.
+  vi.stubEnv("XDG_CONFIG_HOME", "/dev/null");
   for (const name of [
     "GIT_DIR",
     "GIT_WORK_TREE",

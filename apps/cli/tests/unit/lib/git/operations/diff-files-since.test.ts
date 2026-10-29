@@ -14,7 +14,7 @@ function filesFrom(list: string[], patch: string) {
 
 describe("DiffFilesSince", () => {
   it("is checked for the commit being here", () => {
-    expect(new DiffFilesSince(SHA, ["."]).checks()).toEqual([new CommitIsHere(SHA)]);
+    expect(new DiffFilesSince(SHA, ["."]).checks()).toStrictEqual([new CommitIsHere(SHA)]);
   });
 
   it("is null when refused", () => {
@@ -66,6 +66,14 @@ describe("DiffFilesSince", () => {
     expect(files.map((file) => file.patch)).toEqual([
       "diff --git a/a b/a\n-x\ndiff --git a/a b/a\n+y\n",
       "diff --git a/b b/b\n+z\n",
+    ]);
+  });
+
+  it("splits the patch only where a line starts a file's section", async () => {
+    const patch = "diff --git a/a b/a\n+see diff --git a/x b/x\n";
+
+    expect(await filesFrom([":100644 100644 1 2 M", "a"], patch)).toEqual([
+      { path: "a", status: "modified", patch },
     ]);
   });
 

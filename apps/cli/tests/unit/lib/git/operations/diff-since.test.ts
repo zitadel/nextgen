@@ -25,7 +25,7 @@ function gitDiffing(diff: string, calls: string[][] = [], marking = true) {
 
 describe("DiffSince", () => {
   it("is checked for the commit being here", () => {
-    expect(new DiffSince(SHA, ["."], {}).checks()).toEqual([new CommitIsHere(SHA)]);
+    expect(new DiffSince(SHA, ["."], {}).checks()).toStrictEqual([new CommitIsHere(SHA)]);
   });
 
   it("is null when refused", () => {

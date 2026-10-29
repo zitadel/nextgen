@@ -28,7 +28,7 @@ export class Change {
     let index = 0;
     while (index < fields.length) {
       const entry = fields[index++] ?? "";
-      // Any letter not listed is a modification.
+      // M, T (a type change) and U (unmerged) all count as modified.
       const status = statuses[entry.charAt(entry.lastIndexOf(" ") + 1)] ?? "modified";
       const first = fields[index++] ?? "";
       if (status === "renamed" || status === "copied") {

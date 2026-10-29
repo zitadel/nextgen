@@ -9,9 +9,9 @@ const OPTIONS = { except: () => false, authorIfGitHasNone: { name: "n", email: "
 
 describe("CommitAll", () => {
   it("is checked for an operation under way and a detached HEAD", () => {
-    expect(new CommitAll("m", OPTIONS).checks()).toEqual([
-      new NoOperationUnderWay(),
-      new HeadIsOnABranch(),
+    expect(new CommitAll("m", OPTIONS).checks().map((check) => check.constructor)).toEqual([
+      NoOperationUnderWay,
+      HeadIsOnABranch,
     ]);
   });
 

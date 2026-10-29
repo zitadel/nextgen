@@ -1,7 +1,7 @@
 import type { Git } from "../git";
 import type { Check } from "../operation";
 
-/** `commit` is a commit in local history; a shallow clone may lack it. The id comes from a server. */
+/** `commit` is a commit in local history; a shallow clone may lack it. */
 export class CommitIsHere implements Check {
   private readonly commit: string;
 

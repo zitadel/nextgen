@@ -89,9 +89,11 @@ describe("Repository.open", () => {
 
   it("throws when git refuses the repository, rather than answering no repository", async () => {
     const cwd = await scratch.repository();
-    vi.stubEnv("PATH", await scratch.brokenGit("fatal: detected dubious ownership", 128));
+    const refusal =
+      "fatal: detected dubious ownership\nTo add an exception: git config --global --add safe.directory /x";
+    vi.stubEnv("PATH", await scratch.brokenGit(refusal, 128));
 
-    await expect(Repository.open(cwd)).rejects.toThrow("fatal: detected dubious ownership");
+    await expect(Repository.open(cwd)).rejects.toThrow(refusal);
   });
 });
 

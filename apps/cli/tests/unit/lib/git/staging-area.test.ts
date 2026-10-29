@@ -231,18 +231,12 @@ describe("StagingArea", () => {
 
   it("gives only the first of several problems", async () => {
     const cwd = await scratch.committed({ "a.txt": "a\n" });
-    await write(cwd, { ".env": "S=1\n" });
 
-    const problem = await StagingArea.temporary(new Git(cwd), async (staging) => {
-      await staging.startFromHead();
-      await staging.addAll();
-      return staging.problem([
-        new NothingExcludedIsStaged((path) => path === ".env"),
-        new SomethingIsStaged(),
-      ]);
-    });
+    const problem = await StagingArea.temporary(new Git(cwd), async (staging) =>
+      staging.problem([{ problem: async () => "first" }, { problem: async () => "second" }]),
+    );
 
-    expect(problem).toContain(".env");
+    expect(problem).toBe("first");
   });
 
   it("commits as the identity it is given", async () => {

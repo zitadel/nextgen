@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises";
+import { chmod, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -103,12 +103,20 @@ describe("Git", () => {
     expect(new Git(await scratch.directory()).exists("")).toBe(false);
   });
 
-  it("names git's first line in its error, in English whatever the locale", async () => {
-    const cwd = await scratch.directory();
-    vi.stubEnv("LC_ALL", "de_DE.UTF-8");
-    vi.stubEnv("LANGUAGE", "de");
+  it("names git's first line in its error", async () => {
+    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(
+      /^fatal: not a git repository/,
+    );
+  });
 
-    await expect(git(cwd, ["log"])).rejects.toThrow(/^fatal: not a git repository/);
+  it("runs git in English whatever the locale", async () => {
+    const bin = await scratch.directory();
+    await writeFile(join(bin, "git"), '#!/bin/sh\necho "$LC_ALL" >&2\nexit 1\n');
+    await chmod(join(bin, "git"), 0o755);
+    vi.stubEnv("LC_ALL", "de_DE.UTF-8");
+    vi.stubEnv("PATH", bin);
+
+    await expect(git(await scratch.directory(), ["log"])).rejects.toThrow(/^C$/);
   });
 
   it("throws a GitDidNotStartError when there is no git on PATH", async () => {

@@ -47,14 +47,14 @@ export class DiffSince implements Operation<string | null> {
       "--",
       ...this.paths,
     ];
-    try {
-      return await StagingArea.temporary(git, async (staging) => {
+    return StagingArea.temporary(git, async (staging) => {
+      try {
         await staging.startFromDevelopers(git);
         await staging.markAsAdded(this.paths);
         return (await staging.git.run(diff)).stdout;
-      });
-    } catch {
-      return (await git.run(diff)).stdout;
-    }
+      } catch {
+        return (await git.run(diff)).stdout;
+      }
+    });
   }
 }

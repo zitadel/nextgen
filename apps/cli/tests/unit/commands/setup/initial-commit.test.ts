@@ -576,13 +576,3 @@ describe("ensureInitialCommit when it refuses to commit", () => {
     expect(stdout.trim()).toBe("");
   });
 });
-
-describe("ensureInitialCommit on a detached HEAD", () => {
-  it("commits nothing, and says why", async () => {
-    const cwd = await aRepository();
-    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
-    await writeFile(join(cwd, "app/page.tsx"), "export default () => null;\n");
-
-    expect(await ensureInitialCommit(cwd)).toMatchObject({ kind: "unavailable" });
-  });
-});

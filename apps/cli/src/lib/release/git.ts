@@ -31,8 +31,7 @@ export async function worktreeIsDirty(cwd: string): Promise<boolean> {
 /**
  * The coloured diff of `.zitadel/` against `sha`, or null when no diff can be
  * shown: git is missing, this is not a repo, or the commit is not in local
- * history (a shallow clone, say). A dead commit is told apart from a clean tree
- * by first checking the commit resolves.
+ * history (a shallow clone, say).
  */
 export async function diffConfigAgainst(
   cwd: string,
