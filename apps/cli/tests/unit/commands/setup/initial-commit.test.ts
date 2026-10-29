@@ -576,3 +576,16 @@ describe("ensureInitialCommit when it refuses to commit", () => {
     expect(stdout.trim()).toBe("");
   });
 });
+
+describe("ensureInitialCommit while the repository is mid-operation", () => {
+  it("commits nothing on a detached HEAD, and says why", async () => {
+    const cwd = await aRepository();
+    await run("git", ["checkout", "--quiet", "--detach"], { cwd });
+    await writeFile(join(cwd, "app/page.tsx"), "export default () => null;\n");
+
+    expect(await ensureInitialCommit(cwd)).toEqual({
+      kind: "unavailable",
+      reason: "HEAD is detached, so the commit would be on no branch",
+    });
+  });
+});

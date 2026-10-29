@@ -386,7 +386,8 @@ from `details.modified`. The commit covers the project directory, so it can
 only tell its own files from yours when the tree starts clean. Commit or stash
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
-yours and is not exempt.
+yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,
+or on a detached HEAD, setup makes no commit and warns why.
 
 Setup deploys nothing, and it does not need to: a project with no release
 resolves the newest revisions, which are the ones setup just uploaded, so
