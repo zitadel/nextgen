@@ -54,14 +54,6 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
         c.claim_mapping = { ...c.claim_mapping, "profile.email": "mail" };
       }),
   ],
-  [
-    "a standard claim the catalog connection's scopes do not return",
-    (app) =>
-      app.editConnection("google", (c) => {
-        c.oidc.scopes = ["openid", "email"];
-        c.claim_mapping = { ...c.claim_mapping, givenName: "given_name" };
-      }),
-  ],
 ];
 
 /**
@@ -70,6 +62,19 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
  * the warning says.
  */
 const SOFT_WARNINGS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>, string]> = [
+  [
+    "a standard claim the catalog connection's scopes do not return",
+    async (app) => {
+      await app.editUserSchema((schema) => {
+        schema.properties.givenName = { type: "string" };
+      });
+      await app.editConnection("google", (c) => {
+        c.oidc.scopes = ["openid", "email"];
+        c.claim_mapping = { ...c.claim_mapping, givenName: "given_name" };
+      });
+    },
+    "only returns for",
+  ],
   [
     "a claim whose type the property cannot hold",
     async (app) => {
@@ -472,6 +477,16 @@ describe("deploy", () => {
           await edit(app);
 
           expect(await app.deployRendered(["--dry-run"])).toSay(says);
+        });
+
+        it("says nothing about a changeable subject once the connection is deployed", async () => {
+          const app = await anAppWithGoogle();
+          await app.editConnection("google", (c) => {
+            c.subject_claim = "email";
+          });
+          await app.deploy();
+
+          expect(await app.deployRendered(["--dry-run"])).not.toSay("subject_claim");
         });
       });
 

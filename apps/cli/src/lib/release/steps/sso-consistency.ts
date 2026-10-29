@@ -26,6 +26,7 @@ import { reportWarning } from "../../warnings";
 export async function validateSsoConsistency(
   cwd: string,
   suggest: StepContext["suggest"],
+  deployed?: ReadonlySet<string>,
 ): Promise<void> {
   const [schemas, flows, connections] = await Promise.all([
     readJsonDirEntries(join(cwd, SCHEMAS_DIR)),
@@ -53,15 +54,17 @@ export async function validateSsoConsistency(
       }),
     ),
     connections: keyed(IDPS_DIR, connections),
+    ...(deployed ? { deployed } : {}),
   };
 
   const issues = validateProject(tree);
 
-  // A warning-severity issue is a configuration smell, not a wrong file: a
-  // scope a custom connection asks for that the schema does not list, or a
-  // property verified on more than one connection. It is worth saying, but it
-  // must not stop a deploy, so it is reported as a non-blocking warning and
-  // does not join the thrown error.
+  // A warning-severity issue almost certainly does not do what was meant but
+  // may be what the admin intends: a claim the scopes may not return, a claim
+  // type that does not fit its property, a verification read from a claim
+  // that is not a flag, or a subject_claim the user can change. It is worth
+  // saying, but it must not stop a deploy, so it is reported as a non-blocking
+  // warning and does not join the thrown error.
   for (const issue of issues.filter((entry) => entry.severity === "warning")) {
     reportWarning(`${issue.file}: ${issue.message}`);
   }
@@ -93,6 +96,34 @@ export async function validateSsoConsistency(
       },
     },
   );
+}
+
+/**
+ * The slugs of the connections the project already has on the server, or
+ * `undefined` when it cannot say. Some advice only holds before a connection's
+ * first deploy, so a server that does not answer only means that advice is
+ * given anyway: it never fails the check.
+ */
+export async function deployedSlugs(
+  ctx: Pick<StepContext, "client" | "projectId">,
+): Promise<ReadonlySet<string> | undefined> {
+  const slugs = new Set<string>();
+  let pageToken: string | null | undefined;
+  try {
+    do {
+      const page = await ctx.client.queryIdps(
+        { limit: 100, ...(pageToken ? { page_token: pageToken } : {}) },
+        { project_id: ctx.projectId },
+      );
+      for (const idp of page.idps) {
+        slugs.add(idp.slug);
+      }
+      pageToken = page.next_page_token;
+    } while (pageToken);
+  } catch {
+    return undefined;
+  }
+  return slugs;
 }
 
 /** The provider slugs the steps of a flow offer. */

@@ -116,9 +116,10 @@ export type UnmappedAttribute = {
 /**
  * The block naming the attributes still without a claim, told as information
  * rather than an instruction: an attribute that no claim fills is only a
- * problem when a sign-in needs it. A required one is flagged to map before a
- * deploy; an optional one (an `employee_id` the provider may simply never
- * send) is called fine to leave. Empty when every attribute the signing-in
+ * problem when a sign-in needs it. A required one is one sign-up has to
+ * collect in a step, since this connection does not fill it; an optional one
+ * (an `employee_id` the provider may simply never send) is called fine to
+ * leave. Empty when every attribute the signing-in
  * schemas define is already mapped.
  */
 export function unmappedLines(unmapped: readonly UnmappedAttribute[]): string[] {
@@ -130,7 +131,7 @@ export function unmappedLines(unmapped: readonly UnmappedAttribute[]): string[] 
     "Some attributes have no claim yet:",
     ...unmapped.map((attribute) =>
       attribute.required
-        ? `- ${attribute.name} (required) - a sign-in fills this, so map it before you deploy.`
+        ? `- ${attribute.name} (required) - not filled by this connection, so sign-up has to collect it.`
         : `- ${attribute.name} (optional) - fine to leave empty.`,
     ),
   ];

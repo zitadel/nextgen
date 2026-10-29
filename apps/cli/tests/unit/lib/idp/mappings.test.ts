@@ -115,7 +115,7 @@ describe("the unmapped-attributes block", () => {
     const lines = unmappedLines([{ name: "email", required: true }]);
 
     expect(lines.join("\n")).toContain(
-      "email (required) - a sign-in fills this, so map it before you deploy.",
+      "email (required) - not filled by this connection, so sign-up has to collect it.",
     );
   });
 

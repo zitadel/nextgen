@@ -43,6 +43,8 @@ type Project = {
   schemas: Record<string, Schema>;
   flows: Record<string, { schemaPath?: string; body: { steps: Step[] } }>;
   connections: Record<string, Connection>;
+  /** The connection slugs the server already has. */
+  deployed?: string[];
 };
 
 const STAFF = ".zitadel/schemas/staff.json";
@@ -87,6 +89,7 @@ const toTree = (project: Project): ProjectTree => ({
   schemas: new Map(Object.entries(project.schemas)),
   flows: new Map(Object.entries(project.flows)),
   connections: new Map(Object.entries(project.connections)),
+  ...(project.deployed ? { deployed: new Set(project.deployed) } : {}),
 });
 
 /** The issues for the valid project after `edit` has changed it. */
@@ -438,7 +441,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
-    name: "a catalog connection maps a standard claim without the scope that returns it",
+    name: "a catalog connection maps a standard claim without the scope that returns it, which only warns as for a custom one",
     edit: (p) => {
       schemaOf(p).properties.givenName = { type: "string" };
       connectionOf(p).template = "google";
@@ -449,7 +452,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       {
         rule: "sso/claim-needs-scope",
         file: GOOGLE,
-        severity: "error",
+        severity: "warning",
         says: ["claim_mapping", "given_name", '"profile"', 'Add "profile" to oidc.scopes'],
       },
     ],
@@ -781,6 +784,13 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
 /** The edits that sit on a rule's boundary and must be accepted. */
 const accepted: Array<{ name: string; edit: (project: Project) => void }> = [
   { name: "the project as scaffolded", edit: () => {} },
+  {
+    name: "a changeable subject_claim on a connection already deployed, which can no longer change it",
+    edit: (p) => {
+      (connectionOf(p) as { subject_claim?: string }).subject_claim = "email";
+      p.deployed = ["google"];
+    },
+  },
   {
     name: "a verified property that is not unique, since a shared value can still be verified",
     edit: (p) => {

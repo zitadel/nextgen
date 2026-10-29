@@ -19,7 +19,6 @@
  */
 
 import idpConnectionMetaSchema from "../../meta-schemas/idp-connection.json" with { type: "json" };
-import { IDP_PROVIDERS } from "../idp/index.js";
 import { referencedVariable } from "../idp/provider.js";
 import { standardClaim, type ClaimType } from "../idp/standard-claims.js";
 import type { ProjectRuleId } from "./rules.js";
@@ -229,18 +228,6 @@ const stepsText = (steps: readonly string[]) =>
 /** Whether a connection lets a provider create users, which decides what a step must route. */
 const createsUsers = (connection: Json | undefined) =>
   !isObject(connection?.provisioning) || connection.provisioning.creation !== "disabled";
-
-/** The catalog provider ids a connection's `template` may name. */
-const CATALOG_TEMPLATES = new Set<string>(IDP_PROVIDERS);
-
-/**
- * Whether a connection was scaffolded from a catalog provider, which its
- * `template` names. A catalog connection's scopes are vendor knowledge, so a
- * missing scope is an error; a custom connection's are the developer's to get
- * right, so it is only a warning.
- */
-const isCatalog = (body: Json): boolean =>
-  typeof body.template === "string" && CATALOG_TEMPLATES.has(body.template);
 
 /** The SSO rules: schemas, flows and connection files read together. */
 export function ssoRules(tree: ProjectTree): ProjectIssue[] {
@@ -624,15 +611,14 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
           missingScope.set(key, entry);
         }
       }
-      // A catalog provider's scopes are vendor knowledge the CLI scaffolded, so
-      // a missing one is an error; a custom connection's are the developer's, so
-      // it only warns and `deploy` carries on.
-      const scopeSeverity: ProjectIssue["severity"] = isCatalog(body) ? "error" : "warning";
+      // Only a warning, for a catalog provider as for a custom one: a provider
+      // may return the claim another way (the `claims` request parameter, or
+      // its own behaviour), so `deploy` carries on.
       for (const { field, scope, claims } of missingScope.values()) {
         add({
           rule: "sso/claim-needs-scope",
           file: path,
-          severity: scopeSeverity,
+          severity: "warning",
           message: `${field} reads ${[...claims].map(q).join(", ")}, which a provider only returns for the ${q(scope)} scope, and oidc.scopes is ${scopes.map(q).join(", ")}. Add ${q(scope)} to oidc.scopes, or read another claim.`,
         });
       }
@@ -669,8 +655,11 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         });
       }
     }
+    // Only before the first deploy: the server keeps a connection's subject
+    // once it has it, so the advice could not be followed after.
     if (
       typeof body.subject_claim === "string" &&
+      !tree.deployed?.has(slug) &&
       (standardClaim(body.subject_claim) !== undefined || MUTABLE_SUBJECTS.has(body.subject_claim))
     ) {
       add({
