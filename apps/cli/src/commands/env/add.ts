@@ -10,17 +10,7 @@ import { isEnvironmentName } from "../../lib/environment";
 import { writeManagedEnvFile } from "../../lib/fs-safe";
 import { input } from "../../lib/input";
 import { isObject } from "../../lib/json";
-import {
-  buildBundle,
-  createDeployment,
-  createReleaseFromBundle,
-  DEPLOY_ARGS,
-  headSha,
-  runSteps,
-  type StepContext,
-  validateStep,
-  worktreeIsDirty,
-} from "../../lib/release";
+import { DEPLOY_ARGS, deployInitialRelease, type InitialDeployment } from "../../lib/release";
 import { reportWarning } from "../../lib/warnings";
 import {
   BaseCommand,
@@ -46,14 +36,6 @@ const SERVER_RENDERED = ["next", "nuxt"];
 
 /** The message the release this command publishes carries. */
 const INITIAL_DEPLOY_MESSAGE = "Initial deployment from zitadel env add";
-
-/** What the initial deploy published, for the envelope to report. */
-type DeployedRelease = {
-  readonly releaseId: string;
-  readonly contentHash: string;
-  readonly deploymentId: string;
-  readonly origins: readonly string[];
-};
 
 /**
  * `zitadel env add` — bind an environment to a project: create one on the
@@ -264,8 +246,7 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     const hasSomewhereToLand = createdProject && issuer !== undefined;
     const { cliVersion } = this.meta;
     // A project this run created has never had a release, so the environment
-    // serves the server's own defaults until something is deployed to it
-    // (#1651). Offer that deploy here, the one moment the project, its secret
+    // refuses sign-in until something is deployed to it (#1651, #2331). Offer that deploy here, the one moment the project, its secret
     // and its origin are all at hand. A bound project (`--project`) is
     // someone else's and may already serve a release of its own, so it is
     // never offered one, and a run with nobody to ask gets the suggestion in
@@ -274,10 +255,10 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     // not go through `this.input`: that one answers a confirm when `--force`
     // is given, and here `--force` permits overwriting the env file, so it
     // must never answer it.
-    let deployment: DeployedRelease | undefined;
+    let deployment: InitialDeployment | undefined;
     if (hasSomewhereToLand && !nonInteractive && projectSecret !== undefined) {
       consola.info(
-        "Nothing is deployed to this environment yet, so it serves the server's default schema and login flow rather than your .zitadel/ files.",
+        "Nothing is deployed to this environment yet, so it refuses sign-in until your .zitadel/ files are deployed to it.",
       );
       const confirmed = await input(
         {
@@ -376,11 +357,11 @@ export default class EnvAdd extends Promptable(BaseCommand) {
           : []),
         // Said even when nobody could be asked, because it is the one thing
         // standing between this environment and a working app: until a
-        // release is deployed the project serves the server's own defaults,
-        // not the `.zitadel/` files in this directory.
+        // release is deployed the project refuses sign-in, and only a deploy
+        // of the `.zitadel/` files in this directory changes that.
         ...(createdProject && deployment === undefined
           ? [
-              `Nothing is deployed to ${name} yet, so it serves the server's defaults rather than .zitadel/.`,
+              `Nothing is deployed to ${name} yet, so it refuses sign-in until .zitadel/ is deployed to it.`,
               ...(hasSomewhereToLand
                 ? [`Deploy to it: zitadel ${DEPLOY_ARGS}${newEnvironment}`]
                 : [
@@ -406,10 +387,8 @@ export default class EnvAdd extends Promptable(BaseCommand) {
   }
 
   /**
-   * Publish `.zitadel/` to the project this run just created, the way `deploy`
-   * does: build the bundle, validate it, create the release and deploy it to
-   * every primary origin. `deploy`'s diff step is left out, because nothing
-   * has ever been deployed here and there is no baseline to diff against.
+   * Publish `.zitadel/` to the project this run just created (see
+   * {@link deployInitialRelease}).
    *
    * It authenticates with the new project's own secret rather than the one
    * this directory resolves to, since `env add` binds a different project from
@@ -422,50 +401,24 @@ export default class EnvAdd extends Promptable(BaseCommand) {
     projectId: string;
     projectSecret: string;
     selector: EnvironmentSelector;
-  }): Promise<DeployedRelease | undefined> {
+  }): Promise<InitialDeployment | undefined> {
     const json = this.jsonEnabled();
-    const client = createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret });
     consola.start("Deploying .zitadel/ to the new environment");
     try {
-      const { bundle, brandingSources, idpFiles, policyFiles } = await buildBundle(opts.cwd);
-      const ctx: StepContext = {
-        cwd: opts.cwd,
-        client,
+      const deployment = await deployInitialRelease({
+        client: createZitadelClient({ baseUrl: opts.server, token: opts.projectSecret }),
         projectId: opts.projectId,
+        cwd: opts.cwd,
         env: this.meta.env,
-        mode: "deploy",
-        dryRun: false,
         json,
         color: !json && Boolean(process.stdout.isTTY) && !process.env.NO_COLOR,
-        bundle,
-        brandingSources,
-        idpFiles,
-        policyFiles,
+        message: INITIAL_DEPLOY_MESSAGE,
         suggest: (args) => projectCommand(args, opts.selector, this.meta.cliVersion),
-      };
-      await runSteps([validateStep], ctx);
-      const release = await createReleaseFromBundle(client, opts.projectId, bundle, {
-        message: INITIAL_DEPLOY_MESSAGE,
-        gitSha: await headSha(opts.cwd),
-        gitDirty: await worktreeIsDirty(opts.cwd),
       });
-      // No optimistic guard: the project was created moments ago and nothing
-      // has ever been deployed to it, so there is no deployment to race with.
-      const deployment = await createDeployment(client, opts.projectId, {
-        releaseId: release.id,
-        targets: ["primary"],
-        message: INITIAL_DEPLOY_MESSAGE,
-      });
-      const origins = deployment.targets.map((target) => target.origin);
       consola.success(
-        `Deployed ${release.content_hash} to ${origins.length} origin${origins.length === 1 ? "" : "s"}`,
+        `Deployed ${deployment.contentHash} to ${deployment.origins.length} target${deployment.origins.length === 1 ? "" : "s"}`,
       );
-      return {
-        releaseId: release.id,
-        contentHash: release.content_hash,
-        deploymentId: deployment.id,
-        origins,
-      };
+      return deployment;
     } catch (error) {
       reportWarning(
         `The environment was bound but the first deploy failed: ${toZitadelError(error).message}. Run \`zitadel ${DEPLOY_ARGS}${opts.selector}\` to publish it.`,

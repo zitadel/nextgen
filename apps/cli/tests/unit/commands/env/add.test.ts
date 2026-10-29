@@ -209,7 +209,7 @@ describe("env add", () => {
       const out = stripAnsi(await addRendered(cwd));
 
       expect(out).toContain(
-        "Nothing is deployed to production yet, so it serves the server's defaults rather than .zitadel/.",
+        "Nothing is deployed to production yet, so it refuses sign-in until .zitadel/ is deployed to it.",
       );
     });
 

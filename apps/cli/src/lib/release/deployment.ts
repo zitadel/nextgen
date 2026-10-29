@@ -54,16 +54,57 @@ export async function listLiveDeployments(
 }
 
 /**
+ * The project default target: what a caller with no `Origin` is served. The
+ * API names it with this keyword in `targets` and returns it as a target's
+ * `origin`.
+ */
+export const DEFAULT_TARGET = "default";
+
+/**
+ * Where a project deploy lands: every primary origin, and the default target
+ * so callers with no `Origin` run the same release.
+ */
+export const PROJECT_TARGETS: readonly string[] = ["primary", DEFAULT_TARGET];
+
+/**
  * Whether a deployment serves a primary origin. A preview deployment's targets
- * carry an expiry; it is never the baseline, the guard or the thing a bare
- * rollback undoes.
+ * carry an expiry, and a deployment to the default target alone serves no web
+ * origin; neither is the baseline or the thing a bare rollback undoes.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
-  return deployment.targets.some((target) => target.expires_at == null);
+  return deployment.targets.some(
+    (target) => target.expires_at == null && target.origin !== DEFAULT_TARGET,
+  );
 }
 
-/** What target a deploy goes to: every primary origin, or one exact origin. */
-export type DeployTargets = ["primary"] | [string];
+/**
+ * The targets a rollback to deployment writes, as the server rebuilds them:
+ * the project's current primary origins when it served a web origin, and the
+ * default target when it served that.
+ */
+export function rollbackOrigins(
+  deployment: Pick<ListedDeployment, "targets">,
+  primaryOrigins: readonly string[],
+): string[] {
+  const origins = deployment.targets.map((target) => target.origin);
+  return [
+    ...(origins.some((origin) => origin !== DEFAULT_TARGET) ? primaryOrigins : []),
+    ...(origins.includes(DEFAULT_TARGET) ? [DEFAULT_TARGET] : []),
+  ];
+}
+
+/**
+ * The id of the newest deployment to any of origins, the one the server
+ * compares `expected_deployment_id` against. deployments must be newest first.
+ */
+export function newestDeploymentTo(
+  deployments: readonly Pick<ListedDeployment, "id" | "targets">[],
+  origins: readonly string[],
+): string | undefined {
+  return deployments.find((deployment) =>
+    deployment.targets.some((target) => origins.includes(target.origin)),
+  )?.id;
+}
 
 /**
  * Make a release live. The release is named by id or by content digest, never

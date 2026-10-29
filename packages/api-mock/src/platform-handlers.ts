@@ -1496,6 +1496,9 @@ function releaseResponse(release: ReleaseRecord): Record<string, unknown> {
  * Which origins a deployment went to: a preview target carries an expiry, a
  * primary one never does, and the two cannot be mixed in one deployment.
  */
+/** The targets keyword, and stored origin, of the project default target. */
+const DEFAULT_TARGET = "default";
+
 function deploymentKind(deployment: DeploymentRecord): "primary" | "preview" {
   return deployment.targets.some((target) => target.expiresAt !== null) ? "preview" : "primary";
 }
@@ -2006,7 +2009,15 @@ export function setupPlatformHandlers() {
       const resolved = new Set<string>();
       let sawPreview = false;
       let sawPrimary = false;
+      let sawDefault = false;
       for (const target of requested) {
+        // The default target serves callers with no origin. It is kept as its
+        // wire token, which can never collide with an origin.
+        if (target === DEFAULT_TARGET) {
+          resolved.add(DEFAULT_TARGET);
+          sawDefault = true;
+          continue;
+        }
         if (target === "primary") {
           if (primaries.length === 0) {
             return HttpResponse.json(
@@ -2037,6 +2048,15 @@ export function setupPlatformHandlers() {
             `deployment: ${target} is neither a primary origin nor a preview URL of the project`,
           ),
           { status: 403 },
+        );
+      }
+      if (sawPreview && sawDefault) {
+        return HttpResponse.json(
+          errorBody(
+            "dep.invalid",
+            "deployment: the default target and preview URLs cannot be mixed",
+          ),
+          { status: 400 },
         );
       }
       if (sawPreview && sawPrimary) {
@@ -2298,7 +2318,8 @@ export function setupPlatformHandlers() {
       }
 
       // Only a deployment to primary origins can be rolled back, and every
-      // target must still be a primary origin of the project.
+      // target must still be a primary origin of the project or the default
+      // target.
       if (target.targets.some((row) => row.expiresAt !== null)) {
         return HttpResponse.json(
           errorBody(
@@ -2309,7 +2330,9 @@ export function setupPlatformHandlers() {
         );
       }
       const primaries = primaryOrigins(project);
-      const removed = target.targets.find((row) => !primaries.includes(row.origin));
+      const removed = target.targets.find(
+        (row) => row.origin !== DEFAULT_TARGET && !primaries.includes(row.origin),
+      );
       if (removed) {
         return HttpResponse.json(
           errorBody(

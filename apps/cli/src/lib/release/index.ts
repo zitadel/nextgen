@@ -12,10 +12,14 @@ export {
 } from "./release";
 export {
   createDeployment,
+  DEFAULT_TARGET,
+  newestDeploymentTo,
+  PROJECT_TARGETS,
   rollbackDeployment,
+  rollbackOrigins,
   type Deployment,
-  type DeployTargets,
 } from "./deployment";
+export { deployInitialRelease, type InitialDeployment } from "./initial-deploy";
 export { worktreeIsDirty, headSha } from "./git";
 export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
 export { validateStep } from "./steps/validate";

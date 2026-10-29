@@ -7,6 +7,11 @@ const platform = usePlatformMock();
 
 /** Build a release and return its id. */
 async function aRelease(app: ScaffoldedApp): Promise<string> {
+  // Setup deployed the scaffolded config, so the release is built from an
+  // edit of it: one nothing serves.
+  await app.editUserSchema((schema) => {
+    schema.properties.company = { type: "string" };
+  });
   const result = await app.run(["release", "create", "--non-interactive", "--json"]);
   expect(result, "arranging a release should have succeeded").toSucceed();
   return app.envelopeOf<{ release_id: string }>(result).data.release_id;
