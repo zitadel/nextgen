@@ -22,6 +22,23 @@ const config: NextConfig = {
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
+  async headers() {
+    return [
+      {
+        // Every response, the pages' and the other routes': nothing frames the
+        // website, embeds a plugin or moves its base URL. Each page also
+        // carries a report-only policy (proxy.ts).
+        source: "/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; report-uri /csp-report",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default config;

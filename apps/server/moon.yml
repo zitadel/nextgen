@@ -197,10 +197,12 @@ tasks:
     inputs:
       - "@group(serverInputs)"
       # Read by the cloud launcher's tests (apps/cloud/launcher), which hold
-      # the deployment's configuration together. Scoped to test: nothing the
-      # server compiles reads them.
+      # the deployment's configuration together, and by the console's
+      # (internal/staticui/console), which hold the cloud's console headers to
+      # its page. Scoped to test: nothing the server compiles reads them.
       - "/vercel.json"
       - "/apps/cloud/build-launcher.sh"
+      - "/apps/console/index.html"
     options:
       runFromWorkspaceRoot: true
 

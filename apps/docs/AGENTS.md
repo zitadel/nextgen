@@ -44,6 +44,15 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 - Link the website (`/`) with a plain `<a>`, never `next/link`: it is another
   deployment, which `next/link` would prefetch and route to in this app.
 
+## Content-Security-Policy
+
+- Each page renders per request with a nonce (`proxy.ts`, `lib/csp.ts`);
+  give an inline `<script>` of ours the layout's nonce, or the policy reports
+  it. `tests/pages.spec.ts` fails a page with a script that lacks it.
+- Load nothing from an origin `lib/csp.ts` does not allow; widen the policy
+  in the same change. The enforced policy is `next.config.mjs`', never the
+  proxy's: Next.js would read the nonce from it.
+
 ## Content
 
 - Leave `index` out of a folder's `meta.json` `pages`: Fumadocs then opens it
