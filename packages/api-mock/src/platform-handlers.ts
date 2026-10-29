@@ -69,6 +69,8 @@ import {
   GetClaimWindowResponse,
   GetDeploymentByIdParams,
   GetDeploymentByIdQueryParams,
+  GetDeploymentVariablesParams,
+  GetDeploymentVariablesQueryParams,
   GetFlowDefinitionParams,
   GetFlowDefinitionResponse,
   GetIdpByIdParams,
@@ -415,6 +417,8 @@ type DeploymentRecord = {
   rollbackTo: string | null;
   deployedAt: string;
   seq: number;
+  /** The variables of its kind it froze, keyed by name, in the wire shape. */
+  variables: Record<string, unknown>;
 };
 
 /**
@@ -647,6 +651,20 @@ function variablesResponse(
     }
   }
   return out;
+}
+
+/** The variables of one kind a deployment freezes, keyed by name. */
+function frozenVariables(
+  variables: Map<string, Map<string, VariableRecord>>,
+  projectId: string,
+  kind: VariableKind,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(variablesResponse(variables, projectId, [kind])).map(([name, byKind]) => [
+      name,
+      byKind[kind],
+    ]),
+  );
 }
 
 /** One connection, in the wire shape every idp endpoint answers with. */
@@ -1946,8 +1964,8 @@ export function setupPlatformHandlers() {
     // --- deployments -----------------------------------------------------
     // A deployment makes a release live on a set of targets, expanding
     // `primary` to the project's primary origins. It is idempotent on what is
-    // served and append-only; rollback re-applies an earlier one. Variable
-    // freezing arrives with the variables work. The Go handlers are stubs.
+    // served and append-only; rollback re-applies an earlier one. Each one
+    // freezes the variables of its kind; a rollback reuses the restored set.
 
     http.post("*/deployments", async ({ request }) => {
       const query = parse(CreateDeploymentQueryParams, queryRecord(request), "invalid_query");
@@ -2138,6 +2156,7 @@ export function setupPlatformHandlers() {
         rollbackTo: null,
         deployedAt: createdAt,
         seq: ++store.lastSeq,
+        variables: frozenVariables(store.variables, project.id, sawPreview ? "preview" : "primary"),
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -2379,6 +2398,7 @@ export function setupPlatformHandlers() {
         rollbackTo: target.id,
         deployedAt: nowIso(),
         seq: ++store.lastSeq,
+        variables: target.variables,
       };
       store.deployments.set(id, record);
       return HttpResponse.json(deploymentResponse(record), { status: 201 });
@@ -3211,13 +3231,24 @@ export function setupPlatformHandlers() {
     // publishes the client id and secret here, so without them a scaffolded
     // provider has no credentials and sign-in fails at the token endpoint.
 
-    // Registered ahead of `*/variables`, which would otherwise match it. The
-    // server answers 501 until it stores frozen sets, and so does the mock.
-    http.get("*/deployments/:deploymentId/variables", () =>
-      HttpResponse.json(errorBody("not_implemented", "This feature is not implemented yet."), {
-        status: 501,
-      }),
-    ),
+    // Registered ahead of `*/variables`, which would otherwise match it.
+    http.get("*/deployments/:deployment_id/variables", ({ params, request }) => {
+      const path = parse(GetDeploymentVariablesParams, params, "invalid_request");
+      if (!path.ok) {
+        return path.response;
+      }
+      const query = parse(GetDeploymentVariablesQueryParams, queryRecord(request), "invalid_query");
+      if (!query.ok) {
+        return query.response;
+      }
+      const deployment = store.deployments.get(path.data.deployment_id);
+      if (!deployment || deployment.projectId !== query.data.project_id) {
+        return HttpResponse.json(errorBody("dep.not_found", "deployment: not found"), {
+          status: 404,
+        });
+      }
+      return HttpResponse.json(deployment.variables);
+    }),
 
     http.get("*/variables", ({ request }) => {
       const query = parse(GetVariablesQueryParams, queryRecord(request), "invalid_query");

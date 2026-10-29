@@ -109,6 +109,36 @@ session:
   max_ttl: 720h
 ```
 
+## Audit event retention
+
+| YAML key                          | Environment                               | Default          | Description                                                    |
+| --------------------------------- | ----------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| `events.retention.enabled`        | `NEXTGEN_EVENTS_RETENTION_ENABLED`        | `true`           | Delete audit events once they are older than the window        |
+| `events.retention.window`         | `NEXTGEN_EVENTS_RETENTION_WINDOW`         | `720h` (30 days) | How long an event is kept after it was stored                  |
+| `events.retention.interval`       | `NEXTGEN_EVENTS_RETENTION_INTERVAL`       | `1h`             | How often the server purges; the first purge runs as it starts |
+| `events.retention.trigger_secret` | `NEXTGEN_EVENTS_RETENTION_TRIGGER_SECRET` | (empty)          | Leaves the schedule to a scheduler outside the server (below)  |
+
+The server purges on its own timer. A server that runs only while it serves a
+request, such as a Vercel function, can't keep a timer. Set `trigger_secret`
+to at least 16 printable ASCII characters (`openssl rand -hex 32`), and the
+server stops its timer and purges once per `GET` or `POST` to
+`/cron/events-retention` that carries the secret as a bearer token:
+
+```sh
+curl -fsS -H "Authorization: Bearer $TRIGGER_SECRET" https://zitadel.example.com/cron/events-retention
+# {"deleted":42}
+```
+
+- A request without the secret gets `401`, and a purge that fails `500`; the
+  server's log says why.
+- A purge that takes longer than 4½ minutes is cancelled and deletes nothing,
+  so give the call that long.
+- A missed call leaves its events to the next. Two calls at once are safe: the
+  second deletes what the first left, or nothing.
+
+The hosted cloud calls it from a Vercel Cron Job
+([runbook](../runbooks/cloud.md#operating)).
+
 ## Logging
 
 | YAML key                                     | Environment                                          | Default                                       | Description                                                 |

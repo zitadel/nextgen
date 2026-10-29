@@ -184,7 +184,8 @@ the server grants and revokes to match at its next start.
 
 Settings: no Root Directory (the repository root holds `vercel.json`),
 Node.js 24, production branch `main`, preview deployments on, Web Analytics
-and Speed Insights enabled (their tabs in the project). Deployment
+and Speed Insights enabled (their tabs in the project), Cron Jobs enabled
+(the [event retention](#operating) purge runs from one). Deployment
 Protection stays on Vercel Authentication.
 
 Environment variables (add secrets with
@@ -202,6 +203,8 @@ Environment variables (add secrets with
 | `MASTER_KEY_ID` | Preview | preview's `master-key.id`, `cloud-preview-<year>-<month>` |
 | `MASTER_KEY_PREVIOUS_PEM_B64` | Production or Preview; sensitive; only during a rotation | the key being rotated out, which `setup-secrets.sh --force` sets |
 | `MASTER_KEY_PREVIOUS_ID` | Production or Preview; only during a rotation | its id |
+| `CRON_SECRET` | Production; sensitive | `openssl rand -hex 32`, kept in 1Password: the token the [event retention](#operating) cron job sends the server; the build fails without it |
+| `CRON_SECRET` | Preview; sensitive | another one: a preview's build fails without it too, although no cron job runs there; it starts a run on a preview by hand |
 | `CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the share of console page loads that send Speed Insights, `0` to `1`; unset sends every one |
 | `DOCS_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the docs |
 | `WEBSITE_SPEED_INSIGHTS_SAMPLE_RATE` | Production, Preview | `0.01`: the same for the website |
@@ -519,9 +522,9 @@ project and imports the root admin.
   A server that fails to start shows up the same way: the request that
   started the instance answers 500, and its lines end with the launcher's
   error and `the user server exited during startup`. An error outside a
-  request, such as a failed event retention run, has no status to find it
-  by: search the messages for the word, which also matches the 4xx
-  `api error` lines, and keep the `ERROR` ones:
+  request, such as a failed flush of the request audit events, has no
+  status to find it by: search the messages for the word, which also
+  matches the 4xx `api error` lines, and keep the `ERROR` ones:
 
   ```sh
   npx -y vercel@64.5.0 logs --scope team_IDtOs36TGPOejsKm40wr1p3C \
@@ -552,6 +555,36 @@ project and imports the root admin.
   - A bigger pool multiplies across instances against the same
     `max_connections`, and handler time alone does not say whether
     connection waits or the shared vCPU stretched it.
+- **Event retention:** a function runs only while it serves a request, so
+  the server's own hourly purge is off here. A Vercel Cron Job (`crons` in
+  `vercel.json`) calls `/cron/events-retention` on the production deployment
+  at 17 minutes past every hour, with `CRON_SECRET` as its bearer token, and
+  the server deletes the audit events older than 30 days
+  ([ADR 049](../adrs/049-events-api-retention-export.md#amendment-2026-10-27-who-starts-the-purge-and-as-which-role)).
+  - Each run logs one line, `event retention: purged events` with the number
+    it deleted or `event retention: purge failed` with the cause; a failed
+    run answers 500. Settings → Cron Jobs lists the job: View Logs shows its
+    runs, and Run starts one now.
+  - Previews get no cron job. Start a run on one by hand with the preview's
+    `CRON_SECRET` from 1Password and the bypass secret
+    ([Checking a deployment by hand](#checking-a-deployment-by-hand)):
+
+    ```sh
+    curl -fsS -H "Authorization: Bearer $CRON_SECRET" \
+      -H "x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET" \
+      https://cloud-….vercel.app/cron/events-retention
+    ```
+
+  - A run that takes longer than 4½ minutes is cancelled and deletes
+    nothing, and so does every run after it. Delete the backlog in batches,
+    connected as the server's role, until a batch deletes no row:
+
+    ```sql
+    DELETE FROM zitadel_nextgen.events WHERE (project_id, id) IN (
+      SELECT project_id, id FROM zitadel_nextgen.events
+      WHERE created_at < now() - interval '30 days' LIMIT 50000);
+    ```
+
 - **Analytics:** the console reports page views and Web Vitals per route
   pattern (`/console/users/$userId`), the docs and the website per page,
   to the project's Analytics and Speed Insights tabs. Speed Insights samples

@@ -22,6 +22,10 @@
     // bin/start.ts runs the source and imports api's generated client and config.
     "start": {
       "dependsOn": ["@zitadel/config#build"]
+    },
+    // The same file under `tsx watch`.
+    "dev": {
+      "dependsOn": ["@zitadel/config#build"]
     }
   }
 }
