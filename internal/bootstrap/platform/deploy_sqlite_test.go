@@ -20,6 +20,9 @@ import (
 	"github.com/zitadel/nextgen/internal/storage/dbtest"
 )
 
+// consoleOrigin is where the console runs in these tests.
+const consoleOrigin = "https://console.example.com"
+
 // TestEnsureDeployedSQLiteServesTheServersBundle runs the start-up bootstrap
 // against real services: the release the server's bundle builds into carries
 // the platform user schema and the default login flows, it is live on the

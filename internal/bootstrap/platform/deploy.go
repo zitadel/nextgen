@@ -13,22 +13,6 @@ import (
 	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
 
-// originRegistry reads the platform project and adds an origin to it.
-type originRegistry interface {
-	Get(ctx context.Context, id string, opts service.ProjectQueryOptions) (*domain.Project, error)
-	AddOrigin(ctx context.Context, projectID string, origin domain.Origin) (*domain.Origin, error)
-}
-
-// releaseBuilder builds the platform release from the server's bundle.
-type releaseBuilder interface {
-	Build(ctx context.Context, input service.BuildReleaseInput) (*service.CreateReleaseOutput, error)
-}
-
-// targetDeployer deploys that release.
-type targetDeployer interface {
-	Deploy(ctx context.Context, input service.DeployInput) (*service.CreateDeploymentOutput, error)
-}
-
 // platformReleaseMessage is the message the platform release carries.
 const platformReleaseMessage = "Platform configuration of this server"
 
@@ -58,9 +42,9 @@ func EnsureDeployed(
 	ctx context.Context,
 	builtinBase string,
 	consoleOrigin string,
-	projects originRegistry,
-	releases releaseBuilder,
-	deployments targetDeployer,
+	projects service.ProjectService,
+	releases service.ReleaseService,
+	deployments *service.DeploymentService,
 ) error {
 	ctx = service.WithAuthzListUnrestricted(ctx)
 	project, err := projects.Get(ctx, domain.PlatformProjectID, service.ProjectQueryOptions{})

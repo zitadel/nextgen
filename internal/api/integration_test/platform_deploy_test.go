@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"context"
 	"net/http"
 	"testing"
 
@@ -22,6 +23,11 @@ import (
 func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	projects := harness.EnsureProjectService(t)
 	require.NoError(t, platformbootstrap.Ensure(t.Context(), projects, harness.EnsureServiceDB(t), true))
+	// The platform project is outside any test's own project, so this test
+	// removes it (internal/AGENTS.md).
+	t.Cleanup(func() {
+		_, _ = harness.EnsureServiceDB(t).Statements().DeleteProjectByID(context.Background(), domain.PlatformProjectID)
+	})
 	deploy := func() {
 		t.Helper()
 		require.NoError(t, platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, helpers.ConsoleOrigin,
