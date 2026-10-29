@@ -1,7 +1,8 @@
 # Inline scripts under the docs' and the website's Content-Security-Policy
 
-> **Status:** research, 2026-10-29. Next.js 16.4.1 on Vercel (project
-> `cloud`), after zitadel/nextgen#2480.
+> **Status:** decided, 2026-10-29: hashes, report-only first. Next.js 16.4.1
+> on Vercel (project `cloud`), after zitadel/nextgen#2480. Each app's
+> `csp-adapter.mjs` implements it.
 > **Question:** how can the docs (`apps/docs`) and the website
 > (`apps/website`) stop allowing inline script, and what does each way cost?
 
@@ -172,20 +173,20 @@ about 70 lines) sends the hashes in the report-only policy. On its preview:
 
 What remains before enforcing:
 
-- **HTML rendered on demand gets no hashes:** an unknown slug's 404 and the
-  `/docs/index` alias. Set `dynamicParams = false` on the docs route, and
-  give everything else a fallback policy without inline script (such a page
-  then runs without script).
-- **Two policies on one page:** whether Vercel serves both `next.config`'s
-  enforced header and the adapter's when a page has the same header name
-  from each is untested. The prototype dropped `next.config`'s report-only
-  policy.
+- **HTML rendered on demand gets no hashes.** On the docs that's an unknown
+  slug's 404, which renders inside the docs' layout. `dynamicParams = false`
+  would serve the prerendered root 404 instead and lose that layout. Such a
+  page needs a fallback policy without inline script, under which it runs
+  without script.
+- **Two enforced policies on one page:** once the adapter's policy is
+  enforced, it shares its header name with `next.config`'s. Whether Vercel
+  then serves both is untested. Today the adapter's policy is the only
+  report-only one, so nothing collides.
 - **Vercel's toolbar:** keep #2480's `https://vercel.live`. A hash policy
   has no `'strict-dynamic'`, so the host allowlist still counts.
 - **The adapter is a seam:** if Vercel stops injecting its adapter through
-  `NEXT_ADAPTER_PATH`, ours would wrap nothing. The test below catches that
+  `NEXT_ADAPTER_PATH`, ours would wrap nothing. The tests below catch that
   on the next deployment.
-- **The website** takes the same adapter. It wasn't deployed with it.
 
 ## Staying as is
 
@@ -199,11 +200,13 @@ next bug.
 ## Recommendation
 
 1. Add the adapter to the docs and the website, report-only, keeping
-   `https://vercel.live`, and set `dynamicParams = false` on the docs route.
-2. In each app's `tests/`, assert that every inline script on every page
-   carries a hash in its policy. Since the suite runs against each
-   deployment, it also proves the adapter ran.
-3. Once reports stay quiet, enforce the hash policy.
+   `https://vercel.live`. Done: `next start` serves the policy too, since
+   the adapter also writes it into each page's `.meta`.
+2. Assert, on every deployment, that every inline script carries a hash in
+   its page's policy: the docs' `tests/` for every docs page, the cloud's
+   `e2e/console/src-deployment/routes.spec.ts` for the website's. Done.
+3. Once reports stay quiet, give on-demand HTML its fallback policy and
+   enforce the hash policy.
 
 ## How it was measured
 

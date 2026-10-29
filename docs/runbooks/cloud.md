@@ -60,11 +60,12 @@ each response carries security headers:
 - Each service sends its own Content-Security-Policy, enforced and
   report-only: the console's in its service's `headers` (a server test holds
   them to the server's policy for the same page, plus Vercel's toolbar), the
-  docs' and the website's from their `next.config`, the server's from the Go
-  code. Violations go to the server's `/csp-report`.
-- The console's enforced policy covers inline script; the docs' and the
-  website's do not yet: their report-only policies allow it
-  (`'unsafe-inline'`), so their pages stay prerendered.
+  docs' and the website's from their `next.config` and, per prerendered page,
+  their build adapter (`csp-adapter.mjs`), the server's from the Go code.
+  Violations go to the server's `/csp-report`.
+- The console's enforced policy covers inline script. The docs' and the
+  website's report-only policies list each page's inline scripts by hash;
+  their enforced ones do not cover script yet.
 - HSTS is Vercel's default: zitadel.com is on the preload list with its
   subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
   of its own.
