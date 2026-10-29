@@ -8,8 +8,11 @@
     // The add-on implements the console's contract and composes the
     // components it exports, and calls the functions' contract, all read
     // from source. Turbo hashes another package's files only through a task
-    // edge, and there is no task to depend on, so they are listed.
+    // edge, and there is no task to depend on, so they are listed. The
+    // console's own typecheck dependency is the add-on's too: the kit's
+    // sign-in screen imports the built sdk-react.
     "typecheck": {
+      "dependsOn": ["@zitadel/sdk-react#build"],
       "inputs": [
         "$TURBO_EXTENDS$",
         "$TURBO_ROOT$/apps/console/src/**",

@@ -27,6 +27,7 @@
     "@types/react": "catalog:",
     "@zitadel/cloud-functions": "workspace:*",
     "@zitadel/console": "workspace:*",
+    "@zitadel/sdk-react": "workspace:*",
     "@zitadel/vitest-config": "workspace:*",
     "react": "catalog:",
     "typescript": "catalog:",

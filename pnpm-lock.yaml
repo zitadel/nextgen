@@ -774,6 +774,9 @@ importers:
       '@zitadel/console':
         specifier: workspace:*
         version: link:../console
+      '@zitadel/sdk-react':
+        specifier: workspace:*
+        version: link:../../packages/sdk-react
       '@zitadel/vitest-config':
         specifier: workspace:*
         version: link:../../packages/vitest-config
