@@ -34,6 +34,7 @@ type AllStatements interface {
 	ReleaseStatements
 	IDPConnectionStatements
 	AppStatements
+	ClientRegistrationStatements
 	PolicyStatements
 	IDPIdentityLinkStatements
 	DeploymentStatements
@@ -268,6 +269,29 @@ type IDPConnectionStatements interface {
 	// the cursor. An unknown connection returns an empty page, so a handler
 	// needs GetIDPConnection to tell that from a connection with no revisions.
 	ListIDPConnectionRevisions(ctx context.Context, projectID, connectionID string, page database.Page[domain.IDPConnectionField]) (*database.ListResult[*domain.IDPConnection], error)
+}
+
+// ClientRegistrationStatements persists clients that registered themselves
+// through dynamic client registration (RFC 7591). A registration is transient:
+// rows are deleted, never revised, apart from the expiry the purge moves.
+type ClientRegistrationStatements interface {
+	Statements
+	// CreateClientRegistration stores entity, mints its id (the client_id)
+	// and sets CreatedAt. The caller sets ExpiresAt.
+	CreateClientRegistration(ctx context.Context, entity *domain.ClientRegistration) error
+	// GetClientRegistration returns the registration with id in the project.
+	// None returns *database.NoRowFoundError.
+	GetClientRegistration(ctx context.Context, projectID, id string) (*domain.ClientRegistration, error)
+	ListClientRegistrations(ctx context.Context, opts *database.ListOptions[domain.ClientRegistrationField]) (*database.ListResult[*domain.ClientRegistration], error)
+	// DeleteClientRegistration deletes the registration with id. None returns
+	// *database.NoRowFoundError.
+	DeleteClientRegistration(ctx context.Context, projectID, id string) error
+	// ListExpiredClientRegistrations returns the ids of up to limit of the
+	// project's registrations whose expiry is not after now, earliest first.
+	ListExpiredClientRegistrations(ctx context.Context, projectID string, now time.Time, limit int) ([]string, error)
+	// ExtendClientRegistration moves the registration's expiry to expiresAt.
+	// None returns *database.NoRowFoundError.
+	ExtendClientRegistration(ctx context.Context, projectID, id string, expiresAt time.Time) error
 }
 
 // AppStatements persists apps and their revisions, like

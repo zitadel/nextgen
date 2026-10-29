@@ -249,6 +249,10 @@ paths:
     $ref: endpoints/apps/by_id/clients/by_slug/secrets/methods.yaml
   /apps/revisions/{revision_id}:
     $ref: endpoints/apps/revisions/by_id/methods.yaml
+  /client_registrations/query:
+    $ref: endpoints/client_registrations/query/methods.yaml
+  /client_registrations/{id}:
+    $ref: endpoints/client_registrations/by_id/methods.yaml
   /policies:
     $ref: endpoints/policies/methods.yaml
   /policies/evaluate:
@@ -327,6 +331,10 @@ webhooks:
     $ref: endpoints/events/webhooks/authz-revoked.yaml
   branding.created:
     $ref: endpoints/events/webhooks/branding-created.yaml
+  client_registration.created:
+    $ref: endpoints/events/webhooks/client_registration-created.yaml
+  client_registration.deleted:
+    $ref: endpoints/events/webhooks/client_registration-deleted.yaml
   deployment.created:
     $ref: endpoints/events/webhooks/deployment-created.yaml
   flowdef.created:

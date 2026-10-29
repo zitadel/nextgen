@@ -27,6 +27,7 @@ type Handler struct {
 	deploymentService     *service.DeploymentService
 	idpConnectionService  service.IDPConnectionService
 	appService            service.AppService
+	clientRegistrations   service.ClientRegistrationService
 	eventService          *service.EventService
 	tokenService          service.TokenService
 	keyService            service.KeyService
@@ -102,6 +103,13 @@ func NewHandler(
 // below, so the existing NewHandler call sites stay as they are.
 func (h *Handler) WithAppService(apps service.AppService) *Handler {
 	h.appService = apps
+	return h
+}
+
+// WithClientRegistrationService wires the endpoints that list and delete
+// the clients that registered themselves.
+func (h *Handler) WithClientRegistrationService(registrations service.ClientRegistrationService) *Handler {
+	h.clientRegistrations = registrations
 	return h
 }
 

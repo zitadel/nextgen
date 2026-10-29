@@ -103,6 +103,14 @@ func (s *QueryAppsRequest) setDefaults() {
 }
 
 // setDefaults set default value of fields.
+func (s *QueryClientRegistrationsRequest) setDefaults() {
+	{
+		val := int(20)
+		s.Limit.SetTo(Limit(val))
+	}
+}
+
+// setDefaults set default value of fields.
 func (s *QueryGrantsRequest) setDefaults() {
 	{
 		val := int(20)

@@ -1,0 +1,73 @@
+type: object
+description: |
+  A client that registered itself through dynamic client registration
+  (RFC 7591). It belongs to the project, not to an app: it may get tokens for
+  a `third_party` API of an app that opens dynamic registration, each with the
+  user's consent. It is transient: once past `expires_at` it is purged unless
+  a live consent names it. The display fields are the client's own claims; the
+  server checked only its redirect URIs. Its secret is never returned.
+required:
+  - id
+  - redirect_uris
+  - grant_types
+  - token_endpoint_auth_method
+  - created_at
+  - expires_at
+properties:
+  id:
+    type: string
+    description: The client_id the server minted for the client.
+    example: dcr_01KWH3B72K7M7F0N9WD3P2E4YM
+  client_name:
+    type: string
+    description: The name the client registered with.
+    example: Claude Code
+  client_uri:
+    type: string
+    description: The client's home page, as the client claims it.
+  logo_uri:
+    type: string
+    description: The client's logo, as the client claims it.
+  policy_uri:
+    type: string
+    description: The client's privacy policy, as the client claims it.
+  tos_uri:
+    type: string
+    description: The client's terms of service, as the client claims it.
+  software_id:
+    type: string
+    description: The software the client says it is, stable across its registrations.
+  software_version:
+    type: string
+    description: The version of that software.
+  redirect_uris:
+    type: array
+    description: Where the authorization server may send the browser back to.
+    items:
+      type: string
+    example:
+      - http://localhost:33418/callback
+  grant_types:
+    type: array
+    items:
+      type: string
+      enum:
+        - authorization_code
+        - refresh_token
+  token_endpoint_auth_method:
+    type: string
+    description: How the client authenticates at the token endpoint. `none` for a public client.
+    enum:
+      - none
+      - client_secret_basic
+      - client_secret_post
+  created_at:
+    type: string
+    format: date-time
+  expires_at:
+    type: string
+    format: date-time
+    description: |
+      The earliest the registration may be purged. Past it, the registration
+      goes unless a live consent names it; one a consent names is checked
+      again an hour later.

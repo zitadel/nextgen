@@ -98,6 +98,9 @@ const (
 	EventTypeAppUpdated           EventType = "app.updated"
 	EventTypeAppClientSecretAdded EventType = "app.client_secret.added"
 
+	EventTypeClientRegistrationCreated EventType = "client_registration.created"
+	EventTypeClientRegistrationDeleted EventType = "client_registration.deleted"
+
 	EventTypeDeploymentCreated EventType = "deployment.created"
 
 	EventTypeOriginAdded   EventType = "origin.added"

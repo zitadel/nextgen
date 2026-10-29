@@ -51,6 +51,8 @@ var livePathBProducers = map[domain.EventType]string{
 	domain.EventTypeAppCreated:                 "internal/service",
 	domain.EventTypeAppUpdated:                 "internal/service",
 	domain.EventTypeAppClientSecretAdded:       "internal/service",
+	domain.EventTypeClientRegistrationCreated:  "internal/service",
+	domain.EventTypeClientRegistrationDeleted:  "internal/service",
 	domain.EventTypeIDPIdentityLinkCreated:     "internal/service",
 	domain.EventTypeDeploymentCreated:          "internal/service",
 	domain.EventTypeOriginAdded:                "internal/service",

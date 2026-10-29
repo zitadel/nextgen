@@ -37,6 +37,9 @@ import {
   QueryIdpsResponse,
   QueryAppsBody,
   QueryAppsResponse,
+  QueryClientRegistrationsBody,
+  QueryClientRegistrationsResponse,
+  GetClientRegistrationByIdResponse,
   QueryProjectsResponse,
   QuerySessionsResponse,
   QueryTeamsResponse,
@@ -374,6 +377,51 @@ export const RESOURCES = {
     get: {
       call: ({ client, projectId }, id) => client.getAppById(id, { project_id: projectId }),
       response: GetAppByIdResponse,
+    },
+  },
+
+  // Clients that registered themselves through dynamic client registration
+  // (RFC 7591). They register at the authorization server, so there is no
+  // create; an operator lists them and deletes one, which takes its consents
+  // and their tokens with it.
+  "client-registrations": {
+    group: CommandGroups.authentication,
+    singular: "client registration",
+    idField: "id",
+    columns: ["id", "client_name", "token_endpoint_auth_method", "created_at", "expires_at"],
+    heading: "id",
+    detail: [
+      "id",
+      "client_name",
+      "client_uri",
+      "software_id",
+      "software_version",
+      "redirect_uris",
+      "grant_types",
+      "token_endpoint_auth_method",
+      "created_at",
+      "expires_at",
+    ],
+    list: list({
+      items: "client_registrations",
+      body: QueryClientRegistrationsBody,
+      response: QueryClientRegistrationsResponse,
+      filters: [
+        { field: "created_at", operations: FILTER_OPERATIONS },
+        { field: "expires_at", operations: FILTER_OPERATIONS },
+      ],
+      sorts: ["created_at", "expires_at"],
+      call: ({ client, projectId }, body) =>
+        client.queryClientRegistrations(body, { project_id: projectId }),
+    }),
+    get: {
+      call: ({ client, projectId }, id) =>
+        client.getClientRegistrationById(id, { project_id: projectId }),
+      response: GetClientRegistrationByIdResponse,
+    },
+    delete: {
+      call: ({ client, projectId }, id) =>
+        client.deleteClientRegistration(id, { project_id: projectId }),
     },
   },
 

@@ -124,7 +124,8 @@ document leaves it out:
 - **Unique in the project and never reused**, whichever app held it.
 - **Minted ids are row ids** (`client_01K…`): the chosen value sits beside the
   row's own key, so no caller picks a primary key (ADR 047 §4). A chosen id in
-  that form is refused.
+  that form is refused, and so is one in a registration's form (`dcr_01K…`),
+  so the shape of an id says where to look it up.
 
 Secrets follow the app's writer:
 
@@ -192,12 +193,15 @@ revision's transaction:
 | `app_clients` | `client_…`, unique `client_id` | The token endpoint finds a client in one lookup, and the id stays with its client |
 | `app_api_identifiers` | identifier | `resource` finds its app in one lookup, and an identifier stays with its app |
 | `app_client_secrets` | `csec_…` | A registered app's secret hashes |
+| `client_registrations` | `dcr_…`, the `client_id` | Clients that registered themselves: their RFC 7591 metadata, a secret hash for a confidential one, and `expires_at`; transient, outside any app |
 
 The document is stored as written, without the minted ids, so a release that
 sends the same file again matches its earlier revision. `app.created`,
 `app.updated` and `app.client_secret.added` are emitted in the same
 transaction ([events catalog](events-catalog.md)); none carries the document
-or a secret.
+or a secret. A registration emits `client_registration.created`, and a delete
+`client_registration.deleted`; a purge emits nothing, as an expiring session
+does not.
 
 ## API
 
@@ -208,6 +212,11 @@ or a secret.
 | `GET /apps/{id}` | One app with its client ids |
 | `GET /apps/{id}/revisions`, `GET /apps/revisions/{revision_id}` | ADR 063's revision reads |
 | `POST /apps/{id}/clients/{client}/secrets` | Generates or imports a secret for a registered app's confidential client |
+| `POST /client_registrations/query`, `GET /client_registrations/{id}` | Clients that registered themselves, filtered by `created_at` or `expires_at`; never a secret |
+| `DELETE /client_registrations/{id}` | Deletes a registration with its consents and their tokens |
+
+Clients register at the authorization server's `POST /register`, which calls
+`ClientRegistrationService.Register`; the API has no create for them.
 
 Each app has one writer. `POST /apps` refuses a slug the release declares
 (`app.declared`), and a release refuses a slug the API registered: a release
@@ -242,9 +251,17 @@ The authorization server finds clients and APIs through one interface,
 - **Built-in apps** are the third source the POC found: apps the server
   declares, read-only and versioned with the binary, such as the platform
   project's `zitadel`. The directory serves them first.
-- **Clients that register themselves** (client ID metadata documents, sealed
-  dynamic registration) stay in the authorization server; the directory
-  answers not-found for them.
+- **Client ID metadata documents** stay in the authorization server, which
+  fetches and caches them; the directory answers not-found for a URL
+  `client_id`.
+- **Dynamically registered clients** are the directory's too:
+  `ClientRegistration(at, client_id)` finds one by its `dcr_…` id,
+  `VerifyClientRegistrationSecret` checks a confidential one's secret, and the
+  registration's `AccessTo(apiApp, api)` allows a `third_party` API of an app
+  that opens dynamic registration.
+- **`Registration(at)`** says which registration switches the apps serving
+  `at` turn on, a declared app at its pinned revision, so the authorization
+  server advertises and opens its endpoints by it.
 
 Part A agreed to this shape: `internal/oauth` replaces its `PlatformApp()`
 lookups with these calls, and resolves `AppLookup.DeploymentID` itself
@@ -264,20 +281,31 @@ lookups with these calls, and resolves `AppLookup.DeploymentID` itself
   names no API, so it belongs to the project, not to an app; the app is the
   one whose API a request names, and that app's `registration` must allow it.
   `POST /register` stays the authorization server's endpoint and calls the
-  apps write; the directory answers the stored clients. They are transient
-  data, not built yet; the POC's sealed ids stand in until then.
+  apps write, once `Registration(at)` says an app opens it.
   - **An unused registration expires.** `POST /register` is unauthenticated,
     so a registration has a lifetime of its own (an hour covers the browser
     round trip) and is purged once past it with no live consent naming it.
-    A refresh writes nothing to it.
+    A refresh writes nothing to it. The purge rides along with the write
+    that grows the table: each registration checks a batch of the project's
+    expired ones, deletes those no live consent names, and gives the others
+    another lifetime before they are checked again, so they do not hold the
+    batch from the rest.
   - **It keeps its own display fields.** With no app document behind it, the
     RFC 7591 `client_name`, `logo_uri`, `client_uri`, `policy_uri` and
     `tos_uri` stay on its record, and the consent step shows them as the
     client's own claims, beside the redirect host, the one part the server
-    checked.
+    checked. Control and bidi control characters are refused, so a name reads
+    as what it is.
   - **Deleting it deletes its consents and their tokens** in the same
-    transaction, as revoking a session deletes its tokens, through a
-    statement the authorization server provides.
+    transaction, as revoking a session deletes its tokens. The authorization
+    server implements `ClientRegistrationConsents`: `Named` says which
+    registrations a live consent names, for the purge, and `Delete` removes a
+    client's consents and tokens, for a delete or a purge. Until it stores
+    consents, the server runs with `NoConsents`, and the POC's sealed ids
+    keep working beside the store.
+  - **A registered client acts for users:** it authenticates with `none` or
+    a secret the server generates, uses the code grant with refresh, and
+    lists redirect URIs under the same rules as an app client's.
 
 ## Lifetimes and claims are policies
 
@@ -381,8 +409,10 @@ grammar the CLI shares (ADR 064 §11):
 The query filters by columns today (`slug`, `source`, `created_at`). The tabs
 need facets computed when a revision is written, such as `has_api` and
 `has_principal` on `app_revisions`, so every dialect filters them alike.
-Clients that registered themselves are listed on the app's page, from their
-stored registrations and part A's consents, both transient.
+Clients that registered themselves belong to the project, so they get a
+screen of their own over `POST /client_registrations/query`, with a delete;
+an app's page can show the ones users consented to for its APIs, from part
+A's consents.
 
 ## CLI and presets
 
@@ -405,6 +435,9 @@ zitadel apps create partner --preset web --redirect-uri https://partner.example/
 - **`apps list`** and **`apps get`** are registry commands. The noun follows
   the CLI's current plural topics and moves to the singular with the
   ADR 064 amendment.
+- **`client-registrations list`**, **`get`** and **`delete`** are registry
+  commands too: the CLI gives every collection with a query endpoint
+  commands (ADR 031). There is no `create`.
 - Turning the issuer on in `.zitadel/oauth.json`, as the identity model has
   `app create` do, waits for that file (ADR 082 §12).
 
@@ -419,7 +452,7 @@ zitadel apps create partner --preset web --redirect-uri https://partner.example/
 | `AppDirectory` | Built | Service tests on SQLite, a deployment pinning an older revision included |
 | Imported v4 bcrypt secrets | Built | Verified and moved to SHA-256 |
 | What part A reads per request (consent, account choice, display, `jwks`, signing algorithms) | Built in the document | Domain unit tests |
-| Stored dynamically registered clients | Designed | — |
+| Stored dynamically registered clients, the purge, `Registration(at)` | Built | Domain unit tests; `stmttest` on SQLite and Postgres; service tests on SQLite with a fake of part A's consents; HTTP tests on Postgres |
 | `apps create`, `apps list`, `apps get`, presets | Built | CLI and config unit tests |
 | Declared secret verification | Built | Shares `secretVariable` with SSO sign-in; not tested on its own |
 | Lifetimes, claims, SAML, SCIM, console tabs | Designed | — |

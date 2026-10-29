@@ -218,6 +218,10 @@ func appErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 		// The authorization server answers invalid_client itself; an API path
 		// that ever surfaced this would be refusing a credential.
 		return errorResponseWithStatusCode(http.StatusUnauthorized, err)
+	case err.Code == domain.ErrClientRegistrationNotFound().Code:
+		return errorResponseWithStatusCode(http.StatusNotFound, err)
+	case err.Code == domain.ErrClientRegistrationInvalid(nil).Code:
+		return errorResponseWithStatusCode(http.StatusBadRequest, err)
 	case err.Code == domain.ErrAppPermissionDenied().Code:
 		return errorResponseWithStatusCode(http.StatusForbidden, err)
 	case slices.Contains([]string{

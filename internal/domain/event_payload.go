@@ -472,3 +472,8 @@ type AppClientSecretAddedPayload struct {
 	SecretID string `json:"secret_id"`
 	Origin   string `json:"origin"`
 }
+
+// ClientRegistrationPayload is client_registration.created and
+// client_registration.deleted: the metadata the client registered with, as
+// the server keeps it. Never the secret or its hash.
+type ClientRegistrationPayload ClientRegistrationMetadata

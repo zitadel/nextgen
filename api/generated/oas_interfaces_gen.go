@@ -85,6 +85,14 @@ type BuildReleaseRes interface {
 	buildReleaseRes()
 }
 
+type ClientRegistrationCreatedRes interface {
+	clientRegistrationCreatedRes()
+}
+
+type ClientRegistrationDeletedRes interface {
+	clientRegistrationDeletedRes()
+}
+
 type CompleteClaimRes interface {
 	completeClaimRes()
 }
@@ -147,6 +155,10 @@ type CreateTeamRes interface {
 
 type CreateUserRes interface {
 	createUserRes()
+}
+
+type DeleteClientRegistrationRes interface {
+	deleteClientRegistrationRes()
 }
 
 type DeleteGrantRes interface {
@@ -215,6 +227,10 @@ type GetClaimStatusRes interface {
 
 type GetClaimWindowRes interface {
 	getClaimWindowRes()
+}
+
+type GetClientRegistrationByIdRes interface {
+	getClientRegistrationByIdRes()
 }
 
 type GetDeploymentByIdRes interface {
@@ -467,6 +483,10 @@ type PublishPolicyRes interface {
 
 type QueryAppsRes interface {
 	queryAppsRes()
+}
+
+type QueryClientRegistrationsRes interface {
+	queryClientRegistrationsRes()
 }
 
 type QueryGrantsRes interface {

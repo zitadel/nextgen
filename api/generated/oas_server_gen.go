@@ -353,6 +353,14 @@ type Handler interface {
 	//
 	// POST /users
 	CreateUser(ctx context.Context, req *CreateUserRequest, params CreateUserParams) (CreateUserRes, error)
+	// DeleteClientRegistration implements deleteClientRegistration operation.
+	//
+	// Deletes a client that registered itself, together with the consents users
+	// gave it and the tokens issued under them, so the client can no longer get
+	// or refresh a token. Emits `client_registration.deleted`.
+	//
+	// DELETE /client_registrations/{id}
+	DeleteClientRegistration(ctx context.Context, params DeleteClientRegistrationParams) (DeleteClientRegistrationRes, error)
 	// DeleteGrant implements deleteGrant operation.
 	//
 	// Soft-revokes a grant this API manages and emits `authz.revoked`.
@@ -513,6 +521,13 @@ type Handler interface {
 	//
 	// GET /projects/{project_id}/claim/window
 	GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (GetClaimWindowRes, error)
+	// GetClientRegistrationById implements getClientRegistrationById operation.
+	//
+	// Reads a client that registered itself through dynamic client registration,
+	// by its client_id. The lookup is scoped to the project in `project_id`.
+	//
+	// GET /client_registrations/{id}
+	GetClientRegistrationById(ctx context.Context, params GetClientRegistrationByIdParams) (GetClientRegistrationByIdRes, error)
 	// GetDeploymentById implements getDeploymentById operation.
 	//
 	// Reads one deployment record.
@@ -1051,6 +1066,15 @@ type Handler interface {
 	//
 	// POST /apps/query
 	QueryApps(ctx context.Context, req *QueryAppsRequest, params QueryAppsParams) (QueryAppsRes, error)
+	// QueryClientRegistrations implements queryClientRegistrations operation.
+	//
+	// Returns the clients that registered themselves into the project through
+	// dynamic client registration (RFC 7591), paginated with a cursor. Clients
+	// register at the authorization server's registration endpoint, never
+	// through this API.
+	//
+	// POST /client_registrations/query
+	QueryClientRegistrations(ctx context.Context, req *QueryClientRegistrationsRequest, params QueryClientRegistrationsParams) (QueryClientRegistrationsRes, error)
 	// QueryGrants implements queryGrants operation.
 	//
 	// Returns the collaboration grants of a project, paginated with a cursor.

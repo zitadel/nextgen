@@ -1,0 +1,83 @@
+get:
+  operationId: getClientRegistrationById
+  x-zitadel-cli: client-registrations get
+  summary: Get a client registration
+  description: |
+    Reads a client that registered itself through dynamic client registration,
+    by its client_id. The lookup is scoped to the project in `project_id`.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.read
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/client-registration-id.yaml
+  responses:
+    '200':
+      description: The client registration was retrieved successfully.
+      content:
+        application/json:
+          schema:
+            $ref: ../client-registration-response.yaml
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No client registration with this client_id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: getClientRegistrationById-error-response.yaml
+delete:
+  operationId: deleteClientRegistration
+  x-zitadel-cli: client-registrations delete
+  summary: Delete a client registration
+  description: |
+    Deletes a client that registered itself, together with the consents users
+    gave it and the tokens issued under them, so the client can no longer get
+    or refresh a token. Emits `client_registration.deleted`.
+  tags:
+    - Apps
+  security:
+    - oauth2:
+        - app.write
+    - nextgenSession: []
+  parameters:
+    - $ref: ../../../components/parameters/project-id.yaml
+    - $ref: ../../../components/parameters/client-registration-id.yaml
+  responses:
+    '204':
+      description: The client registration was deleted.
+    '401':
+      description: Missing or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '403':
+      description: Insufficient permissions.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    '404':
+      description: No client registration with this client_id exists in the given project.
+      content:
+        application/json:
+          schema:
+            $ref: ../../../components/error-details.yaml
+    default:
+      $ref: deleteClientRegistration-error-response.yaml

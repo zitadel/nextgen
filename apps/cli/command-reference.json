@@ -1645,6 +1645,152 @@
       ]
     },
     {
+      "id": "client-registrations delete",
+      "group": "Authentication",
+      "description": "Delete a client registration by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "client registration id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "force",
+          "char": "f",
+          "description": "Delete the client registration without the confirmation prompt. Required when non-interactive.",
+          "type": "boolean"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "client-registrations delete <id> --force --json"
+        }
+      ]
+    },
+    {
+      "id": "client-registrations get",
+      "group": "Authentication",
+      "description": "Get one client registration by id.",
+      "args": [
+        {
+          "name": "id",
+          "description": "client registration id",
+          "required": true
+        }
+      ],
+      "flags": [
+        {
+          "name": "fields",
+          "description": "Fields to show, comma-separated dot-paths. Defaults to the resource's own; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "client-registrations get <id>"
+        },
+        {
+          "command": "client-registrations get <id> --json"
+        }
+      ]
+    },
+    {
+      "id": "client-registrations list",
+      "group": "Authentication",
+      "description": "List client-registrations.",
+      "args": [],
+      "flags": [
+        {
+          "name": "limit",
+          "description": "Page size (server default 20, max 100).",
+          "type": "option",
+          "min": 1,
+          "max": 100
+        },
+        {
+          "name": "page-token",
+          "description": "Continue from a previous page's next_page_token.",
+          "type": "option"
+        },
+        {
+          "name": "all",
+          "char": "a",
+          "description": "Fetch every page instead of one.",
+          "type": "boolean",
+          "exclusive": [
+            "page-token"
+          ]
+        },
+        {
+          "name": "fields",
+          "description": "Columns to show, comma-separated dot-paths (e.g. id,attributes.email). Defaults to the resource's own columns; `--json` is unaffected.",
+          "type": "option"
+        },
+        {
+          "name": "plain",
+          "description": "Tab-separated rows with no header, for piping. Implied when stdout is not a terminal.",
+          "type": "boolean"
+        },
+        {
+          "name": "filter",
+          "description": "Filter as field=operation:value (operation defaults to equals). Fields: created_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal), expires_at (equals|not_equals|contains|not_contains|less_than|less_than_or_equal|greater_than|greater_than_or_equal).",
+          "type": "option",
+          "multiple": true
+        },
+        {
+          "name": "sort",
+          "description": "Sort as field:direction (asc|desc). Fields: created_at, expires_at.",
+          "type": "option"
+        },
+        {
+          "name": "env",
+          "char": "e",
+          "description": "Environment to run against, e.g. production. Defaults to ZITADEL_ENV, then the hosting platform's build (VERCEL_ENV, or Netlify's CONTEXT), then development.",
+          "type": "option"
+        },
+        {
+          "name": "env-file",
+          "description": "Read ZITADEL_* values from this file ahead of the process environment. A relative path is read from the current directory, not from --cwd. Cannot be combined with --env.",
+          "type": "option"
+        }
+      ],
+      "examples": [
+        {
+          "command": "client-registrations list --json"
+        },
+        {
+          "command": "client-registrations list --all --json"
+        },
+        {
+          "command": "client-registrations list --filter created_at=equals:<value> --sort created_at:desc"
+        }
+      ]
+    },
+    {
       "id": "idps create",
       "group": "Authentication",
       "description": "Create an identity provider connection.",

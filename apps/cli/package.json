@@ -105,6 +105,9 @@
       "apps": {
         "description": "Declare and manage apps: their clients and the APIs they serve."
       },
+      "client-registrations": {
+        "description": "View and delete clients that registered themselves: dynamic client registration (RFC 7591)."
+      },
       "flow-definitions": {
         "description": "View login flows."
       },

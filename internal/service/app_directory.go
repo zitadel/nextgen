@@ -22,10 +22,11 @@ type AppLookup struct {
 
 // AppDirectory is how the authorization server finds the clients and APIs a
 // request names, whoever wrote the app: the server's own built-in apps, apps
-// declared in the release, and apps registered through the API. Clients that
-// register themselves (client ID metadata documents, dynamic registration)
-// are not in it: the authorization server serves them on its own and finds
-// their app through the API they ask for.
+// declared in the release, and apps registered through the API. A client
+// that registered itself through dynamic registration is found by
+// ClientRegistration; one whose client_id is a metadata document URL is not
+// in it, since the authorization server fetches that document itself. Either
+// kind finds its app through the API it asks for.
 type AppDirectory interface {
 	// Client finds the client a client_id names, with its app at the
 	// revision that serves the request. domain.ErrAppClientNotFound when no
@@ -41,6 +42,22 @@ type AppDirectory interface {
 	// client's assertion is checked by the authorization server against the
 	// client's JWKS.
 	VerifyClientSecret(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient, secret string) error
+	// ClientRegistration finds a client that registered itself through
+	// dynamic registration (RFC 7591) by its client_id.
+	// domain.ErrClientRegistrationNotFound when none holds it: never
+	// registered, purged or deleted. The registration's AccessTo says which
+	// APIs it may get.
+	ClientRegistration(ctx context.Context, at AppLookup, clientID string) (*domain.ClientRegistration, error)
+	// VerifyClientRegistrationSecret checks the secret of a registration that
+	// authenticates with one. domain.ErrAppClientSecretInvalid when it does
+	// not match.
+	VerifyClientRegistrationSecret(ctx context.Context, at AppLookup, registration *domain.ClientRegistration, secret string) error
+	// Registration says how clients may register into the apps that serve
+	// at: each switch is on when any of those apps turns it on. The
+	// authorization server advertises and opens its registration endpoints
+	// by it, and AccessTo then holds each registered client to the app whose
+	// API it asks for.
+	Registration(ctx context.Context, at AppLookup) (domain.AppRegistration, error)
 }
 
 type appDirectory struct {
@@ -143,6 +160,96 @@ func (d *appDirectory) VerifyClientSecret(ctx context.Context, at AppLookup, app
 		return d.verifyStoredSecret(ctx, at.ProjectID, client.ClientID, secret)
 	default:
 		return domain.ErrAppClientSecretInvalid()
+	}
+}
+
+func (d *appDirectory) ClientRegistration(ctx context.Context, at AppLookup, clientID string) (_ *domain.ClientRegistration, err error) {
+	ctx, end := startSpan(ctx, "AppDirectory.ClientRegistration")
+	defer end(&err)
+
+	if !domain.PrefixClientRegistration.Matches(clientID) {
+		return nil, domain.ErrClientRegistrationNotFound()
+	}
+	registration, err := d.pool.Statements().GetClientRegistration(ctx, at.ProjectID, clientID)
+	if err != nil {
+		return nil, notFoundAs(err, domain.ErrClientRegistrationNotFound())
+	}
+	return registration, nil
+}
+
+func (d *appDirectory) VerifyClientRegistrationSecret(ctx context.Context, _ AppLookup, registration *domain.ClientRegistration, secret string) (err error) {
+	_, end := startSpan(ctx, "AppDirectory.VerifyClientRegistrationSecret")
+	defer end(&err)
+
+	if !registration.Metadata.AuthMethod.UsesSecret() || registration.SecretHash == "" || secret == "" ||
+		!matchSHA256(registration.SecretHash, secret) {
+		return domain.ErrAppClientSecretInvalid()
+	}
+	return nil
+}
+
+func (d *appDirectory) Registration(ctx context.Context, at AppLookup) (_ domain.AppRegistration, err error) {
+	ctx, end := startSpan(ctx, "AppDirectory.Registration")
+	defer end(&err)
+
+	var open domain.AppRegistration
+	add := func(r domain.AppRegistration) bool {
+		open.ClientIDMetadataDocuments = open.ClientIDMetadataDocuments || r.ClientIDMetadataDocuments
+		open.Dynamic = open.Dynamic || r.Dynamic
+		return open.ClientIDMetadataDocuments && open.Dynamic
+	}
+	for _, app := range d.builtin[at.ProjectID] {
+		if add(app.Document.Registration) {
+			return open, nil
+		}
+	}
+	stmts := d.pool.Statements()
+	// A declared app serves at only at the revision its release pins.
+	var pins map[string]string
+	if at.DeploymentID != "" {
+		deployment, err := stmts.GetDeploymentByID(ctx, at.ProjectID, at.DeploymentID)
+		if err != nil {
+			return domain.AppRegistration{}, err
+		}
+		release, err := stmts.GetReleaseByID(ctx, at.ProjectID, deployment.ReleaseID)
+		if err != nil {
+			return domain.AppRegistration{}, err
+		}
+		pins = PinsFor(release, domain.ReleasePointerKindApp)
+	}
+	// The directory reads for the server, not for a caller's grants.
+	ctx = WithAuthzListUnrestricted(ctx)
+	page := database.Page[domain.AppField]{Limit: maxListLimit}
+	for {
+		result, err := stmts.ListApps(ctx, &database.ListOptions[domain.AppField]{
+			Filter:     database.Equal(database.Col(domain.AppFieldProjectID), at.ProjectID),
+			Pagination: page,
+		})
+		if err != nil {
+			return domain.AppRegistration{}, err
+		}
+		for _, entity := range result.Items {
+			if entity.Source == domain.AppSourceDeclared && pins != nil {
+				revisionID, ok := pins[entity.Slug]
+				if !ok {
+					continue
+				}
+				if entity, err = stmts.GetAppRevision(ctx, at.ProjectID, revisionID); err != nil {
+					return domain.AppRegistration{}, err
+				}
+			}
+			doc, err := domain.ParseAppDocument(entity.Document)
+			if err != nil {
+				return domain.AppRegistration{}, domain.ErrInternal(err).WithMessage("stored app document does not parse")
+			}
+			if add(doc.Registration) {
+				return open, nil
+			}
+		}
+		if len(result.NextCursor) == 0 {
+			return open, nil
+		}
+		page.Cursor = result.NextCursor
 	}
 }
 

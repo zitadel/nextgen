@@ -24,6 +24,7 @@ type statements struct {
 	releaseStatements
 	idpConnectionStatements
 	appStatements
+	clientRegistrationStatements
 	policyStatements
 	idpIdentityLinkStatements
 	deploymentStatements
@@ -68,6 +69,7 @@ func newStatements(client queryExecutor) statements {
 		releaseStatements:             newReleaseStatements(client),
 		idpConnectionStatements:       newIDPConnectionStatements(client),
 		appStatements:                 newAppStatements(client),
+		clientRegistrationStatements:  newClientRegistrationStatements(client),
 		policyStatements:              newPolicyStatements(client),
 		idpIdentityLinkStatements:     newIDPIdentityLinkStatements(client),
 		deploymentStatements:          newDeploymentStatements(client),

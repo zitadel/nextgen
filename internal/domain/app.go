@@ -381,8 +381,8 @@ func (d AppDocument) Validate(source AppSource) error {
 
 	for i, c := range d.Clients {
 		base := fmt.Sprintf("/clients/%d", i)
-		if strings.HasPrefix(c.ClientID, string(PrefixAppClient)+"_") {
-			add(base+"/client_id", "a chosen client_id may not take the form the server mints (%s_...)", PrefixAppClient)
+		if PrefixAppClient.Matches(c.ClientID) || PrefixClientRegistration.Matches(c.ClientID) {
+			add(base+"/client_id", "a chosen client_id may not take a form the server mints (%s_... or %s_...)", PrefixAppClient, PrefixClientRegistration)
 		}
 		switch c.Type {
 		case ClientTypePublic:

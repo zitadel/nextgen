@@ -418,6 +418,17 @@ func (UnimplementedHandler) CreateUser(ctx context.Context, req *CreateUserReque
 	return r, ht.ErrNotImplemented
 }
 
+// DeleteClientRegistration implements deleteClientRegistration operation.
+//
+// Deletes a client that registered itself, together with the consents users
+// gave it and the tokens issued under them, so the client can no longer get
+// or refresh a token. Emits `client_registration.deleted`.
+//
+// DELETE /client_registrations/{id}
+func (UnimplementedHandler) DeleteClientRegistration(ctx context.Context, params DeleteClientRegistrationParams) (r DeleteClientRegistrationRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
 // DeleteGrant implements deleteGrant operation.
 //
 // Soft-revokes a grant this API manages and emits `authz.revoked`.
@@ -614,6 +625,16 @@ func (UnimplementedHandler) GetClaimStatus(ctx context.Context, params GetClaimS
 //
 // GET /projects/{project_id}/claim/window
 func (UnimplementedHandler) GetClaimWindow(ctx context.Context, params GetClaimWindowParams) (r GetClaimWindowRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// GetClientRegistrationById implements getClientRegistrationById operation.
+//
+// Reads a client that registered itself through dynamic client registration,
+// by its client_id. The lookup is scoped to the project in `project_id`.
+//
+// GET /client_registrations/{id}
+func (UnimplementedHandler) GetClientRegistrationById(ctx context.Context, params GetClientRegistrationByIdParams) (r GetClientRegistrationByIdRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 
@@ -1308,6 +1329,18 @@ func (UnimplementedHandler) PublishPolicy(ctx context.Context, req PublishPolicy
 //
 // POST /apps/query
 func (UnimplementedHandler) QueryApps(ctx context.Context, req *QueryAppsRequest, params QueryAppsParams) (r QueryAppsRes, _ error) {
+	return r, ht.ErrNotImplemented
+}
+
+// QueryClientRegistrations implements queryClientRegistrations operation.
+//
+// Returns the clients that registered themselves into the project through
+// dynamic client registration (RFC 7591), paginated with a cursor. Clients
+// register at the authorization server's registration endpoint, never
+// through this API.
+//
+// POST /client_registrations/query
+func (UnimplementedHandler) QueryClientRegistrations(ctx context.Context, req *QueryClientRegistrationsRequest, params QueryClientRegistrationsParams) (r QueryClientRegistrationsRes, _ error) {
 	return r, ht.ErrNotImplemented
 }
 

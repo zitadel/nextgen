@@ -64,6 +64,7 @@ the dialect generator is the only mint path, not that create always overwrites.
 | app revision | `apprev` |
 | app client (its row; a minted `client_id` is this id) | `client` |
 | app client secret (storage-only) | `csec` |
+| client registration (a client that registered itself; the id is its `client_id`) | `dcr` |
 | flow handle (in-memory) | `flow` |
 | JSON schema (when server-assigned) | `sch` |
 | encryption key | `enc_key` |

@@ -2250,6 +2250,59 @@ func (s *AppClientNotFoundDetails) init() AppClientNotFoundDetails {
 	return m
 }
 
+// Merged schema.
+// Ref: #
+type AppClientRegistrationNotFound struct {
+	// Merged property.
+	Code string `json:"code"`
+	// Human-readable explanation of the error.
+	Message string `json:"message"`
+	// Additional error-specific context.
+	Details OptAppClientRegistrationNotFoundDetails `json:"details"`
+}
+
+// GetCode returns the value of Code.
+func (s *AppClientRegistrationNotFound) GetCode() string {
+	return s.Code
+}
+
+// GetMessage returns the value of Message.
+func (s *AppClientRegistrationNotFound) GetMessage() string {
+	return s.Message
+}
+
+// GetDetails returns the value of Details.
+func (s *AppClientRegistrationNotFound) GetDetails() OptAppClientRegistrationNotFoundDetails {
+	return s.Details
+}
+
+// SetCode sets the value of Code.
+func (s *AppClientRegistrationNotFound) SetCode(val string) {
+	s.Code = val
+}
+
+// SetMessage sets the value of Message.
+func (s *AppClientRegistrationNotFound) SetMessage(val string) {
+	s.Message = val
+}
+
+// SetDetails sets the value of Details.
+func (s *AppClientRegistrationNotFound) SetDetails(val OptAppClientRegistrationNotFoundDetails) {
+	s.Details = val
+}
+
+// Additional error-specific context.
+type AppClientRegistrationNotFoundDetails map[string]jx.Raw
+
+func (s *AppClientRegistrationNotFoundDetails) init() AppClientRegistrationNotFoundDetails {
+	m := *s
+	if m == nil {
+		m = map[string]jx.Raw{}
+		*s = m
+	}
+	return m
+}
+
 // A client secret the server generated, returned once.
 // Ref: #
 type AppClientSecret struct {
@@ -15622,6 +15675,1474 @@ func (s *ClaimWindowResponse) SetExpired(val bool) {
 
 func (*ClaimWindowResponse) getClaimWindowRes() {}
 
+// ClientRegistrationCreated2XX is 2XX pattern response for ClientRegistrationCreated operation.
+type ClientRegistrationCreated2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ClientRegistrationCreated2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ClientRegistrationCreated2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ClientRegistrationCreated2XX) clientRegistrationCreatedRes() {}
+
+// ClientRegistrationCreatedDef is default response for ClientRegistrationCreated operation.
+type ClientRegistrationCreatedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ClientRegistrationCreatedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ClientRegistrationCreatedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ClientRegistrationCreatedDef) clientRegistrationCreatedRes() {}
+
+// Merged schema.
+// Ref: #
+type ClientRegistrationCreatedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category ClientRegistrationCreatedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilClientRegistrationCreatedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptClientRegistrationCreatedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  ClientRegistrationPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ClientRegistrationCreatedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ClientRegistrationCreatedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ClientRegistrationCreatedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ClientRegistrationCreatedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ClientRegistrationCreatedEvent) GetCategory() ClientRegistrationCreatedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ClientRegistrationCreatedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ClientRegistrationCreatedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ClientRegistrationCreatedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ClientRegistrationCreatedEvent) GetActorType() OptNilClientRegistrationCreatedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ClientRegistrationCreatedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ClientRegistrationCreatedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ClientRegistrationCreatedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ClientRegistrationCreatedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ClientRegistrationCreatedEvent) GetDelegationType() OptClientRegistrationCreatedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ClientRegistrationCreatedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ClientRegistrationCreatedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ClientRegistrationCreatedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ClientRegistrationCreatedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ClientRegistrationCreatedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ClientRegistrationCreatedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ClientRegistrationCreatedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ClientRegistrationCreatedEvent) GetPayload() ClientRegistrationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ClientRegistrationCreatedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ClientRegistrationCreatedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ClientRegistrationCreatedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ClientRegistrationCreatedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ClientRegistrationCreatedEvent) SetCategory(val ClientRegistrationCreatedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ClientRegistrationCreatedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ClientRegistrationCreatedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ClientRegistrationCreatedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ClientRegistrationCreatedEvent) SetActorType(val OptNilClientRegistrationCreatedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ClientRegistrationCreatedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ClientRegistrationCreatedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ClientRegistrationCreatedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ClientRegistrationCreatedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ClientRegistrationCreatedEvent) SetDelegationType(val OptClientRegistrationCreatedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ClientRegistrationCreatedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ClientRegistrationCreatedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ClientRegistrationCreatedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ClientRegistrationCreatedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ClientRegistrationCreatedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ClientRegistrationCreatedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ClientRegistrationCreatedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ClientRegistrationCreatedEvent) SetPayload(val ClientRegistrationPayload) {
+	s.Payload = val
+}
+
+type ClientRegistrationCreatedEventActorType string
+
+const (
+	ClientRegistrationCreatedEventActorTypeHuman   ClientRegistrationCreatedEventActorType = "human"
+	ClientRegistrationCreatedEventActorTypeService ClientRegistrationCreatedEventActorType = "service"
+	ClientRegistrationCreatedEventActorTypeSystem  ClientRegistrationCreatedEventActorType = "system"
+	ClientRegistrationCreatedEventActorTypeAgent   ClientRegistrationCreatedEventActorType = "agent"
+)
+
+// AllValues returns all ClientRegistrationCreatedEventActorType values.
+func (ClientRegistrationCreatedEventActorType) AllValues() []ClientRegistrationCreatedEventActorType {
+	return []ClientRegistrationCreatedEventActorType{
+		ClientRegistrationCreatedEventActorTypeHuman,
+		ClientRegistrationCreatedEventActorTypeService,
+		ClientRegistrationCreatedEventActorTypeSystem,
+		ClientRegistrationCreatedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationCreatedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationCreatedEventActorTypeHuman:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventActorTypeService:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventActorTypeSystem:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationCreatedEventActorType) UnmarshalText(data []byte) error {
+	switch ClientRegistrationCreatedEventActorType(data) {
+	case ClientRegistrationCreatedEventActorTypeHuman:
+		*s = ClientRegistrationCreatedEventActorTypeHuman
+		return nil
+	case ClientRegistrationCreatedEventActorTypeService:
+		*s = ClientRegistrationCreatedEventActorTypeService
+		return nil
+	case ClientRegistrationCreatedEventActorTypeSystem:
+		*s = ClientRegistrationCreatedEventActorTypeSystem
+		return nil
+	case ClientRegistrationCreatedEventActorTypeAgent:
+		*s = ClientRegistrationCreatedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type ClientRegistrationCreatedEventCategory string
+
+const (
+	ClientRegistrationCreatedEventCategoryRequest ClientRegistrationCreatedEventCategory = "request"
+	ClientRegistrationCreatedEventCategoryAuth    ClientRegistrationCreatedEventCategory = "auth"
+	ClientRegistrationCreatedEventCategorySession ClientRegistrationCreatedEventCategory = "session"
+	ClientRegistrationCreatedEventCategoryAdmin   ClientRegistrationCreatedEventCategory = "admin"
+	ClientRegistrationCreatedEventCategoryEntity  ClientRegistrationCreatedEventCategory = "entity"
+	ClientRegistrationCreatedEventCategorySignal  ClientRegistrationCreatedEventCategory = "signal"
+)
+
+// AllValues returns all ClientRegistrationCreatedEventCategory values.
+func (ClientRegistrationCreatedEventCategory) AllValues() []ClientRegistrationCreatedEventCategory {
+	return []ClientRegistrationCreatedEventCategory{
+		ClientRegistrationCreatedEventCategoryRequest,
+		ClientRegistrationCreatedEventCategoryAuth,
+		ClientRegistrationCreatedEventCategorySession,
+		ClientRegistrationCreatedEventCategoryAdmin,
+		ClientRegistrationCreatedEventCategoryEntity,
+		ClientRegistrationCreatedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationCreatedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationCreatedEventCategoryRequest:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventCategoryAuth:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventCategorySession:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventCategoryAdmin:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventCategoryEntity:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationCreatedEventCategory) UnmarshalText(data []byte) error {
+	switch ClientRegistrationCreatedEventCategory(data) {
+	case ClientRegistrationCreatedEventCategoryRequest:
+		*s = ClientRegistrationCreatedEventCategoryRequest
+		return nil
+	case ClientRegistrationCreatedEventCategoryAuth:
+		*s = ClientRegistrationCreatedEventCategoryAuth
+		return nil
+	case ClientRegistrationCreatedEventCategorySession:
+		*s = ClientRegistrationCreatedEventCategorySession
+		return nil
+	case ClientRegistrationCreatedEventCategoryAdmin:
+		*s = ClientRegistrationCreatedEventCategoryAdmin
+		return nil
+	case ClientRegistrationCreatedEventCategoryEntity:
+		*s = ClientRegistrationCreatedEventCategoryEntity
+		return nil
+	case ClientRegistrationCreatedEventCategorySignal:
+		*s = ClientRegistrationCreatedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type ClientRegistrationCreatedEventDelegationType string
+
+const (
+	ClientRegistrationCreatedEventDelegationTypeDirect    ClientRegistrationCreatedEventDelegationType = "direct"
+	ClientRegistrationCreatedEventDelegationTypeDelegated ClientRegistrationCreatedEventDelegationType = "delegated"
+	ClientRegistrationCreatedEventDelegationTypePatShared ClientRegistrationCreatedEventDelegationType = "pat_shared"
+	ClientRegistrationCreatedEventDelegationTypeExchanged ClientRegistrationCreatedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ClientRegistrationCreatedEventDelegationType values.
+func (ClientRegistrationCreatedEventDelegationType) AllValues() []ClientRegistrationCreatedEventDelegationType {
+	return []ClientRegistrationCreatedEventDelegationType{
+		ClientRegistrationCreatedEventDelegationTypeDirect,
+		ClientRegistrationCreatedEventDelegationTypeDelegated,
+		ClientRegistrationCreatedEventDelegationTypePatShared,
+		ClientRegistrationCreatedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationCreatedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationCreatedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ClientRegistrationCreatedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationCreatedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ClientRegistrationCreatedEventDelegationType(data) {
+	case ClientRegistrationCreatedEventDelegationTypeDirect:
+		*s = ClientRegistrationCreatedEventDelegationTypeDirect
+		return nil
+	case ClientRegistrationCreatedEventDelegationTypeDelegated:
+		*s = ClientRegistrationCreatedEventDelegationTypeDelegated
+		return nil
+	case ClientRegistrationCreatedEventDelegationTypePatShared:
+		*s = ClientRegistrationCreatedEventDelegationTypePatShared
+		return nil
+	case ClientRegistrationCreatedEventDelegationTypeExchanged:
+		*s = ClientRegistrationCreatedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// ClientRegistrationDeleted2XX is 2XX pattern response for ClientRegistrationDeleted operation.
+type ClientRegistrationDeleted2XX struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ClientRegistrationDeleted2XX) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ClientRegistrationDeleted2XX) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ClientRegistrationDeleted2XX) clientRegistrationDeletedRes() {}
+
+// ClientRegistrationDeletedDef is default response for ClientRegistrationDeleted operation.
+type ClientRegistrationDeletedDef struct {
+	StatusCode int
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *ClientRegistrationDeletedDef) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *ClientRegistrationDeletedDef) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+func (*ClientRegistrationDeletedDef) clientRegistrationDeletedRes() {}
+
+// Merged schema.
+// Ref: #
+type ClientRegistrationDeletedEvent struct {
+	// Managed event id (`evt_<opaque>`).
+	ID        string    `json:"id"`
+	ProjectID ProjectID `json:"project_id"`
+	// Emit-time team scope, when the actor operated under a team.
+	TeamID OptNilString `json:"team_id"`
+	// Merged property.
+	EventType string `json:"event_type"`
+	// Wide-event category.
+	Category ClientRegistrationDeletedEventCategory `json:"category"`
+	// When the action happened (server/storage clock, dialect-owned).
+	OccurredAt time.Time `json:"occurred_at"`
+	// When the row was inserted (server/storage clock, dialect-owned).
+	CreatedAt time.Time `json:"created_at"`
+	// Who triggered the event.
+	ActorID OptNilString `json:"actor_id"`
+	// Actor kind.
+	ActorType OptNilClientRegistrationDeletedEventActorType `json:"actor_type"`
+	// Resource type affected.
+	EntityType OptNilString `json:"entity_type"`
+	// Resource id affected.
+	EntityID OptNilString `json:"entity_id"`
+	// Application or agent that produced the event.
+	ClientID string `json:"client_id"`
+	// Token id present at emit time, when any.
+	TokenID OptString `json:"token_id"`
+	// Delegation kind (omit when unset).
+	DelegationType OptClientRegistrationDeletedEventDelegationType `json:"delegation_type"`
+	DelegationID   OptString                                       `json:"delegation_id"`
+	Grantor        OptString                                       `json:"grantor"`
+	// Device fingerprint correlation id.
+	Fingerprint OptString `json:"fingerprint"`
+	// HTTP request correlation id.
+	RequestID OptNilString `json:"request_id"`
+	// Session correlation id.
+	SessionID OptNilString `json:"session_id"`
+	// Login flow correlation id.
+	FlowID   OptNilString              `json:"flow_id"`
+	Metadata OptEventMetadata          `json:"metadata"`
+	Payload  ClientRegistrationPayload `json:"payload"`
+}
+
+// GetID returns the value of ID.
+func (s *ClientRegistrationDeletedEvent) GetID() string {
+	return s.ID
+}
+
+// GetProjectID returns the value of ProjectID.
+func (s *ClientRegistrationDeletedEvent) GetProjectID() ProjectID {
+	return s.ProjectID
+}
+
+// GetTeamID returns the value of TeamID.
+func (s *ClientRegistrationDeletedEvent) GetTeamID() OptNilString {
+	return s.TeamID
+}
+
+// GetEventType returns the value of EventType.
+func (s *ClientRegistrationDeletedEvent) GetEventType() string {
+	return s.EventType
+}
+
+// GetCategory returns the value of Category.
+func (s *ClientRegistrationDeletedEvent) GetCategory() ClientRegistrationDeletedEventCategory {
+	return s.Category
+}
+
+// GetOccurredAt returns the value of OccurredAt.
+func (s *ClientRegistrationDeletedEvent) GetOccurredAt() time.Time {
+	return s.OccurredAt
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ClientRegistrationDeletedEvent) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetActorID returns the value of ActorID.
+func (s *ClientRegistrationDeletedEvent) GetActorID() OptNilString {
+	return s.ActorID
+}
+
+// GetActorType returns the value of ActorType.
+func (s *ClientRegistrationDeletedEvent) GetActorType() OptNilClientRegistrationDeletedEventActorType {
+	return s.ActorType
+}
+
+// GetEntityType returns the value of EntityType.
+func (s *ClientRegistrationDeletedEvent) GetEntityType() OptNilString {
+	return s.EntityType
+}
+
+// GetEntityID returns the value of EntityID.
+func (s *ClientRegistrationDeletedEvent) GetEntityID() OptNilString {
+	return s.EntityID
+}
+
+// GetClientID returns the value of ClientID.
+func (s *ClientRegistrationDeletedEvent) GetClientID() string {
+	return s.ClientID
+}
+
+// GetTokenID returns the value of TokenID.
+func (s *ClientRegistrationDeletedEvent) GetTokenID() OptString {
+	return s.TokenID
+}
+
+// GetDelegationType returns the value of DelegationType.
+func (s *ClientRegistrationDeletedEvent) GetDelegationType() OptClientRegistrationDeletedEventDelegationType {
+	return s.DelegationType
+}
+
+// GetDelegationID returns the value of DelegationID.
+func (s *ClientRegistrationDeletedEvent) GetDelegationID() OptString {
+	return s.DelegationID
+}
+
+// GetGrantor returns the value of Grantor.
+func (s *ClientRegistrationDeletedEvent) GetGrantor() OptString {
+	return s.Grantor
+}
+
+// GetFingerprint returns the value of Fingerprint.
+func (s *ClientRegistrationDeletedEvent) GetFingerprint() OptString {
+	return s.Fingerprint
+}
+
+// GetRequestID returns the value of RequestID.
+func (s *ClientRegistrationDeletedEvent) GetRequestID() OptNilString {
+	return s.RequestID
+}
+
+// GetSessionID returns the value of SessionID.
+func (s *ClientRegistrationDeletedEvent) GetSessionID() OptNilString {
+	return s.SessionID
+}
+
+// GetFlowID returns the value of FlowID.
+func (s *ClientRegistrationDeletedEvent) GetFlowID() OptNilString {
+	return s.FlowID
+}
+
+// GetMetadata returns the value of Metadata.
+func (s *ClientRegistrationDeletedEvent) GetMetadata() OptEventMetadata {
+	return s.Metadata
+}
+
+// GetPayload returns the value of Payload.
+func (s *ClientRegistrationDeletedEvent) GetPayload() ClientRegistrationPayload {
+	return s.Payload
+}
+
+// SetID sets the value of ID.
+func (s *ClientRegistrationDeletedEvent) SetID(val string) {
+	s.ID = val
+}
+
+// SetProjectID sets the value of ProjectID.
+func (s *ClientRegistrationDeletedEvent) SetProjectID(val ProjectID) {
+	s.ProjectID = val
+}
+
+// SetTeamID sets the value of TeamID.
+func (s *ClientRegistrationDeletedEvent) SetTeamID(val OptNilString) {
+	s.TeamID = val
+}
+
+// SetEventType sets the value of EventType.
+func (s *ClientRegistrationDeletedEvent) SetEventType(val string) {
+	s.EventType = val
+}
+
+// SetCategory sets the value of Category.
+func (s *ClientRegistrationDeletedEvent) SetCategory(val ClientRegistrationDeletedEventCategory) {
+	s.Category = val
+}
+
+// SetOccurredAt sets the value of OccurredAt.
+func (s *ClientRegistrationDeletedEvent) SetOccurredAt(val time.Time) {
+	s.OccurredAt = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ClientRegistrationDeletedEvent) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetActorID sets the value of ActorID.
+func (s *ClientRegistrationDeletedEvent) SetActorID(val OptNilString) {
+	s.ActorID = val
+}
+
+// SetActorType sets the value of ActorType.
+func (s *ClientRegistrationDeletedEvent) SetActorType(val OptNilClientRegistrationDeletedEventActorType) {
+	s.ActorType = val
+}
+
+// SetEntityType sets the value of EntityType.
+func (s *ClientRegistrationDeletedEvent) SetEntityType(val OptNilString) {
+	s.EntityType = val
+}
+
+// SetEntityID sets the value of EntityID.
+func (s *ClientRegistrationDeletedEvent) SetEntityID(val OptNilString) {
+	s.EntityID = val
+}
+
+// SetClientID sets the value of ClientID.
+func (s *ClientRegistrationDeletedEvent) SetClientID(val string) {
+	s.ClientID = val
+}
+
+// SetTokenID sets the value of TokenID.
+func (s *ClientRegistrationDeletedEvent) SetTokenID(val OptString) {
+	s.TokenID = val
+}
+
+// SetDelegationType sets the value of DelegationType.
+func (s *ClientRegistrationDeletedEvent) SetDelegationType(val OptClientRegistrationDeletedEventDelegationType) {
+	s.DelegationType = val
+}
+
+// SetDelegationID sets the value of DelegationID.
+func (s *ClientRegistrationDeletedEvent) SetDelegationID(val OptString) {
+	s.DelegationID = val
+}
+
+// SetGrantor sets the value of Grantor.
+func (s *ClientRegistrationDeletedEvent) SetGrantor(val OptString) {
+	s.Grantor = val
+}
+
+// SetFingerprint sets the value of Fingerprint.
+func (s *ClientRegistrationDeletedEvent) SetFingerprint(val OptString) {
+	s.Fingerprint = val
+}
+
+// SetRequestID sets the value of RequestID.
+func (s *ClientRegistrationDeletedEvent) SetRequestID(val OptNilString) {
+	s.RequestID = val
+}
+
+// SetSessionID sets the value of SessionID.
+func (s *ClientRegistrationDeletedEvent) SetSessionID(val OptNilString) {
+	s.SessionID = val
+}
+
+// SetFlowID sets the value of FlowID.
+func (s *ClientRegistrationDeletedEvent) SetFlowID(val OptNilString) {
+	s.FlowID = val
+}
+
+// SetMetadata sets the value of Metadata.
+func (s *ClientRegistrationDeletedEvent) SetMetadata(val OptEventMetadata) {
+	s.Metadata = val
+}
+
+// SetPayload sets the value of Payload.
+func (s *ClientRegistrationDeletedEvent) SetPayload(val ClientRegistrationPayload) {
+	s.Payload = val
+}
+
+type ClientRegistrationDeletedEventActorType string
+
+const (
+	ClientRegistrationDeletedEventActorTypeHuman   ClientRegistrationDeletedEventActorType = "human"
+	ClientRegistrationDeletedEventActorTypeService ClientRegistrationDeletedEventActorType = "service"
+	ClientRegistrationDeletedEventActorTypeSystem  ClientRegistrationDeletedEventActorType = "system"
+	ClientRegistrationDeletedEventActorTypeAgent   ClientRegistrationDeletedEventActorType = "agent"
+)
+
+// AllValues returns all ClientRegistrationDeletedEventActorType values.
+func (ClientRegistrationDeletedEventActorType) AllValues() []ClientRegistrationDeletedEventActorType {
+	return []ClientRegistrationDeletedEventActorType{
+		ClientRegistrationDeletedEventActorTypeHuman,
+		ClientRegistrationDeletedEventActorTypeService,
+		ClientRegistrationDeletedEventActorTypeSystem,
+		ClientRegistrationDeletedEventActorTypeAgent,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationDeletedEventActorType) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationDeletedEventActorTypeHuman:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventActorTypeService:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventActorTypeSystem:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventActorTypeAgent:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationDeletedEventActorType) UnmarshalText(data []byte) error {
+	switch ClientRegistrationDeletedEventActorType(data) {
+	case ClientRegistrationDeletedEventActorTypeHuman:
+		*s = ClientRegistrationDeletedEventActorTypeHuman
+		return nil
+	case ClientRegistrationDeletedEventActorTypeService:
+		*s = ClientRegistrationDeletedEventActorTypeService
+		return nil
+	case ClientRegistrationDeletedEventActorTypeSystem:
+		*s = ClientRegistrationDeletedEventActorTypeSystem
+		return nil
+	case ClientRegistrationDeletedEventActorTypeAgent:
+		*s = ClientRegistrationDeletedEventActorTypeAgent
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Wide-event category.
+type ClientRegistrationDeletedEventCategory string
+
+const (
+	ClientRegistrationDeletedEventCategoryRequest ClientRegistrationDeletedEventCategory = "request"
+	ClientRegistrationDeletedEventCategoryAuth    ClientRegistrationDeletedEventCategory = "auth"
+	ClientRegistrationDeletedEventCategorySession ClientRegistrationDeletedEventCategory = "session"
+	ClientRegistrationDeletedEventCategoryAdmin   ClientRegistrationDeletedEventCategory = "admin"
+	ClientRegistrationDeletedEventCategoryEntity  ClientRegistrationDeletedEventCategory = "entity"
+	ClientRegistrationDeletedEventCategorySignal  ClientRegistrationDeletedEventCategory = "signal"
+)
+
+// AllValues returns all ClientRegistrationDeletedEventCategory values.
+func (ClientRegistrationDeletedEventCategory) AllValues() []ClientRegistrationDeletedEventCategory {
+	return []ClientRegistrationDeletedEventCategory{
+		ClientRegistrationDeletedEventCategoryRequest,
+		ClientRegistrationDeletedEventCategoryAuth,
+		ClientRegistrationDeletedEventCategorySession,
+		ClientRegistrationDeletedEventCategoryAdmin,
+		ClientRegistrationDeletedEventCategoryEntity,
+		ClientRegistrationDeletedEventCategorySignal,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationDeletedEventCategory) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationDeletedEventCategoryRequest:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventCategoryAuth:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventCategorySession:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventCategoryAdmin:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventCategoryEntity:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventCategorySignal:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationDeletedEventCategory) UnmarshalText(data []byte) error {
+	switch ClientRegistrationDeletedEventCategory(data) {
+	case ClientRegistrationDeletedEventCategoryRequest:
+		*s = ClientRegistrationDeletedEventCategoryRequest
+		return nil
+	case ClientRegistrationDeletedEventCategoryAuth:
+		*s = ClientRegistrationDeletedEventCategoryAuth
+		return nil
+	case ClientRegistrationDeletedEventCategorySession:
+		*s = ClientRegistrationDeletedEventCategorySession
+		return nil
+	case ClientRegistrationDeletedEventCategoryAdmin:
+		*s = ClientRegistrationDeletedEventCategoryAdmin
+		return nil
+	case ClientRegistrationDeletedEventCategoryEntity:
+		*s = ClientRegistrationDeletedEventCategoryEntity
+		return nil
+	case ClientRegistrationDeletedEventCategorySignal:
+		*s = ClientRegistrationDeletedEventCategorySignal
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Delegation kind (omit when unset).
+type ClientRegistrationDeletedEventDelegationType string
+
+const (
+	ClientRegistrationDeletedEventDelegationTypeDirect    ClientRegistrationDeletedEventDelegationType = "direct"
+	ClientRegistrationDeletedEventDelegationTypeDelegated ClientRegistrationDeletedEventDelegationType = "delegated"
+	ClientRegistrationDeletedEventDelegationTypePatShared ClientRegistrationDeletedEventDelegationType = "pat_shared"
+	ClientRegistrationDeletedEventDelegationTypeExchanged ClientRegistrationDeletedEventDelegationType = "exchanged"
+)
+
+// AllValues returns all ClientRegistrationDeletedEventDelegationType values.
+func (ClientRegistrationDeletedEventDelegationType) AllValues() []ClientRegistrationDeletedEventDelegationType {
+	return []ClientRegistrationDeletedEventDelegationType{
+		ClientRegistrationDeletedEventDelegationTypeDirect,
+		ClientRegistrationDeletedEventDelegationTypeDelegated,
+		ClientRegistrationDeletedEventDelegationTypePatShared,
+		ClientRegistrationDeletedEventDelegationTypeExchanged,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationDeletedEventDelegationType) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationDeletedEventDelegationTypeDirect:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventDelegationTypeDelegated:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventDelegationTypePatShared:
+		return []byte(s), nil
+	case ClientRegistrationDeletedEventDelegationTypeExchanged:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationDeletedEventDelegationType) UnmarshalText(data []byte) error {
+	switch ClientRegistrationDeletedEventDelegationType(data) {
+	case ClientRegistrationDeletedEventDelegationTypeDirect:
+		*s = ClientRegistrationDeletedEventDelegationTypeDirect
+		return nil
+	case ClientRegistrationDeletedEventDelegationTypeDelegated:
+		*s = ClientRegistrationDeletedEventDelegationTypeDelegated
+		return nil
+	case ClientRegistrationDeletedEventDelegationTypePatShared:
+		*s = ClientRegistrationDeletedEventDelegationTypePatShared
+		return nil
+	case ClientRegistrationDeletedEventDelegationTypeExchanged:
+		*s = ClientRegistrationDeletedEventDelegationTypeExchanged
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// Field to filter or sort client registrations by:
+// - `created_at`: RFC3339 timestamp
+// - `expires_at`: RFC3339 timestamp.
+// Ref: #
+type ClientRegistrationFilterField string
+
+const (
+	ClientRegistrationFilterFieldCreatedAt ClientRegistrationFilterField = "created_at"
+	ClientRegistrationFilterFieldExpiresAt ClientRegistrationFilterField = "expires_at"
+)
+
+// AllValues returns all ClientRegistrationFilterField values.
+func (ClientRegistrationFilterField) AllValues() []ClientRegistrationFilterField {
+	return []ClientRegistrationFilterField{
+		ClientRegistrationFilterFieldCreatedAt,
+		ClientRegistrationFilterFieldExpiresAt,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationFilterField) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationFilterFieldCreatedAt:
+		return []byte(s), nil
+	case ClientRegistrationFilterFieldExpiresAt:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationFilterField) UnmarshalText(data []byte) error {
+	switch ClientRegistrationFilterField(data) {
+	case ClientRegistrationFilterFieldCreatedAt:
+		*s = ClientRegistrationFilterFieldCreatedAt
+		return nil
+	case ClientRegistrationFilterFieldExpiresAt:
+		*s = ClientRegistrationFilterFieldExpiresAt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The metadata a client registered with through dynamic client registration
+// (RFC 7591), as the server keeps it, after its defaults. The client
+// registration (the event's `entity_id`) is the `client_id`. Never the secret
+// or its hash.
+// Ref: #
+type ClientRegistrationPayload struct {
+	ClientName              OptString                                        `json:"client_name"`
+	ClientURI               OptString                                        `json:"client_uri"`
+	LogoURI                 OptString                                        `json:"logo_uri"`
+	PolicyURI               OptString                                        `json:"policy_uri"`
+	TosURI                  OptString                                        `json:"tos_uri"`
+	SoftwareID              OptString                                        `json:"software_id"`
+	SoftwareVersion         OptString                                        `json:"software_version"`
+	RedirectUris            []string                                         `json:"redirect_uris"`
+	GrantTypes              []ClientRegistrationPayloadGrantTypesItem        `json:"grant_types"`
+	TokenEndpointAuthMethod ClientRegistrationPayloadTokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
+}
+
+// GetClientName returns the value of ClientName.
+func (s *ClientRegistrationPayload) GetClientName() OptString {
+	return s.ClientName
+}
+
+// GetClientURI returns the value of ClientURI.
+func (s *ClientRegistrationPayload) GetClientURI() OptString {
+	return s.ClientURI
+}
+
+// GetLogoURI returns the value of LogoURI.
+func (s *ClientRegistrationPayload) GetLogoURI() OptString {
+	return s.LogoURI
+}
+
+// GetPolicyURI returns the value of PolicyURI.
+func (s *ClientRegistrationPayload) GetPolicyURI() OptString {
+	return s.PolicyURI
+}
+
+// GetTosURI returns the value of TosURI.
+func (s *ClientRegistrationPayload) GetTosURI() OptString {
+	return s.TosURI
+}
+
+// GetSoftwareID returns the value of SoftwareID.
+func (s *ClientRegistrationPayload) GetSoftwareID() OptString {
+	return s.SoftwareID
+}
+
+// GetSoftwareVersion returns the value of SoftwareVersion.
+func (s *ClientRegistrationPayload) GetSoftwareVersion() OptString {
+	return s.SoftwareVersion
+}
+
+// GetRedirectUris returns the value of RedirectUris.
+func (s *ClientRegistrationPayload) GetRedirectUris() []string {
+	return s.RedirectUris
+}
+
+// GetGrantTypes returns the value of GrantTypes.
+func (s *ClientRegistrationPayload) GetGrantTypes() []ClientRegistrationPayloadGrantTypesItem {
+	return s.GrantTypes
+}
+
+// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
+func (s *ClientRegistrationPayload) GetTokenEndpointAuthMethod() ClientRegistrationPayloadTokenEndpointAuthMethod {
+	return s.TokenEndpointAuthMethod
+}
+
+// SetClientName sets the value of ClientName.
+func (s *ClientRegistrationPayload) SetClientName(val OptString) {
+	s.ClientName = val
+}
+
+// SetClientURI sets the value of ClientURI.
+func (s *ClientRegistrationPayload) SetClientURI(val OptString) {
+	s.ClientURI = val
+}
+
+// SetLogoURI sets the value of LogoURI.
+func (s *ClientRegistrationPayload) SetLogoURI(val OptString) {
+	s.LogoURI = val
+}
+
+// SetPolicyURI sets the value of PolicyURI.
+func (s *ClientRegistrationPayload) SetPolicyURI(val OptString) {
+	s.PolicyURI = val
+}
+
+// SetTosURI sets the value of TosURI.
+func (s *ClientRegistrationPayload) SetTosURI(val OptString) {
+	s.TosURI = val
+}
+
+// SetSoftwareID sets the value of SoftwareID.
+func (s *ClientRegistrationPayload) SetSoftwareID(val OptString) {
+	s.SoftwareID = val
+}
+
+// SetSoftwareVersion sets the value of SoftwareVersion.
+func (s *ClientRegistrationPayload) SetSoftwareVersion(val OptString) {
+	s.SoftwareVersion = val
+}
+
+// SetRedirectUris sets the value of RedirectUris.
+func (s *ClientRegistrationPayload) SetRedirectUris(val []string) {
+	s.RedirectUris = val
+}
+
+// SetGrantTypes sets the value of GrantTypes.
+func (s *ClientRegistrationPayload) SetGrantTypes(val []ClientRegistrationPayloadGrantTypesItem) {
+	s.GrantTypes = val
+}
+
+// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
+func (s *ClientRegistrationPayload) SetTokenEndpointAuthMethod(val ClientRegistrationPayloadTokenEndpointAuthMethod) {
+	s.TokenEndpointAuthMethod = val
+}
+
+type ClientRegistrationPayloadGrantTypesItem string
+
+const (
+	ClientRegistrationPayloadGrantTypesItemAuthorizationCode ClientRegistrationPayloadGrantTypesItem = "authorization_code"
+	ClientRegistrationPayloadGrantTypesItemRefreshToken      ClientRegistrationPayloadGrantTypesItem = "refresh_token"
+)
+
+// AllValues returns all ClientRegistrationPayloadGrantTypesItem values.
+func (ClientRegistrationPayloadGrantTypesItem) AllValues() []ClientRegistrationPayloadGrantTypesItem {
+	return []ClientRegistrationPayloadGrantTypesItem{
+		ClientRegistrationPayloadGrantTypesItemAuthorizationCode,
+		ClientRegistrationPayloadGrantTypesItemRefreshToken,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationPayloadGrantTypesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationPayloadGrantTypesItemAuthorizationCode:
+		return []byte(s), nil
+	case ClientRegistrationPayloadGrantTypesItemRefreshToken:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationPayloadGrantTypesItem) UnmarshalText(data []byte) error {
+	switch ClientRegistrationPayloadGrantTypesItem(data) {
+	case ClientRegistrationPayloadGrantTypesItemAuthorizationCode:
+		*s = ClientRegistrationPayloadGrantTypesItemAuthorizationCode
+		return nil
+	case ClientRegistrationPayloadGrantTypesItemRefreshToken:
+		*s = ClientRegistrationPayloadGrantTypesItemRefreshToken
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type ClientRegistrationPayloadTokenEndpointAuthMethod string
+
+const (
+	ClientRegistrationPayloadTokenEndpointAuthMethodNone              ClientRegistrationPayloadTokenEndpointAuthMethod = "none"
+	ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretBasic ClientRegistrationPayloadTokenEndpointAuthMethod = "client_secret_basic"
+	ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretPost  ClientRegistrationPayloadTokenEndpointAuthMethod = "client_secret_post"
+)
+
+// AllValues returns all ClientRegistrationPayloadTokenEndpointAuthMethod values.
+func (ClientRegistrationPayloadTokenEndpointAuthMethod) AllValues() []ClientRegistrationPayloadTokenEndpointAuthMethod {
+	return []ClientRegistrationPayloadTokenEndpointAuthMethod{
+		ClientRegistrationPayloadTokenEndpointAuthMethodNone,
+		ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretBasic,
+		ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretPost,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationPayloadTokenEndpointAuthMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationPayloadTokenEndpointAuthMethodNone:
+		return []byte(s), nil
+	case ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretBasic:
+		return []byte(s), nil
+	case ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretPost:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationPayloadTokenEndpointAuthMethod) UnmarshalText(data []byte) error {
+	switch ClientRegistrationPayloadTokenEndpointAuthMethod(data) {
+	case ClientRegistrationPayloadTokenEndpointAuthMethodNone:
+		*s = ClientRegistrationPayloadTokenEndpointAuthMethodNone
+		return nil
+	case ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretBasic:
+		*s = ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretBasic
+		return nil
+	case ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretPost:
+		*s = ClientRegistrationPayloadTokenEndpointAuthMethodClientSecretPost
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// A client that registered itself through dynamic client registration
+// (RFC 7591). It belongs to the project, not to an app: it may get tokens for
+// a `third_party` API of an app that opens dynamic registration, each with the
+// user's consent. It is transient: once past `expires_at` it is purged unless
+// a live consent names it. The display fields are the client's own claims; the
+// server checked only its redirect URIs. Its secret is never returned.
+// Ref: #
+type ClientRegistrationResponse struct {
+	// The client_id the server minted for the client.
+	ID string `json:"id"`
+	// The name the client registered with.
+	ClientName OptString `json:"client_name"`
+	// The client's home page, as the client claims it.
+	ClientURI OptString `json:"client_uri"`
+	// The client's logo, as the client claims it.
+	LogoURI OptString `json:"logo_uri"`
+	// The client's privacy policy, as the client claims it.
+	PolicyURI OptString `json:"policy_uri"`
+	// The client's terms of service, as the client claims it.
+	TosURI OptString `json:"tos_uri"`
+	// The software the client says it is, stable across its registrations.
+	SoftwareID OptString `json:"software_id"`
+	// The version of that software.
+	SoftwareVersion OptString `json:"software_version"`
+	// Where the authorization server may send the browser back to.
+	RedirectUris []string                                   `json:"redirect_uris"`
+	GrantTypes   []ClientRegistrationResponseGrantTypesItem `json:"grant_types"`
+	// How the client authenticates at the token endpoint. `none` for a public client.
+	TokenEndpointAuthMethod ClientRegistrationResponseTokenEndpointAuthMethod `json:"token_endpoint_auth_method"`
+	CreatedAt               time.Time                                         `json:"created_at"`
+	// The earliest the registration may be purged. Past it, the registration
+	// goes unless a live consent names it; one a consent names is checked
+	// again an hour later.
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// GetID returns the value of ID.
+func (s *ClientRegistrationResponse) GetID() string {
+	return s.ID
+}
+
+// GetClientName returns the value of ClientName.
+func (s *ClientRegistrationResponse) GetClientName() OptString {
+	return s.ClientName
+}
+
+// GetClientURI returns the value of ClientURI.
+func (s *ClientRegistrationResponse) GetClientURI() OptString {
+	return s.ClientURI
+}
+
+// GetLogoURI returns the value of LogoURI.
+func (s *ClientRegistrationResponse) GetLogoURI() OptString {
+	return s.LogoURI
+}
+
+// GetPolicyURI returns the value of PolicyURI.
+func (s *ClientRegistrationResponse) GetPolicyURI() OptString {
+	return s.PolicyURI
+}
+
+// GetTosURI returns the value of TosURI.
+func (s *ClientRegistrationResponse) GetTosURI() OptString {
+	return s.TosURI
+}
+
+// GetSoftwareID returns the value of SoftwareID.
+func (s *ClientRegistrationResponse) GetSoftwareID() OptString {
+	return s.SoftwareID
+}
+
+// GetSoftwareVersion returns the value of SoftwareVersion.
+func (s *ClientRegistrationResponse) GetSoftwareVersion() OptString {
+	return s.SoftwareVersion
+}
+
+// GetRedirectUris returns the value of RedirectUris.
+func (s *ClientRegistrationResponse) GetRedirectUris() []string {
+	return s.RedirectUris
+}
+
+// GetGrantTypes returns the value of GrantTypes.
+func (s *ClientRegistrationResponse) GetGrantTypes() []ClientRegistrationResponseGrantTypesItem {
+	return s.GrantTypes
+}
+
+// GetTokenEndpointAuthMethod returns the value of TokenEndpointAuthMethod.
+func (s *ClientRegistrationResponse) GetTokenEndpointAuthMethod() ClientRegistrationResponseTokenEndpointAuthMethod {
+	return s.TokenEndpointAuthMethod
+}
+
+// GetCreatedAt returns the value of CreatedAt.
+func (s *ClientRegistrationResponse) GetCreatedAt() time.Time {
+	return s.CreatedAt
+}
+
+// GetExpiresAt returns the value of ExpiresAt.
+func (s *ClientRegistrationResponse) GetExpiresAt() time.Time {
+	return s.ExpiresAt
+}
+
+// SetID sets the value of ID.
+func (s *ClientRegistrationResponse) SetID(val string) {
+	s.ID = val
+}
+
+// SetClientName sets the value of ClientName.
+func (s *ClientRegistrationResponse) SetClientName(val OptString) {
+	s.ClientName = val
+}
+
+// SetClientURI sets the value of ClientURI.
+func (s *ClientRegistrationResponse) SetClientURI(val OptString) {
+	s.ClientURI = val
+}
+
+// SetLogoURI sets the value of LogoURI.
+func (s *ClientRegistrationResponse) SetLogoURI(val OptString) {
+	s.LogoURI = val
+}
+
+// SetPolicyURI sets the value of PolicyURI.
+func (s *ClientRegistrationResponse) SetPolicyURI(val OptString) {
+	s.PolicyURI = val
+}
+
+// SetTosURI sets the value of TosURI.
+func (s *ClientRegistrationResponse) SetTosURI(val OptString) {
+	s.TosURI = val
+}
+
+// SetSoftwareID sets the value of SoftwareID.
+func (s *ClientRegistrationResponse) SetSoftwareID(val OptString) {
+	s.SoftwareID = val
+}
+
+// SetSoftwareVersion sets the value of SoftwareVersion.
+func (s *ClientRegistrationResponse) SetSoftwareVersion(val OptString) {
+	s.SoftwareVersion = val
+}
+
+// SetRedirectUris sets the value of RedirectUris.
+func (s *ClientRegistrationResponse) SetRedirectUris(val []string) {
+	s.RedirectUris = val
+}
+
+// SetGrantTypes sets the value of GrantTypes.
+func (s *ClientRegistrationResponse) SetGrantTypes(val []ClientRegistrationResponseGrantTypesItem) {
+	s.GrantTypes = val
+}
+
+// SetTokenEndpointAuthMethod sets the value of TokenEndpointAuthMethod.
+func (s *ClientRegistrationResponse) SetTokenEndpointAuthMethod(val ClientRegistrationResponseTokenEndpointAuthMethod) {
+	s.TokenEndpointAuthMethod = val
+}
+
+// SetCreatedAt sets the value of CreatedAt.
+func (s *ClientRegistrationResponse) SetCreatedAt(val time.Time) {
+	s.CreatedAt = val
+}
+
+// SetExpiresAt sets the value of ExpiresAt.
+func (s *ClientRegistrationResponse) SetExpiresAt(val time.Time) {
+	s.ExpiresAt = val
+}
+
+func (*ClientRegistrationResponse) getClientRegistrationByIdRes() {}
+
+type ClientRegistrationResponseGrantTypesItem string
+
+const (
+	ClientRegistrationResponseGrantTypesItemAuthorizationCode ClientRegistrationResponseGrantTypesItem = "authorization_code"
+	ClientRegistrationResponseGrantTypesItemRefreshToken      ClientRegistrationResponseGrantTypesItem = "refresh_token"
+)
+
+// AllValues returns all ClientRegistrationResponseGrantTypesItem values.
+func (ClientRegistrationResponseGrantTypesItem) AllValues() []ClientRegistrationResponseGrantTypesItem {
+	return []ClientRegistrationResponseGrantTypesItem{
+		ClientRegistrationResponseGrantTypesItemAuthorizationCode,
+		ClientRegistrationResponseGrantTypesItemRefreshToken,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationResponseGrantTypesItem) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationResponseGrantTypesItemAuthorizationCode:
+		return []byte(s), nil
+	case ClientRegistrationResponseGrantTypesItemRefreshToken:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationResponseGrantTypesItem) UnmarshalText(data []byte) error {
+	switch ClientRegistrationResponseGrantTypesItem(data) {
+	case ClientRegistrationResponseGrantTypesItemAuthorizationCode:
+		*s = ClientRegistrationResponseGrantTypesItemAuthorizationCode
+		return nil
+	case ClientRegistrationResponseGrantTypesItemRefreshToken:
+		*s = ClientRegistrationResponseGrantTypesItemRefreshToken
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// How the client authenticates at the token endpoint. `none` for a public client.
+type ClientRegistrationResponseTokenEndpointAuthMethod string
+
+const (
+	ClientRegistrationResponseTokenEndpointAuthMethodNone              ClientRegistrationResponseTokenEndpointAuthMethod = "none"
+	ClientRegistrationResponseTokenEndpointAuthMethodClientSecretBasic ClientRegistrationResponseTokenEndpointAuthMethod = "client_secret_basic"
+	ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost  ClientRegistrationResponseTokenEndpointAuthMethod = "client_secret_post"
+)
+
+// AllValues returns all ClientRegistrationResponseTokenEndpointAuthMethod values.
+func (ClientRegistrationResponseTokenEndpointAuthMethod) AllValues() []ClientRegistrationResponseTokenEndpointAuthMethod {
+	return []ClientRegistrationResponseTokenEndpointAuthMethod{
+		ClientRegistrationResponseTokenEndpointAuthMethodNone,
+		ClientRegistrationResponseTokenEndpointAuthMethodClientSecretBasic,
+		ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s ClientRegistrationResponseTokenEndpointAuthMethod) MarshalText() ([]byte, error) {
+	switch s {
+	case ClientRegistrationResponseTokenEndpointAuthMethodNone:
+		return []byte(s), nil
+	case ClientRegistrationResponseTokenEndpointAuthMethodClientSecretBasic:
+		return []byte(s), nil
+	case ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *ClientRegistrationResponseTokenEndpointAuthMethod) UnmarshalText(data []byte) error {
+	switch ClientRegistrationResponseTokenEndpointAuthMethod(data) {
+	case ClientRegistrationResponseTokenEndpointAuthMethodNone:
+		*s = ClientRegistrationResponseTokenEndpointAuthMethodNone
+		return nil
+	case ClientRegistrationResponseTokenEndpointAuthMethodClientSecretBasic:
+		*s = ClientRegistrationResponseTokenEndpointAuthMethodClientSecretBasic
+		return nil
+	case ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost:
+		*s = ClientRegistrationResponseTokenEndpointAuthMethodClientSecretPost
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 type CompleteClaimBadRequest ErrorDetails
 
 func (*CompleteClaimBadRequest) completeClaimRes() {}
@@ -24111,6 +25632,315 @@ func (s *CsrfTokenResponseHeaders) SetResponse(val CsrfTokenResponse) {
 
 func (*CsrfTokenResponseHeaders) getMySessionCsrfTokenRes() {}
 
+// DeleteClientRegistrationErrorResponse represents sum type.
+type DeleteClientRegistrationErrorResponse struct {
+	Type                          DeleteClientRegistrationErrorResponseType // switch on this field
+	AppPermissionDenied           AppPermissionDenied
+	AuthCsrfInvalid               AuthCsrfInvalid
+	AuthUnauthorized              AuthUnauthorized
+	AppClientRegistrationNotFound AppClientRegistrationNotFound
+	EvtInvalid                    EvtInvalid
+	Internal                      Internal
+	NotImplemented                NotImplemented
+	ReqInvalid                    ReqInvalid
+	Unavailable                   Unavailable
+}
+
+// DeleteClientRegistrationErrorResponseType is oneOf type of DeleteClientRegistrationErrorResponse.
+type DeleteClientRegistrationErrorResponseType string
+
+// Possible values for DeleteClientRegistrationErrorResponseType.
+const (
+	AppPermissionDeniedDeleteClientRegistrationErrorResponse           DeleteClientRegistrationErrorResponseType = "app.permission_denied"
+	AuthCsrfInvalidDeleteClientRegistrationErrorResponse               DeleteClientRegistrationErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedDeleteClientRegistrationErrorResponse              DeleteClientRegistrationErrorResponseType = "auth.unauthorized"
+	AppClientRegistrationNotFoundDeleteClientRegistrationErrorResponse DeleteClientRegistrationErrorResponseType = "app.client_registration_not_found"
+	EvtInvalidDeleteClientRegistrationErrorResponse                    DeleteClientRegistrationErrorResponseType = "evt.invalid"
+	InternalDeleteClientRegistrationErrorResponse                      DeleteClientRegistrationErrorResponseType = "internal"
+	NotImplementedDeleteClientRegistrationErrorResponse                DeleteClientRegistrationErrorResponseType = "not_implemented"
+	ReqInvalidDeleteClientRegistrationErrorResponse                    DeleteClientRegistrationErrorResponseType = "req.invalid"
+	UnavailableDeleteClientRegistrationErrorResponse                   DeleteClientRegistrationErrorResponseType = "unavailable"
+)
+
+// IsAppPermissionDenied reports whether DeleteClientRegistrationErrorResponse is AppPermissionDenied.
+func (s DeleteClientRegistrationErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedDeleteClientRegistrationErrorResponse
+}
+
+// IsAuthCsrfInvalid reports whether DeleteClientRegistrationErrorResponse is AuthCsrfInvalid.
+func (s DeleteClientRegistrationErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidDeleteClientRegistrationErrorResponse
+}
+
+// IsAuthUnauthorized reports whether DeleteClientRegistrationErrorResponse is AuthUnauthorized.
+func (s DeleteClientRegistrationErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedDeleteClientRegistrationErrorResponse
+}
+
+// IsAppClientRegistrationNotFound reports whether DeleteClientRegistrationErrorResponse is AppClientRegistrationNotFound.
+func (s DeleteClientRegistrationErrorResponse) IsAppClientRegistrationNotFound() bool {
+	return s.Type == AppClientRegistrationNotFoundDeleteClientRegistrationErrorResponse
+}
+
+// IsEvtInvalid reports whether DeleteClientRegistrationErrorResponse is EvtInvalid.
+func (s DeleteClientRegistrationErrorResponse) IsEvtInvalid() bool {
+	return s.Type == EvtInvalidDeleteClientRegistrationErrorResponse
+}
+
+// IsInternal reports whether DeleteClientRegistrationErrorResponse is Internal.
+func (s DeleteClientRegistrationErrorResponse) IsInternal() bool {
+	return s.Type == InternalDeleteClientRegistrationErrorResponse
+}
+
+// IsNotImplemented reports whether DeleteClientRegistrationErrorResponse is NotImplemented.
+func (s DeleteClientRegistrationErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedDeleteClientRegistrationErrorResponse
+}
+
+// IsReqInvalid reports whether DeleteClientRegistrationErrorResponse is ReqInvalid.
+func (s DeleteClientRegistrationErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidDeleteClientRegistrationErrorResponse
+}
+
+// IsUnavailable reports whether DeleteClientRegistrationErrorResponse is Unavailable.
+func (s DeleteClientRegistrationErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableDeleteClientRegistrationErrorResponse
+}
+
+// SetAppPermissionDenied sets DeleteClientRegistrationErrorResponse to AppPermissionDenied.
+func (s *DeleteClientRegistrationErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedDeleteClientRegistrationErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if DeleteClientRegistrationErrorResponse is AppPermissionDenied.
+func (s DeleteClientRegistrationErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedDeleteClientRegistrationErrorResponse(v AppPermissionDenied) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAuthCsrfInvalid sets DeleteClientRegistrationErrorResponse to AuthCsrfInvalid.
+func (s *DeleteClientRegistrationErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidDeleteClientRegistrationErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if DeleteClientRegistrationErrorResponse is AuthCsrfInvalid.
+func (s DeleteClientRegistrationErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidDeleteClientRegistrationErrorResponse(v AuthCsrfInvalid) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets DeleteClientRegistrationErrorResponse to AuthUnauthorized.
+func (s *DeleteClientRegistrationErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedDeleteClientRegistrationErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if DeleteClientRegistrationErrorResponse is AuthUnauthorized.
+func (s DeleteClientRegistrationErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedDeleteClientRegistrationErrorResponse(v AuthUnauthorized) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetAppClientRegistrationNotFound sets DeleteClientRegistrationErrorResponse to AppClientRegistrationNotFound.
+func (s *DeleteClientRegistrationErrorResponse) SetAppClientRegistrationNotFound(v AppClientRegistrationNotFound) {
+	s.Type = AppClientRegistrationNotFoundDeleteClientRegistrationErrorResponse
+	s.AppClientRegistrationNotFound = v
+}
+
+// GetAppClientRegistrationNotFound returns AppClientRegistrationNotFound and true boolean if DeleteClientRegistrationErrorResponse is AppClientRegistrationNotFound.
+func (s DeleteClientRegistrationErrorResponse) GetAppClientRegistrationNotFound() (v AppClientRegistrationNotFound, ok bool) {
+	if !s.IsAppClientRegistrationNotFound() {
+		return v, false
+	}
+	return s.AppClientRegistrationNotFound, true
+}
+
+// NewAppClientRegistrationNotFoundDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from AppClientRegistrationNotFound.
+func NewAppClientRegistrationNotFoundDeleteClientRegistrationErrorResponse(v AppClientRegistrationNotFound) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetAppClientRegistrationNotFound(v)
+	return s
+}
+
+// SetEvtInvalid sets DeleteClientRegistrationErrorResponse to EvtInvalid.
+func (s *DeleteClientRegistrationErrorResponse) SetEvtInvalid(v EvtInvalid) {
+	s.Type = EvtInvalidDeleteClientRegistrationErrorResponse
+	s.EvtInvalid = v
+}
+
+// GetEvtInvalid returns EvtInvalid and true boolean if DeleteClientRegistrationErrorResponse is EvtInvalid.
+func (s DeleteClientRegistrationErrorResponse) GetEvtInvalid() (v EvtInvalid, ok bool) {
+	if !s.IsEvtInvalid() {
+		return v, false
+	}
+	return s.EvtInvalid, true
+}
+
+// NewEvtInvalidDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from EvtInvalid.
+func NewEvtInvalidDeleteClientRegistrationErrorResponse(v EvtInvalid) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetEvtInvalid(v)
+	return s
+}
+
+// SetInternal sets DeleteClientRegistrationErrorResponse to Internal.
+func (s *DeleteClientRegistrationErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalDeleteClientRegistrationErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if DeleteClientRegistrationErrorResponse is Internal.
+func (s DeleteClientRegistrationErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from Internal.
+func NewInternalDeleteClientRegistrationErrorResponse(v Internal) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets DeleteClientRegistrationErrorResponse to NotImplemented.
+func (s *DeleteClientRegistrationErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedDeleteClientRegistrationErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if DeleteClientRegistrationErrorResponse is NotImplemented.
+func (s DeleteClientRegistrationErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from NotImplemented.
+func NewNotImplementedDeleteClientRegistrationErrorResponse(v NotImplemented) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets DeleteClientRegistrationErrorResponse to ReqInvalid.
+func (s *DeleteClientRegistrationErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidDeleteClientRegistrationErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if DeleteClientRegistrationErrorResponse is ReqInvalid.
+func (s DeleteClientRegistrationErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from ReqInvalid.
+func NewReqInvalidDeleteClientRegistrationErrorResponse(v ReqInvalid) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets DeleteClientRegistrationErrorResponse to Unavailable.
+func (s *DeleteClientRegistrationErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableDeleteClientRegistrationErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if DeleteClientRegistrationErrorResponse is Unavailable.
+func (s DeleteClientRegistrationErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableDeleteClientRegistrationErrorResponse returns new DeleteClientRegistrationErrorResponse from Unavailable.
+func NewUnavailableDeleteClientRegistrationErrorResponse(v Unavailable) DeleteClientRegistrationErrorResponse {
+	var s DeleteClientRegistrationErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// DeleteClientRegistrationErrorResponseStatusCode wraps DeleteClientRegistrationErrorResponse with StatusCode.
+type DeleteClientRegistrationErrorResponseStatusCode struct {
+	StatusCode int
+	Response   DeleteClientRegistrationErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *DeleteClientRegistrationErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *DeleteClientRegistrationErrorResponseStatusCode) GetResponse() DeleteClientRegistrationErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *DeleteClientRegistrationErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *DeleteClientRegistrationErrorResponseStatusCode) SetResponse(val DeleteClientRegistrationErrorResponse) {
+	s.Response = val
+}
+
+func (*DeleteClientRegistrationErrorResponseStatusCode) deleteClientRegistrationRes() {}
+
+type DeleteClientRegistrationForbidden ErrorDetails
+
+func (*DeleteClientRegistrationForbidden) deleteClientRegistrationRes() {}
+
+// DeleteClientRegistrationNoContent is response for DeleteClientRegistration operation.
+type DeleteClientRegistrationNoContent struct{}
+
+func (*DeleteClientRegistrationNoContent) deleteClientRegistrationRes() {}
+
+type DeleteClientRegistrationNotFound ErrorDetails
+
+func (*DeleteClientRegistrationNotFound) deleteClientRegistrationRes() {}
+
+type DeleteClientRegistrationUnauthorized ErrorDetails
+
+func (*DeleteClientRegistrationUnauthorized) deleteClientRegistrationRes() {}
+
 // DeleteGrantErrorResponse represents sum type.
 type DeleteGrantErrorResponse struct {
 	Type                  DeleteGrantErrorResponseType // switch on this field
@@ -27554,6 +29384,8 @@ type Event struct {
 	AuthzGrantedEvent               AuthzGrantedEvent
 	AuthzRevokedEvent               AuthzRevokedEvent
 	BrandingCreatedEvent            BrandingCreatedEvent
+	ClientRegistrationCreatedEvent  ClientRegistrationCreatedEvent
+	ClientRegistrationDeletedEvent  ClientRegistrationDeletedEvent
 	DeploymentCreatedEvent          DeploymentCreatedEvent
 	FlowdefCreatedEvent             FlowdefCreatedEvent
 	FlowdefDeletedEvent             FlowdefDeletedEvent
@@ -27608,6 +29440,8 @@ const (
 	AuthzGrantedEventEvent               EventType = "authz.granted"
 	AuthzRevokedEventEvent               EventType = "authz.revoked"
 	BrandingCreatedEventEvent            EventType = "branding.created"
+	ClientRegistrationCreatedEventEvent  EventType = "client_registration.created"
+	ClientRegistrationDeletedEventEvent  EventType = "client_registration.deleted"
 	DeploymentCreatedEventEvent          EventType = "deployment.created"
 	FlowdefCreatedEventEvent             EventType = "flowdef.created"
 	FlowdefDeletedEventEvent             EventType = "flowdef.deleted"
@@ -27696,6 +29530,16 @@ func (s Event) IsAuthzRevokedEvent() bool { return s.Type == AuthzRevokedEventEv
 
 // IsBrandingCreatedEvent reports whether Event is BrandingCreatedEvent.
 func (s Event) IsBrandingCreatedEvent() bool { return s.Type == BrandingCreatedEventEvent }
+
+// IsClientRegistrationCreatedEvent reports whether Event is ClientRegistrationCreatedEvent.
+func (s Event) IsClientRegistrationCreatedEvent() bool {
+	return s.Type == ClientRegistrationCreatedEventEvent
+}
+
+// IsClientRegistrationDeletedEvent reports whether Event is ClientRegistrationDeletedEvent.
+func (s Event) IsClientRegistrationDeletedEvent() bool {
+	return s.Type == ClientRegistrationDeletedEventEvent
+}
 
 // IsDeploymentCreatedEvent reports whether Event is DeploymentCreatedEvent.
 func (s Event) IsDeploymentCreatedEvent() bool { return s.Type == DeploymentCreatedEventEvent }
@@ -28143,6 +29987,48 @@ func (s Event) GetBrandingCreatedEvent() (v BrandingCreatedEvent, ok bool) {
 func NewBrandingCreatedEventEvent(v BrandingCreatedEvent) Event {
 	var s Event
 	s.SetBrandingCreatedEvent(v)
+	return s
+}
+
+// SetClientRegistrationCreatedEvent sets Event to ClientRegistrationCreatedEvent.
+func (s *Event) SetClientRegistrationCreatedEvent(v ClientRegistrationCreatedEvent) {
+	s.Type = ClientRegistrationCreatedEventEvent
+	s.ClientRegistrationCreatedEvent = v
+}
+
+// GetClientRegistrationCreatedEvent returns ClientRegistrationCreatedEvent and true boolean if Event is ClientRegistrationCreatedEvent.
+func (s Event) GetClientRegistrationCreatedEvent() (v ClientRegistrationCreatedEvent, ok bool) {
+	if !s.IsClientRegistrationCreatedEvent() {
+		return v, false
+	}
+	return s.ClientRegistrationCreatedEvent, true
+}
+
+// NewClientRegistrationCreatedEventEvent returns new Event from ClientRegistrationCreatedEvent.
+func NewClientRegistrationCreatedEventEvent(v ClientRegistrationCreatedEvent) Event {
+	var s Event
+	s.SetClientRegistrationCreatedEvent(v)
+	return s
+}
+
+// SetClientRegistrationDeletedEvent sets Event to ClientRegistrationDeletedEvent.
+func (s *Event) SetClientRegistrationDeletedEvent(v ClientRegistrationDeletedEvent) {
+	s.Type = ClientRegistrationDeletedEventEvent
+	s.ClientRegistrationDeletedEvent = v
+}
+
+// GetClientRegistrationDeletedEvent returns ClientRegistrationDeletedEvent and true boolean if Event is ClientRegistrationDeletedEvent.
+func (s Event) GetClientRegistrationDeletedEvent() (v ClientRegistrationDeletedEvent, ok bool) {
+	if !s.IsClientRegistrationDeletedEvent() {
+		return v, false
+	}
+	return s.ClientRegistrationDeletedEvent, true
+}
+
+// NewClientRegistrationDeletedEventEvent returns new Event from ClientRegistrationDeletedEvent.
+func NewClientRegistrationDeletedEventEvent(v ClientRegistrationDeletedEvent) Event {
+	var s Event
+	s.SetClientRegistrationDeletedEvent(v)
 	return s
 }
 
@@ -36879,6 +38765,254 @@ func (*GetClaimWindowNotFound) getClaimWindowRes() {}
 type GetClaimWindowTooManyRequests ErrorDetails
 
 func (*GetClaimWindowTooManyRequests) getClaimWindowRes() {}
+
+// GetClientRegistrationByIdErrorResponse represents sum type.
+type GetClientRegistrationByIdErrorResponse struct {
+	Type                          GetClientRegistrationByIdErrorResponseType // switch on this field
+	AppPermissionDenied           AppPermissionDenied
+	AuthUnauthorized              AuthUnauthorized
+	AppClientRegistrationNotFound AppClientRegistrationNotFound
+	Internal                      Internal
+	NotImplemented                NotImplemented
+	ReqInvalid                    ReqInvalid
+	Unavailable                   Unavailable
+}
+
+// GetClientRegistrationByIdErrorResponseType is oneOf type of GetClientRegistrationByIdErrorResponse.
+type GetClientRegistrationByIdErrorResponseType string
+
+// Possible values for GetClientRegistrationByIdErrorResponseType.
+const (
+	AppPermissionDeniedGetClientRegistrationByIdErrorResponse           GetClientRegistrationByIdErrorResponseType = "app.permission_denied"
+	AuthUnauthorizedGetClientRegistrationByIdErrorResponse              GetClientRegistrationByIdErrorResponseType = "auth.unauthorized"
+	AppClientRegistrationNotFoundGetClientRegistrationByIdErrorResponse GetClientRegistrationByIdErrorResponseType = "app.client_registration_not_found"
+	InternalGetClientRegistrationByIdErrorResponse                      GetClientRegistrationByIdErrorResponseType = "internal"
+	NotImplementedGetClientRegistrationByIdErrorResponse                GetClientRegistrationByIdErrorResponseType = "not_implemented"
+	ReqInvalidGetClientRegistrationByIdErrorResponse                    GetClientRegistrationByIdErrorResponseType = "req.invalid"
+	UnavailableGetClientRegistrationByIdErrorResponse                   GetClientRegistrationByIdErrorResponseType = "unavailable"
+)
+
+// IsAppPermissionDenied reports whether GetClientRegistrationByIdErrorResponse is AppPermissionDenied.
+func (s GetClientRegistrationByIdErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedGetClientRegistrationByIdErrorResponse
+}
+
+// IsAuthUnauthorized reports whether GetClientRegistrationByIdErrorResponse is AuthUnauthorized.
+func (s GetClientRegistrationByIdErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedGetClientRegistrationByIdErrorResponse
+}
+
+// IsAppClientRegistrationNotFound reports whether GetClientRegistrationByIdErrorResponse is AppClientRegistrationNotFound.
+func (s GetClientRegistrationByIdErrorResponse) IsAppClientRegistrationNotFound() bool {
+	return s.Type == AppClientRegistrationNotFoundGetClientRegistrationByIdErrorResponse
+}
+
+// IsInternal reports whether GetClientRegistrationByIdErrorResponse is Internal.
+func (s GetClientRegistrationByIdErrorResponse) IsInternal() bool {
+	return s.Type == InternalGetClientRegistrationByIdErrorResponse
+}
+
+// IsNotImplemented reports whether GetClientRegistrationByIdErrorResponse is NotImplemented.
+func (s GetClientRegistrationByIdErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedGetClientRegistrationByIdErrorResponse
+}
+
+// IsReqInvalid reports whether GetClientRegistrationByIdErrorResponse is ReqInvalid.
+func (s GetClientRegistrationByIdErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidGetClientRegistrationByIdErrorResponse
+}
+
+// IsUnavailable reports whether GetClientRegistrationByIdErrorResponse is Unavailable.
+func (s GetClientRegistrationByIdErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableGetClientRegistrationByIdErrorResponse
+}
+
+// SetAppPermissionDenied sets GetClientRegistrationByIdErrorResponse to AppPermissionDenied.
+func (s *GetClientRegistrationByIdErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedGetClientRegistrationByIdErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if GetClientRegistrationByIdErrorResponse is AppPermissionDenied.
+func (s GetClientRegistrationByIdErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedGetClientRegistrationByIdErrorResponse(v AppPermissionDenied) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAuthUnauthorized sets GetClientRegistrationByIdErrorResponse to AuthUnauthorized.
+func (s *GetClientRegistrationByIdErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedGetClientRegistrationByIdErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if GetClientRegistrationByIdErrorResponse is AuthUnauthorized.
+func (s GetClientRegistrationByIdErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedGetClientRegistrationByIdErrorResponse(v AuthUnauthorized) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetAppClientRegistrationNotFound sets GetClientRegistrationByIdErrorResponse to AppClientRegistrationNotFound.
+func (s *GetClientRegistrationByIdErrorResponse) SetAppClientRegistrationNotFound(v AppClientRegistrationNotFound) {
+	s.Type = AppClientRegistrationNotFoundGetClientRegistrationByIdErrorResponse
+	s.AppClientRegistrationNotFound = v
+}
+
+// GetAppClientRegistrationNotFound returns AppClientRegistrationNotFound and true boolean if GetClientRegistrationByIdErrorResponse is AppClientRegistrationNotFound.
+func (s GetClientRegistrationByIdErrorResponse) GetAppClientRegistrationNotFound() (v AppClientRegistrationNotFound, ok bool) {
+	if !s.IsAppClientRegistrationNotFound() {
+		return v, false
+	}
+	return s.AppClientRegistrationNotFound, true
+}
+
+// NewAppClientRegistrationNotFoundGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from AppClientRegistrationNotFound.
+func NewAppClientRegistrationNotFoundGetClientRegistrationByIdErrorResponse(v AppClientRegistrationNotFound) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetAppClientRegistrationNotFound(v)
+	return s
+}
+
+// SetInternal sets GetClientRegistrationByIdErrorResponse to Internal.
+func (s *GetClientRegistrationByIdErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalGetClientRegistrationByIdErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if GetClientRegistrationByIdErrorResponse is Internal.
+func (s GetClientRegistrationByIdErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from Internal.
+func NewInternalGetClientRegistrationByIdErrorResponse(v Internal) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets GetClientRegistrationByIdErrorResponse to NotImplemented.
+func (s *GetClientRegistrationByIdErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedGetClientRegistrationByIdErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if GetClientRegistrationByIdErrorResponse is NotImplemented.
+func (s GetClientRegistrationByIdErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from NotImplemented.
+func NewNotImplementedGetClientRegistrationByIdErrorResponse(v NotImplemented) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets GetClientRegistrationByIdErrorResponse to ReqInvalid.
+func (s *GetClientRegistrationByIdErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidGetClientRegistrationByIdErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if GetClientRegistrationByIdErrorResponse is ReqInvalid.
+func (s GetClientRegistrationByIdErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from ReqInvalid.
+func NewReqInvalidGetClientRegistrationByIdErrorResponse(v ReqInvalid) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets GetClientRegistrationByIdErrorResponse to Unavailable.
+func (s *GetClientRegistrationByIdErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableGetClientRegistrationByIdErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if GetClientRegistrationByIdErrorResponse is Unavailable.
+func (s GetClientRegistrationByIdErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableGetClientRegistrationByIdErrorResponse returns new GetClientRegistrationByIdErrorResponse from Unavailable.
+func NewUnavailableGetClientRegistrationByIdErrorResponse(v Unavailable) GetClientRegistrationByIdErrorResponse {
+	var s GetClientRegistrationByIdErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// GetClientRegistrationByIdErrorResponseStatusCode wraps GetClientRegistrationByIdErrorResponse with StatusCode.
+type GetClientRegistrationByIdErrorResponseStatusCode struct {
+	StatusCode int
+	Response   GetClientRegistrationByIdErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *GetClientRegistrationByIdErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *GetClientRegistrationByIdErrorResponseStatusCode) GetResponse() GetClientRegistrationByIdErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *GetClientRegistrationByIdErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *GetClientRegistrationByIdErrorResponseStatusCode) SetResponse(val GetClientRegistrationByIdErrorResponse) {
+	s.Response = val
+}
+
+func (*GetClientRegistrationByIdErrorResponseStatusCode) getClientRegistrationByIdRes() {}
+
+type GetClientRegistrationByIdForbidden ErrorDetails
+
+func (*GetClientRegistrationByIdForbidden) getClientRegistrationByIdRes() {}
+
+type GetClientRegistrationByIdNotFound ErrorDetails
+
+func (*GetClientRegistrationByIdNotFound) getClientRegistrationByIdRes() {}
+
+type GetClientRegistrationByIdUnauthorized ErrorDetails
+
+func (*GetClientRegistrationByIdUnauthorized) getClientRegistrationByIdRes() {}
 
 // GetDeploymentByIdErrorResponse represents sum type.
 type GetDeploymentByIdErrorResponse struct {
@@ -54657,6 +56791,52 @@ func (o OptAppClientNotFoundDetails) Or(d AppClientNotFoundDetails) AppClientNot
 	return d
 }
 
+// NewOptAppClientRegistrationNotFoundDetails returns new OptAppClientRegistrationNotFoundDetails with value set to v.
+func NewOptAppClientRegistrationNotFoundDetails(v AppClientRegistrationNotFoundDetails) OptAppClientRegistrationNotFoundDetails {
+	return OptAppClientRegistrationNotFoundDetails{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientRegistrationNotFoundDetails is optional AppClientRegistrationNotFoundDetails.
+type OptAppClientRegistrationNotFoundDetails struct {
+	Value AppClientRegistrationNotFoundDetails
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientRegistrationNotFoundDetails was set.
+func (o OptAppClientRegistrationNotFoundDetails) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientRegistrationNotFoundDetails) Reset() {
+	var v AppClientRegistrationNotFoundDetails
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientRegistrationNotFoundDetails) SetTo(v AppClientRegistrationNotFoundDetails) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientRegistrationNotFoundDetails) Get() (v AppClientRegistrationNotFoundDetails, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientRegistrationNotFoundDetails) Or(d AppClientRegistrationNotFoundDetails) AppClientRegistrationNotFoundDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppClientSecretAddedEventDelegationType returns new OptAppClientSecretAddedEventDelegationType with value set to v.
 func NewOptAppClientSecretAddedEventDelegationType(v AppClientSecretAddedEventDelegationType) OptAppClientSecretAddedEventDelegationType {
 	return OptAppClientSecretAddedEventDelegationType{
@@ -57411,6 +59591,98 @@ func (o OptClaimPersonalTeamNotActiveDetails) Get() (v ClaimPersonalTeamNotActiv
 
 // Or returns value if set, or given parameter if does not.
 func (o OptClaimPersonalTeamNotActiveDetails) Or(d ClaimPersonalTeamNotActiveDetails) ClaimPersonalTeamNotActiveDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClientRegistrationCreatedEventDelegationType returns new OptClientRegistrationCreatedEventDelegationType with value set to v.
+func NewOptClientRegistrationCreatedEventDelegationType(v ClientRegistrationCreatedEventDelegationType) OptClientRegistrationCreatedEventDelegationType {
+	return OptClientRegistrationCreatedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClientRegistrationCreatedEventDelegationType is optional ClientRegistrationCreatedEventDelegationType.
+type OptClientRegistrationCreatedEventDelegationType struct {
+	Value ClientRegistrationCreatedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptClientRegistrationCreatedEventDelegationType was set.
+func (o OptClientRegistrationCreatedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClientRegistrationCreatedEventDelegationType) Reset() {
+	var v ClientRegistrationCreatedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClientRegistrationCreatedEventDelegationType) SetTo(v ClientRegistrationCreatedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClientRegistrationCreatedEventDelegationType) Get() (v ClientRegistrationCreatedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClientRegistrationCreatedEventDelegationType) Or(d ClientRegistrationCreatedEventDelegationType) ClientRegistrationCreatedEventDelegationType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptClientRegistrationDeletedEventDelegationType returns new OptClientRegistrationDeletedEventDelegationType with value set to v.
+func NewOptClientRegistrationDeletedEventDelegationType(v ClientRegistrationDeletedEventDelegationType) OptClientRegistrationDeletedEventDelegationType {
+	return OptClientRegistrationDeletedEventDelegationType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptClientRegistrationDeletedEventDelegationType is optional ClientRegistrationDeletedEventDelegationType.
+type OptClientRegistrationDeletedEventDelegationType struct {
+	Value ClientRegistrationDeletedEventDelegationType
+	Set   bool
+}
+
+// IsSet returns true if OptClientRegistrationDeletedEventDelegationType was set.
+func (o OptClientRegistrationDeletedEventDelegationType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptClientRegistrationDeletedEventDelegationType) Reset() {
+	var v ClientRegistrationDeletedEventDelegationType
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptClientRegistrationDeletedEventDelegationType) SetTo(v ClientRegistrationDeletedEventDelegationType) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptClientRegistrationDeletedEventDelegationType) Get() (v ClientRegistrationDeletedEventDelegationType, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptClientRegistrationDeletedEventDelegationType) Or(d ClientRegistrationDeletedEventDelegationType) ClientRegistrationDeletedEventDelegationType {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -63226,6 +65498,132 @@ func (o OptNilBrandingCreatedEventActorType) Or(d BrandingCreatedEventActorType)
 	return d
 }
 
+// NewOptNilClientRegistrationCreatedEventActorType returns new OptNilClientRegistrationCreatedEventActorType with value set to v.
+func NewOptNilClientRegistrationCreatedEventActorType(v ClientRegistrationCreatedEventActorType) OptNilClientRegistrationCreatedEventActorType {
+	return OptNilClientRegistrationCreatedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilClientRegistrationCreatedEventActorType is optional nullable ClientRegistrationCreatedEventActorType.
+type OptNilClientRegistrationCreatedEventActorType struct {
+	Value ClientRegistrationCreatedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilClientRegistrationCreatedEventActorType was set.
+func (o OptNilClientRegistrationCreatedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilClientRegistrationCreatedEventActorType) Reset() {
+	var v ClientRegistrationCreatedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilClientRegistrationCreatedEventActorType) SetTo(v ClientRegistrationCreatedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilClientRegistrationCreatedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilClientRegistrationCreatedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ClientRegistrationCreatedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilClientRegistrationCreatedEventActorType) Get() (v ClientRegistrationCreatedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilClientRegistrationCreatedEventActorType) Or(d ClientRegistrationCreatedEventActorType) ClientRegistrationCreatedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptNilClientRegistrationDeletedEventActorType returns new OptNilClientRegistrationDeletedEventActorType with value set to v.
+func NewOptNilClientRegistrationDeletedEventActorType(v ClientRegistrationDeletedEventActorType) OptNilClientRegistrationDeletedEventActorType {
+	return OptNilClientRegistrationDeletedEventActorType{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptNilClientRegistrationDeletedEventActorType is optional nullable ClientRegistrationDeletedEventActorType.
+type OptNilClientRegistrationDeletedEventActorType struct {
+	Value ClientRegistrationDeletedEventActorType
+	Set   bool
+	Null  bool
+}
+
+// IsSet returns true if OptNilClientRegistrationDeletedEventActorType was set.
+func (o OptNilClientRegistrationDeletedEventActorType) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptNilClientRegistrationDeletedEventActorType) Reset() {
+	var v ClientRegistrationDeletedEventActorType
+	o.Value = v
+	o.Set = false
+	o.Null = false
+}
+
+// SetTo sets value to v.
+func (o *OptNilClientRegistrationDeletedEventActorType) SetTo(v ClientRegistrationDeletedEventActorType) {
+	o.Set = true
+	o.Null = false
+	o.Value = v
+}
+
+// IsNull returns true if value is Null.
+func (o OptNilClientRegistrationDeletedEventActorType) IsNull() bool { return o.Null }
+
+// SetToNull sets value to null.
+func (o *OptNilClientRegistrationDeletedEventActorType) SetToNull() {
+	o.Set = true
+	o.Null = true
+	var v ClientRegistrationDeletedEventActorType
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptNilClientRegistrationDeletedEventActorType) Get() (v ClientRegistrationDeletedEventActorType, ok bool) {
+	if o.Null {
+		return v, false
+	}
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptNilClientRegistrationDeletedEventActorType) Or(d ClientRegistrationDeletedEventActorType) ClientRegistrationDeletedEventActorType {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptNilDateTime returns new OptNilDateTime with value set to v.
 func NewOptNilDateTime(v time.Time) OptNilDateTime {
 	return OptNilDateTime{
@@ -67958,6 +70356,52 @@ func (o OptQueryAppsRequestSorting) Get() (v QueryAppsRequestSorting, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptQueryAppsRequestSorting) Or(d QueryAppsRequestSorting) QueryAppsRequestSorting {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptQueryClientRegistrationsRequestSorting returns new OptQueryClientRegistrationsRequestSorting with value set to v.
+func NewOptQueryClientRegistrationsRequestSorting(v QueryClientRegistrationsRequestSorting) OptQueryClientRegistrationsRequestSorting {
+	return OptQueryClientRegistrationsRequestSorting{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptQueryClientRegistrationsRequestSorting is optional QueryClientRegistrationsRequestSorting.
+type OptQueryClientRegistrationsRequestSorting struct {
+	Value QueryClientRegistrationsRequestSorting
+	Set   bool
+}
+
+// IsSet returns true if OptQueryClientRegistrationsRequestSorting was set.
+func (o OptQueryClientRegistrationsRequestSorting) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptQueryClientRegistrationsRequestSorting) Reset() {
+	var v QueryClientRegistrationsRequestSorting
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptQueryClientRegistrationsRequestSorting) SetTo(v QueryClientRegistrationsRequestSorting) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptQueryClientRegistrationsRequestSorting) Get() (v QueryClientRegistrationsRequestSorting, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptQueryClientRegistrationsRequestSorting) Or(d QueryClientRegistrationsRequestSorting) QueryClientRegistrationsRequestSorting {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -81476,6 +83920,435 @@ func (*QueryAppsResponse) queryAppsRes() {}
 type QueryAppsUnauthorized ErrorDetails
 
 func (*QueryAppsUnauthorized) queryAppsRes() {}
+
+type QueryClientRegistrationsBadRequest ErrorDetails
+
+func (*QueryClientRegistrationsBadRequest) queryClientRegistrationsRes() {}
+
+// QueryClientRegistrationsErrorResponse represents sum type.
+type QueryClientRegistrationsErrorResponse struct {
+	Type                          QueryClientRegistrationsErrorResponseType // switch on this field
+	AppPermissionDenied           AppPermissionDenied
+	AuthCsrfInvalid               AuthCsrfInvalid
+	AuthUnauthorized              AuthUnauthorized
+	AppClientRegistrationNotFound AppClientRegistrationNotFound
+	Internal                      Internal
+	NotImplemented                NotImplemented
+	ReqInvalid                    ReqInvalid
+	Unavailable                   Unavailable
+}
+
+// QueryClientRegistrationsErrorResponseType is oneOf type of QueryClientRegistrationsErrorResponse.
+type QueryClientRegistrationsErrorResponseType string
+
+// Possible values for QueryClientRegistrationsErrorResponseType.
+const (
+	AppPermissionDeniedQueryClientRegistrationsErrorResponse           QueryClientRegistrationsErrorResponseType = "app.permission_denied"
+	AuthCsrfInvalidQueryClientRegistrationsErrorResponse               QueryClientRegistrationsErrorResponseType = "auth.csrf_invalid"
+	AuthUnauthorizedQueryClientRegistrationsErrorResponse              QueryClientRegistrationsErrorResponseType = "auth.unauthorized"
+	AppClientRegistrationNotFoundQueryClientRegistrationsErrorResponse QueryClientRegistrationsErrorResponseType = "app.client_registration_not_found"
+	InternalQueryClientRegistrationsErrorResponse                      QueryClientRegistrationsErrorResponseType = "internal"
+	NotImplementedQueryClientRegistrationsErrorResponse                QueryClientRegistrationsErrorResponseType = "not_implemented"
+	ReqInvalidQueryClientRegistrationsErrorResponse                    QueryClientRegistrationsErrorResponseType = "req.invalid"
+	UnavailableQueryClientRegistrationsErrorResponse                   QueryClientRegistrationsErrorResponseType = "unavailable"
+)
+
+// IsAppPermissionDenied reports whether QueryClientRegistrationsErrorResponse is AppPermissionDenied.
+func (s QueryClientRegistrationsErrorResponse) IsAppPermissionDenied() bool {
+	return s.Type == AppPermissionDeniedQueryClientRegistrationsErrorResponse
+}
+
+// IsAuthCsrfInvalid reports whether QueryClientRegistrationsErrorResponse is AuthCsrfInvalid.
+func (s QueryClientRegistrationsErrorResponse) IsAuthCsrfInvalid() bool {
+	return s.Type == AuthCsrfInvalidQueryClientRegistrationsErrorResponse
+}
+
+// IsAuthUnauthorized reports whether QueryClientRegistrationsErrorResponse is AuthUnauthorized.
+func (s QueryClientRegistrationsErrorResponse) IsAuthUnauthorized() bool {
+	return s.Type == AuthUnauthorizedQueryClientRegistrationsErrorResponse
+}
+
+// IsAppClientRegistrationNotFound reports whether QueryClientRegistrationsErrorResponse is AppClientRegistrationNotFound.
+func (s QueryClientRegistrationsErrorResponse) IsAppClientRegistrationNotFound() bool {
+	return s.Type == AppClientRegistrationNotFoundQueryClientRegistrationsErrorResponse
+}
+
+// IsInternal reports whether QueryClientRegistrationsErrorResponse is Internal.
+func (s QueryClientRegistrationsErrorResponse) IsInternal() bool {
+	return s.Type == InternalQueryClientRegistrationsErrorResponse
+}
+
+// IsNotImplemented reports whether QueryClientRegistrationsErrorResponse is NotImplemented.
+func (s QueryClientRegistrationsErrorResponse) IsNotImplemented() bool {
+	return s.Type == NotImplementedQueryClientRegistrationsErrorResponse
+}
+
+// IsReqInvalid reports whether QueryClientRegistrationsErrorResponse is ReqInvalid.
+func (s QueryClientRegistrationsErrorResponse) IsReqInvalid() bool {
+	return s.Type == ReqInvalidQueryClientRegistrationsErrorResponse
+}
+
+// IsUnavailable reports whether QueryClientRegistrationsErrorResponse is Unavailable.
+func (s QueryClientRegistrationsErrorResponse) IsUnavailable() bool {
+	return s.Type == UnavailableQueryClientRegistrationsErrorResponse
+}
+
+// SetAppPermissionDenied sets QueryClientRegistrationsErrorResponse to AppPermissionDenied.
+func (s *QueryClientRegistrationsErrorResponse) SetAppPermissionDenied(v AppPermissionDenied) {
+	s.Type = AppPermissionDeniedQueryClientRegistrationsErrorResponse
+	s.AppPermissionDenied = v
+}
+
+// GetAppPermissionDenied returns AppPermissionDenied and true boolean if QueryClientRegistrationsErrorResponse is AppPermissionDenied.
+func (s QueryClientRegistrationsErrorResponse) GetAppPermissionDenied() (v AppPermissionDenied, ok bool) {
+	if !s.IsAppPermissionDenied() {
+		return v, false
+	}
+	return s.AppPermissionDenied, true
+}
+
+// NewAppPermissionDeniedQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from AppPermissionDenied.
+func NewAppPermissionDeniedQueryClientRegistrationsErrorResponse(v AppPermissionDenied) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetAppPermissionDenied(v)
+	return s
+}
+
+// SetAuthCsrfInvalid sets QueryClientRegistrationsErrorResponse to AuthCsrfInvalid.
+func (s *QueryClientRegistrationsErrorResponse) SetAuthCsrfInvalid(v AuthCsrfInvalid) {
+	s.Type = AuthCsrfInvalidQueryClientRegistrationsErrorResponse
+	s.AuthCsrfInvalid = v
+}
+
+// GetAuthCsrfInvalid returns AuthCsrfInvalid and true boolean if QueryClientRegistrationsErrorResponse is AuthCsrfInvalid.
+func (s QueryClientRegistrationsErrorResponse) GetAuthCsrfInvalid() (v AuthCsrfInvalid, ok bool) {
+	if !s.IsAuthCsrfInvalid() {
+		return v, false
+	}
+	return s.AuthCsrfInvalid, true
+}
+
+// NewAuthCsrfInvalidQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from AuthCsrfInvalid.
+func NewAuthCsrfInvalidQueryClientRegistrationsErrorResponse(v AuthCsrfInvalid) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetAuthCsrfInvalid(v)
+	return s
+}
+
+// SetAuthUnauthorized sets QueryClientRegistrationsErrorResponse to AuthUnauthorized.
+func (s *QueryClientRegistrationsErrorResponse) SetAuthUnauthorized(v AuthUnauthorized) {
+	s.Type = AuthUnauthorizedQueryClientRegistrationsErrorResponse
+	s.AuthUnauthorized = v
+}
+
+// GetAuthUnauthorized returns AuthUnauthorized and true boolean if QueryClientRegistrationsErrorResponse is AuthUnauthorized.
+func (s QueryClientRegistrationsErrorResponse) GetAuthUnauthorized() (v AuthUnauthorized, ok bool) {
+	if !s.IsAuthUnauthorized() {
+		return v, false
+	}
+	return s.AuthUnauthorized, true
+}
+
+// NewAuthUnauthorizedQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from AuthUnauthorized.
+func NewAuthUnauthorizedQueryClientRegistrationsErrorResponse(v AuthUnauthorized) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetAuthUnauthorized(v)
+	return s
+}
+
+// SetAppClientRegistrationNotFound sets QueryClientRegistrationsErrorResponse to AppClientRegistrationNotFound.
+func (s *QueryClientRegistrationsErrorResponse) SetAppClientRegistrationNotFound(v AppClientRegistrationNotFound) {
+	s.Type = AppClientRegistrationNotFoundQueryClientRegistrationsErrorResponse
+	s.AppClientRegistrationNotFound = v
+}
+
+// GetAppClientRegistrationNotFound returns AppClientRegistrationNotFound and true boolean if QueryClientRegistrationsErrorResponse is AppClientRegistrationNotFound.
+func (s QueryClientRegistrationsErrorResponse) GetAppClientRegistrationNotFound() (v AppClientRegistrationNotFound, ok bool) {
+	if !s.IsAppClientRegistrationNotFound() {
+		return v, false
+	}
+	return s.AppClientRegistrationNotFound, true
+}
+
+// NewAppClientRegistrationNotFoundQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from AppClientRegistrationNotFound.
+func NewAppClientRegistrationNotFoundQueryClientRegistrationsErrorResponse(v AppClientRegistrationNotFound) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetAppClientRegistrationNotFound(v)
+	return s
+}
+
+// SetInternal sets QueryClientRegistrationsErrorResponse to Internal.
+func (s *QueryClientRegistrationsErrorResponse) SetInternal(v Internal) {
+	s.Type = InternalQueryClientRegistrationsErrorResponse
+	s.Internal = v
+}
+
+// GetInternal returns Internal and true boolean if QueryClientRegistrationsErrorResponse is Internal.
+func (s QueryClientRegistrationsErrorResponse) GetInternal() (v Internal, ok bool) {
+	if !s.IsInternal() {
+		return v, false
+	}
+	return s.Internal, true
+}
+
+// NewInternalQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from Internal.
+func NewInternalQueryClientRegistrationsErrorResponse(v Internal) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetInternal(v)
+	return s
+}
+
+// SetNotImplemented sets QueryClientRegistrationsErrorResponse to NotImplemented.
+func (s *QueryClientRegistrationsErrorResponse) SetNotImplemented(v NotImplemented) {
+	s.Type = NotImplementedQueryClientRegistrationsErrorResponse
+	s.NotImplemented = v
+}
+
+// GetNotImplemented returns NotImplemented and true boolean if QueryClientRegistrationsErrorResponse is NotImplemented.
+func (s QueryClientRegistrationsErrorResponse) GetNotImplemented() (v NotImplemented, ok bool) {
+	if !s.IsNotImplemented() {
+		return v, false
+	}
+	return s.NotImplemented, true
+}
+
+// NewNotImplementedQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from NotImplemented.
+func NewNotImplementedQueryClientRegistrationsErrorResponse(v NotImplemented) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetNotImplemented(v)
+	return s
+}
+
+// SetReqInvalid sets QueryClientRegistrationsErrorResponse to ReqInvalid.
+func (s *QueryClientRegistrationsErrorResponse) SetReqInvalid(v ReqInvalid) {
+	s.Type = ReqInvalidQueryClientRegistrationsErrorResponse
+	s.ReqInvalid = v
+}
+
+// GetReqInvalid returns ReqInvalid and true boolean if QueryClientRegistrationsErrorResponse is ReqInvalid.
+func (s QueryClientRegistrationsErrorResponse) GetReqInvalid() (v ReqInvalid, ok bool) {
+	if !s.IsReqInvalid() {
+		return v, false
+	}
+	return s.ReqInvalid, true
+}
+
+// NewReqInvalidQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from ReqInvalid.
+func NewReqInvalidQueryClientRegistrationsErrorResponse(v ReqInvalid) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetReqInvalid(v)
+	return s
+}
+
+// SetUnavailable sets QueryClientRegistrationsErrorResponse to Unavailable.
+func (s *QueryClientRegistrationsErrorResponse) SetUnavailable(v Unavailable) {
+	s.Type = UnavailableQueryClientRegistrationsErrorResponse
+	s.Unavailable = v
+}
+
+// GetUnavailable returns Unavailable and true boolean if QueryClientRegistrationsErrorResponse is Unavailable.
+func (s QueryClientRegistrationsErrorResponse) GetUnavailable() (v Unavailable, ok bool) {
+	if !s.IsUnavailable() {
+		return v, false
+	}
+	return s.Unavailable, true
+}
+
+// NewUnavailableQueryClientRegistrationsErrorResponse returns new QueryClientRegistrationsErrorResponse from Unavailable.
+func NewUnavailableQueryClientRegistrationsErrorResponse(v Unavailable) QueryClientRegistrationsErrorResponse {
+	var s QueryClientRegistrationsErrorResponse
+	s.SetUnavailable(v)
+	return s
+}
+
+// QueryClientRegistrationsErrorResponseStatusCode wraps QueryClientRegistrationsErrorResponse with StatusCode.
+type QueryClientRegistrationsErrorResponseStatusCode struct {
+	StatusCode int
+	Response   QueryClientRegistrationsErrorResponse
+}
+
+// GetStatusCode returns the value of StatusCode.
+func (s *QueryClientRegistrationsErrorResponseStatusCode) GetStatusCode() int {
+	return s.StatusCode
+}
+
+// GetResponse returns the value of Response.
+func (s *QueryClientRegistrationsErrorResponseStatusCode) GetResponse() QueryClientRegistrationsErrorResponse {
+	return s.Response
+}
+
+// SetStatusCode sets the value of StatusCode.
+func (s *QueryClientRegistrationsErrorResponseStatusCode) SetStatusCode(val int) {
+	s.StatusCode = val
+}
+
+// SetResponse sets the value of Response.
+func (s *QueryClientRegistrationsErrorResponseStatusCode) SetResponse(val QueryClientRegistrationsErrorResponse) {
+	s.Response = val
+}
+
+func (*QueryClientRegistrationsErrorResponseStatusCode) queryClientRegistrationsRes() {}
+
+type QueryClientRegistrationsForbidden ErrorDetails
+
+func (*QueryClientRegistrationsForbidden) queryClientRegistrationsRes() {}
+
+type QueryClientRegistrationsNotFound ErrorDetails
+
+func (*QueryClientRegistrationsNotFound) queryClientRegistrationsRes() {}
+
+// Request to query the client registrations of a project.
+// Ref: #
+type QueryClientRegistrationsRequest struct {
+	Limit OptLimit `json:"limit"`
+	// Token to retrieve the next page of results. Must be sent with the same
+	// `sorting` as the request that issued the token.
+	PageToken OptNilPageToken `json:"page_token"`
+	// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+	Sorting OptQueryClientRegistrationsRequestSorting `json:"sorting"`
+	// Filter criteria for querying client registrations. Combined with AND.
+	Filter []QueryClientRegistrationsRequestFilterItem `json:"filter"`
+}
+
+// GetLimit returns the value of Limit.
+func (s *QueryClientRegistrationsRequest) GetLimit() OptLimit {
+	return s.Limit
+}
+
+// GetPageToken returns the value of PageToken.
+func (s *QueryClientRegistrationsRequest) GetPageToken() OptNilPageToken {
+	return s.PageToken
+}
+
+// GetSorting returns the value of Sorting.
+func (s *QueryClientRegistrationsRequest) GetSorting() OptQueryClientRegistrationsRequestSorting {
+	return s.Sorting
+}
+
+// GetFilter returns the value of Filter.
+func (s *QueryClientRegistrationsRequest) GetFilter() []QueryClientRegistrationsRequestFilterItem {
+	return s.Filter
+}
+
+// SetLimit sets the value of Limit.
+func (s *QueryClientRegistrationsRequest) SetLimit(val OptLimit) {
+	s.Limit = val
+}
+
+// SetPageToken sets the value of PageToken.
+func (s *QueryClientRegistrationsRequest) SetPageToken(val OptNilPageToken) {
+	s.PageToken = val
+}
+
+// SetSorting sets the value of Sorting.
+func (s *QueryClientRegistrationsRequest) SetSorting(val OptQueryClientRegistrationsRequestSorting) {
+	s.Sorting = val
+}
+
+// SetFilter sets the value of Filter.
+func (s *QueryClientRegistrationsRequest) SetFilter(val []QueryClientRegistrationsRequestFilterItem) {
+	s.Filter = val
+}
+
+type QueryClientRegistrationsRequestFilterItem struct {
+	// The field to filter by.
+	Field     ClientRegistrationFilterField `json:"field"`
+	Value     OptFilterValue                `json:"value"`
+	Operation FilterOperation               `json:"operation"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryClientRegistrationsRequestFilterItem) GetField() ClientRegistrationFilterField {
+	return s.Field
+}
+
+// GetValue returns the value of Value.
+func (s *QueryClientRegistrationsRequestFilterItem) GetValue() OptFilterValue {
+	return s.Value
+}
+
+// GetOperation returns the value of Operation.
+func (s *QueryClientRegistrationsRequestFilterItem) GetOperation() FilterOperation {
+	return s.Operation
+}
+
+// SetField sets the value of Field.
+func (s *QueryClientRegistrationsRequestFilterItem) SetField(val ClientRegistrationFilterField) {
+	s.Field = val
+}
+
+// SetValue sets the value of Value.
+func (s *QueryClientRegistrationsRequestFilterItem) SetValue(val OptFilterValue) {
+	s.Value = val
+}
+
+// SetOperation sets the value of Operation.
+func (s *QueryClientRegistrationsRequestFilterItem) SetOperation(val FilterOperation) {
+	s.Operation = val
+}
+
+// Sort order. Defaults to `created_at` ascending; `id` breaks ties either way.
+type QueryClientRegistrationsRequestSorting struct {
+	// The field to sort by.
+	Field ClientRegistrationFilterField `json:"field"`
+	// The direction to sort by.
+	Direction SortDirection `json:"direction"`
+}
+
+// GetField returns the value of Field.
+func (s *QueryClientRegistrationsRequestSorting) GetField() ClientRegistrationFilterField {
+	return s.Field
+}
+
+// GetDirection returns the value of Direction.
+func (s *QueryClientRegistrationsRequestSorting) GetDirection() SortDirection {
+	return s.Direction
+}
+
+// SetField sets the value of Field.
+func (s *QueryClientRegistrationsRequestSorting) SetField(val ClientRegistrationFilterField) {
+	s.Field = val
+}
+
+// SetDirection sets the value of Direction.
+func (s *QueryClientRegistrationsRequestSorting) SetDirection(val SortDirection) {
+	s.Direction = val
+}
+
+// Paginated list of client registrations.
+// Ref: #
+type QueryClientRegistrationsResponse struct {
+	ClientRegistrations []ClientRegistrationResponse `json:"client_registrations"`
+	// Token to pass as `page_token` in the next request to fetch the following
+	// page. Absent when there are no more results.
+	NextPageToken OptNilPageToken `json:"next_page_token"`
+}
+
+// GetClientRegistrations returns the value of ClientRegistrations.
+func (s *QueryClientRegistrationsResponse) GetClientRegistrations() []ClientRegistrationResponse {
+	return s.ClientRegistrations
+}
+
+// GetNextPageToken returns the value of NextPageToken.
+func (s *QueryClientRegistrationsResponse) GetNextPageToken() OptNilPageToken {
+	return s.NextPageToken
+}
+
+// SetClientRegistrations sets the value of ClientRegistrations.
+func (s *QueryClientRegistrationsResponse) SetClientRegistrations(val []ClientRegistrationResponse) {
+	s.ClientRegistrations = val
+}
+
+// SetNextPageToken sets the value of NextPageToken.
+func (s *QueryClientRegistrationsResponse) SetNextPageToken(val OptNilPageToken) {
+	s.NextPageToken = val
+}
+
+func (*QueryClientRegistrationsResponse) queryClientRegistrationsRes() {}
+
+type QueryClientRegistrationsUnauthorized ErrorDetails
+
+func (*QueryClientRegistrationsUnauthorized) queryClientRegistrationsRes() {}
 
 type QueryGrantsBadRequest ErrorDetails
 

@@ -1,0 +1,8 @@
+type: string
+description: |
+  Field to filter or sort client registrations by:
+  - `created_at`: RFC3339 timestamp
+  - `expires_at`: RFC3339 timestamp
+enum:
+  - created_at
+  - expires_at

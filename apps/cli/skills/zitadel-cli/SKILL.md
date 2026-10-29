@@ -124,6 +124,13 @@ upgrade, so upgrade the app and rerun rather than retrying.
   once. `apps list` and `apps get` read what the server holds; a declared app
   changes only with a release, and the API refuses a write to it
   (`app.declared`).
+- **Client registrations.** A client that registered itself through dynamic
+  client registration belongs to the project, not to an app, and expires an
+  hour after registering unless a user consented to it.
+  `client-registrations list` and `get` show what clients claim about
+  themselves; `client-registrations delete <id>` also deletes the consents
+  users gave the client and their tokens. Clients register at the
+  authorization server, so there is no `create`.
 - **Telemetry.** The CLI sends anonymous usage telemetry by default, and
   agent-driven runs are exactly the ones worth learning from — leave it on.
   Don't add `--no-telemetry` to commands. An opt-out exists for users who need
