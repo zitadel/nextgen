@@ -1,12 +1,16 @@
 ---
 title: Flows and schemas
-description: The relationship between login flows, user schemas, and generated UI.
+description: How login flows, user schemas, and generated UI relate, and how edits become new revisions.
 ---
 
-The flow engine drives login, registration, passkey, and related auth journeys.
+A user schema and a flow definition together describe how users register and sign in. The flow engine runs them for sign-in, registration, passkeys, and related journeys.
 
-A user schema defines **what** the platform stores about a user and how that user type can authenticate. A flow definition defines **when and where** users are asked to provide that data — which step renders when, and which fields each step collects. A flow names its schema by `objectType` in `user_schema` and runs against the revision of it that the deployed release pins, or the newest revision when nothing is deployed to the request's origin; its `steps[].fields` must name properties of it.
+A user schema defines **what** the platform stores about a user and how that user type can authenticate. A flow definition defines **when and where** users are asked for that data: which step renders when, and which fields each step collects.
 
-`zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`, uploads them, and seeds `.zitadel/state.json` so the local files and the platform start in sync. Each folder contains a README explaining what you can change.
+A flow names its schema by `objectType` in `user_schema`. Its `steps[].fields` must name properties of that schema. The flow runs against the schema revision that the deployed release pins. When nothing is deployed to the request's origin, it runs against the newest revision.
 
-The local files are the source of truth: edit them, then publish with [`deploy`](/docs/guides/deploy), which builds them into an immutable release and makes it live. Schema and flow edits each publish a new immutable revision: existing users keep validating against the schema revision they were created with until you [migrate them](/docs/guides/migrate-user-schema). A login that names a flow runs its newest active revision; without a name, older active revisions still count.
+`zitadel setup` scaffolds editable copies of the default user schema and login flow into `.zitadel/schemas/` and `.zitadel/flows/`. It uploads them and seeds `.zitadel/state.json`, so the local files and the platform start in sync. Each folder has a README that says what you can change.
+
+The local files are the source of truth. Edit them, then publish with [`deploy`](/docs/guides/deploy). It builds them into an immutable [release](/docs/guides/deploy#releases-deployments-and-rollback), a snapshot that cannot change, and makes it live.
+
+Each schema or flow edit publishes a new immutable revision. Existing users keep validating against the schema revision they were created with until you [migrate them](/docs/guides/migrate-user-schema). A login that names a flow runs its newest active revision. Without a name, older active revisions still count.

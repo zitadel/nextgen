@@ -1,13 +1,13 @@
 ---
-title: Sessions and auth attempts
-description: Durable sessions and ephemeral authentication attempts.
+title: Sessions and authentication attempts
+description: A session is the durable result of a sign-in. An authentication attempt is the short-lived process that produces it.
 ---
 
-An auth attempt is an ephemeral state machine for one authentication journey. It issues challenges, verifies proofs, and hands off a completed result.
+An authentication attempt is a short-lived state machine for one sign-in. It issues challenges, verifies proofs, and passes on the completed result.
 
-A session is the durable post-auth container. It carries the verified user and factors after an auth attempt succeeds.
+A session is the durable container that follows. After an attempt succeeds, the session carries the verified user and factors.
 
-The generated OpenAPI reference exposes these resources as endpoint groups. The SDK middleware reads the session cookie and validates its token to protect routes and expose auth state to framework code (see [SDK proxy](/docs/sdks/proxy)).
+The OpenAPI reference exposes both as endpoint groups. The SDK middleware reads the session cookie and validates its token. This protects routes and exposes auth state to framework code (see [SDK proxy](/docs/sdks/proxy)).
 
 ## Session lifetime
 
@@ -15,4 +15,4 @@ A completed sign-in gives the session a lifetime of 24 hours. The lifetime start
 
 A sign-in can ask for a different lifetime with the `ttl` field of `POST /sessions/exchange` (see [Sessions](/docs/reference/api/sessions)), up to the server's maximum of 30 days. On a server you run yourself, `session.default_ttl` sets the default and `session.max_ttl` the maximum (see the [configuration guide](https://github.com/zitadel/nextgen/blob/main/docs/quick-start/configuration.md#sessions)).
 
-An anonymous session, which a client can create before anyone signs in, lasts 10 minutes. When a sign-in completes on it, it gets the full lifetime.
+A client can create an anonymous session before anyone signs in. It lasts 10 minutes. When a sign-in completes on it, it gets the full lifetime.

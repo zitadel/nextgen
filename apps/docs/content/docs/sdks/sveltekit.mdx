@@ -1,6 +1,6 @@
 ---
 title: SvelteKit SDK
-description: A server hook and helpers for SvelteKit applications.
+description: Add Zitadel sign-in to a SvelteKit app with a server hook that proxies requests and verifies sessions.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
@@ -8,13 +8,13 @@ import { File, Files } from "fumadocs-ui/components/files";
 import { Step, Steps } from "fumadocs-ui/components/steps";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the server. The login and logout widgets come from the [Svelte SDK](/docs/sdks/svelte).
+The SvelteKit SDK is a `handle` hook that proxies Zitadel requests and verifies sessions on the server. The login and logout components come from the [Svelte SDK](/docs/sdks/svelte).
 
 <Callout title="Generated setup" type="info">
-  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the backend URL, the project secret, and the project id to `.env.local`. It needs SvelteKit 3.
+  The CLI writes `src/hooks.server.ts` and the auth pages, declares the hook's settings in `src/env.ts` (adding them to the app's own file when it has one), and writes the Zitadel URL, the project secret and the project ID to `.env.local`. It needs SvelteKit 3.
 </Callout>
 
-## Install
+## Install the SDK
 
 <Tabs groupId="package-manager" items={["pnpm", "npm", "yarn"]}>
   <Tab>
@@ -34,11 +34,11 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
   </Tab>
 </Tabs>
 
-## Setup
+## Add the server hook
 
 <Tabs items={["CLI generated", "Manual"]}>
   <Tab>
-    The CLI adds the server hook, the pages, environment files, and both SDK packages.
+    The CLI adds the server hook, the pages, environment files and both SDK packages.
 
     <Files>
       <File name="src/hooks.server.ts" />
@@ -53,10 +53,10 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
       <File name="package.json" />
     </Files>
 
-    Every setup also writes `zitadel.json` and the `.zitadel/` folder, adds its entries to `.gitignore`, and adds managed sections to `AGENTS.md` and `README.md`.
+    Every setup also writes `zitadel.json` and the `.zitadel/` folder. It adds entries to `.gitignore` and managed sections to `AGENTS.md` and `README.md`.
   </Tab>
   <Tab>
-    Declare the hook's settings in `src/env.ts`, so SvelteKit serves them from the server-only `$app/env/private`: from `.env.local` in development and from the platform's environment in production. A missing one fails each request with an error naming it, and SvelteKit never bundles them for the browser. If the app already has `src/env.ts`, add the three entries to its `defineEnvVars` call:
+    Declare the hook's settings in `src/env.ts`. SvelteKit then serves them from the server-only `$app/env/private`: from `.env.local` in development and from the platform's environment in production. A missing one fails each request with an error naming it. SvelteKit never bundles them for the browser. If the app already has `src/env.ts`, add the three entries to its `defineEnvVars` call:
 
     ```ts
     import { defineEnvVars } from "@sveltejs/kit/env";
@@ -83,7 +83,7 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
     });
     ```
 
-    Render the widget on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry; `onMount` never runs during server rendering, so the widget is created in the browser with its config already in place:
+    Render the login component on the client only. Its config (`project` and the rest) is set as element properties, which server-rendered markup cannot carry. `onMount` never runs during server rendering, so the component is created in the browser with its config already in place:
 
     ```svelte
     <script lang="ts">
@@ -105,22 +105,22 @@ The SvelteKit SDK is a `handle` hook that proxies and verifies sessions on the s
   </Tab>
 </Tabs>
 
-## Runtime model
+## What the hook does
 
 <Steps>
-  <Step>The hook proxies same-origin `/__nextgen/*` requests to the backend, attaching the project secret only to the session handoff.</Step>
+  <Step>The hook proxies same-origin `/__nextgen/*` requests to Zitadel. It adds the project secret only to the session exchange, the call that turns a completed sign-in into a session.</Step>
   <Step>It verifies the session token and puts the result on `event.locals.nextgenAuth`; read it with `getAuth(event)` in a load function or endpoint.</Step>
-  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login widget returns after sign-in.</Step>
+  <Step>It redirects unauthenticated requests for `protectedRoutes` to `loginPath`, with the requested path and query string in `?next=`, where the login component returns after sign-in.</Step>
 </Steps>
 
-## Verify
+## Verify the setup
 
-- Start the app with `npm run dev`. Setup already wrote the URL, the secret, and the project id to `.env.local`.
+- Start the app with `npm run dev`. Setup already wrote the URL, the secret and the project ID to `.env.local`.
 - Visit `/login` and register a user.
 - Confirm `/profile` shows signed-in state.
-- Log out and confirm `/profile` redirects to `/login`.
+- Sign out and confirm `/profile` redirects to `/login`.
 
 ## See also
 
-- [SDK proxy](/docs/sdks/proxy) — why `/__nextgen/*` must be same-origin and which call carries the project secret.
-- [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit) and the [CLI SvelteKit patcher](https://github.com/zitadel/nextgen/tree/main/apps/cli/src/lib/orca/patchers/rule/sveltekit).
+- [SDK proxy](/docs/sdks/proxy): why `/__nextgen/*` must be same-origin and which call carries the project secret.
+- [`@zitadel/sdk-sveltekit` source](https://github.com/zitadel/nextgen/tree/main/packages/sdk-sveltekit).

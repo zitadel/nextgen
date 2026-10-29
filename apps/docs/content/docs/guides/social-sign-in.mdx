@@ -3,17 +3,17 @@ title: Add social sign-in
 description: Let users sign in with Google or any OpenID Connect provider, set up with the zitadel CLI.
 ---
 
-A social sign-in provider, such as "Sign in with Google", is one more sign-in method on a user schema. `auth-method sso enable` writes the connection, turns it on in the schema and login flow, and stores the provider's credentials on the project. `deploy` then publishes it.
+Social sign-in lets users sign in with an identity provider (IdP) such as Google. The provider is one more sign-in method on a user schema. `auth-method sso enable` writes the connection, turns it on in the schema and login flow, and stores the provider's credentials on the project. `deploy` then publishes it.
 
 ## Register the app with the provider
 
-Create an OAuth client (for Google: a "Web application" client in the Google Cloud console) and keep its client id and client secret. The provider asks for a redirect URI. `sso enable` prints the right one as `callback_uri`; locally, for Google, it is:
+Create an OAuth client and keep its client ID and client secret. For Google, create a "Web application" client in the Google Cloud console. The provider asks for a redirect URI. `sso enable` prints the right one as `callback_uri`. Locally, for Google, it is:
 
 ```text
 http://localhost:3000/__nextgen/idp/google/callback
 ```
 
-Each connection has its own callback URI, on your app's origin, ending in the connection's slug. Register it with the provider exactly as printed. A URI from another connection doesn't work.
+Each connection has its own callback URI. It is on your app's origin and ends in the connection's slug. Register it with the provider exactly as printed. A URI from another connection doesn't work.
 
 ## Enable Google
 
@@ -21,7 +21,7 @@ Each connection has its own callback URI, on your app's origin, ending in the co
 npx @zitadel/cli@latest auth-method sso enable --provider google
 ```
 
-The command prompts for the client id and the client secret. In a script or an agent, pass the client id as a flag and pipe the secret in on stdin; the secret never goes in a flag:
+The command prompts for the client ID and the client secret. In a script or an agent, pass the client ID as a flag and pipe the secret in on stdin. The secret never goes in a flag:
 
 ```sh
 npx @zitadel/cli@latest auth-method sso enable --provider google \
@@ -29,7 +29,7 @@ npx @zitadel/cli@latest auth-method sso enable --provider google \
   --non-interactive --json < secret.txt
 ```
 
-Pass `--schema <name>` when the project has more than one user schema. The JSON result names what it did:
+Pass `--schema <name>` when the project has more than one user schema. The JSON result names what the command did:
 
 ```json
 {
@@ -44,14 +44,14 @@ Pass `--schema <name>` when the project has more than one user schema. The JSON 
 }
 ```
 
-Then publish the change:
+Then deploy the change:
 
 ```sh
 npx @zitadel/cli@latest deploy --dry-run
 npx @zitadel/cli@latest deploy
 ```
 
-Reload the app: the sign-in, registration and password steps show a "Continue with Google" button.
+Reload the app. The sign-in, registration and password steps show a "Continue with Google" button.
 
 ## Any other OpenID Connect provider
 
@@ -65,16 +65,16 @@ npx @zitadel/cli@latest auth-method sso enable --provider custom \
   --client-id abc123 --non-interactive < secret.txt
 ```
 
-- `--slug` names the connection. Schemas and flows refer to it by this name, and it is part of the callback URI (`/__nextgen/idp/acme-sso/callback`).
+- `--slug` names the connection. Schemas and flows refer to it by this name. It is also part of the callback URI (`/__nextgen/idp/acme-sso/callback`).
 - `--display-name` is the text on the sign-in button.
-- `--issuer` is the provider's issuer URL; the server finds its endpoints by discovery.
-- `--scopes` is optional, separated by spaces or commas, and must include `openid`. The default is `openid profile email`.
+- `--issuer` is the provider's issuer URL. The server finds the provider's endpoints by discovery.
+- `--scopes` is optional. Separate scopes with spaces or commas. The list must include `openid`. The default is `openid profile email`.
 
 The credentials are stored as `<SLUG>_CLIENT_ID` and `<SLUG>_CLIENT_SECRET`, for example `ACME_SSO_CLIENT_ID`.
 
 ## During setup
 
-`setup` takes the same provider while it scaffolds the app, so a new app starts with social sign-in. The OAuth client must already exist; pipe its secret in on stdin:
+`setup` takes the same provider while it creates the app, so a new app starts with social sign-in. The OAuth client must already exist. Pipe its secret in on stdin:
 
 ```sh
 npx @zitadel/cli@latest setup --server local --framework next \
@@ -82,31 +82,31 @@ npx @zitadel/cli@latest setup --server local --framework next \
   --non-interactive --json < secret.txt
 ```
 
-For a custom provider, use `--sso custom` with `--sso-slug`, `--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup reports each connection under `data.sso[]`, with its `callback_uri` to register.
+For a custom provider, use `--sso custom` with `--sso-slug`, `--sso-display-name`, `--sso-issuer` and optionally `--sso-scopes`. Setup reports each connection under `data.sso[]`, with the `callback_uri` to register.
 
 ## What the command writes
 
-- **`.zitadel/idps/<slug>.json`**, the connection: protocol, issuer, scopes, claim mapping, and the credentials as references, `${{ GOOGLE_CLIENT_ID }}` and `${{ GOOGLE_CLIENT_SECRET }}`. The file holds no secret, so commit it.
+- **`.zitadel/idps/<slug>.json`**, the connection. It holds the protocol, issuer, scopes, claim mapping (which of the provider's token fields fill which user attributes), and the credentials as references, `${{ GOOGLE_CLIENT_ID }}` and `${{ GOOGLE_CLIENT_SECRET }}`. The file holds no secret, so commit it.
 - **The user schema**, `.zitadel/schemas/<schema>.json`: the slug is added to `x-auth-methods.sso.providers`, and `x-auth-methods.sso.enabled` is set to `true`.
 - **The login flow**, `.zitadel/flows/<flow>.json`: the slug is added to `sso_providers` on the steps that offer sign-in, and two steps are added. `register-sso` creates the user on a first sign-in with the provider. `sso-conflict` handles a provider account whose email already belongs to a user (see [Limits](#limits)).
-- **Two project variables**, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the secret encrypted). They live on the project, not in `.env.local`: the server exchanges the code with the provider, so the app never needs the secret.
+- **Two project variables**, `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` (the secret encrypted). They live on the project, not in `.env.local`. The server exchanges the code with the provider, so the app never needs the secret.
 
-The variables are the one thing `sso enable` publishes before `deploy`. When a credential did not reach the project, for example because the secret was not piped in or the server refused it, `published` is `deferred` or `failed` and `next_commands` starts with the `variables set` command that stores it:
+The variables are the one thing `sso enable` publishes before `deploy`. Sometimes a credential does not reach the project, for example because the secret was not piped in or the server refused it. Then `published` is `deferred` or `failed`, and `next_commands` starts with the `variables set` command that stores it:
 
 ```sh
 npx @zitadel/cli@latest variables set GOOGLE_CLIENT_SECRET --project-level --secret < secret.txt
 ```
 
-To remove a provider, run `auth-method sso disable --provider google`; a custom one is named by its slug, as in `--provider acme-sso`. Then `deploy --dry-run` and `deploy`.
+To remove a provider, run `auth-method sso disable --provider google`. Name a custom one by its slug, as in `--provider acme-sso`. Then run `deploy --dry-run` and `deploy`.
 
-## Fields fixed after the first apply
+## Fields fixed after the first deploy
 
-Once a connection has been applied, these fields identify it and the users who signed in through it, and can't change:
+Once you have deployed a connection, these fields identify it and the users who signed in through it. They can't change:
 
 - `slug`: a file with another slug is another connection
 - `protocol`
 - `oidc.issuer`
-- `subject_claim`
+- `subject_claim`: the claim, a field in the provider's token, that identifies the user at the provider
 
 `deploy` refuses an edit to one of them:
 
@@ -114,20 +114,22 @@ Once a connection has been applied, these fields identify it and the users who s
 Error E_VALIDATION: .zitadel/idps/google.json: subject_claim of the connection "google" cannot be edited
 ```
 
-Restore the stored value, or add a new connection file with its own slug. Everything else in the file, such as `display_name` or `scopes`, can be edited and applied.
+Restore the stored value, or add a new connection file with its own slug. You can edit everything else in the file, such as `display_name` or `scopes`, and deploy it.
 
 ## Test against a local OIDC provider
 
-A provider running on your machine, such as a Keycloak or Dex container on `localhost`, works with the server `zitadel start` runs. A server refuses outgoing requests to loopback addresses unless `NEXTGEN_HTTPCLIENT_ALLOW_LIST` allows them, and `start` sets it to `localhost,127.0.0.0/8,::1/128` unless `.env.local`, `.env` or your shell already sets it. `data.runtime.env.injected` in `start --json` lists the variable.
+A provider running on your machine, such as a Keycloak or Dex container on `localhost`, works with the local runtime that `zitadel start` runs. A server refuses outgoing requests to loopback addresses unless `NEXTGEN_HTTPCLIENT_ALLOW_LIST` allows them. `start` sets it to `localhost,127.0.0.0/8,::1/128` unless `.env.local`, `.env` or your shell already sets it. `data.runtime.env.injected` in `start --json` lists the variable.
 
 Two cases still can't reach the provider, and `sso enable` warns about both:
 
-- **The Docker runtime.** Inside the container, `localhost` is the container itself. Start the server with `zitadel start --runtime binary` instead.
-- **Any other server**, or a local one with `NEXTGEN_HTTPCLIENT_ALLOW_LIST=` set empty, which turns the default off.
+- **The Docker runtime.** Inside the container, `localhost` is the container itself. Start the runtime with `zitadel start --runtime binary` instead.
+- **Any other server**, or a local runtime with `NEXTGEN_HTTPCLIENT_ALLOW_LIST=` set empty, which turns the default off.
 
 `setup --sso custom` doesn't know yet which server will run, so it warns about any `localhost` issuer.
 
-When the server can't reach the provider, the widget only says "This sign-in provider is not available right now", and `zitadel logs --level warn` shows a `sso provider unavailable` warning with `idp.discovery_failed` and `address is denied by 'localhost'`. After changing the variable in `.env.local`, stop the server and start it again: `start` alone keeps a running server as it is.
+When the server can't reach the provider, the login component only says "This sign-in provider is not available right now". `zitadel logs --level warn` then shows a `sso provider unavailable` warning with `idp.discovery_failed` and `address is denied by 'localhost'`.
+
+After you change the variable in `.env.local`, stop the runtime and start it again. `start` alone keeps a running runtime as it is ([Run Zitadel locally](/docs/guides/local-runtime)).
 
 ```sh
 npx @zitadel/cli@latest stop
@@ -138,5 +140,5 @@ Only allow loopback on your machine. A deployed server must not reach its own ne
 
 ## Limits
 
-- **No account linking yet.** A provider account is never linked to an existing user. When someone who registered with a password signs in with Google using the same email, the flow lands on the `sso-conflict` step, which asks them to sign in with their password or passkey instead. That happens on every Google sign-in, because the two stay separate. A user who started with Google signs in with Google.
+- **No account linking yet.** A provider account is never linked to an existing user. Suppose someone registered with a password and now signs in with Google using the same email. The flow lands on the `sso-conflict` step, which asks them to sign in with their password or passkey instead. That happens on every Google sign-in, because the two stay separate. A user who started with Google signs in with Google.
 - **OpenID Connect only.** The CLI knows Google by name; any other provider needs `--provider custom` and an issuer with OIDC discovery. A plain OAuth 2.0 provider, such as GitHub, can't be connected yet.

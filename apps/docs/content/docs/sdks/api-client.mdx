@@ -1,20 +1,20 @@
 ---
 title: API client
-description: Generated TypeScript client and runtime configuration.
+description: A typed TypeScript client for the Zitadel API, with models, Zod schemas, MSW helpers and runtime configuration.
 ---
 
 import { Callout } from "fumadocs-ui/components/callout";
 import { Card, Cards } from "fumadocs-ui/components/card";
 import { Tab, Tabs } from "fumadocs-ui/components/tabs";
 
-`@zitadel/api` is generated from the OpenAPI source under `api/openapi/`.
+`@zitadel/api` is the typed TypeScript client for the Zitadel API. It is generated from the OpenAPI source under `api/openapi/`.
 
 It exposes:
 
 - generated endpoint functions
 - generated models
 - Zod schemas
-- MSW helpers
+- MSW helpers (Mock Service Worker request handlers for tests)
 - runtime helpers for base URL and auth
 
 ## Install
@@ -37,16 +37,16 @@ It exposes:
   </Tab>
 </Tabs>
 
-## Usage
+## Call the API
 
-The package has no root export; import from its subpaths:
+The package has no root export. Import from its subpaths:
 
-- `@zitadel/api/client` — `createZitadelClient`, a typed client bound to a base URL and an optional bearer token.
-- `@zitadel/api/config` — `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it; the Angular SDK has its own `configureZitadel`.
-- `@zitadel/api/generated/model` — request and response types.
-- `@zitadel/api/generated/endpoints/zitadelNextGen` — the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`: on their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
-- `@zitadel/api/runtime/fetch` — `ApiError` and `NetworkError`, which a call throws when the request fails.
-- `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth` — low-level settings, such as the base URL and the token the client sets for you.
+- `@zitadel/api/client`: `createZitadelClient`, a typed client bound to a base URL and an optional bearer token.
+- `@zitadel/api/config`: `configureZitadel` and `getApi`, the shared browser configuration the components read. Every SDK except Angular uses it. The Angular SDK has its own `configureZitadel`.
+- `@zitadel/api/generated/model`: request and response types.
+- `@zitadel/api/generated/endpoints/zitadelNextGen`: the endpoint functions behind the client, with `.zod` and `.msw` variants for the Zod schemas and MSW handlers. Call the endpoints through `createZitadelClient`. On their own they use one base URL and token for the whole process, and the client sets both before each call. The MSW handlers need the optional peers `msw` and `@faker-js/faker`.
+- `@zitadel/api/runtime/fetch`: `ApiError` and `NetworkError`, which a call throws when the request fails.
+- `@zitadel/api/runtime/base-url` and `@zitadel/api/runtime/auth`: low-level settings, such as the base URL and the token the client sets for you.
 
 Call the API from server-side code:
 
@@ -61,19 +61,19 @@ const client = createZitadelClient({
 const project = await client.getProject(process.env.ZITADEL_PROJECT_ID!);
 ```
 
-Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation and takes its path parameters, its body, then its query parameters; an optional body comes after required query parameters.
+Every operation in the [API reference](/docs/reference/api) shows its call through this client, beside its request and response shapes. The method is named after the operation. It takes the path parameters, then the body, then the query parameters. An optional body comes after required query parameters.
 
 <Callout title="Edit the OpenAPI source" type="warn">
-  Do not hand-edit generated API package output. Update `api/openapi/**` and regenerate through the repo tasks.
+  Do not edit the generated package output by hand. Change `api/openapi/**` and regenerate it with the repository's generate task.
 </Callout>
 
 <Cards>
-  <Card title="API reference" href="/docs/reference/api" description="Generated endpoint docs grouped by OpenAPI tags." />
-  <Card title="Sessions" href="/docs/reference/api/sessions" description="Session lifecycle and session-token endpoints." />
-  <Card title="Auth attempts" href="/docs/reference/api/authentication-attempts" description="Ephemeral authentication state machine endpoints." />
+  <Card title="API reference" href="/docs/reference/api" description="Endpoint docs generated from the OpenAPI source, grouped by tag." />
+  <Card title="Sessions" href="/docs/reference/api/sessions" description="Session lifecycle and session token endpoints." />
+  <Card title="Auth attempts" href="/docs/reference/api/authentication-attempts" description="Endpoints for short-lived authentication attempts." />
 </Cards>
 
 ## See also
 
-- [API reference](/docs/reference/api) — every endpoint, generated from the same OpenAPI source.
+- [API reference](/docs/reference/api): every endpoint, generated from the same OpenAPI source.
 - [`@zitadel/api` source](https://github.com/zitadel/nextgen/tree/main/packages/api) and the [OpenAPI spec](https://github.com/zitadel/nextgen/tree/main/api/openapi).

@@ -3,10 +3,11 @@ title: Migrate users between schema revisions
 description: Move existing users to a new user schema revision through the API.
 ---
 
-A user schema is immutable. Every change you deploy creates a new revision of
-it, and a user stays on the revision they were created on until you move them.
-This guide covers moving them: which changes need data from you, how to send
-it, and how to check progress.
+This guide moves existing users to a new revision of their user schema through
+the API. A user schema is immutable. Every change you deploy creates a new
+revision of it, and a user stays on the revision they were created on until you
+move them. The guide covers which changes need data from you, how to send it,
+and how to check progress.
 
 ## Three separate steps
 
@@ -17,20 +18,22 @@ Changing a schema is three steps, and each one happens only when you do it:
 2. **Deployment**: you [deploy](/docs/guides/deploy) a release. New
    registrations use the schema revision that release pins. Existing users are
    not touched.
-3. **Migration**: you move existing users to another revision through the API,
-   one user per request, with any attribute changes the target revision needs.
+3. **Migration**: you move existing users to another revision through the API.
+   Each request moves one user, with any attribute changes the target revision
+   needs.
 
 Deploying never migrates users, and migrating never deploys.
 
 A login flow uses the schema revision its release pins for two things: the
 fields its steps show, and the users it creates. New registrations land on
-that revision. It never checks an existing user's record against it. Sign-in
-looks the login name up among the users of every revision of the schema, and
-checks the password, passkey or SSO link, which belong to the user and not to
-a revision. A user on an older or newer revision therefore signs in under the
-same flow, as long as both revisions keep the same sign-in identifier and
-authentication methods. Users spread over several revisions are normal while a
-migration is in progress.
+that revision. The flow never checks an existing user's record against it.
+
+Sign-in looks the login name up among the users of every revision of the
+schema. It checks the password, passkey or SSO link, which belong to the user
+and not to a revision. A user on an older or newer revision therefore signs in
+under the same flow, as long as both revisions keep the same sign-in identifier
+and authentication methods. Users spread over several revisions are normal
+while a migration is in progress.
 
 ## Three revisions to tell apart
 
@@ -40,7 +43,7 @@ migration is in progress.
 | The one a release pins | The revision new registrations use while that release is served | `zitadel release get <release_id>`, `zitadel deployment list --live` |
 | A user's own           | The revision the user's attributes are validated against        | `schema` on the user: `zitadel users get <user_id>`                  |
 
-The newest revision is not automatically the one in use: a revision you released
+The newest revision is not automatically the one in use. A revision you released
 but didn't deploy takes no registrations.
 
 ## What a migration supports
@@ -48,7 +51,7 @@ but didn't deploy takes no registrations.
 A migration changes a user's attributes. It is supported for attributes that
 play no part in sign-in. Sign-in identifiers, uniqueness rules, authentication
 methods and SSO connections must stay the same between the two revisions.
-Zitadel does not detect or block a migration that changes them, so check the
+Zitadel does not detect or block a migration that changes them. Check the
 target revision yourself.
 
 | Schema change              | Example                                                    | What the migration request needs                                                                        |
@@ -70,9 +73,9 @@ Your own application has to read users on both revisions while a migration
 runs. Plan when you deploy application changes around that.
 
 If a changed attribute is collected at registration, update the login flow
-too, so the release you deploy pins both the schema and the flow that collects
-it. The [deploy guide](/docs/guides/deploy#walkthrough-add-a-field-to-registration)
-shows adding a field to the register step.
+too. Then the release you deploy pins both the schema and the flow that
+collects it. The [deploy guide](/docs/guides/deploy#add-a-field-to-registration)
+shows how to add a field to the register step.
 
 ## Migrate a user
 
@@ -92,10 +95,10 @@ Repeat `--attributes` for each attribute. `key=value` sends a string, and
 attribute. `--data` takes the whole request body as JSON instead, as in the
 examples below.
 
-`attributes` is merged into what the user has: a key you leave out stays as
+`attributes` is merged into what the user has. A key you leave out stays as
 it is, `null` removes an attribute, and any other value replaces it. Zitadel
 validates the merged result against the target revision and checks its
-uniqueness rules, then saves the revision and the attributes together.
+uniqueness rules. It then saves the revision and the attributes together.
 
 The target must be a revision of the user's own schema, the same `objectType`,
 older or newer. A schema with another `objectType` is refused with
@@ -154,23 +157,23 @@ string `"36"`.
 
 ### When a migration is refused
 
-A refused migration changes nothing: the user keeps their revision and every
+A refused migration changes nothing. The user keeps their revision and every
 attribute. The response names each attribute that fails the target revision,
 by its path in the request body, without the rejected values:
 
 ```json
 {
   "code": "req.invalid",
-  "message": "…",
+  "message": "<error message>",
   "details": {
     "details": { "fields": ["attributes.country"] }
   }
 }
 ```
 
-An attribute you didn't send is named too when the merged result fails on it,
-as when the target requires `country` and the user has none. Fix those
-attributes and send the request again.
+The response names an attribute you didn't send when the merged result fails
+on it, for example when the target requires `country` and the user has none.
+Fix those attributes and send the request again.
 
 A value that another user already holds under a uniqueness rule answers
 `409 user.already_exists`, with the attributes in the same
@@ -179,14 +182,14 @@ A value that another user already holds under a uniqueness rule answers
 ### What a migration keeps
 
 A migration changes the schema reference and the attributes, nothing else.
-The user's id, password, passkeys, team memberships and SSO links stay, and
-the user signs in as before.
+The user's ID, password, passkeys, team memberships and SSO links stay. The
+user signs in as before.
 
-### Moving back to an older revision
+### Move a user back to an older revision
 
 You can move a user to an older revision with the same request. The same
-validation applies. Values an earlier migration removed are not restored: send
-them again if the older revision needs them.
+validation applies. A migration does not restore values an earlier migration
+removed. Send them again if the older revision needs them.
 
 ## Find users by revision
 
@@ -198,8 +201,8 @@ npx @zitadel/cli@latest users list \
   --all --json
 ```
 
-List the users of a schema who are not on its newest revision yet, which is
-the list left to migrate:
+List the users of a schema who are not on its newest revision yet. This is the
+list left to migrate:
 
 ```sh
 npx @zitadel/cli@latest users list \
@@ -209,18 +212,19 @@ npx @zitadel/cli@latest users list \
 ```
 
 `data.count` in the result is how many users matched. It shows how users are
-spread over revisions now, not who was migrated: a user created on the newest
+spread over revisions now, not who was migrated. A user created on the newest
 revision was never migrated, and still counts.
 
 The same filters work on `POST /users/query` (see
 [Users](/docs/reference/api/users)).
 
-## Rolling back
+## Roll back a deployment
 
 [`deployment rollback`](/docs/guides/deploy#releases-deployments-and-rollback)
-serves an earlier release again, and new registrations follow the revision
-that release pins. A rollback restores configuration, not user data: users
-keep their revisions and attributes, including those you migrated. For the
-attribute-only changes above, migrated users keep signing in after a rollback
-without being moved back. A rollback doesn't reverse a data change you made
-during migration.
+makes an earlier release live again, and new registrations follow the revision
+that release pins. It restores configuration, not user data. Users keep their
+revisions and attributes, including those you migrated.
+
+For the attribute-only changes above, migrated users keep signing in after a
+rollback without being moved back. A rollback doesn't reverse a data change you
+made during migration.

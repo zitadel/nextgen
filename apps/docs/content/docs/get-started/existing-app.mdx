@@ -1,9 +1,9 @@
 ---
 title: Add Zitadel to an existing app
-description: Run setup in an app you already have, what it writes for each framework, and when it stops instead.
+description: Run setup in an existing app, what it writes for each framework, and when it stops without changing anything.
 ---
 
-In an app you already have, setup detects the framework and patches the app instead of scaffolding a new one. You need what the [Quickstart](/docs/get-started/quickstart#prerequisites) needs. Commit your work, then run these in the app's directory:
+In an app you already have, setup detects the framework and patches the app instead of scaffolding a new one. You need the [Quickstart's prerequisites](/docs/get-started/quickstart#prerequisites). Commit your work, then run these in the app's directory:
 
 ```sh
 npx @zitadel/cli@latest doctor
@@ -11,17 +11,28 @@ npx @zitadel/cli@latest start
 npx @zitadel/cli@latest setup --server local
 ```
 
-Setup asks the same questions and writes the same Zitadel files as for a new app ([Scaffold auth](/docs/get-started/quickstart#scaffold-auth)). Then prove the browser flow as the [Quickstart](/docs/get-started/quickstart#prove-the-browser-flow) does.
+Setup asks the same questions and writes the same Zitadel files as for a new app ([Scaffold auth](/docs/get-started/quickstart#scaffold-auth)). Then [prove the browser flow](/docs/get-started/quickstart#prove-the-browser-flow) as the Quickstart does.
 
 ## What setup writes, by framework
 
-- **Next.js and Nuxt:** setup detects the framework and patches the app. Before it creates anything, it stops with `E_CONFLICT` rather than overwrite a file of yours that it would write, such as your own `proxy.ts` or `app/login/page.tsx`. Next.js runs one request boundary, so setup also stops on yours under the other name: on Next 16 it writes `proxy.ts`, and Next refuses to run beside a `middleware.ts`. Move yours aside, rerun setup, and merge it into the file setup writes. If `package.json` names Next.js by a tag such as `latest`, setup can't tell the version and writes `middleware.ts`, so it stops on an existing `proxy.ts`: pin the version the app runs, such as `^16.0.0`, and rerun.
-- **SvelteKit, SolidStart, Qwik Router, and TanStack Start:** setup detects the framework and writes the server hook or middleware (`src/hooks.server.ts`, `src/middleware.ts`, `src/routes/plugin@nextgen.ts`, or `src/start.ts`) plus the landing, login, register, and profile routes.
-- **React, Vue, Angular, Solid, Svelte, and Qwik:** setup writes the app's root component to a fixed path: `src/App.tsx` (React, Solid), `src/App.vue`, `src/App.svelte`, `src/app.tsx` (Qwik), or `src/app/app.ts` (Angular). If your app has a file there, setup stops with `E_CONFLICT` on it, again before creating anything. It also reads the entry that mounts your root component, the script `index.html` loads or Angular's `src/main.ts`, and stops when that mounts one from another file, such as `src/App.jsx` or Angular 17–19's `src/app/app.component.ts`, because your app would never load setup's. Import the root from the path setup writes in that entry, rerun setup, and move what you need from yours into it.
-- **Other apps,** such as a Next.js Pages Router app, a React app without Vite, or an app on a framework older than setup supports (Next.js 15.2.3, Nuxt 4, SvelteKit 3 with Svelte 5, SolidStart 2, Qwik Router and Qwik 2.0.0-beta.45, TanStack Start 1, React 18, Vue 3.2, Angular 17, Solid 1.6, Svelte 5): setup doesn't support them yet and stops without changing anything. Don't pass `--force` there: where setup detects no framework at all, `--force` makes it scaffold a new app over yours.
+- **Next.js and Nuxt:** before it creates anything, setup stops with `E_CONFLICT` rather than overwrite a file of yours that it would write, such as your own `proxy.ts` or `app/login/page.tsx`.
+  - Setup also writes a request boundary, the file that runs on every request before your routes. Next.js allows only one, so setup stops on yours under the other name too.
+  - On Next 16 setup writes `proxy.ts`, and Next refuses to run beside a `middleware.ts`. Move yours aside, rerun setup, and merge it into the file setup writes.
+  - If `package.json` names Next.js by a tag such as `latest`, setup can't tell the version and writes `middleware.ts`. It then stops on an existing `proxy.ts`. Pin the version the app runs, such as `^16.0.0`, and rerun.
+- **SvelteKit, SolidStart, Qwik Router, and TanStack Start:** setup writes the server hook or middleware (`src/hooks.server.ts`, `src/middleware.ts`, `src/routes/plugin@nextgen.ts`, or `src/start.ts`). It also writes the landing, login, register, and profile routes.
+- **React, Vue, Angular, Solid, Svelte, and Qwik:** setup writes the app's root component to a fixed path: `src/App.tsx` (React, Solid), `src/App.vue`, `src/App.svelte`, `src/app.tsx` (Qwik), or `src/app/app.ts` (Angular).
+  - If your app has a file there, setup stops with `E_CONFLICT` on it, again before creating anything.
+  - Setup also reads the entry that mounts your root component: the script `index.html` loads, or Angular's `src/main.ts`. It stops when that entry mounts a root from another file, such as `src/App.jsx` or Angular 17–19's `src/app/app.component.ts`, because your app would never load setup's.
+  - To fix it, import the root from the path setup writes in that entry, rerun setup, and move what you need from yours into it.
+- **Other apps:** setup doesn't support them yet and stops without changing anything. They are:
+  - a Next.js Pages Router app;
+  - a React app without Vite;
+  - an app on a framework older than setup supports. Setup needs at least Next.js 15.2.3, Nuxt 4, SvelteKit 3 with Svelte 5, SolidStart 2, Qwik Router and Qwik 2.0.0-beta.45, TanStack Start 1, React 18, Vue 3.2, Angular 17, Solid 1.6, or Svelte 5.
+
+  Don't pass `--force` there. Where setup detects no framework at all, `--force` makes it scaffold a new app over yours.
 
 ## When setup stops
 
-If you pass `--framework`, name the one your app uses: when setup detects another, it stops with `E_CONFLICT` instead of treating your app as a directory to scaffold into. The files setup writes under `.zitadel/`, such as the default schema and login flow, are checked before it creates the project too, so a conflict leaves nothing behind.
+If you pass `--framework`, name the one your app uses. When setup detects another, it stops with `E_CONFLICT` instead of treating your app as a directory to scaffold into. Setup also checks the files it writes under `.zitadel/`, such as the default schema and login flow, before it creates the project. A conflict therefore leaves nothing behind.
 
-After an `E_CONFLICT`, the error's hint says what to change. For a file at a path setup writes, move it aside and rerun, or rerun with `--force` to let setup replace it and merge your version back from git. `--force` doesn't help with your root component or request boundary at another path, or with a connection under `.zitadel/idps/`, which setup never replaces.
+After an `E_CONFLICT`, the error's hint says what to change. For a file at a path setup writes, move it aside and rerun. Or rerun with `--force` to let setup replace it, then merge your version back from git. `--force` doesn't help with your root component or request boundary at another path. It also doesn't help with a connection under `.zitadel/idps/`, which setup never replaces.
