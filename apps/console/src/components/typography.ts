@@ -13,12 +13,6 @@ export const PAGE_TITLE_ROW = "flex min-h-9 items-center justify-between gap-3";
  */
 export const SECTION_HEADING = "text-foreground font-serif text-base leading-5";
 
-/**
- * A subordinate heading inside a card's body, under its section title: the
- * 14/20 display face (Figma text style `zitadel/subsection-heading`).
- */
-export const SUBSECTION_HEADING = "text-foreground font-serif text-sm leading-5";
-
 /** The overline face: display, uppercase 12/16 with 0.72px tracking. Colour is the caller's. */
 export const OVERLINE = "font-serif text-xs leading-4 tracking-[0.72px] uppercase";
 
