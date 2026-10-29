@@ -197,7 +197,9 @@ describe("add user sheet", () => {
     await userEvent.click(picker);
     expect(await screen.findByRole("option", { name: /Business/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Minimal/ })).toBeInTheDocument();
-    expect(askedTokens).toEqual([null, "tok_2"]);
+    // The Users list behind the sheet walks the same pages for its filter
+    // before the sheet opens; the sheet's own walk is the last two reads.
+    expect(askedTokens.slice(-2)).toEqual([null, "tok_2"]);
   });
 
   it("re-renders the field set and clears values when the schema changes", async () => {
