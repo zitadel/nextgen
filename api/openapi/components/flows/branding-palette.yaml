@@ -43,7 +43,7 @@ properties:
     description: Valid fields, success alerts and pills.
   warning:
     $ref: branding-color.yaml
-    description: Warning surfaces. It is stored, but nothing renders it.
+    description: Warning surfaces. It is stored, but nothing renders it yet.
   error:
     $ref: branding-color.yaml
     description: Invalid fields, error alerts and pills.

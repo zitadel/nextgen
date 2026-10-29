@@ -16,7 +16,7 @@
         "centered",
         "split"
       ],
-      "description": "Layout preset the revision declares, `centered` or `split`. It is\nvalidated on publish and handed to the template as `branding.layout`.\nThe bundled default template does not read it, so changing it alone\nchanges nothing on screen, and it is not an appearance control.\n\nThe designs you can eject (`centered`, `minimal`) ship as templates, and\nboth carry `centered`. To switch designs, use\n`zitadel branding eject --design <name>` instead of editing this field.\n",
+      "description": "Layout preset the revision declares, `centered` or `split`. It is\nvalidated on publish and handed to the template as `branding.layout`.\nThe bundled default template does not read it, so changing it alone\nchanges nothing on screen, and it is not an appearance control.\n\nThe designs you can eject (`centered`, `minimal`) ship as templates, and\nboth carry `centered`. `split` appears on revisions published from\nthe earlier split designs. To switch designs, use\n`zitadel branding eject --design <name>` instead of editing this field.\n",
       "default": "centered"
     },
     "liquid_template": {
@@ -163,7 +163,7 @@
         },
         "warning": {
           "$ref": "#/$defs/BrandingColor",
-          "description": "Warning surfaces. It is stored, but nothing renders it."
+          "description": "Warning surfaces. It is stored, but nothing renders it yet."
         },
         "error": {
           "$ref": "#/$defs/BrandingColor",

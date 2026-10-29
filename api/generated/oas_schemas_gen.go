@@ -8357,7 +8357,8 @@ type Branding struct {
 	// The bundled default template does not read it, so changing it alone
 	// changes nothing on screen, and it is not an appearance control.
 	// The designs you can eject (`centered`, `minimal`) ship as templates, and
-	// both carry `centered`. To switch designs, use
+	// both carry `centered`. `split` appears on revisions published from
+	// the earlier split designs. To switch designs, use
 	// `zitadel branding eject --design <name>` instead of editing this field.
 	Layout OptBrandingLayout `json:"layout"`
 	// The LiquidJS template for rendering this step. The login component renders
@@ -8991,7 +8992,8 @@ func (s *BrandingCreatedPayload) SetHeroURL(val OptString) {
 // The bundled default template does not read it, so changing it alone
 // changes nothing on screen, and it is not an appearance control.
 // The designs you can eject (`centered`, `minimal`) ship as templates, and
-// both carry `centered`. To switch designs, use
+// both carry `centered`. `split` appears on revisions published from
+// the earlier split designs. To switch designs, use
 // `zitadel branding eject --design <name>` instead of editing this field.
 type BrandingLayout string
 
@@ -9062,7 +9064,7 @@ type BrandingPalette struct {
 	Link OptBrandingColor `json:"link"`
 	// Valid fields, success alerts and pills.
 	Success OptBrandingColor `json:"success"`
-	// Warning surfaces. It is stored, but nothing renders it.
+	// Warning surfaces. It is stored, but nothing renders it yet.
 	Warning OptBrandingColor `json:"warning"`
 	// Invalid fields, error alerts and pills.
 	Error OptBrandingColor `json:"error"`
@@ -24134,15 +24136,17 @@ func NewVariableSetEventEvent(v VariableSetEvent) Event {
 func (*Event) getEventRes() {}
 
 // Metadata recorded when the event was emitted, already redacted when written.
-// The `client` object can carry the requester's IP address, user agent and
-// origin, so a security information and event management (SIEM) system can join
-// on `request_id`. It is not an input for live risk evaluation.
+// On `request.api` events, the `client` object can carry the requester's IP
+// address, user agent and origin. A security information and event management
+// (SIEM) system can join the request's other events to it on `request_id`. It
+// is not an input for live risk evaluation.
 // Ref: #
 type EventMetadata struct {
 	// What authorized the request, when it was not a grant on the event's
 	// project. Every event of such a request carries it.
 	Authorization OptEventMetadataAuthorization `json:"authorization"`
-	// Observed HTTP requester context, recorded only for events emitted by an API request.
+	// The requester's HTTP context. Recorded only on `request.api` events: join
+	// the request's other events to it through `request_id`.
 	Client          OptEventMetadataClient `json:"client"`
 	AdditionalProps EventMetadataAdditional
 }
@@ -24254,7 +24258,8 @@ func (s *EventMetadataAuthorizationPath) UnmarshalText(data []byte) error {
 	}
 }
 
-// Observed HTTP requester context, recorded only for events emitted by an API request.
+// The requester's HTTP context. Recorded only on `request.api` events: join
+// the request's other events to it through `request_id`.
 type EventMetadataClient struct {
 	// The client IP from the first `X-Forwarded-For` hop, or the remote address of the connection.
 	IP OptString `json:"ip"`

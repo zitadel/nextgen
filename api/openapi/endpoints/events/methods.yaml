@@ -12,8 +12,8 @@ get:
     for oldest first. Requires `events.read`.
 
     Until a project is claimed, its events are stored but hidden, so the list
-    is empty. Team-scoped credentials see only events whose emit-time
-    `team_id` matches the credential's team.
+    is empty. A team-scoped credential would see only events whose emit-time
+    `team_id` matches its team; such credentials are not issued today.
 
     The `event_type` of each item says which event schema it follows.
   tags:

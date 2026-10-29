@@ -33,16 +33,16 @@ tags:
       One authentication round for a user, which lives for 15 minutes. Issue challenges for authentication factors, verify proofs, and complete the attempt into a handoff token.
   - name: Sessions
     description: |
-      What a user holds after signing in. Create anonymous sessions, read and query sessions, exchange a handoff token for a session, and revoke sessions.
+      A user's runtime state, anonymous or signed in. Create anonymous sessions, read and query sessions, exchange a handoff token for a session, and revoke sessions.
   - name: Projects
     description: |
-      A project is the unit that holds an application's identity configuration. Create and update projects, manage their origins, claim a project for a team, and list who administers it.
+      A project is the top-level boundary that holds users, sessions and their sign-in configuration. Create and update projects, manage their origins, claim a project for a team, and list who administers it.
   - name: Teams
     description: |
       Teams are groups of people that own projects and give their members access to them. Create, read, update, query and delete the teams of a project.
   - name: Users
     description: |
-      The people who sign in to a project. Create and look up users, read the current user, and set passwords.
+      The identities of a project, such as people or service accounts. Create and look up users, read the current user, and set passwords.
   - name: Schemas
     description: |
       User schemas, which define the attributes of a user and which attribute identifies it. Create and look up schemas.

@@ -382,8 +382,8 @@ type Invoker interface {
 	// or doesn't exist succeeds without changing anything.
 	// A team that still owns a project is refused with `409
 	// team.owns_project`. Deactivating it would leave the project owned by a
-	// deactivated team and so unmanageable. The API has no endpoint that
-	// releases that ownership, so such a team cannot be deactivated through it.
+	// deactivated team and so unmanageable. No endpoint releases that
+	// ownership yet, so such a team cannot be deactivated today.
 	//
 	// DELETE /teams/{team_id}
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
@@ -816,8 +816,8 @@ type Invoker interface {
 	// Returns the audit events of one project, newest first. Pass `order=asc`
 	// for oldest first. Requires `events.read`.
 	// Until a project is claimed, its events are stored but hidden, so the list
-	// is empty. Team-scoped credentials see only events whose emit-time
-	// `team_id` matches the credential's team.
+	// is empty. A team-scoped credential would see only events whose emit-time
+	// `team_id` matches its team; such credentials are not issued today.
 	// The `event_type` of each item says which event schema it follows.
 	//
 	// GET /events
@@ -4196,8 +4196,8 @@ func (c *Client) sendDeleteGrant(ctx context.Context, params DeleteGrantParams) 
 // or doesn't exist succeeds without changing anything.
 // A team that still owns a project is refused with `409
 // team.owns_project`. Deactivating it would leave the project owned by a
-// deactivated team and so unmanageable. The API has no endpoint that
-// releases that ownership, so such a team cannot be deactivated through it.
+// deactivated team and so unmanageable. No endpoint releases that
+// ownership yet, so such a team cannot be deactivated today.
 //
 // DELETE /teams/{team_id}
 func (c *Client) DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error) {
@@ -10176,8 +10176,8 @@ func (c *Client) sendListDeployments(ctx context.Context, params ListDeployments
 // Returns the audit events of one project, newest first. Pass `order=asc`
 // for oldest first. Requires `events.read`.
 // Until a project is claimed, its events are stored but hidden, so the list
-// is empty. Team-scoped credentials see only events whose emit-time
-// `team_id` matches the credential's team.
+// is empty. A team-scoped credential would see only events whose emit-time
+// `team_id` matches its team; such credentials are not issued today.
 // The `event_type` of each item says which event schema it follows.
 //
 // GET /events

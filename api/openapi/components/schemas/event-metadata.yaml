@@ -4,9 +4,10 @@ type: object
 # risk-evaluator input."
 description: |
   Metadata recorded when the event was emitted, already redacted when written.
-  The `client` object can carry the requester's IP address, user agent and
-  origin, so a security information and event management (SIEM) system can join
-  on `request_id`. It is not an input for live risk evaluation.
+  On `request.api` events, the `client` object can carry the requester's IP
+  address, user agent and origin. A security information and event management
+  (SIEM) system can join the request's other events to it on `request_id`. It
+  is not an input for live risk evaluation.
 additionalProperties: true
 properties:
   authorization:
@@ -32,7 +33,9 @@ properties:
         description: The project the actor's user belongs to.
   client:
     # Original text: "Observed HTTP requestor context on Path A request.api only."
-    description: Observed HTTP requester context, recorded only for events emitted by an API request.
+    description: |
+      The requester's HTTP context. Recorded only on `request.api` events: join
+      the request's other events to it through `request_id`.
     type: object
     additionalProperties: false
     properties:

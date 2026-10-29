@@ -31,7 +31,8 @@ properties:
       changes nothing on screen, and it is not an appearance control.
 
       The designs you can eject (`centered`, `minimal`) ship as templates, and
-      both carry `centered`. To switch designs, use
+      both carry `centered`. `split` appears on revisions published from
+      the earlier split designs. To switch designs, use
       `zitadel branding eject --design <name>` instead of editing this field.
     default: centered
   liquid_template:
