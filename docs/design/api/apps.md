@@ -172,7 +172,7 @@ records fall like this:
 | Record | Kind | Owner |
 | --- | --- | --- |
 | App documents and their revisions, client ids, API identifiers, a registered app's secret hashes | Configuration | Apps |
-| Dynamically registered clients | Transient: kept while a consent or a refresh token uses them, then purged | Apps stores them; the authorization server's `POST /register` writes them |
+| Dynamically registered clients | Transient: purged once past a short lifetime of their own and named by no live consent | Apps stores them; the authorization server's `POST /register` writes them |
 | Client ID metadata documents | Not stored: fetched and cached | Authorization server |
 | Consents, codes, refresh tokens | Transient, stored like sessions | Authorization server |
 | SCIM sync state | Transient: a reconcile rebuilds it | Apps (designed) |
@@ -266,6 +266,18 @@ lookups with these calls, and resolves `AppLookup.DeploymentID` itself
   `POST /register` stays the authorization server's endpoint and calls the
   apps write; the directory answers the stored clients. They are transient
   data, not built yet; the POC's sealed ids stand in until then.
+  - **An unused registration expires.** `POST /register` is unauthenticated,
+    so a registration has a lifetime of its own (an hour covers the browser
+    round trip) and is purged once past it with no live consent naming it.
+    A refresh writes nothing to it.
+  - **It keeps its own display fields.** With no app document behind it, the
+    RFC 7591 `client_name`, `logo_uri`, `client_uri`, `policy_uri` and
+    `tos_uri` stay on its record, and the consent step shows them as the
+    client's own claims, beside the redirect host, the one part the server
+    checked.
+  - **Deleting it deletes its consents and their tokens** in the same
+    transaction, as revoking a session deletes its tokens, through a
+    statement the authorization server provides.
 
 ## Lifetimes and claims are policies
 
