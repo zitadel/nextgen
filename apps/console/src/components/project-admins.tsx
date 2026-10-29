@@ -43,11 +43,11 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  *
  * **Every other grant is a row of its own, from the grants read.** The admins
  * list is people with live admin access, so it leaves out a grant to a team the
- * viewer is not in, a `viewer` or `editor` grant, an expired grant and a
- * deleted user's grant. Each is still the project's, and still the thing to
- * revoke, so each is a row: a team's, named by the team, or the person's,
- * degraded to the id where nothing else is left. Only a grant the admins list
- * already shows on a person's row is left out, so nobody appears twice for it.
+ * viewer is not in, a `viewer` or `editor` grant and an expired grant. Each is
+ * still the project's, and still the thing to revoke, so each is a row: a
+ * team's, named by the team, or the person's, named by the id where the ref
+ * carries nothing else. Only a grant the admins list already shows on a
+ * person's row is left out, so nobody appears twice for it.
  *
  * **Only a direct grant is removable from a person's row.** Owning-team access
  * is not a grant, and a team grant belongs to the team's row; so a person who
@@ -269,7 +269,6 @@ function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: str
       grantId: grant.id,
       principal,
       keeps: admin ? admin.sources.map(describeKept) : [],
-      unresolved: principal === "user" && !grant.user?.display && !grant.user?.identifier,
     },
   };
 }

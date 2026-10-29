@@ -385,9 +385,10 @@ describe("project admins", () => {
   });
 
   it("keeps a direct grant the admins list leaves out, down to its id", async () => {
-    // The admins list is live access by people who exist, so an expired grant
-    // or a deleted user's is only on the grants read, as a degraded ref:
-    // `user_id` only. It is still the project's, and still revocable here.
+    // The admins list is live admin access, so an expired grant is only on
+    // the grants read; a ref whose schema designates neither display name nor
+    // identifier carries `user_id` only. It is still the project's, and still
+    // revocable here.
     stubProject({ grants: [grant({ user: { user_id: "user_1" } })] });
     const deleted = stubDeleteGrant();
     await renderProject();
@@ -396,14 +397,11 @@ describe("project admins", () => {
     expect(row("user_1").getByText("Admin grant")).toBeInTheDocument();
     expect(row("user_1").queryByText("Team")).not.toBeInTheDocument();
     const dialog = await openRemove("user_1");
-    // A deleted user and one outside the viewer's read look the same, so the
-    // copy claims neither that the account exists nor that it is gone.
+    // The id alone names the row, and the default copy is true for it: the
+    // grant is the user's direct access, whatever else is known about them.
     expect(
-      dialog.getByText(
-        "User details are unavailable. Removing this grant revokes the access it provides.",
-      ),
+      dialog.getByText("This removes the user's direct access grant to this project."),
     ).toBeInTheDocument();
-    expect(dialog.queryByText(/direct access grant/)).not.toBeInTheDocument();
     await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_1", projectId: PROJECT_ID }]));
   });

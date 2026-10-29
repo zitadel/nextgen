@@ -12,13 +12,6 @@ export interface Removable {
   principal: "user" | "team";
   /** How the person keeps admin access once the grant is gone; empty when they do not. */
   keeps: string[];
-  /**
-   * A user ref with nothing but its id: a user whose schema designates
-   * neither a display name nor an identifier (ADR 058), or a grant a delete
-   * left behind before deletes revoked grants. The copy claims nothing about
-   * the account.
-   */
-  unresolved?: boolean;
 }
 
 /**
@@ -68,9 +61,6 @@ export function RemoveAdminDialog({
 function describeRemoval(removable: Removable): string {
   if (removable.principal === "team") {
     return "Team members will lose access provided by this grant. Other access is unaffected.";
-  }
-  if (removable.unresolved) {
-    return "User details are unavailable. Removing this grant revokes the access it provides.";
   }
   if (removable.keeps.length > 0) {
     return `The user will keep admin access through ${joinAnd(removable.keeps)}.`;
