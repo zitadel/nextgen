@@ -44,10 +44,12 @@ jobs:
     permissions:
       contents: read
     env:
-      # Vercel's Preview CLOUD_MIGRATOR_DATABASE_URL: the PlanetScale
-      # database `preview`, its `main` branch (a production branch to
-      # PlanetScale, still the preview cluster), database `postgres`. Never
-      # the Production value: the launcher refuses a database that holds the
+      # A role that inherits `postgres` on the PlanetScale database
+      # `preview`, its `main` branch (a production branch to PlanetScale,
+      # still the preview cluster), database `postgres`, port 5432, as
+      # Vercel's Preview CLOUD_MIGRATOR_DATABASE_URL is. It may drop what
+      # `postgres` owns (docs/runbooks/cloud.md, "Database"). Never
+      # production's: the launcher refuses a database that holds the
       # server's schema, which production's does.
       CLOUD_MIGRATOR_DATABASE_URL: ${{ secrets.CLOUD_PREVIEW_MIGRATOR_DATABASE_URL }}
     steps:

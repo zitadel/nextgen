@@ -5,9 +5,12 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"net/url"
+	"os"
 	"testing"
 	"time"
 
@@ -295,4 +298,131 @@ func TestEnsurePreviewDatabaseActsAsTheDefaultRoleWithoutCreateDB(t *testing.T) 
 	require.NoError(t, admin.QueryRow(ctx,
 		"SELECT coalesce(shobj_description(oid, 'pg_database'), '') FROM pg_database WHERE datname = $1", name).Scan(&comment))
 	assert.Contains(t, comment, "feature/member", "the member may stamp what its role owns")
+}
+
+// A role that cannot act as the default role creates the database as itself.
+// Only it can drop that one, so the build log warns.
+func TestEnsurePreviewDatabaseWarnsWhenOnlyItsRoleCanDropIt(t *testing.T) {
+	ctx := context.Background()
+	dsn, stop, err := testdb.PostgresDSN(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	admin, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = admin.Close(context.Background()) })
+
+	suffix := make([]byte, 4)
+	_, err = rand.Read(suffix)
+	require.NoError(t, err)
+	outsider := "launcher_outsider_" + hex.EncodeToString(suffix)
+	name := "preview_outsider_test_" + hex.EncodeToString(suffix)
+	if _, err := admin.Exec(ctx, "CREATE ROLE "+pgx.Identifier{outsider}.Sanitize()+" LOGIN CREATEDB PASSWORD 'outsider'"); err != nil {
+		t.Skipf("cannot create roles on this test database: %v", err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		_, _ = admin.Exec(bg, "DROP DATABASE IF EXISTS "+pgx.Identifier{name}.Sanitize()+" WITH (FORCE)")
+		_, _ = admin.Exec(bg, "DROP ROLE IF EXISTS "+pgx.Identifier{outsider}.Sanitize())
+	})
+	u, err := url.Parse(dsn)
+	if err != nil || u.Scheme == "" {
+		t.Skip("the test database URL is not a postgres:// URL")
+	}
+	u.User = url.UserPassword(outsider, "outsider")
+
+	logged := captureStderr(t, func() {
+		require.NoError(t, ensurePreviewDatabase(ctx, u.String(), name, "feature/outsider", time.Now()))
+	})
+	var owner string
+	require.NoError(t, admin.QueryRow(ctx, "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = $1", name).Scan(&owner))
+	assert.Equal(t, outsider, owner, "created as the connecting role")
+	assert.Contains(t, logged, "warning: created "+pgx.Identifier{name}.Sanitize()+" as "+outsider)
+	assert.Contains(t, logged, "the preview cleanup cannot")
+}
+
+// captureStderr returns what run writes to os.Stderr.
+func captureStderr(t *testing.T, run func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	previous := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = previous }()
+	run()
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	return string(out)
+}
+
+// On PlanetScale the preview builds' role has CREATEDB of its own. It still
+// creates the database as the default role, so another role that inherits
+// that one (the cleanup workflow's, an operator's) can drop it, and it
+// migrates it through the same inheritance: extensions, database options,
+// schema and tables.
+func TestEnsurePreviewDatabaseLeavesItToTheDefaultRoleWithCreateDB(t *testing.T) {
+	ctx := context.Background()
+	dsn, stop, err := testdb.PostgresDSN(ctx)
+	require.NoError(t, err)
+	t.Cleanup(stop)
+
+	admin, err := pgx.Connect(ctx, dsn)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = admin.Close(context.Background()) })
+
+	suffix := make([]byte, 4)
+	_, err = rand.Read(suffix)
+	require.NoError(t, err)
+	builds := "launcher_builds_" + hex.EncodeToString(suffix)
+	cleanup := "launcher_cleanup_" + hex.EncodeToString(suffix)
+	base := "launcher_owner_base_" + hex.EncodeToString(suffix)
+	name := "preview_owner_test_" + hex.EncodeToString(suffix)
+	t.Cleanup(func() {
+		bg := context.Background()
+		for _, db := range []string{name, base} {
+			_, _ = admin.Exec(bg, "DROP DATABASE IF EXISTS "+pgx.Identifier{db}.Sanitize()+" WITH (FORCE)")
+		}
+		for _, role := range []string{builds, cleanup} {
+			_, _ = admin.Exec(bg, "DROP ROLE IF EXISTS "+pgx.Identifier{role}.Sanitize())
+		}
+	})
+	for _, role := range []string{builds, cleanup} {
+		ident := pgx.Identifier{role}.Sanitize()
+		if _, err := admin.Exec(ctx, "CREATE ROLE "+ident+" LOGIN CREATEDB PASSWORD 'member'"); err != nil {
+			t.Skipf("cannot create roles on this test database: %v", err)
+		}
+		if _, err := admin.Exec(ctx, "GRANT "+pgx.Identifier{adminRole}.Sanitize()+" TO "+ident); err != nil {
+			t.Skipf("cannot grant %s on this test database: %v", adminRole, err)
+		}
+	}
+	// A base database of its own: a shared test server's postgres database
+	// may hold the server's schema, which the drop refuses.
+	_, err = admin.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{base}.Sanitize())
+	require.NoError(t, err)
+	as := func(role, database string) string {
+		t.Helper()
+		u, err := url.Parse(dsn)
+		if err != nil || u.Scheme == "" {
+			t.Skip("the test database URL is not a postgres:// URL")
+		}
+		u.User = url.UserPassword(role, "member")
+		u.Path = "/" + database
+		return u.String()
+	}
+
+	require.NoError(t, ensurePreviewDatabase(ctx, as(builds, base), name, "feature/owner", time.Now()))
+	var owner string
+	require.NoError(t, admin.QueryRow(ctx, "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = $1", name).Scan(&owner))
+	assert.Equal(t, adminRole, owner, "created as the default role, although the builds' role may create databases itself")
+
+	preview, err := sql.Open("pgx", as(builds, name))
+	require.NoError(t, err)
+	require.NoError(t, migration.Migrate(ctx, preview), "the builds' role migrates what the default role owns")
+	require.NoError(t, preview.Close())
+
+	require.NoError(t, dropPreviewDatabases(ctx, as(cleanup, base), time.Time{}, name), "another member drops it")
+	var found bool
+	require.NoError(t, admin.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&found))
+	assert.False(t, found)
 }
