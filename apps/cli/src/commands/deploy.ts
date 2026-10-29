@@ -2,6 +2,7 @@ import { Flags } from "@oclif/core";
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
+  abbreviate,
   buildBundle,
   createDeployment,
   DEPLOY_ARGS,
@@ -255,18 +256,6 @@ export function liveOn(hash: string, origins: readonly string[]): string {
   const where =
     origins.length === 1 ? origins[0] : `${origins.slice(0, -1).join(", ")} and ${origins.at(-1)}`;
   return `${release} on ${where}.`;
-}
-
-/**
- * A content hash short enough to close the chain on. `sha256:` and 64 hex
- * digits is wider than a closing line may be, so the digest is cut to the 12
- * characters that identify it in practice; the full hash stays in the
- * envelope, where something might match on it.
- */
-export function abbreviate(hash: string): string {
-  const separator = hash.indexOf(":");
-  const algorithm = separator < 0 ? "" : hash.slice(0, separator + 1);
-  return `${algorithm}${hash.slice(separator + 1, separator + 13)}`;
 }
 
 /** The `code` of an API error body, when it carries one. */

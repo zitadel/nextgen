@@ -469,6 +469,45 @@ describe("setup command", () => {
     expect(framed(res.stdout).at(-1)).toContain("Using project ");
   });
 
+  it("says in the chain that it deployed what it wrote", async () => {
+    const cwd = await makeNextProject();
+
+    const res = await runCliForTest([
+      ...["setup", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ...["--non-interactive", "--skip-install", "--no-git", "--framework", "next"],
+      ...PINNED_DEV_PORT,
+    ]);
+
+    expect(res.exitCode).toBe(0);
+    // Said as a step of the chain, like the commit above it, rather than in
+    // lines of its own beside it — and on one line: the full content hash is
+    // wider than a step line may be, so it is abbreviated rather than wrapped
+    // onto a second line that reads as another step.
+    expect(stripAnsi(res.stdout)).toMatch(/Deployed sha256:[0-9a-f]{12} to 1 origin$/m);
+  });
+
+  it("names the deploy in the box when its own deploy failed", async () => {
+    const cwd = await makeNextProject();
+    server.use(
+      http.post("*/releases/build", () =>
+        HttpResponse.json({ code: "internal", message: "boom" }, { status: 500 }),
+      ),
+    );
+
+    const res = await runCliForTest([
+      ...["setup", "--cwd", cwd, "--server", "https://api.zitadel.cloud"],
+      ...["--non-interactive", "--skip-install", "--no-git", "--framework", "next"],
+      ...PINNED_DEV_PORT,
+    ]);
+
+    // A failed deploy leaves the project on its stored revisions, so the
+    // deploy that fixes it leads the box as well as the envelope: the two
+    // renderings are one summary and neither may drop a step the other has.
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Left .zitadel/ undeployed");
+    expect(framed(res.stdout).join("\n")).toContain("Deploy .zitadel/ so the project serves");
+  });
+
   describe("a custom provider", () => {
     const ACME = [
       "--sso",
