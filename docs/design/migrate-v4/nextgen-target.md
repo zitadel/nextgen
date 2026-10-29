@@ -219,7 +219,7 @@
 
 | # | Gap | Where | Effect on the migration | Suggested fix |
 |---|---|---|---|---|
-| G1 | Sign-in resolves users of any status; status enforcement is deferred | `resolveIdentifier` in [auth_attempt.go](../../../internal/service/auth_attempt.go) | Deactivated or locked v4 users could still sign in | Refuse non-active users at the identifier and SSO bind steps (independent of migration) |
+| G1 | Sign-in resolves users of any status; status enforcement is deferred | `resolveIdentifier` in [auth_attempt.go](../../../internal/service/auth_attempt.go) | Deactivated or locked v4 users still sign in: the POC's demo check showed it for all four on real v4 data | Refuse non-active users at the identifier and SSO bind steps (independent of migration) |
 | G2 | Rehash on verify is not persisted | `PasswapHasher.VerifyHash` in [passwap.go](../../../internal/crypto/passwap.go) | bcrypt users stay on bcrypt, and each sign-in computes and drops an argon2id hash | ADR 038 follow-up 1 |
 | G3 | No email reset or recovery | [ADR 038 §4](../../adrs/038-user-credential-migration-and-recovery.md), [ADR 050](../../adrs/050-dev-inbox.md) | Users without a usable hash cannot get in | Email code or magic link |
 | G4 | No service writes a lifecycle owner, a team under a given id, a membership or a link, and none emits for them | §4, §6, §8 | The migrator writes statements and emits events itself | An internal import service with events (`team.membership.updated` #879) |

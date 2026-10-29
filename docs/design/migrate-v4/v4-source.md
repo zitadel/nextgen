@@ -89,6 +89,15 @@ This is v4's own projection query (`prepareEventTypeScans`).
   that instance. v4's projections do the same constantly.
 - **Pairs with idempotent apply.** Keep the cursor beside the stage. Skip
   events at or below the stored per-aggregate `sequence`.
+- **Detect with position, fold by sequence.** The POC uses this query only to
+  learn which aggregates changed. It then reads each one's events after its
+  staged sequence on the primary key (`instance_id, aggregate_type,
+  aggregate_id, sequence`), in sequence order
+  ([events.go](../../../internal/migratev4/v4/events.go)).
+  - One aggregate's sequences become visible in order: a push that reads the
+    newest sequence waits for the transaction holding it.
+  - So the fold is right even where positions disagree with sequences, which
+    old data written before 4.18 can contain.
 - **Instances.** List them from `instance.added` minus `instance.removed`, both
   on `aggregate_type = 'instance'`. A partial index (`active_instances_events`)
   covers that.
@@ -125,6 +134,7 @@ files are under `v4:internal/repository/`.
 | `instance.added`, `instance.changed` {`name`} | Name |
 | `instance.removed` | Instance removed. Stop and report |
 | `instance.default.org.set` {`orgId`} | Default org (the newest wins) |
+| `instance.iam.project.set` {`iamProjectId`} | Zitadel's own project (the console's), left out of `assess`'s project count |
 | `instance.domain.added` {`domain`, `generated`}, `.primary.set`, `.removed`; `instance.trusted_domains.added`/`.removed` | Origin candidates for the report |
 | `instance.policy.domain.added`/`.changed` {`userLoginMustBeDomain`, …} | Instance default for login names (default false) |
 | `instance.policy.login.added`/`.changed` {`allowUsernamePassword`, `allowRegister`, `allowExternalIdp`, `forceMFA`, `disableLoginWithEmail`, `disableLoginWithPhone`, …} | `assess` flags, such as forced MFA |
@@ -282,9 +292,15 @@ defines login names, together with setup steps 58 and 72.
 
 ## 6. What `assess` counts but does not migrate
 
-These categories are counted as live objects by folding add and remove
-events per object id. The exact type lists are in each package's
-`eventstore.go`.
+- **Live objects.** Projects, user grants, actions and user schemas are folded
+  per aggregate from their add and remove events. The exact type lists are in
+  each package's `eventstore.go`.
+- **Settings.** These are counted as changes someone made:
+  - Setup writes its defaults with an empty `creator`: 72
+    `instance.customtext.set`, the default label, lockout and password
+    policies, the first members, and feature flags.
+  - API writes carry the acting user's id. `creator <> ''` therefore separates
+    customizations from a fresh instance's defaults.
 
 | Category | Aggregate, event-type prefix |
 |---|---|

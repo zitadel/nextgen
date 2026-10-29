@@ -103,6 +103,7 @@ func NewCommand() *cobra.Command {
 
 	root.AddCommand(serverCmd)
 	root.AddCommand(newMigrateCommand(&configPath))
+	root.AddCommand(newMigrateV4Command(&configPath))
 	return root
 }
 
