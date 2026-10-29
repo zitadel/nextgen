@@ -96,6 +96,14 @@ selectable without an implementation behind it.
   private-use scheme for a public client, without a fragment and in their
   canonical form, so the browser goes byte for byte to the URI that was
   checked ([POC findings](https://github.com/zitadel/nextgen/pull/2451)).
+- **What the authorization server reads per request** (agreed with part A):
+  the consent policy (`consent`: `skip`, which only a first-party client may
+  use, `new_scopes` or `always`), `account_choice`, the display fields a
+  client ID metadata document carries (`logo_uri`, `client_uri`, `policy_uri`,
+  `tos_uri`, on the app), post-logout redirect URIs, `private_key_jwt` keys as
+  a public JWK set (`jwks`), and a signing algorithm, RS256 unless the client
+  (`id_token_signed_response_alg`) or the API (`signing_alg`) asks for ES256.
+  Branding and flows find the app by its slug.
 - **What the document does not hold:** token lifetimes and claim mappings,
   which are policies ([below](#lifetimes-and-claims-are-policies)), and a
   principal's rights, which are grants.
@@ -152,6 +160,23 @@ The domain answers these rules
 ([`app.go`](../../../internal/domain/app.go): `AccessTo`, `GrantScopes`), so
 the authorization server and anything else that issues tokens apply them the
 same way.
+
+## Kinds of data
+
+Apps are configuration, whoever writes them: a declared app is code, a
+registered one is configuration written through the API, revisioned like a
+connection. Of the three kinds of data, the only stateful data is users;
+transient data is sessions and consent; events are audit logs only. An app's
+records fall like this:
+
+| Record | Kind | Owner |
+| --- | --- | --- |
+| App documents and their revisions, client ids, API identifiers, a registered app's secret hashes | Configuration | Apps |
+| Dynamically registered clients | Transient: kept while a consent or a refresh token uses them, then purged | Apps stores them; the authorization server's `POST /register` writes them |
+| Client ID metadata documents | Not stored: fetched and cached | Authorization server |
+| Consents, codes, refresh tokens | Transient, stored like sessions | Authorization server |
+| SCIM sync state | Transient: a reconcile rebuilds it | Apps (designed) |
+| `app.*` events | Events: audit only, never a feed for an engine | Apps |
 
 ## Storage
 
@@ -221,8 +246,26 @@ The authorization server finds clients and APIs through one interface,
   dynamic registration) stay in the authorization server; the directory
   answers not-found for them.
 
-`internal/oauth` (part A) would replace its `PlatformApp()` lookups with these
-calls. The interface was proposed to the POC session; it is not agreed yet.
+Part A agreed to this shape: `internal/oauth` replaces its `PlatformApp()`
+lookups with these calls, and resolves `AppLookup.DeploymentID` itself
+(ADR 081 §10). Also agreed:
+
+- **Without `resource`, a token is for userinfo only** (ADR 082 §5). The
+  order of a client's `apis` is the default the SDK sends, not one the server
+  applies.
+- **A `private_key_jwt` assertion** is checked by the authorization server
+  against the client's `jwks`; `VerifyClientSecret` covers secrets only.
+- **`scopes_supported` lists exactly what is accepted**, because clients such
+  as Claude Code request every advertised scope: an API's protected-resource
+  metadata (RFC 9728) lists its own scopes, and the authorization server's
+  metadata the built-in ones.
+- **Dynamically registered clients are stored**, not sealed into their
+  `client_id`, so they can be listed and revoked one by one. A registration
+  names no API, so it belongs to the project, not to an app; the app is the
+  one whose API a request names, and that app's `registration` must allow it.
+  `POST /register` stays the authorization server's endpoint and calls the
+  apps write; the directory answers the stored clients. They are transient
+  data, not built yet; the POC's sealed ids stand in until then.
 
 ## Lifetimes and claims are policies
 
@@ -299,10 +342,13 @@ keeps the app's own user store in step:
 | `deprovision` | `deactivate` (`active: false`) or `delete` |
 | `groups` | Later: teams as SCIM groups |
 
-- **Engine:** an ADR 065 job per config that reads user events (ADR 048)
-  from a cursor and pushes creates, updates and deactivations, with a row per
-  config and user (remote id, last pushed hash, attempts, last error) for
-  idempotency and retries, and a full reconcile when the config changes.
+- **Engine:** ADR 065 jobs. A user write enqueues a provisioning job in its
+  own transaction, and a periodic reconcile pages through the users by
+  `updated_at`, so a missed job only delays a push. Audit events are never
+  its feed.
+- **State:** a row per config and user (remote id, last pushed hash,
+  attempts, last error) for idempotency and retries. It is transient: the
+  matching key finds the remote user again, so a reconcile rebuilds it.
 - It needs nothing from part A, so it is the cheaper of the two to build
   first.
 
@@ -323,8 +369,8 @@ grammar the CLI shares (ADR 064 §11):
 The query filters by columns today (`slug`, `source`, `created_at`). The tabs
 need facets computed when a revision is written, such as `has_api` and
 `has_principal` on `app_revisions`, so every dialect filters them alike.
-Clients that registered themselves are listed from part A's grants table, on
-the app's page, since nothing else stores them.
+Clients that registered themselves are listed on the app's page, from their
+stored registrations and part A's consents, both transient.
 
 ## CLI and presets
 
@@ -360,6 +406,8 @@ zitadel apps create partner --preset web --redirect-uri https://partner.example/
 | Release bundle, pinned revisions | Built | Service tests on SQLite |
 | `AppDirectory` | Built | Service tests on SQLite, a deployment pinning an older revision included |
 | Imported v4 bcrypt secrets | Built | Verified and moved to SHA-256 |
+| What part A reads per request (consent, account choice, display, `jwks`, signing algorithms) | Built in the document | Domain unit tests |
+| Stored dynamically registered clients | Designed | — |
 | `apps create`, `apps list`, `apps get`, presets | Built | CLI and config unit tests |
 | Declared secret verification | Built | Shares `secretVariable` with SSO sign-in; not tested on its own |
 | Lifetimes, claims, SAML, SCIM, console tabs | Designed | — |
@@ -376,8 +424,5 @@ zitadel apps create partner --preset web --redirect-uri https://partner.example/
    issuer's origin) covers the common case.
 3. **Deleting an app**, with [#1013](https://github.com/zitadel/nextgen/issues/1013)
    for declared resources.
-4. **Without `resource`**, ADR 082 §5 issues a token for userinfo only, while
-   the POC used the client's first API. The document keeps "default first"
-   either way.
-5. **The secret format** (prefix, checksum) with the apps and machine
+4. **The secret format** (prefix, checksum) with the apps and machine
    identities note.

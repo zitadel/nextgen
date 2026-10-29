@@ -44,6 +44,13 @@ properties:
       The scopes the API defines on top of the built-in OpenID Connect ones. A request for a scope
       neither defines fails with `invalid_scope`; it is never dropped silently. Granted scopes reach
       the token in `scope` only, never as claims.
+  signing_alg:
+    type: string
+    enum:
+    - RS256
+    - ES256
+    description: The algorithm access tokens for the API are signed with. RS256 when left out
+      (ADR 082 §7).
   third_party:
     type: boolean
     description: Lets clients that registered themselves into the app (client ID metadata documents

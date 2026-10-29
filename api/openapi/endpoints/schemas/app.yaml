@@ -30,6 +30,27 @@ properties:
     description: The app's name, shown on the consent screen.
     examples:
     - Shop
+  logo_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's logo, shown on the consent and account-choice screens. The display fields
+      are those a client ID metadata document carries (RFC 7591), so the screens read both alike.
+  client_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's home page, linked from the consent screen.
+  policy_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's privacy policy, linked from the consent screen.
+  tos_uri:
+    type: string
+    pattern: ^https://
+    maxLength: 2048
+    description: The app's terms of service, linked from the consent screen.
   preset:
     type: string
     pattern: ^[a-z0-9][a-z0-9_-]*$

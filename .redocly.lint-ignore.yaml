@@ -8,6 +8,11 @@ api/openapi/endpoints/schemas/user-schema.yaml:
     # a data-format migration.
     - '#/properties/objectType'
     - '#/properties/metaSchema'
+api/openapi/endpoints/schemas/app-client-jwk.yaml:
+  rule/wire-enum-no-camel-case:
+    # `EdDSA` is the JOSE name of the Ed25519 signature algorithm (RFC 8037), a
+    # value a JWK carries as written, not a wire enum of ours.
+    - '#/properties/alg/enum'
 api/openapi/endpoints/schemas/sso-auth-method.yaml:
   no-required-schema-properties-undefined:
     # `providers` is defined at the schema root; the if/then/else arms only

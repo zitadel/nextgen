@@ -185,6 +185,18 @@ func TestAppService_RegisteredApp(t *testing.T) {
 		require.NoError(t, f.directory.VerifyClientSecret(f.ctx, f.at(), app, web, "ownCloud-hardcoded"))
 	})
 
+	t.Run("a private_key_jwt client gets no secret, and takes none", func(t *testing.T) {
+		withKeys, err := f.apps.CreateOrRevise(f.ctx, f.projectID, []byte(`{"slug":"jobs","name":"Jobs","clients":[
+			{"slug":"runner","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
+			 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]}}]}`))
+		require.NoError(t, err)
+		assert.Empty(t, withKeys.Secrets)
+		_, err = f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
+			ProjectID: f.projectID, AppID: withKeys.App.ID, ClientSlug: "runner",
+		})
+		require.ErrorIs(t, err, domain.ErrAppInvalid(nil))
+	})
+
 	t.Run("a public client takes no secret", func(t *testing.T) {
 		_, err := f.apps.AddClientSecret(f.ctx, service.AddAppClientSecretInput{
 			ProjectID: f.projectID, AppID: created.App.ID, ClientSlug: "desktop",

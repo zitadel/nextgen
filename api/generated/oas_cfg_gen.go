@@ -41,6 +41,7 @@ var regexMap = map[string]ogenregex.Regexp{
 	"^att_[a-zA-Z0-9_-]+$":                  ogenregex.MustCompile("^att_[a-zA-Z0-9_-]+$"),
 	"^ch_[a-zA-Z0-9_-]+$":                   ogenregex.MustCompile("^ch_[a-zA-Z0-9_-]+$"),
 	"^dep_[a-zA-Z0-9_-]+$":                  ogenregex.MustCompile("^dep_[a-zA-Z0-9_-]+$"),
+	"^https://":                             ogenregex.MustCompile("^https://"),
 	"^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$": ogenregex.MustCompile("^https?://(\\[[0-9a-f:.]+\\]|[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*)(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3}))?$"),
 	"^pol_[a-zA-Z0-9_-]+$":    ogenregex.MustCompile("^pol_[a-zA-Z0-9_-]+$"),
 	"^polrev_[a-zA-Z0-9_-]+$": ogenregex.MustCompile("^polrev_[a-zA-Z0-9_-]+$"),

@@ -202,6 +202,25 @@ const (
 	ClientAuthNone              ClientAuthMethod = "none"
 	ClientAuthClientSecretBasic ClientAuthMethod = "client_secret_basic"
 	ClientAuthClientSecretPost  ClientAuthMethod = "client_secret_post"
+	ClientAuthPrivateKeyJWT     ClientAuthMethod = "private_key_jwt"
+)
+
+// UsesSecret reports whether the method authenticates with a client secret.
+func (m ClientAuthMethod) UsesSecret() bool {
+	return m == ClientAuthClientSecretBasic || m == ClientAuthClientSecretPost
+}
+
+// ConsentPolicy is when the user is asked to consent to a client.
+type ConsentPolicy string
+
+const (
+	// ConsentSkip asks only when the request says prompt=consent. Only a
+	// first-party client may skip.
+	ConsentSkip ConsentPolicy = "skip"
+	// ConsentNewScopes asks for scopes the user has not consented to yet.
+	ConsentNewScopes ConsentPolicy = "new_scopes"
+	// ConsentAlways asks on every request.
+	ConsentAlways ConsentPolicy = "always"
 )
 
 // GrantType is an OAuth grant type a client may use.
@@ -221,8 +240,14 @@ var BuiltinScopes = []string{"openid", "profile", "email", "address", "phone", "
 // `.zitadel/apps/<slug>.json`. The meta-schema (app.json) checks each field;
 // Validate checks the rules across fields.
 type AppDocument struct {
-	Slug         string          `json:"slug"`
-	Name         string          `json:"name"`
+	Slug string `json:"slug"`
+	Name string `json:"name"`
+	// The display fields a client ID metadata document carries (RFC 7591),
+	// so the consent and account-choice steps read both alike.
+	LogoURI      string          `json:"logo_uri,omitempty"`
+	ClientURI    string          `json:"client_uri,omitempty"`
+	PolicyURI    string          `json:"policy_uri,omitempty"`
+	TOSURI       string          `json:"tos_uri,omitempty"`
 	Preset       string          `json:"preset,omitempty"`
 	Clients      []AppClient     `json:"clients,omitempty"`
 	APIs         []AppAPI        `json:"apis,omitempty"`
@@ -231,17 +256,24 @@ type AppDocument struct {
 
 // AppClient is an OAuth client of an app.
 type AppClient struct {
-	Slug                   string           `json:"slug"`
-	Name                   string           `json:"name,omitempty"`
-	ClientID               string           `json:"client_id,omitempty"`
-	Type                   ClientType       `json:"type"`
-	AuthMethod             ClientAuthMethod `json:"auth_method,omitempty"`
-	Secret                 string           `json:"secret,omitempty"`
-	Grants                 []GrantType      `json:"grants"`
-	RedirectURIs           []string         `json:"redirect_uris,omitempty"`
-	PostLogoutRedirectURIs []string         `json:"post_logout_redirect_uris,omitempty"`
-	FirstParty             *bool            `json:"first_party,omitempty"`
-	APIs                   []ClientAPI      `json:"apis,omitempty"`
+	Slug       string           `json:"slug"`
+	Name       string           `json:"name,omitempty"`
+	ClientID   string           `json:"client_id,omitempty"`
+	Type       ClientType       `json:"type"`
+	AuthMethod ClientAuthMethod `json:"auth_method,omitempty"`
+	Secret     string           `json:"secret,omitempty"`
+	// JWKS is the public key set a private_key_jwt client signs its
+	// assertions with, passed to the authorization server as written.
+	JWKS                   json.RawMessage `json:"jwks,omitempty"`
+	Grants                 []GrantType     `json:"grants"`
+	RedirectURIs           []string        `json:"redirect_uris,omitempty"`
+	PostLogoutRedirectURIs []string        `json:"post_logout_redirect_uris,omitempty"`
+	FirstParty             *bool           `json:"first_party,omitempty"`
+	Consent                ConsentPolicy   `json:"consent,omitempty"`
+	AccountChoice          bool            `json:"account_choice,omitempty"`
+	// IDTokenSignedResponseAlg is RS256 when empty (ADR 082 §7).
+	IDTokenSignedResponseAlg string      `json:"id_token_signed_response_alg,omitempty"`
+	APIs                     []ClientAPI `json:"apis,omitempty"`
 }
 
 // ClientAPI is one API a client may get tokens for. API is a slug of the
@@ -258,7 +290,9 @@ type AppAPI struct {
 	Name       string     `json:"name,omitempty"`
 	Identifier string     `json:"identifier"`
 	Scopes     []APIScope `json:"scopes,omitempty"`
-	ThirdParty bool       `json:"third_party,omitempty"`
+	// SigningAlg is RS256 when empty (ADR 082 §7).
+	SigningAlg string `json:"signing_alg,omitempty"`
+	ThirdParty bool   `json:"third_party,omitempty"`
 }
 
 // APIScope is a scope an API defines, with its consent line.
@@ -365,8 +399,21 @@ func (d AppDocument) Validate(source AppSource) error {
 			}
 		case ClientTypeConfidential:
 			if c.AuthMethod == ClientAuthNone {
-				add(base+"/auth_method", "a confidential client authenticates with a secret")
+				add(base+"/auth_method", "a confidential client authenticates with a secret or a key")
 			}
+		}
+		if c.EffectiveAuthMethod() == ClientAuthPrivateKeyJWT {
+			if err := checkJWKS(c.JWKS); err != nil {
+				add(base+"/jwks", "%s", err)
+			}
+			if c.Secret != "" {
+				add(base+"/secret", "a private_key_jwt client authenticates with its keys, not a secret")
+			}
+		} else if len(c.JWKS) > 0 {
+			add(base+"/jwks", "jwks is for a private_key_jwt client")
+		}
+		if c.Consent == ConsentSkip && !c.IsFirstParty(source) {
+			add(base+"/consent", "only a first-party client may skip consent")
 		}
 		if slices.Contains(c.Grants, GrantRefreshToken) && !slices.Contains(c.Grants, GrantAuthorizationCode) {
 			add(base+"/grants", "refresh_token needs authorization_code: OAuth 2.1 issues no refresh token for client_credentials")
@@ -384,7 +431,7 @@ func (d AppDocument) Validate(source AppSource) error {
 				add(fmt.Sprintf("%s/post_logout_redirect_uris/%d", base, j), "%s", err)
 			}
 		}
-		if c.Type == ClientTypeConfidential {
+		if c.EffectiveAuthMethod().UsesSecret() {
 			switch {
 			case source == AppSourceRegistered && c.Secret != "":
 				add(base+"/secret", "an app registered through the API gets its secrets from the server or an import, not a variable reference")
@@ -495,6 +542,18 @@ func (c AppClient) EffectiveAuthMethod() ClientAuthMethod {
 	return ClientAuthClientSecretBasic
 }
 
+// EffectiveConsent is the client's consent policy, or else skip for a
+// first-party client and new_scopes for a third-party one.
+func (c AppClient) EffectiveConsent(source AppSource) ConsentPolicy {
+	if c.Consent != "" {
+		return c.Consent
+	}
+	if c.IsFirstParty(source) {
+		return ConsentSkip
+	}
+	return ConsentNewScopes
+}
+
 // IsFirstParty reports whether the client skips consent: its first_party
 // field, or else true for a declared or built-in app and false for a
 // registered one (ADR 082 §3).
@@ -591,6 +650,31 @@ func GrantScopes(api AppAPI, access ClientAPIAccess, requested []string) ([]stri
 		return nil, ErrInvalidScope(details)
 	}
 	return granted, nil
+}
+
+// checkJWKS accepts a key set with at least one key, each with its own kid
+// when there are several, so an assertion's kid picks one. The meta-schema
+// already admits public members only.
+func checkJWKS(raw json.RawMessage) error {
+	var set struct {
+		Keys []struct {
+			Kid string `json:"kid"`
+		} `json:"keys"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &set) != nil || len(set.Keys) == 0 {
+		return fmt.Errorf("a private_key_jwt client needs its public keys in jwks")
+	}
+	if len(set.Keys) == 1 {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, key := range set.Keys {
+		if key.Kid == "" || seen[key.Kid] {
+			return fmt.Errorf("several keys need a kid each, and no two alike")
+		}
+		seen[key.Kid] = true
+	}
+	return nil
 }
 
 // checkAPIIdentifier accepts an https URL, an http URL on a loopback host, or

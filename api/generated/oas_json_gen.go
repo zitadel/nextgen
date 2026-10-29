@@ -1640,6 +1640,30 @@ func (s *App) encodeFields(e *jx.Encoder) {
 		e.Str(s.Name)
 	}
 	{
+		if s.LogoURI.Set {
+			e.FieldStart("logo_uri")
+			s.LogoURI.Encode(e)
+		}
+	}
+	{
+		if s.ClientURI.Set {
+			e.FieldStart("client_uri")
+			s.ClientURI.Encode(e)
+		}
+	}
+	{
+		if s.PolicyURI.Set {
+			e.FieldStart("policy_uri")
+			s.PolicyURI.Encode(e)
+		}
+	}
+	{
+		if s.TosURI.Set {
+			e.FieldStart("tos_uri")
+			s.TosURI.Encode(e)
+		}
+	}
+	{
 		if s.Preset.Set {
 			e.FieldStart("preset")
 			s.Preset.Encode(e)
@@ -1673,14 +1697,18 @@ func (s *App) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfApp = [7]string{
-	0: "$schema",
-	1: "slug",
-	2: "name",
-	3: "preset",
-	4: "clients",
-	5: "apis",
-	6: "registration",
+var jsonFieldsNameOfApp = [11]string{
+	0:  "$schema",
+	1:  "slug",
+	2:  "name",
+	3:  "logo_uri",
+	4:  "client_uri",
+	5:  "policy_uri",
+	6:  "tos_uri",
+	7:  "preset",
+	8:  "clients",
+	9:  "apis",
+	10: "registration",
 }
 
 // Decode decodes App from json.
@@ -1688,7 +1716,7 @@ func (s *App) Decode(d *jx.Decoder) error {
 	if s == nil {
 		return errors.New("invalid: unable to decode App to nil")
 	}
-	var requiredBitSet [1]uint8
+	var requiredBitSet [2]uint8
 
 	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
 		switch string(k) {
@@ -1725,6 +1753,46 @@ func (s *App) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"name\"")
+			}
+		case "logo_uri":
+			if err := func() error {
+				s.LogoURI.Reset()
+				if err := s.LogoURI.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"logo_uri\"")
+			}
+		case "client_uri":
+			if err := func() error {
+				s.ClientURI.Reset()
+				if err := s.ClientURI.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"client_uri\"")
+			}
+		case "policy_uri":
+			if err := func() error {
+				s.PolicyURI.Reset()
+				if err := s.PolicyURI.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"policy_uri\"")
+			}
+		case "tos_uri":
+			if err := func() error {
+				s.TosURI.Reset()
+				if err := s.TosURI.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"tos_uri\"")
 			}
 		case "preset":
 			if err := func() error {
@@ -1789,8 +1857,9 @@ func (s *App) Decode(d *jx.Decoder) error {
 	}
 	// Validate required fields.
 	var failures []validate.FieldError
-	for i, mask := range [1]uint8{
+	for i, mask := range [2]uint8{
 		0b00000110,
+		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
 			// Mask only required fields and check equality to mask using XOR.
@@ -1870,6 +1939,12 @@ func (s *AppAPI) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.SigningAlg.Set {
+			e.FieldStart("signing_alg")
+			s.SigningAlg.Encode(e)
+		}
+	}
+	{
 		if s.ThirdParty.Set {
 			e.FieldStart("third_party")
 			s.ThirdParty.Encode(e)
@@ -1877,12 +1952,13 @@ func (s *AppAPI) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAppAPI = [5]string{
+var jsonFieldsNameOfAppAPI = [6]string{
 	0: "slug",
 	1: "name",
 	2: "identifier",
 	3: "scopes",
-	4: "third_party",
+	4: "signing_alg",
+	5: "third_party",
 }
 
 // Decode decodes AppAPI from json.
@@ -1944,6 +2020,16 @@ func (s *AppAPI) Decode(d *jx.Decoder) error {
 				return nil
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"scopes\"")
+			}
+		case "signing_alg":
+			if err := func() error {
+				s.SigningAlg.Reset()
+				if err := s.SigningAlg.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"signing_alg\"")
 			}
 		case "third_party":
 			if err := func() error {
@@ -2124,6 +2210,46 @@ func (s *AppAPIScope) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes AppAPISigningAlg as json.
+func (s AppAPISigningAlg) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppAPISigningAlg from json.
+func (s *AppAPISigningAlg) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppAPISigningAlg to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppAPISigningAlg(v) {
+	case AppAPISigningAlgRS256:
+		*s = AppAPISigningAlgRS256
+	case AppAPISigningAlgES256:
+		*s = AppAPISigningAlgES256
+	default:
+		*s = AppAPISigningAlg(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppAPISigningAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppAPISigningAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode implements json.Marshaler.
 func (s *AppClient) Encode(e *jx.Encoder) {
 	e.ObjStart()
@@ -2166,6 +2292,12 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Jwks.Set {
+			e.FieldStart("jwks")
+			s.Jwks.Encode(e)
+		}
+	}
+	{
 		e.FieldStart("grants")
 		e.ArrStart()
 		for _, elem := range s.Grants {
@@ -2200,6 +2332,24 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 		}
 	}
 	{
+		if s.Consent.Set {
+			e.FieldStart("consent")
+			s.Consent.Encode(e)
+		}
+	}
+	{
+		if s.AccountChoice.Set {
+			e.FieldStart("account_choice")
+			s.AccountChoice.Encode(e)
+		}
+	}
+	{
+		if s.IDTokenSignedResponseAlg.Set {
+			e.FieldStart("id_token_signed_response_alg")
+			s.IDTokenSignedResponseAlg.Encode(e)
+		}
+	}
+	{
 		if s.Apis != nil {
 			e.FieldStart("apis")
 			e.ArrStart()
@@ -2211,18 +2361,22 @@ func (s *AppClient) encodeFields(e *jx.Encoder) {
 	}
 }
 
-var jsonFieldsNameOfAppClient = [11]string{
+var jsonFieldsNameOfAppClient = [15]string{
 	0:  "slug",
 	1:  "name",
 	2:  "client_id",
 	3:  "type",
 	4:  "auth_method",
 	5:  "secret",
-	6:  "grants",
-	7:  "redirect_uris",
-	8:  "post_logout_redirect_uris",
-	9:  "first_party",
-	10: "apis",
+	6:  "jwks",
+	7:  "grants",
+	8:  "redirect_uris",
+	9:  "post_logout_redirect_uris",
+	10: "first_party",
+	11: "consent",
+	12: "account_choice",
+	13: "id_token_signed_response_alg",
+	14: "apis",
 }
 
 // Decode decodes AppClient from json.
@@ -2296,8 +2450,18 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"secret\"")
 			}
+		case "jwks":
+			if err := func() error {
+				s.Jwks.Reset()
+				if err := s.Jwks.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"jwks\"")
+			}
 		case "grants":
-			requiredBitSet[0] |= 1 << 6
+			requiredBitSet[0] |= 1 << 7
 			if err := func() error {
 				s.Grants = make([]AppClientGrantsItem, 0)
 				if err := d.Arr(func(d *jx.Decoder) error {
@@ -2362,6 +2526,36 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 			}(); err != nil {
 				return errors.Wrap(err, "decode field \"first_party\"")
 			}
+		case "consent":
+			if err := func() error {
+				s.Consent.Reset()
+				if err := s.Consent.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"consent\"")
+			}
+		case "account_choice":
+			if err := func() error {
+				s.AccountChoice.Reset()
+				if err := s.AccountChoice.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"account_choice\"")
+			}
+		case "id_token_signed_response_alg":
+			if err := func() error {
+				s.IDTokenSignedResponseAlg.Reset()
+				if err := s.IDTokenSignedResponseAlg.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"id_token_signed_response_alg\"")
+			}
 		case "apis":
 			if err := func() error {
 				s.Apis = make([]AppClientAPI, 0)
@@ -2389,7 +2583,7 @@ func (s *AppClient) Decode(d *jx.Decoder) error {
 	// Validate required fields.
 	var failures []validate.FieldError
 	for i, mask := range [2]uint8{
-		0b01001001,
+		0b10001001,
 		0b00000000,
 	} {
 		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
@@ -2584,6 +2778,8 @@ func (s *AppClientAuthMethod) Decode(d *jx.Decoder) error {
 		*s = AppClientAuthMethodClientSecretBasic
 	case AppClientAuthMethodClientSecretPost:
 		*s = AppClientAuthMethodClientSecretPost
+	case AppClientAuthMethodPrivateKeyJwt:
+		*s = AppClientAuthMethodPrivateKeyJwt
 	default:
 		*s = AppClientAuthMethod(v)
 	}
@@ -2600,6 +2796,48 @@ func (s AppClientAuthMethod) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AppClientAuthMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientConsent as json.
+func (s AppClientConsent) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientConsent from json.
+func (s *AppClientConsent) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientConsent to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientConsent(v) {
+	case AppClientConsentSkip:
+		*s = AppClientConsentSkip
+	case AppClientConsentNewScopes:
+		*s = AppClientConsentNewScopes
+	case AppClientConsentAlways:
+		*s = AppClientConsentAlways
+	default:
+		*s = AppClientConsent(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientConsent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientConsent) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -2943,6 +3181,545 @@ func (s AppClientIDTakenDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *AppClientIDTakenDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientIDTokenSignedResponseAlg as json.
+func (s AppClientIDTokenSignedResponseAlg) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientIDTokenSignedResponseAlg from json.
+func (s *AppClientIDTokenSignedResponseAlg) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientIDTokenSignedResponseAlg to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientIDTokenSignedResponseAlg(v) {
+	case AppClientIDTokenSignedResponseAlgRS256:
+		*s = AppClientIDTokenSignedResponseAlgRS256
+	case AppClientIDTokenSignedResponseAlgES256:
+		*s = AppClientIDTokenSignedResponseAlgES256
+	default:
+		*s = AppClientIDTokenSignedResponseAlg(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientIDTokenSignedResponseAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientIDTokenSignedResponseAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppClientJwk) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppClientJwk) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("kty")
+		s.Kty.Encode(e)
+	}
+	{
+		if s.Kid.Set {
+			e.FieldStart("kid")
+			s.Kid.Encode(e)
+		}
+	}
+	{
+		if s.Use.Set {
+			e.FieldStart("use")
+			s.Use.Encode(e)
+		}
+	}
+	{
+		if s.Alg.Set {
+			e.FieldStart("alg")
+			s.Alg.Encode(e)
+		}
+	}
+	{
+		if s.N.Set {
+			e.FieldStart("n")
+			s.N.Encode(e)
+		}
+	}
+	{
+		if s.E.Set {
+			e.FieldStart("e")
+			s.E.Encode(e)
+		}
+	}
+	{
+		if s.Crv.Set {
+			e.FieldStart("crv")
+			s.Crv.Encode(e)
+		}
+	}
+	{
+		if s.X.Set {
+			e.FieldStart("x")
+			s.X.Encode(e)
+		}
+	}
+	{
+		if s.Y.Set {
+			e.FieldStart("y")
+			s.Y.Encode(e)
+		}
+	}
+}
+
+var jsonFieldsNameOfAppClientJwk = [9]string{
+	0: "kty",
+	1: "kid",
+	2: "use",
+	3: "alg",
+	4: "n",
+	5: "e",
+	6: "crv",
+	7: "x",
+	8: "y",
+}
+
+// Decode decodes AppClientJwk from json.
+func (s *AppClientJwk) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwk to nil")
+	}
+	var requiredBitSet [2]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "kty":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				if err := s.Kty.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kty\"")
+			}
+		case "kid":
+			if err := func() error {
+				s.Kid.Reset()
+				if err := s.Kid.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"kid\"")
+			}
+		case "use":
+			if err := func() error {
+				s.Use.Reset()
+				if err := s.Use.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"use\"")
+			}
+		case "alg":
+			if err := func() error {
+				s.Alg.Reset()
+				if err := s.Alg.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"alg\"")
+			}
+		case "n":
+			if err := func() error {
+				s.N.Reset()
+				if err := s.N.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"n\"")
+			}
+		case "e":
+			if err := func() error {
+				s.E.Reset()
+				if err := s.E.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"e\"")
+			}
+		case "crv":
+			if err := func() error {
+				s.Crv.Reset()
+				if err := s.Crv.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"crv\"")
+			}
+		case "x":
+			if err := func() error {
+				s.X.Reset()
+				if err := s.X.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"x\"")
+			}
+		case "y":
+			if err := func() error {
+				s.Y.Reset()
+				if err := s.Y.Decode(d); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"y\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppClientJwk")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [2]uint8{
+		0b00000001,
+		0b00000000,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppClientJwk) {
+					name = jsonFieldsNameOfAppClientJwk[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppClientJwk) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwk) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkAlg as json.
+func (s AppClientJwkAlg) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientJwkAlg from json.
+func (s *AppClientJwkAlg) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwkAlg to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientJwkAlg(v) {
+	case AppClientJwkAlgRS256:
+		*s = AppClientJwkAlgRS256
+	case AppClientJwkAlgES256:
+		*s = AppClientJwkAlgES256
+	case AppClientJwkAlgEdDSA:
+		*s = AppClientJwkAlgEdDSA
+	default:
+		*s = AppClientJwkAlg(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientJwkAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwkAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkCrv as json.
+func (s AppClientJwkCrv) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientJwkCrv from json.
+func (s *AppClientJwkCrv) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwkCrv to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientJwkCrv(v) {
+	case AppClientJwkCrvP256:
+		*s = AppClientJwkCrvP256
+	case AppClientJwkCrvEd25519:
+		*s = AppClientJwkCrvEd25519
+	default:
+		*s = AppClientJwkCrv(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientJwkCrv) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwkCrv) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkKty as json.
+func (s AppClientJwkKty) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientJwkKty from json.
+func (s *AppClientJwkKty) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwkKty to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientJwkKty(v) {
+	case AppClientJwkKtyRSA:
+		*s = AppClientJwkKtyRSA
+	case AppClientJwkKtyEC:
+		*s = AppClientJwkKtyEC
+	case AppClientJwkKtyOKP:
+		*s = AppClientJwkKtyOKP
+	default:
+		*s = AppClientJwkKty(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientJwkKty) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwkKty) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkUse as json.
+func (s AppClientJwkUse) Encode(e *jx.Encoder) {
+	e.Str(string(s))
+}
+
+// Decode decodes AppClientJwkUse from json.
+func (s *AppClientJwkUse) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwkUse to nil")
+	}
+	v, err := d.StrBytes()
+	if err != nil {
+		return err
+	}
+	// Try to use constant string.
+	switch AppClientJwkUse(v) {
+	case AppClientJwkUseSig:
+		*s = AppClientJwkUseSig
+	default:
+		*s = AppClientJwkUse(v)
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s AppClientJwkUse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwkUse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode implements json.Marshaler.
+func (s *AppClientJwks) Encode(e *jx.Encoder) {
+	e.ObjStart()
+	s.encodeFields(e)
+	e.ObjEnd()
+}
+
+// encodeFields encodes fields.
+func (s *AppClientJwks) encodeFields(e *jx.Encoder) {
+	{
+		e.FieldStart("keys")
+		e.ArrStart()
+		for _, elem := range s.Keys {
+			elem.Encode(e)
+		}
+		e.ArrEnd()
+	}
+}
+
+var jsonFieldsNameOfAppClientJwks = [1]string{
+	0: "keys",
+}
+
+// Decode decodes AppClientJwks from json.
+func (s *AppClientJwks) Decode(d *jx.Decoder) error {
+	if s == nil {
+		return errors.New("invalid: unable to decode AppClientJwks to nil")
+	}
+	var requiredBitSet [1]uint8
+
+	if err := d.ObjBytes(func(d *jx.Decoder, k []byte) error {
+		switch string(k) {
+		case "keys":
+			requiredBitSet[0] |= 1 << 0
+			if err := func() error {
+				s.Keys = make([]AppClientJwk, 0)
+				if err := d.Arr(func(d *jx.Decoder) error {
+					var elem AppClientJwk
+					if err := elem.Decode(d); err != nil {
+						return err
+					}
+					s.Keys = append(s.Keys, elem)
+					return nil
+				}); err != nil {
+					return err
+				}
+				return nil
+			}(); err != nil {
+				return errors.Wrap(err, "decode field \"keys\"")
+			}
+		default:
+			return errors.Errorf("unexpected field %q", k)
+		}
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, "decode AppClientJwks")
+	}
+	// Validate required fields.
+	var failures []validate.FieldError
+	for i, mask := range [1]uint8{
+		0b00000001,
+	} {
+		if result := (requiredBitSet[i] & mask) ^ mask; result != 0 {
+			// Mask only required fields and check equality to mask using XOR.
+			//
+			// If XOR result is not zero, result is not equal to expected, so some fields are missed.
+			// Bits of fields which would be set are actually bits of missed fields.
+			missed := bits.OnesCount8(result)
+			for bitN := 0; bitN < missed; bitN++ {
+				bitIdx := bits.TrailingZeros8(result)
+				fieldIdx := i*8 + bitIdx
+				var name string
+				if fieldIdx < len(jsonFieldsNameOfAppClientJwks) {
+					name = jsonFieldsNameOfAppClientJwks[fieldIdx]
+				} else {
+					name = strconv.Itoa(fieldIdx)
+				}
+				failures = append(failures, validate.FieldError{
+					Name:  name,
+					Error: validate.ErrFieldRequired,
+				})
+				// Reset bit.
+				result &^= 1 << bitIdx
+			}
+		}
+	}
+	if len(failures) > 0 {
+		return &validate.Error{Fields: failures}
+	}
+
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s *AppClientJwks) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *AppClientJwks) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -85355,6 +86132,39 @@ func (s *NotImplementedDetails) UnmarshalJSON(data []byte) error {
 	return s.Decode(d)
 }
 
+// Encode encodes AppAPISigningAlg as json.
+func (o OptAppAPISigningAlg) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppAPISigningAlg from json.
+func (o *OptAppAPISigningAlg) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppAPISigningAlg to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppAPISigningAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppAPISigningAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
 // Encode encodes AppClientAuthMethod as json.
 func (o OptAppClientAuthMethod) Encode(e *jx.Encoder) {
 	if !o.Set {
@@ -85384,6 +86194,39 @@ func (s OptAppClientAuthMethod) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAppClientAuthMethod) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientConsent as json.
+func (o OptAppClientConsent) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppClientConsent from json.
+func (o *OptAppClientConsent) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientConsent to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientConsent) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientConsent) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }
@@ -85418,6 +86261,171 @@ func (s OptAppClientIDTakenDetails) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON implements stdjson.Unmarshaler.
 func (s *OptAppClientIDTakenDetails) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientIDTokenSignedResponseAlg as json.
+func (o OptAppClientIDTokenSignedResponseAlg) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppClientIDTokenSignedResponseAlg from json.
+func (o *OptAppClientIDTokenSignedResponseAlg) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientIDTokenSignedResponseAlg to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientIDTokenSignedResponseAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientIDTokenSignedResponseAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkAlg as json.
+func (o OptAppClientJwkAlg) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppClientJwkAlg from json.
+func (o *OptAppClientJwkAlg) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientJwkAlg to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientJwkAlg) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientJwkAlg) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkCrv as json.
+func (o OptAppClientJwkCrv) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppClientJwkCrv from json.
+func (o *OptAppClientJwkCrv) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientJwkCrv to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientJwkCrv) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientJwkCrv) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwkUse as json.
+func (o OptAppClientJwkUse) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	e.Str(string(o.Value))
+}
+
+// Decode decodes AppClientJwkUse from json.
+func (o *OptAppClientJwkUse) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientJwkUse to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientJwkUse) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientJwkUse) UnmarshalJSON(data []byte) error {
+	d := jx.DecodeBytes(data)
+	return s.Decode(d)
+}
+
+// Encode encodes AppClientJwks as json.
+func (o OptAppClientJwks) Encode(e *jx.Encoder) {
+	if !o.Set {
+		return
+	}
+	o.Value.Encode(e)
+}
+
+// Decode decodes AppClientJwks from json.
+func (o *OptAppClientJwks) Decode(d *jx.Decoder) error {
+	if o == nil {
+		return errors.New("invalid: unable to decode OptAppClientJwks to nil")
+	}
+	o.Set = true
+	if err := o.Value.Decode(d); err != nil {
+		return err
+	}
+	return nil
+}
+
+// MarshalJSON implements stdjson.Marshaler.
+func (s OptAppClientJwks) MarshalJSON() ([]byte, error) {
+	e := jx.Encoder{}
+	s.Encode(&e)
+	return e.Bytes(), nil
+}
+
+// UnmarshalJSON implements stdjson.Unmarshaler.
+func (s *OptAppClientJwks) UnmarshalJSON(data []byte) error {
 	d := jx.DecodeBytes(data)
 	return s.Decode(d)
 }

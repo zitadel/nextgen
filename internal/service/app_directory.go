@@ -34,10 +34,12 @@ type AppDirectory interface {
 	// API finds the API whose identifier is resource, exactly, by the same
 	// rules. domain.ErrAppAPINotFound when none.
 	API(ctx context.Context, at AppLookup, resource string) (*domain.ResolvedApp, domain.AppAPI, error)
-	// VerifyClientSecret checks a confidential client's secret: a registered
-	// app's stored hashes, or a declared app's ${{ NAME }} variable as the
-	// deployment froze it. domain.ErrAppClientSecretInvalid when it matches
-	// none.
+	// VerifyClientSecret checks the secret of a client that authenticates
+	// with one: a registered app's stored hashes, or a declared app's
+	// ${{ NAME }} variable as the deployment froze it.
+	// domain.ErrAppClientSecretInvalid when it matches none. A private_key_jwt
+	// client's assertion is checked by the authorization server against the
+	// client's JWKS.
 	VerifyClientSecret(ctx context.Context, at AppLookup, app *domain.ResolvedApp, client domain.AppClient, secret string) error
 }
 
@@ -120,7 +122,7 @@ func (d *appDirectory) VerifyClientSecret(ctx context.Context, at AppLookup, app
 	ctx, end := startSpan(ctx, "AppDirectory.VerifyClientSecret")
 	defer end(&err)
 
-	if client.Type != domain.ClientTypeConfidential || secret == "" {
+	if !client.EffectiveAuthMethod().UsesSecret() || secret == "" {
 		return domain.ErrAppClientSecretInvalid()
 	}
 	switch app.Source {

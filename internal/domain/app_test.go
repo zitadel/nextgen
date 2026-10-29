@@ -134,6 +134,25 @@ func TestAppDocumentValidate(t *testing.T) {
 			want: []string{"/clients/0/auth_method", "/clients/0/secret", "/clients/0/grants", "/clients/1/auth_method"},
 		},
 		{
+			name: "a private_key_jwt client needs keys and no secret; keys are for private_key_jwt alone",
+			app: `{"slug":"a","name":"A","clients":[
+				{"slug":"k","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"]},
+				{"slug":"s","type":"confidential","auth_method":"private_key_jwt","secret":"${{ S }}",
+				 "jwks":{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]},"grants":["client_credentials"]},
+				{"slug":"j","type":"confidential","secret":"${{ J }}","jwks":{"keys":[{"kty":"OKP"}]},"grants":["client_credentials"]},
+				{"slug":"d","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
+				 "jwks":{"keys":[{"kty":"OKP","kid":"1"},{"kty":"OKP","kid":"1"}]}},
+				{"slug":"ok","type":"confidential","auth_method":"private_key_jwt","grants":["client_credentials"],
+				 "jwks":{"keys":[{"kty":"OKP","kid":"1"},{"kty":"OKP","kid":"2"}]}}]}`,
+			want: []string{"/clients/0/jwks", "/clients/1/secret", "/clients/2/jwks", "/clients/3/jwks"},
+		},
+		{
+			name:   "only a first-party client may skip consent",
+			app:    `{"slug":"a","name":"A","clients":[{"slug":"c","type":"public","consent":"skip","grants":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
+			source: domain.AppSourceRegistered,
+			want:   []string{"/clients/0/consent"},
+		},
+		{
 			name: "a chosen client_id may not look minted",
 			app: `{"slug":"a","name":"A","clients":[{"slug":"c","client_id":"client_01ABC","type":"public",
 				"grants":["authorization_code"],"redirect_uris":["https://a.example/cb"]}]}`,
@@ -188,9 +207,13 @@ func TestAppClientDefaults(t *testing.T) {
 	assert.True(t, web.IsFirstParty(domain.AppSourceDeclared))
 	assert.True(t, web.IsFirstParty(domain.AppSourceBuiltin))
 	assert.False(t, web.IsFirstParty(domain.AppSourceRegistered))
+	assert.Equal(t, domain.ConsentSkip, web.EffectiveConsent(domain.AppSourceDeclared))
+	assert.Equal(t, domain.ConsentNewScopes, web.EffectiveConsent(domain.AppSourceRegistered))
 	no := false
 	web.FirstParty = &no
 	assert.False(t, web.IsFirstParty(domain.AppSourceDeclared))
+	web.Consent = domain.ConsentAlways
+	assert.Equal(t, domain.ConsentAlways, web.EffectiveConsent(domain.AppSourceDeclared))
 }
 
 func TestResolvedAppAccessTo(t *testing.T) {

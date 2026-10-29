@@ -221,7 +221,8 @@ func (s *appService) afterWrite(ctx context.Context, stmts AllStatements, entity
 	secrets := map[string]string{}
 	if entity.Source == domain.AppSourceRegistered {
 		for i, client := range doc.Clients {
-			if client.Type != domain.ClientTypeConfidential {
+			// A private_key_jwt client authenticates with its keys.
+			if !client.EffectiveAuthMethod().UsesSecret() {
 				continue
 			}
 			stored, err := stmts.ListAppClientSecrets(ctx, entity.ProjectID, clients[i].ID)
@@ -595,8 +596,8 @@ func (s *appService) AddClientSecret(ctx context.Context, input AddAppClientSecr
 		if !ok {
 			return domain.ErrAppClientNotFound()
 		}
-		if client.Type != domain.ClientTypeConfidential {
-			return domain.ErrAppInvalid(nil).WithMessage("app: a public client holds no secret")
+		if !client.EffectiveAuthMethod().UsesSecret() {
+			return domain.ErrAppInvalid(nil).WithMessage("app: the client authenticates without a secret: it is public or uses private_key_jwt")
 		}
 		stored, err := stmts.ListAppClientIDs(ctx, input.ProjectID, entity.ID)
 		if err != nil {

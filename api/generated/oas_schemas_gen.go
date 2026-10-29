@@ -1092,6 +1092,15 @@ type App struct {
 	Slug string `json:"slug"`
 	// The app's name, shown on the consent screen.
 	Name string `json:"name"`
+	// The app's logo, shown on the consent and account-choice screens. The display fields are those a
+	// client ID metadata document carries (RFC 7591), so the screens read both alike.
+	LogoURI OptString `json:"logo_uri"`
+	// The app's home page, linked from the consent screen.
+	ClientURI OptString `json:"client_uri"`
+	// The app's privacy policy, linked from the consent screen.
+	PolicyURI OptString `json:"policy_uri"`
+	// The app's terms of service, linked from the consent screen.
+	TosURI OptString `json:"tos_uri"`
 	// The preset the app was made from, such as `web` or `service-account`. A label for the console and
 	// agents; it carries no behavior, which comes only from the configs.
 	Preset OptString `json:"preset"`
@@ -1115,6 +1124,26 @@ func (s *App) GetSlug() string {
 // GetName returns the value of Name.
 func (s *App) GetName() string {
 	return s.Name
+}
+
+// GetLogoURI returns the value of LogoURI.
+func (s *App) GetLogoURI() OptString {
+	return s.LogoURI
+}
+
+// GetClientURI returns the value of ClientURI.
+func (s *App) GetClientURI() OptString {
+	return s.ClientURI
+}
+
+// GetPolicyURI returns the value of PolicyURI.
+func (s *App) GetPolicyURI() OptString {
+	return s.PolicyURI
+}
+
+// GetTosURI returns the value of TosURI.
+func (s *App) GetTosURI() OptString {
+	return s.TosURI
 }
 
 // GetPreset returns the value of Preset.
@@ -1150,6 +1179,26 @@ func (s *App) SetSlug(val string) {
 // SetName sets the value of Name.
 func (s *App) SetName(val string) {
 	s.Name = val
+}
+
+// SetLogoURI sets the value of LogoURI.
+func (s *App) SetLogoURI(val OptString) {
+	s.LogoURI = val
+}
+
+// SetClientURI sets the value of ClientURI.
+func (s *App) SetClientURI(val OptString) {
+	s.ClientURI = val
+}
+
+// SetPolicyURI sets the value of PolicyURI.
+func (s *App) SetPolicyURI(val OptString) {
+	s.PolicyURI = val
+}
+
+// SetTosURI sets the value of TosURI.
+func (s *App) SetTosURI(val OptString) {
+	s.TosURI = val
 }
 
 // SetPreset sets the value of Preset.
@@ -1190,6 +1239,8 @@ type AppAPI struct {
 	// neither defines fails with `invalid_scope`; it is never dropped silently. Granted scopes reach
 	// the token in `scope` only, never as claims.
 	Scopes []AppAPIScope `json:"scopes"`
+	// The algorithm access tokens for the API are signed with. RS256 when left out (ADR 082 §7).
+	SigningAlg OptAppAPISigningAlg `json:"signing_alg"`
 	// Lets clients that registered themselves into the app (client ID metadata documents or dynamic
 	// registration) ask for this API and any of its scopes, each with the user's consent. Off when left
 	// out.
@@ -1216,6 +1267,11 @@ func (s *AppAPI) GetScopes() []AppAPIScope {
 	return s.Scopes
 }
 
+// GetSigningAlg returns the value of SigningAlg.
+func (s *AppAPI) GetSigningAlg() OptAppAPISigningAlg {
+	return s.SigningAlg
+}
+
 // GetThirdParty returns the value of ThirdParty.
 func (s *AppAPI) GetThirdParty() OptBool {
 	return s.ThirdParty
@@ -1239,6 +1295,11 @@ func (s *AppAPI) SetIdentifier(val string) {
 // SetScopes sets the value of Scopes.
 func (s *AppAPI) SetScopes(val []AppAPIScope) {
 	s.Scopes = val
+}
+
+// SetSigningAlg sets the value of SigningAlg.
+func (s *AppAPI) SetSigningAlg(val OptAppAPISigningAlg) {
+	s.SigningAlg = val
 }
 
 // SetThirdParty sets the value of ThirdParty.
@@ -1275,6 +1336,48 @@ func (s *AppAPIScope) SetDescription(val OptString) {
 	s.Description = val
 }
 
+// The algorithm access tokens for the API are signed with. RS256 when left out (ADR 082 §7).
+type AppAPISigningAlg string
+
+const (
+	AppAPISigningAlgRS256 AppAPISigningAlg = "RS256"
+	AppAPISigningAlgES256 AppAPISigningAlg = "ES256"
+)
+
+// AllValues returns all AppAPISigningAlg values.
+func (AppAPISigningAlg) AllValues() []AppAPISigningAlg {
+	return []AppAPISigningAlg{
+		AppAPISigningAlgRS256,
+		AppAPISigningAlgES256,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppAPISigningAlg) MarshalText() ([]byte, error) {
+	switch s {
+	case AppAPISigningAlgRS256:
+		return []byte(s), nil
+	case AppAPISigningAlgES256:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppAPISigningAlg) UnmarshalText(data []byte) error {
+	switch AppAPISigningAlg(data) {
+	case AppAPISigningAlgRS256:
+		*s = AppAPISigningAlgRS256
+		return nil
+	case AppAPISigningAlgES256:
+		*s = AppAPISigningAlgES256
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
 // An OAuth 2.1 client of the app: a web app, a SPA, a native app, a CLI or a
 // service that gets tokens from the project's authorization server. OpenID
 // Connect is OAuth plus the `openid` scope, so one client shape serves both.
@@ -1296,14 +1399,17 @@ type AppClient struct {
 	//  `confidential` clients authenticate at the token endpoint.
 	Type AppClientType `json:"type"`
 	// How the client authenticates at the token endpoint. A public client uses `none`, which is also its
-	// default; a confidential client uses a secret, `client_secret_basic` unless this says
-	// `client_secret_post`.
+	// default. A confidential client uses a secret, `client_secret_basic` unless this says
+	// `client_secret_post`, or signs an assertion with a key in `jwks` (`private_key_jwt`).
 	AuthMethod OptAppClientAuthMethod `json:"auth_method"`
 	// The client secret of an app declared in the release, as a `${{ NAME }}` reference to a
 	// project variable (ADR 062), never the value itself. The server reads the variable from the
 	// deployment when the client authenticates. An app registered through the API holds no
 	// reference: its secrets are generated by the server or imported.
 	Secret OptString `json:"secret"`
+	// The public keys a `private_key_jwt` client signs its assertions with, as a JWK set. Public members
+	// only, so a private key can never be committed.
+	Jwks OptAppClientJwks `json:"jwks"`
 	// The grant types the client may use. `authorization_code` signs a user in with PKCE (every
 	// client, OAuth 2.1); `refresh_token` keeps a grant alive; `client_credentials` lets a
 	// confidential client act as itself, so the tokens it gets have the client as `sub`. A public
@@ -1320,6 +1426,16 @@ type AppClient struct {
 	// client of an app declared in the release is first-party and a client of an app registered through
 	// the API is not.
 	FirstParty OptBool `json:"first_party"`
+	// When the user is asked to consent. `skip` never asks unless the request says `prompt=consent`,
+	// and only a first-party client may skip. `new_scopes` asks for scopes the user has not consented
+	// to yet. `always` asks on every request. Defaults to `skip` for a first-party client and
+	// `new_scopes` for a third-party one.
+	Consent OptAppClientConsent `json:"consent"`
+	// Lets the user pick an account, or sign in as someone else, when a session is already live (ADR 081
+	// §11). A request asks for it with `prompt=select_account` either way.
+	AccountChoice OptBool `json:"account_choice"`
+	// The algorithm the client's ID tokens are signed with. RS256 when left out (ADR 082 §7).
+	IDTokenSignedResponseAlg OptAppClientIDTokenSignedResponseAlg `json:"id_token_signed_response_alg"`
 	// The APIs the client may get access tokens for, its default first. A token is for one API
 	// (RFC 8707): the request names it with `resource`, and a request for an API not listed here
 	// fails with `invalid_target`.
@@ -1356,6 +1472,11 @@ func (s *AppClient) GetSecret() OptString {
 	return s.Secret
 }
 
+// GetJwks returns the value of Jwks.
+func (s *AppClient) GetJwks() OptAppClientJwks {
+	return s.Jwks
+}
+
 // GetGrants returns the value of Grants.
 func (s *AppClient) GetGrants() []AppClientGrantsItem {
 	return s.Grants
@@ -1374,6 +1495,21 @@ func (s *AppClient) GetPostLogoutRedirectUris() []string {
 // GetFirstParty returns the value of FirstParty.
 func (s *AppClient) GetFirstParty() OptBool {
 	return s.FirstParty
+}
+
+// GetConsent returns the value of Consent.
+func (s *AppClient) GetConsent() OptAppClientConsent {
+	return s.Consent
+}
+
+// GetAccountChoice returns the value of AccountChoice.
+func (s *AppClient) GetAccountChoice() OptBool {
+	return s.AccountChoice
+}
+
+// GetIDTokenSignedResponseAlg returns the value of IDTokenSignedResponseAlg.
+func (s *AppClient) GetIDTokenSignedResponseAlg() OptAppClientIDTokenSignedResponseAlg {
+	return s.IDTokenSignedResponseAlg
 }
 
 // GetApis returns the value of Apis.
@@ -1411,6 +1547,11 @@ func (s *AppClient) SetSecret(val OptString) {
 	s.Secret = val
 }
 
+// SetJwks sets the value of Jwks.
+func (s *AppClient) SetJwks(val OptAppClientJwks) {
+	s.Jwks = val
+}
+
 // SetGrants sets the value of Grants.
 func (s *AppClient) SetGrants(val []AppClientGrantsItem) {
 	s.Grants = val
@@ -1429,6 +1570,21 @@ func (s *AppClient) SetPostLogoutRedirectUris(val []string) {
 // SetFirstParty sets the value of FirstParty.
 func (s *AppClient) SetFirstParty(val OptBool) {
 	s.FirstParty = val
+}
+
+// SetConsent sets the value of Consent.
+func (s *AppClient) SetConsent(val OptAppClientConsent) {
+	s.Consent = val
+}
+
+// SetAccountChoice sets the value of AccountChoice.
+func (s *AppClient) SetAccountChoice(val OptBool) {
+	s.AccountChoice = val
+}
+
+// SetIDTokenSignedResponseAlg sets the value of IDTokenSignedResponseAlg.
+func (s *AppClient) SetIDTokenSignedResponseAlg(val OptAppClientIDTokenSignedResponseAlg) {
+	s.IDTokenSignedResponseAlg = val
 }
 
 // SetApis sets the value of Apis.
@@ -1466,14 +1622,15 @@ func (s *AppClientAPI) SetScopes(val []string) {
 }
 
 // How the client authenticates at the token endpoint. A public client uses `none`, which is also its
-// default; a confidential client uses a secret, `client_secret_basic` unless this says
-// `client_secret_post`.
+// default. A confidential client uses a secret, `client_secret_basic` unless this says
+// `client_secret_post`, or signs an assertion with a key in `jwks` (`private_key_jwt`).
 type AppClientAuthMethod string
 
 const (
 	AppClientAuthMethodNone              AppClientAuthMethod = "none"
 	AppClientAuthMethodClientSecretBasic AppClientAuthMethod = "client_secret_basic"
 	AppClientAuthMethodClientSecretPost  AppClientAuthMethod = "client_secret_post"
+	AppClientAuthMethodPrivateKeyJwt     AppClientAuthMethod = "private_key_jwt"
 )
 
 // AllValues returns all AppClientAuthMethod values.
@@ -1482,6 +1639,7 @@ func (AppClientAuthMethod) AllValues() []AppClientAuthMethod {
 		AppClientAuthMethodNone,
 		AppClientAuthMethodClientSecretBasic,
 		AppClientAuthMethodClientSecretPost,
+		AppClientAuthMethodPrivateKeyJwt,
 	}
 }
 
@@ -1493,6 +1651,8 @@ func (s AppClientAuthMethod) MarshalText() ([]byte, error) {
 	case AppClientAuthMethodClientSecretBasic:
 		return []byte(s), nil
 	case AppClientAuthMethodClientSecretPost:
+		return []byte(s), nil
+	case AppClientAuthMethodPrivateKeyJwt:
 		return []byte(s), nil
 	default:
 		return nil, errors.Errorf("invalid value: %q", s)
@@ -1510,6 +1670,61 @@ func (s *AppClientAuthMethod) UnmarshalText(data []byte) error {
 		return nil
 	case AppClientAuthMethodClientSecretPost:
 		*s = AppClientAuthMethodClientSecretPost
+		return nil
+	case AppClientAuthMethodPrivateKeyJwt:
+		*s = AppClientAuthMethodPrivateKeyJwt
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// When the user is asked to consent. `skip` never asks unless the request says `prompt=consent`,
+// and only a first-party client may skip. `new_scopes` asks for scopes the user has not consented
+// to yet. `always` asks on every request. Defaults to `skip` for a first-party client and
+// `new_scopes` for a third-party one.
+type AppClientConsent string
+
+const (
+	AppClientConsentSkip      AppClientConsent = "skip"
+	AppClientConsentNewScopes AppClientConsent = "new_scopes"
+	AppClientConsentAlways    AppClientConsent = "always"
+)
+
+// AllValues returns all AppClientConsent values.
+func (AppClientConsent) AllValues() []AppClientConsent {
+	return []AppClientConsent{
+		AppClientConsentSkip,
+		AppClientConsentNewScopes,
+		AppClientConsentAlways,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientConsent) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientConsentSkip:
+		return []byte(s), nil
+	case AppClientConsentNewScopes:
+		return []byte(s), nil
+	case AppClientConsentAlways:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientConsent) UnmarshalText(data []byte) error {
+	switch AppClientConsent(data) {
+	case AppClientConsentSkip:
+		*s = AppClientConsentSkip
+		return nil
+	case AppClientConsentNewScopes:
+		*s = AppClientConsentNewScopes
+		return nil
+	case AppClientConsentAlways:
+		*s = AppClientConsentAlways
 		return nil
 	default:
 		return errors.Errorf("invalid value: %q", data)
@@ -1645,6 +1860,341 @@ func (s *AppClientIDTakenDetails) init() AppClientIDTakenDetails {
 		*s = m
 	}
 	return m
+}
+
+// The algorithm the client's ID tokens are signed with. RS256 when left out (ADR 082 §7).
+type AppClientIDTokenSignedResponseAlg string
+
+const (
+	AppClientIDTokenSignedResponseAlgRS256 AppClientIDTokenSignedResponseAlg = "RS256"
+	AppClientIDTokenSignedResponseAlgES256 AppClientIDTokenSignedResponseAlg = "ES256"
+)
+
+// AllValues returns all AppClientIDTokenSignedResponseAlg values.
+func (AppClientIDTokenSignedResponseAlg) AllValues() []AppClientIDTokenSignedResponseAlg {
+	return []AppClientIDTokenSignedResponseAlg{
+		AppClientIDTokenSignedResponseAlgRS256,
+		AppClientIDTokenSignedResponseAlgES256,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientIDTokenSignedResponseAlg) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientIDTokenSignedResponseAlgRS256:
+		return []byte(s), nil
+	case AppClientIDTokenSignedResponseAlgES256:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientIDTokenSignedResponseAlg) UnmarshalText(data []byte) error {
+	switch AppClientIDTokenSignedResponseAlg(data) {
+	case AppClientIDTokenSignedResponseAlgRS256:
+		*s = AppClientIDTokenSignedResponseAlgRS256
+		return nil
+	case AppClientIDTokenSignedResponseAlgES256:
+		*s = AppClientIDTokenSignedResponseAlgES256
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// One public key (RFC 7517). Private members (`d`, `p`, `q`, `k` and the rest) are not accepted.
+// Ref: #
+type AppClientJwk struct {
+	Kty AppClientJwkKty    `json:"kty"`
+	Kid OptString          `json:"kid"`
+	Use OptAppClientJwkUse `json:"use"`
+	Alg OptAppClientJwkAlg `json:"alg"`
+	// RSA modulus.
+	N OptString `json:"n"`
+	// RSA exponent.
+	E   OptString          `json:"e"`
+	Crv OptAppClientJwkCrv `json:"crv"`
+	X   OptString          `json:"x"`
+	Y   OptString          `json:"y"`
+}
+
+// GetKty returns the value of Kty.
+func (s *AppClientJwk) GetKty() AppClientJwkKty {
+	return s.Kty
+}
+
+// GetKid returns the value of Kid.
+func (s *AppClientJwk) GetKid() OptString {
+	return s.Kid
+}
+
+// GetUse returns the value of Use.
+func (s *AppClientJwk) GetUse() OptAppClientJwkUse {
+	return s.Use
+}
+
+// GetAlg returns the value of Alg.
+func (s *AppClientJwk) GetAlg() OptAppClientJwkAlg {
+	return s.Alg
+}
+
+// GetN returns the value of N.
+func (s *AppClientJwk) GetN() OptString {
+	return s.N
+}
+
+// GetE returns the value of E.
+func (s *AppClientJwk) GetE() OptString {
+	return s.E
+}
+
+// GetCrv returns the value of Crv.
+func (s *AppClientJwk) GetCrv() OptAppClientJwkCrv {
+	return s.Crv
+}
+
+// GetX returns the value of X.
+func (s *AppClientJwk) GetX() OptString {
+	return s.X
+}
+
+// GetY returns the value of Y.
+func (s *AppClientJwk) GetY() OptString {
+	return s.Y
+}
+
+// SetKty sets the value of Kty.
+func (s *AppClientJwk) SetKty(val AppClientJwkKty) {
+	s.Kty = val
+}
+
+// SetKid sets the value of Kid.
+func (s *AppClientJwk) SetKid(val OptString) {
+	s.Kid = val
+}
+
+// SetUse sets the value of Use.
+func (s *AppClientJwk) SetUse(val OptAppClientJwkUse) {
+	s.Use = val
+}
+
+// SetAlg sets the value of Alg.
+func (s *AppClientJwk) SetAlg(val OptAppClientJwkAlg) {
+	s.Alg = val
+}
+
+// SetN sets the value of N.
+func (s *AppClientJwk) SetN(val OptString) {
+	s.N = val
+}
+
+// SetE sets the value of E.
+func (s *AppClientJwk) SetE(val OptString) {
+	s.E = val
+}
+
+// SetCrv sets the value of Crv.
+func (s *AppClientJwk) SetCrv(val OptAppClientJwkCrv) {
+	s.Crv = val
+}
+
+// SetX sets the value of X.
+func (s *AppClientJwk) SetX(val OptString) {
+	s.X = val
+}
+
+// SetY sets the value of Y.
+func (s *AppClientJwk) SetY(val OptString) {
+	s.Y = val
+}
+
+type AppClientJwkAlg string
+
+const (
+	AppClientJwkAlgRS256 AppClientJwkAlg = "RS256"
+	AppClientJwkAlgES256 AppClientJwkAlg = "ES256"
+	AppClientJwkAlgEdDSA AppClientJwkAlg = "EdDSA"
+)
+
+// AllValues returns all AppClientJwkAlg values.
+func (AppClientJwkAlg) AllValues() []AppClientJwkAlg {
+	return []AppClientJwkAlg{
+		AppClientJwkAlgRS256,
+		AppClientJwkAlgES256,
+		AppClientJwkAlgEdDSA,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientJwkAlg) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientJwkAlgRS256:
+		return []byte(s), nil
+	case AppClientJwkAlgES256:
+		return []byte(s), nil
+	case AppClientJwkAlgEdDSA:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientJwkAlg) UnmarshalText(data []byte) error {
+	switch AppClientJwkAlg(data) {
+	case AppClientJwkAlgRS256:
+		*s = AppClientJwkAlgRS256
+		return nil
+	case AppClientJwkAlgES256:
+		*s = AppClientJwkAlgES256
+		return nil
+	case AppClientJwkAlgEdDSA:
+		*s = AppClientJwkAlgEdDSA
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type AppClientJwkCrv string
+
+const (
+	AppClientJwkCrvP256    AppClientJwkCrv = "P-256"
+	AppClientJwkCrvEd25519 AppClientJwkCrv = "Ed25519"
+)
+
+// AllValues returns all AppClientJwkCrv values.
+func (AppClientJwkCrv) AllValues() []AppClientJwkCrv {
+	return []AppClientJwkCrv{
+		AppClientJwkCrvP256,
+		AppClientJwkCrvEd25519,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientJwkCrv) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientJwkCrvP256:
+		return []byte(s), nil
+	case AppClientJwkCrvEd25519:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientJwkCrv) UnmarshalText(data []byte) error {
+	switch AppClientJwkCrv(data) {
+	case AppClientJwkCrvP256:
+		*s = AppClientJwkCrvP256
+		return nil
+	case AppClientJwkCrvEd25519:
+		*s = AppClientJwkCrvEd25519
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type AppClientJwkKty string
+
+const (
+	AppClientJwkKtyRSA AppClientJwkKty = "RSA"
+	AppClientJwkKtyEC  AppClientJwkKty = "EC"
+	AppClientJwkKtyOKP AppClientJwkKty = "OKP"
+)
+
+// AllValues returns all AppClientJwkKty values.
+func (AppClientJwkKty) AllValues() []AppClientJwkKty {
+	return []AppClientJwkKty{
+		AppClientJwkKtyRSA,
+		AppClientJwkKtyEC,
+		AppClientJwkKtyOKP,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientJwkKty) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientJwkKtyRSA:
+		return []byte(s), nil
+	case AppClientJwkKtyEC:
+		return []byte(s), nil
+	case AppClientJwkKtyOKP:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientJwkKty) UnmarshalText(data []byte) error {
+	switch AppClientJwkKty(data) {
+	case AppClientJwkKtyRSA:
+		*s = AppClientJwkKtyRSA
+		return nil
+	case AppClientJwkKtyEC:
+		*s = AppClientJwkKtyEC
+		return nil
+	case AppClientJwkKtyOKP:
+		*s = AppClientJwkKtyOKP
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+type AppClientJwkUse string
+
+const (
+	AppClientJwkUseSig AppClientJwkUse = "sig"
+)
+
+// AllValues returns all AppClientJwkUse values.
+func (AppClientJwkUse) AllValues() []AppClientJwkUse {
+	return []AppClientJwkUse{
+		AppClientJwkUseSig,
+	}
+}
+
+// MarshalText implements encoding.TextMarshaler.
+func (s AppClientJwkUse) MarshalText() ([]byte, error) {
+	switch s {
+	case AppClientJwkUseSig:
+		return []byte(s), nil
+	default:
+		return nil, errors.Errorf("invalid value: %q", s)
+	}
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler.
+func (s *AppClientJwkUse) UnmarshalText(data []byte) error {
+	switch AppClientJwkUse(data) {
+	case AppClientJwkUseSig:
+		*s = AppClientJwkUseSig
+		return nil
+	default:
+		return errors.Errorf("invalid value: %q", data)
+	}
+}
+
+// The public keys a `private_key_jwt` client signs its assertions with, as a JWK set. Public members
+// only, so a private key can never be committed.
+type AppClientJwks struct {
+	Keys []AppClientJwk `json:"keys"`
+}
+
+// GetKeys returns the value of Keys.
+func (s *AppClientJwks) GetKeys() []AppClientJwk {
+	return s.Keys
+}
+
+// SetKeys sets the value of Keys.
+func (s *AppClientJwks) SetKeys(val []AppClientJwk) {
+	s.Keys = val
 }
 
 // Merged schema.
@@ -53647,6 +54197,52 @@ func (s *OAuth2) SetScopes(val []string) {
 	s.Scopes = val
 }
 
+// NewOptAppAPISigningAlg returns new OptAppAPISigningAlg with value set to v.
+func NewOptAppAPISigningAlg(v AppAPISigningAlg) OptAppAPISigningAlg {
+	return OptAppAPISigningAlg{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppAPISigningAlg is optional AppAPISigningAlg.
+type OptAppAPISigningAlg struct {
+	Value AppAPISigningAlg
+	Set   bool
+}
+
+// IsSet returns true if OptAppAPISigningAlg was set.
+func (o OptAppAPISigningAlg) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppAPISigningAlg) Reset() {
+	var v AppAPISigningAlg
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppAPISigningAlg) SetTo(v AppAPISigningAlg) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppAPISigningAlg) Get() (v AppAPISigningAlg, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppAPISigningAlg) Or(d AppAPISigningAlg) AppAPISigningAlg {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppClientAuthMethod returns new OptAppClientAuthMethod with value set to v.
 func NewOptAppClientAuthMethod(v AppClientAuthMethod) OptAppClientAuthMethod {
 	return OptAppClientAuthMethod{
@@ -53693,6 +54289,52 @@ func (o OptAppClientAuthMethod) Or(d AppClientAuthMethod) AppClientAuthMethod {
 	return d
 }
 
+// NewOptAppClientConsent returns new OptAppClientConsent with value set to v.
+func NewOptAppClientConsent(v AppClientConsent) OptAppClientConsent {
+	return OptAppClientConsent{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientConsent is optional AppClientConsent.
+type OptAppClientConsent struct {
+	Value AppClientConsent
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientConsent was set.
+func (o OptAppClientConsent) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientConsent) Reset() {
+	var v AppClientConsent
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientConsent) SetTo(v AppClientConsent) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientConsent) Get() (v AppClientConsent, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientConsent) Or(d AppClientConsent) AppClientConsent {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptAppClientIDTakenDetails returns new OptAppClientIDTakenDetails with value set to v.
 func NewOptAppClientIDTakenDetails(v AppClientIDTakenDetails) OptAppClientIDTakenDetails {
 	return OptAppClientIDTakenDetails{
@@ -53733,6 +54375,236 @@ func (o OptAppClientIDTakenDetails) Get() (v AppClientIDTakenDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptAppClientIDTakenDetails) Or(d AppClientIDTakenDetails) AppClientIDTakenDetails {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientIDTokenSignedResponseAlg returns new OptAppClientIDTokenSignedResponseAlg with value set to v.
+func NewOptAppClientIDTokenSignedResponseAlg(v AppClientIDTokenSignedResponseAlg) OptAppClientIDTokenSignedResponseAlg {
+	return OptAppClientIDTokenSignedResponseAlg{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientIDTokenSignedResponseAlg is optional AppClientIDTokenSignedResponseAlg.
+type OptAppClientIDTokenSignedResponseAlg struct {
+	Value AppClientIDTokenSignedResponseAlg
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientIDTokenSignedResponseAlg was set.
+func (o OptAppClientIDTokenSignedResponseAlg) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientIDTokenSignedResponseAlg) Reset() {
+	var v AppClientIDTokenSignedResponseAlg
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientIDTokenSignedResponseAlg) SetTo(v AppClientIDTokenSignedResponseAlg) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientIDTokenSignedResponseAlg) Get() (v AppClientIDTokenSignedResponseAlg, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientIDTokenSignedResponseAlg) Or(d AppClientIDTokenSignedResponseAlg) AppClientIDTokenSignedResponseAlg {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientJwkAlg returns new OptAppClientJwkAlg with value set to v.
+func NewOptAppClientJwkAlg(v AppClientJwkAlg) OptAppClientJwkAlg {
+	return OptAppClientJwkAlg{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientJwkAlg is optional AppClientJwkAlg.
+type OptAppClientJwkAlg struct {
+	Value AppClientJwkAlg
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientJwkAlg was set.
+func (o OptAppClientJwkAlg) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientJwkAlg) Reset() {
+	var v AppClientJwkAlg
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientJwkAlg) SetTo(v AppClientJwkAlg) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientJwkAlg) Get() (v AppClientJwkAlg, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientJwkAlg) Or(d AppClientJwkAlg) AppClientJwkAlg {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientJwkCrv returns new OptAppClientJwkCrv with value set to v.
+func NewOptAppClientJwkCrv(v AppClientJwkCrv) OptAppClientJwkCrv {
+	return OptAppClientJwkCrv{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientJwkCrv is optional AppClientJwkCrv.
+type OptAppClientJwkCrv struct {
+	Value AppClientJwkCrv
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientJwkCrv was set.
+func (o OptAppClientJwkCrv) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientJwkCrv) Reset() {
+	var v AppClientJwkCrv
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientJwkCrv) SetTo(v AppClientJwkCrv) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientJwkCrv) Get() (v AppClientJwkCrv, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientJwkCrv) Or(d AppClientJwkCrv) AppClientJwkCrv {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientJwkUse returns new OptAppClientJwkUse with value set to v.
+func NewOptAppClientJwkUse(v AppClientJwkUse) OptAppClientJwkUse {
+	return OptAppClientJwkUse{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientJwkUse is optional AppClientJwkUse.
+type OptAppClientJwkUse struct {
+	Value AppClientJwkUse
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientJwkUse was set.
+func (o OptAppClientJwkUse) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientJwkUse) Reset() {
+	var v AppClientJwkUse
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientJwkUse) SetTo(v AppClientJwkUse) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientJwkUse) Get() (v AppClientJwkUse, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientJwkUse) Or(d AppClientJwkUse) AppClientJwkUse {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
+// NewOptAppClientJwks returns new OptAppClientJwks with value set to v.
+func NewOptAppClientJwks(v AppClientJwks) OptAppClientJwks {
+	return OptAppClientJwks{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptAppClientJwks is optional AppClientJwks.
+type OptAppClientJwks struct {
+	Value AppClientJwks
+	Set   bool
+}
+
+// IsSet returns true if OptAppClientJwks was set.
+func (o OptAppClientJwks) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptAppClientJwks) Reset() {
+	var v AppClientJwks
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptAppClientJwks) SetTo(v AppClientJwks) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptAppClientJwks) Get() (v AppClientJwks, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptAppClientJwks) Or(d AppClientJwks) AppClientJwks {
 	if v, ok := o.Get(); ok {
 		return v
 	}
