@@ -185,7 +185,7 @@ func buildCreateAttributes(
 // storedSchemaURL returns the URL the project stores the document's schema
 // under: the header's own when that row exists or none does, else the URL of
 // the row that names the same built-in under another base.
-func storedSchemaURL(ctx context.Context, stmts schemaReader, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
+func storedSchemaURL(ctx context.Context, stmts service.AllStatements, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
 	stored, err := builtinBases.GetJSONSchema(ctx, stmts, h.ProjectID, h.SchemaURL)
 	if err == nil {
 		return stored.URL, nil
@@ -207,12 +207,6 @@ func storedSchemaURL(ctx context.Context, stmts schemaReader, builtinBases domai
 	return h.SchemaURL, nil
 }
 
-// schemaReader is what the import reads a project's schemas with.
-type schemaReader interface {
-	domain.JSONSchemaGetter
-	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
-}
-
 const (
 	// defaultSchemaPath is the default user schema's path under the built-in
 	// schema namespace.
@@ -223,7 +217,7 @@ const (
 
 // newestSchemaOfType is the project's newest schema declaring objectType, nil
 // when it has none.
-func newestSchemaOfType(ctx context.Context, stmts schemaReader, projectID, objectType string) (*domain.JSONSchema, error) {
+func newestSchemaOfType(ctx context.Context, stmts service.AllStatements, projectID, objectType string) (*domain.JSONSchema, error) {
 	result, err := stmts.ListJSONSchemas(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
 		Filter: database.And(
 			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),

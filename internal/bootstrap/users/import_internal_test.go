@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	servicemocks "github.com/zitadel/nextgen/internal/service/mocks"
 	"github.com/zitadel/nextgen/internal/storage/database"
 )
 
@@ -116,25 +118,31 @@ func TestBuildCreateAttributes_placeholderSchemaDeclaresNothingUnique(t *testing
 	}, scopesOf(t, got))
 }
 
-// schemaRows is a schemaReader over the URLs a project stores. A URL that is
-// not one, such as a minted sch_ id, is a deployed human-user schema.
+// schemaRows is the ids a project stores. A minted sch_ id is a deployed
+// human-user schema.
 type schemaRows map[string]bool
 
-func (r schemaRows) GetJSONSchemaByID(_ context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
-	if !r[schemaID] {
-		return nil, database.NewNoRowFoundError(nil)
-	}
-	return &domain.JSONSchema{ProjectID: projectID, URL: schemaID}, nil
-}
-
-func (r schemaRows) ListJSONSchemas(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
-	result := &database.ListResult[*domain.JSONSchema]{}
-	for id := range r {
-		if strings.HasPrefix(id, "sch_") {
-			result.Items = append(result.Items, &domain.JSONSchema{URL: id})
-		}
-	}
-	return result, nil
+// statements is a statements mock that answers schema reads from rows.
+func (r schemaRows) statements(t *testing.T) *servicemocks.MockAllStatements {
+	stmts := servicemocks.NewMockAllStatements(gomock.NewController(t))
+	stmts.EXPECT().GetJSONSchemaByID(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
+		DoAndReturn(func(_ context.Context, projectID, schemaID string) (*domain.JSONSchema, error) {
+			if !r[schemaID] {
+				return nil, database.NewNoRowFoundError(nil)
+			}
+			return &domain.JSONSchema{ProjectID: projectID, URL: schemaID}, nil
+		})
+	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
+		DoAndReturn(func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+			result := &database.ListResult[*domain.JSONSchema]{}
+			for id := range r {
+				if strings.HasPrefix(id, "sch_") {
+					result.Items = append(result.Items, &domain.JSONSchema{URL: id})
+				}
+			}
+			return result, nil
+		})
+	return stmts
 }
 
 func TestStoredSchemaURL(t *testing.T) {
@@ -157,7 +165,7 @@ func TestStoredSchemaURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := storedSchemaURL(t.Context(), tt.stored, bases, Header{ProjectID: "proj_1", SchemaURL: tt.header})
+			got, err := storedSchemaURL(t.Context(), tt.stored.statements(t), bases, Header{ProjectID: "proj_1", SchemaURL: tt.header})
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got)
 		})
