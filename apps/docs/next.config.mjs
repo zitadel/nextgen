@@ -1,6 +1,8 @@
 import { createNextStory } from "@fumadocs/story/next";
 import { createMDX } from "fumadocs-mdx/next";
 
+import { fileURLToPath } from "node:url";
+
 import moved from "./lib/moved.json" with { type: "json" };
 
 const withMDX = createMDX();
@@ -51,6 +53,12 @@ const reportOnlyPolicy = [
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
+  // Each prerendered page's report-only policy, with its inline scripts'
+  // hashes (csp-adapter.mjs); it wraps Vercel's adapter.
+  adapterPath: fileURLToPath(new URL("./csp-adapter.mjs", import.meta.url)),
+  // The build's ID is in every page's inline payload: the same commit builds
+  // the same hashes.
+  generateBuildId: () => process.env.VERCEL_GIT_COMMIT_SHA || null,
   // Keeps `next dev` from writing Next's agent rules into AGENTS.md when an
   // AI coding agent runs it (apps/AGENTS.md).
   agentRules: false,
@@ -73,7 +81,6 @@ const config = {
           // Enforced: nothing frames the docs, embeds a plugin or moves their
           // base URL.
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
-          { key: "Content-Security-Policy-Report-Only", value: policy(reportOnlyPolicy) },
         ],
       },
     ];
