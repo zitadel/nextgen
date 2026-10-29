@@ -33,7 +33,13 @@ async function call(path: string, secret: string, body: object): Promise<Record<
 }
 
 /** A project on the mock with two deploys to one primary origin, and its directory. */
-async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
+async function twoDeploys(): Promise<{
+  cwd: string;
+  first: string;
+  undone: string;
+  projectId: string;
+  secret: string;
+}> {
   const project = await call("/projects", "", { name: "rollback" });
   const id = project.id as string;
   const secret = project.project_secret as string;
@@ -41,7 +47,7 @@ async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
     pattern: "https://app.acme.com",
     kind: "primary",
   });
-  let undone = "";
+  const deployed: string[] = [];
   for (const revision of ["sch_a", "sch_b"]) {
     const release = await call(`/releases?project_id=${id}`, secret, {
       pointers: [{ kind: "schema", revision_id: revision }],
@@ -50,7 +56,7 @@ async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
       release_id: release.id,
       targets: ["primary"],
     });
-    undone = deployment.id as string;
+    deployed.push(deployment.id as string);
   }
   const cwd = await mkdtemp(join(tmpdir(), "zitadel-rollback-"));
   dirs.push(cwd);
@@ -66,7 +72,13 @@ async function twoDeploys(): Promise<{ cwd: string; undone: string }> {
       created_at: "2026-01-01T00:00:00.000Z",
     }),
   );
-  return { cwd, undone };
+  return {
+    cwd,
+    first: deployed[0] as string,
+    undone: deployed[1] as string,
+    projectId: id,
+    secret,
+  };
 }
 
 describe("deployment rollback", () => {
@@ -117,6 +129,42 @@ describe("deployment rollback", () => {
     ]);
 
     expect(guards).toEqual([undone]);
+  });
+
+  it("guards a rollback with the newest deployment to what it writes, not a newer default-only one", async () => {
+    const { cwd, first, undone, projectId, secret } = await twoDeploys();
+    const release = await call(`/releases?project_id=${projectId}`, secret, {
+      pointers: [{ kind: "schema", revision_id: "sch_c" }],
+    });
+    await call(`/deployments?project_id=${projectId}`, secret, {
+      release_id: release.id,
+      targets: ["default"],
+    });
+    const guards: unknown[] = [];
+    server.use(
+      http.post(`${SERVER}/deployments/:id/rollback`, async ({ request }) => {
+        guards.push(
+          (JSON.parse(await request.clone().text()) as Record<string, unknown>)
+            .expected_deployment_id,
+        );
+        return undefined;
+      }),
+    );
+
+    const { exitCode } = await runCliForTest([
+      "deployment",
+      "rollback",
+      first,
+      "--force",
+      "--cwd",
+      cwd,
+      "--server",
+      SERVER,
+      "--json",
+    ]);
+
+    expect(guards).toEqual([undone]);
+    expect(exitCode).toBe(0);
   });
 
   it("reports the revisions the restored release pins", async () => {

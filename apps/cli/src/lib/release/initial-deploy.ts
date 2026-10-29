@@ -2,7 +2,7 @@ import type { ZitadelClient } from "@zitadel/api/client";
 
 import type { SuggestedCommand } from "../suggestion";
 import { buildBundle } from "./bundle";
-import { createDeployment } from "./deployment";
+import { createDeployment, PROJECT_TARGETS } from "./deployment";
 import { headSha, worktreeIsDirty } from "./git";
 import { runSteps, type StepContext } from "./pipeline";
 import { createReleaseFromBundle } from "./release";
@@ -19,9 +19,9 @@ export type InitialDeployment = {
 /**
  * Publish `.zitadel/` to a project nothing has been deployed to, the way
  * `deploy` does: build the bundle, validate it, create the release and deploy
- * it to every primary origin. `deploy`'s diff step is left out, because there
- * is no live release to diff against, and so is its optimistic guard, because
- * there is no deployment to race with.
+ * it to every primary origin and the default target. `deploy`'s diff step is
+ * left out, because there is no live release to diff against, and so is its
+ * optimistic guard, because there is no deployment to race with.
  */
 export async function deployInitialRelease(input: {
   client: ZitadelClient;
@@ -57,7 +57,7 @@ export async function deployInitialRelease(input: {
   });
   const deployment = await createDeployment(input.client, input.projectId, {
     releaseId: release.id,
-    targets: ["primary"],
+    targets: [...PROJECT_TARGETS],
     message: input.message,
   });
   return {

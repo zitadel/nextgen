@@ -665,7 +665,7 @@ describe("setup command pre-flight", () => {
     expect(capture.requests).toEqual([]);
   });
 
-  it("deploys .zitadel/ to the primary origin with the project secret", async () => {
+  it("deploys .zitadel/ to the primary origin and the default target with the project secret", async () => {
     const cwd = await makeNextApp();
     const capture = await startCreateProjectCaptureServer();
 
@@ -688,7 +688,7 @@ describe("setup command pre-flight", () => {
       {
         body: expect.objectContaining({
           release_id: "rel_test",
-          targets: ["primary"],
+          targets: ["primary", "default"],
         }),
         authorization: `Bearer ${capture.projects[0]?.project_secret}`,
       },
@@ -698,7 +698,7 @@ describe("setup command pre-flight", () => {
       release_id: "rel_test",
       content_hash: "sha256:test",
       deployment_id: "dep_test",
-      origins: ["http://localhost:3000"],
+      origins: ["default", "http://localhost:3000"],
     });
   });
 
@@ -1219,7 +1219,7 @@ async function startCreateProjectCaptureServer(
         JSON.stringify({
           id: "dep_test",
           release_id: deployment.release_id,
-          targets: [{ origin: "http://localhost:3000" }],
+          targets: [{ origin: "default" }, { origin: "http://localhost:3000" }],
           deployed_at: "2026-06-01T00:00:00.000Z",
         }),
       );

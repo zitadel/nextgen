@@ -105,8 +105,9 @@ upgrade, so upgrade the app and rerun rather than retrying.
   is served the `default` deployment target; `origin rm` asks first and needs
   `--force` when non-interactive. Removing a preview pattern leaves its live
   previews served until they expire.
-  `deploy` lands only on primary origins and fails with `E_VALIDATION` without
-  one; its `next_commands` name the step that gives the project one. `setup`
+  `deploy` lands on every primary origin and the `default` target, and fails
+  with `E_VALIDATION` without a primary origin; its `next_commands` name the
+  step that gives the project one. `setup`
   0.1.0 registered the app's URL (`ZITADEL_ISSUER`) as a `preview` origin,
   which `origin add --kind primary` refuses with `E_CONFLICT`: `doctor` warns
   (`issuer-origin`) and `doctor --fix` makes it primary.
@@ -229,7 +230,8 @@ Each invocation prints one JSON object:
 - A `list` verb emits `data: { items, count, next_page_token }`; when a page
   remains, `data.next_commands` carries the exact command for the next page.
 - `deploy` emits `data.content_hash` (the release digest), `data.origins`
-  (the origins it went live on) and `data.resources` (how many it pinned). A
+  (the targets it went live on: every primary origin, and `default`, the target
+  a caller with no `Origin` is served) and `data.resources` (how many it pinned). A
   re-run on unchanged config returns the same digest. Use it to confirm what
   went live.
 - `preview` is `deploy` for a pull-request build: it deploys the release to the
@@ -385,8 +387,8 @@ zitadel setup`. A release records the commit it was built from and `deploy`
 diffs `.zitadel/` against it, so without this the first release carries no
 commit and the next deploy reports no diff.
 
-Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
-to verify is served the release it built. `data.deployment` carries the
+Then setup deploys `.zitadel/` to the app's origin and the `default` target,
+so the sign-in it asks you to verify is served the release it built. `data.deployment` carries the
 `release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
 `--dry-run` or when the deploy failed. A failed deploy is a warning, never a
 failed setup, and `data.next_commands` then leads with the `deploy` that fixes
