@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { usePlatformMock } from "../helpers/platform";
-import { aSetUpApp } from "../helpers/project";
+import { anUndeployedEnvironment, aSetUpApp } from "../helpers/project";
 
 const platform = usePlatformMock();
 
@@ -44,9 +44,9 @@ describe("variable resolve", () => {
   describe("against a valid server", () => {
     describe("--json", () => {
       it("is a miss when nothing is deployed", async () => {
-        const app = await aSetUpApp();
+        const app = await anUndeployedEnvironment();
 
-        const result = await app.resolveVariables();
+        const result = await app.run(["variable", "resolve", "--env", "staging", "--json"]);
 
         expect(result).toFailWith("E_NOT_FOUND");
       });
