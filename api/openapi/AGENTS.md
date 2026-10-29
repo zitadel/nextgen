@@ -75,8 +75,10 @@ else: the metadata and Open Graph image (cut at a word past 160 characters),
 `llms.txt` and the MCP server's page list
 ([`apps/docs/lib/description.ts`](../../apps/docs/lib/description.ts)).
 
-- Open with a sentence that says on its own what the operation does, in 160
-  characters or fewer.
+- Write in the docs' tone ([`apps/docs/AGENTS.md`](../../apps/docs/AGENTS.md#writing)).
+- Open an operation with a third-person verb ("Creates a user"); open a
+  webhook with what happened ("A token was revoked.").
+- Keep the first sentence to 160 characters or fewer.
 - `rule/operation-description-opens-with-sentence` rejects a description that
   starts with a heading, a quote (a `> **Deprecated**` note goes after the
   sentence), a list, a table, a code fence or HTML.
