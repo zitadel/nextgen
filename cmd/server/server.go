@@ -344,6 +344,20 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		policyService,
 		builtinBases,
 	)
+	// The console signs operators in to the platform project from the public
+	// base, the first console origin, so that project serves a deployed release
+	// there like any other project.
+	if cfg.Platform.BootstrapProject {
+		if err := platform.EnsureDeployed(ctx, consoleHosts[0], projectService, platform.Catalog{
+			Schemas:        schemaService,
+			Flows:          flowDefinitionSvc,
+			IDPConnections: idpConnectionService,
+			Policies:       policyService,
+			Branding:       brandingService,
+		}, releaseService, deploymentService); err != nil {
+			return fmt.Errorf("failed to deploy the platform project: %w", err)
+		}
+	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {
 		return err
