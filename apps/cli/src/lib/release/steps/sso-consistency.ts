@@ -7,6 +7,7 @@ import { FLOWS_DIR } from "../../flows";
 import { IDPS_DIR } from "../../idp";
 import { type JsonDirEntry, readJsonDirEntries } from "../../json-dir";
 import { SCHEMAS_DIR } from "../../user-schema";
+import type { StepContext } from "../pipeline";
 import { reportWarning } from "../../warnings";
 
 /**
@@ -22,7 +23,10 @@ import { reportWarning } from "../../warnings";
  * A deploy publishes everything under `.zitadel/`, so everything is judged;
  * there is no narrower set of files a deploy "touches".
  */
-export async function validateSsoConsistency(cwd: string): Promise<void> {
+export async function validateSsoConsistency(
+  cwd: string,
+  suggest: StepContext["suggest"],
+): Promise<void> {
   const [schemas, flows, connections] = await Promise.all([
     readJsonDirEntries(join(cwd, SCHEMAS_DIR)),
     readJsonDirEntries(join(cwd, FLOWS_DIR)),
@@ -76,8 +80,9 @@ export async function validateSsoConsistency(cwd: string): Promise<void> {
     {
       hint:
         "These checks read the schemas, flows and connection files together. " +
-        "Fix the files named above and re-run; no changes were made. " +
+        "Fix the files named above, then check again; no changes were made. " +
         "Only the CLI makes these checks.",
+      nextCommands: [suggest("deploy --dry-run")],
       details: {
         issues: errors.map(({ rule, file, steps, message }) => ({
           rule,

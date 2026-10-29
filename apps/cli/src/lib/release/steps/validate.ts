@@ -39,7 +39,7 @@ export const validateStep: Step = {
     validateBundleShapes(ctx);
     validateFlows(ctx);
     await validateConnections(ctx);
-    await validateSsoConsistency(ctx.cwd);
+    await validateSsoConsistency(ctx.cwd, ctx.suggest);
     for (const warning of await brandingAssetWarnings(brandingsOf(ctx))) {
       reportWarning(warning);
     }

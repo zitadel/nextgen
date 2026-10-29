@@ -127,17 +127,17 @@ function distance(a: string, b: string): number {
 }
 
 /**
- * The one property a mistyped name most likely meant, as a sentence to put in
- * a message, or an empty string when nothing is close enough to be worth
- * saying. A different case, or a name one or two edits away (a name of four
- * characters or fewer tolerates one), counts; the closest wins and a tie
- * names nothing, because guessing between two is no help.
+ * The one name a mistyped name most likely meant, or `undefined` when nothing
+ * is close enough to be worth saying. A different case, or a name one or two
+ * edits away (a name of four characters or fewer tolerates one), counts; the
+ * closest wins and a tie names nothing, because guessing between two is no
+ * help.
  */
-function didYouMean(name: string, candidates: Iterable<string>): string {
+function closest(name: string, candidates: Iterable<string>): string | undefined {
   // A name of one or two characters is as close to a dozen others as to the
   // one meant, so a guess would be noise.
   if (name.length < 3) {
-    return "";
+    return undefined;
   }
   const allowed = name.length <= 4 ? 1 : 2;
   let best: { candidate: string; cost: number } | undefined;
@@ -157,7 +157,13 @@ function didYouMean(name: string, candidates: Iterable<string>): string {
       tied = true;
     }
   }
-  return best === undefined || tied ? "" : ` Did you mean ${q(best.candidate)}?`;
+  return best === undefined || tied ? undefined : best.candidate;
+}
+
+/** {@link closest} as a sentence to put in a message, or an empty string. */
+function didYouMean(name: string, candidates: Iterable<string>): string {
+  const meant = closest(name, candidates);
+  return meant === undefined ? "" : ` Did you mean ${q(meant)}?`;
 }
 
 /** The names of every property the given schemas define. */
@@ -330,7 +336,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
           rule: "sso/connection-resolves",
           file: path,
           slug,
-          message: `sso.providers lists ${q(slug)} but there is no connection file with that slug under .zitadel/idps/. Add the file, or remove ${q(slug)} from sso.providers.`,
+          message: `sso.providers lists ${q(slug)} but there is no connection file with that slug under .zitadel/idps/.${didYouMean(slug, connectionBySlug.keys())} Add the file, or remove ${q(slug)} from sso.providers.`,
         });
       }
     }
@@ -393,14 +399,16 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
       }
 
       for (const slug of step.providers) {
-        if (!connectionBySlug.has(slug)) {
+        // A provider the flow's schema also lists is reported once, on the
+        // schema, since one missing file is one mistake.
+        if (!connectionBySlug.has(slug) && !sso?.providers.includes(slug)) {
           onStep(
             "sso/connection-resolves",
             path,
             slug,
             step.name,
             (steps) =>
-              `${stepsText(steps)}: sso provider ${q(slug)} has no connection file with that slug under .zitadel/idps/. Add the file, or remove the provider from the flow.`,
+              `${stepsText(steps)}: sso provider ${q(slug)} has no connection file with that slug under .zitadel/idps/.${didYouMean(slug, connectionBySlug.keys())} Add the file, or remove the provider from the flow.`,
             slug,
           );
         }
@@ -420,8 +428,19 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
             `${stepsText(steps)}: offers sso_providers but "sso" is not an enabled authentication method in ${schemaPath}. Enable it there, or remove sso_providers.`,
         );
       }
+      // A slug the schema lists without a connection file is most likely a typo
+      // of a provider the flow offers: that mistake is reported on the schema,
+      // so the provider it was meant to be is not reported again here.
+      const mistypedInSchema = sso.providers
+        .filter((listed) => !connectionBySlug.has(listed))
+        .map((listed) => closest(listed, connectionBySlug.keys()));
       for (const slug of step.providers) {
-        if (sso.enabled && !sso.providers.includes(slug)) {
+        if (
+          sso.enabled &&
+          !sso.providers.includes(slug) &&
+          connectionBySlug.has(slug) &&
+          !mistypedInSchema.includes(slug)
+        ) {
           onStep(
             "sso/provider-id",
             path,
@@ -440,7 +459,17 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         const mapped = Object.keys(
           isObject(connection.body.claim_mapping) ? connection.body.claim_mapping : {},
         );
-        if (!mapped.some((key) => hasProperty(schema, key))) {
+        // When no schema that lists the connection defines any mapped name,
+        // each name is already reported as unknown (with a "Did you mean"), and
+        // fixing those fixes this too.
+        const listing = [...tree.schemas.values()].filter((candidate) =>
+          schemaSso(candidate).providers.includes(slug),
+        );
+        const allUnknown =
+          mapped.length > 0 &&
+          listing.length > 0 &&
+          mapped.every((key) => !listing.some((candidate) => hasProperty(candidate, key)));
+        if (!allUnknown && !mapped.some((key) => hasProperty(schema, key))) {
           onStep(
             "sso/empty-claim-mapping",
             path,
@@ -550,8 +579,14 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     }
     const unreadable = (key: string) =>
       referencing.length > 0 && !referencing.some((schema) => hasProperty(schema, key));
+    // A mapped name no schema defines that is a typo of a verified key is
+    // reported with a "Did you mean" naming that key; the key then has no
+    // mapping only because of that typo, so it is not reported again.
+    const meantByTypos = mapping
+      .filter(unreadable)
+      .map((typo) => closest(typo, propertyNames(referencing)));
     for (const key of verified) {
-      if (!mapping.includes(key) && !unreadable(key)) {
+      if (!mapping.includes(key) && !unreadable(key) && !meantByTypos.includes(key)) {
         add({
           rule: "sso/unmapped-verification-key",
           file: path,

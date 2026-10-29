@@ -166,7 +166,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
-    name: "the schema and a step both name google and no connection file has that slug",
+    name: "the schema and a step both name google and no connection file has that slug, reported once on the schema",
     edit: (p) => {
       p.connections = {};
     },
@@ -175,12 +175,6 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
         rule: "sso/connection-resolves",
         file: STAFF,
         says: ["sso.providers", "google", "Add the file"],
-      },
-      {
-        rule: "sso/connection-resolves",
-        file: LOGIN,
-        steps: ["identifier"],
-        says: ["identifier", "google"],
       },
     ],
   },
@@ -297,19 +291,52 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     ],
   },
   {
-    name: "the connection maps nothing the schema defines",
+    name: "one typo in the schema's provider list, reported once with the provider it meant",
     edit: (p) => {
-      connectionOf(p).claim_mapping = { emailAddress: "mail" };
+      schemaOf(p)["x-auth-methods"].sso.providers = ["googel"];
     },
     expect: [
       {
-        rule: "sso/empty-claim-mapping",
+        rule: "sso/connection-resolves",
+        file: STAFF,
+        says: ['"googel"', 'Did you mean "google"?'],
+      },
+    ],
+  },
+  {
+    name: "one typo in a flow step's provider list, reported once with the provider it meant",
+    edit: (p) => {
+      stepOf(p, "identifier").sso_providers = ["googel"];
+    },
+    expect: [
+      {
+        rule: "sso/connection-resolves",
         file: LOGIN,
         steps: ["identifier"],
-        says: ["maps nothing"],
+        says: ['"googel"', 'Did you mean "google"?'],
       },
-      { rule: "sso/orphaned-mapping-target", file: GOOGLE, says: ["emailAddress"] },
     ],
+  },
+  {
+    name: "one typo in a mapping target that a verification names, reported once",
+    edit: (p) => {
+      connectionOf(p).claim_mapping = { emial: "email" };
+      connectionOf(p).verified_claims = { email: "email_verified" };
+    },
+    expect: [
+      {
+        rule: "sso/orphaned-mapping-target",
+        file: GOOGLE,
+        says: ['"emial"', 'Did you mean "email"?'],
+      },
+    ],
+  },
+  {
+    name: "the connection maps only names the schema does not define, reported once per name",
+    edit: (p) => {
+      connectionOf(p).claim_mapping = { emailAddress: "mail" };
+    },
+    expect: [{ rule: "sso/orphaned-mapping-target", file: GOOGLE, says: ["emailAddress"] }],
   },
   {
     name: "verified_claims names a key that claim_mapping does not map",
@@ -1287,11 +1314,9 @@ describe("how the rules read the project", () => {
       };
     });
 
-    // a.json is judged, on the step that offers it and as a file; b.json is
-    // only named as the duplicate.
+    // a.json is judged as the file; b.json is only named as the duplicate.
     expect(issues.map(({ rule, file }) => ({ rule, file }))).toEqual([
       { rule: "sso/duplicate-slug", file: "b.json" },
-      { rule: "sso/empty-claim-mapping", file: LOGIN },
       { rule: "sso/orphaned-mapping-target", file: "a.json" },
     ]);
   });
@@ -1311,12 +1336,12 @@ describe("how the rules read the project", () => {
     });
 
     // Two providers the schema lists with no file, then the one the flow offers
-    // that the schema does not list and no file backs either.
+    // with no file: its missing file is the cause, so that it is also unlisted
+    // is not said again.
     expect(issues.map((issue) => issue.rule)).toEqual([
       "sso/connection-resolves",
       "sso/connection-resolves",
       "sso/connection-resolves",
-      "sso/provider-id",
     ]);
   });
 
@@ -1348,7 +1373,7 @@ describe("how the rules read the project", () => {
 
     expect(
       issues.filter((issue) => issue.rule === "sso/connection-resolves").map((i) => i.slug),
-    ).toEqual(["google", "google"]);
+    ).toEqual(["google"]);
   });
 
   it("names a verified_claims key that no schema has once, not twice", () => {
