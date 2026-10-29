@@ -243,7 +243,8 @@ func TestPasswordRegisterFlow(t *testing.T) {
 	pw, err := harness.EnsureUserFixture(t).GetPasswordByUserID(t.Context(), project.ID, user.ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, pw.EncodedHash)
-	require.NoError(t, pw.Verify(newPass, harness.EnsureHashVerifier(t)))
+	_, err = pw.Verify(newPass, harness.EnsureHasherFactory(t).Default())
+	require.NoError(t, err)
 }
 
 // TestPasswordRegisterFlow_DuplicateEmail confirms a second registration with

@@ -3,7 +3,9 @@ import { type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/api/zitadel";
+import { CONFIRM_CONTENT, CONFIRM_TITLE } from "@/components/confirm-dialog";
 import { FormError } from "@/components/form-error";
+import { DIALOG_FOOTER } from "@/components/notice-dialog";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -38,13 +40,10 @@ const CONFIRM_WORD = "DELETE";
 // `max-w-sm` (384px) carries the important suffix because the primitive's own
 // `data-[size=default]:sm:max-w-lg` compiles to a higher-specificity selector
 // and would otherwise win, leaving the dialog 512px wide.
-const CONTENT = "gap-0 rounded-md p-0 sm:max-w-sm!";
 const HEADER = "flex flex-row items-start gap-6 p-6 text-left";
 // Flat 10% in both themes; only the destructive button lifts in dark.
 const MEDIA = "bg-destructive/10 text-destructive";
 const COLUMN = "flex min-w-0 flex-1 flex-col gap-1.5";
-const TITLE = "font-serif text-lg leading-7 font-normal";
-const FOOTER = "flex-row items-center justify-end gap-2 px-6 pb-6";
 
 /**
  * The delete-user confirmation dialog.
@@ -93,7 +92,7 @@ export function DeleteUserDialog({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       {children && <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>}
-      <AlertDialogContent className={CONTENT}>
+      <AlertDialogContent className={CONFIRM_CONTENT}>
         {/* Remounted per opening so a typed confirmation or a failed attempt
             never carries into the next one. */}
         {open && (
@@ -147,7 +146,7 @@ function DeleteUserForm({
           <TriangleAlert aria-hidden />
         </AlertDialogMedia>
         <div className={COLUMN}>
-          <AlertDialogTitle className={TITLE}>Delete {name}?</AlertDialogTitle>
+          <AlertDialogTitle className={CONFIRM_TITLE}>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>
             This permanently deletes the user and all associated sessions, grants, and profile data.
             This action cannot be undone.
@@ -173,7 +172,7 @@ function DeleteUserForm({
         </div>
       </AlertDialogHeader>
 
-      <AlertDialogFooter className={FOOTER}>
+      <AlertDialogFooter className={DIALOG_FOOTER}>
         {/* `type="button"` is load-bearing: the Radix primitive renders a bare
             `<button>`, which inside a `<form>` defaults to `type="submit"` and
             would delete the user Cancel is meant to spare.

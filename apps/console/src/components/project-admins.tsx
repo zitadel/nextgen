@@ -2,11 +2,12 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { AddAdminDialog } from "@/components/add-admin-dialog";
-import { DetailSection } from "@/components/detail-page";
+import { CARD_ACTION_BUTTON } from "@/components/detail-page";
 import { RemoveAdminDialog } from "@/components/remove-admin-dialog";
 import {
   RESOURCE_CELL,
   RESOURCE_CELL_MUTED,
+  RESOURCE_TABLE_WRAP,
   ResourceEmptyRow,
   ResourceHeadCell,
   ResourceHeaderRow,
@@ -24,9 +25,10 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
 
 /**
  * A project's admins: who administers it, and how that access is given and
- * taken away (#1025, journey in #769). Rendered on the project's own page,
- * because a grant is project-level data (#1238): the project id comes from the
- * route, and every request made from here carries it.
+ * taken away (#1025, journey in #769). The Admins tab of the project's own
+ * page, because a grant is project-level data (#1238): the project id comes
+ * from the route, and every request made from here carries it. The Add button
+ * is `AddAdminButton`, which the page draws on the tab row.
  *
  * **The owner is not a row.** Their access comes through the owning team, not
  * an admin grant, so a freshly claimed project lists nobody — and removing the
@@ -64,67 +66,66 @@ export function ProjectAdmins({
   grants: Grant[];
   /** The signed-in user, to tell their own grant from access that comes some other way. */
   viewerUserId?: string;
-  /** Called after a grant was added or removed, to reload the page's data. */
+  /** Called after a grant was removed, to reload the page's data. */
   onChanged: () => void;
 }) {
   const rows = grants.map(toAdminRow);
   const notListed = !grants.some((grant) => grant.user?.user_id === viewerUserId);
   return (
     // Labelled so the section is a landmark assistive tech can jump to.
-    <DetailSection
-      title="Admins"
-      titleId="project-admins"
-      className="mt-8"
-      note={
-        notListed && (
-          <p className="text-muted-foreground text-sm">
-            Your access to this Project isn’t a grant of your own, so you aren’t listed here.
-          </p>
-        )
-      }
-      role="region"
-      aria-labelledby="project-admins"
-      action={
-        <AddAdminDialog projectId={projectId} onAdded={onChanged}>
-          {/* Primary and the list screens' size: it is the section's one
-              action, and it reads like the Add on Users and Teams. */}
-          <Button className="shrink-0 gap-1.5 px-2.5!">
-            <Plus aria-hidden />
-            Add admin
-          </Button>
-        </AddAdminDialog>
-      }
-    >
-      <Table className="text-xs">
-        <TableHeader>
-          <ResourceHeaderRow>
-            <ResourceHeadCell>Email</ResourceHeadCell>
-            {/* The design's `Status` column is not here: a grant has no status
-                field, so every row would read `Active` and the column would
-                say nothing about any of them. */}
-            <ResourceHeadCell>Level</ResourceHeadCell>
-            <ResourceMenuHead className="w-15" />
-          </ResourceHeaderRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <ResourceEmptyRow colSpan={3}>No additional admins have been added.</ResourceEmptyRow>
-          ) : (
-            rows.map((row) => (
-              <ResourceRow key={row.id}>
-                <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
-                  {row.name}
-                </TableCell>
-                <TableCell className={RESOURCE_CELL_MUTED}>{row.level}</TableCell>
-                <TableCell className={RESOURCE_CELL}>
-                  <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
-                </TableCell>
-              </ResourceRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </DetailSection>
+    <section aria-label="Admins" className="flex flex-col gap-4">
+      {notListed && (
+        <p className="text-muted-foreground text-sm">
+          Your access to this Project isn’t a grant of your own, so you aren’t listed here.
+        </p>
+      )}
+      <div className={RESOURCE_TABLE_WRAP}>
+        <Table className="text-xs">
+          <TableHeader>
+            <ResourceHeaderRow>
+              <ResourceHeadCell>Email</ResourceHeadCell>
+              {/* The design's `Status` column is not here: a grant has no status
+                  field, so every row would read `Active` and the column would
+                  say nothing about any of them. */}
+              <ResourceHeadCell>Level</ResourceHeadCell>
+              <ResourceMenuHead className="w-15" />
+            </ResourceHeaderRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <ResourceEmptyRow colSpan={3}>No additional admins have been added.</ResourceEmptyRow>
+            ) : (
+              rows.map((row) => (
+                <ResourceRow key={row.id}>
+                  <TableCell className={`${RESOURCE_CELL} text-foreground truncate text-sm`}>
+                    {row.name}
+                  </TableCell>
+                  <TableCell className={RESOURCE_CELL_MUTED}>{row.level}</TableCell>
+                  <TableCell className={RESOURCE_CELL}>
+                    <RowActions projectId={projectId} row={row} onRemoved={onChanged} />
+                  </TableCell>
+                </ResourceRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The tab's one action, drawn on the tab row rather than in the table: the
+ * secondary small button the design places beside the tabs.
+ */
+export function AddAdminButton({ projectId, onAdded }: { projectId: string; onAdded: () => void }) {
+  return (
+    <AddAdminDialog projectId={projectId} onAdded={onAdded}>
+      <Button variant="secondary" size="sm" className={CARD_ACTION_BUTTON}>
+        <Plus aria-hidden />
+        Add admin
+      </Button>
+    </AddAdminDialog>
   );
 }
 

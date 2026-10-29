@@ -3,16 +3,8 @@ import { type FormEvent, type ReactNode, useId, useState } from "react";
 import { toast } from "sonner";
 
 import { api } from "@/api/zitadel";
+import { FORM_DIALOG_BODY, FormDialog, FormDialogFooter } from "@/components/form-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useSubmit } from "@/hooks/use-submit";
@@ -60,32 +52,24 @@ export function AddAdminDialog({
   const [open, setOpen] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      {/* 384px, matching the remove dialog and the design. The important suffix
-          beats the primitive's own `sm:max-w-lg`. */}
-      <DialogContent className="sm:max-w-sm!">
-        <DialogHeader>
-          <DialogTitle>Add admin</DialogTitle>
-          <DialogDescription>
-            They get full administrative access to this project. They need to have signed up
-            already.
-          </DialogDescription>
-        </DialogHeader>
-        {/* Remounted per opening so a cancelled attempt does not leave its
-            address or its error behind. */}
-        {open && (
-          <AddAdminForm
-            projectId={projectId}
-            onDone={() => {
-              setOpen(false);
-              onAdded();
-            }}
-            onCancel={() => setOpen(false)}
-          />
-        )}
-      </DialogContent>
-    </Dialog>
+    // 384px, matching the remove dialog and the design.
+    <FormDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={children}
+      width="sm"
+      title="Add admin"
+      description="They get full administrative access to this project. They need to have signed up already."
+    >
+      <AddAdminForm
+        projectId={projectId}
+        onDone={() => {
+          setOpen(false);
+          onAdded();
+        }}
+        onCancel={() => setOpen(false)}
+      />
+    </FormDialog>
   );
 }
 
@@ -143,36 +127,38 @@ function AddAdminForm({
           alone does not: `Field` wires up no description of its own, so a
           screen reader returning to the control would otherwise hear that it
           is wrong without hearing why. */}
-      <Field data-invalid={error ? true : undefined}>
-        <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
-        <Input
-          id={inputId}
-          name="identifier"
-          type="email"
-          required
-          autoComplete="off"
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? errorId : undefined}
-          value={value}
-          onChange={(event) => {
-            setValue(event.target.value);
-            // The message described the address that was refused. Editing makes
-            // it a different address, so the message and the invalid state go
-            // with the old one rather than waiting for the next submit.
-            add.clearError();
-          }}
-        />
-        <FieldError id={errorId}>{error}</FieldError>
-      </Field>
+      <div className={FORM_DIALOG_BODY}>
+        <Field data-invalid={error ? true : undefined}>
+          <FieldLabel htmlFor={inputId}>Email address</FieldLabel>
+          <Input
+            id={inputId}
+            name="identifier"
+            type="email"
+            required
+            autoComplete="off"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            value={value}
+            onChange={(event) => {
+              setValue(event.target.value);
+              // The message described the address that was refused. Editing makes
+              // it a different address, so the message and the invalid state go
+              // with the old one rather than waiting for the next submit.
+              add.clearError();
+            }}
+          />
+          <FieldError id={errorId}>{error}</FieldError>
+        </Field>
+      </div>
 
-      <DialogFooter>
+      <FormDialogFooter>
         <Button type="button" variant="outline" onClick={onCancel} disabled={add.pending}>
           Cancel
         </Button>
         <Button type="submit" disabled={value.trim() === ""} loading={add.pending}>
           Add admin
         </Button>
-      </DialogFooter>
+      </FormDialogFooter>
     </form>
   );
 }

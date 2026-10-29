@@ -64,7 +64,7 @@ export function Finish({ index, count }: { index: number; count: number }) {
           <Sentences text="From the first command to a login that is yours in a minute. The quickstart walks you through it." />
         </p>
         <div className="finish-reveal" style={order(3)}>
-          <CallToAction className="mt-7" />
+          <CallToAction placement="showcase" className="mt-7" />
         </div>
       </div>
     </li>

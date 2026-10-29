@@ -11,20 +11,40 @@
     //
     // `test` is the journey harness's unit tests in both runners. Where this
     // differs from moon.yml on purpose: moon runs the lanes through its `e2e:all`
-    // aggregate in ci.yml's own e2e step; turbo has no affected selection and
-    // the lanes are uncached, so ci-turbo.yml runs them as explicit steps gated
-    // by ci-mode, and there is no `all` here. Each lane's inputs are its own
-    // folder plus the shared files (and, for the demo lanes, the demo app they
-    // serve), like moon's, so ci-mode's affected walk over this graph does not
-    // mark the journey for a console spec edit but does see a demo app edit. The
-    // two demo-next lanes share a task-guard mutex in package.json (both serve
-    // the demo on :3002), standing in for moon's mutex of the same name.
+    // aggregate in ci.yml's own e2e step; ci-turbo.yml names every lane in
+    // one `turbo run --affected`, which runs the affected ones side by side,
+    // and there is no `all` here. Each
+    // lane's inputs are its own folder plus the shared files (and, for the
+    // demo lanes, the demo app they serve), less the docs and the ignored
+    // trees, so a console spec edit does not select the journey and a demo
+    // app edit selects the demo's lanes. The two demo-next lanes share a
+    // task-guard mutex in package.json (both serve the demo on :3002),
+    // standing in for moon's mutex of the same name.
+    // The packed-CLI helpers and the journey's registry scripts import the
+    // root release scripts; the harness's unit tests (`test`) also read the
+    // CLI's skill, the mock OIDC provider's users and the built-in schemas.
     "typecheck": {
-      "dependsOn": ["@zitadel/testing#build"]
+      "dependsOn": ["@zitadel/testing#build"],
+      "inputs": ["$TURBO_EXTENDS$", "$TURBO_ROOT$/scripts/*.mjs", "$TURBO_ROOT$/scripts/*.d.mts"]
+    },
+    "test": {
+      "inputs": [
+        "$TURBO_EXTENDS$",
+        "$TURBO_ROOT$/scripts/*.mjs",
+        "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+      ]
     },
     "console-smoke": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts"],
-      "dependsOn": ["@zitadel/console#build"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/console#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -33,20 +53,38 @@
     // 8097) and the binary path are the Playwright configs' defaults; the
     // scripts set the NEXTGEN_* switches each lane asserts.
     "console-real": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts"],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-embedded": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts"],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "console-platform": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts"],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -56,8 +94,15 @@
     // deployment-checks workflow runs it for every deployment. Nothing to build.
     // The Playwright config refuses to run without CLOUD_URL.
     "console-deployment": {
-      "inputs": ["console/**", "package.json", "playwright.shared.ts"],
+      "inputs": [
+        "console/**",
+        "package.json",
+        "playwright.shared.ts",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
       "cache": false,
+      "dependsOn": ["install-browsers"],
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
     },
     // The built-in schemas the `schemas` service publishes under /schemas/v1/
@@ -71,16 +116,50 @@
         "package.json",
         "playwright.shared.ts",
         "$TURBO_ROOT$/scripts/render-builtin-schemas.mjs",
-        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json"
+        "$TURBO_ROOT$/api/openapi/endpoints/schemas/*.json",
+        "!**/README.md",
+        "!**/AGENTS.md"
       ],
       "cache": false,
+      "dependsOn": ["install-browsers"],
       "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*"]
+    },
+    // The packed CLI against the deployment CLOUD_URL names, beside the
+    // console's and the schemas' suites in `pnpm check:cloud` and the
+    // deployment-checks workflow (previews only: each run leaves a project in
+    // the deployment's database). It packs the CLI with the release's own
+    // code, so its inputs reach outside the package.
+    "cli-deployment": {
+      "inputs": [
+        "cli/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/scripts/release-artifacts.mjs",
+        "$TURBO_ROOT$/scripts/release-manifest.mjs",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build"],
+      "cache": false,
+      "passThroughEnv": ["CLOUD_URL", "VERCEL_AUTOMATION_BYPASS_SECRET", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "GITHUB_*", "NODE_EXTRA_CA_CERTS"]
     },
     // Mock lanes run api-mock's `start` and the demo's `dev`, so they need what
     // those need rather than a production build of the demo.
     "demo-next-mock": {
-      "inputs": ["demo-next/**", "package.json", "playwright.shared.ts", "$TURBO_ROOT$/apps/demo-next/**"],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
+      "inputs": [
+        "demo-next/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/apps/demo-next/**",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!$TURBO_ROOT$/apps/demo-next/node_modules/**",
+        "!$TURBO_ROOT$/apps/demo-next/.next/**",
+        "!$TURBO_ROOT$/apps/demo-next/README.md",
+        "!$TURBO_ROOT$/apps/demo-next/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/sdk-next#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -88,14 +167,38 @@
     // @zitadel/testing. The script keeps the server-hosted UIs and the platform
     // project off.
     "demo-next-real": {
-      "inputs": ["demo-next/**", "package.json", "playwright.shared.ts", "$TURBO_ROOT$/apps/demo-next/**"],
-      "dependsOn": ["@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
+      "inputs": [
+        "demo-next/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/apps/demo-next/**",
+        "$TURBO_ROOT$/scripts/task-guard.mjs",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!$TURBO_ROOT$/apps/demo-next/node_modules/**",
+        "!$TURBO_ROOT$/apps/demo-next/.next/**",
+        "!$TURBO_ROOT$/apps/demo-next/README.md",
+        "!$TURBO_ROOT$/apps/demo-next/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/testing#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "demo-nuxt-mock": {
-      "inputs": ["demo-nuxt/**", "package.json", "playwright.shared.ts", "$TURBO_ROOT$/apps/demo-nuxt/**"],
-      "dependsOn": ["@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
+      "inputs": [
+        "demo-nuxt/**",
+        "package.json",
+        "playwright.shared.ts",
+        "$TURBO_ROOT$/apps/demo-nuxt/**",
+        "!**/README.md",
+        "!**/AGENTS.md",
+        "!$TURBO_ROOT$/apps/demo-nuxt/node_modules/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/.nuxt/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/.output/**",
+        "!$TURBO_ROOT$/apps/demo-nuxt/README.md",
+        "!$TURBO_ROOT$/apps/demo-nuxt/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/api-mock#build", "@zitadel/sdk-nuxt#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
@@ -103,29 +206,61 @@
     // provider binary, imports the kit's virtual-passkey helper, and its claim
     // suite the console copy in
     // console/support/copy.ts. The scripts default ZITADEL_TELEMETRY to 0.
-    // `e2e-local` is the runner with caller-supplied flags (ci-turbo.yml passes
-    // `--ci …`); `journey` is the by-hand alias; `journey-local` bakes in the
-    // `--ci` set and, like moon's lane of the same name, also depends on every
-    // framework SDK build so an SDK-only change selects it (sdk-next arrives via
-    // cli#build).
+    // `e2e-local` is the runner with caller-supplied flags; `journey` is the
+    // by-hand alias; `journey-local`, CI's lane, bakes in the `--ci` set and,
+    // like moon's lane of the same name, also depends on every framework SDK
+    // build so an SDK-only change selects it (sdk-next arrives via cli#build).
+    // Unlike moon's, it also depends on the server's build: the server it runs
+    // comes packed in the release snapshot, which CI builds in a step before
+    // it, and without the edge a Go change would not select the journey. Moon
+    // runs it with every other lane through `e2e:all`.
     "e2e-local": {
-      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "inputs": [
+        "journey/**",
+        "package.json",
+        "console/support/copy.ts",
+        "$TURBO_ROOT$/scripts/*.mjs",
+        "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey": {
-      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
-      "dependsOn": ["@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
+      "inputs": [
+        "journey/**",
+        "package.json",
+        "console/support/copy.ts",
+        "$TURBO_ROOT$/scripts/*.mjs",
+        "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
+      "dependsOn": ["install-browsers", "@zitadel/cli#build", "@zitadel/testing#build", "@zitadel/oidc-mock#build"],
       "cache": false,
       "passThroughEnv": ["ZITADEL_*", "NEXTGEN_*", "JOURNEY_*", "REAL_*", "EMBEDDED_*", "PLATFORM_*", "PLAYWRIGHT_*", "PWDEBUG", "DEBUG", "RUNNER_TEMP", "GITHUB_*", "DOCKER_*", "TESTCONTAINERS_*"]
     },
     "journey-local": {
-      "inputs": ["journey/**", "package.json", "console/support/copy.ts"],
+      "inputs": [
+        "journey/**",
+        "package.json",
+        "console/support/copy.ts",
+        "$TURBO_ROOT$/scripts/*.mjs",
+        "$TURBO_ROOT$/apps/cli/skills/**",
+        "$TURBO_ROOT$/tools/oidc-mock/users.json",
+        "!**/README.md",
+        "!**/AGENTS.md"
+      ],
       "dependsOn": [
+        "install-browsers",
         "@zitadel/cli#build",
         "@zitadel/testing#build",
         "@zitadel/oidc-mock#build",
+        "@zitadel/server#build",
         "@zitadel/sdk-nuxt#build",
         "@zitadel/sdk-react#build",
         "@zitadel/sdk-vue#build",

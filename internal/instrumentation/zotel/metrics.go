@@ -93,13 +93,13 @@ func (m *OtelMetrics) Shutdown(ctx context.Context) error {
 	var err error
 
 	if m.loggerProvider != nil {
-		errors.Join(err, m.loggerProvider.Shutdown(ctx))
+		err = errors.Join(err, m.loggerProvider.Shutdown(ctx))
 	}
 	if m.tracerProvider != nil {
-		errors.Join(err, m.tracerProvider.Shutdown(ctx))
+		err = errors.Join(err, m.tracerProvider.Shutdown(ctx))
 	}
 	if m.meterProvider != nil {
-		errors.Join(err, m.meterProvider.Shutdown(ctx))
+		err = errors.Join(err, m.meterProvider.Shutdown(ctx))
 	}
 
 	return err

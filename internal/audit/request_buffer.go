@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/instrumentation/metrics"
 )
 
 // RequestBufferConfig tunes Path A batching (ADR 048).
@@ -233,10 +234,15 @@ func (b *RequestBuffer) flush(batch []bufferedEvent) {
 			events[i].OccurredAtWait = time.Since(item.startedAt)
 		}
 		insertCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		start := time.Now()
 		lastErr = b.insert.InsertEvents(insertCtx, events)
+		metrics.RecordAuditInsert(insertCtx, metrics.AuditRequest, time.Since(start))
 		cancel()
 		if lastErr == nil {
 			b.flushed.Add(uint64(len(events)))
+			for _, ev := range events {
+				metrics.RecordAuditEvents(ctx, string(ev.EventType), 1)
+			}
 			return
 		}
 		if attempt < maxAttempts {

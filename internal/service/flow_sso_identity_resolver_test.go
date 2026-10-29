@@ -61,7 +61,7 @@ type ssoResolverFixture struct {
 	stmts       *servicemocks.MockAllStatements
 	connections *servicemocks.MockIDPConnectionService
 	schemaStore *domainmock.MockJSONSchemaStore
-	hasher      *cryptomock.MockHasher
+	hasher      *cryptomock.MockPasswordHasher
 	resolver    *service.FlowSSOIdentityResolver
 	// events are the events expectCreateUser saw inserted.
 	events []*domain.Event
@@ -74,7 +74,7 @@ func newSSOResolverFixture(t *testing.T) *ssoResolverFixture {
 	stmts := servicemocks.NewMockAllStatements(ctrl)
 	connections := servicemocks.NewMockIDPConnectionService(ctrl)
 	schemaStore := domainmock.NewMockJSONSchemaStore(ctrl)
-	hasher := cryptomock.NewMockHasher(ctrl)
+	hasher := cryptomock.NewMockPasswordHasher(ctrl)
 	pool.EXPECT().Statements().Return(stmts).AnyTimes()
 	users := service.NewUserService(pool, schemaStore, nil, nil, nil, domain.BuiltinSchemaBases{})
 	return &ssoResolverFixture{

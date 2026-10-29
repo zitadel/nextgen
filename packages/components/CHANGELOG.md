@@ -1,5 +1,35 @@
 # @zitadel/components
 
+## 0.3.0
+
+### Patch Changes
+
+- [#2417](https://github.com/zitadel/nextgen/pull/2417) [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15) - `<zitadel-login>` now shows the project's minimum password length under the password field while someone chooses a password, instead of only after a too-short submit. The designs `zitadel branding eject` copies show it too; a template you ejected earlier gets it by adding `| fieldRuleHint: f` to its `field_help` line. A field's clear button no longer appears while the field is empty.
+- Updated dependencies [[`1f44571`](https://github.com/zitadel/nextgen/commit/1f445718ef34b78571a5b970665d7556eea79894), [`bc22739`](https://github.com/zitadel/nextgen/commit/bc22739b93d9575f7a278098569df5cecbdf8f15)]:
+  - @zitadel/config@0.3.0
+
+## 0.2.0
+
+### Minor Changes
+
+- [#2236](https://github.com/zitadel/nextgen/pull/2236) [`dcc1282`](https://github.com/zitadel/nextgen/commit/dcc1282fc30ae06735cdeb627eb013e3ec35df4f) - A GitHub sign-in button in the login now shows the GitHub logo, in the button's text colour in light and dark mode; Google's logo is unchanged, and providers without a brand icon, such as custom OIDC connections, stay text-only.
+
+- [#2231](https://github.com/zitadel/nextgen/pull/2231) [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5) - The password step of `<zitadel-login>` shows the account as a full-width chip that goes back to use another account, with an avatar generated from the typed identifier, so it never confirms an account exists; the console shows the same avatar. Custom templates get the chip as `<zl-account>`, and `<zl-avatar>` and `@zitadel/components/avatar` export the avatar for your own pages.
+
+- [#2373](https://github.com/zitadel/nextgen/pull/2373) [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19) - `<zitadel-login>` now says why it switched between sign-in and sign-up by itself: an email without an account becomes a sign-up, with a note to fix a typo in the email field, and one with an account a sign-in; an identity provider sign-in without an account gets the same note. Flow API steps carry `purpose` and, after a switch, `notice`.
+  
+  **Upgrading a page or design from an earlier release:** a page that shows its own heading in place of the widget's should follow `step.purpose` from the `zitadel-flow-step` event, not step names, and a design ejected earlier shows the notice once its template renders `messages`, as the designs `zitadel branding eject` copies now do.
+
+- [#2126](https://github.com/zitadel/nextgen/pull/2126) [`4bcb7c3`](https://github.com/zitadel/nextgen/commit/4bcb7c3a56d988929099e5c5431f705841963f92) - Where the user chooses a password, the login's password field now follows the project's password policy, its `min_length` and its `max_length` or the 64-character cap, and refuses a password outside them with the bound in the message. The fixed minimum of 8 is gone, so a project without a policy has none; sign-in steps carry no length rule.
+
+### Patch Changes
+
+- [#2317](https://github.com/zitadel/nextgen/pull/2317) [`5092d59`](https://github.com/zitadel/nextgen/commit/5092d59756c22718e3bd2c1d376a46ae48d958c8) - The React, Vue, Solid, Svelte, Qwik and Angular SDKs' published types now resolve under strict Node ESM resolution (`node16` and `nodenext`), and `@zitadel/components` exports `defaultTemplate` and `layoutChromeCss` as plain strings, so its declarations import no chunk without types.
+
+- [#2328](https://github.com/zitadel/nextgen/pull/2328) [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1) - The packages no longer ship `.d.ts.map` files. They pointed at `src` files the packages do not publish, so an editor's go-to-definition already landed on the `.d.ts`; it still does.
+- Updated dependencies [[`08a369b`](https://github.com/zitadel/nextgen/commit/08a369b1b6e2218f284df5950bf65e5249091ea0), [`76dc3be`](https://github.com/zitadel/nextgen/commit/76dc3be0e6475dc0efa37e7b4b4d47fad16fc9a9), [`b8fb271`](https://github.com/zitadel/nextgen/commit/b8fb271bacc623010daedf8d2b019fba5b374171), [`c0e9b41`](https://github.com/zitadel/nextgen/commit/c0e9b417cc1814294ef337b1f9e0713553a54bd5), [`d41d1a6`](https://github.com/zitadel/nextgen/commit/d41d1a6a29b50dd77ee48e84d4eba5fe862c7f19), [`65e1b78`](https://github.com/zitadel/nextgen/commit/65e1b7834326cfdd82e366df33df026769bf07af), [`31ef6c1`](https://github.com/zitadel/nextgen/commit/31ef6c1ec87540b0ac5f7b54e6087c67aded32e1)]:
+  - @zitadel/config@0.2.0
+
 ## 0.1.0
 
 ### Minor Changes

@@ -5,6 +5,7 @@ import type { FileOp } from "../file-writer/types";
 import type { PatchContext, PatchView } from "../../types";
 import { AbstractRulePatcher } from "../base";
 import { devScriptPortOp } from "../dev-script-port";
+import { envVarsEdit } from "./env-vars";
 import {
   hooksServerTemplate,
   indexPageTemplate,
@@ -48,7 +49,18 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
       // The auth boundary is written on every setup; a pre-existing hook at
       // this exact path is a genuine conflict the file-writer refuses (and
       // --force replaces), the same way Next writes its request boundary.
-      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate(ctx) },
+      { kind: "write", path: src("hooks.server.ts"), contents: hooksServerTemplate() },
+      {
+        kind: "edit",
+        // SvelteKit reads every env variable an app declares from src/env.ts
+        // (or .js), so the settings the hook imports from $app/env/private are
+        // merged into the app's own file, and the file is written only where
+        // there is none.
+        path: [src("env.ts"), src("env.js")],
+        edit: envVarsEdit(),
+        // Undeclared, the hook cannot read its settings: doctor must fail, not pass.
+        wiring: "infrastructure",
+      },
       // The app shell and landing page are written only when setup created the
       // skeleton itself — a pre-existing app keeps its own root layout, theme,
       // and landing page (ADR 044), same as the Next/Nuxt homepage.
@@ -126,17 +138,17 @@ export class SvelteKitPatcher extends AbstractRulePatcher {
     return [SDK_DEPENDENCY, COMPONENT_DEPENDENCY];
   }
 
-  protected override routeConfigEdits(_view: PatchView): ReadonlyArray<string> {
-    // The dev script's port is pinned in place by an `edit` op eject can't
-    // revert, so it is listed as a manual cleanup step.
-    return ["package.json"];
+  protected override routeConfigEdits(view: PatchView): ReadonlyArray<string> {
+    // The dev script's port and the env declarations are edited in place by
+    // `edit` ops eject can't revert, so they are listed as manual cleanup steps.
+    return ["package.json", join(view.framework.appDir, "env.*")];
   }
 
   protected summary(_ctx: PatchContext): { title: string; detail: string } {
     return {
       title: "SvelteKit integration",
       detail:
-        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle) plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
+        "Wrote src/hooks.server.ts (@zitadel/sdk-sveltekit handle), declared its settings in src/env.ts, plus layout and landing/login/register/profile routes using @zitadel/sdk-svelte.",
     };
   }
 }
