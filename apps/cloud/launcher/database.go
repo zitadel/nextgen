@@ -389,7 +389,8 @@ const adminRole = "postgres"
 //
 // A role that cannot act as adminRole, or acts as one that may not create
 // databases, creates it as itself and then needs CREATEDB of its own. Postgres
-// never passes that attribute on through membership.
+// never passes that attribute on through membership. Only that role can drop
+// such a database, so the build log says so.
 func createDatabase(ctx context.Context, conn *pgx.Conn, identifier string) error {
 	create := "CREATE DATABASE " + identifier
 	if _, setErr := conn.Exec(ctx, "SET ROLE "+pgx.Identifier{adminRole}.Sanitize()); setErr == nil {
@@ -400,8 +401,12 @@ func createDatabase(ctx context.Context, conn *pgx.Conn, identifier string) erro
 			return err
 		}
 	}
-	_, err := conn.Exec(ctx, create)
-	return err
+	if _, err := conn.Exec(ctx, create); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "launcher: warning: created %s as %s, not as %s: only %s can drop it, the preview cleanup cannot (docs/runbooks/cloud.md, \"Database\")\n",
+		identifier, conn.Config().User, adminRole, conn.Config().User)
+	return nil
 }
 
 // quoteLiteral quotes a string as a SQL literal for a statement that takes no
