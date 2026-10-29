@@ -61,20 +61,13 @@ type RuntimeResolver struct {
 }
 
 // NewRuntimeResolver builds the resolver. ownOrigins are the origins the
-// deployment's console runs on; an empty list names none.
+// deployment's console runs on; a blank one names none.
 func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...string) *RuntimeResolver {
-	seen := make(map[string]struct{}, len(ownOrigins))
 	var origins []string
 	for _, origin := range ownOrigins {
-		origin = strings.TrimSpace(origin)
-		if origin == "" {
-			continue
+		if origin = strings.TrimSpace(origin); origin != "" && !slices.Contains(origins, origin) {
+			origins = append(origins, origin)
 		}
-		if _, ok := seen[origin]; ok {
-			continue
-		}
-		seen[origin] = struct{}{}
-		origins = append(origins, origin)
 	}
 	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigins: origins, now: time.Now}
 }
@@ -211,10 +204,10 @@ type matchedOrigin struct {
 }
 
 // gateOpening is Gate for the request that opens an attempt, which also
-// opens a console host where the project's origins refuse it: the console
-// previews a project's login from there with the project's own flow. A
-// project that admits that origin itself keeps its own rules there,
-// deployments and previews included. Only the opening takes this exemption;
+// opens an origin of the deployment's console where the project's origins
+// refuse it: the console previews a project's login from there with the
+// project's own flow. A project that admits that origin itself keeps its own
+// rules there, deployments and previews included. Only the opening takes this exemption;
 // every later step answers to Gate alone, so that origin can show a project's
 // first step but never sign anyone in.
 func (r *RuntimeResolver) gateOpening(ctx context.Context, project *domain.Project, origin string) (*matchedOrigin, error) {

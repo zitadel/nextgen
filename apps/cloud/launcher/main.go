@@ -438,7 +438,29 @@ func prepareServer(extra []string) ([]string, error) {
 			return nil, err
 		}
 	}
+	// Added to, not defaulted: a deployment names its custom domains there, and
+	// the URLs Vercel serves it at must stay console origins beside them.
+	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
+		return nil, err
+	}
 	return append(args, extra...), nil
+}
+
+// consoleOrigins is configured, comma separated, followed by every host
+// Vercel serves this deployment at: a browser can open the console on the
+// deployment's own URL as well as on the branch alias or production domain
+// publicBase picks, and a preview is reviewed on both.
+func consoleOrigins(configured string) string {
+	var origins []string
+	if strings.TrimSpace(configured) != "" {
+		origins = append(origins, configured)
+	}
+	for _, key := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
+		if host := os.Getenv(key); host != "" {
+			origins = append(origins, "https://"+host)
+		}
+	}
+	return strings.Join(origins, ",")
 }
 
 // withParams adds each parameter the URL does not set yet. The server also

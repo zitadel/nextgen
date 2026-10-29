@@ -190,6 +190,11 @@ type ServerConfig struct {
 	// stays on schema.builtin_public_base, which is an identifier namespace,
 	// not an address.
 	PublicBase string `mapstructure:"public_base"`
+	// ConsoleOrigins are origins the console is also reached at, beside the
+	// origin of PublicBase, such as another hostname in front of the same
+	// deployment. Opening a flow from one is exempt from a project's origins,
+	// as from PublicBase's.
+	ConsoleOrigins []string `mapstructure:"console_origins"`
 	// RequestIDHeader names a header that a proxy in front of the server sets
 	// to its own ID for each request, such as Vercel's x-vercel-id. The server
 	// then uses that ID as the request ID, so its logs, events and error pages

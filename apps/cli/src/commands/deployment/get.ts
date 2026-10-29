@@ -1,8 +1,10 @@
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
+import { frozenVariables, toVariableRows } from "../../lib/variables";
 
 /**
  * `zitadel deployment get <deployment_id>` — read one deployment record: the
- * release it made live, the origins it went to, and when.
+ * release it made live, the origins it went to, when, and the variables it
+ * froze.
  */
 export default class DeploymentGet extends EnvironmentCommand {
   static override description = "Read one deployment by id.";
@@ -17,9 +19,13 @@ export default class DeploymentGet extends EnvironmentCommand {
     await this.toMeta(flags);
     const { client, projectId } = await this.connect();
 
-    const deployment = await client.getDeploymentById(args.deployment_id, {
-      project_id: projectId,
-    });
+    const scope = { project_id: projectId };
+    // `--json` carries the record alone, so only a person's view reads the
+    // frozen set.
+    const [deployment, variables] = await Promise.all([
+      client.getDeploymentById(args.deployment_id, scope),
+      this.jsonEnabled() ? undefined : client.getDeploymentVariables(args.deployment_id, scope),
+    ]);
 
     const origins = deployment.targets.map((target) => target.origin);
     return this.emit({
@@ -31,6 +37,7 @@ export default class DeploymentGet extends EnvironmentCommand {
         `  reason    ${deployment.metadata.reason ?? "deploy"}`,
         `  deployed  ${deployment.deployed_at}`,
         `  origins   ${origins.join(", ")}`,
+        ...(variables === undefined ? [] : ["", frozenVariables(toVariableRows(variables))]),
       ].join("\n"),
     });
   }

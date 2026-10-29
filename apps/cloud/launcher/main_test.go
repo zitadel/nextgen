@@ -47,6 +47,7 @@ func setLauncherEnv(t *testing.T, dataDir string) {
 		"NEXTGEN_PLATFORM_OPERATORS",
 		"NEXTGEN_SERVER_ADDRESS",
 		"NEXTGEN_SERVER_CONSOLE_ENABLED",
+		"NEXTGEN_SERVER_CONSOLE_ORIGINS",
 		"NEXTGEN_SERVER_CONSOLE_PATH",
 		"NEXTGEN_SERVER_PUBLIC_BASE",
 		"NEXTGEN_SERVER_REQUEST_ID_HEADER",
@@ -306,6 +307,7 @@ func TestPrepareServerPinsTheDeploymentShape(t *testing.T) {
 	assert.Equal(t, "true", os.Getenv("NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT"))
 	assert.Equal(t, "json", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
 	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
+	assert.Equal(t, "https://nextgen-preview-cloud.vercel.app", os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))
 }
 
 // vercel.json mounts the console service, and builds it, at the path the
@@ -453,6 +455,23 @@ func TestPrepareServerKeepsExplicitDefaults(t *testing.T) {
 
 	assert.Equal(t, "https://cloud.example.com", os.Getenv("NEXTGEN_SERVER_PUBLIC_BASE"))
 	assert.Equal(t, "text", os.Getenv("NEXTGEN_INSTRUMENTATION_LOG_FORMAT"))
+}
+
+func TestConsoleOrigins(t *testing.T) {
+	setLauncherEnv(t, t.TempDir())
+	t.Setenv("VERCEL_URL", "nextgen-preview-cloud-abc123-zitadel.vercel.app")
+	t.Setenv("VERCEL_BRANCH_URL", "nextgen-preview-cloud-git-feature-zitadel.vercel.app")
+
+	assert.Equal(t,
+		"https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app",
+		consoleOrigins(""), "a preview serves the console on its own URL and its branch's")
+	assert.Equal(t,
+		"https://preview.zitadel.com,https://nextgen-preview-cloud-abc123-zitadel.vercel.app,https://nextgen-preview-cloud-git-feature-zitadel.vercel.app",
+		consoleOrigins("https://preview.zitadel.com"), "a configured custom domain keeps Vercel's hosts beside it")
+
+	t.Setenv("VERCEL_URL", "")
+	t.Setenv("VERCEL_BRANCH_URL", "")
+	assert.Empty(t, consoleOrigins(""), "a local run names none")
 }
 
 func TestPublicBase(t *testing.T) {

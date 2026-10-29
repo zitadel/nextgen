@@ -1795,15 +1795,15 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
-  test("answers not_implemented for a deployment's variables", async () => {
+  test("answers not found for the variables of a deployment the project does not hold", async () => {
     const projectId = await newProject("vars-deployment");
 
     const res = await fetch(
       `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
     );
 
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("dep.not_found");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1867,6 +1867,78 @@ describe("api-mock releases and deployments", () => {
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
+
+  test("freezes the variables of the deployment's kind, untouched by later writes", async () => {
+    const project = await newProject("deployment-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const variables = `${BASE}/variables?project_id=${project.id}`;
+    const write = (kind: string, payload: object) =>
+      fetch(`${variables}&kind=${kind}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    await write("primary", { HOST: "app.acme.com", TOKEN: { value: "s3cr3t", secret: true } });
+    await write("preview", { HOST: "preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    await write("primary", { HOST: "changed.acme.com" });
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ HOST: "app.acme.com", TOKEN: { secret: true } });
+  });
+
+  test("reuses the restored deployment's frozen variables on rollback", async () => {
+    const project = await newProject("rollback-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const write = (payload: object) =>
+      fetch(`${BASE}/variables?project_id=${project.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    const deploy = async (body: object) => {
+      const release = (await (await createRelease(project.id, project.secret, body)).json()) as {
+        id: string;
+      };
+      return (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: ["primary"],
+        })
+      ).json()) as { id: string };
+    };
+    await write({ HOST: "first.acme.com" });
+    const first = await deploy(rel1);
+    await write({ HOST: "second.acme.com" });
+    await deploy(rel2);
+    const rolledBack = (await (
+      await fetch(`${BASE}/deployments/${first.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${rolledBack.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
     const project = await newProject("release-build-idps");
