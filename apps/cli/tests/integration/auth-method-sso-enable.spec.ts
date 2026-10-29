@@ -702,12 +702,20 @@ describe("auth-method sso enable", () => {
     });
 
     describe("rendered for a terminal", () => {
-      it("says the provider is configured locally and not yet live", async () => {
+      it("says the provider is saved locally and not yet live", async () => {
         const app = await aSetUpApp();
 
         const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
 
-        expect(result).toPrint("Google sign-in is configured locally.");
+        expect(result).toPrint("Saved in your project. Not applied, not tested.");
+      });
+
+      it("prints nothing after its box to repeat what the box says", async () => {
+        const app = await aSetUpApp();
+
+        const result = await app.enableSsoRendered(GOOGLE, CREDENTIALS);
+
+        expect(result).not.toPrint("Next:");
       });
 
       it("renders text rather than a json envelope", async () => {

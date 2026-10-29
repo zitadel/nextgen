@@ -4,6 +4,7 @@ import {
   mappingLines,
   readMappings,
   statusLine,
+  stepLines,
   stillToConfigure,
   unmappedAttributes,
   unmappedLines,
@@ -136,19 +137,49 @@ describe("the used-by block", () => {
 });
 
 describe("what is still to configure", () => {
-  const steps = (status: "saved" | "applied" | "present"): string[] =>
-    stillToConfigure({ status, file: ".zitadel/idps/acme.json", provider: "Acme" });
+  const steps = (options: Partial<Parameters<typeof stillToConfigure>[0]> = {}): string[] =>
+    stepLines(
+      stillToConfigure({
+        status: "saved",
+        file: ".zitadel/idps/acme.json",
+        provider: "Acme",
+        ...options,
+      }),
+    );
 
   it("sends a connection that is only saved to deploy", () => {
-    expect(steps("saved").join("\n")).toContain("zitadel deploy");
+    expect(steps().join("\n")).toContain("zitadel deploy");
   });
 
   it("does not ask for a deploy of one that already reached the server", () => {
-    expect(steps("applied").join("\n")).not.toContain("zitadel deploy");
+    expect(steps({ status: "applied" }).join("\n")).not.toMatch(/deploy/i);
+  });
+
+  it("asks for a deploy whenever a file changed, whatever the connection's status", () => {
+    expect(steps({ status: "present", deploy: true }).join("\n")).toContain("zitadel deploy");
+  });
+
+  it("puts each deploy command on a line of its own under its step", () => {
+    const lines = steps({ deployCommands: ["zitadel deploy --dry-run"] });
+
+    expect(lines).toContain("3. Deploy, so Acme sign-in reaches your app:");
+    expect(lines).toContain("   `zitadel deploy --dry-run`");
+  });
+
+  it("lists the credentials to publish before the deploy", () => {
+    const lines = steps({
+      republish: ["zitadel variable set ACME_SECRET"],
+      deployCommands: ["zitadel deploy --dry-run"],
+    });
+
+    expect(lines).toContain("   `zitadel variable set ACME_SECRET`");
+    expect(lines.findIndex((line) => line.includes("Publish the credentials"))).toBeLessThan(
+      lines.findIndex((line) => line.includes("Deploy,")),
+    );
   });
 
   it("always ends on a sign-in, the only test of the mapping", () => {
-    expect(steps("applied").at(-1)).toContain("Sign in once");
+    expect(steps({ status: "applied" }).at(-1)).toContain("Sign in once with Acme");
   });
 });
 
@@ -174,11 +205,13 @@ describe("the status line", () => {
 
 describe("the steps for a present connection", () => {
   it("leave out the deploy a saved one needs, and still end on a sign-in", () => {
-    const steps = stillToConfigure({
-      status: "present",
-      file: ".zitadel/idps/acme.json",
-      provider: "Acme",
-    });
+    const steps = stepLines(
+      stillToConfigure({
+        status: "present",
+        file: ".zitadel/idps/acme.json",
+        provider: "Acme",
+      }),
+    );
 
     expect(steps.join("\n")).not.toContain("zitadel deploy");
     expect(steps.at(-1)).toContain("Sign in once");

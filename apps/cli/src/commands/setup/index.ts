@@ -63,6 +63,7 @@ import {
   SETUP_FLAG_NAMES,
   ssoEnableArgs,
   statusLine,
+  stepLines,
   stillToConfigure,
   storeClientSecret,
   type SecretOutcome,
@@ -319,11 +320,13 @@ export default class Setup extends Promptable(BaseCommand) {
         "",
         statusLine("applied"),
         "Still to do:",
-        ...stillToConfigure({
-          status: "applied",
-          file: file.path,
-          provider: provider.displayName,
-        }).map((step, at) => `${at + 1}. ${step}`),
+        ...stepLines(
+          stillToConfigure({
+            status: "applied",
+            file: file.path,
+            provider: provider.displayName,
+          }),
+        ),
       ];
     });
   }

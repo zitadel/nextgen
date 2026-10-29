@@ -164,24 +164,61 @@ export function usedByLines(schemas: readonly string[]): string[] {
  */
 export type ConnectionStatus = "saved" | "applied" | "present";
 
+/** One thing left to do, and the commands that do it, if any. */
+export type Step = {
+  readonly text: string;
+  readonly commands?: readonly string[];
+};
+
 /**
- * What is still to do for a connection, in the order it is done. The first
- * step depends on whether the connection already reached the server; the last
- * is always true, because a sign-in is the only proof that the claims a
+ * What is still to do for a connection, in the order it is done. A deploy is
+ * among them when a file changed that has not reached the server; the last
+ * step is always there, because a sign-in is the only proof that the claims a
  * provider returns are the ones the mapping names.
  */
 export function stillToConfigure(options: {
   readonly status: ConnectionStatus;
   readonly file: string;
   readonly provider: string;
-}): string[] {
-  const { status, file, provider } = options;
+  /** Whether a deploy is still needed. Defaults to a connection only saved. */
+  readonly deploy?: boolean;
+  /** The commands that deploy, shown under that step when they can be run as written. */
+  readonly deployCommands?: readonly string[];
+  /** The commands that publish credentials which did not reach the project. */
+  readonly republish?: readonly string[];
+}): Step[] {
+  const { status, file, provider, deployCommands = [], republish = [] } = options;
+  const deploy = options.deploy ?? status === "saved";
   return [
-    `Register the redirect URI at ${provider}.`,
-    `Check the claim names in ${file}.`,
-    ...(status === "saved" ? ["Run `zitadel deploy`."] : []),
-    "Sign in once: until then the mapping is untested.",
+    { text: `Register the redirect URI at ${provider}.` },
+    { text: `Check the claim names in ${file}.` },
+    ...(republish.length > 0
+      ? [{ text: "Publish the credentials that did not reach your Project:", commands: republish }]
+      : []),
+    ...(deploy
+      ? [
+          deployCommands.length > 0
+            ? { text: `Deploy, so ${provider} sign-in reaches your app:`, commands: deployCommands }
+            : { text: `Run \`zitadel deploy\`, so ${provider} sign-in reaches your app.` },
+        ]
+      : []),
+    { text: `Sign in once with ${provider}: until then the mapping is untested.` },
   ];
+}
+
+/**
+ * Steps as numbered lines, each command on a line of its own under its step
+ * so it can be copied without the sentence around it.
+ */
+export function stepLines(steps: readonly Step[]): string[] {
+  return steps.flatMap((step, at) => {
+    const marker = `${at + 1}. `;
+    const pad = " ".repeat(marker.length);
+    return [
+      `${marker}${step.text}`,
+      ...(step.commands ?? []).map((command) => `${pad}\`${command}\``),
+    ];
+  });
 }
 
 /** The state line: where the connection exists, and that no sign-in has tested it. */

@@ -68,6 +68,7 @@ import {
   type StoredVariables,
   ssoEditRefusal,
   statusLine,
+  stepLines,
   stillToConfigure,
   type SsoResult,
   type SsoSkipped,
@@ -473,13 +474,6 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       // has one, because the command refuses without it.
       reportSecretOutcome(secret, this.meta.cliVersion, reusing, this.environmentSelector());
     }
-    await this.reportConnection({
-      cwd,
-      body: connectionBody,
-      file: reusing ? plan.file.path : plan.path,
-      provider: entry.displayName,
-      status: reusing ? "present" : "saved",
-    });
     this.reportOutcome(outcome);
     // `variable set` first, for a credential that did not reach the project:
     // the connection references it as `${{ NAME }}` and the engine resolves
@@ -500,9 +494,28 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
       secret?.published === "stored" && (clientIdState === undefined || clientIdState === "stored");
     const stored = credentialsStored ? ["Provider credentials are stored on your Project."] : [];
     const name = entry.displayName;
+    const followUps = this.followUps(unpublished, scopeArgs, recovery);
+    // Commands come back only when every argument can be run as written: the
+    // credential ones first, then the two deploy commands.
+    const commands = followUps.next_commands.map(String);
+    await this.reportConnection({
+      cwd,
+      body: connectionBody,
+      file: reusing ? plan.file.path : plan.path,
+      provider: name,
+      status: reusing ? "present" : "saved",
+      stored: credentialsStored,
+      deploy: unpublished,
+      republish: commands.slice(0, recovery.length),
+      deployCommands: commands.slice(recovery.length),
+    });
 
     return this.emit({
       status: "ok",
+      // The box is the human output and ends with what is left to do, as
+      // `setup`'s does, so the generic summary would only repeat it. `--json`
+      // still carries the title and the follow-ups.
+      pretty: "",
       data: {
         // Configured is not live, and stored credentials are only claimed once
         // they reached the Project (a failed or deferred publish warns instead).
@@ -532,15 +545,16 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         }),
         // An ok result carries its follow-ups in data.next_commands (errors
         // use the top-level nextCommands instead).
-        ...this.followUps(unpublished, scopeArgs, recovery),
+        ...followUps,
       },
     });
   }
 
   /**
-   * The connection file, what it maps and what is still to do, so a run does
-   * not end with the mapping known only to whoever opens the file. Not shown
-   * under `--json`, which carries the mapping in its payload instead.
+   * The run's whole human result, in one box as `setup` ends with: the
+   * connection file and what it maps, where the connection stands, and what is
+   * left to do with the commands that do it, so nothing follows the box to
+   * repeat it. Not shown under `--json`, which carries all of it in its payload.
    */
   private async reportConnection(input: {
     cwd: string;
@@ -548,6 +562,12 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
     file: string;
     provider: string;
     status: ConnectionStatus;
+    /** Whether both credentials reached the project. */
+    stored: boolean;
+    /** Whether a file changed that only a deploy publishes. */
+    deploy: boolean;
+    republish: readonly string[];
+    deployCommands: readonly string[];
   }): Promise<void> {
     const schemas = await readSchemaFiles(input.cwd);
     printBox({
@@ -561,8 +581,10 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         ),
         "",
         statusLine(input.status),
+        ...(input.stored ? ["Provider credentials are stored on your Project."] : []),
+        "",
         "Still to do:",
-        ...stillToConfigure(input).map((step, at) => `${at + 1}. ${step}`),
+        ...stepLines(stillToConfigure(input)),
       ].join("\n"),
     });
   }
