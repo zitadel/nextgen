@@ -15,6 +15,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+
+	"github.com/zitadel/nextgen/internal/storage/dialect/postgres/migration"
 )
 
 // The database contract, the same variable names in both Vercel targets:
@@ -121,8 +123,30 @@ func checkServedThroughPooler(servingDSN, migratorDSN string) error {
 // ensureDatabase is ensurePreviewDatabase; tests replace it.
 var ensureDatabase = ensurePreviewDatabase
 
-// dropDatabase is dropPreviewDatabase; tests replace it.
-var dropDatabase = dropPreviewDatabase
+// dropDatabase is dropPreviewDatabases; tests replace it.
+var dropDatabase = dropPreviewDatabases
+
+// listDatabases is listPreviewDatabases; tests replace it.
+var listDatabases = listPreviewDatabases
+
+// connectPreviewCluster opens one connection through a preview's base URL.
+func connectPreviewCluster(ctx context.Context, baseDSN string) (*pgx.Conn, error) {
+	config, err := pgx.ParseConfig(baseDSN)
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
+	}
+	// A pgxpool parameter would reach Postgres as an unknown setting.
+	for key := range config.RuntimeParams {
+		if strings.HasPrefix(key, "pool_") {
+			delete(config.RuntimeParams, key)
+		}
+	}
+	conn, err := pgx.ConnectConfig(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("connect to the preview cluster: %w", err)
+	}
+	return conn, nil
+}
 
 // ensurePreviewDatabase creates the preview's database unless it exists and
 // stamps it with the branch and the time of this deployment, so a cleanup can
@@ -135,19 +159,9 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	config, err := pgx.ParseConfig(baseDSN)
+	conn, err := connectPreviewCluster(ctx, baseDSN)
 	if err != nil {
-		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
-	}
-	// A pgxpool parameter would reach Postgres as an unknown setting.
-	for key := range config.RuntimeParams {
-		if strings.HasPrefix(key, "pool_") {
-			delete(config.RuntimeParams, key)
-		}
-	}
-	conn, err := pgx.ConnectConfig(ctx, config)
-	if err != nil {
-		return fmt.Errorf("connect to the preview cluster: %w", err)
+		return err
 	}
 	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
 
@@ -179,38 +193,110 @@ func ensurePreviewDatabase(ctx context.Context, baseDSN, name, ref string, now t
 	return nil
 }
 
-// dropPreviewDatabase drops a preview database so the next ensurePreviewDatabase
-// call recreates it empty. Used when goose refuses to migrate because the
-// sticky preview still carries an older version set (for example after a
-// migration was renumbered on the branch). Production never calls this.
+// dropPreviewDatabases drops the preview databases named that exist, through
+// one connection. runMigrate drops one so the next ensurePreviewDatabase call
+// recreates it empty, when goose refuses to migrate because the sticky
+// preview still carries an older version set (for example after a migration
+// was renumbered on the branch); runDropPreview drops a merged branch's, or
+// every idle one, for good. Production never calls this. A failed drop does
+// not stop the others; the errors come back together.
 //
 // Preview databases are often owned by adminRole (createDatabase elevates when
 // the migrator lacks CREATEDB), so DROP mirrors that elevation: try as the
 // connecting role, then once as adminRole on insufficient_privilege.
-func dropPreviewDatabase(ctx context.Context, baseDSN, name string) error {
+func dropPreviewDatabases(ctx context.Context, baseDSN string, names ...string) error {
+	connectCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	conn, err := connectPreviewCluster(connectCtx, baseDSN)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := checkPreviewClusterBase(connectCtx, conn); err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, name := range names {
+		if err := dropPreviewDatabase(ctx, conn, name); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func dropPreviewDatabase(ctx context.Context, conn *pgx.Conn, name string) error {
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	config, err := pgx.ParseConfig(baseDSN)
-	if err != nil {
-		return fmt.Errorf("parse %s: %w", migratorDatabaseURLVar, err)
+	var exists bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", name).Scan(&exists); err != nil {
+		return fmt.Errorf("look up preview database %s: %w", name, err)
 	}
-	for key := range config.RuntimeParams {
-		if strings.HasPrefix(key, "pool_") {
-			delete(config.RuntimeParams, key)
-		}
+	if !exists {
+		fmt.Fprintf(os.Stderr, "launcher: no preview database %s to drop\n", name)
+		return nil
 	}
-	conn, err := pgx.ConnectConfig(ctx, config)
-	if err != nil {
-		return fmt.Errorf("connect to the preview cluster: %w", err)
-	}
-	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
-
 	identifier := pgx.Identifier{name}.Sanitize()
 	if err := dropDatabaseAsConnectingOrAdmin(ctx, conn, identifier); err != nil {
 		return fmt.Errorf("drop preview database %s: %w", name, err)
 	}
-	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s to remigrate from an empty schema\n", name)
+	fmt.Fprintf(os.Stderr, "launcher: dropped preview database %s\n", name)
+	return nil
+}
+
+// previewDatabase is a preview database and the stamp its last deployment
+// left (ensurePreviewDatabase), empty when it has none.
+type previewDatabase struct {
+	name, stamp string
+}
+
+// listPreviewDatabases lists the preview cluster's preview databases with
+// their stamps, after the same check a drop makes.
+func listPreviewDatabases(ctx context.Context, baseDSN string) ([]previewDatabase, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	conn, err := connectPreviewCluster(ctx, baseDSN)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = conn.Close(context.WithoutCancel(ctx)) }()
+	if err := checkPreviewClusterBase(ctx, conn); err != nil {
+		return nil, err
+	}
+
+	rows, err := conn.Query(ctx, `SELECT datname, coalesce(shobj_description(oid, 'pg_database'), '')
+		FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY datname`)
+	if err != nil {
+		return nil, fmt.Errorf("list preview databases: %w", err)
+	}
+	databases, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (previewDatabase, error) {
+		var db previewDatabase
+		err := row.Scan(&db.name, &db.stamp)
+		return db, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list preview databases: %w", err)
+	}
+	return databases, nil
+}
+
+// checkPreviewClusterBase refuses a connection to a database that holds the
+// server's schema, before anything is listed or dropped through it. A drop has to
+// connect to the preview cluster's base database, which holds no deployment;
+// production's database holds its schema. The value is easy to take from
+// the wrong place: Vercel's Production and Preview targets name the variable
+// alike, and the PlanetScale database `preview` has a production branch of
+// its own (`main`), which is still the preview cluster.
+func checkPreviewClusterBase(ctx context.Context, conn *pgx.Conn) error {
+	var deployment bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = $1)", migration.SchemaName).Scan(&deployment); err != nil {
+		return fmt.Errorf("look up the %s schema: %w", migration.SchemaName, err)
+	}
+	if deployment {
+		return fmt.Errorf("%s reaches database %s, which holds the %s schema: it must name the preview cluster's base database, Vercel's Preview value, never Production's",
+			migratorDatabaseURLVar, conn.Config().Database, migration.SchemaName)
+	}
 	return nil
 }
 
