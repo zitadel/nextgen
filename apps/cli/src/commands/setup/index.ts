@@ -323,7 +323,7 @@ export default class Setup extends Promptable(BaseCommand) {
           status: "applied",
           file: file.path,
           provider: provider.displayName,
-        }).map((step, at) => `  ${at + 1}. ${step}`),
+        }).map((step, at) => `${at + 1}. ${step}`),
       ];
     });
   }

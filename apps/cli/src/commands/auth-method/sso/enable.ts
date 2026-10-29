@@ -562,7 +562,7 @@ export default class AuthMethodSsoEnable extends AuthMethodCommand {
         "",
         statusLine(input.status),
         "Still to do:",
-        ...stillToConfigure(input).map((step, at) => `  ${at + 1}. ${step}`),
+        ...stillToConfigure(input).map((step, at) => `${at + 1}. ${step}`),
       ].join("\n"),
     });
   }
