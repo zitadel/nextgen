@@ -43,6 +43,7 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       char: "f",
       description: "Roll back without the confirmation prompt. Required when non-interactive.",
     }),
+    message: Flags.string({ char: "m", description: "A short summary of why this rolls back." }),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -121,7 +122,9 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
       return this.emit({ status: "skipped", reason: "rollback-cancelled" });
     }
 
+    const message = flags.message?.trim();
     const deployment = await rollbackDeployment(client, projectId, targetId, {
+      ...(message ? { message } : {}),
       ...(expectedDeploymentId === undefined ? {} : { expectedDeploymentId }),
     });
 

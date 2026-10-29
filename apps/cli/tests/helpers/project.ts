@@ -693,6 +693,20 @@ export class ScaffoldedApp {
     return this.envelopeOf<{ count: number }>(result).data.count;
   }
 
+  /** The message a release records, as `release get` reports it. */
+  async releaseMessage(releaseId: string): Promise<string | null> {
+    const result = await this.cli(["release", "get", releaseId, "--json"]);
+    expect(result, "release get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
+  /** The message a deployment records, as `deployment get` reports it. */
+  async deploymentMessage(deploymentId: string): Promise<string | null> {
+    const result = await this.cli(["deployment", "get", deploymentId, "--json"]);
+    expect(result, "deployment get should have succeeded").toSucceed();
+    return this.envelopeOf<{ metadata: { message: string | null } }>(result).data.metadata.message;
+  }
+
   /** Build a release from `.zitadel/` and deploy it to every primary origin. */
   deploy(extraArgs: string[] = []): Promise<CliResult> {
     return this.cli(["deploy", "--non-interactive", "--json", ...withDeployMessage(extraArgs)]);
