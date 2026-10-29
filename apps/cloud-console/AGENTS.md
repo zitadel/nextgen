@@ -16,8 +16,9 @@ contains it.
 - Call the cloud's backend only through `src/cloud-api.ts`, with the shapes of
   `@zitadel/cloud-functions/contract`
   ([cloud-functions](../cloud-functions/AGENTS.md)).
-- Keep what is not live yet out of production builds (`unreleased` in
-  `src/index.ts`, root ADR 083 §9).
+- Read a screen's data through `whenLive` and draw its preview state when the
+  functions are not live; keep what has none out of production builds
+  (`unreleased` in `src/index.ts`, root ADR 083 §9).
 - Nothing builds here. The console's build with the add-on, as the cloud makes
   it, forced because the add-on's files are no inputs of that build:
 

@@ -10,9 +10,11 @@ import { VercelInsights } from "./vercel-insights";
 
 /**
  * What waits for its functions to go live or for its check on a preview
- * (root ADR 083 §9): previews and local runs get it, production keeps
- * Vercel's insights alone. The build inlines the stage, so a production
- * bundle carries none of it.
+ * (root ADR 083 §9): previews and local runs get it, production does not.
+ * Billing and Support are in both, since each shows its preview state while
+ * the functions answer `cloud.not_live`; Email has none, as nothing sends
+ * marketing email yet. The build inlines the stage, so a production bundle
+ * carries none of what it leaves out.
  */
 const unreleased = import.meta.env.CLOUD_STAGE !== "production";
 
@@ -32,4 +34,4 @@ export const addon: ConsoleAddon = unreleased
       screens: [billingScreen, supportScreen, emailScreen],
       signInApiBase: "/cloud/zitadel",
     }
-  : { Root: VercelInsights, track };
+  : { Root: VercelInsights, track, screens: [billingScreen, supportScreen] };

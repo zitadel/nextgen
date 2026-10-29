@@ -31,38 +31,60 @@ import {
   TableRow,
 } from "@zitadel/console/addon/ui";
 
-import { cloudGet, cloudSend } from "../cloud-api";
+import { type Live, cloudGet, cloudSend, whenLive } from "../cloud-api";
 import { screen } from "./screen";
 
 /**
  * Settings → Billing: each team the person administers, its plan, this
  * period's usage, its invoices and how it pays (root ADR 083 §6). Payment
  * details never pass through the console: changing them, or the plan, opens
- * Stripe's own pages.
+ * Stripe's own pages. While the functions bill no one (`cloud.not_live`), it
+ * says the cloud is free during the preview.
  */
 export const billingScreen = screen({
   path: "/settings/billing",
   nav: { label: "Billing", view: "settings", order: 2, icon: CreditCard },
-  load: () => cloudGet<BillingOverview>("/billing"),
+  load: () => whenLive(cloudGet<BillingOverview>("/billing")),
   Screen: BillingScreen,
 });
 
-function BillingScreen({ data }: AddonScreenProps<BillingOverview>) {
+function BillingScreen({ data }: AddonScreenProps<Live<BillingOverview>>) {
   return (
     <Page>
       <SettingsColumn>
         <div className={PAGE_TITLE_ROW}>
           <h1 className={DETAIL_TITLE}>Billing</h1>
         </div>
-        {data.teams.length === 0 ? (
+        {!data.live ? (
+          <BillingPreview />
+        ) : data.data.teams.length === 0 ? (
           <p className="mt-6 text-sm text-muted-foreground">
             You administer no team, so there is nothing to bill you for.
           </p>
         ) : (
-          data.teams.map((team) => <TeamBillingSections key={team.team_id} team={team} />)
+          data.data.teams.map((team) => <TeamBillingSections key={team.team_id} team={team} />)
         )}
       </SettingsColumn>
     </Page>
+  );
+}
+
+/** Before Stripe is live: what the cloud costs now, and when that changes. */
+function BillingPreview() {
+  return (
+    <SettingsSection
+      title="Free during the preview"
+      description="Zitadel Cloud costs nothing while it is in preview. Nothing is charged until your team picks a plan."
+    >
+      <SettingsCard>
+        <DetailRow label="Plan" align="center">
+          <span className="flex items-center gap-2 text-sm">
+            Preview
+            <Badge variant="secondary">Free</Badge>
+          </span>
+        </DetailRow>
+      </SettingsCard>
+    </SettingsSection>
   );
 }
 

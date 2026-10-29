@@ -31,20 +31,24 @@ import {
   toast,
 } from "@zitadel/console/addon/ui";
 
-import { cloudGet, cloudSend } from "../cloud-api";
+import { type Live, cloudGet, cloudSend, whenLive } from "../cloud-api";
 import { screen } from "./screen";
 
 /**
  * Settings → Support: write to us, and the requests already written (root ADR
- * 083 §5). Each is a HubSpot ticket on the person's contact and their team's
- * company; replies arrive by email, which HubSpot sends.
+ * 083 §7). Each is a HubSpot ticket on the person's contact and their team's
+ * company; replies arrive by email, which HubSpot sends. While the functions
+ * file no tickets (`cloud.not_live`), it points to Zitadel's GitHub issues.
  */
 export const supportScreen = screen({
   path: "/settings/support",
   nav: { label: "Support", view: "settings", order: 3, icon: LifeBuoy },
-  load: () => cloudGet<TicketList>("/support/tickets"),
+  load: () => whenLive(cloudGet<TicketList>("/support/tickets")),
   Screen: SupportScreen,
 });
+
+/** Where help is while tickets are not live: public, so the screen says so. */
+const ISSUES_URL = "https://github.com/zitadel/nextgen/issues";
 
 const STATUS: Record<Ticket["status"], string> = {
   new: "Received",
@@ -53,55 +57,86 @@ const STATUS: Record<Ticket["status"], string> = {
   closed: "Closed",
 };
 
-function SupportScreen({ data, reload }: AddonScreenProps<TicketList>) {
+function SupportScreen({ data, reload }: AddonScreenProps<Live<TicketList>>) {
   return (
     <Page>
       <SettingsColumn>
         <div className={PAGE_TITLE_ROW}>
           <h1 className={DETAIL_TITLE}>Support</h1>
         </div>
-        <SettingsSection
-          title="Write to us"
-          description="We answer by email. Say which project it concerns, and what you expected to happen."
-        >
-          <SettingsCard>
-            <TicketForm onSent={reload} />
-          </SettingsCard>
-        </SettingsSection>
-        <SettingsSection title="Your requests" description="What you wrote to us, newest first.">
-          <Card className={DETAIL_CARD}>
-            <CardContent className="px-6 py-2">
-              {data.tickets.length === 0 ? (
-                <p className="py-3 text-sm text-muted-foreground">
-                  You have not written to us yet.
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className={PANEL_HEAD_CELL}>Subject</TableHead>
-                      <TableHead className={PANEL_HEAD_CELL}>Status</TableHead>
-                      <TableHead className={PANEL_HEAD_CELL}>Updated</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.tickets.map((ticket) => (
-                      <TableRow key={ticket.id}>
-                        <TableCell className={PANEL_BODY_CELL}>{ticket.subject}</TableCell>
-                        <TableCell className={PANEL_BODY_CELL}>{STATUS[ticket.status]}</TableCell>
-                        <TableCell className={PANEL_BODY_CELL}>
-                          {new Date(ticket.updated_at).toLocaleDateString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </SettingsSection>
+        {data.live ? <Tickets tickets={data.data} reload={reload} /> : <SupportPreview />}
       </SettingsColumn>
     </Page>
+  );
+}
+
+/** Before HubSpot is live: where to ask today. */
+function SupportPreview() {
+  return (
+    <SettingsSection
+      title="Get help"
+      description="Ask a question or report a problem in Zitadel's GitHub issues."
+    >
+      <SettingsCard>
+        <p className="text-sm text-muted-foreground">
+          Issues are public: leave out anything private, such as keys, secrets or your users&apos;
+          data.
+        </p>
+        <div className="flex justify-end">
+          <Button asChild>
+            <a href={ISSUES_URL} target="_blank" rel="noreferrer">
+              Open GitHub issues
+            </a>
+          </Button>
+        </div>
+      </SettingsCard>
+    </SettingsSection>
+  );
+}
+
+/** With HubSpot live: the form, and the person's own requests. */
+function Tickets({ tickets: data, reload }: { tickets: TicketList; reload: () => Promise<void> }) {
+  return (
+    <>
+      <SettingsSection
+        title="Write to us"
+        description="We answer by email. Say which project it concerns, and what you expected to happen."
+      >
+        <SettingsCard>
+          <TicketForm onSent={reload} />
+        </SettingsCard>
+      </SettingsSection>
+      <SettingsSection title="Your requests" description="What you wrote to us, newest first.">
+        <Card className={DETAIL_CARD}>
+          <CardContent className="px-6 py-2">
+            {data.tickets.length === 0 ? (
+              <p className="py-3 text-sm text-muted-foreground">You have not written to us yet.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className={PANEL_HEAD_CELL}>Subject</TableHead>
+                    <TableHead className={PANEL_HEAD_CELL}>Status</TableHead>
+                    <TableHead className={PANEL_HEAD_CELL}>Updated</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.tickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell className={PANEL_BODY_CELL}>{ticket.subject}</TableCell>
+                      <TableCell className={PANEL_BODY_CELL}>{STATUS[ticket.status]}</TableCell>
+                      <TableCell className={PANEL_BODY_CELL}>
+                        {new Date(ticket.updated_at).toLocaleDateString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </SettingsSection>
+    </>
   );
 }
 

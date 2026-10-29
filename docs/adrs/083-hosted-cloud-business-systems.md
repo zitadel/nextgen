@@ -305,9 +305,14 @@ server's catch-all.
 
 - Every system answers from `src/mock.ts`. It keeps state per process, so a
   change made in one Vercel instance is not seen by another.
-- Production refuses mocks with `503 cloud.not_live`. The add-on's
-  production build keeps Vercel's insights alone (`CLOUD_STAGE`): no screens,
-  no provisioning call, and no sign-in hop or BotID client until a preview has
+- Production refuses mocks with `503 cloud.not_live`, and a screen that reads
+  one shows its preview state instead (`whenLive`). In production, Billing says
+  the cloud is free during the preview and that nothing is charged until a
+  team picks a plan. Support points to Zitadel's GitHub issues, and warns that
+  they are public.
+- The add-on's production build (`CLOUD_STAGE`) leaves out what has no
+  preview state: Email, since nothing sends marketing email yet, the
+  provisioning call, and the sign-in hop and BotID client until a preview has
   shown them working. Previews and local runs get all of it.
 - The hourly cron is not in `vercel.json` yet. Cron runs in production only,
   where it would answer 503 every hour; it lands with the live Stripe

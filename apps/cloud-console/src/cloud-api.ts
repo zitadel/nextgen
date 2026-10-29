@@ -25,6 +25,24 @@ export function cloudGet<T>(path: string): Promise<T> {
   return call<T>("GET", path);
 }
 
+/** What a screen read, or that this deployment's functions do not answer it yet. */
+export type Live<T> = { live: true; data: T } | { live: false };
+
+/**
+ * A read that a screen shows in its preview state while the functions answer
+ * `cloud.not_live`, as production does until a system's live adapter ships
+ * (root ADR 083 §9). Any other failure still reaches the console's error
+ * state.
+ */
+export async function whenLive<T>(read: Promise<T>): Promise<Live<T>> {
+  try {
+    return { live: true, data: await read };
+  } catch (error) {
+    if (error instanceof CloudApiError && error.code === "cloud.not_live") return { live: false };
+    throw error;
+  }
+}
+
 /**
  * A call that changes something. JSON only: a cross-origin form cannot send
  * it, and the functions also refuse a foreign `Origin`.
