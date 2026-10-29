@@ -7,7 +7,6 @@ import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
-  deployMessage,
   diffConfigAgainst,
   diffConfigFilesAgainst,
   worktreeIsDirty,
@@ -60,34 +59,6 @@ describe("worktreeIsDirty", () => {
     dir = cwd;
 
     expect(await worktreeIsDirty(cwd)).toBe(false);
-  });
-});
-
-describe("deployMessage", () => {
-  it("takes -m, trimmed, over the commit subject", async () => {
-    const cwd = await cleanRepo();
-
-    expect(await deployMessage("  add company  ", cwd)).toBe("add company");
-  });
-
-  it("falls back to the commit subject when -m is blank", async () => {
-    const cwd = await cleanRepo();
-
-    expect(await deployMessage("   ", cwd)).toBe("initial");
-  });
-
-  it("cuts a commit subject longer than the server records", async () => {
-    const cwd = await cleanRepo();
-    await run("git", ["commit", "-q", "--allow-empty", "-m", "x".repeat(2000)], { cwd });
-
-    expect(await deployMessage(undefined, cwd)).toHaveLength(1024);
-  });
-
-  it("is undefined without -m outside a git repository", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "zitadel-git-norepo-"));
-    dir = cwd;
-
-    expect(await deployMessage(undefined, cwd)).toBeUndefined();
   });
 });
 

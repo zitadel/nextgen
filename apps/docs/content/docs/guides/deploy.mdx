@@ -76,7 +76,7 @@ Add the origins a project serves with `origin add` before the first deploy; `dep
 
 ## Messages
 
-`deploy -m` and `preview -m` record a short summary on the release and on the deployment. Without `-m`, both use the subject of the current git commit. Outside a git repository, a non-interactive `deploy` fails without `-m`. Record why a rollback happened with `deployment rollback -m`.
+`deploy -m` and `preview -m` record a short summary on the release and on the deployment. Without `-m`, both use the title of the pull request on a GitHub pull request build, Vercel's commit message on a Vercel build, and otherwise the subject of the current git commit when there are no uncommitted changes. With none of these, a non-interactive `deploy` fails without `-m`. Record why a rollback happened with `deployment rollback -m`.
 
 A release keeps the message of the run that first built its content. When a pull request's `preview` built it, the `deploy` after merge reuses that release, and its message is recorded on the deployment only.
 
@@ -87,6 +87,9 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 ```yaml
 # .github/workflows/zitadel-preview.yml, on: pull_request
 - uses: actions/checkout@v4
+# Your hosting deploy, reporting the preview URL as an output named url.
+- id: host
+  run: echo "url=https://your-preview.example.com" >> "$GITHUB_OUTPUT"
 - run: npx @zitadel/cli@alpha preview --origin "$PREVIEW_URL" --non-interactive --json
   env:
     ZITADEL_ENV: preview
@@ -110,6 +113,7 @@ Run `preview` on pull requests and `deploy` on pushes to the main branch:
 - GitHub Actions sets no environment name, so `preview` needs `ZITADEL_ENV=preview`. Without it, the preview is skipped.
 - `preview` detects preview URLs only on Vercel and Netlify. Pass `--origin` with the URL your hosting step reports.
 - `fetch-depth: 0` keeps the history `deploy` diffs against. With the default shallow checkout, the diff is not shown.
+- When a pull request's `preview` built the release, the release records GitHub's merge commit, which is not in the main branch's history, so the `deploy` after merge shows no diff either.
 - To pass your own message, put it in `env:` and use `-m "$MESSAGE"`. Never write `${{ github.event.head_commit.message }}` into `run:`: the shell would run whatever the commit message contains.
 
 ## How publishing works

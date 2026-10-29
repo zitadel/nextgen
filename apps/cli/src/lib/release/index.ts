@@ -17,16 +17,17 @@ export {
   type DeployTargets,
 } from "./deployment";
 export { deployInitialRelease, type InitialDeployment } from "./initial-deploy";
-export { deployMessage, worktreeIsDirty, headSha } from "./git";
+export { worktreeIsDirty, headSha } from "./git";
+export { deployMessage, messageFlag } from "./message";
 export { runSteps, type PipelineMode, type Step, type StepContext } from "./pipeline";
 export { validateStep } from "./steps/validate";
 export { diffStep } from "./steps/diff";
 export { originMatchesPattern, type ProjectOriginEntry } from "./origins";
 
 /**
- * The arguments of a suggested publish. A non-interactive `deploy` outside a git
- * repository refuses to run without `-m`, so a suggested deploy carries one for
- * the reader to fill in.
+ * The arguments of a suggested publish. A non-interactive `deploy` with no
+ * message to fall back on refuses to run without `-m`, so a suggested deploy
+ * carries one for the reader to fill in.
  */
 export const DEPLOY_ARGS = "deploy -m '<what changed>'";
 export { type ListedDeployment, listLiveDeployments, servesPrimary } from "./deployment";

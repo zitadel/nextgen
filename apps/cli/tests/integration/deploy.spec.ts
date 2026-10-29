@@ -112,7 +112,7 @@ describe("deploy", () => {
         expect(result.stdout + result.stderr).toContain("pol.invalid");
       });
 
-      it("requires -m when non-interactive", async () => {
+      it("requires -m when non-interactive outside a git repository", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 
@@ -136,7 +136,7 @@ describe("deploy", () => {
         expect(await app.deploymentMessage(data.deployment_id ?? "")).toBe("wip");
       });
 
-      it("rejects a blank -m when non-interactive", async () => {
+      it("rejects a blank -m rather than falling back", async () => {
         const app = await aSetUpApp();
         await app.addPrimaryOrigin();
 

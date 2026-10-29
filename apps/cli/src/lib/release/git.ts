@@ -44,27 +44,9 @@ export async function headSha(cwd: string): Promise<string | null> {
 
 /** The current commit's subject line, or null when there is no repo or no commit yet. */
 export async function headSubject(cwd: string): Promise<string | null> {
-  const stdout = await git(cwd, ["log", "-1", "--format=%s"]);
+  // `log.showSignature` would otherwise put gpg's lines ahead of the subject.
+  const stdout = await git(cwd, ["log", "-1", "--no-show-signature", "--format=%s"]);
   return stdout === null ? null : stdout.trim() || null;
-}
-
-/** The longest message the server records on a release or a deployment. */
-const MESSAGE_MAX_LENGTH = 1024;
-
-/**
- * The message a deploy records: `-m` when it is not blank, else the subject of
- * the current commit, so a CI run that passes none still records one.
- */
-export async function deployMessage(
-  flag: string | undefined,
-  cwd: string,
-): Promise<string | undefined> {
-  const given = flag?.trim();
-  if (given) {
-    return given;
-  }
-  const subject = await headSubject(cwd);
-  return subject === null ? undefined : subject.slice(0, MESSAGE_MAX_LENGTH);
 }
 
 /**

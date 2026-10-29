@@ -48,8 +48,8 @@ export interface Envelope<T = Record<string, unknown>> {
 }
 
 /**
- * A non-interactive `deploy` needs a `-m` message, so the helpers default one
- * unless the spec already supplied its own.
+ * A non-interactive `deploy` outside a git repository, as `aSetUpApp` arranges,
+ * needs a `-m` message, so the helpers default one unless the spec supplied its own.
  */
 function withDeployMessage(extraArgs: readonly string[]): string[] {
   const hasMessage = extraArgs.some((arg) => arg === "-m" || arg === "--message");

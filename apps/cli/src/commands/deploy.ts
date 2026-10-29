@@ -1,5 +1,3 @@
-import { Flags } from "@oclif/core";
-
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope } from "../lib/oclif";
 import {
   buildBundle,
@@ -10,6 +8,7 @@ import {
   diffStep,
   headSha,
   listLiveDeployments,
+  messageFlag,
   runSteps,
   servesPrimary,
   type StepContext,
@@ -49,11 +48,9 @@ export default class Deploy extends EnvironmentCommand {
     "<%= config.bin %> deploy --dry-run",
   ];
   static override flags = {
-    message: Flags.string({
-      char: "m",
-      description:
-        "A short summary of what this release changes. Defaults to the current commit's subject.",
-    }),
+    message: messageFlag(
+      "A short summary of what this release changes. Defaults to the pull request's title or the current commit's subject.",
+    ),
   };
 
   async run(): Promise<JsonEnvelope> {
@@ -63,16 +60,14 @@ export default class Deploy extends EnvironmentCommand {
     const json = this.jsonEnabled();
     const color = !json && isTTY && flags.color !== false && !process.env.NO_COLOR;
 
-    // A deploy records why it happened: `-m`, else the current commit's
-    // subject. Interactively the reason can be left off, but a
-    // non-interactive caller (CI) outside a git repository must name one.
-    // Rejected here, before the pipeline writes anything, so a missing message
-    // never leaves a half-synced IdP behind. A dry run makes no release, so it
-    // is exempt.
-    const message = await deployMessage(flags.message, cwd);
+    // A deploy records why it happened. Interactively the reason can be left
+    // off, but a non-interactive caller (CI) with no message to fall back on
+    // must name one, refused before anything is built. A dry run records
+    // nothing, so it neither resolves nor needs one.
+    const message = dryRun ? undefined : await deployMessage(flags.message, cwd, env);
     if (nonInteractive && !dryRun && message === undefined) {
       throw new ZitadelError("E_VALIDATION", "A deploy needs a message in non-interactive mode", {
-        hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a git commit.",
+        hint: "Pass -m/--message with a short summary of what this release changes, or deploy from a clean git commit.",
       });
     }
 
