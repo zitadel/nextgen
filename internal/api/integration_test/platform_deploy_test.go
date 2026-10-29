@@ -15,26 +15,21 @@ import (
 	"github.com/zitadel/nextgen/internal/domain"
 )
 
-// TestPlatformProjectSignsInFromTheConsole runs the start-up deploy of the
-// platform project twice, the second a restart that changes nothing, and
-// signs in to it from the console's origin the way the console does: the
-// flow opens and its first step is submitted there.
+// TestPlatformProjectSignsInFromTheConsole bootstraps the platform project as
+// the server does on start, twice, and signs in to it from the console's
+// origin the way the console does: the flow opens and its first step is
+// submitted there.
 func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
-	platform := harness.EnsurePlatformProject(t)
+	projects := harness.EnsureProjectService(t)
+	require.NoError(t, platformbootstrap.Ensure(t.Context(), projects, harness.EnsureServiceDB(t), true))
 	deploy := func() {
 		t.Helper()
-		require.NoError(t, platformbootstrap.EnsureDeployed(t.Context(), helpers.ConsoleOrigin,
-			harness.EnsureProjectService(t), platformbootstrap.Catalog{
-				Schemas:        harness.EnsureSchemaService(t),
-				Flows:          harness.EnsureFlowDefinitionService(t),
-				IDPConnections: harness.EnsureIDPConnectionService(t),
-				Policies:       harness.EnsurePolicyService(t),
-				Branding:       harness.EnsureBrandingService(t),
-			}, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t)))
+		require.NoError(t, platformbootstrap.EnsureDeployed(t.Context(), helpers.BuiltinSchemaBaseURL, helpers.ConsoleOrigin,
+			projects, harness.EnsureReleaseService(t), harness.EnsureDeploymentService(t)))
 	}
 	served := func() []domain.OriginDeployment {
 		t.Helper()
-		read, err := harness.EnsureServiceDB(t).Statements().GetNewestPerOrigin(t.Context(), platform.ID,
+		read, err := harness.EnsureServiceDB(t).Statements().GetNewestPerOrigin(t.Context(), domain.PlatformProjectID,
 			[]string{helpers.ConsoleOrigin})
 		require.NoError(t, err)
 		return read
@@ -46,7 +41,7 @@ func TestPlatformProjectSignsInFromTheConsole(t *testing.T) {
 	deploy()
 	assert.Equal(t, first, served(), "a restart that changes nothing deploys nothing")
 
-	resp, body := openFlow(t, platform.ID, helpers.ConsoleOrigin)
+	resp, body := openFlow(t, domain.PlatformProjectID, helpers.ConsoleOrigin)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 	var opened api.FlowResponse
 	require.NoError(t, opened.UnmarshalJSON(body), string(body))

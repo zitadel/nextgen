@@ -5,28 +5,12 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/zitadel/nextgen/api/openapi/endpoints/flow_definitions"
+	"github.com/zitadel/nextgen/api/openapi/endpoints/schemas"
 	"github.com/zitadel/nextgen/internal/domain"
 	"github.com/zitadel/nextgen/internal/service"
+	configdefaults "github.com/zitadel/nextgen/packages/config/defaults"
 )
-
-// Catalog lists what the platform release pins, each at its newest revision.
-type Catalog struct {
-	Schemas interface {
-		ListSchemas(ctx context.Context, input service.ListSchemasInput) (*service.ListSchemasOutput, error)
-	}
-	Flows interface {
-		List(ctx context.Context, req service.ListFlowDefinitionsRequest) (*service.ListFlowDefinitionsResponse, error)
-	}
-	IDPConnections interface {
-		List(ctx context.Context, input service.ListIDPConnectionsInput) (*service.ListIDPConnectionsOutput, error)
-	}
-	Policies interface {
-		List(ctx context.Context, input service.ListPoliciesInput) (*service.ListPoliciesOutput, error)
-	}
-	Branding interface {
-		GetLatest(ctx context.Context, projectID string) (*domain.Branding, error)
-	}
-}
 
 // originRegistry reads the platform project and adds an origin to it.
 type originRegistry interface {
@@ -34,9 +18,9 @@ type originRegistry interface {
 	AddOrigin(ctx context.Context, projectID string, origin domain.Origin) (*domain.Origin, error)
 }
 
-// releasePublisher creates the release the platform project serves.
-type releasePublisher interface {
-	Create(ctx context.Context, input service.CreateReleaseInput) (*service.CreateReleaseOutput, error)
+// releaseBuilder builds the platform release from the server's bundle.
+type releaseBuilder interface {
+	Build(ctx context.Context, input service.BuildReleaseInput) (*service.CreateReleaseOutput, error)
 }
 
 // targetDeployer deploys that release.
@@ -44,18 +28,22 @@ type targetDeployer interface {
 	Deploy(ctx context.Context, input service.DeployInput) (*service.CreateDeploymentOutput, error)
 }
 
-// EnsureDeployed makes the platform project serve its current configuration,
-// like any project the CLI deploys: consoleOrigin, where the console signs
-// operators in, is a primary origin of it, and a release of every kind's
-// newest revision is deployed to its primary origins.
-// It runs on every start, so an upgrade's new defaults go live; a deploy that
-// changes nothing writes nothing.
+// platformReleaseMessage is the message the platform release carries.
+const platformReleaseMessage = "Platform configuration of this server"
+
+// EnsureDeployed deploys the platform project the way the CLI deploys any
+// project: consoleOrigin, where the console signs operators in, is a primary
+// origin of it, and the configuration this server ships (the platform user
+// schema and the default login flows) is built into one release and deployed
+// to its primary origins. It runs on every start, so an upgrade's default
+// flows go live; a start that changes nothing builds back to the same release
+// and deploys nothing.
 func EnsureDeployed(
 	ctx context.Context,
+	builtinBase string,
 	consoleOrigin string,
 	projects originRegistry,
-	catalog Catalog,
-	releases releasePublisher,
+	releases releaseBuilder,
 	deployments targetDeployer,
 ) error {
 	ctx = service.WithAuthzListUnrestricted(ctx)
@@ -70,81 +58,59 @@ func EnsureDeployed(
 		}
 	}
 
-	content, err := platformContent(ctx, catalog)
+	bundle, err := platformBundle(builtinBase)
 	if err != nil {
 		return err
 	}
-	pointers, err := content.Pointers()
+	built, err := releases.Build(ctx, bundle)
 	if err != nil {
-		return fmt.Errorf("pin platform release: %w", err)
-	}
-	if len(pointers) == 0 {
-		return nil
-	}
-	created, err := releases.Create(ctx, service.CreateReleaseInput{
-		ProjectID: domain.PlatformProjectID,
-		Pointers:  releasePointers(pointers),
-	})
-	if err != nil {
-		return fmt.Errorf("release platform project: %w", err)
+		return fmt.Errorf("build platform release: %w", err)
 	}
 	if _, err := deployments.Deploy(ctx, service.DeployInput{
 		ProjectID: domain.PlatformProjectID,
-		ReleaseID: created.Release.ID,
+		ReleaseID: built.Release.ID,
 		Targets:   []string{domain.DeploymentTargetPrimary},
 		Reason:    domain.DeploymentReasonDeploy,
 	}); err != nil {
-		return fmt.Errorf("deploy platform project: %w", err)
+		return fmt.Errorf("deploy platform release: %w", err)
 	}
 	return nil
 }
 
-func platformContent(ctx context.Context, catalog Catalog) (domain.ReleaseContent, error) {
-	const limit = 100
-	schemas, err := catalog.Schemas.ListSchemas(ctx, service.ListSchemasInput{
-		ProjectID:                   domain.PlatformProjectID,
-		LatestRevisionPerObjectType: true,
-		Limit:                       limit,
-	})
+// platformBundle is the configuration this server ships for the platform
+// project, as a release bundle. The user schema is named by its URL, its
+// identity: users and the bootstrap import refer to it there, and Ensure
+// stores it when it creates the project.
+func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
+	flows, err := flow_definitions.DefaultLoginFlowDefinitions(builtinBase, domain.PlatformProjectID)
 	if err != nil {
-		return domain.ReleaseContent{}, fmt.Errorf("list platform schemas: %w", err)
+		return service.BuildReleaseInput{}, fmt.Errorf("platform login flows: %w", err)
 	}
-	flows, err := catalog.Flows.List(ctx, service.ListFlowDefinitionsRequest{
-		ProjectID:             domain.PlatformProjectID,
-		LatestRevisionPerName: true,
-		Limit:                 limit,
-	})
-	if err != nil {
-		return domain.ReleaseContent{}, fmt.Errorf("list platform flows: %w", err)
+	message := platformReleaseMessage
+	bundle := service.BuildReleaseInput{
+		ProjectID: domain.PlatformProjectID,
+		Schemas:   []service.BuildSchema{{Index: 0, URL: schemas.DefaultHumanUserSchemaURL(builtinBase)}},
+		Message:   &message,
 	}
-	idps, err := catalog.IDPConnections.List(ctx, service.ListIDPConnectionsInput{ProjectID: domain.PlatformProjectID, Limit: limit})
-	if err != nil {
-		return domain.ReleaseContent{}, fmt.Errorf("list platform identity providers: %w", err)
+	for i, flow := range flows {
+		purposes := make(map[string]string, len(flow.Purposes))
+		for purpose, entryStep := range flow.Purposes {
+			purposes[purpose.String()] = entryStep
+		}
+		bundle.FlowDefinitions = append(bundle.FlowDefinitions, service.BuildFlowDefinition{
+			Index: i,
+			Request: service.FlowDefinitionRequest{
+				ProjectID:     domain.PlatformProjectID,
+				Name:          flow.Name,
+				Status:        flow.Status.String(),
+				SchemaVersion: "1.0.0",
+				FlowSchemaURI: configdefaults.DefaultFlowSchemaURI,
+				UserSchema:    flow.UserSchema,
+				Purposes:      purposes,
+				Audience:      flow.Audience,
+				Steps:         flow.Steps,
+			},
+		})
 	}
-	policies, err := catalog.Policies.List(ctx, service.ListPoliciesInput{ProjectID: domain.PlatformProjectID, Limit: limit})
-	if err != nil {
-		return domain.ReleaseContent{}, fmt.Errorf("list platform policies: %w", err)
-	}
-	if schemas.NextPageToken != "" || flows.NextPageToken != "" || idps.NextPageToken != "" || policies.NextPageToken != "" {
-		return domain.ReleaseContent{}, fmt.Errorf("list platform configuration: more than %d of a kind", limit)
-	}
-	branding, err := catalog.Branding.GetLatest(ctx, domain.PlatformProjectID)
-	if err != nil {
-		return domain.ReleaseContent{}, fmt.Errorf("read platform branding: %w", err)
-	}
-	return domain.ReleaseContent{
-		Schemas:         schemas.Items,
-		FlowDefinitions: flows.Items,
-		IDPConnections:  idps.Items,
-		Policies:        policies.Items,
-		Branding:        branding,
-	}, nil
-}
-
-func releasePointers(pointers []domain.ReleasePointer) []service.CreateReleasePointer {
-	out := make([]service.CreateReleasePointer, len(pointers))
-	for i, pointer := range pointers {
-		out[i] = service.CreateReleasePointer{Kind: pointer.Kind, RevisionID: pointer.RevisionID}
-	}
-	return out
+	return bundle, nil
 }
