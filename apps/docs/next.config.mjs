@@ -19,31 +19,10 @@ if (sampleRate && !(Number(sampleRate) >= 0 && Number(sampleRate) <= 1)) {
   );
 }
 
-const dev = process.env.NODE_ENV === "development";
 const policy = (directives) => directives.join("; ");
 const enforcedPolicy = [
   "object-src 'none'",
   "base-uri 'self'",
-  "frame-ancestors 'none'",
-  "report-uri /csp-report",
-];
-// Reported on, not enforced. Inline scripts run unchecked ('unsafe-inline'):
-// a nonce would take a render per request, and the pages are prerendered.
-// What it limits is where a script, an image or a request may come from or
-// go to, so what a script could carry off.
-const reportOnlyPolicy = [
-  "default-src 'self'",
-  // React rebuilds server error stacks with eval in development only.
-  `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
-  // Code blocks colour their tokens with style attributes (Shiki).
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  // Search, the feedback route, the API reference's calls to the API on the
-  // same origin, Vercel's analytics; next dev's reload socket.
-  `connect-src 'self'${dev ? " ws:" : ""}`,
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
   "frame-ancestors 'none'",
   "report-uri /csp-report",
 ];
@@ -71,9 +50,9 @@ const config = {
         source: "/:path*",
         headers: [
           // Enforced: nothing frames the docs, embeds a plugin or moves their
-          // base URL.
+          // base URL. Each page also carries a report-only policy with a nonce
+          // of its own (proxy.ts).
           { key: "Content-Security-Policy", value: policy(enforcedPolicy) },
-          { key: "Content-Security-Policy-Report-Only", value: policy(reportOnlyPolicy) },
         ],
       },
     ];
