@@ -25,6 +25,10 @@ export default function proxy(request: NextRequest) {
   const headers = new Headers(request.headers);
   if (nonce) headers.set(NONCE_HEADER, nonce);
   headers.set("content-security-policy-report-only", reportOnly);
+  // On Vercel the request also carries next.config's enforced policy, which
+  // Next.js reads first; a request header binds no browser, so give it the
+  // nonce's policy.
+  headers.set("content-security-policy", reportOnly);
 
   const response = NextResponse.next({ request: { headers } });
   response.headers.set("Content-Security-Policy-Report-Only", reportOnly);
