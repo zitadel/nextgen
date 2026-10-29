@@ -312,7 +312,7 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	// The console previews a project's login from these hosts, so opening a
 	// flow admits them for every project; no later step does.
-	consoleHosts, err := consoleOrigins(cfg.Server.PublicBase)
+	consoleHosts, err := consoleOrigins(cfg.Server.PublicBase, cfg.Server.ConsoleOrigins)
 	if err != nil {
 		return err
 	}
@@ -564,24 +564,21 @@ func consoleBaseURL(publicBase, consolePath string) (string, error) {
 	return base.String(), nil
 }
 
-// consoleOrigins are the hosts a browser can open the console on: the public
-// base, plus the Vercel deployment, branch, and production URLs when the
-// process is one of those deployments. The unique deployment URL is not the
-// branch alias public_base uses, and a preview serves both.
-func consoleOrigins(publicBase string) ([]string, error) {
+// consoleOrigins are the origins a browser can open the console on: the
+// public base's, plus each of server.console_origins.
+func consoleOrigins(publicBase string, extra []string) ([]string, error) {
 	own, err := publicOrigin(publicBase)
 	if err != nil {
 		return nil, err
 	}
 	origins := []string{own}
-	for _, key := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
-		host := os.Getenv(key)
-		if host == "" {
+	for _, entry := range extra {
+		if strings.TrimSpace(entry) == "" {
 			continue
 		}
-		origin, err := domain.NormalizeOrigin("https://" + host)
+		origin, err := browserOrigin(strings.TrimSpace(entry))
 		if err != nil {
-			return nil, fmt.Errorf("%s %q is not an origin: %w", key, host, err)
+			return nil, fmt.Errorf("server.console_origins: %q is not an origin: %w", entry, err)
 		}
 		origins = append(origins, origin)
 	}
@@ -592,19 +589,25 @@ func consoleOrigins(publicBase string) ([]string, error) {
 // its console runs. A browser never spells out the scheme's default port, so
 // neither does this.
 func publicOrigin(publicBase string) (string, error) {
-	base, err := url.Parse(publicBase)
+	origin, err := browserOrigin(publicBase)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse server public base: %w", err)
+		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
+	}
+	return origin, nil
+}
+
+// browserOrigin is the origin of raw as a browser sends it: lowercase, with no
+// path and no default port.
+func browserOrigin(raw string) (string, error) {
+	base, err := url.Parse(raw)
+	if err != nil {
+		return "", err
 	}
 	host := base.Host
 	if port := base.Port(); (base.Scheme == "https" && port == "443") || (base.Scheme == "http" && port == "80") {
 		host = strings.TrimSuffix(host, ":"+port)
 	}
-	origin, err := domain.NormalizeOrigin(base.Scheme + "://" + host)
-	if err != nil {
-		return "", fmt.Errorf("server public base %q has no valid origin: %w", publicBase, err)
-	}
-	return origin, nil
+	return domain.NormalizeOrigin(base.Scheme + "://" + host)
 }
 
 // ----------------------------- CONFIG --------------------------------------
@@ -645,6 +648,7 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("server.console_enabled", true)
 	v.SetDefault("server.console_path", "/ui/console")
 	v.SetDefault("server.public_base", "https://nextgen.zitadel.cloud")
+	v.SetDefault("server.console_origins", []string{})
 	// Generation on by default: a first local start has to work with no
 	// configuration at all. Production turns it off, per ADR 029.
 	v.SetDefault("server.generate_master_key", true)

@@ -76,6 +76,16 @@ func TestConsoleBaseURL(t *testing.T) {
 	}
 }
 
+func TestConsoleOrigins(t *testing.T) {
+	got, err := consoleOrigins("https://zitadel.example.com/nextgen", []string{" https://Console.Example.com:443 ", ""})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"https://zitadel.example.com", "https://console.example.com"}, got,
+		"the public base's origin first, then each configured one normalized")
+
+	_, err = consoleOrigins("https://zitadel.example.com", []string{"console.example.com"})
+	require.ErrorContains(t, err, "server.console_origins")
+}
+
 func TestPublicOrigin(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -282,6 +292,19 @@ func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
 // The failure here is the report's own, a data dir that was never migrated,
 // and the record has to come out at ERROR, past a warn level, carrying the
 // error run returns.
+func TestLoadConfigReadsConsoleOriginsFromEnv(t *testing.T) {
+	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
+	t.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", "https://a.example.com,https://b.example.com")
+
+	configPath := filepath.Join(t.TempDir(), "nextgen.yaml")
+	require.NoError(t, os.WriteFile(configPath, nil, 0o600))
+
+	cfg, err := loadConfig(configPath)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"https://a.example.com", "https://b.example.com"}, cfg.Server.ConsoleOrigins)
+}
+
 func TestRunLogsTheErrorItReturns(t *testing.T) {
 	_, configPath := tempServerConfig(t)
 	cfg, err := loadConfig(configPath)

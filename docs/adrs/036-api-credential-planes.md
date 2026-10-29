@@ -315,8 +315,8 @@ A project with no origin pattern no longer admits every origin. A loopback
 origin is still always admitted. A request with no `Origin`, and one from a
 console host the project does not list, is served the deployment to the
 `default` target. The console hosts are the origin of `server.public_base`
-and, when set, `VERCEL_URL`, `VERCEL_BRANCH_URL`, and
-`VERCEL_PROJECT_PRODUCTION_URL`. When platform bootstrap is enabled, startup
+and each origin in `server.console_origins`; the hosted cloud's launcher
+fills that list with the URLs Vercel serves the deployment at. When platform bootstrap is enabled, startup
 deploys the platform project's current schemas and login flows to that
 target. No such deployment answers `409` with `rel.no_default`. A listed
 origin, a loopback origin, or a live preview with nothing deployed answers

@@ -430,6 +430,7 @@ func prepareServer(extra []string) ([]string, error) {
 		"NEXTGEN_PLATFORM_BOOTSTRAP_PROJECT": "true",
 		"NEXTGEN_INSTRUMENTATION_LOG_FORMAT": "json",
 		"NEXTGEN_SERVER_PUBLIC_BASE":         publicBase(env),
+		"NEXTGEN_SERVER_CONSOLE_ORIGINS":     consoleOrigins(),
 		// The bootstrap admin administers every project (ADR 075), unless
 		// the deployment names its platform operators itself.
 		"NEXTGEN_PLATFORM_OPERATORS": s.adminID,
@@ -439,6 +440,19 @@ func prepareServer(extra []string) ([]string, error) {
 		}
 	}
 	return append(args, extra...), nil
+}
+
+// consoleOrigins lists every host Vercel serves this deployment at, comma
+// separated: a browser can open the console on the deployment's own URL as
+// well as on the branch alias or production domain publicBase picks.
+func consoleOrigins() string {
+	var origins []string
+	for _, key := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
+		if host := os.Getenv(key); host != "" {
+			origins = append(origins, "https://"+host)
+		}
+	}
+	return strings.Join(origins, ",")
 }
 
 // withParams adds each parameter the URL does not set yet. The server also
