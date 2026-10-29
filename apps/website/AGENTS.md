@@ -19,12 +19,11 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 
 ## Content-Security-Policy
 
-- The front page renders per request with a nonce (`proxy.ts`,
-  `app/csp.ts`); give an inline `<script>` the layout's nonce. The changelog
-  is prerendered, so its policy has none: keep `proxy.ts`' list of
-  prerendered paths in step with the pages that are.
-- The enforced policy is `next.config.ts`', never the proxy's: Next.js would
-  read the nonce from it.
+- The policies are `next.config.ts`' `headers()`, the same for every page,
+  so pages stay prerendered. The report-only one allows inline scripts, so it
+  does not cover them; it does cover where requests and images go.
+- Load nothing from another origin without widening the report-only policy
+  in the same change.
 
 ## The fonts
 

@@ -60,8 +60,11 @@ each response carries security headers:
 - Each service sends its own Content-Security-Policy, enforced and
   report-only: the console's in its service's `headers` (a server test holds
   them to the server's policy for the same page, plus Vercel's toolbar), the
-  docs' and the website's from their `proxy.ts` and `next.config`, the
-  server's from the Go code. Violations go to the server's `/csp-report`.
+  docs' and the website's from their `next.config`, the server's from the Go
+  code. Violations go to the server's `/csp-report`.
+- The console's enforced policy covers inline script; the docs' and the
+  website's do not yet: their report-only policies allow it
+  (`'unsafe-inline'`), so their pages stay prerendered.
 - HSTS is Vercel's default: zitadel.com is on the preload list with its
   subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
   of its own.
@@ -552,8 +555,9 @@ project and imports the root admin.
 - **Policy violations:** a browser's report of a Content-Security-Policy
   violation is a `WARN` line `content security policy violation` from the
   `server` function, naming the page, the directive and what it blocked.
-  Reports from previews include Vercel's toolbar, which the docs' and the
-  website's nonces cannot allow; first-party code reports nothing.
+  Reports from previews include Vercel's toolbar on the docs' and the
+  website's pages, whose policies do not allow it; first-party code reports
+  nothing.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

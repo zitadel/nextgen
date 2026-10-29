@@ -46,12 +46,11 @@ MCP, `llms.txt`, Open Graph images, `.md` pages) live under `/docs` here.
 
 ## Content-Security-Policy
 
-- Each page renders per request with a nonce (`proxy.ts`, `lib/csp.ts`);
-  give an inline `<script>` of ours the layout's nonce, or the policy reports
-  it. `tests/pages.spec.ts` fails a page with a script that lacks it.
-- Load nothing from an origin `lib/csp.ts` does not allow; widen the policy
-  in the same change. The enforced policy is `next.config.mjs`', never the
-  proxy's: Next.js would read the nonce from it.
+- The policies are `next.config.mjs`' `headers()`, the same for every page,
+  so pages stay prerendered. The report-only one allows inline scripts, so it
+  does not cover them; it does cover where requests and images go.
+- Load nothing from another origin without widening the report-only policy
+  in the same change; `tests/` fails a page whose violations it sees.
 
 ## Content
 

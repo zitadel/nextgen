@@ -136,21 +136,6 @@ test("no service's page may be framed", async ({ request }) => {
   expect(wrong).toEqual([]);
 });
 
-// The website renders its front page per request, so every script on it
-// holds the nonce its report-only policy names (apps/website/proxy.ts); the
-// docs' own suite checks theirs.
-test("the website's front page gives each script its nonce", async ({ request }) => {
-  const response = await request.get("/");
-  expect(response.status()).toBe(200);
-  const nonce = /'nonce-([^']+)'/.exec(
-    response.headers()["content-security-policy-report-only"] ?? "",
-  )?.[1];
-  expect(nonce).toBeTruthy();
-  const scripts = (await response.text()).match(/<script\b[^>]*>/g) ?? [];
-  expect(scripts.length).toBeGreaterThan(0);
-  expect(scripts.filter((tag) => !tag.includes(` nonce="${nonce}"`))).toEqual([]);
-});
-
 // The console service's policies are the ones the server sends for the same
 // page (internal/staticui/console holds vercel.json to them): enforced, its
 // scripts from its own origin and its inline one by hash, and a stricter one
