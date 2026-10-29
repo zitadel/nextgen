@@ -286,16 +286,6 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		return fmt.Errorf("failed to bootstrap platform project: %w", err)
 	}
 
-	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
-		return fmt.Errorf("failed to bootstrap users: %w", err)
-	}
-
-	// After the import, so a bootstrap admin named in platform.operators
-	// exists by the time it is granted (ADR 075 §4).
-	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
-		return fmt.Errorf("failed to reconcile platform operators: %w", err)
-	}
-
 	schemaService := service.NewSchemaService(serviceDBPool, schemaResolverWithHTTP, schemaValidator, builtinBases)
 	flowDefinitionSvc := service.NewFlowDefinitionService(
 		serviceDBPool,
@@ -346,11 +336,22 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	)
 	// The console signs operators in to the platform project from the public
 	// base, the first console origin, so that project serves a deployed release
-	// there like any other project.
+	// there like any other project. Before the user import, which needs the
+	// platform user schema this release stores.
 	if cfg.Platform.BootstrapProject {
 		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
 			return fmt.Errorf("failed to deploy the platform project: %w", err)
 		}
+	}
+
+	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
+		return fmt.Errorf("failed to bootstrap users: %w", err)
+	}
+
+	// After the import, so a bootstrap admin named in platform.operators
+	// exists by the time it is granted (ADR 075 §4).
+	if err := platform.ReconcileOperators(ctx, serviceDBPool, cfg.Platform.ResolvedProjectID(), cfg.Platform.Operators); err != nil {
+		return fmt.Errorf("failed to reconcile platform operators: %w", err)
 	}
 	passwordPolicy, err := service.NewPasswordPolicy(policyEngine, policyService, passwordHasher, serviceDBPool)
 	if err != nil {

@@ -4,6 +4,7 @@ package platform
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -53,14 +54,17 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	release, err := releases.Get(ctx, domain.PlatformProjectID, first[0].ReleaseID)
 	require.NoError(t, err)
 	kinds := map[domain.ReleasePointerKind]int{}
+	schemaID := ""
 	for _, pointer := range release.Pointers {
 		kinds[pointer.Kind]++
+		if pointer.Kind == domain.ReleasePointerKindSchema {
+			schemaID = pointer.RevisionID
+		}
 	}
 	assert.Equal(t, 1, kinds[domain.ReleasePointerKindSchema], "the platform user schema")
 	assert.Positive(t, kinds[domain.ReleasePointerKindFlowDefinition], "the default login flows")
 
-	// The release reuses the flows Ensure stored with the project rather than
-	// storing them a second time.
+	// The project starts empty: everything it serves came with the release.
 	flows, err := pool.Statements().ListFlowDefinitions(
 		service.WithAuthzListUnrestricted(ctx),
 		&database.ListOptions[domain.FlowDefinitionField]{
@@ -69,9 +73,11 @@ func TestEnsureDeployedSQLiteServesTheServersBundle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, flows.Items, kinds[domain.ReleasePointerKindFlowDefinition])
 
-	// The platform variant, not the default (its shape is pinned in
+	// Stored under an id the build minted, as for any project's schema, and the
+	// platform variant, not the default (its shape is pinned in
 	// platform_schema_test.go).
-	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, domain.PlatformProjectID, schemas.DefaultHumanUserSchemaURL(testSchemaBase))
+	assert.True(t, strings.HasPrefix(schemaID, "sch_"), schemaID)
+	userSchema, err := pool.Statements().GetJSONSchemaByID(ctx, domain.PlatformProjectID, schemaID)
 	require.NoError(t, err)
 	assert.Equal(t, []string{schemas.PlatformDisplayNameProperty}, domain.DesignatedDisplay(userSchema.Schema))
 }

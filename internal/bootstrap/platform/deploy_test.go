@@ -32,7 +32,8 @@ func TestEnsureDeployedBuildsTheServersBundleAndDeploysIt(t *testing.T) {
 	bundle := releases.bundle
 	assert.Equal(t, domain.PlatformProjectID, bundle.ProjectID)
 	require.Len(t, bundle.Schemas, 1, "the platform user schema")
-	assert.Equal(t, "https://example.com/api/schemas/default-human-user.json", bundle.Schemas[0].URL)
+	assert.Empty(t, bundle.Schemas[0].URL)
+	assert.False(t, domain.SchemaDocumentHasTopLevelID(bundle.Schemas[0].Document), "a bundled schema carries no $id")
 	require.Len(t, bundle.FlowDefinitions, len(defaults), "the default login flows")
 	for i, flow := range bundle.FlowDefinitions {
 		assert.Equal(t, defaults[i].Name, flow.Request.Name)

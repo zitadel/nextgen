@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/zitadel/nextgen/internal/crypto"
 	"github.com/zitadel/nextgen/internal/domain"
@@ -184,15 +185,65 @@ func buildCreateAttributes(
 // storedSchemaURL returns the URL the project stores the document's schema
 // under: the header's own when that row exists or none does, else the URL of
 // the row that names the same built-in under another base.
-func storedSchemaURL(ctx context.Context, stmts domain.JSONSchemaGetter, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
+func storedSchemaURL(ctx context.Context, stmts schemaReader, builtinBases domain.BuiltinSchemaBases, h Header) (string, error) {
 	stored, err := builtinBases.GetJSONSchema(ctx, stmts, h.ProjectID, h.SchemaURL)
 	if err == nil {
 		return stored.URL, nil
 	}
-	if _, ok := errors.AsType[*database.NoRowFoundError](err); ok {
-		return h.SchemaURL, nil
+	if _, ok := errors.AsType[*database.NoRowFoundError](err); !ok {
+		return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
 	}
-	return "", fmt.Errorf("look up json_schema %q: %w", h.SchemaURL, err)
+	// A project that deployed the default schema stores it under an id the
+	// release build minted: the built-in URL names it by its objectType.
+	if rel, ok := builtinBases.RelPath(h.SchemaURL); ok && strings.TrimPrefix(rel, "/") == defaultSchemaPath {
+		deployed, err := newestSchemaOfType(ctx, stmts, h.ProjectID, defaultSchemaObjectType)
+		if err != nil {
+			return "", err
+		}
+		if deployed != nil {
+			return deployed.URL, nil
+		}
+	}
+	return h.SchemaURL, nil
+}
+
+// schemaReader is what the import reads a project's schemas with.
+type schemaReader interface {
+	domain.JSONSchemaGetter
+	ListJSONSchemas(ctx context.Context, filter *database.ListOptions[domain.JSONSchemaField], opts service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error)
+}
+
+const (
+	// defaultSchemaPath is the default user schema's path under the built-in
+	// schema namespace.
+	defaultSchemaPath = "default-human-user.json"
+	// defaultSchemaObjectType is the objectType that schema declares.
+	defaultSchemaObjectType = "human-user"
+)
+
+// newestSchemaOfType is the project's newest schema declaring objectType, nil
+// when it has none.
+func newestSchemaOfType(ctx context.Context, stmts schemaReader, projectID, objectType string) (*domain.JSONSchema, error) {
+	result, err := stmts.ListJSONSchemas(service.WithAuthzListUnrestricted(ctx), &database.ListOptions[domain.JSONSchemaField]{
+		Filter: database.And(
+			database.Equal(database.Col(domain.JSONSchemaFieldProjectID), projectID),
+			database.Equal(database.Col(domain.JSONSchemaFieldObjectType), objectType),
+		),
+		Pagination: database.Page[domain.JSONSchemaField]{
+			Limit: 1,
+			OrderBy: database.OrderBy[domain.JSONSchemaField]{
+				Columns:   []database.Column[domain.JSONSchemaField]{database.Col(domain.JSONSchemaFieldCreatedAt)},
+				Direction: database.OrderDesc,
+			},
+		},
+	}, service.JSONSchemaQueryOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list %s schemas: %w", objectType, err)
+	}
+	if len(result.Items) == 0 {
+		return nil, nil
+	}
+	return result.Items[0], nil
 }
 
 // loadUserSchema reads the user's schema document so attribute uniqueness can

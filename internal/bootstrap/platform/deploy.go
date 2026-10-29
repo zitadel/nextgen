@@ -2,6 +2,7 @@ package platform
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -30,6 +31,21 @@ type targetDeployer interface {
 
 // platformReleaseMessage is the message the platform release carries.
 const platformReleaseMessage = "Platform configuration of this server"
+
+// platformUserSchema is the platform user schema as a bundle carries it, with
+// no $id: a bundled schema is identified by its objectType.
+func platformUserSchema(builtinBase string) ([]byte, error) {
+	document, err := schemas.PlatformHumanUserSchema(builtinBase)
+	if err != nil {
+		return nil, fmt.Errorf("platform user schema: %w", err)
+	}
+	var schema map[string]any
+	if err := json.Unmarshal(document, &schema); err != nil {
+		return nil, fmt.Errorf("platform user schema: %w", err)
+	}
+	delete(schema, "$id")
+	return json.Marshal(schema)
+}
 
 // EnsureDeployed deploys the platform project the way the CLI deploys any
 // project: consoleOrigin, where the console signs operators in, is a primary
@@ -78,10 +94,13 @@ func EnsureDeployed(
 }
 
 // platformBundle is the configuration this server ships for the platform
-// project, as a release bundle. The user schema is named by its URL, its
-// identity: users and the bootstrap import refer to it there, and Ensure
-// stores it when it creates the project.
+// project, as a release bundle: the documents a `.zitadel/` directory would
+// hold, so the build stores them under ids it mints, as for any project.
 func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
+	schema, err := platformUserSchema(builtinBase)
+	if err != nil {
+		return service.BuildReleaseInput{}, err
+	}
 	flows, err := flow_definitions.DefaultLoginFlowDefinitions(builtinBase, domain.PlatformProjectID)
 	if err != nil {
 		return service.BuildReleaseInput{}, fmt.Errorf("platform login flows: %w", err)
@@ -89,7 +108,7 @@ func platformBundle(builtinBase string) (service.BuildReleaseInput, error) {
 	message := platformReleaseMessage
 	bundle := service.BuildReleaseInput{
 		ProjectID: domain.PlatformProjectID,
-		Schemas:   []service.BuildSchema{{Index: 0, URL: schemas.DefaultHumanUserSchemaURL(builtinBase)}},
+		Schemas:   []service.BuildSchema{{Index: 0, Document: schema}},
 		Message:   &message,
 	}
 	for i, flow := range flows {
