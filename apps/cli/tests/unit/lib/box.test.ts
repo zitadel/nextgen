@@ -1,5 +1,13 @@
 import consola from "consola";
+import { box } from "consola/utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The frame is drawn by consola's `box`; spying on it shows the colour a box
+// asks for, which its output only carries when the terminal has colour.
+vi.mock("consola/utils", async (original) => {
+  const actual = await original<typeof import("consola/utils")>();
+  return { ...actual, box: vi.fn(actual.box) };
+});
 
 import { command, printBox, renderBox, renderBoxActions, wrapForBox } from "../../../src/lib/box";
 import { stripAnsi } from "../../helpers/run-cli";
@@ -142,13 +150,14 @@ describe("printBox", () => {
   });
 
   it("is green for a result and cyan for a hint", () => {
-    const spy = vi.spyOn(consola, "log").mockImplementation(() => undefined);
+    vi.spyOn(consola, "log").mockImplementation(() => undefined);
+    vi.mocked(box).mockClear();
 
     printBox({ title: "Done", message: "m" });
     printBox({ title: "Hint", message: "m", tone: "info" });
 
-    expect(String(spy.mock.calls[0]?.[0])).toContain("\u001b[32m");
-    expect(String(spy.mock.calls[1]?.[0])).toContain("\u001b[36m");
+    expect(vi.mocked(box).mock.calls[0]?.[1]).toMatchObject({ style: { borderColor: "green" } });
+    expect(vi.mocked(box).mock.calls[1]?.[1]).toMatchObject({ style: { borderColor: "cyan" } });
   });
 
   it("wraps the message to the terminal before it is drawn", () => {
