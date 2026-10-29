@@ -6,6 +6,7 @@ import type {
 
 import { api } from "@/api/zitadel";
 import { readAllPages } from "./paging";
+import { titleCase } from "./text";
 
 /**
  * Display strings for the login-flow screens. Read-only: flow definitions are
@@ -69,8 +70,7 @@ export function flowDisplayName(definition: FlowDefinition): string {
 
 /** `default-login` → `Default login`: a slug as a label. Shared with the release screens. */
 export function humanise(value: string): string {
-  const spaced = value.replace(/[-_]/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+  return titleCase(value.replace(/[-_]/g, " "));
 }
 
 /**

@@ -27,7 +27,8 @@
 //     is the function's writable /tmp, and the console is a service of its own
 //     (repo-root vercel.json). The platform project is bootstrapped, logs are
 //     JSON and the public base is the deployment's URL unless a NEXTGEN_*
-//     variable says otherwise.
+//     variable says otherwise. The URLs Vercel serves the deployment at are
+//     added to NEXTGEN_SERVER_CONSOLE_ORIGINS, whatever it already names.
 //
 // A deployment migrates at deploy time, never at startup: a turbo task runs
 // `launcher migrate` after compiling, which creates a preview's database when
@@ -50,6 +51,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -440,7 +442,7 @@ func prepareServer(extra []string) ([]string, error) {
 	}
 	// Added to, not defaulted: a deployment names its custom domains there, and
 	// the URLs Vercel serves it at must stay console origins beside them.
-	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
+	if err := os.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", consoleOrigins(env, os.Getenv("NEXTGEN_SERVER_CONSOLE_ORIGINS"))); err != nil {
 		return nil, err
 	}
 	return append(args, extra...), nil
@@ -448,15 +450,22 @@ func prepareServer(extra []string) ([]string, error) {
 
 // consoleOrigins is configured, comma separated, followed by every host
 // Vercel serves this deployment at: a browser can open the console on the
-// deployment's own URL as well as on the branch alias or production domain
-// publicBase picks, and a preview is reviewed on both.
-func consoleOrigins(configured string) string {
+// deployment's own URL as well as on its branch alias and, in production, the
+// production domain, and a preview is reviewed on both. An origin already
+// listed is not added again, so a second call changes nothing.
+func consoleOrigins(env, configured string) string {
 	var origins []string
-	if strings.TrimSpace(configured) != "" {
-		origins = append(origins, configured)
+	for _, origin := range strings.Split(configured, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			origins = append(origins, origin)
+		}
 	}
-	for _, key := range []string{"VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"} {
-		if host := os.Getenv(key); host != "" {
+	keys := []string{"VERCEL_URL", "VERCEL_BRANCH_URL"}
+	if env == "production" {
+		keys = append(keys, "VERCEL_PROJECT_PRODUCTION_URL")
+	}
+	for _, key := range keys {
+		if host := os.Getenv(key); host != "" && !slices.Contains(origins, "https://"+host) {
 			origins = append(origins, "https://"+host)
 		}
 	}

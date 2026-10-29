@@ -82,8 +82,19 @@ func TestConsoleOrigins(t *testing.T) {
 	assert.Equal(t, []string{"https://zitadel.example.com", "https://console.example.com"}, got,
 		"the public base's origin first, then each configured one as a browser sends it")
 
-	_, err = consoleOrigins("https://zitadel.example.com", []string{"console.example.com"})
-	require.ErrorContains(t, err, "server.console_origins")
+	// A browser never sends these as an Origin, so they would never match.
+	for _, entry := range []string{
+		"console.example.com",
+		"https://console.example.com/path",
+		"https://console.example.com?q",
+		"https://user:pass@console.example.com",
+		"https://*.vercel.app",
+		"https://console.example.com:",
+		"https://bücher.example",
+	} {
+		_, err = consoleOrigins("https://zitadel.example.com", []string{entry})
+		require.ErrorContains(t, err, "server.console_origins", entry)
+	}
 }
 
 func TestPublicOrigin(t *testing.T) {
@@ -285,13 +296,6 @@ func TestLoadConfigReadsPlatformOperatorsFromEnv(t *testing.T) {
 	assert.Equal(t, []string{"user_platformadmin", "user_01H0000000000000000000000"}, cfg.Platform.Operators)
 }
 
-// TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
-// did not fire for the early returns that declare err in an if's scope, among
-// them the bootstrap return this test drives, so such a failed start was only
-// visible through main's log.Fatal, which slog.SetDefault bridges in at INFO.
-// The failure here is the report's own, a data dir that was never migrated,
-// and the record has to come out at ERROR, past a warn level, carrying the
-// error run returns.
 func TestLoadConfigReadsConsoleOriginsFromEnv(t *testing.T) {
 	t.Setenv("NEXTGEN_SERVER_DATA_DIR", t.TempDir())
 	t.Setenv("NEXTGEN_SERVER_CONSOLE_ORIGINS", "https://a.example.com,https://b.example.com")
@@ -305,6 +309,13 @@ func TestLoadConfigReadsConsoleOriginsFromEnv(t *testing.T) {
 	assert.Equal(t, []string{"https://a.example.com", "https://b.example.com"}, cfg.Server.ConsoleOrigins)
 }
 
+// TestRunLogsTheErrorItReturns pins #1409. run's deferred "run error" record
+// did not fire for the early returns that declare err in an if's scope, among
+// them the bootstrap return this test drives, so such a failed start was only
+// visible through main's log.Fatal, which slog.SetDefault bridges in at INFO.
+// The failure here is the report's own, a data dir that was never migrated,
+// and the record has to come out at ERROR, past a warn level, carrying the
+// error run returns.
 func TestRunLogsTheErrorItReturns(t *testing.T) {
 	_, configPath := tempServerConfig(t)
 	cfg, err := loadConfig(configPath)

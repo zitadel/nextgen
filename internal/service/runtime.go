@@ -61,12 +61,14 @@ type RuntimeResolver struct {
 }
 
 // NewRuntimeResolver builds the resolver. ownOrigins are the origins the
-// deployment's console runs on; a blank one names none.
+// deployment's console runs on, normalized here as a request's origin is;
+// one that is blank or not an origin names none.
 func NewRuntimeResolver(v2Pool *DB, releases ReleaseService, ownOrigins ...string) *RuntimeResolver {
 	var origins []string
 	for _, origin := range ownOrigins {
-		if origin = strings.TrimSpace(origin); origin != "" && !slices.Contains(origins, origin) {
-			origins = append(origins, origin)
+		normalized, err := domain.NormalizeOrigin(origin)
+		if err == nil && !slices.Contains(origins, normalized) {
+			origins = append(origins, normalized)
 		}
 	}
 	return &RuntimeResolver{v2Pool: v2Pool, releases: releases, ownOrigins: origins, now: time.Now}

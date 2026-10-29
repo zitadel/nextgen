@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/go-viper/mapstructure/v2"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -582,18 +583,51 @@ func consoleOrigins(publicBase string, extra []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	origins := []string{own}
-	for _, entry := range extra {
-		if strings.TrimSpace(entry) == "" {
+	configured, err := configuredConsoleOrigins(extra)
+	if err != nil {
+		return nil, err
+	}
+	return append([]string{own}, configured...), nil
+}
+
+// configuredConsoleOrigins are the entries of server.console_origins as a
+// browser sends them; a blank entry names none.
+func configuredConsoleOrigins(entries []string) ([]string, error) {
+	var origins []string
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
 			continue
 		}
-		origin, err := browserOrigin(strings.TrimSpace(entry))
+		origin, err := consoleOrigin(entry)
 		if err != nil {
 			return nil, fmt.Errorf("server.console_origins: %q is not an origin: %w", entry, err)
 		}
 		origins = append(origins, origin)
 	}
 	return origins, nil
+}
+
+// consoleOrigin is entry as a browser sends it in an Origin header. What a
+// browser never sends there would never match, so it is refused rather than
+// dropped: a path, query or credentials, a wildcard, an empty port, or a host
+// not in its ASCII (punycode) form.
+func consoleOrigin(entry string) (string, error) {
+	u, err := url.Parse(entry)
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case u.User != nil || (u.Path != "" && u.Path != "/") || strings.ContainsAny(entry, "?#"):
+		return "", errors.New("an origin is scheme://host[:port] and nothing more")
+	case strings.Contains(u.Host, "*"):
+		return "", errors.New("an origin names one host, not a pattern")
+	case strings.HasSuffix(u.Host, ":"):
+		return "", errors.New("an origin's port is never empty")
+	case strings.IndexFunc(u.Host, func(r rune) bool { return r > unicode.MaxASCII }) >= 0:
+		return "", errors.New("a browser sends the host in its ASCII (punycode) form")
+	}
+	return browserOrigin(entry)
 }
 
 // browserOrigin is the origin of raw as a browser sends it: lowercase, with no
