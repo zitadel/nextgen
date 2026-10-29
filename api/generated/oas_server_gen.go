@@ -350,8 +350,10 @@ type Handler interface {
 	DeleteTeam(ctx context.Context, params DeleteTeamParams) (DeleteTeamRes, error)
 	// DeleteUserByID implements DeleteUserByID operation.
 	//
-	// Deletes a user and removes them from every team they belong to.
-	// The user is removed, not deactivated, and the deletion emits `user.deleted`.
+	// Deletes a user, removes them from every team they belong to, and revokes
+	// every grant they hold, on any project.
+	// The user is removed, not deactivated, and the deletion emits `user.deleted`,
+	// plus `authz.revoked` for each grant on that grant's project.
 	// With a project secret the request is idempotent: deleting a user that exists
 	// in no project succeeds without changing anything.
 	//
@@ -365,6 +367,28 @@ type Handler interface {
 	//
 	// DELETE /variables/{variable_name}
 	DeleteVariable(ctx context.Context, params DeleteVariableParams) (DeleteVariableRes, error)
+	// EvaluatePolicy implements evaluatePolicy operation.
+	//
+	// Evaluates a policy config against one request, without side effects, and
+	// answers the decision the operation would reach. Nothing is read from or
+	// written to the project: the config is the one in the body, checked
+	// exactly as a publish checks it, so an invalid config answers `pol.invalid`
+	// with the same violations.
+	// `input` is what the operation's request carries, in the operation's own
+	// terms (a password, not its length): the server derives what the policy
+	// checks with the code the live operation runs, guards included. `facts`
+	// states what the operation would look up at runtime, such as whether the
+	// candidate matches one of the user's kept passwords.
+	// The decision and the names of the failed rules hold wherever the
+	// operation runs. `code` and `violations` are what an API call answers; a
+	// login flow shows the same rules as field errors on the password field
+	// (`error.x-auth-methods#password_<rule>` in `step.error`).
+	// Which policy a project or release applies is not decided here: read it
+	// and pass its config.
+	// The caller needs read access to the project in `project_id`.
+	//
+	// POST /policies/evaluate
+	EvaluatePolicy(ctx context.Context, req EvaluatePolicyRequest, params EvaluatePolicyParams) (EvaluatePolicyRes, error)
 	// ExchangeHandoff implements exchangeHandoff operation.
 	//
 	// Consumes a one-time `handoff_token` minted by `POST /auth_attempts/{id}/handoff`

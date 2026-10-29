@@ -114,11 +114,13 @@ const NOT_CALLED: Readonly<Record<string, string>> = {
   // listing (`idps revisions <id>`) and inventing verbs for one resource is
   // what ADR 064 §4 rules out, so these wait for that shape to be decided.
   listIdpRevisions: "sub-resource listing; the CLI has no grammar for it yet (ADR 063)",
-  // Policies are written from .zitadel/policies/ by `apply` (ADR 066).
-  publishPolicy: "configuration: `apply` publishes .zitadel/policies/ through the policy syncer",
+  // Policies are written from .zitadel/policies/ by `deploy` (ADR 066).
+  publishPolicy: "configuration: `deploy` publishes .zitadel/policies/ in the release bundle",
   listPolicyRevisions: "sub-resource listing; same grammar question as `listIdpRevisions`",
   getPolicyRevision: "reads one revision by revision id; same shape question as above",
   getIdpRevisionById: "reads one revision by revision id; same shape question as above",
+  evaluatePolicy:
+    "a dry run `policies test` sends per case from lib/policies/tests.ts; no registry verb evaluates",
 
   // Known gaps, recorded rather than hidden. These are additive and tracked as
   // a follow-up; they are listed here so adding one is a deliberate act.

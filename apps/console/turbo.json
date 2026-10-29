@@ -6,9 +6,12 @@
       "dependsOn": ["@zitadel/sdk-react#build"]
     },
     // Builds into the server's embed directory, outside the package. The
-    // hosted cloud's build bakes its base path, Vercel's insights and their
-    // sample rate in (vite.config.ts, src/vite-env.d.ts), so the variables are
-    // part of the cache key and visible to the build. None has the VITE_
+    // hosted cloud's build bakes its base path, Vercel's insights, their
+    // sample rate and the commit its events report in (vite.config.ts,
+    // src/vite-env.d.ts), so the variables are part of the cache key and
+    // visible to the build. The commit makes that build miss on every
+    // deployment, which costs its own two-second `vite build`, never its
+    // dependencies'. None has the VITE_
     // prefix: Vite's framework inference would hash a prefixed one into every
     // Vite package of the run, the console's dependencies too
     // (vite.config.ts), and strict mode hides an unprefixed one unless it is
@@ -22,8 +25,13 @@
     // .env.local would restore a build made without it; they are listed.
     "build": {
       "dependsOn": ["@zitadel/sdk-react#build"],
-      "env": ["CONSOLE_BASE_PATH", "CONSOLE_VERCEL_INSIGHTS", "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": [
+        "CONSOLE_BASE_PATH",
+        "CONSOLE_VERCEL_INSIGHTS",
+        "CONSOLE_SPEED_INSIGHTS_SAMPLE_RATE",
+        "VERCEL_GIT_COMMIT_SHA"
+      ],
+      "inputs": ["$TURBO_EXTENDS$", ".env*"],
       "outputs": ["$TURBO_ROOT$/internal/staticui/console/dist/**"]
     },
     // The release UI build consumes the package release output and runs after
@@ -49,19 +57,21 @@
       "passThroughEnv": ["CONSOLE_*"]
     },
     // Real-data dev loop: boots a seeded ephemeral instance through the built
-    // CLI, then the dev server against it (scripts/dev-real.mts builds the
-    // server itself; a task dependency on the server build would cycle, as
-    // the server embeds the console).
+    // CLI, then the dev server against it. scripts/dev-real.mts builds the
+    // server itself, because in moon's project graph that dependency would
+    // cycle (the server embeds the console); turbo has no project graph, so
+    // here the server build is a dependency and the script's own build a
+    // cache hit.
     "dev:real": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
+      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "passThroughEnv": ["CONSOLE_*", "ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "dev:claim": {
       "cache": false,
       "persistent": true,
-      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build"],
+      "dependsOn": ["@zitadel/sdk-react#build", "@zitadel/cli#build", "@zitadel/server#build"],
       "passThroughEnv": ["CONSOLE_*", "ZITADEL_*", "NEXTGEN_*", "GOFLAGS"]
     },
     "preview": {

@@ -13,7 +13,7 @@ import (
 // A run of consecutive DDL becomes one batch, and DML in the middle splits it.
 // This is the whole property, and it needs no database: the rewriter is a pure
 // function over the migration text.
-func TestBatchUpDDLSplitsRunsAtDML(t *testing.T) {
+func TestBatchDDLSplitsRunsAtDML(t *testing.T) {
 	t.Parallel()
 
 	src := strings.Join([]string{
@@ -24,14 +24,16 @@ func TestBatchUpDDLSplitsRunsAtDML(t *testing.T) {
 		stmt("UPDATE users SET status = 'active'"),
 		stmt("CREATE TABLE team_memberships (id STRING(MAX)) PRIMARY KEY (id)"),
 		"-- +goose Down",
+		stmt("DROP INDEX idx_team_memberships_user"),
 		stmt("DROP TABLE team_memberships"),
 	}, "\n")
 
-	got := batchUpDDL(src)
+	got := batchDDL(src)
 
-	// Two DDL runs in Up, so two batches: ALTER+ALTER, then CREATE.
-	assert.Equal(t, 2, strings.Count(got, "START BATCH DDL"))
-	assert.Equal(t, 2, strings.Count(got, "RUN BATCH"))
+	// Two DDL runs in Up, so two batches: ALTER+ALTER, then CREATE. Down's
+	// two DROPs are a third.
+	assert.Equal(t, 3, strings.Count(got, "START BATCH DDL"))
+	assert.Equal(t, 3, strings.Count(got, "RUN BATCH"))
 
 	// The UPDATE must sit outside any batch: DML inside a DDL batch is rejected.
 	upSection := got[strings.Index(got, "-- +goose Up"):strings.Index(got, "-- +goose Down")]
@@ -41,17 +43,19 @@ func TestBatchUpDDLSplitsRunsAtDML(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(beforeUpdate, "RUN BATCH"),
 		"the first run must close before the UPDATE, not span it")
 
-	// Down is left alone.
+	// Up's last run closes before the Down marker, and Down opens its own.
+	assert.True(t, strings.HasSuffix(strings.TrimSpace(upSection), runBatchStmt),
+		"the CREATE run must close inside Up:\n%s", upSection)
 	downSection := got[strings.Index(got, "-- +goose Down"):]
-	assert.NotContains(t, downSection, "START BATCH DDL",
-		"only the Up section is rewritten")
+	assert.Equal(t, 1, strings.Count(downSection, "START BATCH DDL"))
+	assert.Equal(t, 1, strings.Count(downSection, "RUN BATCH"))
 }
 
 // The Up section can end at EOF rather than at a Down marker.
-func TestBatchUpDDLClosesRunAtEOF(t *testing.T) {
+func TestBatchDDLClosesRunAtEOF(t *testing.T) {
 	t.Parallel()
 	src := "-- +goose Up\n" + stmt("CREATE TABLE t (id STRING(MAX)) PRIMARY KEY (id)")
-	got := batchUpDDL(src)
+	got := batchDDL(src)
 	assert.Equal(t, 1, strings.Count(got, "START BATCH DDL"))
 	assert.Equal(t, 1, strings.Count(got, "RUN BATCH"))
 	assert.True(t, strings.HasSuffix(strings.TrimSpace(got), "-- +goose StatementEnd"),
@@ -61,7 +65,7 @@ func TestBatchUpDDLClosesRunAtEOF(t *testing.T) {
 // A leading comment inside the block must not hide the verb: 000011's UPDATE is
 // preceded by four comment lines, and misreading it as DDL would put DML in a
 // batch.
-func TestBatchUpDDLClassifiesPastLeadingComments(t *testing.T) {
+func TestBatchDDLClassifiesPastLeadingComments(t *testing.T) {
 	t.Parallel()
 	assert.False(t, isDDLStatement([]string{
 		stmtBegin, "-- explanatory comment", "-- second line",
@@ -74,14 +78,15 @@ func TestBatchUpDDLClassifiesPastLeadingComments(t *testing.T) {
 }
 
 // Non-migration input is passed through untouched.
-func TestBatchUpDDLLeavesNonMigrationsAlone(t *testing.T) {
+func TestBatchDDLLeavesNonMigrationsAlone(t *testing.T) {
 	t.Parallel()
 	src := "SELECT 1\n"
-	assert.Equal(t, src, batchUpDDL(src))
+	assert.Equal(t, src, batchDDL(src))
 }
 
-// The real migrations must survive the rewrite: every Up DDL statement ends up
-// inside a batch, and no DML does. 000011 is the file that interleaves them.
+// The real migrations must survive the rewrite: every DDL statement, Up or
+// Down, ends up inside a batch, and no DML does. 000011 is the file that
+// interleaves them, in both directions.
 func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 	t.Parallel()
 	sub, err := fs.Sub(sqlFiles, "sql")
@@ -103,7 +108,7 @@ func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 		assert.Equal(t, opens, closes, "%s: every batch must be closed", name)
 		totalBatches += opens
 
-		// Walk the rewritten Up section and check each statement's placement,
+		// Walk the rewritten sections and check each statement's placement,
 		// rather than trusting the counts above. Counting alone would pass a
 		// file whose new CREATE sits outside every batch.
 		//
@@ -111,7 +116,7 @@ func TestBatchDDLFSOverRealMigrations(t *testing.T) {
 		// than isDDLStatement: sharing the classifier makes it its own oracle,
 		// which is how `CREATE` alone on a line went unbatched in five blocks of
 		// 000012 with this test green.
-		for _, s := range upStatements(text) {
+		for _, s := range statements(text) {
 			assert.Equal(t, looksLikeDDL(s.block), isDDLStatement(s.block),
 				"%s: classifier disagrees with an independent read of:\n%s",
 				name, strings.Join(s.block, "\n"))
@@ -139,32 +144,30 @@ func stmt(sql string) string {
 	return stmtBegin + "\n" + sql + "\n" + stmtEnd
 }
 
-// upStatement is one goose statement block from a rewritten Up section, with
+// statement is one goose statement block from a rewritten section, with
 // whether it fell inside an open DDL batch.
-type upStatement struct {
+type statement struct {
 	block   []string
 	batched bool
 }
 
-// upStatements walks a rewritten migration's Up section and reports each
-// statement block in order, tracking batch state as START/RUN are encountered.
-// The injected START/RUN blocks are not themselves reported.
-func upStatements(text string) []upStatement {
-	var out []upStatement
+// statements walks a rewritten migration's Up and Down sections and reports
+// each statement block in order, tracking batch state as START/RUN are
+// encountered. The injected START/RUN blocks are not themselves reported. A
+// batch still open at a section marker counts as unbatched from there on, so
+// a run leaking across the marker shows up as DDL outside any batch.
+func statements(text string) []statement {
+	var out []statement
 	var block []string
-	inUp, inBatch, inStatement := false, false, false
+	inSection, inBatch, inStatement := false, false, false
 
 	for _, line := range strings.Split(text, "\n") {
 		trimmed := strings.TrimSpace(line)
-		switch {
-		case trimmed == gooseUp:
-			inUp = true
-			continue
-		case trimmed == gooseDown:
-			inUp = false
+		if trimmed == gooseUp || trimmed == gooseDown {
+			inSection, inBatch = true, false
 			continue
 		}
-		if !inUp {
+		if !inSection {
 			continue
 		}
 
@@ -180,7 +183,7 @@ func upStatements(text string) []upStatement {
 			case "RUN BATCH":
 				inBatch = false
 			default:
-				out = append(out, upStatement{block: append([]string(nil), block...), batched: inBatch})
+				out = append(out, statement{block: append([]string(nil), block...), batched: inBatch})
 			}
 		case inStatement:
 			block = append(block, line)
@@ -225,7 +228,7 @@ func TestIsDDLStatementAcceptsVerbAloneOnItsLine(t *testing.T) {
 }
 
 // Unwrapped SQL is legal in goose, and must not be swept into an open batch.
-func TestBatchUpDDLClosesRunBeforeUnwrappedSQL(t *testing.T) {
+func TestBatchDDLClosesRunBeforeUnwrappedSQL(t *testing.T) {
 	t.Parallel()
 	src := strings.Join([]string{
 		"-- +goose Up",
@@ -234,7 +237,7 @@ func TestBatchUpDDLClosesRunBeforeUnwrappedSQL(t *testing.T) {
 		stmt("CREATE TABLE b (id STRING(MAX)) PRIMARY KEY (id)"),
 	}, "\n")
 
-	got := batchUpDDL(src)
+	got := batchDDL(src)
 	upTo := got[:strings.Index(got, "UPDATE a SET")]
 	assert.Equal(t, 1, strings.Count(upTo, "RUN BATCH"),
 		"the batch must close before unwrapped DML, which Spanner would reject inside it:\n%s", got)

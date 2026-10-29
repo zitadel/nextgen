@@ -482,7 +482,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
-		requestEventBuf)
+		requestEventBuf,
+		retentionJob.Trigger())
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -700,6 +701,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
+	// Empty: the server purges on its own timer, not when a scheduler calls.
+	v.SetDefault("events.retention.trigger_secret", "")
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("service_ping.enabled", false)
@@ -863,7 +866,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -907,6 +910,19 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// The event retention trigger, when a scheduler outside the process runs
+	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
+	// not the API's, so it takes the request ID and the request line but none
+	// of the middleware a client's request passes.
+	if retentionTrigger != nil {
+		mux.Handle(audit.RetentionTriggerPath, middleware.Chain(retentionTrigger,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+		))
+	}
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }

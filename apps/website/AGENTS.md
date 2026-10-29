@@ -95,6 +95,11 @@ Shared app rules: [`apps/AGENTS.md`](../AGENTS.md).
 - Keep `metadata.internal` in the skill's `SKILL.md`: it keeps the skill out
   of `npx skills add zitadel/nextgen --full-depth`, the users' install.
 
+## Analytics
+
+- Send a custom event only through `app/analytics.ts`, and list it in
+  [`docs/product-analytics-events.yaml`](../../docs/product-analytics-events.yaml) in the same change.
+
 ## Routing
 
 The cloud routes only `/`, `/changelog`, `/changelog/*`, `/llms.txt`,
@@ -116,5 +121,6 @@ moon run website:typecheck website:lint website:test website:build
 moon run website:start   # the build on port 3004
 ```
 
-Vercel runs `turbo run build --filter=@zitadel/components`, then
-`pnpm run build`; the Next build itself never goes through a task runner.
+Vercel runs `turbo run build --filter=@zitadel/website`; the build's key
+holds the deployment's ID, so Vercel never restores it
+([turborepo.md](../../docs/design/build/turborepo.md)).

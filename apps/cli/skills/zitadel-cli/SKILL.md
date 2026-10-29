@@ -201,6 +201,11 @@ over reading `<resource> --help` one at a time. A `list` verb's envelope carries
 you pass `--all`, so a "how many …?" question is one `list --all --json` call:
 read the count, do not page and tally.
 
+To find the users still on an older revision of a schema, filter on the
+schema's object type and exclude the newest revision's URL:
+`users list --filter schema_object_type=equals:<type> --filter
+schema=not_equals:<newest-url> --all --json`.
+
 ## Reading the envelope
 
 Each invocation prints one JSON object:
@@ -233,6 +238,9 @@ Each invocation prints one JSON object:
   `--origin`, which selects targets but never authorizes a preview deploy. A CI
   build other than Vercel or Netlify must set `ZITADEL_ENV=preview`, or it is
   skipped too. `preview list` and `preview rm <url>` read and end live previews.
+- `deployment get <id>` emits the deployment as the API serves it; on a
+  terminal it also shows the variables the deployment froze, secrets masked.
+  Read them as JSON with `variable resolve`.
 - `deployment rollback` emits `data.release_id` (the release live again),
   `data.origins` and `data.pointers`, the `{kind, handle, revision_id}`
   revisions that release pins; the `schema` one is what new registrations use.
@@ -368,6 +376,36 @@ npx @zitadel/cli@latest setup --framework next --server local --non-interactive 
 npx @zitadel/cli@latest doctor --non-interactive --json
 npx @zitadel/cli@latest deploy -m "<why this release changes>" --non-interactive --json
 ```
+
+`setup` commits the project it scaffolds: `git init` first when the directory
+is not yet a repository, then one commit, `chore: scaffold the project with
+zitadel setup`. A release records the commit it was built from and `deploy`
+diffs `.zitadel/` against it, so without this the first release carries no
+commit and the next deploy reports no diff.
+
+Then setup deploys `.zitadel/` to the app's origin, so the sign-in it asks you
+to verify is served the release it built. `data.deployment` carries the
+`release_id`, `content_hash`, `deployment_id` and `origins`, and is null on
+`--dry-run` or when the deploy failed. A failed deploy is a warning, never a
+failed setup, and `data.next_commands` then leads with the `deploy` that fixes
+it.
+
+Setup refuses with `E_CONFLICT` when the repository already has uncommitted
+work, untracked files included, which `details.untracked` lists separately
+from `details.modified`. The commit covers the project directory, so it can
+only tell its own files from yours when the tree starts clean. Commit or stash
+first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
+the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
+yours and is not exempt.
+
+Setup deploys nothing, and it does not need to: a project with no release
+resolves the newest revisions, which are the ones setup just uploaded, so
+sign-in already runs on `.zitadel/`. Deploying pins them into a release, which
+is what the server will require once that fallback goes (#1616). The publish
+step says so and names the command. `data.git` reports what setup did
+(`initialized`, and the `commit`, or null). `--no-git` skips both the refusal
+and the commit, and nothing prompts, so this is the same interactively and in
+CI.
 
 `setup` scaffolds into an empty directory, or patches an existing app project
 where it detects a framework. What `start` leaves in a directory —
@@ -557,4 +595,4 @@ Load on demand:
 
 - [`references/driving-login-ui.md`](references/driving-login-ui.md) — driving the
   `<zitadel-login>` component in a browser, and the authoritative repo-config
-  workflow (schemas, flows, branding, policies).
+  workflow (schemas, flows, branding, policies and their tests).

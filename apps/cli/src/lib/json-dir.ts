@@ -26,9 +26,14 @@ export async function readJsonDir(absDir: string): Promise<ReadonlyArray<Record<
 
 /**
  * {@link readJsonDir}, keeping each body's file name — for callers that report
- * a problem against the file it came from.
+ * a problem against the file it came from. `skip` leaves out files by name
+ * before they are read, so a file the caller does not own (a policy test file
+ * beside the policies) can never fail it.
  */
-export async function readJsonDirEntries(absDir: string): Promise<ReadonlyArray<JsonDirEntry>> {
+export async function readJsonDirEntries(
+  absDir: string,
+  { skip }: { skip?: (name: string) => boolean } = {},
+): Promise<ReadonlyArray<JsonDirEntry>> {
   let entries: string[];
   try {
     entries = await readdir(absDir);
@@ -39,7 +44,7 @@ export async function readJsonDirEntries(absDir: string): Promise<ReadonlyArray<
     throw error;
   }
   const result: JsonDirEntry[] = [];
-  for (const entry of entries.filter((name) => name.endsWith(".json")).sort()) {
+  for (const entry of entries.filter((name) => name.endsWith(".json") && !skip?.(name)).sort()) {
     const abs = join(absDir, entry);
     let raw: unknown;
     try {

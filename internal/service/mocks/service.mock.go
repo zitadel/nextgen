@@ -6358,6 +6358,45 @@ func (c *MockAllStatementsRevokeAuthzAssignmentCall) DoAndReturn(f func(context.
 	return c
 }
 
+// RevokeAuthzAssignmentsByPrincipal mocks base method.
+func (m *MockAllStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeAuthzAssignmentsByPrincipal", ctx, principalType, principalID)
+	ret0, _ := ret[0].([]*domain.AuthzAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RevokeAuthzAssignmentsByPrincipal indicates an expected call of RevokeAuthzAssignmentsByPrincipal.
+func (mr *MockAllStatementsMockRecorder) RevokeAuthzAssignmentsByPrincipal(ctx, principalType, principalID any) *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeAuthzAssignmentsByPrincipal", reflect.TypeOf((*MockAllStatements)(nil).RevokeAuthzAssignmentsByPrincipal), ctx, principalType, principalID)
+	return &MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall{Call: call}
+}
+
+// MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall wrap *gomock.Call
+type MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall) Return(arg0 []*domain.AuthzAssignment, arg1 error) *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall) Do(f func(context.Context, domain.AuthzPrincipalType, string) ([]*domain.AuthzAssignment, error)) *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall) DoAndReturn(f func(context.Context, domain.AuthzPrincipalType, string) ([]*domain.AuthzAssignment, error)) *MockAllStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
 // RevokeRelease mocks base method.
 func (m *MockAllStatements) RevokeRelease(ctx context.Context, projectID, id string) (*domain.Release, error) {
 	m.ctrl.T.Helper()
@@ -12902,6 +12941,45 @@ func (c *MockAuthzAssignmentStatementsRevokeAuthzAssignmentCall) Do(f func(conte
 
 // DoAndReturn rewrite *gomock.Call.DoAndReturn
 func (c *MockAuthzAssignmentStatementsRevokeAuthzAssignmentCall) DoAndReturn(f func(context.Context, string, string) error) *MockAuthzAssignmentStatementsRevokeAuthzAssignmentCall {
+	c.Call = c.Call.DoAndReturn(f)
+	return c
+}
+
+// RevokeAuthzAssignmentsByPrincipal mocks base method.
+func (m *MockAuthzAssignmentStatements) RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RevokeAuthzAssignmentsByPrincipal", ctx, principalType, principalID)
+	ret0, _ := ret[0].([]*domain.AuthzAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RevokeAuthzAssignmentsByPrincipal indicates an expected call of RevokeAuthzAssignmentsByPrincipal.
+func (mr *MockAuthzAssignmentStatementsMockRecorder) RevokeAuthzAssignmentsByPrincipal(ctx, principalType, principalID any) *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	mr.mock.ctrl.T.Helper()
+	call := mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeAuthzAssignmentsByPrincipal", reflect.TypeOf((*MockAuthzAssignmentStatements)(nil).RevokeAuthzAssignmentsByPrincipal), ctx, principalType, principalID)
+	return &MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall{Call: call}
+}
+
+// MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall wrap *gomock.Call
+type MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall struct {
+	*gomock.Call
+}
+
+// Return rewrite *gomock.Call.Return
+func (c *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall) Return(arg0 []*domain.AuthzAssignment, arg1 error) *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	c.Call = c.Call.Return(arg0, arg1)
+	return c
+}
+
+// Do rewrite *gomock.Call.Do
+func (c *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall) Do(f func(context.Context, domain.AuthzPrincipalType, string) ([]*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall {
+	c.Call = c.Call.Do(f)
+	return c
+}
+
+// DoAndReturn rewrite *gomock.Call.DoAndReturn
+func (c *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall) DoAndReturn(f func(context.Context, domain.AuthzPrincipalType, string) ([]*domain.AuthzAssignment, error)) *MockAuthzAssignmentStatementsRevokeAuthzAssignmentsByPrincipalCall {
 	c.Call = c.Call.DoAndReturn(f)
 	return c
 }
