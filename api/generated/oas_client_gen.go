@@ -1056,6 +1056,8 @@ type Invoker interface {
 	// QueryTeams invokes queryTeams operation.
 	//
 	// Returns the teams of a project, paginated with a cursor.
+	// `project_id` names the project to list; without it, the credential's own
+	// project is listed.
 	//
 	// POST /teams/query
 	QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error)
@@ -14729,6 +14731,8 @@ func (c *Client) sendQuerySessions(ctx context.Context, request *QuerySessionsRe
 // QueryTeams invokes queryTeams operation.
 //
 // Returns the teams of a project, paginated with a cursor.
+// `project_id` names the project to list; without it, the credential's own
+// project is listed.
 //
 // POST /teams/query
 func (c *Client) QueryTeams(ctx context.Context, request *QueryTeamsRequest, params QueryTeamsParams) (QueryTeamsRes, error) {
@@ -14797,8 +14801,11 @@ func (c *Client) sendQueryTeams(ctx context.Context, request *QueryTeamsRequest,
 		}
 
 		if err := q.EncodeParam(cfg, func(e uri.Encoder) error {
-			if unwrapped := string(params.ProjectID); true {
-				return e.EncodeValue(conv.StringToString(unwrapped))
+			if val, ok := params.ProjectID.Get(); ok {
+				if unwrapped := string(val); true {
+					return e.EncodeValue(conv.StringToString(unwrapped))
+				}
+				return nil
 			}
 			return nil
 		}); err != nil {
