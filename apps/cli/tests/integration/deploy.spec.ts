@@ -62,6 +62,14 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
         c.claim_mapping = { ...c.claim_mapping, givenName: "given_name" };
       }),
   ],
+];
+
+/**
+ * Mapping mistakes that almost certainly do not do what was meant, which a
+ * deploy warns about and carries on past: the admin may know better, and what
+ * the warning says.
+ */
+const SOFT_WARNINGS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>, string]> = [
   [
     "a claim whose type the property cannot hold",
     async (app) => {
@@ -72,6 +80,7 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
         c.claim_mapping = { ...c.claim_mapping, refreshedAt: "updated_at" };
       });
     },
+    "updated_at",
   ],
   [
     "a verification that reads a claim which is not a boolean",
@@ -79,6 +88,7 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
       app.editConnection("google", (c) => {
         c.verified_claims = { email: "email" };
       }),
+    "never verifies",
   ],
   [
     "a subject that is a claim the user can change",
@@ -86,6 +96,7 @@ const HARD_ERRORS: ReadonlyArray<[string, (app: ScaffoldedApp) => Promise<void>]
       app.editConnection("google", (c) => {
         c.subject_claim = "email";
       }),
+    "subject_claim",
   ],
 ];
 
@@ -445,6 +456,22 @@ describe("deploy", () => {
           await edit(app);
 
           expect(await app.deployDryRun()).toFailWith("E_VALIDATION");
+        });
+      });
+
+      describe("warns about a mapping that probably does not do what was meant", () => {
+        it.each(SOFT_WARNINGS)("deploy --dry-run carries on past %s", async (_name, edit) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deployDryRun()).toSucceed();
+        });
+
+        it.each(SOFT_WARNINGS)("deploy --dry-run warns about %s", async (_name, edit, says) => {
+          const app = await anAppWithGoogle();
+          await edit(app);
+
+          expect(await app.deployRendered(["--dry-run"])).toSay(says);
         });
       });
 

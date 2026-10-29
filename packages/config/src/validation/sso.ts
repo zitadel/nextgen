@@ -609,6 +609,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
       if (typeof source === "string" && standard !== undefined && standard.type !== "boolean") {
         add({
           rule: "sso/verification-source-not-boolean",
+          severity: "warning",
           file: path,
           message: `verified_claims reads ${q(source)} to verify ${q(key)}, but that is ${article(standard.type)} ${standard.type} claim, not one that says whether a value is verified, so it never verifies. Read the claim the provider sends for that (such as "email_verified").`,
         });
@@ -639,6 +640,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
     ) {
       add({
         rule: "sso/subject-claim-unstable",
+        severity: "warning",
         file: path,
         message: `subject_claim is ${q(body.subject_claim)}, a profile claim the user can change, and identity keys on the subject, so a change would sign them in as a stranger. Use a claim that never changes: "sub", or a provider-specific one such as "oid".`,
       });
@@ -664,6 +666,7 @@ export function ssoRules(tree: ProjectTree): ProjectIssue[] {
         ];
         add({
           rule: "sso/claim-type-mismatch",
+          severity: "warning",
           file: path,
           message: `claim_mapping reads ${q(claim)}, ${article(standard.type)} ${standard.type} claim, into ${q(key)}, which the schema types as ${declared.join(" or ")}. Read a claim of a matching type, or change the type of ${q(key)}.`,
         });

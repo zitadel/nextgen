@@ -459,6 +459,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     expect: [
       {
         rule: "sso/claim-type-mismatch",
+        severity: "warning",
         file: GOOGLE,
         says: ["updated_at", "number claim", "refreshedAt", "string", "change the type"],
       },
@@ -471,7 +472,12 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       connectionOf(p).claim_mapping = { email: "email", verified: "email_verified" };
     },
     expect: [
-      { rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["boolean claim", "verified"] },
+      {
+        rule: "sso/claim-type-mismatch",
+        severity: "warning",
+        file: GOOGLE,
+        says: ["boolean claim", "verified"],
+      },
     ],
   },
   {
@@ -480,7 +486,14 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       schemaOf(p).properties.home = { type: "string" };
       connectionOf(p).claim_mapping = { email: "email", home: "address" };
     },
-    expect: [{ rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["object claim", "home"] }],
+    expect: [
+      {
+        rule: "sso/claim-type-mismatch",
+        severity: "warning",
+        file: GOOGLE,
+        says: ["object claim", "home"],
+      },
+    ],
   },
   {
     name: "a string claim is mapped into an integer property",
@@ -491,6 +504,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     expect: [
       {
         rule: "sso/claim-type-mismatch",
+        severity: "warning",
         file: GOOGLE,
         says: ["birthdate", "string claim", "integer"],
       },
@@ -505,6 +519,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     expect: [
       {
         rule: "sso/verification-source-not-boolean",
+        severity: "warning",
         file: GOOGLE,
         says: ["email", "string claim", "email_verified"],
       },
@@ -554,6 +569,7 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
     expect: [
       {
         rule: "sso/subject-claim-unstable",
+        severity: "warning",
         file: GOOGLE,
         says: ['subject_claim is "email"', "can change", '"sub"'],
       },
@@ -679,7 +695,14 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       schemaOf(p).properties.home = { type: "string" };
       connectionOf(p).claim_mapping = { email: "email", home: "address" };
     },
-    expect: [{ rule: "sso/claim-type-mismatch", file: GOOGLE, says: ["an object claim"] }],
+    expect: [
+      {
+        rule: "sso/claim-type-mismatch",
+        severity: "warning",
+        file: GOOGLE,
+        says: ["an object claim"],
+      },
+    ],
   },
   {
     name: "a connection no schema lists and no flow offers, with a subject the user can change",
@@ -691,7 +714,12 @@ const broken: Array<{ name: string; edit: (project: Project) => void; expect: Ex
       } as Connection;
     },
     expect: [
-      { rule: "sso/subject-claim-unstable", file: ".zitadel/idps/spare.json", says: ["email"] },
+      {
+        rule: "sso/subject-claim-unstable",
+        severity: "warning",
+        file: ".zitadel/idps/spare.json",
+        says: ["email"],
+      },
     ],
   },
   {
