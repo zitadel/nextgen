@@ -43,6 +43,9 @@ const reportOnlyPolicy = [
   // Search, the feedback route, the API reference's calls to the API on the
   // same origin, Vercel's analytics; next dev's reload socket.
   `connect-src 'self'${dev ? " ws:" : ""}`,
+  // The toolbar's page, which makes its own requests under vercel.live's
+  // policy.
+  "frame-src https://vercel.live",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

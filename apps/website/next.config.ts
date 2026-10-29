@@ -34,6 +34,9 @@ const reportOnlyPolicy = [
   "img-src 'self' data:",
   // Vercel's analytics on the same origin; next dev's reload socket.
   `connect-src 'self'${dev ? " ws:" : ""}`,
+  // The toolbar's page, which makes its own requests under vercel.live's
+  // policy.
+  "frame-src https://vercel.live",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
