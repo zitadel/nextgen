@@ -353,6 +353,7 @@ describe("project admins", () => {
     expect(row("Operations").getByText("Admin grant")).toBeInTheDocument();
     // The team label is what tells a team row from a person's.
     expect(row("Operations").getByText("Team")).toBeInTheDocument();
+    expect(row("Operations").queryByText("(you)")).not.toBeInTheDocument();
     const dialog = await openRemove("Operations");
     // A team's grant, so the copy is about its members, not "their account".
     expect(
@@ -362,6 +363,25 @@ describe("project admins", () => {
     ).toBeInTheDocument();
     await userEvent.click(dialog.getByRole("button", { name: "Remove grant" }));
     await waitFor(() => expect(deleted).toEqual([{ id: "asgn_team", projectId: PROJECT_ID }]));
+  });
+
+  it("says when a grant has expired", async () => {
+    // Authorization ignores an expired grant, so it must not read like a live
+    // one; it is still the project's, and still revocable here.
+    stubProject({
+      grants: [
+        grant({
+          id: "asgn_old",
+          expires_at: "2020-01-01T00:00:00Z",
+          user: grantUser({ display: "Maya Patel" }),
+        }),
+      ],
+    });
+    await renderProject();
+
+    await openAdmins();
+    expect(row("Maya Patel").getByText("Admin grant, expired")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Actions for Maya Patel" })).toBeInTheDocument();
   });
 
   it("keeps a direct grant the admins list leaves out, down to its id", async () => {

@@ -55,10 +55,9 @@ type Grant = Awaited<ReturnType<typeof api.queryGrants>>["grants"][number];
  * someone who keeps admin access another way says so, rather than claiming
  * they lose the project.
  *
- * **A viewer with no row is told why.** Whoever opens this page can see the
- * project, but a platform operator (ADR 075) holds it through neither a grant
- * nor the owning team, so no row is theirs and the line says their access is
- * not a grant of their own.
+ * **A viewer with no row has none.** A platform operator (ADR 075) holds the
+ * project through neither a grant nor the owning team, so nothing here is
+ * theirs, and the table says nothing about it.
  *
  * **Not an invite flow.** The design draws `Invite`, a `Pending` status and
  * revoke/resend actions, but a grant is only ever created against a person who
@@ -173,7 +172,9 @@ interface AdminRow {
  * nothing to a reader, and the team rows come from another read.
  */
 function toRows(admins: Admin[], grants: Grant[], viewerUserId?: string): AdminRow[] {
-  const shown = new Set(admins.flatMap((admin) => admin.sources.flatMap(directGrantId)));
+  const shown = new Set(
+    admins.flatMap((admin) => admin.sources.filter(isDirectGrant).map((source) => source.grant_id)),
+  );
   const byUser = new Map(admins.map((admin) => [admin.user.user_id, admin]));
   const rows = [
     ...admins.map((admin) => toPersonRow(admin, viewerUserId)),
@@ -184,33 +185,27 @@ function toRows(admins: Admin[], grants: Grant[], viewerUserId?: string): AdminR
   return rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
-/** The id of a person's own grant; a team's grant is the team's row, not theirs. */
-function directGrantId(source: Source): string[] {
-  return source.type === "grant" && !source.team ? [source.grant_id] : [];
+/** A person's own grant; a team's grant is the team's row, not theirs. */
+function isDirectGrant(source: Source): source is Extract<Source, { type: "grant" }> {
+  return source.type === "grant" && !source.team;
 }
 
-/**
- * A user-ref renders `display`, falling back to `identifier`, then `user_id`
- * (ADR 058 §3): a deleted user degrades to the id, which is what the operator
- * needs to know whose grant they are revoking.
- */
 function toPersonRow(admin: Admin, viewerUserId?: string): AdminRow {
   const { user, sources } = admin;
-  const direct = sources.find((source) => source.type === "grant" && !source.team);
+  const direct = sources.find(isDirectGrant);
   return {
     key: `user:${user.user_id}`,
     kind: "user",
-    name: user.display ?? user.identifier ?? user.user_id,
+    name: userLabel(user),
     self: user.user_id === viewerUserId,
     access: describeAccess(sources),
-    removable:
-      direct?.type === "grant"
-        ? {
-            grantId: direct.grant_id,
-            principal: "user",
-            keeps: sources.filter((source) => source !== direct).map(describeKept),
-          }
-        : undefined,
+    removable: direct
+      ? {
+          grantId: direct.grant_id,
+          principal: "user",
+          keeps: sources.filter((source) => source !== direct).map(describeKept),
+        }
+      : undefined,
   };
 }
 
@@ -220,18 +215,14 @@ function toPersonRow(admin: Admin, viewerUserId?: string): AdminRow {
  * however many there are.
  */
 function describeAccess(sources: Source[]): string {
-  const [first, ...rest] = sources.map(describeSource);
-  return joinAnd([
-    first ?? "",
-    ...rest.map((line) => line.charAt(0).toLowerCase() + line.slice(1)),
-  ]);
+  return titleCase(joinAnd(sources.map(describeSource)));
 }
 
 function describeSource(source: Source): string {
   if (source.type === "owning_team") {
-    return "Owning team";
+    return "owning team";
   }
-  return source.team ? `Via team ${teamLabel(source.team)}` : "Admin grant";
+  return source.team ? `via team ${teamLabel(source.team)}` : "admin grant";
 }
 
 /** The same source as the remove dialog names what stays. */
@@ -248,23 +239,32 @@ function teamLabel(team: { team_id: string; name?: string }): string {
 }
 
 /**
+ * A user ref renders `display`, falling back to `identifier`, then `user_id`
+ * (ADR 058 §3): a ref with nothing but its id still names whose grant the
+ * operator is revoking.
+ */
+function userLabel(user: { user_id: string; display?: string; identifier?: string }): string {
+  return user.display ?? user.identifier ?? user.user_id;
+}
+
+/**
  * A grant's `user` / `team` ref carries the name without a read per row.
  * Discriminate on which of the two is present; the id is always the last
  * fallback. A person's lower grant keeps whatever the admins list says they
- * hold, so removing it does not claim they lose the project.
+ * hold, so removing it does not claim they lose the project. An expired
+ * grant is still the project's, but authorization ignores it, so the cell
+ * says so rather than reading like a live one.
  */
 function toGrantRow(grant: Grant, byUser: Map<string, Admin>, viewerUserId?: string): AdminRow {
-  const level = grant.relation;
   const principal = grant.team ? "team" : "user";
   const admin = grant.user && byUser.get(grant.user.user_id);
+  const expired = !!grant.expires_at && Date.parse(grant.expires_at) < Date.now();
   return {
     key: `grant:${grant.id}`,
     kind: principal,
-    name: grant.team
-      ? teamLabel(grant.team)
-      : (grant.user?.display ?? grant.user?.identifier ?? grant.user?.user_id ?? grant.id),
-    self: grant.user?.user_id === viewerUserId,
-    access: `${titleCase(level)} grant`,
+    name: grant.team ? teamLabel(grant.team) : grant.user ? userLabel(grant.user) : grant.id,
+    self: !!grant.user && grant.user.user_id === viewerUserId,
+    access: `${titleCase(grant.relation)} grant${expired ? ", expired" : ""}`,
     removable: {
       grantId: grant.id,
       principal,

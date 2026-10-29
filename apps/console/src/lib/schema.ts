@@ -1,6 +1,7 @@
 import { api } from "@/api/zitadel";
 import { readAllPages } from "./paging";
 import { field } from "./record";
+import { titleCase } from "./text";
 
 /**
  * A user schema as the console reads it.
@@ -353,7 +354,7 @@ function propertyTypeLabel(property: Record<string, unknown>): string {
       ? [type]
       : [];
   if (names.length === 0) return "—";
-  return names.map((name) => name.charAt(0).toUpperCase() + name.slice(1)).join(" | ");
+  return names.map(titleCase).join(" | ");
 }
 
 /**
@@ -373,7 +374,7 @@ function propertyLabel(key: string, property: Record<string, unknown>): string {
     .split(/\s+/);
   const [first, ...rest] = words;
   if (!first) return key;
-  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(" ");
+  return [titleCase(first), ...rest].join(" ");
 }
 
 /**

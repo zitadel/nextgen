@@ -13,9 +13,10 @@ export interface Removable {
   /** How the person keeps admin access once the grant is gone; empty when they do not. */
   keeps: string[];
   /**
-   * A user ref with nothing but its id: the user is outside what the viewer
-   * may read, or was deleted before deletes revoked grants. The copy claims
-   * nothing about the account.
+   * A user ref with nothing but its id: a user whose schema designates
+   * neither a display name nor an identifier (ADR 058), or a grant a delete
+   * left behind before deletes revoked grants. The copy claims nothing about
+   * the account.
    */
   unresolved?: boolean;
 }

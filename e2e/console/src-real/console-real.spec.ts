@@ -249,13 +249,16 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
   const team = await withErrorBody(
     zitadel.api.createTeam({ name: uniqueName("granted-team") }, { project_id: projectId }),
   );
+  let grantId: string | undefined;
   try {
-    await withErrorBody(
+    const grant = await withErrorBody(
       zitadel.api.createGrant(
         { team: { team_id: team.id }, relation: "admin" },
         { project_id: projectId },
       ),
     );
+    // The create answers 201 with the grant; its id is what the teardown revokes.
+    if (grant && typeof grant === "object" && "id" in grant) grantId = grant.id;
 
     await signIn(page, zitadel, operator);
     await page.goto(`/projects/${projectId}`);
@@ -280,7 +283,11 @@ test("lists a team's grant as the team's own row, and revokes it from there", as
     ).toBeVisible();
     await expectNoErrorBoundary(page);
   } finally {
-    // Leaves the instance as found: the Teams screens read the same project.
+    // Leaves the instance as found: the Teams screens read the same project,
+    // and `DELETE /teams/{id}` leaves the team's grants behind, which would
+    // come back as an id-only team row on later runs.
+    if (grantId)
+      await zitadel.api.deleteGrant(grantId, { project_id: projectId }).catch(() => undefined);
     await zitadel.api.deleteTeam(team.id).catch(() => undefined);
   }
 });
