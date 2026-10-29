@@ -80,6 +80,32 @@ describe("renderBox", () => {
   });
 });
 
+describe("wrapForBox", () => {
+  it("hangs a wrapped bullet under its text rather than back at the left margin", () => {
+    const lines = wrapForBox(`  • ${"word ".repeat(30).trim()}`, 40).split("\n");
+
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0]).toMatch(/^ {2}• \S/);
+    for (const line of lines.slice(1)) {
+      expect(line).toMatch(/^ {4}\S/);
+    }
+  });
+
+  it("hangs a numbered step under its text", () => {
+    const lines = wrapForBox(`  1. ${"word ".repeat(30).trim()}`, 40).split("\n");
+
+    expect(lines[0]).toMatch(/^ {2}1\. \S/);
+    expect(lines[1]).toMatch(/^ {5}\S/);
+  });
+
+  it("wraps a plain paragraph back at the left margin", () => {
+    const lines = wrapForBox("word ".repeat(30).trim(), 40).split("\n");
+
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[1]).toMatch(/^\S/);
+  });
+});
+
 describe("printBox", () => {
   afterEach(() => {
     vi.restoreAllMocks();

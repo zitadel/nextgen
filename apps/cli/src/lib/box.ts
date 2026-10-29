@@ -29,7 +29,34 @@ export function wrapForBox(message: string, columns = process.stdout.columns): s
     MIN_CONTENT_WIDTH,
     Math.min(columns ?? MAX_TERMINAL_WIDTH, MAX_TERMINAL_WIDTH) - BOX_OVERHEAD,
   );
-  return wrapAnsi(message, width, { hard: false, trim: false });
+  return message
+    .split("\n")
+    .map((line) => wrapLineHanging(line, width))
+    .join("\n");
+}
+
+/**
+ * Wrap one line to `width`, hanging the continuation under the text after a
+ * leading list marker ("  • ", "  1. ") or the line's own indentation, so a
+ * sentence too long for the box reads as one item rather than spilling back to
+ * the left border. A line with neither marker nor indent wraps as a plain
+ * paragraph. Tokens are never split, so URLs and commands stay whole.
+ */
+function wrapLineHanging(line: string, width: number): string {
+  const prefix = (line.match(/^(\s*(?:•|\d+[.)])\s+)/) ?? line.match(/^(\s*)/))?.[1] ?? "";
+  const content = line.slice(prefix.length);
+  if (content === "") {
+    return line;
+  }
+  // Wrap the text after the marker to what is left of the width, so the marker
+  // plus a wrapped line never runs past the frame. At a pathologically narrow
+  // width a long token still overflows, exactly as a plain wrap would.
+  const avail = Math.max(1, width - prefix.length);
+  const pad = " ".repeat(prefix.length);
+  return wrapAnsi(content, avail, { hard: false, trim: true })
+    .split("\n")
+    .map((part, at) => (at === 0 ? prefix : pad) + part)
+    .join("\n");
 }
 
 /**
