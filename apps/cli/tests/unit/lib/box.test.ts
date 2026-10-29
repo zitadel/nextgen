@@ -78,6 +78,16 @@ describe("renderBox", () => {
 
     expect(stripAnsi(renderBox({ title: "T", message: url }))).toContain(url);
   });
+
+  it("styles `code` itself, so a line holding it still reaches the border", () => {
+    const framed = stripAnsi(
+      renderBox({ title: "T", message: "Run `zitadel deploy`.\nA plain line." }),
+    );
+    const lines = framed.split("\n").filter((line) => line.includes("│"));
+
+    expect(framed).toContain("Run zitadel deploy.");
+    expect(new Set(lines.map((line) => [...line].length)).size).toBe(1);
+  });
 });
 
 describe("wrapForBox", () => {

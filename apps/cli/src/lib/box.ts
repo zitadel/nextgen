@@ -106,7 +106,11 @@ function frame({ title, tone = "success" }: BoxOptions) {
  * {@link printBox} where it is logged.
  */
 export function renderBox(options: BoxOptions): string {
-  return box(wrapForBox(options.message), frame(options));
+  // consola's terminal output turns `code` into cyan text and drops the
+  // backticks. Do the same here, before the frame is measured: done after, the
+  // line would come out two columns short of the border.
+  const message = options.message.replace(/`([^`]+)`/g, (_, code: string) => pc.cyan(code));
+  return box(wrapForBox(message), frame(options));
 }
 
 /**
