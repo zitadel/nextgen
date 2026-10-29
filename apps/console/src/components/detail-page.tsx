@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 import { MetaCard } from "./detail-meta";
-import { EYEBROW, PAGE_TITLE } from "./typography";
+import { EYEBROW, SECTION_HEADING, PAGE_TITLE } from "./typography";
 
 /**
  * Shared geometry for the console's resource detail screens (Users, Teams,
@@ -30,22 +30,20 @@ export const DETAIL_TITLE = PAGE_TITLE;
 export const ICON_PLATE =
   "bg-muted text-foreground flex size-9 shrink-0 items-center justify-center rounded-md";
 
+/** A card's or tab row's small action: 12px text, a 14px glyph. */
+export const CARD_ACTION_BUTTON = "gap-1 px-2.5 text-xs [&_svg]:size-3.5!";
+
 /** A body card: the stock `Card` with its own gap and padding removed. */
 export const DETAIL_CARD = "gap-0 py-0";
 
-/** The sentence-case card title some cards carry instead of the eyebrow: the 14/20 display face. */
-export const CARD_HEADING = "text-foreground font-serif text-sm leading-5";
-
 /**
- * A body card with a titled section: the title, an optional action beside it,
- * an optional note under them, a rule, then `children`. Inset 24px, 20px top
- * and bottom, 16px between parts. The title is the muted eyebrow unless the
- * card's design draws it as a heading.
+ * A body card with a titled section: the title (an `h2` in `SECTION_HEADING`), an
+ * optional action beside it, an optional note under them, a rule, then
+ * `children`. Inset 24px, 20px top and bottom, 16px between parts.
  */
 export function DetailSection({
   title,
   titleId,
-  titleStyle = "eyebrow",
   action,
   note,
   className,
@@ -55,16 +53,14 @@ export function DetailSection({
   title: string;
   /** Sets the title's id, for a card labelled by it. */
   titleId?: string;
-  /** `heading`: sentence case in the display face, as the release cards draw it. */
-  titleStyle?: "eyebrow" | "heading";
   action?: ReactNode;
   /** A line between the header and the rule. */
   note?: ReactNode;
 }) {
   const heading = (
-    <span id={titleId} className={titleStyle === "heading" ? CARD_HEADING : EYEBROW}>
+    <h2 id={titleId} className={SECTION_HEADING}>
       {title}
-    </span>
+    </h2>
   );
   return (
     <Card className={cn(DETAIL_CARD, className)} {...props}>
@@ -82,6 +78,42 @@ export function DetailSection({
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * A card row with a label rail: the label, and a badge beside it, on a 192px
+ * column, then the value 24px after it, stacked under `sm`. The rail is 216px
+ * less the gap, so the value starts on the column an inline field's input
+ * does. `divider` closes the row with the rule the next one sits under.
+ */
+export function DetailRow({
+  label,
+  align = "start",
+  divider = false,
+  as: Tag = "div",
+  children,
+}: {
+  label: ReactNode;
+  /** `center` for a one-line value, as a row with a trailing menu. */
+  align?: "start" | "center";
+  divider?: boolean;
+  as?: "div" | "li";
+  children: ReactNode;
+}) {
+  return (
+    <Tag
+      className={cn(
+        "flex flex-col gap-1 sm:flex-row sm:gap-6",
+        align === "center" ? "sm:items-center" : "sm:items-start",
+        divider && "border-b border-border py-3",
+      )}
+    >
+      <div className="flex shrink-0 items-center gap-2 text-sm leading-5 text-muted-foreground sm:w-48">
+        {label}
+      </div>
+      {children}
+    </Tag>
   );
 }
 

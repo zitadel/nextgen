@@ -1,12 +1,16 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { diffConfigAgainst, worktreeIsDirty } from "../../../../src/lib/release/git";
+import {
+  diffConfigAgainst,
+  diffConfigFilesAgainst,
+  worktreeIsDirty,
+} from "../../../../src/lib/release/git";
 
 const run = promisify(execFile);
 
@@ -122,5 +126,152 @@ describe("diffConfigAgainst", () => {
     const cwd = await cleanRepo();
 
     expect(await diffConfigAgainst(cwd, "0".repeat(40), false)).toBeNull();
+  });
+});
+
+/** {@link cleanRepo}, with the commit a diff is taken against. */
+async function cleanCommit(): Promise<{ cwd: string; sha: string }> {
+  const cwd = await cleanRepo();
+  const { stdout } = await run("git", ["rev-parse", "HEAD"], { cwd });
+  return { cwd, sha: stdout.trim() };
+}
+
+describe("diffConfigFilesAgainst", () => {
+  it("reports a changed file with its part of the diff", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files).toEqual([
+      {
+        path: ".zitadel/schemas/marker.json",
+        status: "modified",
+        patch: expect.stringContaining('+{ "edited": true }'),
+      },
+    ]);
+  });
+
+  it("reports an untracked file as added", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await writeFile(join(cwd, ".zitadel", "schemas", "new.json"), '{ "added": true }\n');
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
+      { path: ".zitadel/schemas/new.json", status: "added" },
+    ]);
+  });
+
+  it("reports a removed file as deleted", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await rm(join(cwd, ".zitadel", "schemas", "marker.json"));
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map(({ path, status }) => ({ path, status }))).toEqual([
+      { path: ".zitadel/schemas/marker.json", status: "deleted" },
+    ]);
+  });
+
+  it("reports a moved file as renamed, with where it came from", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await run("git", ["mv", ".zitadel/schemas/marker.json", ".zitadel/schemas/moved.json"], {
+      cwd,
+    });
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(
+      files?.map(({ path, status, previous_path }) => ({ path, status, previous_path })),
+    ).toEqual([
+      {
+        path: ".zitadel/schemas/moved.json",
+        status: "renamed",
+        previous_path: ".zitadel/schemas/marker.json",
+      },
+    ]);
+  });
+
+  it("reports a file replaced by a symlink once, as modified", async () => {
+    const { cwd, sha } = await cleanCommit();
+    // git shows a change of file type as a deletion and a creation under one
+    // header: both halves belong to the one file.
+    await rm(join(cwd, ".zitadel", "schemas", "marker.json"));
+    await symlink("elsewhere.json", join(cwd, ".zitadel", "schemas", "marker.json"));
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files).toEqual([
+      {
+        path: ".zitadel/schemas/marker.json",
+        status: "modified",
+        patch: expect.stringMatching(/deleted file mode[\s\S]*new file mode 120000/),
+      },
+    ]);
+  });
+
+  it("joins back into exactly the diff the terminal shows", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
+    await mkdir(join(cwd, ".zitadel", "flows"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "flows", "kiosk login.json"), "{}\n");
+    await writeFile(join(cwd, ".zitadel", "flows", 'say "hi".json'), "{}\n");
+    await writeFile(join(cwd, ".zitadel", "flows", "émigré.json"), "{}\n");
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map((file) => file.patch).join("")).toBe(
+      await diffConfigAgainst(cwd, sha, false),
+    );
+  });
+
+  it("names a file by its own path, however git would quote it", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await writeFile(join(cwd, ".zitadel", "schemas", 'say "hi" émigré.json'), "{}\n");
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map((file) => file.path)).toEqual(['.zitadel/schemas/say "hi" émigré.json']);
+  });
+
+  it("names files from the project, not the repository root above it", async () => {
+    dir = await mkdtemp(join(tmpdir(), "zitadel-git-monorepo-"));
+    const cwd = join(dir, "apps", "web");
+    await mkdir(join(cwd, ".zitadel", "schemas"), { recursive: true });
+    await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), "{}\n");
+    const git = (args: string[]) => run("git", args, { cwd: dir });
+    await git(["init", "-q"]);
+    await git(["config", "user.email", "test@example.com"]);
+    await git(["config", "user.name", "Test"]);
+    await git(["add", "."]);
+    await git(["commit", "-q", "-m", "initial"]);
+    const sha = (await git(["rev-parse", "HEAD"])).stdout.trim();
+    await writeFile(join(cwd, ".zitadel", "schemas", "marker.json"), '{ "edited": true }\n');
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files?.map((file) => file.path)).toEqual([".zitadel/schemas/marker.json"]);
+  });
+
+  it("never reports .zitadel/secret, which is not part of a release", async () => {
+    const { cwd, sha } = await cleanCommit();
+    await writeFile(join(cwd, ".zitadel", "secret"), '{ "project_secret": "sk_live" }\n');
+
+    const files = await diffConfigFilesAgainst(cwd, sha);
+
+    expect(files).toEqual([]);
+  });
+
+  it("reports no files when nothing changed", async () => {
+    const { cwd, sha } = await cleanCommit();
+
+    expect(await diffConfigFilesAgainst(cwd, sha)).toEqual([]);
+  });
+
+  it("returns null when the commit is not in this repository's history", async () => {
+    const { cwd } = await cleanCommit();
+
+    expect(await diffConfigFilesAgainst(cwd, "0".repeat(40))).toBeNull();
   });
 });

@@ -130,8 +130,35 @@ describe("<zl-field> aria wiring", () => {
     expect(submits).toBe(0);
   });
 
-  it("swaps the trailing icon for the error and success states", async () => {
+  it("draws no clear button while the field is empty, but keeps its space", async () => {
     const field = mount(`<zl-field name="email"></zl-field>`);
+    await field.updateComplete;
+    expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
+    expect(field.shadowRoot?.querySelector(".zr-field__wrap--trailing")).not.toBeNull();
+  });
+
+  it("draws the clear button once something is typed", async () => {
+    const field = mount(`<zl-field name="email"></zl-field>`);
+    await field.updateComplete;
+    const input = field.shadowRoot?.querySelector("input") as HTMLInputElement;
+    input.value = "a";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await field.updateComplete;
+    expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).not.toBeNull();
+  });
+
+  it("withdraws the clear button once it has cleared the field", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com"></zl-field>`);
+    await field.updateComplete;
+    const clear = field.shadowRoot?.querySelector('[aria-label="Clear"]') as HTMLButtonElement;
+    clear.click();
+    await field.updateComplete;
+    expect(field.value).toBe("");
+    expect(field.shadowRoot?.querySelector('[aria-label="Clear"]')).toBeNull();
+  });
+
+  it("swaps the trailing icon for the error and success states", async () => {
+    const field = mount(`<zl-field name="email" value="alice@acme.com"></zl-field>`);
     await field.updateComplete;
     const trailingIcon = () =>
       field.shadowRoot?.querySelector(".zr-field__trailing zl-icon")?.getAttribute("name");

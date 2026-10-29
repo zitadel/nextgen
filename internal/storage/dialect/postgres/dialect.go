@@ -24,11 +24,11 @@ func (p Config) Connect(ctx context.Context) (database.Pool, error) {
 	if p.ConnConfig.Tracer == nil {
 		p.ConnConfig.Tracer = pgxTracer{}
 	}
-	pool, err := pgxpool.NewWithConfig(ctx, p.Config)
+	pgxPool, err := pgxpool.NewWithConfig(ctx, p.Config)
 	if err != nil {
 		return nil, err
 	}
-	return newPool(pool), nil
+	return newPool(pgxPool), nil
 }
 
 // Name implements [database.Dialect].

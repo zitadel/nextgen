@@ -13,7 +13,9 @@ export const folderCommand = `mkdir ${appFolder} && cd ${appFolder}`;
 export const startCommand = "npx @zitadel/cli@latest start";
 export const setupCommand = "npx @zitadel/cli@latest setup --framework next --server local";
 
-export const commands = [startCommand, setupCommand, "npm run dev"];
+export const devCommand = "npm run dev";
+
+export const commands = [startCommand, setupCommand, devCommand];
 
 // What publishes a change to the user model or the login flow, as steps 3
 // and 4 run it and /llms.txt tells agents.

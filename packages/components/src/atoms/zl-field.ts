@@ -42,8 +42,10 @@ export type ZlFieldInputDetail = { name: string; value: string };
  *                toggle takes the slot in every state, so the field never
  *                shows two icons. The clear button is a pointer-only affordance
  *                (`tabindex="-1"`) — keyboard users clear via the input
- *                itself. The toggle has no keyboard equivalent, so it sits in
- *                the tab order right after the input.
+ *                itself — drawn only while there is something to clear; an
+ *                empty field keeps its space, so text does not shift when
+ *                typing starts. The toggle has no keyboard equivalent, so it
+ *                sits in the tab order right after the input.
  *   description  14/20 in `--zl-muted-foreground`
  *   read-only    `--zl-muted` fill at full contrast, no hover edge and no
  *                clear button; still focusable and still submitted
@@ -325,6 +327,12 @@ export class ZlField extends FormAtom {
       iconName = "check";
       tone = "success";
       clearable = false;
+    }
+
+    // A Clear button on an empty field does nothing, yet a pointer user still
+    // reads it as a control and a screen reader still lists it.
+    if (clearable && this.value === "") {
+      return null;
     }
 
     const icon = html`<zl-icon name=${iconName} size="16" tone=${tone} decorative></zl-icon>`;

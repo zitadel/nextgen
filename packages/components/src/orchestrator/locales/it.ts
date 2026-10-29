@@ -230,6 +230,9 @@ export const it: Locale = {
   "error.field_max_length_value": "{0} può contenere al massimo {1} caratteri.",
   "error.field_invalid": "Controlla {0}.",
 
+  // --- Suggerimenti dalle regole di validazione ({0} = limite della regola) ---
+  "hint.field_min_length": "Almeno {0} caratteri.",
+
   // --- Alert a livello di modulo ---
   "error.sign_in_server.title": "Non è stato possibile completare l'accesso.",
   "error.sign_in_server.body": "Riprova tra qualche minuto",

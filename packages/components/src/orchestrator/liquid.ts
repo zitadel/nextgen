@@ -129,6 +129,27 @@ export function createLiquidEngine(options: CreateLiquidOptions): Liquid {
   });
 
   /**
+   * A field's help text, or, when it has none, a hint from the rules its
+   * validation declares: the minimum length of a password the user chooses.
+   * The server sets it from the project's password policy only where a
+   * password is chosen, so a sign-in step never shows it. Without the hint the
+   * rule surfaces only as an error after the first submit (#251).
+   *
+   * It filters the help text rather than the field so an ejected template that
+   * uses it degrades on an older runtime: without `strictFilters` an unknown
+   * filter passes its input through, which is the help text, not the field.
+   */
+  engine.registerFilter("fieldRuleHint", (help: unknown, field: unknown) => {
+    const text = stringify(help);
+    if (text !== "") return text;
+    const { type, validation } = (field ?? {}) as Partial<CreateFlow201StepFieldsItem>;
+    const minLength = validation?.min_length;
+    if (type !== "password" || minLength === undefined || minLength <= 0) return "";
+    const template = options.locale["hint.field_min_length"];
+    return template === undefined ? "" : interpolate(template, [String(minLength)]);
+  });
+
+  /**
    * Builds `<zl-select>` options from a field's closed `validation.enum`. The
    * wire only carries the allowed values (strings), so the label defaults to the
    * value — author the enum with display-ready text. Piped through `| json` into

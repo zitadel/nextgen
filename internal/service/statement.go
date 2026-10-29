@@ -161,6 +161,7 @@ type JSONSchemaQueryOptions struct {
 	// object_type. Rows without an object_type are revisions of nothing and
 	// pass through untouched.
 	LatestRevisionPerObjectType bool
+	IncludeInUse                bool
 }
 
 type JSONSchemaStatements interface {
@@ -575,6 +576,11 @@ type UserPasswordStatements interface {
 	// the one that lands last is current. An unknown user returns
 	// *database.ForeignKeyError.
 	SetUserPassword(ctx context.Context, pw *domain.SetUserPassword) error
+	// UpdateUserPasswordHash replaces pw's hash with updated in place, so the
+	// password keeps its row, its created_at and its place in the history. It
+	// changes nothing when pw.EncodedHash is no longer stored: a concurrent
+	// rehash got there first.
+	UpdateUserPasswordHash(ctx context.Context, pw *domain.UserPassword, updated string) error
 	GetUserPassword(ctx context.Context, filter database.Filter[domain.UserPasswordField]) (*domain.UserPassword, error)
 	ListUserPasswords(ctx context.Context, filter *database.ListOptions[domain.UserPasswordField]) (*database.ListResult[*domain.UserPassword], error)
 	GetUserPasswordHistory(ctx context.Context, projectID, userID string) ([]*domain.UserPassword, error)
@@ -667,34 +673,25 @@ type VariableStatements interface {
 	DeleteVariable(ctx context.Context, owner domain.VariableOwner, kind domain.DeploymentOriginKind, name string) error
 }
 
-// VariableSetStatements freezes the variables a deployment is created with
-// and reads them back (ADR 069). A set is content-addressed: identical values
-// in one project are stored once, however many deployments use them.
+// VariableSetStatements stores the variable set a deployment was created
+// with and reads it back (ADR 069). A set is content-addressed: identical
+// values in one project are stored once, however many deployments use them.
+// The caller resolves the set. These statements do not read the live rows.
 type VariableSetStatements interface {
 	Statements
-	// FreezeDeploymentVariables copies the variables of projectID for the
-	// deployment's origin kind into an immutable set and links deploymentID
-	// to it, in one transaction. The kind is the deployment's own, read from
-	// its row inside that transaction, never a caller's choice. It reads the
-	// rows of that kind only: a preview deployment freezes the preview values
-	// and nothing else, so a name entered for primary alone is absent from
-	// it, and a value that applies to both kinds is in both freezes because
-	// it was entered twice. A project with no variables freezes the empty
-	// set, which is stored and linked like any other.
-	//
-	// The set is inserted only when its hash is new to the project, so a
-	// deployment whose values did not change writes no set row and shares
-	// the one that exists. The link is one row per deployment: freezing the
-	// same deployment twice returns UniqueError, and a deployment that does
-	// not exist in projectID -- including one of another project -- returns
-	// NoRowFoundError, since there is no row to read the kind from.
-	//
-	// Secrets are copied as the ciphertext stored, never decrypted. The set
-	// returned is what a later GetDeploymentVariables reads back.
-	FreezeDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
-	// GetDeploymentVariables returns the set deploymentID was frozen with,
-	// as it was then, whatever the project's variables have become since. A
-	// deployment that was never frozen -- or does not exist, or belongs to
+	// EnsureVariableSet inserts set when its hash is new to the project. A
+	// hash that already exists is success: that row holds the same entries.
+	// It does not link a deployment and it does not read the live variables.
+	// The caller passes the set it already resolved.
+	EnsureVariableSet(ctx context.Context, set *domain.VariableSet) error
+	// LinkDeploymentVariableSet points deploymentID at the set setHash already
+	// names. The set row must already exist: this inserts the link only. A
+	// second link of the same deployment is a UniqueError. A deployment or a
+	// set the project does not hold is a ForeignKeyError.
+	LinkDeploymentVariableSet(ctx context.Context, projectID, deploymentID, setHash string) error
+	// GetDeploymentVariables returns the set deploymentID was linked to, as it
+	// was then, whatever the project's variables have become since. A
+	// deployment that was never linked -- or does not exist, or belongs to
 	// another project -- returns NoRowFoundError.
 	GetDeploymentVariables(ctx context.Context, projectID, deploymentID string) (*domain.VariableSet, error)
 }
@@ -767,6 +764,11 @@ type AuthzAssignmentStatements interface {
 	// into the SELECT so a caller cannot list across projects.
 	ListManagedGrants(ctx context.Context, projectID string, opts *database.ListOptions[domain.AuthzAssignmentField]) (*database.ListResult[*domain.AuthzAssignment], error)
 	RevokeAuthzAssignment(ctx context.Context, projectID, id string) error
+	// RevokeAuthzAssignmentsByPrincipal revokes every unrevoked assignment the
+	// principal holds and returns the revoked rows, in no particular order.
+	// Keyed on the principal alone: a platform user's grants sit on the
+	// projects they were granted on, not on the user's own (ADR 053).
+	RevokeAuthzAssignmentsByPrincipal(ctx context.Context, principalType domain.AuthzPrincipalType, principalID string) ([]*domain.AuthzAssignment, error)
 	// ListProjectAdmins returns a page of the people, by user id, who
 	// administer the project: as active members of the owning team, as active
 	// members of a team with an unexpired admin grant, or as existing users

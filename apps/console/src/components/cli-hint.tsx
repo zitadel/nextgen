@@ -14,6 +14,9 @@ export const CLI = "npx @zitadel/cli@latest";
 /** `apply`: writes the local definitions to the project. */
 export const CLI_DEPLOY = `${CLI} deploy`;
 
+/** `variable set`: enters or changes a project's variables and secrets. */
+export const CLI_VARIABLE_SET = `${CLI} variable set`;
+
 /**
  * `setup`: creates a project and connects the app in the current directory.
  * It names the server unless that is the CLI's default: the CLI takes its

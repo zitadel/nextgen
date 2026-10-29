@@ -254,10 +254,12 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	}
 	keyService := service.NewKeyService(serviceDBPool, *masterKey, crypterCache, signingKeyCache)
 
+	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	authAttemptSvc := service.NewAuthAttemptService(
 		serviceDBPool,
 		sessionResolver,
 		userLookup,
+		projectHashers,
 		passwordHasher,
 	)
 	sessionService := service.NewSessionService(serviceDBPool, userRefs, service.SessionConfig{
@@ -319,9 +321,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	brandingService := service.NewBrandingService(serviceDBPool)
 	variableService := service.NewVariableService(serviceDBPool, keyService)
 	idpConnectionService := service.NewIDPConnectionService(serviceDBPool, schemaValidator)
-	deploymentService := service.NewDeploymentService(serviceDBPool)
+	deploymentService := service.NewDeploymentService(serviceDBPool, variableService)
 	eventService := service.NewEventService(serviceDBPool)
-	projectHashers := service.NewProjectHasherResolver(serviceDBPool, hasherFactory)
 	// Operation policies (ADR 066). Every template is compiled and checked
 	// here, so a template the server cannot evaluate stops it before it
 	// serves traffic. A project's published instance is resolved per password
@@ -481,7 +482,8 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 	mux, err := buildHTTPMux(cfg.Server, idgen.NewULID(), oasServer,
 		api.NewIDPCallbackHandler(ssoCallback),
 		standaloneRuntimeResolver(projectService, tokenService, keyService, cfg.Platform.ResolvedProjectID()),
-		requestEventBuf)
+		requestEventBuf,
+		retentionJob.Trigger())
 	if err != nil {
 		return fmt.Errorf("failed to build http mux: %w", err)
 	}
@@ -622,7 +624,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("password_hasher.hasher.memory", 64*1024)
 	v.SetDefault("password_hasher.hasher.threads", 4)
 	// Keep bcrypt and legacy verifiers registered so pre-existing hashes still
-	// validate and transparently rehash to argon2id on the next successful login.
+	// validate. A successful sign-in stores a new hash written by the project's
+	// hasher, argon2id unless the project chose another method.
 	v.SetDefault("password_hasher.verifiers", []crypto.HashName{
 		crypto.HashNameArgon2,
 		crypto.HashNameBcrypt,
@@ -698,6 +701,8 @@ func readConfig(configPath string, overrides ...configOverride) (Config, error) 
 	v.SetDefault("events.retention.window", 30*24*time.Hour)
 	v.SetDefault("events.retention.interval", time.Hour)
 	v.SetDefault("events.retention.enabled", true)
+	// Empty: the server purges on its own timer, not when a scheduler calls.
+	v.SetDefault("events.retention.trigger_secret", "")
 	v.SetDefault("events.export.enabled", false)
 	v.SetDefault("events.export.interval", 5*time.Second)
 	v.SetDefault("service_ping.enabled", false)
@@ -861,7 +866,7 @@ func consoleLink(consolePath string) *errorpage.Link {
 	return &errorpage.Link{Label: "Open the console", Href: consolePath + "/"}
 }
 
-func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer) (*http.ServeMux, error) {
+func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiHandler, idpCallbackHandler http.Handler, runtime runtimeResolver, requestEvents *audit.RequestBuffer, retentionTrigger http.Handler) (*http.ServeMux, error) {
 	mux := http.NewServeMux()
 
 	if cfg.ConsoleEnabled {
@@ -884,12 +889,13 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 	// the catch-all API mount below.
 	mux.Handle(consoleRuntimePath, newConsoleRuntimeHandler(runtime))
 
-	chain := func(h http.Handler, redactQuery ...string) http.Handler {
+	chain := func(h http.Handler) http.Handler {
 		return middleware.Chain(h,
 			func(next http.Handler) http.Handler {
 				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
 			},
-			func(next http.Handler) http.Handler { return middleware.WithLogging(next, redactQuery...) },
+			middleware.WithLogging,
+			api.WithRecover,
 			api.WithRequestHostMiddleware,
 			middleware.WithUserAgentMiddleware,
 			api.WithSessionStateNoStore,
@@ -898,14 +904,25 @@ func buildHTTPMux(cfg ServerConfig, reqIdGen middleware.RequestIDGenerator, apiH
 		)
 	}
 	// The same chain: the callback reads its cookie by the request scheme
-	// (WithRequestHostMiddleware). Its code is a credential and its state is
-	// single-use, so the request log hides both: a log line must not be able
-	// to replay a sign-in. Both spellings serve one handler: the prefixed path
-	// arrives when the instance is the browser origin, the stripped one through
-	// a scaffolded app's SDK proxy.
-	callback := chain(idpCallbackHandler, "code", "state")
+	// (WithRequestHostMiddleware). Both spellings serve one handler: the
+	// prefixed path arrives when the instance is the browser origin, the
+	// stripped one through a scaffolded app's SDK proxy.
+	callback := chain(idpCallbackHandler)
 	mux.Handle(api.IDPCallbackPattern, callback)
 	mux.Handle(api.IDPCallbackUpstreamPattern, callback)
+	// The event retention trigger, when a scheduler outside the process runs
+	// the purge (events.retention.trigger_secret, ADR 049): the operator's,
+	// not the API's, so it takes the request ID and the request line but none
+	// of the middleware a client's request passes.
+	if retentionTrigger != nil {
+		mux.Handle(audit.RetentionTriggerPath, middleware.Chain(retentionTrigger,
+			func(next http.Handler) http.Handler {
+				return middleware.WithRequestContextMiddleware(reqIdGen, cfg.RequestIDHeader, next)
+			},
+			middleware.WithLogging,
+			api.WithRecover,
+		))
+	}
 	mux.Handle("/", chain(apiHandler))
 	return mux, nil
 }

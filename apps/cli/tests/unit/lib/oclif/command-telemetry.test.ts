@@ -1,9 +1,10 @@
+import type { Properties } from "mixpanel";
 import { describe, expect, it } from "vitest";
 
 import {
   commandEventProperties,
   deviceProfileProperties,
-  VERCEL_EVENT_KEYS,
+  vercelEventKeys,
 } from "../../../../src/lib/oclif/command-telemetry";
 import type { GlobalOptions } from "../../../../src/lib/oclif/types";
 import { VERCEL_ENDPOINT, vercelEventBody } from "../../../../src/lib/telemetry/vercel";
@@ -50,31 +51,65 @@ describe("commandEventProperties", () => {
   });
 });
 
-describe("VERCEL_EVENT_KEYS", () => {
+describe("vercelEventKeys", () => {
+  function vercelCopy(event: string, command: string, extra: Properties) {
+    const props = commandEventProperties(meta({ command }), "sess-1", extra);
+    return JSON.parse(
+      vercelEventBody(
+        event,
+        props,
+        { endpoint: VERCEL_ENDPOINT, keys: vercelEventKeys(command) },
+        0,
+      ),
+    ).ed as Record<string, unknown>;
+  }
+
   it("gives the Vercel copy of a failed command the header, its outcome and whether it ran without prompts", () => {
-    const props = commandEventProperties(meta({ command: "doctor" }), "sess-1", {
+    const copy = vercelCopy("cli_command_failed", "variable:list", {
       status: "error",
       reason: "E_NETWORK",
       exit_code: 1,
       duration_ms: 12,
     });
-    const body = JSON.parse(
-      vercelEventBody(
-        "cli_command_failed",
-        props,
-        { endpoint: VERCEL_ENDPOINT, keys: VERCEL_EVENT_KEYS },
-        0,
-      ),
-    );
-    expect(Object.keys(body.ed)).toEqual([...VERCEL_EVENT_KEYS]);
-    expect(body.ed).toMatchObject({
+    expect(Object.keys(copy)).toEqual([...vercelEventKeys("variable:list")]);
+    expect(copy).toMatchObject({
       surface: "cli",
-      command: "doctor",
+      command: "variable:list",
       status: "error",
       reason: "E_NETWORK",
       non_interactive: true,
     });
-    expect(body.ed).not.toHaveProperty("is_ci");
+    expect(copy).not.toHaveProperty("is_ci");
+  });
+
+  it("keeps a completed command's own dimension beside whether it ran without prompts", () => {
+    const copy = vercelCopy("cli_command_completed", "setup", {
+      framework: "nextjs",
+      renderer: "react",
+      status: "ok",
+    });
+    expect(copy).toMatchObject({ framework: "nextjs", non_interactive: true });
+    expect(copy).not.toHaveProperty("renderer");
+  });
+
+  it("puts a failed command's own dimension in place of whether it ran without prompts", () => {
+    const copy = vercelCopy("cli_command_failed", "doctor", {
+      checks_failed: 1,
+      failed_checks: "port",
+      status: "error",
+      reason: "E_PORT_IN_USE",
+    });
+    expect(copy).toMatchObject({ failed_checks: "port", reason: "E_PORT_IN_USE" });
+    expect(copy).not.toHaveProperty("non_interactive");
+    expect(copy).not.toHaveProperty("checks_failed");
+  });
+
+  it("keeps whether a failed command ran without prompts when it recorded no dimension of its own", () => {
+    const copy = vercelCopy("cli_command_failed", "doctor", {
+      status: "error",
+      reason: "E_NETWORK",
+    });
+    expect(copy).toMatchObject({ non_interactive: true });
   });
 });
 

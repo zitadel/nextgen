@@ -686,6 +686,32 @@ describe("api-mock spec conformance — responses match orval-generated zod", ()
     expect(typeof row?.metadata.created_at).toBe("string");
   });
 
+  test("GET /schemas adds metadata.in_use only when expanded", async () => {
+    const create = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "user-schema",
+        metaSchema: "https://nextgen.com/api/schemas/user-schema.json",
+        objectType: "conformance-in-use",
+        "x-auth-methods": { password: { enabled: true } },
+      }),
+    });
+    const { id } = (await create.json()) as { id: string };
+    const metadataOf = async (query: string) => {
+      const res = await fetch(`${BASE}/schemas?project_id=proj_schema_in_use${query}`);
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        schemas: Array<{ id: string; metadata: Record<string, unknown> }>;
+      };
+      return body.schemas.find((entry) => entry.id === id)?.metadata;
+    };
+
+    expect(await metadataOf("")).not.toHaveProperty("in_use");
+    // The mock keeps no users, so an expanded revision is never in use.
+    expect(await metadataOf("&expand=in_use")).toMatchObject({ in_use: false });
+  });
+
   test("GET /schemas pages with limit and next_page_token", async () => {
     // The consumer suites replace this handler with local MSW handlers, so
     // the mock's own slicing, token emission and continuation are only
@@ -1769,15 +1795,15 @@ describe("api-mock idp and variable contract details", () => {
     });
   });
 
-  test("answers not_implemented for a deployment's variables", async () => {
+  test("answers not found for the variables of a deployment the project does not hold", async () => {
     const projectId = await newProject("vars-deployment");
 
     const res = await fetch(
       `${BASE}/deployments/dep_01KX5N7C9D2E7F0N9WD3P2E4YM6/variables?project_id=${projectId}`,
     );
 
-    expect(res.status).toBe(501);
-    expect(((await res.json()) as { code?: string }).code).toBe("not_implemented");
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { code?: string }).code).toBe("dep.not_found");
   });
 
   test("reads back what the write did not touch", async () => {
@@ -1818,6 +1844,13 @@ describe("api-mock releases and deployments", () => {
       body: JSON.stringify({ pattern, kind: "primary" }),
     });
 
+  const addPreview = (id: string, secret: string, pattern: string) =>
+    fetch(`${BASE}/projects/${id}/origins`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
+      body: JSON.stringify({ pattern, kind: "preview" }),
+    });
+
   const rel1 = { pointers: [{ kind: "schema", revision_id: "sch_a" }] };
   const rel2 = { pointers: [{ kind: "schema", revision_id: "sch_b" }] };
 
@@ -1834,6 +1867,78 @@ describe("api-mock releases and deployments", () => {
       headers: { "content-type": "application/json", authorization: `Bearer ${secret}` },
       body: JSON.stringify(body),
     });
+
+  test("freezes the variables of the deployment's kind, untouched by later writes", async () => {
+    const project = await newProject("deployment-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const variables = `${BASE}/variables?project_id=${project.id}`;
+    const write = (kind: string, payload: object) =>
+      fetch(`${variables}&kind=${kind}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    await write("primary", { HOST: "app.acme.com", TOKEN: { value: "s3cr3t", secret: true } });
+    await write("preview", { HOST: "preview.acme.com" });
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const deployment = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: ["primary"],
+      })
+    ).json()) as { id: string };
+    await write("primary", { HOST: "changed.acme.com" });
+
+    const res = await fetch(
+      `${BASE}/deployments/${deployment.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ HOST: "app.acme.com", TOKEN: { secret: true } });
+  });
+
+  test("reuses the restored deployment's frozen variables on rollback", async () => {
+    const project = await newProject("rollback-frozen-variables");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const write = (payload: object) =>
+      fetch(`${BASE}/variables?project_id=${project.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify(payload),
+      });
+    const deploy = async (body: object) => {
+      const release = (await (await createRelease(project.id, project.secret, body)).json()) as {
+        id: string;
+      };
+      return (await (
+        await createDeployment(project.id, project.secret, {
+          release_id: release.id,
+          targets: ["primary"],
+        })
+      ).json()) as { id: string };
+    };
+    await write({ HOST: "first.acme.com" });
+    const first = await deploy(rel1);
+    await write({ HOST: "second.acme.com" });
+    await deploy(rel2);
+    const rolledBack = (await (
+      await fetch(`${BASE}/deployments/${first.id}/rollback?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({}),
+      })
+    ).json()) as { id: string };
+
+    const res = await fetch(
+      `${BASE}/deployments/${rolledBack.id}/variables?project_id=${project.id}`,
+      { headers: { authorization: `Bearer ${project.secret}` } },
+    );
+
+    expect(await res.json()).toEqual({ HOST: "first.acme.com" });
+  });
 
   test("builds a release whose bundle carries a connection, resolving it by slug", async () => {
     const project = await newProject("release-build-idps");
@@ -1929,6 +2034,88 @@ describe("api-mock releases and deployments", () => {
 
     expect(res.status).toBe(400);
     expect(((await res.json()) as { code: string }).code).toBe("idp.field_immutable");
+  });
+
+  test("evaluates a password policy as a password set would, storing nothing", async () => {
+    const project = await newProject("policy-evaluate");
+    const evaluate = (body: object) =>
+      fetch(`${BASE}/policies/evaluate?project_id=${project.id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ operation: "auth.factor.password.set", ...body }),
+      });
+    const decision = async (body: object) => {
+      const res = await evaluate(body);
+      expect(res.status).toBe(200);
+      return res.json();
+    };
+
+    expect(
+      await decision({ config: { min_length: 12 }, input: { password: "a-long-enough-one" } }),
+    ).toEqual({
+      allowed: true,
+    });
+    expect(await decision({ config: { min_length: 12 }, input: { password: "short1" } })).toEqual({
+      allowed: false,
+      code: "user.password_policy_violation",
+      violations: { min_length: 12 },
+    });
+    // 13 code points, 14 bytes.
+    expect(
+      await decision({ config: { min_length: 14 }, input: { password: "Passwört12345" } }),
+    ).toMatchObject({
+      violations: { min_length: 14 },
+    });
+    expect(await decision({ config: {}, input: { password: "" } })).toEqual({
+      allowed: false,
+      code: "user.password_empty",
+    });
+    expect(await decision({ config: {}, input: { password: "a".repeat(65) } })).toMatchObject({
+      violations: { max_length: 64 },
+    });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { history_matches: [false, true] },
+      }),
+    ).toMatchObject({ violations: { history_depth: 2 } });
+    expect(
+      await decision({
+        config: { history_depth: 2 },
+        input: { password: "reused" },
+        facts: { self_service: false, history_matches: [true] },
+      }),
+    ).toEqual({ allowed: true });
+
+    const contradicting = await evaluate({
+      config: { min_length: 20, max_length: 10 },
+      input: { password: "x" },
+    });
+    expect(contradicting.status).toBe(400);
+    expect(((await contradicting.json()) as { code: string }).code).toBe("pol.invalid");
+    for (const malformed of [
+      { config: { min_lenght: 12 }, input: { password: "x" } },
+      { config: {}, input: { password: "x", passwd: "x" } },
+      { config: { history_depth: 2 }, input: { password: "x" }, facts: { history_match: [true] } },
+      { config: {}, input: { password: "a".repeat(4097) } },
+      {
+        config: {},
+        input: { password: "x" },
+        facts: { history_matches: [false, false, false, false, true] },
+      },
+    ]) {
+      const res = await evaluate(malformed);
+      expect(res.status, JSON.stringify(malformed)).toBe(400);
+      expect(((await res.json()) as { code: string }).code).toBe("req.invalid");
+    }
+
+    const listed = (await (
+      await fetch(`${BASE}/policies?project_id=${project.id}`, {
+        headers: { authorization: `Bearer ${project.secret}` },
+      })
+    ).json()) as { policies: unknown[] };
+    expect(listed.policies).toEqual([]);
   });
 
   test("builds a release whose bundle carries a policy, revising it only when it changes", async () => {
@@ -2198,10 +2385,10 @@ describe("api-mock releases and deployments", () => {
     const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
       id: string;
     };
-    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "1h" };
+    const body = { release_id: release.id, targets: ["https://x-acme.vercel.app"], ttl: "PT1H" };
     await createDeployment(project.id, project.secret, body);
 
-    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "30d" });
+    const renewed = await createDeployment(project.id, project.secret, { ...body, ttl: "P30D" });
 
     expect(renewed.status).toBe(201);
   });
@@ -2302,6 +2489,246 @@ describe("api-mock releases and deployments", () => {
     ).json()) as { deployments: { release_id: string }[] };
     expect(live.deployments).toHaveLength(1);
     expect(live.deployments[0]?.release_id).toBe(first.id);
+  });
+
+  test("a preview deployment defaults an omitted ttl and writes one preview per URL", async () => {
+    const project = await newProject("deploy-preview");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    // An omitted ttl is accepted: the project's default applies, so the preview
+    // is written with a future expiry rather than being refused.
+    const deployed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+    });
+    expect(deployed.status).toBe(201);
+    const body = (await deployed.json()) as { targets: { origin: string; expires_at: string }[] };
+    expect(body.targets[0]?.origin).toBe(url);
+    expect(new Date(body.targets[0]?.expires_at as string).getTime()).toBeGreaterThan(Date.now());
+
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: { origin: string }[];
+    };
+    expect(listed.previews.map((preview) => preview.origin)).toEqual([url]);
+  });
+
+  test("refuses a deployment that mixes preview URLs with primary origins", async () => {
+    const project = await newProject("deploy-mixed");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    const mixed = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["https://app.acme.com", "https://acme-git-sso-acmeinc.vercel.app"],
+      ttl: "PT168H",
+    });
+    expect(mixed.status).toBe(400);
+    expect(((await mixed.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("refuses a ttl on a primary-origin deployment", async () => {
+    const project = await newProject("deploy-primary-ttl");
+    await addPrimary(project.id, project.secret, "https://app.acme.com");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+
+    // ttl is only meaningful for previews: a primary-origin deployment that
+    // carries one is refused, even though an omitted ttl on a preview defaults.
+    const withTtl = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: ["primary"],
+      ttl: "PT168H",
+    });
+    expect(withTtl.status).toBe(400);
+    expect(((await withTtl.json()) as { code: string }).code).toBe("dep.invalid");
+  });
+
+  test("removes a preview idempotently and stops listing it", async () => {
+    const project = await newProject("preview-remove");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+
+    const removePreview = () =>
+      fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+        body: JSON.stringify({ origin: url }),
+      });
+
+    expect((await removePreview()).status).toBe(204);
+    const afterFirst = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: unknown[];
+    };
+    expect(afterFirst.previews).toHaveLength(0);
+
+    // Idempotent: removing an already-gone preview still answers 204.
+    expect((await removePreview()).status).toBe(204);
+  });
+
+  test("lets a release whose only preview was removed be revoked", async () => {
+    const project = await newProject("preview-remove-revoke");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+    await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin: url }),
+    });
+
+    const revoked = await fetch(`${BASE}/releases/${release.id}/revoke?project_id=${project.id}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${project.secret}` },
+    });
+
+    expect(revoked.status).toBe(200);
+  });
+
+  test("renews a preview's expiry on a re-deploy of unchanged content", async () => {
+    const project = await newProject("preview-renew");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+
+    const first = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT60M",
+    });
+    expect(first.status).toBe(201);
+    const expiresFirst = (
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+
+    // Re-deploying the same release and variables writes a new deployment
+    // (201), the renewal, whose ttl pushes the preview's expiry later.
+    const again = await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: [url],
+      ttl: "PT168H",
+    });
+    expect(again.status).toBe(201);
+    const renewedBody = (await again.json()) as { targets: { expires_at: string }[] };
+    const expiresAgain = (
+      (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+        previews: { expires_at: string }[];
+      }
+    ).previews[0]?.expires_at as string;
+    expect(new Date(expiresAgain).getTime()).toBeGreaterThan(new Date(expiresFirst).getTime());
+    // The renewal reports the expiry the preview now runs on.
+    expect(renewedBody.targets[0]?.expires_at).toBe(expiresAgain);
+  });
+
+  test("pages the previews list with limit and next_page_token", async () => {
+    const project = await newProject("preview-paging");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const urls = [
+      "https://a-acmeinc.vercel.app",
+      "https://b-acmeinc.vercel.app",
+      "https://c-acmeinc.vercel.app",
+    ];
+    await createDeployment(project.id, project.secret, {
+      release_id: release.id,
+      targets: urls,
+      ttl: "PT168H",
+    });
+
+    const first = (await (
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(first.previews).toHaveLength(2);
+    const token = first.next_page_token;
+    expect(typeof token).toBe("string");
+
+    const second = (await (
+      await fetch(`${BASE}/projects/${project.id}/previews?limit=2&page_token=${token}`)
+    ).json()) as { previews: { origin: string }[]; next_page_token?: string | null };
+    expect(second.previews).toHaveLength(1);
+    expect(second.next_page_token ?? null).toBeNull();
+
+    // Every URL appears exactly once across the two pages.
+    const seen = [...first.previews, ...second.previews].map((preview) => preview.origin).sort();
+    expect(seen).toEqual([...urls].sort());
+
+    // A token the mock never minted is rejected, like the real server.
+    const bad = await fetch(`${BASE}/projects/${project.id}/previews?page_token=not-a-cursor`);
+    expect(bad.status).toBe(400);
+  });
+
+  test("a preview removal leaves deployment history untouched", async () => {
+    const project = await newProject("preview-remove-history");
+    await addPreview(project.id, project.secret, "https://*-acmeinc.vercel.app");
+    const release = (await (await createRelease(project.id, project.secret, rel1)).json()) as {
+      id: string;
+    };
+    const url = "https://acme-git-sso-acmeinc.vercel.app";
+    const deployed = (await (
+      await createDeployment(project.id, project.secret, {
+        release_id: release.id,
+        targets: [url],
+        ttl: "PT168H",
+      })
+    ).json()) as { id: string; deployed_at: string; targets: { expires_at: string }[] };
+    const historyBefore = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+
+    const removed = await fetch(`${BASE}/projects/${project.id}/previews/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${project.secret}` },
+      body: JSON.stringify({ origin: url }),
+    });
+    expect(removed.status).toBe(204);
+
+    // The live preview list no longer admits the URL — its preview is gone.
+    const listed = (await (await fetch(`${BASE}/projects/${project.id}/previews`)).json()) as {
+      previews: unknown[];
+    };
+    expect(listed.previews).toHaveLength(0);
+    // Nor does the live deployments view.
+    const liveDeployments = (await (
+      await fetch(`${BASE}/deployments?project_id=${project.id}&live=true`)
+    ).json()) as { deployments: unknown[] };
+    expect(liveDeployments.deployments).toHaveLength(0);
+
+    // But the deployment that served it keeps its real timestamps — removal
+    // ends the preview, it does not rewrite history.
+    const historyAfter = (await (
+      await fetch(`${BASE}/deployments/${deployed.id}?project_id=${project.id}`)
+    ).json()) as { deployed_at: string; targets: { origin: string; expires_at: string }[] };
+    expect(historyAfter.deployed_at).toBe(historyBefore.deployed_at);
+    expect(historyAfter.targets).toEqual(historyBefore.targets);
+    expect(historyAfter.targets[0]?.expires_at).toBe(deployed.targets[0]?.expires_at);
   });
 
   test("refuses to revoke a release an origin still serves, then allows it", async () => {
