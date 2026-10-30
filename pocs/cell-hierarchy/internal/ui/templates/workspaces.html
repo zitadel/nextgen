@@ -1,0 +1,78 @@
+{{define "workspaces"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      <h1>Workspaces</h1>
+      <p class="muted">A workspace is the customer's first site (project) on a chosen cell, linked to a platform team. Expand by adding child sites on other cells.</p>
+      {{if .Flash}}<div class="flash-ok">{{.Flash}}</div>{{end}}
+      {{if .FlashErr}}<div class="flash-err">{{.FlashErr}}</div>{{end}}
+
+      <div class="panel">
+        <h2>Root sites</h2>
+        {{if .Sites}}
+        <table>
+          <thead><tr><th>Workspace / site</th><th>Cell</th><th>Team</th><th>Users</th><th>Lookup</th></tr></thead>
+          <tbody>
+          {{range .Sites}}
+            <tr>
+              <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a> {{.Name}}</td>
+              <td>{{.HostLabel}}</td>
+              <td class="muted">{{.CustomerTeamID}}</td>
+              <td>{{.UserCount}}</td>
+              <td>{{if .LookupEnabled}}<span class="badge lookup">on</span>{{else}}off{{end}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No workspaces yet. Create a platform team first, then a workspace here.</p>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Create workspace (= first site)</h2>
+        <p class="muted">Creates the project immediately on the chosen cell, enables lookup, attaches to <code>platform</code>, and stores <code>customer_team_id</code>.</p>
+        {{if .Teams}}
+        <form method="post" action="/workspaces">
+          <label for="id">Workspace / site id</label>
+          <input id="id" name="id" required placeholder="acme"/>
+          <label for="name">Name</label>
+          <input id="name" name="name" placeholder="Acme"/>
+          <label for="cell">Cell</label>
+          <select id="cell" name="cell" required>
+            {{range .Cells}}
+            <option value="{{.Label}}" {{if eq .Label "eu-1"}}selected{{end}}>{{.Label}}</option>
+            {{end}}
+          </select>
+          <label for="customer_team_id">Customer team (on platform)</label>
+          <select id="customer_team_id" name="customer_team_id" required>
+            <option value="">Select team…</option>
+            {{range .Teams}}
+            <option value="{{.ID}}">{{.Name}} (<code>{{.ID}}</code>)</option>
+            {{end}}
+          </select>
+          <button type="submit">Create workspace</button>
+        </form>
+        {{else}}
+        <p class="flash-err">No teams on platform yet. <a href="/platform">Create a team</a> first (e.g. acme).</p>
+        {{end}}
+      </div>
+
+      {{template "latest-trace" .}}
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}

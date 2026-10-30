@@ -1,0 +1,165 @@
+{{define "project"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{.Title}} · cell hierarchy</title>
+  <style>{{template "layout-styles" .}}</style>
+</head>
+<body>
+<div class="app">
+  {{template "layout-nav" .}}
+  <div class="content">
+    <div class="content-main">
+      {{template "layout-breadcrumbs" .}}
+      <h1>{{.Title}}</h1>
+      <p class="hint">Site = project on one cell. Create users here; keys float up the parent-site chain. Lookup walks up.</p>
+    {{with .Project}}
+      {{if .FlashOK}}<p class="flash-ok">{{.FlashOK}}</p>{{end}}
+      {{if .FlashErr}}<p class="flash-err">{{.FlashErr}}</p>{{end}}
+      {{if .Error}}<p class="flash-err">{{.Error}}</p>{{end}}
+
+      <div class="panel">
+        <h2>Site meta</h2>
+        <p>
+          <strong>{{.Project.Name}}</strong>
+          {{if .Project.LookupEnabled}}<span class="badge lookup">lookup on</span>{{else}}<span class="badge">lookup off</span>{{end}}
+          {{if .Project.WorkspaceID}}<span class="badge">workspace {{.Project.WorkspaceID}}</span>{{end}}
+          {{if .CustomerTeam}}<span class="badge">team {{.CustomerTeam}}</span>{{end}}
+        </p>
+        <p class="muted">id=<code>{{.Project.ID}}</code> · cell={{.HostLabel}} · host={{.Project.HostCellURL}}</p>
+        <p class="muted">parent_site={{if .Project.ParentProjectID}}<a href="/projects/{{.Project.ParentProjectID}}"><code>{{.Project.ParentProjectID}}</code></a>{{else}}(none){{end}} · parent_cell={{.Project.ParentCellURL}}</p>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Create user</h2>
+          <p class="muted">Creates on this site and floats the lookup key up parents.</p>
+          <form method="post" action="/projects/{{.Project.ID}}/users">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" required placeholder="joe@example.com"/>
+            <button type="submit">Create user</button>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Lookup from here</h2>
+          <p class="muted">Walks up the parent-site chain until a hit or root.</p>
+          <form method="post" action="/projects/{{.Project.ID}}/lookup">
+            <label for="key">Key</label>
+            <input id="key" name="key" required placeholder="joe@example.com"/>
+            <button type="submit">Lookup</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Users</h2>
+        {{if .Users}}
+        <table>
+          <thead><tr><th>Email</th><th>Epoch</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {{range .Users}}
+            <tr{{if .DeletedAt}} class="tombstoned"{{end}}>
+              <td>{{.Email}}</td>
+              <td>{{.Epoch}}</td>
+              <td class="muted">
+                {{if .DeletedAt}}deleted{{else if .Blocked}}blocked{{else}}active{{end}}
+              </td>
+              <td>
+                {{if not .DeletedAt}}
+                <form method="post" action="/projects/{{$.Project.Project.ID}}/users/delete" class="inline">
+                  <input type="hidden" name="email" value="{{.Email}}"/>
+                  <button class="danger" type="submit">Delete</button>
+                </form>
+                {{end}}
+              </td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No users on this site.</p>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Lookup table (this cell)</h2>
+        <p class="muted">Provenance: <span class="badge local">local</span> · <span class="badge child">from child</span> floated keys.</p>
+        {{if .Lookup}}
+        <table>
+          <thead><tr><th>Key</th><th>Home</th><th>State</th><th>Provenance</th></tr></thead>
+          <tbody>
+          {{range .Lookup}}
+            <tr>
+              <td>{{.Key}}</td>
+              <td><code>{{.HomeProjectID}}</code></td>
+              <td>{{.State}}</td>
+              <td>
+                {{if eq .Source "child"}}
+                <span class="badge child">from child {{.ViaProject}}</span>
+                {{else}}
+                <span class="badge local">local</span>
+                {{end}}
+              </td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">Empty lookup table.</p>
+        {{end}}
+      </div>
+
+      <div class="panel">
+        <h2>Child sites</h2>
+        {{if .ChildSites}}
+        <table>
+          <thead><tr><th>Site</th><th>Cell</th><th>Users</th></tr></thead>
+          <tbody>
+          {{range .ChildSites}}
+            <tr>
+              <td><a href="/projects/{{.ID}}"><code>{{.ID}}</code></a></td>
+              <td>{{.HostLabel}}</td>
+              <td>{{.UserCount}}</td>
+            </tr>
+          {{end}}
+          </tbody>
+        </table>
+        {{else}}
+        <p class="muted">No child sites attached to this site.</p>
+        {{end}}
+
+        <h2 style="margin-top:1rem">Add child site</h2>
+        <p class="muted">New project on another cell; lookup parent defaults to this site (pick another site in the same workspace for multi-level chains).</p>
+        <form method="post" action="/projects/{{.Project.ID}}/sites">
+          <input type="hidden" name="workspace_id" value="{{.WorkspaceRoot}}"/>
+          <label for="site_id">Site id</label>
+          <input id="site_id" name="id" required placeholder="acme-us2"/>
+          <label for="site_cell">Cell</label>
+          <select id="site_cell" name="cell" required>
+            {{range $.Cells}}
+            <option value="{{.Label}}">{{.Label}}</option>
+            {{end}}
+          </select>
+          <label for="parent_project_id">Parent site</label>
+          <select id="parent_project_id" name="parent_project_id">
+            <option value="{{.Project.ID}}" selected>{{.Project.ID}} (this site)</option>
+            {{range .ParentOptions}}
+              {{if ne .ID $.Project.Project.ID}}
+              <option value="{{.ID}}">{{.ID}} @ {{.HostLabel}}</option>
+              {{end}}
+            {{end}}
+          </select>
+          <button type="submit">Add site</button>
+        </form>
+      </div>
+    {{end}}
+
+      {{template "latest-trace" .}}
+    </div>
+  </div>
+</div>
+</body>
+</html>
+{{end}}
