@@ -1,3 +1,5 @@
+import { passProtection, zitadelServer } from "./zitadel";
+
 /** Where the console's add-on points the sign-in widget (`signInApiBase`). */
 export const SIGN_IN_PREFIX = "/cloud/zitadel";
 
@@ -38,14 +40,10 @@ const HOP_HEADERS = [
 ];
 
 /**
- * One of the sign-in widget's calls, forwarded to the Zitadel server with its
- * cookies, `Origin` and body (root ADR 084 §5), after BotID's check for a flow
- * write. Deployed, the server answers on the same origin; behind a dev proxy
- * (the console's dev server, or `vercel dev` in `workspace:cloud`) that origin
- * is the functions' own, so both local loops name the server in
- * `CLOUD_ZITADEL_URL` (moon.yml, scripts/run-cloud.mjs). The server sees the
- * request the widget made, so the session cookie it sets reaches the browser
- * unchanged.
+ * One of the sign-in widget's calls, forwarded to the Zitadel server
+ * (`zitadelServer`) with its cookies, `Origin` and body (root ADR 084 §5),
+ * after BotID's check for a flow write. The server sees the request the widget
+ * made, so the session cookie it sets reaches the browser unchanged.
  *
  * A bad verdict is refused until the server reads ADR 019's risk signal;
  * then the verdict travels as that header and nothing is refused here.
@@ -53,7 +51,7 @@ const HOP_HEADERS = [
 export async function forwardSignIn(
   request: Request,
   verdict: () => Promise<BotVerdict>,
-  server = process.env.CLOUD_ZITADEL_URL || new URL(request.url).origin,
+  server = zitadelServer(request),
 ): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.slice(SIGN_IN_PREFIX.length) || "/";
@@ -75,12 +73,8 @@ export async function forwardSignIn(
       );
     }
   }
-  const headers = new Headers(request.headers);
+  const headers = passProtection(new Headers(request.headers));
   for (const name of HOP_HEADERS) headers.delete(name);
-  // A preview deployment sits behind Vercel Authentication, which a call from
-  // the function to its own origin must pass as well.
-  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-  if (bypass) headers.set("x-vercel-protection-bypass", bypass);
   const answer = await fetch(new URL(`${path}${url.search}`, server), {
     method: request.method,
     headers,

@@ -1,13 +1,25 @@
 import type { EmailPreferences, Plan, TeamBilling, Ticket } from "./contract";
-import type { Billing, Caller, Crm, Directory, Systems, Team, UsageRecord } from "./ports";
+import { type HubspotAnswer, type Send, hubspotCrm } from "./hubspot/crm";
+import type { HubspotSettings } from "./hubspot/requests";
+import type {
+  Billing,
+  Caller,
+  Crm,
+  CrmRequest,
+  Directory,
+  Systems,
+  Team,
+  UsageRecord,
+} from "./ports";
 
 /**
  * Every system in memory (root ADR 084 §9), for local runs, previews and
  * tests: what a call changes is kept for the life of the process, so a
  * created ticket is listed and a saved preference reads back. On Vercel a
  * workflow step can run in another instance than the request that started
- * it, which then does not see its change. Never served in production
- * (`src/systems.ts`).
+ * it, which then does not see its change. Production takes only onboarding's
+ * writes from here, which send nothing (`onboardingSystems()` in
+ * `src/systems.ts`).
  */
 export function mockSystems(): Systems {
   const plans = new Map<string, Plan["id"]>();
@@ -39,9 +51,6 @@ function mockDirectory(plans: Map<string, Plan["id"]>): Directory {
     },
     async administeredTeams() {
       return [MOCK_TEAM];
-    },
-    async signupConsent() {
-      return { product_news: false, at: "2026-10-29T08:00:00Z" };
     },
     async usage(hour) {
       const record: UsageRecord = {
@@ -119,19 +128,65 @@ function mockBilling(plans: Map<string, Plan["id"]>): Billing {
   };
 }
 
+/**
+ * Stand-ins for the portal's own ids, which the recorder needs only to show
+ * where they go; go-live takes them from HubSpot (root ADR 084 §9).
+ */
+const MOCK_HUBSPOT: HubspotSettings = {
+  dealPipeline: "pipeline_mock",
+  dealStage: "stage_mock_account_created",
+  subscriptions: { newsletter: 1, security: 2 },
+  legalBasisExplanation: "Signed up for Zitadel Cloud.",
+};
+
+/**
+ * HubSpot as the recorder answers it (root ADR 084 §9): nothing leaves the
+ * process. A lookup finds nothing, so a run shows every write onboarding
+ * makes, and a write answers with an id made from our keys, so every instance
+ * answers alike. Each call logs one line, its label, which names our ids and
+ * never an email. `answer` stands in for what HubSpot holds, in tests.
+ */
+export function recordingHubspot(
+  answer: (request: CrmRequest) => HubspotAnswer | undefined = () => undefined,
+): Send {
+  return async (request) => {
+    console.info(`hubspot (mock, not sent): ${request.label}`);
+    return answer(request) ?? recordedAnswer(request);
+  };
+}
+
+function recordedAnswer(request: CrmRequest): HubspotAnswer {
+  if (request.method === "GET") {
+    // A person new to HubSpot has chosen no subscription yet.
+    if (request.path.startsWith("/communication-preferences/")) {
+      return { status: 200, body: { status: "SUCCESS", results: [] } };
+    }
+    return { status: 404 };
+  }
+  const properties = (request.body as { properties?: Record<string, string> } | undefined)
+    ?.properties;
+  if (request.method === "POST" && properties?.zitadel_user_id) {
+    return { status: 201, body: { id: `contact_mock_${properties.zitadel_user_id}` } };
+  }
+  if (request.method === "POST" && properties?.zitadel_team_id) {
+    return { status: 201, body: { id: `deal_mock_${properties.zitadel_team_id}` } };
+  }
+  return { status: 200, body: {} };
+}
+
 function mockCrm(): Crm {
   const preferences = new Map<string, EmailPreferences>();
   const tickets = new Map<string, Ticket[]>();
+  const hubspot = hubspotCrm(recordingHubspot(), MOCK_HUBSPOT);
   return {
-    async upsertContact(person, consent) {
-      if (!preferences.has(person.email)) {
-        preferences.set(person.email, { product_news: consent.product_news });
-      }
-      return { contact_id: `contact_mock_${person.user_id}` };
+    upsertContact: hubspot.upsertContact,
+    async subscribe(person) {
+      // Onboarding subscribes everyone, so Settings → Email reads the newsletter
+      // back as on until the person turns it off.
+      if (!preferences.has(person.email)) preferences.set(person.email, { product_news: true });
+      return hubspot.subscribe(person);
     },
-    async upsertCompany(team) {
-      return { company_id: `company_mock_${team.id}` };
-    },
+    ensureDeal: hubspot.ensureDeal,
     async emailPreferences(person) {
       return preferences.get(person.email) ?? { product_news: false };
     },
