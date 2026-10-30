@@ -1,5 +1,6 @@
 import type { OperationObject, ParameterObject, PathItemObject } from "fumadocs-openapi";
 import type { RequestData } from "fumadocs-openapi/requests";
+import { type ApiArgument, operations } from "@zitadel/api/generated/operations";
 
 // The API reference's TypeScript sample: the operation called through
 // `@zitadel/api`, the client /docs/sdks/api-client documents. The page calls
@@ -9,10 +10,11 @@ import type { RequestData } from "fumadocs-openapi/requests";
 // client, call it with the operation's default request (lib/default-request.ts).
 //
 // The call mirrors what orval generates (packages/api/orval.config.ts): one
-// client method per operation, named after its operationId, taking the path
-// parameters in the order the path names them, then the body, then an object
-// of the query parameters, then fetch options. Header and cookie parameters are
-// not arguments; the fetch options carry the headers.
+// client method per operation, named after its operationId, taking the
+// arguments `@zitadel/api/generated/operations` records for it (path
+// parameters, the body, an object of the query parameters, optional ones last),
+// then fetch options. Header and cookie parameters are not arguments; the
+// fetch options carry the headers.
 
 /** The security schemes the spec declares, which pick how the sample authenticates. */
 export const securitySchemes = ["oauth2", "sessionCookie"] as const;
@@ -46,21 +48,23 @@ export function sdkSample(
   const query = parameters.filter((parameter) => parameter.in === "query");
   const params = queryArguments(query, request);
   const headers = headerArguments(parameters, request);
-  const body = resolve<{ required?: boolean }>(operation.requestBody);
 
-  const slots: Slot[] = pathParameterNames(path).map((name) => ({
-    value: request.path[name]?.value ?? "",
-    required: true,
-  }));
-  if (body) slots.push({ value: request.body ?? {}, required: body.required === true });
-  if (query.length > 0) {
-    const required = query.some((parameter) => parameter.required);
-    slots.push({
-      value: required || Object.keys(params).length > 0 ? params : undefined,
-      required,
-    });
-  }
-  slots.push({ value: headers && { headers }, required: false });
+  // In the order the client takes them, which the generator records once for
+  // the client's own paging too (packages/api/scripts/operations.ts).
+  const slots: Slot[] = [
+    ...argumentsOf(operation.operationId ?? "").map((argument) => ({
+      value:
+        argument.in === "path"
+          ? (request.path[argument.name]?.value ?? "")
+          : argument.in === "body"
+            ? (request.body ?? {})
+            : argument.required || Object.keys(params).length > 0
+              ? params
+              : undefined,
+      required: argument.required,
+    })),
+    { value: headers && { headers }, required: false },
+  ];
 
   const result = returnsContent(operation) ? `const ${resultName(method)} = ` : "";
   const args = callArguments(slots);
@@ -77,20 +81,23 @@ interface Slot {
   required: boolean;
 }
 
-// orval moves the optional arguments after the required ones, as TypeScript
-// wants them, so an optional body follows required query parameters. An
-// optional argument the call leaves out stays `undefined` while a later one is
-// set.
+/** The client function's arguments, as `@zitadel/api` records them. */
+function argumentsOf(operationId: string): readonly ApiArgument[] {
+  const operation = operations.find((candidate) => candidate.id === operationId);
+  if (!operation) {
+    throw new Error(`${operationId} is not an operation of @zitadel/api`);
+  }
+  return operation.arguments;
+}
+
+// An optional argument the call leaves out stays `undefined` while a later one
+// is set.
 function callArguments(slots: Slot[]): unknown[] {
-  const ordered = [
-    ...slots.filter((slot) => slot.required),
-    ...slots.filter((slot) => !slot.required),
-  ];
-  let end = ordered.length;
-  while (end > 0 && ordered[end - 1]?.required === false && ordered[end - 1]?.value === undefined) {
+  let end = slots.length;
+  while (end > 0 && slots[end - 1]?.required === false && slots[end - 1]?.value === undefined) {
     end--;
   }
-  return ordered.slice(0, end).map((slot) => slot.value);
+  return slots.slice(0, end).map((slot) => slot.value);
 }
 
 /** The client method of an operation: orval camel-cases the operationId. */

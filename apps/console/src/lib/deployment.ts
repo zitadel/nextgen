@@ -36,7 +36,11 @@ export function releaseRevoked(deployment: Deployment): boolean {
   return deployment.release?.revoked_at != null;
 }
 
-/** Where a release went, newest first. */
+/**
+ * Where a release went, newest first. `GET /deployments` has no filter by
+ * release, so the project's whole history is read and filtered here; a
+ * release's own history is a handful.
+ */
 export async function listReleaseDeployments(
   projectId: string,
   releaseId: string,

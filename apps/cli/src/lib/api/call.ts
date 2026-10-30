@@ -65,6 +65,15 @@ export const send = async (
   return { status: res.status, body: sanitizeResponse(rawBody) };
 };
 
+/** The `page_token` the request already carries, which the walk starts from. */
+const startOf = (request: ApiRequest): string | undefined => {
+  if (request.operation.paging?.token === "body") {
+    const token = (request.body as { page_token?: unknown } | undefined)?.page_token;
+    return typeof token === "string" ? token : undefined;
+  }
+  return request.query.find(([name]) => name === "page_token")?.[1];
+};
+
 /** The request for the page `token` names; `undefined` leaves the request as it is. */
 const pageOf = (request: ApiRequest, token: string | undefined): ApiRequest => {
   const paging = request.operation.paging;
@@ -103,6 +112,7 @@ export const sendAll = async (
     {
       items: paging.items,
       all: true,
+      token: startOf(request),
       nextPageToken: "next_page_token",
     },
   );

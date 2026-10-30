@@ -735,30 +735,6 @@ describe("user detail", () => {
     ).toBeInTheDocument();
   });
 
-  it("counts passkeys from every page", async () => {
-    stub();
-    server.use(
-      http.get(`${USERS_URL}/${USER_ID}/passkeys`, ({ request }) =>
-        new URL(request.url).searchParams.get("page_token") === "p2"
-          ? HttpResponse.json({
-              passkeys: [{ id: "pk_2", name: "iPhone", created_at: "2026-07-02T00:00:00Z" }],
-            })
-          : HttpResponse.json({
-              passkeys: [{ id: "pk_1", name: "MacBook", created_at: "2026-07-01T00:00:00Z" }],
-              next_page_token: "p2",
-            }),
-      ),
-    );
-    await renderDetail();
-
-    await userEvent.click(await screen.findByRole("tab", { name: "Authentication" }));
-    expect(
-      within(screen.getByRole("tabpanel")).getByText(
-        `2 registered, last verified ${formatDateTime("2026-07-02T00:00:00Z")}`,
-      ),
-    ).toBeInTheDocument();
-  });
-
   it("says when no passkey is set up", async () => {
     stub({ passkeys: [] });
     await renderDetail();

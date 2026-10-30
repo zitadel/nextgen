@@ -3,7 +3,7 @@ import type { GetReleaseById200PointersItem } from "@zitadel/api/generated/model
 
 import { CommandGroups, EnvironmentCommand, type JsonEnvelope, nonBlankArg } from "../../lib/oclif";
 import { renderTable } from "../../lib/oclif/crud/table";
-import { rollbackDeployment, servesPrimary } from "../../lib/release";
+import { type ListedDeployment, rollbackDeployment, servesPrimary } from "../../lib/release";
 import { toZitadelError, ZitadelError } from "../../lib/errors";
 import { Promptable } from "../../lib/oclif/promptable";
 import { reportWarning } from "../../lib/warnings";
@@ -55,16 +55,21 @@ export default class DeploymentRollback extends Promptable(EnvironmentCommand) {
     // saw, and must make the server refuse rather than become the expected one.
     let bareGuard: string | undefined;
     if (targetId === undefined) {
-      // The prior deployment of a long-lived origin can sit beyond the
-      // server's first page, so the whole history is drained rather than the
-      // default page searched — otherwise a bare rollback would miss a target
-      // further back and refuse a rollback it should resolve.
       // A preview deployment is never the deploy a bare rollback undoes, nor
       // one it can restore: the server refuses to roll one back. Primary
       // deployments make one history for the project, newest first.
-      const history = (await client.listDeployments.all({ project_id: projectId })).filter(
-        servesPrimary,
-      );
+      //
+      // The prior primary can sit beyond the first page behind live previews,
+      // so the history is read page by page until it turns up, and no further.
+      const history: ListedDeployment[] = [];
+      for await (const deployment of client.listDeployments.items({ project_id: projectId })) {
+        if (servesPrimary(deployment)) {
+          history.push(deployment);
+        }
+        if (history.length === 2) {
+          break;
+        }
+      }
       const [latest, prior] = history;
       if (!latest) {
         throw new ZitadelError("E_VALIDATION", "There is no deployment to roll back", {

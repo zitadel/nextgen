@@ -22,7 +22,7 @@ import { paging } from "../generated/paging";
 import { setApiAuthToken } from "./auth";
 import { setProxyPath } from "./base-url";
 import { setRequestPolicy } from "./fetch";
-import { paged, type PagingShape } from "./paging";
+import { paged, type PagingShape } from "./paged";
 
 type Endpoints = typeof endpoints;
 type Paging = typeof paging;

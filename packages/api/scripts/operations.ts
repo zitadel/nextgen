@@ -75,6 +75,7 @@ function operationOf(path: string, method: string, item: PathItem, operation: Op
     auth: authentication(operation.security ?? []),
     parameters,
     body: body ? (body.required === true ? "required" : "optional") : null,
+    arguments: argumentsOf(path, parameters, body),
     paging: paging(
       parameters,
       body?.content?.["application/json"]?.schema,
@@ -82,6 +83,32 @@ function operationOf(path: string, method: string, item: PathItem, operation: Op
     ),
     cli: typeof operation["x-zitadel-cli"] === "string" ? operation["x-zitadel-cli"] : null,
   };
+}
+
+/**
+ * The client function's arguments, in the order orval writes them: path
+ * parameters in the path's order, the body, then the query parameters as one
+ * object, with every optional argument moved after the required ones, as
+ * TypeScript wants them. The request options orval adds last are left out.
+ */
+function argumentsOf(
+  path: string,
+  parameters: readonly { name: string; in: string; required: boolean }[],
+  body: { required?: boolean } | undefined,
+) {
+  const query = parameters.filter((parameter) => parameter.in === "query");
+  const slots = [
+    ...[...path.matchAll(/\{([^}]+)\}/g)].map(([, name]) => ({
+      in: "path",
+      name,
+      required: true,
+    })),
+    ...(body ? [{ in: "body", required: body.required === true }] : []),
+    ...(query.length > 0
+      ? [{ in: "query", required: query.some((parameter) => parameter.required) }]
+      : []),
+  ];
+  return [...slots.filter((slot) => slot.required), ...slots.filter((slot) => !slot.required)];
 }
 
 /** How an operation is authenticated, in the docs' vocabulary (apps/docs/lib/sdk-sample.ts). */
@@ -133,13 +160,9 @@ function properties(schema: Schema | undefined): Map<string, Schema> {
   return found;
 }
 
-/**
- * The argument of the generated function that carries `page_token`. orval
- * orders them path parameters first, then the body, then the query parameters.
- */
+/** The argument of the generated function that carries `page_token`. */
 function pagingArgument(operation: ReturnType<typeof operationOf>): number {
-  const path = operation.parameters.filter((parameter) => parameter.in === "path").length;
-  return operation.paging?.token === "body" || operation.body === null ? path : path + 1;
+  return operation.arguments.findIndex((argument) => argument.in === operation.paging?.token);
 }
 
 function pagingSource(operations: readonly ReturnType<typeof operationOf>[]): string {
@@ -173,6 +196,12 @@ export type ApiParameter = Readonly<{
   required: boolean;
 }>;
 
+/** One argument of a client function: a path parameter, the body, or the query parameters. */
+export type ApiArgument = Readonly<
+  | { in: "path"; name: string; required: true }
+  | { in: "body" | "query"; required: boolean }
+>;
+
 /** One operation of the Zitadel API, as the OpenAPI document declares it. */
 export type ApiOperation = Readonly<{
   /** The \`operationId\`, which names the client's function. */
@@ -191,6 +220,12 @@ export type ApiOperation = Readonly<{
   parameters: readonly ApiParameter[];
   /** Whether it takes a JSON body, and whether the body is required. */
   body: "required" | "optional" | null;
+  /**
+   * The client function's arguments, in orval's order: path parameters, the
+   * body and the query parameters as one object, optional ones last. The
+   * request options orval adds after them are not listed.
+   */
+  arguments: readonly ApiArgument[];
   /**
    * How it pages (ADR 027): whether its \`page_token\` goes in the query or the
    * body, and the response field that holds the page. \`null\` when it does not.

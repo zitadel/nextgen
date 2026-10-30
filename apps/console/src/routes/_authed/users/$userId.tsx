@@ -68,7 +68,10 @@ export const Route = createFileRoute("/_authed/users/$userId")({
             .then((value) => value.schema as UserSchema)
             .catch(() => undefined)
         : Promise.resolve(undefined),
-      api.listUserPasskeys.all(params.userId, { limit: 100 }).catch(() => undefined),
+      api
+        .listUserPasskeys(params.userId)
+        .then((result) => result.passkeys)
+        .catch(() => undefined),
       api.listUserIdentityLinks.all(params.userId, { limit: 100 }).catch(() => undefined),
       // `null`: the user has no password; `undefined`: it could not be read.
       api
