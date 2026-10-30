@@ -45,7 +45,7 @@ from `@zitadel/api/client`.
 | `@zitadel/api/runtime/base-url` | `setProxyPath()` / `getProxyPath()` — the low-level slot `configureZitadel()` writes; call it directly only when you manage configuration yourself |
 | `@zitadel/api/runtime/auth` | `getApiAuthToken()` and bearer plumbing; `setApiCsrfToken()` / `getApiCsrfToken()` / `setApiCsrfRejectionHandler()` for session-cookie writes (see below) |
 | `@zitadel/api/runtime/fetch` | The shared `customFetch` interceptor |
-| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all` |
+| `@zitadel/api/runtime/paging` | `pages()`, the cursor walk behind every paged function's `pages`, `items` and `all`; `nextToken()`, a page's cursor to the next one |
 
 ### CSRF token for session-cookie writes
 
