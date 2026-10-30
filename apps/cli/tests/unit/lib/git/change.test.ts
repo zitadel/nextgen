@@ -24,9 +24,9 @@ describe("Change.listedIn", () => {
   });
 
   it.each([
-    ["R100", "renamed"],
-    ["C075", "copied"],
-  ])("reads where a %s entry came from and went", (letter, status) => {
+    ["renamed", "R100"],
+    ["copied", "C075"],
+  ])("reads where a %s file came from and went", (status, letter) => {
     const [change] = Change.listedIn([`:100644 100644 1 1 ${letter}`, "old", "new"]);
 
     expect(change).toMatchObject({ path: "new", status, previousPath: "old" });

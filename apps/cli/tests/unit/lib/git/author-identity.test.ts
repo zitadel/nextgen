@@ -16,10 +16,10 @@ function gitWith(own: boolean, guess: boolean) {
 
 describe("AuthorIdentity", () => {
   it.each([
-    [true, true, "yours"],
-    [false, true, "guessed"],
-    [false, false, "fallback"],
-  ])("with its own %s and a guess %s, comes from %s", async (own, guess, source) => {
+    ["the developer's own when they have an identity", true, true, "yours"],
+    ["a guess when git can only guess one", false, true, "guessed"],
+    ["the fallback when git cannot build one at all", false, false, "fallback"],
+  ])("names %s", async (_, own, guess, source) => {
     expect((await AuthorIdentity.of(gitWith(own, guess))).source).toBe(source);
   });
 });

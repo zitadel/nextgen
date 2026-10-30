@@ -116,17 +116,19 @@ function lines(stdout: string, separator: string): string[] {
 }
 
 /**
- * Keeps the developer's own git setup out of a test that runs the module on
- * real git: no global or system config, ignore or attributes (a global hook, `diff.renames=false`)
- * and no inherited repository, identity or editor, as a git hook running the
- * suite would set. Call it in `beforeEach`.
+ * Keeps the developer's own git setup out of a test that runs the module on real git. Call it in `beforeEach`.
+ *
+ * - No global or system config (a global hook, `diff.renames=false`).
+ * - No global ignore or attributes file, which git finds under `XDG_CONFIG_HOME`.
+ * - No repository above the temp directory, which on some runners sits inside
+ *   a checkout and would make a scratch directory part of it.
+ * - No inherited repository, index, identity or editor, as a git hook running
+ *   the suite would set.
  */
 export function isolateGit(): void {
   vi.stubEnv("GIT_CONFIG_GLOBAL", "/dev/null");
   vi.stubEnv("GIT_CONFIG_NOSYSTEM", "1");
-  // Scratch directories are in no repository even where the temp directory sits in a checkout.
   vi.stubEnv("GIT_CEILING_DIRECTORIES", tmpdir());
-  // Where git also finds a global ignore and attributes file.
   vi.stubEnv("XDG_CONFIG_HOME", "/dev/null");
   for (const name of [
     "GIT_DIR",

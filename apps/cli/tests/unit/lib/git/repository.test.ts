@@ -247,16 +247,17 @@ describe("Repository.commitAll", () => {
     expect(await stagedFiles(root)).toEqual(["apps/api/b.txt"]);
   });
 
-  it.each([
-    ["HEAD is detached", "detached"],
-    ["a rebase is under way", "rebase"],
-  ])("commits nothing when %s", async (_, how) => {
+  it("commits nothing when HEAD is detached", async () => {
     const cwd = await twoCommits();
-    if (how === "detached") {
-      await git(cwd, "checkout", "--quiet", "--detach");
-    } else {
-      await git(cwd, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-i", "HEAD~1");
-    }
+    await git(cwd, "checkout", "--quiet", "--detach");
+    await write(cwd, { "c.txt": "c\n" });
+
+    expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
+  });
+
+  it("commits nothing when a rebase is under way", async () => {
+    const cwd = await twoCommits();
+    await git(cwd, "-c", "sequence.editor=sed -i.bak s/^pick/edit/", "rebase", "-i", "HEAD~1");
     await write(cwd, { "c.txt": "c\n" });
 
     expect(await (await open(cwd)).commitAll("m", OPTIONS)).toMatchObject({ committed: false });
@@ -341,9 +342,8 @@ describe("Repository.diffSince", () => {
     expect(await stagedFiles(cwd)).toEqual([]);
   });
 
-  it("sees an edit made in the same instant the index was written", async () => {
+  it("sees an edit made in the same instant the index was written, by modification time alone", async () => {
     const { cwd, sha } = await base();
-    // Only modification times count, so a second passing between steps cannot hide the edit.
     await git(cwd, "config", "core.checkStat", "minimal");
     const file = join(cwd, ".zitadel/schemas/a.json");
     const instant = new Date("2026-01-01T00:00:00Z");
@@ -391,16 +391,20 @@ describe("Repository.diffSince", () => {
     expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).not.toContain("EXTERNAL");
   });
 
-  it.each([
-    [true, true],
-    [false, false],
-  ])("with colour %s is coloured: %s", async (color, coloured) => {
+  it("colours the diff when asked", async () => {
     const { cwd, sha } = await base();
     await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
 
-    const diff = await (await open(cwd)).diffSince(sha, [".zitadel/"], { color });
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], { color: true })).toContain(
+      "\u001b[",
+    );
+  });
 
-    expect(diff?.includes("\u001b[")).toBe(coloured);
+  it("leaves the diff uncoloured otherwise", async () => {
+    const { cwd, sha } = await base();
+    await write(cwd, { ".zitadel/schemas/a.json": "[]\n" });
+
+    expect(await (await open(cwd)).diffSince(sha, [".zitadel/"], {})).not.toContain("\u001b[");
   });
 
   it("shows a submodule as the developer configured", async () => {

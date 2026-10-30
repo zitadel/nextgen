@@ -22,15 +22,16 @@ describe("UncommittedFiles", () => {
     ]);
   });
 
-  it.each(["R  new\0old\0", " R new\0old\0", "C  new\0old\0"])(
-    "skips where %j came from, and only that",
-    async (entry) => {
-      expect(await listed("", `${entry}?? b.txt\0`)).toEqual([
-        { path: "new", untracked: false },
-        { path: "b.txt", untracked: true },
-      ]);
-    },
-  );
+  it.each([
+    ["a staged rename", "R  new\0old\0"],
+    ["a rename in the working tree", " R new\0old\0"],
+    ["a staged copy", "C  new\0old\0"],
+  ])("skips where %s came from, and only that", async (_, entry) => {
+    expect(await listed("", `${entry}?? b.txt\0`)).toEqual([
+      { path: "new", untracked: false },
+      { path: "b.txt", untracked: true },
+    ]);
+  });
 
   it("lists nothing in a clean directory", async () => {
     expect(await listed("", "")).toEqual([]);

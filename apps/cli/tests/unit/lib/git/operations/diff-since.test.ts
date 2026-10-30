@@ -51,10 +51,10 @@ describe("DiffSince", () => {
   });
 
   it.each([
-    [{ color: true }, "--color=always"],
-    [{ color: false }, "--no-color"],
-    [{}, "--no-color"],
-  ])("with %j diffs with %s", async (options, flag) => {
+    ["colour", { color: true }, "--color=always"],
+    ["no colour", { color: false }, "--no-color"],
+    ["nothing about colour", {}, "--no-color"],
+  ])("diffs with the right colour flag when asked for %s", async (_, options, flag) => {
     const calls: string[][] = [];
 
     await new DiffSince(SHA, ["."], options).run(gitDiffing("", calls));

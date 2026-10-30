@@ -4,10 +4,11 @@ import { IsDirty } from "../../../../../src/lib/git/operations/is-dirty";
 import { fakeGit } from "../../../../helpers/git-repo";
 
 describe("IsDirty", () => {
-  it.each([
-    ["", false],
-    [" M a.txt\n", true],
-  ])("with status %j is %s", async (stdout, dirty) => {
-    expect(await new IsDirty().run(fakeGit(() => ({ stdout })))).toBe(dirty);
+  it("is clean when status lists nothing", async () => {
+    expect(await new IsDirty().run(fakeGit(() => ({ stdout: "" })))).toBe(false);
+  });
+
+  it("is dirty when status lists a change", async () => {
+    expect(await new IsDirty().run(fakeGit(() => ({ stdout: " M a.txt\n" })))).toBe(true);
   });
 });
