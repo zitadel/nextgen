@@ -8,7 +8,7 @@ import { APPLE, GITHUB, GOOGLE, primary, providers } from "./atoms";
 // place it, some over a picture of their own, drawn here rather than
 // photographed: a wide desktop sign-in card, a split screen beside a travel
 // picture, a dialog over a dashboard whose session ran out, a landing page's
-// sign-up, a phone app, a photo wall. The apps, their names and their content
+// sign-up, a phone app, a store's checkout. The apps, their names and their content
 // are invented; everything paints with the --zl-* properties of the app's
 // brand, so the login and its app read as one product.
 
@@ -776,118 +776,152 @@ export function PhoneApp() {
   );
 }
 
-// The photo wall's tiles: colours of dusk, sea, forest and city lights, and
-// heights that never line up across columns.
-const TILES = [
-  ["#f97316", "#7c2d12"],
-  ["#0ea5e9", "#0c4a6e"],
-  ["#22c55e", "#14532d"],
-  ["#e879f9", "#581c87"],
-  ["#facc15", "#78350f"],
-  ["#38bdf8", "#1e1b4b"],
-  ["#fb7185", "#4c0519"],
-  ["#a3e635", "#1a2e05"],
+// The shop's order: what is in the bag, drawn as simple product shots.
+const ORDER = [
+  { name: "Wool overshirt", detail: "Charcoal · M", price: "CHF 129.00", tone: "#3f3f46" },
+  { name: "Canvas tote", detail: "Natural", price: "CHF 39.00", tone: "#d6cbb5" },
+  { name: "Merino beanie", detail: "Rust", price: "CHF 29.00", tone: "#b45534" },
 ];
-const HEIGHTS = [260, 340, 220, 300, 380, 240, 320, 280];
 
-/** A photo community's sign-up, over the wall of photos it opens onto. */
-export function PhotoWall() {
-  const columns = 7;
+const STEPS = ["Bag", "Sign in", "Shipping", "Payment"];
+
+/** A store's checkout: the steps along the top, the login where the order goes on, the bag beside it. */
+export function Checkout() {
   return (
     <Frame>
-      <div
+      <header
         style={{
-          position: "absolute",
-          inset: "-40px -20px",
-          display: "grid",
-          gridTemplateColumns: `repeat(${columns}, 1fr)`,
-          gap: 16,
+          height: 104,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 120px",
+          borderBottom: `1px solid ${faint(10)}`,
         }}
       >
-        {Array.from({ length: columns }, (_, column) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: a fixed grid, never reordered
-            key={column}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-              marginTop: (column % 3) * -70,
-            }}
-          >
-            {Array.from({ length: 6 }, (_, row) => {
-              const at = (column * 3 + row * 5) % TILES.length;
-              const [light, dark] = TILES[at] ?? ["#888", "#222"];
-              return (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a fixed grid, never reordered
-                  key={row}
-                  style={{
-                    height: HEIGHTS[(column + row * 3) % HEIGHTS.length],
-                    borderRadius: 18,
-                    background: `radial-gradient(120% 90% at ${20 + ((row * 37) % 60)}% 20%, ${light}, ${dark})`,
-                  }}
-                />
-              );
-            })}
-          </div>
+        <span style={{ ...heading, fontSize: 34, letterSpacing: 6 }}>ATELIER NORD</span>
+        <span style={{ fontSize: 18, color: faint(60) }}>Secure checkout</span>
+      </header>
+      <div style={{ display: "flex", justifyContent: "center", gap: 18, padding: "40px 0 0" }}>
+        {STEPS.map((step, index) => (
+          <span key={step} style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 19 }}>
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                color: index <= 1 ? "var(--zl-foreground)" : faint(45),
+                fontWeight: index === 1 ? 600 : 400,
+              }}
+            >
+              <span
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: 15,
+                  background: index <= 1 ? "var(--zl-primary)" : faint(8),
+                  color: index <= 1 ? "var(--zl-primary-foreground)" : faint(50),
+                }}
+              >
+                {index === 0 ? "✓" : index + 1}
+              </span>
+              {step}
+            </span>
+            {index < STEPS.length - 1 && (
+              <span style={{ width: 64, height: 1, background: faint(index < 1 ? 50 : 15) }} />
+            )}
+          </span>
         ))}
       </div>
       <div
         style={{
-          position: "absolute",
-          inset: 0,
-          background: "radial-gradient(45% 60% at 50% 52%, rgb(0 0 0 / 0.82), rgb(0 0 0 / 0.35))",
-        }}
-      />
-      <header
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 96,
-          display: "flex",
-          alignItems: "center",
-          gap: 48,
-          padding: "0 64px",
-          background: "rgb(0 0 0 / 0.55)",
-          color: "#fff",
-          fontSize: 20,
+          display: "grid",
+          gridTemplateColumns: "1fr 620px",
+          gap: 96,
+          padding: "72px 120px 0",
+          alignItems: "start",
         }}
       >
-        <Logo name="Lumora" size={38} />
-        {["Explore", "Collections", "Studio"].map((link) => (
-          <span key={link} style={{ opacity: 0.75 }}>
-            {link}
-          </span>
-        ))}
-        <span style={{ marginLeft: "auto" }}>Log in</span>
-      </header>
-      <div
-        style={{ position: "absolute", inset: 0, top: 96, display: "grid", placeItems: "center" }}
-      >
-        <Large scale={1.3}>
-          <Card
-            title="Join Lumora"
-            subtitle="Share your best shots with two million photographers"
-            fields={
-              <zl-field
-                label="Email"
-                type="email"
-                placeholder="you@example.com"
-                autocomplete="off"
+        {/* Room above for the card's scale, which grows it from its centre. */}
+        <div style={{ display: "grid", placeItems: "center", paddingTop: 130 }}>
+          <Large scale={1.4}>
+            <Card
+              title="Sign in to check out"
+              subtitle="We'll keep your order and your address"
+              fields={
+                <zl-field
+                  label="Email"
+                  type="email"
+                  placeholder="you@example.com"
+                  autocomplete="off"
+                />
+              }
+              actions={
+                <>
+                  {primary("Continue")}
+                  {providers([GOOGLE, APPLE])}
+                  <zl-button hierarchy="text" type="button" label="Continue as guest" block />
+                </>
+              }
+            />
+          </Large>
+        </div>
+        <aside
+          style={{
+            padding: 40,
+            borderRadius: "var(--zl-radius-xl)",
+            background: faint(3),
+            border: `1px solid ${faint(8)}`,
+            display: "flex",
+            flexDirection: "column",
+            gap: 28,
+          }}
+        >
+          <h3 style={{ ...heading, fontSize: 30, fontWeight: 500 }}>Your bag</h3>
+          {ORDER.map(({ name, detail, price, tone }) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", gap: 24 }}>
+              <div
+                style={{
+                  width: 96,
+                  height: 112,
+                  borderRadius: "var(--zl-radius-md)",
+                  background: `linear-gradient(160deg, ${tone}, color-mix(in srgb, ${tone} 70%, #000))`,
+                }}
               />
-            }
-            actions={
-              <>
-                {primary("Sign up")}
-                {providers([GOOGLE, APPLE])}
-              </>
-            }
-            nav={SIGN_IN}
-          />
-        </Large>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 22, fontWeight: 600 }}>{name}</div>
+                <div style={{ fontSize: 18, color: faint(55), marginTop: 6 }}>{detail}</div>
+              </div>
+              <div style={{ fontSize: 20 }}>{price}</div>
+            </div>
+          ))}
+          <div style={{ height: 1, background: faint(10) }} />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 20,
+              color: faint(65),
+            }}
+          >
+            <span>Shipping</span>
+            <span>Free</span>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 26,
+              fontWeight: 600,
+            }}
+          >
+            <span>Total</span>
+            <span>CHF 197.00</span>
+          </div>
+        </aside>
       </div>
     </Frame>
   );

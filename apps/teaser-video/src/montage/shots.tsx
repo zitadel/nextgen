@@ -8,8 +8,8 @@ import {
   BankSignIn,
   DashboardSession,
   LandingSignUp,
+  Checkout,
   PhoneApp,
-  PhotoWall,
   TravelSplit,
 } from "./app-scenes";
 import { AvatarShot } from "./avatar-shot";
@@ -293,7 +293,7 @@ const IN_APPS: ShotSpec[] = (
     [DashboardSession, { theme: "dark", color: COLORS.orange, corners: "sharp", headings: "mono" }],
     [LandingSignUp, { theme: "light", color: COLORS.green, corners: "sharp", headings: "serif" }],
     [PhoneApp, { theme: "light", color: COLORS.purple, corners: "round", headings: "sans" }],
-    [PhotoWall, { theme: "dark", color: COLORS.green, corners: "round", headings: "mono" }],
+    [Checkout, { theme: "light", corners: "soft", headings: "serif" }],
   ] as const
 ).map(([App, brand], index, apps) => ({
   beats: 1,

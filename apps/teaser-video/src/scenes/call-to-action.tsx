@@ -49,6 +49,11 @@ const AGENTS: { name: string; icon?: SimpleIcon }[] = [
   { name: "Codex" },
 ];
 
+/** The space between each row of marks and the words, the same above and below. */
+const ROW_GAP = 150;
+/** Both rows of marks take the same height, so the gaps measure alike. */
+const ROW: CSSProperties = { display: "flex", alignItems: "center", height: 56 };
+
 const FONT = "Arimo, system-ui, sans-serif";
 const MONO = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace';
 
@@ -82,41 +87,33 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
   const promise = focusIn(frame, 14, 26);
   const command = focusIn(frame, 24, 24);
   return (
-    <div style={{ position: "absolute", width: WIDTH, height: HEIGHT, color: "#fafafa" }}>
-      <div
-        style={{
-          position: "absolute",
-          top: 160,
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 30,
-        }}
-      >
-        <div style={{ display: "flex", gap: 64 }}>
-          {FRAMEWORKS.map((icon, index) => (
-            <span
-              key={icon.slug}
-              style={{ display: "flex", ...focused(focusIn(frame, 10 + index * 4), leave) }}
-            >
-              <Mark icon={icon} size={52} />
-            </span>
-          ))}
-        </div>
+    // One column, so the two rows of marks sit the same distance above and
+    // below the words, and the whole stays centred on the frame.
+    <div
+      style={{
+        position: "absolute",
+        width: WIDTH,
+        height: HEIGHT,
+        color: "#fafafa",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: ROW_GAP,
+      }}
+    >
+      <div style={{ ...ROW, gap: 64 }}>
+        {FRAMEWORKS.map((icon, index) => (
+          <span
+            key={icon.slug}
+            style={{ display: "flex", ...focused(focusIn(frame, 10 + index * 4), leave) }}
+          >
+            <Mark icon={icon} size={52} />
+          </span>
+        ))}
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 64,
-        }}
-      >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 64 }}>
         <div
           style={{
             display: "flex",
@@ -163,33 +160,21 @@ export function CallToAction({ frame, leave }: { frame: number; leave: number })
         </span>
       </div>
 
-      <div
-        style={{
-          position: "absolute",
-          bottom: 140,
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 30,
-        }}
-      >
-        <div style={{ display: "flex", gap: 72, fontFamily: FONT, fontSize: 30, fontWeight: 500 }}>
-          {AGENTS.map(({ name, icon }, index) => (
-            <span
-              key={name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                ...focused(focusIn(frame, 28 + index * 6), leave),
-              }}
-            >
-              {icon && <Mark icon={icon} size={40} />}
-              {name}
-            </span>
-          ))}
-        </div>
+      <div style={{ ...ROW, gap: 72, fontFamily: FONT, fontSize: 30, fontWeight: 500 }}>
+        {AGENTS.map(({ name, icon }, index) => (
+          <span
+            key={name}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              ...focused(focusIn(frame, 28 + index * 6), leave),
+            }}
+          >
+            {icon && <Mark icon={icon} size={40} />}
+            {name}
+          </span>
+        ))}
       </div>
     </div>
   );
