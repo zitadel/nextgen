@@ -137,27 +137,6 @@ export function userFilter(search: UsersSearch, latest: string | undefined): Use
 }
 
 /**
- * One page of a team's members: the project's users holding an active
- * membership in it (`team_id`, ADR 024). The filter reads memberships, so it
- * needs `team_membership.read` like `expand: ["teams"]` does, and is refused
- * the same way to a grant on only part of the project.
- */
-export function fetchTeamMembers(
-  projectId: string,
-  teamId: string,
-  pageToken?: string,
-): Promise<UsersPage> {
-  return api.queryUsers(
-    {
-      limit: PAGE_SIZE,
-      page_token: pageToken,
-      filter: [{ field: "team_id", operation: "equals", value: teamId }],
-    },
-    { project_id: projectId },
-  );
-}
-
-/**
  * The properties one schema gives the users that reference it: what the
  * Columns menu offers to pin, grouped under the schema it belongs to.
  */

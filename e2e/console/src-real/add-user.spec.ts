@@ -129,14 +129,16 @@ test("surfaces the API's own message when the email is already taken", async ({
   await drawer.getByLabel("Email").fill(existing.email);
   await drawer.getByRole("button", { name: "Add user", exact: true }).click();
 
-  const alert = drawer.getByRole("alert");
+  // The form's error, not the line under the field, which is an alert too.
+  const alert = drawer.getByRole("alert").filter({ hasText: "already exists" });
   await expect(alert).toBeVisible();
   // ADR 030 makes the payload's `message` the human-facing string; the transport
   // string ("POST /users returned 409") must never reach an operator.
-  await expect(alert).toContainText("already exists");
-  // The server names the taken field.
-  await expect(alert).toContainText("(email)");
   await expect(alert).not.toContainText("returned 409");
+  // The server names the taken field, and the drawer marks it there.
+  const email = drawer.getByLabel("Email");
+  await expect(email).toHaveAttribute("aria-invalid", "true");
+  await expect(email).toHaveAccessibleDescription("Another user already has this value.");
   // The drawer stays open so the value can be corrected.
   await expect(drawer).toBeVisible();
 });
