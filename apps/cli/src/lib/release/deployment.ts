@@ -56,10 +56,12 @@ export async function listLiveDeployments(
 /**
  * Whether a deployment serves a primary origin. A preview deployment's targets
  * carry an expiry; it is never the baseline, the guard or the thing a bare
- * rollback undoes.
+ * rollback undoes. Neither is one that reaches only the default target.
  */
 export function servesPrimary(deployment: Pick<ListedDeployment, "targets">): boolean {
-  return deployment.targets.some((target) => target.expires_at == null);
+  return deployment.targets.some(
+    (target) => target.expires_at == null && target.origin !== "default",
+  );
 }
 
 /** What target a deploy goes to: every primary origin, or one exact origin. */

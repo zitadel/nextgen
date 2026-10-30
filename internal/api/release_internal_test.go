@@ -140,11 +140,13 @@ func TestReleaseErrorResponseConflicts(t *testing.T) {
 func TestReleaseInUseResponseCarriesOrigins(t *testing.T) {
 	resp, ok := releaseInUseResponse(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{Origins: []domain.ReleaseInUseOrigin{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_2"},
 	}}))
 	require.True(t, ok)
 	assert.Equal(t, api.ErrorCode(domain.ErrReleaseInUse(domain.ReleaseInUseDetails{}).Code), resp.Code)
 	assert.Equal(t, []api.RevokeReleaseConflictDetailsOriginsItem{
 		{Origin: "https://app.acme.com", DeploymentID: "dep_1"},
+		{Origin: "default", DeploymentID: "dep_2"},
 	}, resp.Details.Origins)
 }
 

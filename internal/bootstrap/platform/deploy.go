@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,10 +28,9 @@ const maxBuildAttempts = 3
 // project: the configuration this server ships (the platform user schema, the
 // default login flows and the recommended password policy) is built into one
 // release and deployed to consoleOrigin, the project's one primary origin, and
-// to the default target, which serves a console origin the project does not
-// list and a caller with no origin. It runs on every start, so an upgrade's defaults go live. A start that changes
-// nothing deploys nothing, and a server built before the one that made the live
-// deployment leaves it alone.
+// to the default target. It runs on every start, so an upgrade's defaults go
+// live. A start that changes nothing deploys nothing, and a server built before
+// the one that made the live deployment leaves it alone.
 func EnsureDeployed(
 	ctx context.Context,
 	builtinBase string,
@@ -106,7 +106,8 @@ func buildRelease(ctx context.Context, releases service.ReleaseService, bundle s
 // no date, such as a development one, always deploys.
 func deployedByNewerBuild(live []*domain.Deployment, builtAt time.Time) bool {
 	for _, deployment := range live {
-		if deployment.OriginKind != domain.DeploymentOriginKindPrimary {
+		if deployment.OriginKind != domain.DeploymentOriginKindPrimary ||
+			slices.Equal(deployment.Origins(), []string{domain.DefaultTargetOrigin}) {
 			continue
 		}
 		if deployment.Metadata.Message == nil || builtAt.IsZero() {

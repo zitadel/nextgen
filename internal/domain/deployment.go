@@ -138,6 +138,15 @@ func (d *Deployment) Origins() []string {
 	return origins
 }
 
+// DeploymentTargetName is how an origin reads outside storage: the origin
+// itself, or the keyword for the default target.
+func DeploymentTargetName(origin string) string {
+	if origin == DefaultTargetOrigin {
+		return DeploymentTargetDefault
+	}
+	return origin
+}
+
 // OriginDeployment is one deployment to one origin. Seq counts the
 // deployments to the origin; the newest has the highest.
 type OriginDeployment struct {
@@ -171,8 +180,8 @@ func SamePrimaryRelease(candidate, current *Deployment) bool {
 		current.ReleaseID == candidate.ReleaseID && slices.Equal(current.Origins(), candidate.Origins())
 }
 
-// DeploymentsEqual reports whether candidate repeats current, the project's
-// newest primary deployment: the same release, the same origins, and the same
+// DeploymentsEqual reports whether candidate repeats current, the newest
+// deployment to its origins: the same release, the same origins, and the same
 // frozen variable set, so writing it would change nothing. A deployment to
 // preview URLs never equals one, since writing it renews its previews.
 func DeploymentsEqual(candidate, current *Deployment, candidateSetHash, currentSetHash string) bool {

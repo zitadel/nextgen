@@ -281,9 +281,13 @@ func DeploymentPayloadSnapshot(dep *Deployment) DeploymentPayload {
 	if dep == nil {
 		return DeploymentPayload{}
 	}
+	targets := make([]string, len(dep.Targets))
+	for i, target := range dep.Targets {
+		targets[i] = DeploymentTargetName(target.Origin)
+	}
 	payload := DeploymentPayload{
 		ReleaseID: dep.ReleaseID,
-		Targets:   dep.Origins(),
+		Targets:   targets,
 		Reason:    dep.Metadata.Reason.String(),
 	}
 	if dep.Metadata.Message != nil {

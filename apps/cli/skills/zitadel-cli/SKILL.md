@@ -96,7 +96,7 @@ nothing; `data.skills` and `data.directories` say what it added where.
   the server is never read from `zitadel.json`. `zitadel env` shows what resolved and where
   each value came from; `zitadel env add <name>` binds another environment to a
   project. The project it creates has never had a release, so the environment
-  serves the server's own defaults until something is deployed to it: run the
+  refuses sign-in until something is deployed to it: run the
   `deploy` the result's `next_commands` names, against the file it wrote
   (`--env-file .env.<name>.local`). A person at a terminal is asked whether to
   deploy there and then; your runs never are, so they never deploy — run that

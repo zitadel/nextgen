@@ -21747,7 +21747,7 @@ func (s *DeploymentCreatedEventDelegationType) UnmarshalText(data []byte) error 
 // Ref: #
 type DeploymentCreatedPayload struct {
 	ReleaseID OptString `json:"release_id"`
-	// The origins the release went live on, sorted.
+	// The origins the release went live on, sorted; `default` is the default target.
 	Targets    []string  `json:"targets"`
 	Reason     OptString `json:"reason"`
 	Message    OptString `json:"message"`
@@ -51609,6 +51609,52 @@ func (o OptDeploymentReason) Or(d DeploymentReason) DeploymentReason {
 	return d
 }
 
+// NewOptDeploymentTargetOrigin returns new OptDeploymentTargetOrigin with value set to v.
+func NewOptDeploymentTargetOrigin(v DeploymentTargetOrigin) OptDeploymentTargetOrigin {
+	return OptDeploymentTargetOrigin{
+		Value: v,
+		Set:   true,
+	}
+}
+
+// OptDeploymentTargetOrigin is optional DeploymentTargetOrigin.
+type OptDeploymentTargetOrigin struct {
+	Value DeploymentTargetOrigin
+	Set   bool
+}
+
+// IsSet returns true if OptDeploymentTargetOrigin was set.
+func (o OptDeploymentTargetOrigin) IsSet() bool { return o.Set }
+
+// Reset unsets value.
+func (o *OptDeploymentTargetOrigin) Reset() {
+	var v DeploymentTargetOrigin
+	o.Value = v
+	o.Set = false
+}
+
+// SetTo sets value to v.
+func (o *OptDeploymentTargetOrigin) SetTo(v DeploymentTargetOrigin) {
+	o.Set = true
+	o.Value = v
+}
+
+// Get returns value and boolean that denotes whether value was set.
+func (o OptDeploymentTargetOrigin) Get() (v DeploymentTargetOrigin, ok bool) {
+	if !o.Set {
+		return v, false
+	}
+	return o.Value, true
+}
+
+// Or returns value if set, or given parameter if does not.
+func (o OptDeploymentTargetOrigin) Or(d DeploymentTargetOrigin) DeploymentTargetOrigin {
+	if v, ok := o.Get(); ok {
+		return v
+	}
+	return d
+}
+
 // NewOptDuration returns new OptDuration with value set to v.
 func NewOptDuration(v ogenx.ISODuration) OptDuration {
 	return OptDuration{
@@ -59661,52 +59707,6 @@ func (o OptNotImplementedDetails) Get() (v NotImplementedDetails, ok bool) {
 
 // Or returns value if set, or given parameter if does not.
 func (o OptNotImplementedDetails) Or(d NotImplementedDetails) NotImplementedDetails {
-	if v, ok := o.Get(); ok {
-		return v
-	}
-	return d
-}
-
-// NewOptOrigin returns new OptOrigin with value set to v.
-func NewOptOrigin(v Origin) OptOrigin {
-	return OptOrigin{
-		Value: v,
-		Set:   true,
-	}
-}
-
-// OptOrigin is optional Origin.
-type OptOrigin struct {
-	Value Origin
-	Set   bool
-}
-
-// IsSet returns true if OptOrigin was set.
-func (o OptOrigin) IsSet() bool { return o.Set }
-
-// Reset unsets value.
-func (o *OptOrigin) Reset() {
-	var v Origin
-	o.Value = v
-	o.Set = false
-}
-
-// SetTo sets value to v.
-func (o *OptOrigin) SetTo(v Origin) {
-	o.Set = true
-	o.Value = v
-}
-
-// Get returns value and boolean that denotes whether value was set.
-func (o OptOrigin) Get() (v Origin, ok bool) {
-	if !o.Set {
-		return v, false
-	}
-	return o.Value, true
-}
-
-// Or returns value if set, or given parameter if does not.
-func (o OptOrigin) Or(d Origin) Origin {
 	if v, ok := o.Get(); ok {
 		return v
 	}
@@ -81184,13 +81184,13 @@ func (s *RevokeReleaseConflictDetails) SetOrigins(val []RevokeReleaseConflictDet
 }
 
 type RevokeReleaseConflictDetailsOriginsItem struct {
-	Origin Origin `json:"origin"`
+	Origin DeploymentTargetOrigin `json:"origin"`
 	// The newest deployment to the origin, which pins the release.
 	DeploymentID DeploymentID `json:"deployment_id"`
 }
 
 // GetOrigin returns the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() Origin {
+func (s *RevokeReleaseConflictDetailsOriginsItem) GetOrigin() DeploymentTargetOrigin {
 	return s.Origin
 }
 
@@ -81200,7 +81200,7 @@ func (s *RevokeReleaseConflictDetailsOriginsItem) GetDeploymentID() DeploymentID
 }
 
 // SetOrigin sets the value of Origin.
-func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val Origin) {
+func (s *RevokeReleaseConflictDetailsOriginsItem) SetOrigin(val DeploymentTargetOrigin) {
 	s.Origin = val
 }
 

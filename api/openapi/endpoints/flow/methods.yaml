@@ -18,10 +18,10 @@ post:
     answers `403` with `proj.preview_not_live`; nothing deployed to a listed
     origin, a loopback origin, or a live preview answers `409` with
     `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
-    A request with no `Origin`, and one from the server's own origin when the
-    project does not list that host, is served the `default` target. No
-    default deployment answers `409` with `rel.no_default`. A step submitted
-    from the server's own origin is still refused unless the project lists it.
+    A request with no `Origin`, and one from a console origin the project does
+    not list, is served the `default` target. No default deployment answers
+    `409` with `rel.no_default`. A step submitted from a console origin is
+    still refused unless the project lists it.
 
     The response contains an `id` field — the flow handle. Use it as the path
     parameter for all subsequent `/flow/{id}/submit` calls.

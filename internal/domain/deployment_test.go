@@ -252,3 +252,10 @@ func TestResolvePreviewTTL(t *testing.T) {
 	_, err = ResolvePreviewTTL(new(MaxPreviewTTL + time.Second))
 	assert.ErrorContains(t, err, "at most 365 days")
 }
+
+func TestDeploymentPayloadSnapshotNamesTheDefaultTarget(t *testing.T) {
+	t.Parallel()
+
+	deployment := &Deployment{Targets: []DeploymentTarget{{Origin: DefaultTargetOrigin}, {Origin: "https://app.acme.com"}}}
+	assert.Equal(t, []string{"default", "https://app.acme.com"}, DeploymentPayloadSnapshot(deployment).Targets)
+}

@@ -161,6 +161,9 @@ func (h *Handler) ListDeployments(ctx context.Context, params api.ListDeployment
 		Limit:           int(params.Limit.Value),
 	}
 	if origin, ok := params.Origin.Get(); ok {
+		if origin == domain.DeploymentTargetDefault {
+			origin = domain.DefaultTargetOrigin
+		}
 		input.Origin = new(string(origin))
 	}
 	result, err := h.deploymentService.List(ctx, input)
@@ -291,10 +294,7 @@ func deploymentErrorResponse(err domain.Error) *api.ErrorDetailsStatusCode {
 // toAPIDeploymentTargetOrigin maps the stored origin to the wire token. The
 // default target is the empty string in storage and `default` on the wire.
 func toAPIDeploymentTargetOrigin(origin string) api.DeploymentTargetOrigin {
-	if origin == domain.DefaultTargetOrigin {
-		return api.DeploymentTargetOrigin(domain.DeploymentTargetDefault)
-	}
-	return api.DeploymentTargetOrigin(origin)
+	return api.DeploymentTargetOrigin(domain.DeploymentTargetName(origin))
 }
 
 func toAPIDeploymentStatus(live bool) api.DeploymentStatus {

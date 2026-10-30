@@ -117,6 +117,9 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
     );
   }
   const backendUrl = devBackendUrl(mode);
+  // `console:dev-claim` signs in to the platform project, which serves only the
+  // server's own origin; a browser's dev-server origin has nothing deployed.
+  const forwardedOrigin = process.env.CONSOLE_PROXY_ORIGIN;
 
   // Anchor the context to a path segment so a similarly-prefixed path (e.g.
   // `/api2/...`) is not accidentally proxied and rewritten.
@@ -142,6 +145,9 @@ function devApiProxy(mode: string): Record<string, ProxyOptions> {
       // the server was asked.
       configure: (proxy) => {
         proxy.on("proxyReq", (proxyReq) => {
+          if (forwardedOrigin && proxyReq.getHeader("origin")) {
+            proxyReq.setHeader("origin", forwardedOrigin);
+          }
           if (process.env.CONSOLE_DEV_PROXY_LOG) {
             console.log(`[console-proxy] ${proxyReq.method} ${proxyReq.path}`);
           }

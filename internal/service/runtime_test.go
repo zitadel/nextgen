@@ -163,8 +163,6 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
-			Return([]domain.OriginDeployment{}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
 			Return([]domain.OriginDeployment{{
 				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
@@ -191,16 +189,14 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 		statements := servicemocks.NewMockAllStatements(ctrl)
 		pool.EXPECT().Statements().Return(statements).AnyTimes()
 		releases := servicemocks.NewMockReleaseService(ctrl)
-		alias := "https://cloud-preview.vercel.app"
-		resolver := service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin, alias)
+		alias := "https://console-abc123.example.com"
+		resolver := service.NewRuntimeResolver(service.NewPool(pool), releases, ownOrigin, " HTTPS://Console-ABC123.example.com ")
 		statements.EXPECT().GetProjectByID(gomock.Any(), projectID).Return(&domain.Project{
 			ID: projectID,
 			Origins: []domain.Origin{
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{alias}).
-			Return([]domain.OriginDeployment{}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
 			Return([]domain.OriginDeployment{{
 				Origin: domain.DefaultTargetOrigin, DeploymentID: "dep_default", ReleaseID: "rel_default", DeployedAt: time.Now(),
@@ -226,8 +222,6 @@ func TestRuntimeResolver_Resolve(t *testing.T) {
 				{Pattern: origin, Kind: domain.OriginKindPrimary},
 			},
 		}, nil)
-		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{ownOrigin}).
-			Return([]domain.OriginDeployment{}, nil)
 		statements.EXPECT().GetNewestPerOrigin(gomock.Any(), projectID, []string{domain.DefaultTargetOrigin}).
 			Return([]domain.OriginDeployment{}, nil)
 

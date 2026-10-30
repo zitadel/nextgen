@@ -1313,9 +1313,9 @@ func (s *Server) handleCreateBrandingRequest(args [0]string, argsEscaped bool, w
 // variable values for its kind, with no fallback between primary and
 // preview values. A deployment that names `default` freezes the primary
 // values.
-// A deployment to `primary` changes nothing when the project's newest
-// primary deployment has the same release and frozen values and covers
-// exactly the current primary origins: the call answers `200` with that
+// A deployment to `primary` or `default` changes nothing when the newest
+// deployment to its targets has the same release and frozen values and
+// covers exactly those targets: the call answers `200` with that
 // deployment. Any other request writes a new deployment and answers `201`;
 // for preview URLs that record renews their previews.
 // Failures:
@@ -1566,10 +1566,10 @@ func (s *Server) handleCreateDeploymentRequest(args [0]string, argsEscaped bool,
 // answers `403` with `proj.preview_not_live`; nothing deployed to a listed
 // origin, a loopback origin, or a live preview answers `409` with
 // `rel.not_deployed`; a revoked release answers `409` with `rel.revoked`.
-// A request with no `Origin`, and one from the server's own origin when the
-// project does not list that host, is served the `default` target. No
-// default deployment answers `409` with `rel.no_default`. A step submitted
-// from the server's own origin is still refused unless the project lists it.
+// A request with no `Origin`, and one from a console origin the project does
+// not list, is served the `default` target. No default deployment answers
+// `409` with `rel.no_default`. A step submitted from a console origin is
+// still refused unless the project lists it.
 // The response contains an `id` field — the flow handle. Use it as the path
 // parameter for all subsequent `/flow/{id}/submit` calls.
 // The response also sets an encrypted `HttpOnly` cookie (`_zflow`) containing

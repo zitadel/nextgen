@@ -15,9 +15,9 @@ post:
     preview values. A deployment that names `default` freezes the primary
     values.
 
-    A deployment to `primary` changes nothing when the project's newest
-    primary deployment has the same release and frozen values and covers
-    exactly the current primary origins: the call answers `200` with that
+    A deployment to `primary` or `default` changes nothing when the newest
+    deployment to its targets has the same release and frozen values and
+    covers exactly those targets: the call answers `200` with that
     deployment. Any other request writes a new deployment and answers `201`;
     for preview URLs that record renews their previews.
 

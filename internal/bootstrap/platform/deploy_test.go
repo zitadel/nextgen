@@ -19,6 +19,10 @@ func TestDeployedByNewerBuild(t *testing.T) {
 	}
 	builtAt := func(when time.Time) string { return platformDeployPrefix + when.Format(time.RFC3339) }
 	preview := &domain.Deployment{OriginKind: domain.DeploymentOriginKindPreview}
+	defaultOnly := &domain.Deployment{
+		OriginKind: domain.DeploymentOriginKindPrimary,
+		Targets:    []domain.DeploymentTarget{{Origin: domain.DefaultTargetOrigin}},
+	}
 
 	for _, tt := range []struct {
 		name string
@@ -34,6 +38,7 @@ func TestDeployedByNewerBuild(t *testing.T) {
 		{"a release replaces a development build", []*domain.Deployment{primary(builtAt(time.Time{}))}, earlier, false},
 		{"a deployment of someone else's says nothing", []*domain.Deployment{primary("by hand")}, earlier, false},
 		{"a preview is not what the console is served", []*domain.Deployment{preview, primary(builtAt(later))}, earlier, true},
+		{"nor is a deployment to the default target alone", []*domain.Deployment{defaultOnly, primary(builtAt(later))}, earlier, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, deployedByNewerBuild(tt.live, tt.own))
