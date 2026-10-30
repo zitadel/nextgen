@@ -42,9 +42,9 @@ The document declares this scheme as OAuth 2.0, with authorization-code and clie
 
 [`zitadel setup`](/docs/get-started/quickstart) creates your project and writes its secret to `.env.local` as `ZITADEL_PROJECT_SECRET`, and to `.zitadel/secret`. [Create project](/docs/reference/api/projects) (`POST /projects`), which needs no credential, returns it as `project_secret`; no other operation returns it. Keep the secret on a server, out of source control and out of the browser ([Configuration as code](/docs/concepts/repo-config#what-stays-out-of-source-control)).
 
-### Session cookie (`nextgenSession`)
+### Session cookie (`sessionCookie`)
 
-The `__nextgen_session` cookie authenticates a signed-in user's requests from the browser. The server sets it when a session is created or a handoff is exchanged ([Sessions](/docs/reference/api/sessions)); an app sends it through the [SDK proxy](/docs/sdks/proxy) on its own origin.
+The session cookie, `__Host-zitadel_session`, authenticates a signed-in user's requests from the browser. The server sets it when a session is created or a handoff is exchanged ([Sessions](/docs/reference/api/sessions)); an app sends it through the [SDK proxy](/docs/sdks/proxy) on its own origin. Over plain http to a loopback host, such as `http://localhost:8080`, the server sets it as `zitadel_session`, without the prefix and `Secure`, so that Safari keeps it, and reads that name there too. A program sends `__Host-zitadel_session` over any transport.
 
 A request the cookie authenticates that changes something must come from the same origin and carry the session's CSRF token, from `GET /sessions/me/csrf`, in the `X-Zitadel-CSRF` header. `GET` requests and the `POST …/query` reads need no token. A missing or invalid cookie answers `401` with the code `auth.unauthorized`, a failed CSRF check `403` with `auth.csrf_invalid`.
 

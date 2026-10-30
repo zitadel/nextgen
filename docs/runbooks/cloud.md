@@ -53,6 +53,24 @@ The docs' live examples mock the flow API in the browser with a service
 worker scoped to `/docs/`, so the mock never answers for the console on the
 same origin.
 
+Every service shares the origin, and with it a signed-in user's session, so
+each response carries security headers:
+
+- `vercel.json`'s top-level `headers` reach every service's responses (not
+  its own redirects): `nosniff`, `Referrer-Policy` and `X-Frame-Options`.
+- Each service sends its own Content-Security-Policy, enforced and
+  report-only: the console's in its service's `headers` (a server test holds
+  them to the server's policy for the same page, plus Vercel's toolbar), the
+  docs' and the website's from their `next.config` and, per prerendered page,
+  their build adapter (`csp-adapter.mjs`), the server's from the Go code.
+  Violations go to the server's `/csp-report`.
+- The console's enforced policy covers inline script. The docs' and the
+  website's report-only policies list each page's inline scripts by hash;
+  their enforced ones do not cover script yet.
+- HSTS is Vercel's default: zitadel.com is on the preload list with its
+  subdomains, so the cloud's host needs no `includeSubDomains` or `preload`
+  of its own.
+
 The launcher pins what follows from this layout (listen address from
 `PORT`, console off with its links at `/console`) and defaults the rest
 (platform project bootstrapped, JSON logs, public base from Vercel's URL).
@@ -572,6 +590,12 @@ project and imports the root admin.
     | jq -r 'select(.type == "log") | .data.message | fromjson? | select(.level == "ERROR") | .msg'
   ```
 
+- **Policy violations:** a browser's report of a Content-Security-Policy
+  violation is a `WARN` line `content security policy violation` from the
+  `server` function, naming the page, the directive and what it blocked.
+  First-party code reports nothing. The docs' and the website's policies
+  allow the script and the frame of Vercel's toolbar, which Vercel builds
+  into their bundles.
 - **Cold starts:** a Go instance boots in one to two seconds.
 - **Concurrency:** an instance serves several requests at once on its one
   vCPU, the Go service included, although Vercel's Fluid docs name only

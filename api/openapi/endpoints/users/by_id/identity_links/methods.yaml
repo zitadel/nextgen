@@ -13,7 +13,7 @@ get:
   security:
     - oauth2:
         - user.read
-    - nextgenSession: []
+    - sessionCookie: []
   responses:
     '200':
       description: The identity links of a user are returned

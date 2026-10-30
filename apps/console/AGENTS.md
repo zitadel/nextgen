@@ -71,6 +71,13 @@ between files are the sign the component is missing.
   `router.state.location`: ending on `location` can leave a loader's request
   in flight, which MSW reports as unhandled in a later test.
 
+## Content-Security-Policy
+
+- The console's policy allows its bundle and `index.html`'s inline script
+  by hash. A change to that script changes the hash the cloud sends
+  (repo-root `vercel.json`): `internal/staticui/console`'s test names the
+  value to set.
+
 ## Analytics
 
 - Send a custom event only through `src/lib/analytics.ts`, and list it in

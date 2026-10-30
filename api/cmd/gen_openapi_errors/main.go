@@ -910,14 +910,14 @@ var csrfErrors = []string{
 	"domain.ErrAuthCSRFInvalid",
 }
 
-// acceptsSessionCookie reports whether the operation lists the nextgenSession
+// acceptsSessionCookie reports whether the operation lists the sessionCookie
 // scheme among its security requirements.
 func acceptsSessionCookie(op methodsFileOperation) bool {
 	if op.Security == nil {
 		return false
 	}
 	for _, requirement := range *op.Security {
-		if _, ok := requirement["nextgenSession"]; ok {
+		if _, ok := requirement["sessionCookie"]; ok {
 			return true
 		}
 	}

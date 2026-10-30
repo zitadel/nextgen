@@ -25,8 +25,8 @@ import { useTheme } from "@/theme";
  * (`resolve-api.ts`), and the console's app-wide `configureZitadel()` call
  * carries an empty project id, so attribute-level config would lose to it and
  * the widget would refuse to start a flow. On a terminal step the widget
- * exchanges its `handoff_token` for the `__nextgen_session` HttpOnly cookie
- * before navigating to `postSignInUrl`, a full-document navigation, so the app
+ * exchanges its `handoff_token` for the HttpOnly session cookie before
+ * navigating to `postSignInUrl`, a full-document navigation, so the app
  * reboots with the cookie in place.
  *
  * `next` is the sanitized router-relative path to land on, re-joined with the

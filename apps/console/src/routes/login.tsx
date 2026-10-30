@@ -53,7 +53,7 @@ function isLoopbackConsole(): boolean {
 }
 
 /**
- * Exchanges a sign-in link's handoff token for the `__nextgen_session`
+ * Exchanges a sign-in link's handoff token for the session
  * cookie, the same `POST /sessions/exchange` the widget calls at the end of a
  * login flow. Failures fall through to the normal sign-in widget.
  */

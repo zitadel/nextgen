@@ -12,7 +12,7 @@ post:
   security:
     - oauth2:
         - team.read
-    - nextgenSession: []
+    - sessionCookie: []
   parameters:
     - $ref: ../../../components/parameters/project-id-query.yaml
   requestBody:
