@@ -7,8 +7,6 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
 
-import { baseTest } from "@zitadel/vitest-config";
-
 const defaultConsoleBase = "/ui/console/";
 const consoleOutDir = "../../internal/staticui/console/dist";
 const defaultApiBase = "/api";
@@ -82,28 +80,6 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
-  },
-  test: {
-    ...baseTest,
-    name: "@zitadel/console",
-    environment: "jsdom",
-    setupFiles: ["./src/test-setup.ts"],
-    // The env every spec starts from. Vite also loads `.env.local`, so without
-    // the blank fallback a developer's local VITE_CONSOLE_RUNTIME_FALLBACK would
-    // turn runtime-discovery failures into the standalone fallback (Console ADR
-    // 0004 §3). A spec that needs another value stubs it with `vi.stubEnv`, and
-    // `unstubEnvs` restores these before the next test.
-    env: {
-      VITE_CONSOLE_API_BASE: "http://localhost/api",
-      VITE_CONSOLE_RUNTIME_FALLBACK: "",
-    },
-    unstubEnvs: true,
-    // Above the RTL asyncUtilTimeout (5s, set in test-setup.ts) with room for a
-    // test that makes several queries, so a slow query reports its own Testing
-    // Library diagnostic rather than being cut short by this budget. A file's
-    // first test also imports the router and every screen (test-setup.ts): in
-    // CI that first test takes ~9s, and up to ~16s on a busy runner.
-    testTimeout: 30_000,
   },
 }));
 

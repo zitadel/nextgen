@@ -7,6 +7,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { sessionCookieName } from "@zitadel/testing/playwright";
 
 import { frameworkForId } from "../scripts/frameworks.mjs";
+import { isLoggedOutUrl } from "../scripts/navigation.mjs";
 
 /**
  * A variable the journey runner sets for the suites (JOURNEY_OUTPUT_DIR,
@@ -140,8 +141,7 @@ export async function logout(page: Page): Promise<void> {
     await logout.waitFor({ state: "visible", timeout: 5_000 });
   }
   await logout.click();
-  const loggedOutUrl = expectsProtectedRouteRedirect ? loginUrl : /\/(?:login)?(?:[/?#]|$)/;
-  await expect(page).toHaveURL(loggedOutUrl);
+  await expect(page).toHaveURL((url) => isLoggedOutUrl(url, expectsProtectedRouteRedirect));
   await expectSessionCleared(page);
 }
 

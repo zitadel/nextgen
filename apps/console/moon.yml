@@ -18,6 +18,11 @@ tasks:
     inputs:
       # Declaring inputs drops the default project folder, so it is restated.
       - "**/*"
+      - "file://.env?optional"
+      - "file://.env.local?optional"
+      - "file://.env.production?optional"
+      - "file://.env.production.local?optional"
+      - "$VITE_*"
       # The hosted cloud's build bakes its base path, Vercel's insights, their
       # sample rate and the commit its events report in (vite.config.ts,
       # src/vite-env.d.ts), so the variables are part of the cache key: that

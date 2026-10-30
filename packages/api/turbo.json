@@ -19,12 +19,13 @@
     "test": {
       "dependsOn": ["generate"]
     },
-    // The release builds start after cli:test, which imports this package's
-    // dist at runtime: the clean step must not run while it does (moon: the
-    // `public-dist` mutex). Every other release build depends on this one
-    // through its package edges, so they all wait for cli:test.
+    // Release writes wait for cli:test and server:test, including the normal
+    // console build Go embeds. Every other release build reaches this one,
+    // so no release dist is cleaned while those readers are running. Moon
+    // orders server:test through its release entrypoints' serial deps to
+    // avoid a project cycle.
     "build-release": {
-      "dependsOn": ["generate", "@zitadel/cli#test"]
+      "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test"]
     }
   }
 }

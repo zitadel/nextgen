@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, stat, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -184,8 +184,20 @@ async function diffConfig(
   try {
     scratch = await mkdtemp(join(tmpdir(), "zitadel-diff-"));
     const tempIndex = join(scratch, "index");
-    // The real index may not exist yet (a fresh repo); start empty if so.
-    await copyFile(resolve(cwd, indexPath), tempIndex).catch(() => undefined);
+    // Git uses the index's mtime to detect same-size edits made within one
+    // timestamp tick. A fresh copy's newer mtime would hide those changes.
+    // Round down to milliseconds so conversion never makes the copy newer.
+    try {
+      const sourceIndex = resolve(cwd, indexPath);
+      const { atime, mtimeMs } = await stat(sourceIndex);
+      await copyFile(sourceIndex, tempIndex);
+      await utimes(tempIndex, atime, Math.floor(mtimeMs) / 1000);
+    } catch (error) {
+      // A fresh repo has no index yet; other failures use the original index.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return git(cwd, diffArgs);
+      }
+    }
     const env: NodeJS.ProcessEnv = { GIT_INDEX_FILE: tempIndex };
     // `git add` refuses a whole pathspec when one part matches nothing, so only
     // the directories this project has are marked.

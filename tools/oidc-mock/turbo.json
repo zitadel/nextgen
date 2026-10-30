@@ -4,16 +4,19 @@
   // Test-only OIDC provider for the journey runner; nested Go module, no root import.
   "tasks": {
     // Tracked Go files only, as the server project checks them.
-    "format": {},
+    "format": { "cache": false },
     "vet": {
+      "cache": false,
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     },
     "build": {
-      "dependsOn": ["vet"],
+      "cache": false,
+      "inputs": ["$TURBO_EXTENDS$", "!**/*_test.go", "!**/testdata/**"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "outputs": ["dist/oidc-mock"]
     },
     "test": {
+      "cache": false,
       "dependsOn": ["format", "vet"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"]
     }

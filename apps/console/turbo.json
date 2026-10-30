@@ -60,8 +60,8 @@
     // CLI, then the dev server against it. scripts/dev-real.mts builds the
     // server itself, because in moon's project graph that dependency would
     // cycle (the server embeds the console); turbo has no project graph, so
-    // here the server build is a dependency and the script's own build a
-    // cache hit.
+    // here the server build is an explicit dependency too. Native Go commands
+    // run when selected; Go's own cache keeps a repeated build incremental.
     "dev:real": {
       "cache": false,
       "persistent": true,

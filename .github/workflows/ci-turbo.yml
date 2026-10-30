@@ -123,7 +123,7 @@ jobs:
       id-token: write
     env:
       # check-generate-pruned runs in a step of its own before them.
-      GATE_TASKS: lint typecheck build test check-adrs check-moon-graph
+      GATE_TASKS: lint typecheck build test check-typecheck check-openapi-rules check-adrs check-moon-graph
     steps:
       # Write dirty pages back early so Docker's container creates do not
       # wait for a backlog of dirty pages.

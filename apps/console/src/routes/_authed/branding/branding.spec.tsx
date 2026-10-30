@@ -226,7 +226,7 @@ describe("branding screen", () => {
     const router = await renderAt("/branding");
     expect(await screen.findByLabelText("Previewed flow")).toHaveTextContent("Acme login");
 
-    await act(() => router.history.push(scopedPath("/branding", "proj_other")));
+    await act(() => router.navigate({ to: "/branding", search: { project: "proj_other" } }));
 
     await waitFor(() =>
       expect(screen.getByLabelText("Previewed flow")).toHaveTextContent("Default login"),

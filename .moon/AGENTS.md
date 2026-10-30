@@ -28,9 +28,10 @@ Where the two differ on purpose:
 - Some scripts set values a moon task's `env` sets too, because turbo cannot.
   They set them as defaults (`${VAR-default}`), so a caller's value still
   wins.
-- Turbo's console `build` lists the git-ignored `.env*` files as inputs. Moon
-  hashes only the files git sees, listed or not, so `moon.yml` does not list
-  them: under moon a changed `.env.local` still restores the old build.
+- List ignored dotenv inputs as `.env*` in Turbo and explicit optional paths
+  (`file://.env.local?optional`) in Moon; Moon's globs skip ignored files.
+- Order release writes after server tests: Turbo uses `api#build-release`;
+  Moon uses release entrypoints' serial deps to avoid a project cycle.
 - Turbo's inputs follow file classes: no task hashes its package's docs, and
   no build its tests ([turborepo-graph.md](../docs/design/build/turborepo-graph.md)).
   Moon keeps the whole folder (below). A file read outside the folder goes
@@ -48,6 +49,8 @@ Where the two differ on purpose:
 - `typescript.yml` defines `lint`, `typecheck`, `build`
   (`outputs: dist/**/*`) and `test` once for every TypeScript project.
   `javascript.yml` gives the JavaScript projects the same `lint`.
+- Keep shared Vitest inputs on `test` and `typecheck`; projects without Vitest
+  replace the inherited typecheck inputs so their builds stay unaffected.
 - A project's `moon.yml` never repeats a shared task's command. It adds only
   `deps` (appended), `outputs` with `options.mergeOutputs: "replace"`, a
   different command with `options.mergeArgs: "replace"`, or options (a mutex,
@@ -68,6 +71,10 @@ package's own files. The exceptions name only what lies outside the folder:
   `bench` because `tools/bench` compiles the root module through
   `replace github.com/zitadel/nextgen => ../..` (`tools/bench/go.mod`).
   Anything compiled in through `//go:embed` or read by a test belongs in them.
+- Keep Go production inputs separate from `_test.go`, `testdata`, and nested
+  modules; put generation directives in production Go sources.
+- Leave native Go tasks uncached by both runners; Go owns compiler/test caching
+  and the local server build must refresh Git metadata when selected.
 - The root `workspace` project's `test` and `check-*` tasks list their files,
   because its folder is the whole repo.
 
@@ -78,6 +85,8 @@ package's own files. The exceptions name only what lies outside the folder:
   tests or tooling use it).
 - Use another package through its exports, never a relative path into its
   folder.
+- Root Vitest config imports the shared file directly with a boundaries waiver;
+  a root workspace dependency would make Turbo hash it into every task.
 - Never list a dependency another one already reaches, unless the path runs
   through a task with no `outputs`, which moon does not hash (`server:test`
   lists the UI builds although `server:vet` already orders them).
