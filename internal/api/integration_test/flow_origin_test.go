@@ -35,7 +35,6 @@ func TestFlowOrigins(t *testing.T) {
 	project, ok := created.(*api.CreateProjectResponse)
 	require.True(t, ok, helpers.MustMarshal(t, created))
 	harness.CleanupProject(t, project.ID)
-	deployDefaultTarget(t, string(project.ID))
 
 	t.Run("an origin the project does not list cannot open a flow", func(t *testing.T) {
 		resp, body := openFlow(t, project.ID, "https://evil.example.test")
@@ -74,8 +73,6 @@ func TestDefaultTarget(t *testing.T) {
 	t.Parallel()
 
 	fixture := newDeploymentFixture(t)
-	assertFlowCode(t, fixture.project, "", domain.ErrReleaseNoDefault().Code)
-	assertFlowCode(t, fixture.project, helpers.ConsoleOrigin, domain.ErrReleaseNoDefault().Code)
 	assertFlowCode(t, fixture.project, appOrigin, domain.ErrReleaseNotDeployed(nil).Code)
 
 	listResp, err := fixture.client.ListFlowDefinitions(t.Context(), api.ListFlowDefinitionsParams{

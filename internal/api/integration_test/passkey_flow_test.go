@@ -33,7 +33,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// --- Seed project ---------------------------------------------------------
 	project, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, project.ID)
 
 	// Create the user schema so the resolver can look it up from the DB.  The
 	// schema's $id becomes the URL that the flow definition references.
@@ -82,7 +81,6 @@ func TestPasskeyFlowLogin(t *testing.T) {
 	// fail against its foreign public key.
 	decoyProject, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
 	require.NoError(t, err)
-	deployDefaultTarget(t, decoyProject.ID)
 	harness.CreateUserSchema(t, decoyProject, harness.EnsureTestData(t).Schemas.CreateSchemaRequestUserSchema)
 	decoyTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
 		ProjectID: decoyProject.ID,

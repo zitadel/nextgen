@@ -104,13 +104,6 @@ func ErrReleaseNotDeployed(details any) Error {
 	return newError(PrefixRelease.ErrorCodePrefix("not_deployed"), "nothing is deployed to this origin", details, nil)
 }
 
-// ErrReleaseNoDefault reports that the project has no deployment to its
-// default target. Callers with no origin, and the console host when the
-// project does not list it, are served that target.
-func ErrReleaseNoDefault() Error {
-	return newError(PrefixRelease.ErrorCodePrefix("no_default"), "nothing is deployed to the default target", nil, nil)
-}
-
 // ReleasePointer pins one revision of one resource. Handle names the resource
 // and RevisionID the revision of it, so two revisions of the same resource
 // share a handle and cannot both appear in a release.

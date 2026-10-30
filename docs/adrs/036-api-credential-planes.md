@@ -327,15 +327,10 @@ platform project, which the console signs operators in to, lists the origin of
 and on a loopback origin; at any other console origin a sign-in opens and its
 first submit is refused, while previewing a project's login keeps working.
 
-## Amendment (2026-10-30): an empty allowlist admits nothing
+## Amendment (2026-10-30): the default target
 
-A project with no origin pattern no longer admits every origin. A loopback
-origin is still always admitted. A request with no `Origin`, and one from a
-console origin the project does not list, is served the deployment to the
-`default` target. When platform bootstrap is enabled, startup deploys the
-platform project to its primary origin and to that target, so a console origin
-it does not list still opens a flow. No such deployment answers `409` with
-`rel.no_default`. A listed origin, a loopback origin, or a live preview with
-nothing deployed answers `409` with `rel.not_deployed`. So the console signs in
-to the platform project on a loopback origin only when that origin is its
-public base.
+A request with no `Origin`, and one admitted without a project pattern with
+nothing deployed to its origin, is served the deployment to the `default`
+target when there is one. When platform bootstrap is enabled, startup deploys
+the platform project to its primary origin and to that target, so a console
+origin it does not list still opens a flow.
