@@ -13,8 +13,15 @@ import (
 
 // SecurityHandler is handler for security parameters.
 type SecurityHandler interface {
-	// HandleNextgenSession handles nextgenSession security.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// HandleOAuth2 handles oauth2 security.
+	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
+	// HandleSessionCookie handles sessionCookie security.
+	// The session cookie issued at session creation or superseding handoff exchange.
+	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
+	// http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
+	// as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
+	// keeps it, and accepts that name there too; `__Host-zitadel_session` takes
+	// precedence. A program sends `__Host-zitadel_session` over any transport.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
 	// `Missing or invalid session token.`
 	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
@@ -25,9 +32,7 @@ type SecurityHandler interface {
 	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
 	// project secret
 	// authenticates is not affected.
-	HandleNextgenSession(ctx context.Context, operationName OperationName, t NextgenSession) (context.Context, error)
-	// HandleOAuth2 handles oauth2 security.
-	HandleOAuth2(ctx context.Context, operationName OperationName, t OAuth2) (context.Context, error)
+	HandleSessionCookie(ctx context.Context, operationName OperationName, t SessionCookie) (context.Context, error)
 }
 
 func findAuthorization(h http.Header, prefix string) (string, bool) {
@@ -43,88 +48,6 @@ func findAuthorization(h http.Header, prefix string) (string, bool) {
 		return value, true
 	}
 	return "", false
-}
-
-// operationRolesNextgenSession is a private map storing roles per operation.
-var operationRolesNextgenSession = map[string][]string{
-	AddOriginOperation:             []string{},
-	CompleteClaimOperation:         []string{},
-	CreateDeploymentOperation:      []string{},
-	CreateGrantOperation:           []string{},
-	CreateTeamOperation:            []string{},
-	CreateUserOperation:            []string{},
-	DeleteGrantOperation:           []string{},
-	DeleteUserByIDOperation:        []string{},
-	EvaluatePolicyOperation:        []string{},
-	GetBrandingByIdOperation:       []string{},
-	GetDeploymentByIdOperation:     []string{},
-	GetFlowDefinitionOperation:     []string{},
-	GetGrantOperation:              []string{},
-	GetIdpByIdOperation:            []string{},
-	GetIdpRevisionByIdOperation:    []string{},
-	GetMyPasswordStateOperation:    []string{},
-	GetMySessionOperation:          []string{},
-	GetMySessionCsrfTokenOperation: []string{},
-	GetMyUserOperation:             []string{},
-	GetMyUserSchemaOperation:       []string{},
-	GetPolicyOperation:             []string{},
-	GetPolicyRevisionOperation:     []string{},
-	GetProjectOperation:            []string{},
-	GetReleaseByIdOperation:        []string{},
-	GetSchemaByIdOperation:         []string{},
-	GetTeamOperation:               []string{},
-	GetUserByIDOperation:           []string{},
-	GetUserPasswordStateOperation:  []string{},
-	GetVariableOperation:           []string{},
-	GetVariablesOperation:          []string{},
-	ListBrandingOperation:          []string{},
-	ListDeploymentsOperation:       []string{},
-	ListFlowDefinitionsOperation:   []string{},
-	ListMyIdentityLinksOperation:   []string{},
-	ListMyPasskeysOperation:        []string{},
-	ListMyProjectsOperation:        []string{},
-	ListMyTeamsOperation:           []string{},
-	ListPoliciesOperation:          []string{},
-	ListPolicyRevisionsOperation:   []string{},
-	ListProjectAdminsOperation:     []string{},
-	ListReleasesOperation:          []string{},
-	ListSchemasOperation:           []string{},
-	ListUserIdentityLinksOperation: []string{},
-	ListUserPasskeysOperation:      []string{},
-	ListUserTeamsOperation:         []string{},
-	PatchMyUserOperation:           []string{},
-	PatchProjectOperation:          []string{},
-	PatchUserByIDOperation:         []string{},
-	QueryGrantsOperation:           []string{},
-	QueryIdpsOperation:             []string{},
-	QueryTeamsOperation:            []string{},
-	QueryUsersOperation:            []string{},
-	RemoveOriginOperation:          []string{},
-	RevokeMySessionOperation:       []string{},
-	RevokeReleaseOperation:         []string{},
-	RollbackDeploymentOperation:    []string{},
-	UpdateTeamOperation:            []string{},
-}
-
-// GetRolesForNextgenSession returns the required roles for the given operation.
-//
-// This is useful for authorization scenarios where you need to know which roles
-// are required for an operation.
-//
-// Example:
-//
-//	requiredRoles := GetRolesForNextgenSession(AddPetOperation)
-//
-// Returns nil if the operation has no role requirements or if the operation is unknown.
-func GetRolesForNextgenSession(operation string) []string {
-	roles, ok := operationRolesNextgenSession[operation]
-	if !ok {
-		return nil
-	}
-	// Return a copy to prevent external modification
-	result := make([]string, len(roles))
-	copy(result, roles)
-	return result
 }
 
 // oauth2ScopesOAuth2 is a private map storing OAuth2 scopes per operation.
@@ -386,27 +309,86 @@ func GetOAuth2ScopesForOAuth2(operation string) []string {
 	return result
 }
 
-func (s *Server) securityNextgenSession(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
-	var t NextgenSession
-	const parameterName = "__nextgen_session"
-	var value string
-	switch cookie, err := req.Cookie(parameterName); {
-	case err == nil: // if NO error
-		value = cookie.Value
-	case errors.Is(err, http.ErrNoCookie):
-		return ctx, false, nil
-	default:
-		return nil, false, errors.Wrap(err, "get cookie value")
+// operationRolesSessionCookie is a private map storing roles per operation.
+var operationRolesSessionCookie = map[string][]string{
+	AddOriginOperation:             []string{},
+	CompleteClaimOperation:         []string{},
+	CreateDeploymentOperation:      []string{},
+	CreateGrantOperation:           []string{},
+	CreateTeamOperation:            []string{},
+	CreateUserOperation:            []string{},
+	DeleteGrantOperation:           []string{},
+	DeleteUserByIDOperation:        []string{},
+	EvaluatePolicyOperation:        []string{},
+	GetBrandingByIdOperation:       []string{},
+	GetDeploymentByIdOperation:     []string{},
+	GetFlowDefinitionOperation:     []string{},
+	GetGrantOperation:              []string{},
+	GetIdpByIdOperation:            []string{},
+	GetIdpRevisionByIdOperation:    []string{},
+	GetMyPasswordStateOperation:    []string{},
+	GetMySessionOperation:          []string{},
+	GetMySessionCsrfTokenOperation: []string{},
+	GetMyUserOperation:             []string{},
+	GetMyUserSchemaOperation:       []string{},
+	GetPolicyOperation:             []string{},
+	GetPolicyRevisionOperation:     []string{},
+	GetProjectOperation:            []string{},
+	GetReleaseByIdOperation:        []string{},
+	GetSchemaByIdOperation:         []string{},
+	GetTeamOperation:               []string{},
+	GetUserByIDOperation:           []string{},
+	GetUserPasswordStateOperation:  []string{},
+	GetVariableOperation:           []string{},
+	GetVariablesOperation:          []string{},
+	ListBrandingOperation:          []string{},
+	ListDeploymentsOperation:       []string{},
+	ListFlowDefinitionsOperation:   []string{},
+	ListMyIdentityLinksOperation:   []string{},
+	ListMyPasskeysOperation:        []string{},
+	ListMyProjectsOperation:        []string{},
+	ListMyTeamsOperation:           []string{},
+	ListPoliciesOperation:          []string{},
+	ListPolicyRevisionsOperation:   []string{},
+	ListProjectAdminsOperation:     []string{},
+	ListReleasesOperation:          []string{},
+	ListSchemasOperation:           []string{},
+	ListUserIdentityLinksOperation: []string{},
+	ListUserPasskeysOperation:      []string{},
+	ListUserTeamsOperation:         []string{},
+	PatchMyUserOperation:           []string{},
+	PatchProjectOperation:          []string{},
+	PatchUserByIDOperation:         []string{},
+	QueryGrantsOperation:           []string{},
+	QueryIdpsOperation:             []string{},
+	QueryTeamsOperation:            []string{},
+	QueryUsersOperation:            []string{},
+	RemoveOriginOperation:          []string{},
+	RevokeMySessionOperation:       []string{},
+	RevokeReleaseOperation:         []string{},
+	RollbackDeploymentOperation:    []string{},
+	UpdateTeamOperation:            []string{},
+}
+
+// GetRolesForSessionCookie returns the required roles for the given operation.
+//
+// This is useful for authorization scenarios where you need to know which roles
+// are required for an operation.
+//
+// Example:
+//
+//	requiredRoles := GetRolesForSessionCookie(AddPetOperation)
+//
+// Returns nil if the operation has no role requirements or if the operation is unknown.
+func GetRolesForSessionCookie(operation string) []string {
+	roles, ok := operationRolesSessionCookie[operation]
+	if !ok {
+		return nil
 	}
-	t.APIKey = value
-	t.Roles = operationRolesNextgenSession[operationName]
-	rctx, err := s.sec.HandleNextgenSession(ctx, operationName, t)
-	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
-		return nil, false, nil
-	} else if err != nil {
-		return nil, false, err
-	}
-	return rctx, true, err
+	// Return a copy to prevent external modification
+	result := make([]string, len(roles))
+	copy(result, roles)
+	return result
 }
 
 func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
@@ -426,10 +408,40 @@ func (s *Server) securityOAuth2(ctx context.Context, operationName OperationName
 	return rctx, true, err
 }
 
+func (s *Server) securitySessionCookie(ctx context.Context, operationName OperationName, req *http.Request) (context.Context, bool, error) {
+	var t SessionCookie
+	const parameterName = "__Host-zitadel_session"
+	var value string
+	switch cookie, err := req.Cookie(parameterName); {
+	case err == nil: // if NO error
+		value = cookie.Value
+	case errors.Is(err, http.ErrNoCookie):
+		return ctx, false, nil
+	default:
+		return nil, false, errors.Wrap(err, "get cookie value")
+	}
+	t.APIKey = value
+	t.Roles = operationRolesSessionCookie[operationName]
+	rctx, err := s.sec.HandleSessionCookie(ctx, operationName, t)
+	if errors.Is(err, ogenerrors.ErrSkipServerSecurity) {
+		return nil, false, nil
+	} else if err != nil {
+		return nil, false, err
+	}
+	return rctx, true, err
+}
+
 // SecuritySource is provider of security values (tokens, passwords, etc.).
 type SecuritySource interface {
-	// NextgenSession provides nextgenSession security value.
-	// The __nextgen_session cookie issued at session creation or superseding handoff exchange.
+	// OAuth2 provides oauth2 security value.
+	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
+	// SessionCookie provides sessionCookie security value.
+	// The session cookie issued at session creation or superseding handoff exchange.
+	// A browser holds it as `__Host-zitadel_session`, with `Secure`. Over plain
+	// http to a loopback host (`localhost`, `127.0.0.1`, `::1`) the server sets it
+	// as `zitadel_session` instead, without `Secure` or the prefix, so that Safari
+	// keeps it, and accepts that name there too; `__Host-zitadel_session` takes
+	// precedence. A program sends `__Host-zitadel_session` over any transport.
 	// A missing or invalid cookie yields `401` with code `auth.unauthorized` and the message
 	// `Missing or invalid session token.`
 	// Cross-site request forgery (ADR 053 §5): a state-changing request that this
@@ -440,27 +452,25 @@ type SecuritySource interface {
 	// the `POST …/query` reads, which need no token. Safe methods (`GET`) are not checked. A request a
 	// project secret
 	// authenticates is not affected.
-	NextgenSession(ctx context.Context, operationName OperationName) (NextgenSession, error)
-	// OAuth2 provides oauth2 security value.
-	OAuth2(ctx context.Context, operationName OperationName) (OAuth2, error)
+	SessionCookie(ctx context.Context, operationName OperationName) (SessionCookie, error)
 }
 
-func (s *Client) securityNextgenSession(ctx context.Context, operationName OperationName, req *http.Request) error {
-	t, err := s.sec.NextgenSession(ctx, operationName)
-	if err != nil {
-		return errors.Wrap(err, "security source \"NextgenSession\"")
-	}
-	req.AddCookie(&http.Cookie{
-		Name:  "__nextgen_session",
-		Value: t.APIKey,
-	})
-	return nil
-}
 func (s *Client) securityOAuth2(ctx context.Context, operationName OperationName, req *http.Request) error {
 	t, err := s.sec.OAuth2(ctx, operationName)
 	if err != nil {
 		return errors.Wrap(err, "security source \"OAuth2\"")
 	}
 	req.Header.Set("Authorization", "Bearer "+t.Token)
+	return nil
+}
+func (s *Client) securitySessionCookie(ctx context.Context, operationName OperationName, req *http.Request) error {
+	t, err := s.sec.SessionCookie(ctx, operationName)
+	if err != nil {
+		return errors.Wrap(err, "security source \"SessionCookie\"")
+	}
+	req.AddCookie(&http.Cookie{
+		Name:  "__Host-zitadel_session",
+		Value: t.APIKey,
+	})
 	return nil
 }

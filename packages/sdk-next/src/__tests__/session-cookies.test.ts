@@ -12,7 +12,7 @@ import { clearSessionCheckCache } from "@zitadel/sdk-core/middleware";
 import { nextgenMiddleware } from "../middleware";
 
 const PROJECT = "proj_app";
-const SESSION = `__nextgen_session_${PROJECT}`;
+const SESSION = `zitadel_session_${PROJECT}`;
 
 /**
  * The middleware's answer for a request that carries this project's session
@@ -25,7 +25,7 @@ async function copied(path: string): Promise<NextResponse> {
     vi.fn(async () => Response.json({ project_id: PROJECT, user_id: "u1" })),
   );
   const request = new NextRequest(`http://localhost:3000${path}`, {
-    headers: { cookie: "__nextgen_session=tok" },
+    headers: { cookie: "zitadel_session=tok" },
   });
   return (await nextgenMiddleware(request, {
     url: "http://localhost:4000",

@@ -176,11 +176,27 @@ function returnTargetRefusal(
  *   `"http://localhost:4000"`). Pass the server's own origin so that
  *   `verifyHandoffToken` can enforce issuer consistency.
  */
-export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
+export function setupMockHandlers(
+  options: {
+    iss?: string;
+    /**
+     * Emails that already have an account (case-insensitive). Passing a list,
+     * even an empty one, routes typed emails as the default flow does: an
+     * unknown one signing in moves to sign-up, a known one signing up moves to
+     * sign-in, and a sign-up the mock completes joins the list until `reset()`.
+     * The `exists@example.com` registration error gives way to that switch.
+     * Omit it to keep every typed email on the happy path.
+     */
+    accounts?: readonly string[];
+  } = {},
+): MockHandle {
   const iss = options.iss ?? "http://localhost:8080";
+  const routesByAccount = options.accounts !== undefined;
   let actor: FlowActor = startFlowActor();
   let captured: CapturedRequest[] = [];
-  const authn = new AuthnStore();
+  // Typed emails and the provider's return ask the same store, so an account
+  // is one whichever way the visitor arrives.
+  const authn = new AuthnStore(options.accounts);
   // Which emails this mock has already seen arrive through a provider. The
   // engine keys links on the provider's subject; see SsoIdentityStore for why
   // the mock keys on email.
@@ -210,6 +226,23 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
       return "sso_authenticated";
     }
     return authn.hasAccount(email) ? "user_already_exists" : "sso_user_not_found";
+  }
+
+  /**
+   * The engine's email lookup on a typed submit, when the caller opted in: it
+   * moves the flow to the other purpose only when the email says the visitor
+   * picked the wrong one.
+   */
+  function accountOutcome(
+    before: FlowStepName | "idle",
+    action: string,
+    email: string | undefined,
+  ): "user_not_found" | "user_already_exists" | undefined {
+    if (!routesByAccount || action !== "submit" || !email) return undefined;
+    const known = authn.hasAccount(email);
+    if (before === "identifier" && !known) return "user_not_found";
+    if (before === "register" && known) return "user_already_exists";
+    return undefined;
   }
 
   function reset(): void {
@@ -337,8 +370,8 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
   /**
    * `step.purpose`, as the server reports it: the default flow fixes it on the
    * steps that sign in or sign up, and the others keep the purpose the flow
-   * started with. The mock never switches between them by itself, so no step
-   * carries a `notice`.
+   * currently serves. Automatic email switches attach their notice only to
+   * the submit response, as the engine does, not to later reads of that step.
    */
   function withPurpose(response: CreateFlow201): CreateFlow201 {
     const purpose =
@@ -454,8 +487,12 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         iss,
       };
 
+      const outcome = accountOutcome(before, body.action, email);
+
+      // With account routing the collision is the switch to sign-in, as the
+      // default flow wires `user_already_exists`, not this error.
       const registrationErrorKey =
-        before === "register" && body.action === "submit" && email
+        !routesByAccount && before === "register" && body.action === "submit" && email
           ? authn.registrationError(email)
           : null;
       if (registrationErrorKey) {
@@ -541,8 +578,24 @@ export function setupMockHandlers(options: { iss?: string } = {}): MockHandle {
         action: body.action,
         fields: submitted,
         sso_provider_id: body.sso_provider_id ?? null,
+        outcome,
       });
-      return ok(await currentResponse());
+      const after = actor.getSnapshot();
+      const createdEmail = after.context.capturedFields.email;
+      if (
+        routesByAccount &&
+        (before === "register-password" || before === "register-sso") &&
+        after.value === "done" &&
+        createdEmail
+      ) {
+        authn.addAccount(createdEmail);
+      }
+      const response = await currentResponse();
+      return ok(
+        outcome
+          ? { ...response, step: { ...response.step, notice: `notice.${outcome}` } }
+          : response,
+      );
     }),
     getGetFlowStepMockHandler(async ({ params }) => {
       captured.push({ kind: "getFlowStep", flowId: String(params.id) });

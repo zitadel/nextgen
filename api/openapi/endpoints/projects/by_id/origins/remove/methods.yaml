@@ -14,7 +14,7 @@ post:
   security:
     - oauth2:
         - origin.delete
-    - nextgenSession: []
+    - sessionCookie: []
   requestBody:
     required: true
     content:

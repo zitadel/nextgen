@@ -43,8 +43,12 @@ export default defineConfig({
     // Every request the suite makes, from the request fixture and from the
     // browser, carries the bypass; a deployment without protection ignores
     // it. The console loads nothing from another origin, so it reaches no
-    // one else.
-    extraHTTPHeaders: bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {},
+    // one else. The skip keeps Vercel's toolbar out of a preview's pages, so
+    // a policy violation the browser spec sees is the console's own.
+    extraHTTPHeaders: {
+      ...(bypassSecret ? { "x-vercel-protection-bypass": bypassSecret } : {}),
+      "x-vercel-skip-toolbar": "1",
+    },
   },
   projects: [
     // The routing checks talk HTTP through the request fixture: no browser.

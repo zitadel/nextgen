@@ -41,6 +41,9 @@ tasks:
       - ".generated/cli.d.mts"
 
   typecheck:
+    # This app uses Playwright, not the shared Vitest configuration.
+    options:
+      mergeInputs: "replace"
     deps:
       - "generate"
       # The live examples import the components and the mock, each from its
@@ -57,6 +60,21 @@ tasks:
 
   build:
     command: "corepack pnpm exec next build"
+    inputs:
+      - "**/*"
+      # Literal paths include ignored files; Moon's globs do not.
+      - "file://.env?optional"
+      - "file://.env.local?optional"
+      - "file://.env.production?optional"
+      - "file://.env.production.local?optional"
+      - "file://.env.development?optional"
+      - "file://.env.development.local?optional"
+      - "file://.env.test?optional"
+      - "file://.env.test.local?optional"
+      - "$NEXT_*"
+      - "$NODE_ENV"
+      - "$VERCEL_DEPLOYMENT_ID"
+      - "$DOCS_SPEED_INSIGHTS_SAMPLE_RATE"
     deps:
       # After typecheck, never beside it: `next build` empties .next/types and
       # fills it again, and tsc reads the route types there (next-env.d.ts
