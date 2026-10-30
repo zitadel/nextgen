@@ -20,9 +20,7 @@ export async function headSha(cwd: string): Promise<string | null> {
 
 /** The current commit's subject line, or null when there is no repo or no commit yet. */
 export async function headSubject(cwd: string): Promise<string | null> {
-  // `log.showSignature` would otherwise put gpg's lines ahead of the subject.
-  const stdout = await git(cwd, ["log", "-1", "--no-show-signature", "--format=%s"]);
-  return stdout === null ? null : stdout.trim() || null;
+  return Repository.answer(cwd, (repository) => repository.currentSubject(), null);
 }
 
 /**
