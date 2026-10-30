@@ -120,14 +120,39 @@ migrates through, because migrations hold a session advisory lock.
   creates it when it is missing, stamps it with the branch and the time of
   the deployment (a database comment), and migrates it; the function serves
   from it. Previews start empty and never see production data.
-- **Cleanup** is not automated yet. The plan: drop preview databases whose
-  stamp is older than 30 days. Until then, by hand on `preview`:
+- **Cleanup:** [`preview-cleanup.yml`](../../.github/workflows/preview-cleanup.yml)
+  drops a branch's database once its pull request from this repository
+  merges (`launcher drop-preview <branch>`), and every day each database
+  whose stamp is older than 30 days (`launcher drop-preview --idle-days
+  30`). That sweep also takes an open pull request nobody pushed to for
+  30 days; its next push starts it empty. A database without a stamp's
+  deployment time is kept and logged, and so is one a deployment stamps
+  while the sweep runs. The branch's preview deployments
+  stay up, without a database.
+  - **By hand:** run the workflow from the Actions tab. It lists what the
+    sweep would drop; tick *Drop* to drop it.
+  - **The secret:** the workflow expects the repository secret
+    `CLOUD_PREVIEW_MIGRATOR_DATABASE_URL`: a role of the PlanetScale
+    database `preview` (whose `main` PlanetScale calls a production
+    branch) that inherits `postgres`, its database `postgres`, port 5432,
+    as Vercel's **Preview** `CLOUD_MIGRATOR_DATABASE_URL` is. Never
+    production's: the launcher refuses a URL whose database holds the
+    server's schema, as production's does. Set it with `gh secret set
+    CLOUD_PREVIEW_MIGRATOR_DATABASE_URL --repo zitadel/nextgen`, which
+    prompts for the value.
+  - **Ownership:** only a database's owner, or a role that inherits it, may
+    drop it. The launcher creates preview databases as `postgres`, so any
+    role inheriting `postgres` can. One the builds' role created as itself,
+    before the launcher did that, only that role can, until the dashboard's
+    *Reassign objects* on it (Settings, Roles) hands its databases to
+    `postgres`; the builds keep working, as they inherit `postgres`.
+  - **One database by hand,** on `preview`:
 
-  ```sql
-  SELECT datname, shobj_description(oid, 'pg_database') AS stamp
-  FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY 2;
-  DROP DATABASE "preview_…" WITH (FORCE);
-  ```
+    ```sql
+    SELECT datname, shobj_description(oid, 'pg_database') AS stamp
+    FROM pg_database WHERE datname LIKE 'preview\_%' ORDER BY 2;
+    DROP DATABASE "preview_…" WITH (FORCE);
+    ```
 
 ## One-time setup
 
@@ -141,10 +166,11 @@ cluster, a connection budget or an admin role with pull request code:
   `pg_write_all_data` for the running server, and one inheriting `postgres`
   for the migrations (they create extensions and the schema and set
   database options).
-- **`preview`**, single node. One role inheriting `postgres`: it creates the
-  preview databases, migrates them and serves from them. Postgres never
-  passes the `CREATEDB` attribute on through membership, so the launcher
-  creates a database as `postgres` when the role lacks the attribute itself.
+- **`preview`**, single node. One role inheriting `postgres`
+  (`vercel-preview-migrator`): it creates the preview databases, migrates
+  them and serves from them. The launcher creates each as `postgres`, which
+  then owns it, so the cleanup's role can drop it (Database, cleanup);
+  without `CREATEDB` of its own the role still may, as `postgres` has it.
 
 ### 2. Master keys and root admins
 

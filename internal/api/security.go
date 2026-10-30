@@ -413,6 +413,14 @@ func GetScopeContext(ctx context.Context) (ScopeContext, bool) {
 	return v, ok
 }
 
+// listProjectID is the project a list taking the optional project_id
+// (project-id-query.yaml) addresses: the one it names, else the credential's
+// own. A missing scope yields "", which the list gate refuses.
+func listProjectID(ctx context.Context, projectID api.OptProjectID) string {
+	scopeCtx, _ := GetScopeContext(ctx)
+	return string(projectID.Or(api.ProjectID(scopeCtx.ProjectID)))
+}
+
 func withActorFromToken(ctx context.Context, token *domain.Token) context.Context {
 	if token == nil {
 		return ctx

@@ -3,6 +3,7 @@
 package integration_test
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"testing"
@@ -11,7 +12,81 @@ import (
 	"github.com/stretchr/testify/require"
 	api "github.com/zitadel/nextgen/api/generated"
 	"github.com/zitadel/nextgen/internal/api/integration_test/helpers"
+	"github.com/zitadel/nextgen/internal/domain"
+	"github.com/zitadel/nextgen/internal/service"
 )
+
+// TestQueryTeamsSessionAuthorization pins what an omitted project_id adds for a
+// Console session, against the real resolver and list predicate: the default
+// follows the session's grants as they change, and a grant on another project
+// does not widen it. That the default and an explicit home ID check and list
+// the same project is TestQueryTeams_ProjectScope's.
+func TestQueryTeamsSessionAuthorization(t *testing.T) {
+	t.Parallel()
+
+	home, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	userID, ownTeamID := harness.CreateUserOwnedByTeam(t, home.ID)
+	hiddenTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: home.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+	foreign, err := harness.EnsureProjectService(t).Create(t.Context(), helpers.ProjectName(), nil, true)
+	require.NoError(t, err)
+	foreignTeam, err := harness.EnsureTeamService(t).Create(t.Context(), service.CreateTeamInput{
+		ProjectID: foreign.ID,
+		Name:      helpers.TeamName(),
+	})
+	require.NoError(t, err)
+
+	client, err := helpers.NewApiClient(harness.EnsureTestServer(t).URL)
+	require.NoError(t, err)
+	client.SetSessionToken(sessionCookieIn(t, home, userID).Value)
+	stmts := harness.EnsureServiceDB(t).Statements()
+
+	listTeams := func(t *testing.T, req *api.QueryTeamsRequest, params api.QueryTeamsParams) []string {
+		t.Helper()
+		resp, err := client.QueryTeams(t.Context(), req, params)
+		require.NoError(t, err)
+		require.IsType(t, &api.QueryTeamsResponse{}, resp, helpers.MustMarshal(t, resp))
+		ids := []string{}
+		for _, team := range resp.(*api.QueryTeamsResponse).Teams {
+			ids = append(ids, team.ID)
+		}
+		return ids
+	}
+
+	t.Run("a foreign grant needs an explicit target and does not widen the default", func(t *testing.T) {
+		grant := harness.SeedProjectViewer(t, foreign.ID, userID)
+		t.Cleanup(func() {
+			require.NoError(t, stmts.RevokeAuthzAssignment(context.Background(), grant.ProjectID, grant.ID))
+		})
+		assert.Equal(t, []string{foreignTeam.ID}, listTeams(t, &api.QueryTeamsRequest{},
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(foreign.ID))}))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}))
+	})
+
+	t.Run("a resource grant exposes only the granted team until revoked", func(t *testing.T) {
+		grant := &domain.AuthzAssignment{
+			ProjectID: home.ID, CatalogID: domain.SystemCatalogID,
+			PrincipalType: domain.AuthzPrincipalTypeUser, PrincipalID: userID,
+			ObjectType: "project", Relation: "viewer",
+		}
+		grant.ApplyScope(domain.NewResourceAssignmentScope(ownTeamID))
+		require.NoError(t, stmts.CreateAuthzAssignment(t.Context(), grant))
+
+		assert.Equal(t, []string{ownTeamID}, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{Filter: []api.QueryTeamsRequestFilterItem{{
+			Field: api.TeamFilterFieldName, Operation: api.FilterOperationEquals,
+			Value: api.NewOptFilterValue(api.NewStringFilterValue(hiddenTeam.Name)),
+		}}}, api.QueryTeamsParams{}), "a name filter must not reach a team outside the grant")
+
+		require.NoError(t, stmts.RevokeAuthzAssignment(t.Context(), grant.ProjectID, grant.ID))
+		assert.Empty(t, listTeams(t, &api.QueryTeamsRequest{}, api.QueryTeamsParams{}),
+			"the same session must stop seeing the team once the grant is revoked")
+	})
+}
 
 // TestTeamReadsAcceptSession pins #1227: after a claim the Console lands on
 // /teams holding only __nextgen_session, so queryTeams and getTeam must accept
@@ -46,7 +121,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 
 	t.Run("queryTeams returns the claimer's team", func(t *testing.T) {
 		resp, err := session.QueryTeams(t.Context(), claimerTeamOnly,
-			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(console.ID))})
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -69,7 +144,7 @@ func TestTeamReadsAcceptSession(t *testing.T) {
 		harness.SetProjectSecretOnApiClient(t, secret, console)
 
 		resp, err := secret.QueryTeams(t.Context(), claimerTeamOnly,
-			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(console.ID))})
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -129,7 +204,7 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 	// the rows a caller sees come from grants, and this caller has none.
 	t.Run("sees no teams in the console project without a grant", func(t *testing.T) {
 		resp, err := session.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
-			api.QueryTeamsParams{ProjectID: api.ProjectID(console.ID)})
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(console.ID))})
 		require.NoError(t, err)
 		listed, ok := resp.(*api.QueryTeamsResponse)
 		require.True(t, ok, helpers.MustMarshal(t, resp))
@@ -164,7 +239,7 @@ func TestTeamReadsSessionWithoutAccess(t *testing.T) {
 	// green even if a stranger could list a foreign project's teams.
 	t.Run("cannot list teams of a project it has no foothold in", func(t *testing.T) {
 		resp, err := session.QueryTeams(t.Context(), &api.QueryTeamsRequest{},
-			api.QueryTeamsParams{ProjectID: api.ProjectID(otherProject.ID)})
+			api.QueryTeamsParams{ProjectID: api.NewOptProjectID(api.ProjectID(otherProject.ID))})
 		require.NoError(t, err)
 		require.IsType(t, &api.QueryTeamsNotFound{}, resp, helpers.MustMarshal(t, resp))
 	})

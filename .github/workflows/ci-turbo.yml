@@ -6,9 +6,9 @@ name: ci-turbo
 # blocking a merge. At the cutover they replace the moon steps in ci.yml and
 # this file goes.
 #
-# Three jobs run side by side, each on a runner of its own that checks out,
-# installs and shares the remote cache (TURBO_CACHE below): the gate (lint,
-# typecheck, build and test, with the Go database lanes), the journey (the
+# Three jobs run side by side, each on a standard GitHub-hosted runner that
+# checks out, installs and shares the remote cache (TURBO_CACHE below): the
+# gate (lint, typecheck, build and test, with the Go database lanes), the journey (the
 # release snapshot, then its lane) and the other e2e lanes. The release
 # builds rewrite the dist folders the gate and the other lanes read; on its
 # own runner the snapshot rewrites only the journey's, so the journey no
@@ -89,10 +89,8 @@ env:
   # test output is left in the log.
   NO_COLOR: ""
   TURBO_TELEMETRY_DISABLED: "1"
-  # Depot runners point TURBO_API at Depot's own turbo cache. These jobs use
-  # Vercel's instead (one cache shared with the cloud deployments); delete
-  # this line and the remote-cache steps to use Depot's, which needs no
-  # setup on Depot runners.
+  # Vercel's remote cache is shared with the cloud deployments. The
+  # remote-cache step authenticates these GitHub-hosted jobs over OIDC.
   TURBO_API: https://vercel.com
   # Every run reads and writes the remote cache, pull requests and the
   # merge queue too, as moon's runs do with Depot's: a pull request's
@@ -113,7 +111,7 @@ jobs:
   # The steps the three jobs share carry YAML anchors here, in the gate's
   # job, and the other two jobs repeat them by alias (`- *setup-go`).
   gate-turbo:
-    runs-on: &runner ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || 'depot-ubuntu-24.04-16' }}
+    runs-on: &runner ubuntu-24.04
     timeout-minutes: 120
     permissions: &permissions
       contents: read
@@ -124,8 +122,8 @@ jobs:
       # check-generate-pruned runs in a step of its own before them.
       GATE_TASKS: lint typecheck build test check-adrs check-moon-graph
     steps:
-      # As in ci.yml: write dirty pages back early, so that Docker's container
-      # creates do not wait for a backlog of several GB on Depot's EC2 runners.
+      # Write dirty pages back early so Docker's container creates do not
+      # wait for a backlog of dirty pages.
       - name: Write dirty pages back early
         run: sudo sysctl -w vm.dirty_background_bytes=67108864
 
@@ -167,10 +165,8 @@ jobs:
           fi
           nohup docker pull --quiet "$image" </dev/null >"$RUNNER_TEMP/postgres-image-pull.log" 2>&1 &
 
-      # As in ci.yml, whose cache entry these jobs share: on Depot runners
-      # they all build through Depot's Go cache (GOCACHEPROG and
-      # DEPOT_CACHE_TOKEN, which turbo passes through), and the module cache
-      # is the same.
+      # Cache Go's build and module caches through GitHub Actions, keyed on
+      # every module's go.sum.
       - &setup-go
         if: ${{ steps.affected.outputs.run == 'true' }}
         uses: actions/setup-go@v6
@@ -231,10 +227,8 @@ jobs:
         with:
           team: ${{ vars.TURBO_TEAM }}
 
-      # Depot runners inject a token for Depot's own turbo cache; with TURBO_API
-      # pointing at Vercel it only produces a failed request per task, and
-      # turbo would still report "Remote caching enabled". Without a Vercel
-      # token the job runs with the local cache alone.
+      # Without a Vercel token, including on fork pull requests, use only
+      # the local cache.
       - &local-cache-only
         name: Use the local cache only when the token exchange failed
         if: ${{ steps.affected.outputs.run == 'true' && steps.remote-cache.outcome != 'success' }}
