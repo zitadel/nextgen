@@ -383,7 +383,9 @@ commit and the next deploy reports no diff.
 Setup refuses with `E_CONFLICT` when the repository already has uncommitted
 work, untracked files included, which `details.untracked` lists separately
 from `details.modified`. The commit covers the project directory, so it can
-only tell its own files from yours when the tree starts clean. Commit or stash
+only tell its own files from yours when the tree starts clean. It never
+commits `.env*` files (other than `.env.example`), `.zitadel/secret` or
+`.zitadel/local/`, whatever their case. Commit or stash
 first, then rerun. Only what `start` leaves is exempt: `.zitadel/local/` and
 the `.gitignore` line that ignores it. A connection under `.zitadel/idps/` is
 yours and is not exempt. During a merge, rebase, cherry-pick, revert or bisect,

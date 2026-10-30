@@ -595,3 +595,13 @@ describe("ensureInitialCommit when git explains at length", () => {
     }
   });
 });
+
+describe("assertCleanWorktree with a directory named like the local server's", () => {
+  it("refuses uncommitted work under it, since only start's own is exempt", async () => {
+    const cwd = await aRepository();
+    await mkdir(join(cwd, ".Zitadel/Local"), { recursive: true });
+    await writeFile(join(cwd, ".Zitadel/Local/notes.md"), "mine\n");
+
+    await expect(assertCleanWorktree(cwd)).rejects.toMatchObject({ code: "E_CONFLICT" });
+  });
+});

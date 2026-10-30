@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { isSecretPath } from "../../../src/lib/secret-paths";
+import { isLocalRuntimePath, isSecretPath } from "../../../src/lib/secret-paths";
+
+describe("isLocalRuntimePath", () => {
+  it.each([
+    [".zitadel/local/admin.json", true],
+    ["apps/web/.zitadel/local", true],
+    [".Zitadel/Local/admin.json", false],
+    [".zitadel/locales/en.json", false],
+  ])("treats %s as the local server's: %s", (path, local) => {
+    expect(isLocalRuntimePath(path)).toBe(local);
+  });
+});
 
 describe("isSecretPath", () => {
   it.each([

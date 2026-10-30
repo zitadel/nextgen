@@ -16,7 +16,12 @@ export function isSecretPath(path: string): boolean {
   return name.startsWith(".env") && name !== ".env.example";
 }
 
-/** Whether `path` is under `.zitadel/local/`, at any depth, where the local server keeps its admin credential and data. */
+/**
+ * Whether `path` is under `.zitadel/local/`, at any depth, where the local server keeps its admin credential and data.
+ *
+ * Matched with its case, since it names the directory `start` writes; on a
+ * case-sensitive filesystem `.Zitadel/Local/` is someone else's.
+ */
 export function isLocalRuntimePath(path: string): boolean {
-  return /(^|\/)\.zitadel\/local(\/|$)/i.test(path);
+  return /(^|\/)\.zitadel\/local(\/|$)/.test(path);
 }
