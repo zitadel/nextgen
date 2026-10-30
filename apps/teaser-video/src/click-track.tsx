@@ -35,8 +35,8 @@ const key =
 const enter: Sound = (t, noise) =>
   t > 0.12
     ? 0
-    : 0.55 * noise() * Math.exp(-t / 0.012) +
-      0.6 * Math.sin(2 * Math.PI * 170 * t) * Math.exp(-t / 0.04);
+    : 0.28 * noise() * Math.exp(-t / 0.012) +
+      0.3 * Math.sin(2 * Math.PI * 170 * t) * Math.exp(-t / 0.04);
 
 // A sine falling from 90 Hz to 45 Hz as it fades: a hit felt more than heard.
 const hit: Sound = (t) =>
@@ -52,18 +52,18 @@ function cues(metronome: boolean): Cue[] {
   const list: Cue[] = [];
   for (const { keys, enter: enterAt } of CLI_KEYS) {
     for (const frame of keys) {
-      list.push({ frame: beats(SECTIONS.cli.from) + frame, sound: key(0.25) });
+      list.push({ frame: beats(SECTIONS.cli.from) + frame, sound: key(0.1) });
     }
     list.push({ frame: beats(SECTIONS.cli.from) + enterAt, sound: enter });
   }
   for (const frame of KEYSTROKES) {
-    list.push({ frame: beats(SECTIONS.coldOpen.from) + frame, sound: key(0.35) });
+    list.push({ frame: beats(SECTIONS.coldOpen.from) + frame, sound: key(0.14) });
   }
   list.push({ frame: beats(SECTIONS.coldOpen.from) + ENTER, sound: enter });
   IDENTIFIERS.forEach(({ keys }, index) => {
     const from = beats(SECTIONS.montage.from + index * IDENTIFIER_BEATS);
     for (const frame of keys) {
-      list.push({ frame: from + frame, sound: key(0.25) });
+      list.push({ frame: from + frame, sound: key(0.1) });
     }
   });
   if (!metronome) {
