@@ -31,20 +31,21 @@ export const SECTIONS = {
   cli: { from: 0, length: 16 },
   coldOpen: { from: 16, length: 8 },
   montage: { from: 24, length: 24 },
-  outro: { from: 48, length: 10 },
+  outro: { from: 48, length: 11 },
 } satisfies Record<string, Section>;
 
 /**
  * The outro's moments, in beats from its start: the call to action holds for
  * a bar, the logo replaces it on the next downbeat and plays for two seconds
- * (four beats), and as its last letter lands everything scrolls up out of the
- * frame as the gradient rises, then fades to black over the last beat.
+ * (four beats), holds for a beat once its last letter lands, and then
+ * everything scrolls up out of the frame as the gradient rises, then fades to
+ * black over the last beat.
  */
 export const OUTRO = {
   logo: 4,
-  scroll: 8,
+  scroll: 9,
   scrollLength: 1.5,
-  black: 9,
+  black: 10,
 };
 
 /**
