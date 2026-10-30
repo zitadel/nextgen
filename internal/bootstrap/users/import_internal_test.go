@@ -133,7 +133,11 @@ func (r schemaRows) statements(t *testing.T) *servicemocks.MockAllStatements {
 			return &domain.JSONSchema{ProjectID: projectID, URL: schemaID}, nil
 		})
 	stmts.EXPECT().ListJSONSchemas(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
-		DoAndReturn(func(context.Context, *database.ListOptions[domain.JSONSchemaField], service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+		DoAndReturn(func(_ context.Context, list *database.ListOptions[domain.JSONSchemaField], _ service.JSONSchemaQueryOptions) (*database.ListResult[*domain.JSONSchema], error) {
+			require.Equal(t, database.And(
+				database.Equal(database.Col(domain.JSONSchemaFieldProjectID), "proj_1"),
+				database.Equal(database.Col(domain.JSONSchemaFieldObjectType), "human-user"),
+			), list.Filter)
 			result := &database.ListResult[*domain.JSONSchema]{}
 			for id := range r {
 				if strings.HasPrefix(id, "sch_") {

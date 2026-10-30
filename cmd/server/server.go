@@ -342,6 +342,9 @@ func run(ctx context.Context, cfg Config, userFiles []string, applyMigrations bo
 		if err := platform.EnsureDeployed(ctx, cfg.Schema.BuiltinPublicBase, build.Date(), consoleHosts[0], projectService, releaseService, deploymentService); err != nil {
 			return fmt.Errorf("failed to deploy the platform project: %w", err)
 		}
+		for _, origin := range consoleHosts[1:] {
+			slog.Info("console origin can preview a project's login but not sign in to the platform project", slog.String("origin", origin))
+		}
 	}
 
 	if err := users.Import(ctx, serviceDBPool, passwordHasher, users.DialectFromConfig(cfg.Database.Raw), builtinBases, userFiles); err != nil {
