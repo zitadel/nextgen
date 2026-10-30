@@ -20,6 +20,9 @@ import (
 // in when the server that made it was built.
 const platformDeployPrefix = "Platform configuration built "
 
+// maxBuildAttempts bounds how often a start builds the platform release.
+const maxBuildAttempts = 3
+
 // EnsureDeployed deploys the platform project the way the CLI deploys any
 // project: the configuration this server ships (the platform user schema, the
 // default login flows and the recommended password policy) is built into one
@@ -50,12 +53,7 @@ func EnsureDeployed(
 	if err != nil {
 		return err
 	}
-	// Replicas that start together race to store the same revisions. The loser's
-	// second build finds what the winner stored.
-	built, err := releases.Build(ctx, bundle)
-	if err != nil {
-		built, err = releases.Build(ctx, bundle)
-	}
+	built, err := buildRelease(ctx, releases, bundle)
 	if err != nil {
 		return fmt.Errorf("build platform release: %w", err)
 	}
@@ -82,6 +80,17 @@ func EnsureDeployed(
 		return fmt.Errorf("deploy platform release: %w", err)
 	}
 	return nil
+}
+
+// buildRelease builds bundle, retrying because replicas that start together race
+// to store the same revisions: a loser's next build finds what the winner stored.
+func buildRelease(ctx context.Context, releases service.ReleaseService, bundle service.BuildReleaseInput) (*service.CreateReleaseOutput, error) {
+	for attempt := 1; ; attempt++ {
+		built, err := releases.Build(ctx, bundle)
+		if err == nil || attempt == maxBuildAttempts {
+			return built, err
+		}
+	}
 }
 
 // deployedByNewerBuild reports whether the newest primary deployment came from
