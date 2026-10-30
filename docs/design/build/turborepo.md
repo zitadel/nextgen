@@ -87,9 +87,9 @@ contributor scripts build through moon, or through turbo with
   those edges and add it to `release-manifest.mjs`.
 - `api#build-release` also depends on `@zitadel/server#test`, which the other
   release builds reach. This finishes the normal console build and its Go
-  readers before any release dist is cleaned. Moon orders this through the
-  serial dependencies of `pack`, `snapshot` and `publish` to avoid a project
-  cycle.
+  readers before any release dist is cleaned. Turbo has no order-only edge,
+  so `pack` and `publish` run the Go tests as well; moon orders them only in
+  `snapshot`, its one release entry point with Go tasks.
 
 ## Inputs and outputs
 
@@ -145,6 +145,8 @@ contributor scripts build through moon, or through turbo with
   the effective host/target/compiler when Go variables are unset, and the
   local server binary stamps Git HEAD, commit date and branch metadata.
   Database tests additionally use `-count=1` to disable Go's result cache.
+  Generation stays cached: go.mod pins its toolchain, and nothing it writes
+  depends on the host or the commit.
 - `moon run workspace:test` probes both real graphs in an isolated fixture:
   source/test invalidation, shared config scope, release ordering and ignored
   dotenv changes. CI runs these tests through each runner's `test` task.

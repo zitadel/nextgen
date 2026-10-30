@@ -309,10 +309,9 @@ edges: the release builds start after `cli#test` (`api#build-release`
 depends on it, the rest reach `api`'s), each depends on the release builds of
 the packages its dev build depends on, and the two UI release builds wait for
 all of them. The console release build also waits for `server#test` before
-rewriting the embedded dist that Go compiles. Moon expresses this through
-the serial dependencies of all three release entrypoints to avoid a project
-cycle. `scripts/task-graph.test.mjs` checks the resulting order in both
-runners. Separate release output directories remain open decision 5; the
+rewriting the embedded dist that Go compiles; in moon, `snapshot` is the only
+release entry point with Go tasks, and its serial dependencies order them.
+`scripts/task-graph.test.mjs` checks the resulting order in both runners. Separate release output directories remain open decision 5; the
 full release order check (`release:check-graph`) still needs its Turbo port.
 
 ## Script ports
@@ -569,9 +568,10 @@ the release graph.
 1. **The release graph.** Moon orders it with serial dependencies and the
    release builds' package edges; turbo's edges reproduce that order for
    `snapshot`, `pack` and `publish`. The console release build waits for the
-   server tests in both runners, checked by the task-graph regression suite.
-   Separate release output directories (decision 5) would also isolate
-   independent runner invocations that currently share a checkout. The full
+   server tests in both runners, checked by the task-graph regression suite;
+   under turbo that edge makes `pack` and `publish` run the Go tests too.
+   Separate release output directories (decision 5) would drop the edge and
+   isolate independent runner invocations that currently share a checkout. The full
    release graph checker still needs its Turbo port before cutover.
 2. **Selection.** `--affected` follows task inputs and task edges only with
    `futureFlags.affectedUsingTaskInputs` (root `turbo.json`);

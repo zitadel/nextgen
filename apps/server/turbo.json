@@ -7,6 +7,8 @@
   // Native Go commands use Go's own compiler/test caches, not runner results:
   // unset GOOS/GOARCH/CGO_ENABLED and the installed compiler are host defaults
   // neither runner hashes. The local binary also stamps the current Git HEAD.
+  // Generation stays cached: go.mod pins its toolchain, and its output does
+  // not depend on the host or the commit.
   "tasks": {
     "go-sources": {
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
@@ -85,7 +87,6 @@
     // packages read mid-graph (config's meta-schemas, api's error responses).
     // Outputs are mirrored by GENERATED_GLOBS in scripts/generated-outputs.mjs.
     "generate": {
-      "cache": false,
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
@@ -118,7 +119,6 @@
       ]
     },
     "check-generate": {
-      "cache": false,
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [
@@ -134,7 +134,6 @@
     // CI runner and rude on a machine someone is working in. CI runs it in
     // place of the plain check.
     "check-generate-pruned": {
-      "cache": false,
       "dependsOn": ["go-sources"],
       "env": ["GOFLAGS", "CGO_ENABLED", "GOOS", "GOARCH"],
       "inputs": [

@@ -19,11 +19,11 @@
     "test": {
       "dependsOn": ["generate"]
     },
-    // Release writes wait for cli:test and server:test, including the normal
-    // console build Go embeds. Every other release build reaches this one,
-    // so no release dist is cleaned while those readers are running. Moon
-    // orders server:test through its release entrypoints' serial deps to
-    // avoid a project cycle.
+    // Every other release build reaches this one, so none cleans a dist while
+    // cli#test or server#test (and the console build it embeds) reads it.
+    // Turbo has no order-only edge, so pack and publish run the Go tests too;
+    // moon orders them in snapshot only. Separate release output (open
+    // decision 5 in docs/design/build/turborepo-migration.md) would drop it.
     "build-release": {
       "dependsOn": ["generate", "@zitadel/cli#test", "@zitadel/server#test"]
     }

@@ -199,6 +199,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
         expect(moonProjects.get(project).tasks[task].options.cache).toBe(false);
       }
     }
+    // Generation depends on neither: go.mod pins its toolchain.
+    const generation = ["generate", "check-generate", "check-generate-pruned"];
+    const { tasks } = JSON.parse(
+      run(turbo, ["run", ...generation, "--filter=@zitadel/server", "--dry=json"]),
+    );
+    for (const task of generation) {
+      const turboTask = tasks.find(({ taskId }) => taskId === `@zitadel/server#${task}`);
+      expect(turboTask.resolvedTaskDefinition.cache, task).toBe(true);
+      expect(moonProjects.get("server").tasks[task].options.cache, task).toBe(true);
+    }
   });
 
   test("release writes wait for the Go readers in both runners", () => {
@@ -219,9 +229,16 @@ describe.sequential("task graph cache and ordering contracts", () => {
       for (const [from, to] of graph.graph.edges) {
         if (ids.has(from) && ids.has(to)) waitsFor.get(ids.get(from)).push(ids.get(to));
       }
+      // Every Go task on the root module resolves the console's embed.
+      const goReaders = [...waitsFor.keys()].filter((id) =>
+        /^server:(?!openapi$|format$)/.test(id),
+      );
+      expect(goReaders.length > 0, entry).toBe(entry === "snapshot");
       for (const id of waitsFor.keys()) {
         if (id.endsWith(":build-release")) {
-          expect(reaches(waitsFor, id, "server:test"), `${entry}: ${id}`).toBe(true);
+          for (const reader of goReaders) {
+            expect(reaches(waitsFor, id, reader), `${entry}: ${id} -> ${reader}`).toBe(true);
+          }
         }
       }
     }

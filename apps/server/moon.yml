@@ -41,6 +41,8 @@ fileGroups:
 
 # Go's own cache accounts for the effective compiler and target defaults.
 # Runner result caches do not; native commands must run when selected.
+# Generation stays cached: go.mod pins its toolchain, and its output does not
+# depend on the host or the commit.
 tasks:
   openapi:
     command: "node scripts/lint-openapi.mjs"
@@ -96,7 +98,6 @@ tasks:
       - "/internal/**/*_enumer.go"
       - "/internal/**/*.mock.go"
     options:
-      cache: false
       runFromWorkspaceRoot: true
       # Generation rewrites files other projects read mid-graph: the JSON
       # meta-schemas (config:sync-schemas) and the error-response YAML
@@ -128,11 +129,10 @@ tasks:
       - "/scripts/dev-process.mjs"
       # Imported at module scope, not only under --prune: GENERATED_GLOBS is
       # what this task's git comparison looks at, so a glob edit that does not
-      # select this task would leave the new pathspecs unchecked.
+      # invalidate here would cache-hit and pass against the old pathspecs.
       - "/scripts/clean-generated.mjs"
       - "/scripts/generated-outputs.mjs"
     options:
-      cache: false
       runFromWorkspaceRoot: true
       mutex: "generated-sources"
 
@@ -152,7 +152,6 @@ tasks:
       - "/scripts/generated-outputs.mjs"
       - "/scripts/dev-process.mjs"
     options:
-      cache: false
       runFromWorkspaceRoot: true
       mutex: "generated-sources"
 

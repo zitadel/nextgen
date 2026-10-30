@@ -9,9 +9,8 @@
   // tests (api's release build depends on them, every other one on api's
   // through its package edges) and then run in parallel on the same package
   // edges as their dev builds, and the two UI release builds wait for all of
-  // them. api#build-release also waits for server#test, so all release writes
-  // wait for the normal console build and its Go readers. Moon expresses this
-  // at the serial release entrypoints to avoid a project cycle.
+  // them. api#build-release also waits for server#test (see
+  // packages/api/turbo.json).
   "tasks": {
     "changesets": {
       "cache": false,

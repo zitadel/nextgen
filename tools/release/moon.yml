@@ -60,13 +60,9 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
-  # The Go tests compile the embedded console. Finish them before release
-  # builds rewrite dist. Turbo puts this edge on api#build-release, which
-  # every release build reaches; Moon needs it here to avoid a project cycle.
   pack:
     command: "node scripts/release.mjs pack"
     deps:
-      - "server:test"
       - "release:build-public-packages"
       - "console:build-release"
     outputs:
@@ -77,6 +73,8 @@ tasks:
       runFromWorkspaceRoot: true
       runInCI: false
 
+  # server:test goes first: the Go tests compile the console dist that
+  # console:build-release rewrites. pack and publish run no Go task.
   snapshot:
     command: "node scripts/release.mjs snapshot"
     deps:
@@ -94,7 +92,6 @@ tasks:
   publish:
     command: "node scripts/release.mjs publish"
     deps:
-      - "server:test"
       - "release:build-public-packages"
       - "console:build-release"
     options:
