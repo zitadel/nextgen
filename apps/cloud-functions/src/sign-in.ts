@@ -16,6 +16,14 @@ export function isFlowWrite(method: string, path: string): boolean {
   return method === "POST" && (path === "/flow" || /^\/flow\/[^/]+\/submit$/.test(path));
 }
 
+/**
+ * A path as the widget spells it: segments of unreserved characters, none
+ * empty, no trailing slash. Every path of the API fits, ids included. The
+ * server routes the path it decodes, so `/%66low` is its `/flow`; any other
+ * spelling is refused before `isFlowWrite` reads it, never guessed at.
+ */
+const PLAIN_PATH = /^(\/[A-Za-z0-9._~-]+)+$/;
+
 /** Headers that describe one hop, never the request itself. */
 const HOP_HEADERS = [
   "connection",
@@ -49,6 +57,13 @@ export async function forwardSignIn(
 ): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.slice(SIGN_IN_PREFIX.length) || "/";
+  if (!PLAIN_PATH.test(path)) {
+    // The server's own answer to a path it does not serve (ADR 076).
+    return Response.json(
+      { code: "req.not_found", message: "No API operation matches this path." },
+      { status: 404 },
+    );
+  }
   if (isFlowWrite(request.method, path)) {
     const { isBot, isVerifiedBot } = await verdict();
     if (isBot && !isVerifiedBot) {

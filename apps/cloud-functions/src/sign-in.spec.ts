@@ -56,6 +56,25 @@ describe("the sign-in widget's calls", () => {
     expect(answer.headers.getSetCookie()).toEqual(["__nextgen_session=new; Path=/"]);
   });
 
+  it.each([
+    "/cloud/zitadel/%66low",
+    "/cloud/zitadel/flow/flw_1/%73ubmit",
+    "/cloud/zitadel/flow/",
+    "/cloud/zitadel//flow",
+  ])("refuses %s, a spelling the server could route to a flow write unchecked", async (path) => {
+    const verdict = vi.fn(human);
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const answer = await forwardSignIn(
+      new Request(`https://cloud.example${path}`, { method: "POST", body: "{}" }),
+      verdict,
+    );
+    expect(answer.status).toBe(404);
+    expect(await answer.json()).toMatchObject({ code: "req.not_found" });
+    expect(verdict).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it("forwards to CLOUD_ZITADEL_URL, not its own origin, when it names the server", async () => {
     // As behind the console's dev proxy, which hands the functions their own host.
     vi.stubEnv("CLOUD_ZITADEL_URL", "http://localhost:8094");
