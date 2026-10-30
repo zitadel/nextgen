@@ -4,9 +4,8 @@ import type { Check, Operation } from "../operation";
 /**
  * Whether anything in the whole repository is uncommitted, not only under the directory.
  *
- * The whole repository, because a release records the commit it was built
- * from: a change anywhere, a code change the config depends on, say, makes
- * that record inexact.
+ * Any change anywhere in the repository counts, including outside the
+ * directory the repository was opened on.
  */
 export class IsDirty implements Operation<boolean> {
   /** Nothing to check. */
