@@ -36,11 +36,19 @@ const identifier = (
   keys: keystrokes(text, seconds(0.05), beats(IDENTIFIER_BEATS) - seconds(0.23), `id-${text}`),
 });
 
-// All four stay in the cold open's dark, without a brand colour, so the change
-// reads as the identifier and the finish of the field, not as a new palette.
+// All four stay in the cold open's dark, each with a muted, deep brand colour
+// on its button, so the change reads as the identifier and the finish of the
+// field, not as a new palette.
+const MUTED = {
+  purple: "#4a2f6b",
+  olive: "#4d5b3a",
+  slate: "#33465c",
+  burgundy: "#6d2f38",
+};
+
 export const IDENTIFIERS: Identifier[] = [
   identifier(
-    { theme: "dark", corners: "soft", headings: "serif" },
+    { theme: "dark", color: MUTED.purple, corners: "soft", headings: "serif" },
     {
       label: "Username",
       type: "text",
@@ -56,7 +64,7 @@ export const IDENTIFIERS: Identifier[] = [
     }`,
   ),
   identifier(
-    { theme: "dark", corners: "sharp", headings: "sans" },
+    { theme: "dark", color: MUTED.olive, corners: "sharp", headings: "sans" },
     {
       label: "Phone",
       type: "tel",
@@ -75,7 +83,7 @@ export const IDENTIFIERS: Identifier[] = [
     }`,
   ),
   identifier(
-    { theme: "dark", corners: "soft", headings: "mono" },
+    { theme: "dark", color: MUTED.slate, corners: "soft", headings: "mono" },
     {
       label: "Employee ID",
       type: "text",
@@ -95,7 +103,7 @@ export const IDENTIFIERS: Identifier[] = [
     }`,
   ),
   identifier(
-    { theme: "dark", corners: "round", headings: "sans" },
+    { theme: "dark", color: MUTED.burgundy, corners: "round", headings: "sans" },
     {
       label: "Customer number",
       type: "text",
