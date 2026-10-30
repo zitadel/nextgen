@@ -85,7 +85,7 @@ for (const method of ["error", "warn"] as const) {
 // against that test's timeout, which a cold start on a busy CI runner outlasts;
 // the tests after it then import the router while this factory still runs,
 // and Vitest hands them the unmocked module (preload on, no screen loaded).
-// Such a spec fails on every run instead, here.
+// The wrapper below fails such a spec on every run instead.
 vi.mock("./router", async (importOriginal) => {
   const importingTest = expect.getState().currentTestName;
   const actual = await importOriginal<typeof import("./router")>();
